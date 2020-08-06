@@ -1,0 +1,9 @@
+*~
+*.txt
+*.bin
+*.o
+*.ppm
+*.csv
+*.bak
+*.traindata
+dpct_output

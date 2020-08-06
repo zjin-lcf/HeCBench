@@ -1,0 +1,4 @@
+
+      //#pragma omp target data map(to: array[0:arrayLength]) map(tofrom: sum)
+      //#pragma omp target teams distribute parallel for thread_limit(threads) 
+
