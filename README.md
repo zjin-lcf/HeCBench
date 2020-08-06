@@ -1,5 +1,5 @@
 # oneAPI Benchmarks
-This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. Intel DPC++ Compatibility Tool can convert a CUDA program to a SYCL program. 
+This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. Intel DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program. 
 
 
 # Experiments
