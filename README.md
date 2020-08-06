@@ -61,7 +61,7 @@ Platform: Intel Xeon E3-1284L with a Gen8 P6300 integrated GPU
 
 | inversek2j | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
-| total enqueue | 1000001 | 100004 | 400008 |
+| total enqueue | 100001 | 100004 | 400008 |
 | host timing(s) | 5 | 3.75 | 41.7 |
 | device timing(s) | 1.93 | 2.65 | 28.7 |
 
