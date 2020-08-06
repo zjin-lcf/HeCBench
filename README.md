@@ -1,10 +1,10 @@
 # oneAPI Benchmarks
-This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. We also use Intel DPC++ Compatibility Tool to convert a CUDA program to a SYCL program.
+This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. Intel DPC++ Compatibility Tool can convert a CUDA program to a SYCL program. 
 
 
 # Experiments
-The performance results were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of OpenCL enqueue API calls. The host timing is the total elapsed time of executing OpenCL API functions on a host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU. 
-
+We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program. The performance results were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of OpenCL enqueue API calls. The host timing is the total elapsed time of executing OpenCL API functions on a host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU.
+ 
 ## Setup
 Software: Intel oneAPI Beta08 Toolkit, Ubuntu 18.04  
 Platform: Intel Xeon E3-1284L with a Gen8 P6300 integrated GPU
