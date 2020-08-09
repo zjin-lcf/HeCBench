@@ -75,5 +75,5 @@ clean:
 edit:
 	vim -p $(source) XSbench_header.h
 
-run:
+run: $(program)
 	./$(program) -s small -m event
