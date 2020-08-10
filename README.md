@@ -3,12 +3,15 @@ This repository contains a collection of data-parallel programs for evaluating o
 
 
 # Experiments
-We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program. The performance results were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of OpenCL enqueue API calls. The host timing is the total elapsed time of executing OpenCL API functions on a host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU. The Plugin Interface is OpenCL.  
+We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program. The performance results below were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of OpenCL enqueue API calls. The host timing is the total elapsed time of executing OpenCL API functions on a host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU. The Plugin Interface is OpenCL.  
  
 ## Setup
 Software: Intel<sup>®</sup> oneAPI Beta08 Toolkit, Ubuntu 18.04  
 Platform 1: Intel<sup>®</sup> Xeon E3-1284L with a Gen8 P6300 integrated GPU  
 Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
+
+## Run
+A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 
 ## Results on Platform 1
 | amgmk | SYCL | DPCT | OpenMP |     
@@ -274,7 +277,7 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
 
 ### chi2
-  The Chi-square 2-df test 
+  The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
