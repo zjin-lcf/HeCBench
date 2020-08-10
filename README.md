@@ -63,6 +63,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 | device timing(ms) | 6.8 | 6.7 | 7.6 |
 
 
+| heat | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 1003 | 1003 | 10029 |
+| host timing(s) | 8.54 | 8.44 | 12.36 |
+| device timing(s) | 7.98 | 7.6 | 8.36 |
+
+
 | inversek2j | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 400008 |
@@ -284,6 +291,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
+
+## heat
+  The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
