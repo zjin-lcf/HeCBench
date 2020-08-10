@@ -195,6 +195,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 | device timing(ms) | 5.8 | 5.8 | 6.8 |
 
 
+| heat | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 1003 | 1003 | 10029 |
+| host timing(s) | 9.79 | 9.75 | 16.1 |
+| device timing(s) | 9.19 | 8.74 | 12.3 |
+
+
 | inversek2j | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 400008 |
