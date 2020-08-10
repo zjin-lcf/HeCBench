@@ -42,7 +42,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.92 | 1.93 | 2.36 |  
 
 
-| black-sholes | SYCL | DPCT | OpenMP | 
+| black-scholes | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 9 |
 | host timing(s) | 0.57 | 1.42 | 4.67 | 
@@ -179,6 +179,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 326 | 327 | 1957 |
 | host timing(s) | 3.01 | 3.22 | 6.26 | 
 | device timing(s) | 2.59 | 2.52 | 2.77 |  
+
+
+| black-scholes | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 2 | 3 | 9 |
+| host timing(s) | 0.71 | 1.42 | 4.57 | 
+| device timing(s) | 0.27 | 0.42 | 1.01 |  
 
 
 | chi2 | SYCL | DPCT | OpenMP | 
