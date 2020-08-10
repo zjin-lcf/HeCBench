@@ -1,4 +1,4 @@
-# oneAPI Benchmarks
+# oneAPI Direct Programming
 This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program. 
 
 
@@ -11,7 +11,7 @@ Platform 1: Intel<sup>®</sup> Xeon E3-1284L with a Gen8 P6300 integrated GPU
 Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 
 ## Run
-A script "run.sh" attempts to run all tests with the OpenCL plugin interface
+A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
 
 ## Results on Platform 1
 | amgmk | SYCL | DPCT | OpenMP |     
