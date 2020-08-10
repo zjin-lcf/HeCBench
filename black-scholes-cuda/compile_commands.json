@@ -1,7 +1,0 @@
-[
-    {
-        "command": "nvcc -c  -std=c++14 -Wall -O3 -o blackScholesAnalyticEngine.o -D__CUDACC__=1 blackScholesAnalyticEngine.cu",
-        "directory": "/home/cc/CUDA-examples/finance-bench/BlackScholesEngine",
-        "file": "/home/cc/CUDA-examples/finance-bench/BlackScholesEngine/blackScholesAnalyticEngine.cu"
-    }
-]
