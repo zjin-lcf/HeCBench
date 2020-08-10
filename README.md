@@ -42,6 +42,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 | device timing(s) | 1.92 | 1.93 | 2.36 |  
 
 
+| black-sholes | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 2 | 3 | 9 |
+| host timing(s) | 0.57 | 1.42 | 4.67 | 
+| device timing(s) | 0.16 | 0.35 | 0.98 |  
+
+
 | chi2 | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 12 |
@@ -282,6 +289,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface
 
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
+
+### black-scholes
+  The Black Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
