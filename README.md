@@ -170,8 +170,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | bezier-surface | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 12 |
-| host timing(s) | 1.94 | 2.1 | 6.04 | 
-| device timing(s) | 1.19 | 1.17 | 2.27 |  
+| host timing(s) | 1.94 | 2.1 | 5.37 | 
+| device timing(s) | 1.19 | 1.17 | 0.81 |  
 
 
 | bitonic-sort | SYCL | DPCT | OpenMP | 
@@ -184,8 +184,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | black-scholes | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 9 |
-| host timing(s) | 0.71 | 1.42 | 4.57 | 
-| device timing(s) | 0.27 | 0.42 | 1.01 |  
+| host timing(s) | 0.71 | 1.42 | 4.49 | 
+| device timing(s) | 0.27 | 0.42 | 0.96 |  
 
 
 | chi2 | SYCL | DPCT | OpenMP | 
@@ -205,7 +205,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | haccmk | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 4 | 11 | 21 |
-| host timing(s) | 0.31 | 0.63 | 3.49 |
+| host timing(s) | 0.31 | 0.63 | 3.42 |
 | device timing(ms) | 5.8 | 5.8 | 6.8 |
 
 
@@ -219,8 +219,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | inversek2j | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 400008 |
-| host timing(s) | 6.45 | 22 | 1211 |
-| device timing(s) | 3.91 | 4.37 | 1181 |
+| host timing(s) | 6.45 | 22 | 50.5 |
+| device timing(s) | 3.91 | 4.37 | 6.1  |
 
 
 | iso2dfd | SYCL | DPCT | OpenMP | 
@@ -228,6 +228,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 1001 | 1004 | 10010 |
 | host timing(s) | 2.77 | 3.29 | 6.42 |
 | device timing(s) | 2.42 | 2.45 | 2.75 |
+
 
 | mandelbrot | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
@@ -267,8 +268,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | particle-diffusion | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 7 | 18 |
-| host timing(s) | 1.14 | 1.49 | 5.05 |
-| device timing(s) | 0.24 | 0.48 | 1.52 |
+| host timing(s) | 1.14 | 1.49 | 4.83 |
+| device timing(s) | 0.24 | 0.48 | 1.32 |
 
 
 | reduction | SYCL | DPCT | OpenMP | 
