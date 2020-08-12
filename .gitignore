@@ -6,4 +6,6 @@
 *.csv
 *.bak
 *.traindata
+*.swp
+*.out
 dpct_output
