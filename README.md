@@ -24,15 +24,15 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | aobench | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 20 | 30 | 85 |
-| host timing(s) | 0.58 | 0.89 | 3.92 | 
+| host timing(s) | 0.58 | 0.89 | 3.71 | 
 | device timing(s) | 0.13 | 0.13 | 0.16 |  
 
 
 | bezier-surface | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 12 |
-| host timing(s) | 1.5 | 1.79 | 5.3 | 
-| device timing(s) | 0.7 | 0.71 | 1.3 |  
+| host timing(s) | 1.5 | 1.79 | 4.47 | 
+| device timing(s) | 0.7 | 0.71 | 0.75 |  
 
 
 | bitonic-sort | SYCL | DPCT | OpenMP | 
@@ -46,7 +46,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 9 |
 | host timing(s) | 0.57 | 1.42 | 4.67 | 
-| device timing(s) | 0.16 | 0.35 | 0.98 |  
+| device timing(s) | 0.16 | 0.35 | 0.95 |  
 
 
 | chi2 | SYCL | DPCT | OpenMP | 
@@ -59,7 +59,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | gamma-correction | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 9 |
-| host timing(s) | 0.27 | 0.66 | 3.6 |
+| host timing(s) | 0.27 | 0.66 | 3.56 |
 | device timing(ms) | 14 | 27 | 73 |
 
 
@@ -80,8 +80,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | inversek2j | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 400008 |
-| host timing(s) | 5 | 3.75 | 41.7 |
-| device timing(s) | 1.93 | 2.65 | 28.7 |
+| host timing(s) | 5 | 3.75 | 16.1 |
+| device timing(s) | 1.93 | 2.65 | 3.85 |
 
 
 | iso2dfd | SYCL | DPCT | OpenMP | 
@@ -142,8 +142,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | sph | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 13512 |
-| host timing(s) | 14.6 | 15.2 | 17.4 |
-| device timing(s) | 14 | 14.1 | 13.3 |
+| host timing(s) | 14.6 | 15.2 | 12.2 |
+| device timing(s) | 14 | 14.1 | 10.9 |
 
 
 | stencil | SYCL | DPCT | OpenMP |

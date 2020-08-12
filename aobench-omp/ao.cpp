@@ -65,9 +65,9 @@ static void vcross(Vec *c, Vec v0, Vec v1)
 #pragma omp declare target
 static void vnormalize(Vec *c)
 {
-  float length = sqrt(vdot((*c), (*c)));
+  float length = sqrtf(vdot((*c), (*c)));
 
-  if (fabs(length) > 1.0e-17f) {
+  if (fabsf(length) > 1.0e-17f) {
     c->x /= length;
     c->y /= length;
     c->z /= length;
@@ -89,7 +89,7 @@ void ray_sphere_intersect(Isect *isect, const Ray *ray, const Sphere *sphere)
   float D = B * B - C;
 
   if (D > 0.0) {
-    float t = -B - sqrt(D);
+    float t = -B - sqrtf(D);
 
     if ((t > 0.0) && (t < isect->t)) {
       isect->t = t;
@@ -202,11 +202,11 @@ void ambient_occlusion(Vec *col, const Isect *isect,
 
   for (j = 0; j < ntheta; j++) {
     for (i = 0; i < nphi; i++) {
-      float theta = sqrt(rng());
+      float theta = sqrtf(rng());
       float phi = 2.0f * M_PI * rng();
-      float x = cos(phi) * theta;
-      float y = sin(phi) * theta;
-      float z = sqrt(1.0f - theta * theta);
+      float x = cosf(phi) * theta;
+      float y = sinf(phi) * theta;
+      float z = sqrtf(1.0f - theta * theta);
 
       // local -> global
       float rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;

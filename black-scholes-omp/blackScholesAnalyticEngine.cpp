@@ -273,7 +273,7 @@ void runBlackScholesAnalyticEngine()
                   blackCalcStruct blackCalc;
                 
                   //initialize the calculator
-                  initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrt(variance), riskFreeDiscount);
+                  initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrtf(variance), riskFreeDiscount);
                 
                   //retrieve the results values
                   float resultVal = getResultVal(blackCalc);

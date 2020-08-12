@@ -23,7 +23,7 @@ void haccmk (
                    map(vx2[0:n], vy2[0:n], vz2[0:n])
 
    {
-    #pragma omp teams distribute parallel for //thread_limit(256)
+    #pragma omp teams distribute parallel for
     for (int i = 0; i < n; i++) {
 
 	const float ma0 = 0.269327f; 
@@ -53,7 +53,7 @@ void haccmk (
 		if ( r2 < fsrrmax ) m = mass[j]; else m = 0.f;
 
 		f = r2 + mp_rsm;
-		f = m * ( 1.f / ( f * sqrt( f ) ) - 
+		f = m * ( 1.f / ( f * sqrtf( f ) ) - 
 				( ma0 + r2*(ma1 + r2*(ma2 + r2*(ma3 + r2*(ma4 + r2*ma5))))));
 
 		xi = xi + f * dxc;

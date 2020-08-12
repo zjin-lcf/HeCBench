@@ -122,12 +122,12 @@ void motion_device(float* particleX, float* particleY,
             particleY[ii] += displacementY;
 
             // Compute distances from particle position to grid point
-            float dX = particleX[ii] - trunc(particleX[ii]);
-            float dY = particleY[ii] - trunc(particleY[ii]);
+            float dX = particleX[ii] - truncf(particleX[ii]);
+            float dY = particleY[ii] - truncf(particleY[ii]);
 
             // Compute grid point indices
-            int iX = floor(particleX[ii]);
-            int iY = floor(particleY[ii]);
+            int iX = floorf(particleX[ii]);
+            int iY = floorf(particleY[ii]);
 
             // Check if particle is still in computation grid
             if ((particleX[ii] < grid_size) &&

@@ -15,7 +15,7 @@
 //device kernel to retrieve the compound factor in interestRate
 float interestRateCompoundFactor(float t, yieldTermStruct currYieldTermStruct)
 {
-	return (exp((currYieldTermStruct.forward)*t));
+	return (expf((currYieldTermStruct.forward)*t));
 }
 
 
@@ -96,7 +96,7 @@ float errorFunct(normalDistStruct normDist, float x)
 		S=ERROR_FUNCT_one+s*(ERROR_FUNCT_sb1+s*(ERROR_FUNCT_sb2+s*(ERROR_FUNCT_sb3+s*(ERROR_FUNCT_sb4+s*(ERROR_FUNCT_sb5+s*(ERROR_FUNCT_sb6+s*ERROR_FUNCT_sb7))))));
 	}
 
-	r = exp( -ax*ax-0.5625 +R/S);
+	r = expf( -ax*ax-0.5625 +R/S);
 	if(x>=0) 
 		return ERROR_FUNCT_one-r/ax; 
 	else 
@@ -148,7 +148,7 @@ void initCumNormDist(normalDistStruct& currCumNormDist)
 //device function to initialize variable in the black calculator
 void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct payoff)
 {
-	blackCalculator.d1 = log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5*blackCalculator.stdDev;
+	blackCalculator.d1 = logf(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5*blackCalculator.stdDev;
 	blackCalculator.d2 = blackCalculator.d1 - blackCalculator.stdDev;
 
 	//initialize the cumulative normal distribution structure

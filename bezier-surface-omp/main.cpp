@@ -186,9 +186,17 @@ inline FLOAT BezierBlend(int k, FLOAT mu, int n) {
         }
     }
     if(k > 0)
+#if DOUBLE_PRECISION
         blend *= pow(mu, (FLOAT)k);
+#else
+        blend *= powf(mu, (FLOAT)k);
+#endif
     if(n - k > 0)
+#if DOUBLE_PRECISION
         blend *= pow(1 - mu, (FLOAT)(n - k));
+#else
+        blend *= powf(1 - mu, (FLOAT)(n - k));
+#endif
     return (blend);
 }
 #pragma omp end declare target

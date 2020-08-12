@@ -207,8 +207,8 @@ int main(int argc, char* argv[])
 	      			float diff_pe_pc_y = pe_y - pc_y;
 	      			float diff_tgt_pc_x = curr_xTargetIn - pc_x;
 	      			float diff_tgt_pc_y = curr_yTargetIn - pc_y;
-	      			float len_diff_pe_pc = sqrt(diff_pe_pc_x * diff_pe_pc_x + diff_pe_pc_y * diff_pe_pc_y);
-	      			float len_diff_tgt_pc = sqrt(diff_tgt_pc_x * diff_tgt_pc_x + diff_tgt_pc_y * diff_tgt_pc_y);
+	      			float len_diff_pe_pc = sqrtf(diff_pe_pc_x * diff_pe_pc_x + diff_pe_pc_y * diff_pe_pc_y);
+	      			float len_diff_tgt_pc = sqrtf(diff_tgt_pc_x * diff_tgt_pc_x + diff_tgt_pc_y * diff_tgt_pc_y);
 	      			float a_x = diff_pe_pc_x / len_diff_pe_pc;
 	      			float a_y = diff_pe_pc_y / len_diff_pe_pc;
 	      			float b_x = diff_tgt_pc_x / len_diff_tgt_pc;
@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
 	      				a_dot_b = 1.f;
 	      			else if (a_dot_b < -1.f)
 	      				a_dot_b = -1.f;
-	      			angle = acos(a_dot_b) * (180.f / PI);
+	      			angle = acosf(a_dot_b) * (180.f / PI);
 	      			// Determine angle direction
 	      			float direction = a_x * b_y - a_y * b_x;
 	      			if (direction < 0.f)
