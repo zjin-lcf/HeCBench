@@ -118,6 +118,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.6 | 2.6 | 2.6 |
 
 
+| mkl-sgemm | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 80001 | 120004 | 80004 |
+| host timing(s) | 5.94 | 7.63 | 4.3 |
+| device timing(s) | 2.3 | 2.33 | 2.27 |
+
+
 | page-rank | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 6 | 11 | 30 |
@@ -334,6 +341,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### md5hash
   The MD5 Hash function (https://github.com/vetter/shoc/)
+
+### mkl-sgemm
+  Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
