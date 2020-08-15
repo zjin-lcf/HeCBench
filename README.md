@@ -265,6 +265,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 5.39 | 5.39 | 5.12 |
 
 
+| mkl-sgemm | SYCL | DPCT | OpenMP | 
+| --- | --- | --- | --- |
+| total enqueue | 20004 | 60007 | 20007 |
+| host timing(s) | 1.63 | 14.8 | 6.7 |
+| device timing(s) | 0.45 | 4.0 | 0.64 |
+
+
 | page-rank | SYCL | DPCT | OpenMP | 
 | --- | --- | --- | --- |
 | total enqueue | 6 | 11 | 30 |
