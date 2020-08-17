@@ -82,9 +82,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 102 | 102 | 1107 |
 | host timing(s) | 1.99 | 2.33 | 5.5 |
 | device timing(s) | 1.65 | 1.68 | 1.89 |
+
+
 | inversek2j | SYCL | DPCT | OpenMP | 
-
-
 | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 400008 |
 | host timing(s) | 5 | 3.75 | 16.1 |
