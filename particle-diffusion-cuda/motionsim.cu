@@ -206,7 +206,7 @@ void motion_device(float* particleX, float* particleY,
 int main(int argc, char* argv[]) {
   // Cell and Particle parameters
   const size_t grid_size = 21;    // Size of square grid
-  const size_t n_particles = 20;  // Number of particles
+  const size_t n_particles = 147456;  // Number of particles
   const float radius = 0.5;       // Cell radius = 0.5*(grid spacing)
 
   // Default number of operations

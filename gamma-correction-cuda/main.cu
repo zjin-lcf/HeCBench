@@ -30,8 +30,8 @@ void gamma_correction(ImgPixel* pixel) {
 
 int main() {
 	// Image size is width x height
-	int width = 2560;
-	int height = 1600;
+	int width = 7680; //2560;
+	int height = 4320; //1600;
 
 	Img<ImgFormat::BMP> image{width, height};
 	ImgFractal fractal{width, height};
