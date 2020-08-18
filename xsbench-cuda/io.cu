@@ -75,7 +75,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		printf("Avg Lookups/s per MPI rank: ");
 		fancy_int(total_lookups / nprocs);
 		#else
-		printf("Total Time Statistics (HIP+OpenCL Init / JIT Compilation + Simulation Kernel)\n");
+		printf("Total Time Statistics (CUDA Init / JIT Compilation + Simulation Kernel)\n");
 		printf("Runtime:               %.3lf seconds\n", runtime);
 		printf("Lookups:               "); fancy_int(lookups);
 		printf("Lookups/s:             ");

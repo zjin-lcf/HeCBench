@@ -8,7 +8,7 @@
 // Following these functions are a number of optimized variants,
 // which each deploy a different combination of optimizations strategies. By
 // default, XSBench will only run the baseline implementation. Optimized variants
-// are not yet implemented in this HIP port.
+// are not yet implemented in this CUDA port.
 ////////////////////////////////////////////////////////////////////////////////////
 __global__ void lookup ( int *num_nucs, double *concs, int*mats, 
 		NuclideGridPoint* nuclide_grid, int* verification,
@@ -75,7 +75,6 @@ __global__ void lookup ( int *num_nucs, double *concs, int*mats,
 }
 
 
-// use HIP namespace to reduce symbol names
 unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int mype, double * kernel_init_time)
 {
 	
@@ -127,7 +126,6 @@ unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int 
 		NuclideGridPoint *nuclide_grid_d = nullptr;
 
 
-		// assign HIP buffer to existing memory
 		//buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
                 cudaMalloc((void**)&num_nucs_d, sizeof(int) * SD.length_num_nucs);
                 cudaMemcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs, cudaMemcpyHostToDevice);
