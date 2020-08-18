@@ -75,7 +75,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		printf("Avg Lookups/s per MPI rank: ");
 		fancy_int(total_lookups / nprocs);
 		#else
-		printf("Total Time Statistics (HIP+OpenCL Init / JIT Compilation + Simulation Kernel)\n");
+		printf("Total Time Statistics (CUDA Init / JIT Compilation + Simulation Kernel)\n");
 		printf("Runtime:               %.3lf seconds\n", runtime);
 		printf("Lookups:               "); fancy_int(lookups);
 		printf("Lookups/s:             ");
@@ -129,7 +129,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            HIP\n");
+	printf("Programming Model:            CUDA\n");
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else

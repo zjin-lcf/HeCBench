@@ -87,7 +87,7 @@ int main( int argc, char* argv[] )
 	}
 	else
 	{
-		printf("History-based simulation not implemented in HIP. Instead,\nuse the event-based method with \"-m event\" argument.\n");
+		printf("History-based simulation not implemented in CUDA. Instead,\nuse the event-based method with \"-m event\" argument.\n");
 		exit(1);
 	}
 
