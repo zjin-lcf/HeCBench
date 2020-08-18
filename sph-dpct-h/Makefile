@@ -1,0 +1,63 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = dpcpp
+OPTIMIZE  = yes
+DEBUG     = no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = sph
+
+build: $(program)
+
+
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): fileio.o fluid.o geometry.o
+	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
+
+fileio.o : fileio.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+fluid.o : fluid.cpp  
+	$(CC) $(CFLAGS) -c $< -o $@
+
+geometry.o : geometry.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) fileio.o fluid.o geometry.o *.csv
+
+run: $(program)
+	./$(program)
+

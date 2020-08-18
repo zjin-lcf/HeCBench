@@ -1,0 +1,526 @@
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+CLIntercept (64-bit) is loading...
+CLintercept file location: /home/cc/opencl-intercept-layer/install/bin/../lib/libOpenCL.so
+CLIntercept URL: https://github.com/intel/opencl-intercept-layer
+CLIntercept git description: v2.2.2-18-g204c386
+CLIntercept git refspec: refs/heads/master
+CLInterecpt git hash: 204c386f6c9ccafeab839d5738c9fcde0ad05744
+CLIntercept optional features:
+    cliloader(supported)
+    cliprof(supported)
+    kernel overrides(supported)
+    ITT tracing(NOT supported)
+    MDAPI(supported)
+CLIntercept environment variable prefix: CLI_
+CLIntercept config file: clintercept.conf
+Read OpenCL file name from user parameters: /opt/intel/oneapi/compiler/latest/linux/lib/libOpenCL.so.1.2.real
+Trying to load dispatch from: /opt/intel/oneapi/compiler/latest/linux/lib/libOpenCL.so.1.2.real
+Couldn't get exported function pointer to: clCreateBufferWithProperties
+Couldn't get exported function pointer to: clCreateImageWithProperties
+Couldn't get exported function pointer to: clSetContextDestructorCallback
+... success!
+Control CallLogging is set to non-default value: true
+Control ReportToStderr is set to non-default value: true
+Control HostPerformanceTiming is set to non-default value: true
+Control DevicePerformanceTiming is set to non-default value: true
+Timer Started!
+... loading complete.
+./gamma-correction
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+CLIntercept (64-bit) is loading...
+CLintercept file location: /home/cc/opencl-intercept-layer/install/bin/../lib/libOpenCL.so
+CLIntercept URL: https://github.com/intel/opencl-intercept-layer
+CLIntercept git description: v2.2.2-18-g204c386
+CLIntercept git refspec: refs/heads/master
+CLInterecpt git hash: 204c386f6c9ccafeab839d5738c9fcde0ad05744
+CLIntercept optional features:
+    cliloader(supported)
+    cliprof(supported)
+    kernel overrides(supported)
+    ITT tracing(NOT supported)
+    MDAPI(supported)
+CLIntercept environment variable prefix: CLI_
+CLIntercept config file: clintercept.conf
+Read OpenCL file name from user parameters: /opt/intel/oneapi/compiler/latest/linux/lib/libOpenCL.so.1.2.real
+Trying to load dispatch from: /opt/intel/oneapi/compiler/latest/linux/lib/libOpenCL.so.1.2.real
+Couldn't get exported function pointer to: clCreateBufferWithProperties
+Couldn't get exported function pointer to: clCreateImageWithProperties
+Couldn't get exported function pointer to: clSetContextDestructorCallback
+... success!
+Control CallLogging is set to non-default value: true
+Control ReportToStderr is set to non-default value: true
+Control HostPerformanceTiming is set to non-default value: true
+Control DevicePerformanceTiming is set to non-default value: true
+Timer Started!
+... loading complete.
+>>>> clGetPlatformIDs
+<<<< clGetPlatformIDs -> CL_SUCCESS
+>>>> clGetPlatformIDs
+<<<< clGetPlatformIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clCreateContext: properties = [ NULL ], num_devices = 1, devices = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ]
+<<<< clCreateContext: returned 0xd46890 -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateCommandQueueWithProperties: context = 0xd46890, device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], properties = [ CL_QUEUE_PROPERTIES = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE ]
+<<<< clCreateCommandQueueWithProperties: returned 0xd3afb0 -> CL_SUCCESS
+>>>> clGetPlatformIDs
+<<<< clGetPlatformIDs -> CL_SUCCESS
+>>>> clGetPlatformIDs
+<<<< clGetPlatformIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_NAME (00000902)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceIDs: platform = [ Intel(R) OpenCL HD Graphics ], device_type = CL_DEVICE_TYPE_ALL (FFFFFFFF)
+<<<< clGetDeviceIDs -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PARENT_DEVICE (00001042)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clCreateContext: properties = [ NULL ], num_devices = 1, devices = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ]
+<<<< clCreateContext: returned 0xd3bb88 -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) FPGA Emulation Platform for OpenCL(TM) ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateCommandQueue: context = 0xd3bb88, device = [ Intel(R) FPGA Emulation Device (CL_DEVICE_TYPE_ACCELERATOR) ], properties = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE (1)
+<<<< clCreateCommandQueue: returned 0xd3e7d8 -> CL_SUCCESS
+>>>> clCreateContext: properties = [ NULL ], num_devices = 1, devices = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ]
+<<<< clCreateContext: returned 0x231bea8 -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateCommandQueueWithProperties: context = 0x231bea8, device = [ Intel(R) Xeon(R) CPU E3-1284L v4 @ 2.90GHz (CL_DEVICE_TYPE_CPU) ], properties = [ CL_QUEUE_PROPERTIES = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE ]
+<<<< clCreateCommandQueueWithProperties: returned 0xd3e168 -> CL_SUCCESS
+>>>> clCreateBuffer: context = 0xd46890, flags = CL_MEM_READ_WRITE (1), size = 16384000, host_ptr = (nil)
+<<<< clCreateBuffer: returned 0x3a232a0 -> CL_SUCCESS
+>>>> clEnqueueWriteBuffer: queue = 0xd3afb0, buffer = 0x3a232a0, non-blocking, offset = 0, cb = 16384000, ptr = 0x7fbc65452010
+<<<< clEnqueueWriteBuffer created event = 0x3a24c60 -> CL_SUCCESS
+>>>> clWaitForEvents: event_list = ( size = 1 )[ 0x3a24c60 ]
+<<<< clWaitForEvents -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_NUM_DEVICES (00001083)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_TYPE (00001000)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_COMPILER_AVAILABLE (00001028)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 65212
+<<<< clCreateProgramWithIL: returned 0x3a27330 -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 2212
+<<<< clCreateProgramWithIL: returned 0x3b164b0 -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3b164b0, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 9820
+<<<< clCreateProgramWithIL: returned 0x3b171b0 -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3b171b0, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 9460
+<<<< clCreateProgramWithIL: returned 0x3b17550 -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3b17550, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 80676
+<<<< clCreateProgramWithIL: returned 0x3b19e30 -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3b19e30, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clGetPlatformInfo: platform = [ Intel(R) OpenCL HD Graphics ], param_name = CL_PLATFORM_VERSION (00000901)
+<<<< clGetPlatformInfo -> CL_SUCCESS
+>>>> clCreateProgramWithIL: context = 0xd46890, length = 80752
+<<<< clCreateProgramWithIL: returned 0x3b1a210 -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3b1a210, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clCompileProgram: program = 0x3a27330, pfn_notify = (nil)
+<<<< clCompileProgram -> CL_SUCCESS
+>>>> clLinkProgram: context = 0xd46890, num_input_programs = 6, pfn_notify = (nil)
+<<<< clLinkProgram: returned 0x3b1a660 -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3a27330
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clCreateKernel: program = 0x3b1a660, kernel_name = _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11
+<<<< clCreateKernel: returned 0x3be6d60 -> CL_SUCCESS
+>>>> clSetKernelArg( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): kernel = 0x3be6d60, index = 0, size = 8, value = 0x3a232a0
+<<<< clSetKernelArg -> CL_SUCCESS
+>>>> clSetKernelArg( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): kernel = 0x3be6d60, index = 1, size = 8, value = 0xfa0000
+<<<< clSetKernelArg -> CL_SUCCESS
+>>>> clSetKernelArg( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): kernel = 0x3be6d60, index = 2, size = 8, value = 0xfa0000
+<<<< clSetKernelArg -> CL_SUCCESS
+>>>> clSetKernelArg( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): kernel = 0x3be6d60, index = 3, size = 8, value = (nil)
+<<<< clSetKernelArg -> CL_SUCCESS
+>>>> clGetKernelInfo( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): param_name = CL_KERNEL_CONTEXT (1193)
+<<<< clGetKernelInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetExtensionFunctionAddressForPlatform: platform = [ Intel(R) OpenCL HD Graphics ], func_name = clHostMemAllocINTEL
+<<<< clGetExtensionFunctionAddressForPlatform: returned 0x7fbc6ae9ea10 -> CL_SUCCESS
+>>>> clSetKernelExecInfo( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): param_name = CL_KERNEL_EXEC_INFO_INDIRECT_HOST_ACCESS_INTEL (00004200)
+<<<< clSetKernelExecInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetExtensionFunctionAddressForPlatform: platform = [ Intel(R) OpenCL HD Graphics ], func_name = clDeviceMemAllocINTEL
+<<<< clGetExtensionFunctionAddressForPlatform: returned 0x7fbc6ae9ef70 -> CL_SUCCESS
+>>>> clSetKernelExecInfo( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): param_name = CL_KERNEL_EXEC_INFO_INDIRECT_DEVICE_ACCESS_INTEL (00004201)
+<<<< clSetKernelExecInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetContextInfo: param_name = CL_CONTEXT_DEVICES (00001081)
+<<<< clGetContextInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_PLATFORM (00001031)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetExtensionFunctionAddressForPlatform: platform = [ Intel(R) OpenCL HD Graphics ], func_name = clSharedMemAllocINTEL
+<<<< clGetExtensionFunctionAddressForPlatform: returned 0x7fbc6ae9f580 -> CL_SUCCESS
+>>>> clSetKernelExecInfo( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): param_name = CL_KERNEL_EXEC_INFO_INDIRECT_SHARED_ACCESS_INTEL (00004202)
+<<<< clSetKernelExecInfo -> CL_SUCCESS
+>>>> clEnqueueNDRangeKernel( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ): queue = 0xd3afb0, kernel = 0x3be6d60, global_work_offset = < 0, 0, 0 >, global_work_size = < 4096000 x 1 x 1 >, local_work_size = < 256 x 1 x 1 >, event_wait_list = ( size = 1 )[ 0x3a24c60 ]
+<<<< clEnqueueNDRangeKernel created event = 0x4a03d90 -> CL_SUCCESS
+>>>> clEnqueueReadBuffer: queue = 0xd3afb0, buffer = 0x3a232a0, non-blocking, offset = 0, cb = 16384000, ptr = 0x7fbc65452010
+<<<< clEnqueueReadBuffer created event = 0x4a54af0 -> CL_SUCCESS
+>>>> clWaitForEvents: event_list = ( size = 1 )[ 0x4a54af0 ]
+<<<< clWaitForEvents -> CL_SUCCESS
+Pass>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_NAME (0000102B)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_NAME (0000102B)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_VERSION (0000102F)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_VERSION (0000102F)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_MAX_WORK_ITEM_SIZES (00001005)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_HOST_UNIFIED_MEMORY (00001035)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_MAX_CLOCK_FREQUENCY (0000100C)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_MAX_COMPUTE_UNITS (00001002)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_MAX_WORK_GROUP_SIZE (00001004)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_GLOBAL_MEM_SIZE (0000101F)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_LOCAL_MEM_SIZE (00001023)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_EXTENSIONS (00001030)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_SUB_GROUP_SIZES_INTEL (00004108)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_SUB_GROUP_SIZES_INTEL (00004108)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+>>>> clGetDeviceInfo: device = [ Intel(R) Gen8 HD Graphics NEO (CL_DEVICE_TYPE_GPU) ], param_name = CL_DEVICE_MAX_WORK_GROUP_SIZE (00001004)
+<<<< clGetDeviceInfo -> CL_SUCCESS
+. Run on Intel(R) Gen8 HD Graphics NEO
+>>>> clWaitForEvents: event_list = ( size = 1 )[ 0x4a54af0 ]
+<<<< clWaitForEvents -> CL_SUCCESS
+>>>> clWaitForEvents: event_list = ( size = 1 )[ 0x4a54af0 ]
+<<<< clWaitForEvents -> CL_SUCCESS
+>>>> clWaitForEvents: event_list = ( size = 1 )[ 0x4a03d90 ]
+<<<< clWaitForEvents -> CL_SUCCESS
+>>>> clReleaseMemObject: [ ref count = 1 ] mem = 0x3a232a0
+<<<< clReleaseMemObject: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseEvent: [ ref count = 1 ] event = 0x3a24c60
+<<<< clReleaseEvent: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseEvent: [ ref count = 1 ] event = 0x4a03d90
+<<<< clReleaseEvent: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseEvent: [ ref count = 1 ] event = 0x4a54af0
+<<<< clReleaseEvent: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseCommandQueue: [ ref count = 1 ] command_queue = 0xd3afb0
+<<<< clReleaseCommandQueue: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseContext: [ ref count = 1 ] context = 0xd46890
+<<<< clReleaseContext: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b164b0
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b171b0
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b17550
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b19e30
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b1a210
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseKernel: [ ref count = 1 ] kernel = 0x3be6d60
+<<<< clReleaseKernel: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseProgram: [ ref count = 1 ] program = 0x3b1a660
+<<<< clReleaseProgram: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseCommandQueue: [ ref count = 1 ] command_queue = 0xd3e7d8
+<<<< clReleaseCommandQueue: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseContext: [ ref count = 1 ] context = 0xd3bb88
+<<<< clReleaseContext: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseCommandQueue: [ ref count = 1 ] command_queue = 0xd3e168
+<<<< clReleaseCommandQueue: [ ref count = 0 ] -> CL_SUCCESS
+>>>> clReleaseContext: [ ref count = 1 ] context = 0x231bea8
+<<<< clReleaseContext: [ ref count = 0 ] -> CL_SUCCESS
+Total Enqueues: 3
+
+
+Host Performance Timing Results:
+
+Total Time (ns): 587078066
+
+                                                                                        Function Name,  Calls,     Time (ns), Time (%),  Average (ns),      Min (ns),      Max (ns)
+                                                                                     clCompileProgram,      6,          1641,    0.00%,           273,           116,           703
+                                                                                       clCreateBuffer,      1,       2994458,    0.51%,       2994458,       2994458,       2994458
+                                                                                 clCreateCommandQueue,      1,         13683,    0.00%,         13683,         13683,         13683
+                                                                   clCreateCommandQueueWithProperties,      2,         12618,    0.00%,          6309,          1696,         10922
+                                                                                      clCreateContext,      3,     325615531,   55.46%,     108538510,          7218,     213476069
+                                                                                       clCreateKernel,      1,          7230,    0.00%,          7230,          7230,          7230
+                                                                                clCreateProgramWithIL,      6,         77328,    0.01%,         12888,          1396,         33548
+clEnqueueNDRangeKernel( _ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11 ),      1,         53733,    0.01%,         53733,         53733,         53733
+                                                                                  clEnqueueReadBuffer,      1,        330828,    0.06%,        330828,        330828,        330828
+                                                                                 clEnqueueWriteBuffer,      1,        585792,    0.10%,        585792,        585792,        585792
+                                                                                     clGetContextInfo,     20,          5522,    0.00%,           276,           144,           928
+                                                                                       clGetDeviceIDs,     24,         10388,    0.00%,           432,           122,          3703
+                                                                                      clGetDeviceInfo,     73,         20918,    0.00%,           286,            89,           829
+                                                             clGetExtensionFunctionAddressForPlatform,      3,          5552,    0.00%,          1850,          1114,          3235
+                                                                                      clGetKernelInfo,      1,           317,    0.00%,           317,           317,           317
+                                                                                     clGetPlatformIDs,      4,      45151417,    7.69%,      11287854,            87,      45151064
+                                                                                    clGetPlatformInfo,     32,         12632,    0.00%,           394,           104,          1293
+                                                                                        clLinkProgram,      1,     208467808,   35.51%,     208467808,     208467808,     208467808
+                                                                                clReleaseCommandQueue,      3,         40522,    0.01%,         13507,          1769,         25088
+                                                                                     clReleaseContext,      3,         17368,    0.00%,          5789,           335,         10126
+                                                                                       clReleaseEvent,      3,          2543,    0.00%,           847,           515,          1450
+                                                                                      clReleaseKernel,      1,          1559,    0.00%,          1559,          1559,          1559
+                                                                                   clReleaseMemObject,      1,        745222,    0.13%,        745222,        745222,        745222
+                                                                                     clReleaseProgram,      7,         63791,    0.01%,          9113,           415,         33805
+                                                                                       clSetKernelArg,      4,          2288,    0.00%,           572,           182,          1544
+                                                                                  clSetKernelExecInfo,      3,          1247,    0.00%,           415,           205,           794
+                                                                                      clWaitForEvents,      5,       2836130,    0.48%,        567226,           689,       1814037
+
+Device Performance Timing Results for Intel(R) Gen8 HD Graphics NEO (48CUs, 1150MHz):
+
+Total Time (ns): 2421200
+
+                                                              Function Name,  Calls,     Time (ns), Time (%),  Average (ns),      Min (ns),      Max (ns)
+_ZTSZZ4mainENKUlRN2cl4sycl7handlerEE84_38clES2_EUlNS0_7nd_itemILi3EEEE92_11,      1,        782000,   32.30%,        782000,        782000,        782000
+                                                        clEnqueueReadBuffer,      1,        757120,   31.27%,        757120,        757120,        757120
+                                                       clEnqueueWriteBuffer,      1,        882080,   36.43%,        882080,        882080,        882080
+CLIntercept is shutting down...
+... shutdown complete.
+CLIntercept is shutting down...
+... shutdown complete.
