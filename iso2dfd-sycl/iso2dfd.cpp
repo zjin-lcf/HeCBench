@@ -253,6 +253,9 @@ int main(int argc, char* argv[]) {
   b_next.set_final_data(nullptr);
   b_prev.set_final_data(nullptr);
 
+  auto global_range = range<2>((nRows+15)/16*16, (nCols+15)/16*16);
+  auto local_range = range<2>(16, 16);
+
   // Iterate over time steps
   for (unsigned int k = 0; k < nIterations; k += 1) {
 
@@ -263,8 +266,6 @@ int main(int argc, char* argv[]) {
         auto next = b_next.get_access<access::mode::read_write>(h);
         auto prev = b_prev.get_access<access::mode::read_write>(h);
         auto vel = b_vel.get_access<access::mode::read>(h);
-        auto global_range = range<2>((nRows+15)/16*16, (nCols+15)/16*16);
-        auto local_range = range<2>(16, 16);
 
         if (k % 2 == 0)
           h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
