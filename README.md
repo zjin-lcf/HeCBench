@@ -56,6 +56,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.19 | 0.23 | 0.35 | 0.92 |
 
 
+| clenergy | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 502 | 502  | 502 | 3011 |
+| host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
+| device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -213,6 +220,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 3 | 3 | 12 |
 | host timing(s) | 0.96 | 1.25 | 1.3 | 4.51 |
 | device timing(s) | 0.19 | 0.31 | 0.28 | 1.03 |
+
+
+| clenergy | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 502 | 502  | 502 | 3011 |
+| host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
+| device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
