@@ -225,8 +225,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | clenergy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 502 | 502  | 502 | 3011 |
-| host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
-| device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
+| host timing(s) | 16.7 | 16.4 | 16.8 | 20.1 |
+| device timing(s) | 15.99 | 15.7 | 15.93 | 15.99  |
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -364,6 +364,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
+
+### clenergy
+  Direct Coulomb summation kernel (http://www.ks.uiuc.edu/Training/Workshop/GPU_Aug2010/resources/clenergy.tar.gz)
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
