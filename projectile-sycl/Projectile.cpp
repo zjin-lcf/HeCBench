@@ -40,7 +40,7 @@ void GpuParallel(queue& q, std::vector<Projectile>& in_vect,
       // Output accessor set to discard write mode.
       auto pObj = bufout_vect.get_access<access::mode::discard_write>(h);
 
-      h.parallel_for(nd_range(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         float proj_angle = obj[i].getangle();
         float proj_vel = obj[i].getvelocity();
