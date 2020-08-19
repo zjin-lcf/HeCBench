@@ -153,6 +153,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.22 | 0.51 | 0.53 | 1.42 |
 
 
+| projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 102 | 102 | 307 | 
+| host timing(s) | 3.0 | 3.4 | 3.5 | 6.5 |
+| device timing(s) | 2.7 | 2.7 | 2.7 | 2.85 |
+
+
 | reduction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 325 | 326 | 326 | 975 |
@@ -320,6 +327,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.24 | 0.48 | 0.41 | 1.32 |
 
 
+| projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 102 | 102 | 307 | 
+| host timing(s) | 2.12 | 2.5 | 2.5 | 5.4 |
+| device timing(s) | 1.75 | 1.75 | 1.74 | 1.82 |
+
+
 | reduction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 325 | 326 | 326 | 975 |
@@ -400,6 +414,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
+
+### projectile
+  Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
 
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
