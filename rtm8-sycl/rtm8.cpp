@@ -107,6 +107,7 @@ int main() {
     }
   }
 
+  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -135,67 +136,58 @@ int main() {
 
   for (int t = 0; t < nt; t++) {
     q.submit([&](handler& cgh) {
-        auto a = a_d.get_access<sycl_read>(cgh);
-        auto next_s = next_s_d.get_access<sycl_read_write>(cgh);
-        auto next_r = next_r_d.get_access<sycl_read_write>(cgh);
-        auto image = image_d.get_access<sycl_write>(cgh);
-        auto current_r = current_r_d.get_access<sycl_read>(cgh);
-        auto current_s = current_s_d.get_access<sycl_read>(cgh);
-        auto vsq = vsq_d.get_access<sycl_read>(cgh);
+      auto a = a_d.get_access<sycl_read>(cgh);
+      auto next_s = next_s_d.get_access<sycl_read_write>(cgh);
+      auto next_r = next_r_d.get_access<sycl_read_write>(cgh);
+      auto image = image_d.get_access<sycl_write>(cgh);
+      auto current_r = current_r_d.get_access<sycl_read>(cgh);
+      auto current_s = current_s_d.get_access<sycl_read>(cgh);
+      auto vsq = vsq_d.get_access<sycl_read>(cgh);
 
-#ifdef NDRANGE
-        cgh.parallel_for<class kernel1>( nd_range<3>(range<3>(nx_pad, ny_pad, nz_pad), range<3>(groupSize,groupSize,1)), [=] (nd_item<3> item) {
-          int x = item.get_global_id(0);
-          int y = item.get_global_id(1);
-          int z = item.get_global_id(2);
-#else 
-          cgh.parallel_for<class kernel1>( nd_range<3>(range<3>(nz_pad, ny_pad, nx_pad), 
-              range<3>(1, groupSize, groupSize)), [=] (nd_item<3> item) {
-            int x = item.get_global_id(2);
-            int y = item.get_global_id(1);
-            int z = item.get_global_id(0);
-#endif
-            float div;
-            if ((4 <= x && x < (nx - 4) ) && (4 <= y && y < (ny - 4)) && (4 <= z && z < (nz - 4))){
-            div =
-            a[0] * current_s[indexTo1D(x,y,z)] +
-            a[1] * (current_s[indexTo1D(x+1,y,z)] + current_s[indexTo1D(x-1,y,z)] +
-              current_s[indexTo1D(x,y+1,z)] + current_s[indexTo1D(x,y-1,z)] +
-              current_s[indexTo1D(x,y,z+1)] + current_s[indexTo1D(x,y,z-1)]) +
-            a[2] * (current_s[indexTo1D(x+2,y,z)] + current_s[indexTo1D(x-2,y,z)] +
-              current_s[indexTo1D(x,y+2,z)] + current_s[indexTo1D(x,y-2,z)] +
-              current_s[indexTo1D(x,y,z+2)] + current_s[indexTo1D(x,y,z-2)]) +
-            a[3] * (current_s[indexTo1D(x+3,y,z)] + current_s[indexTo1D(x-3,y,z)] +
-              current_s[indexTo1D(x,y+3,z)] + current_s[indexTo1D(x,y-3,z)] +
-              current_s[indexTo1D(x,y,z+3)] + current_s[indexTo1D(x,y,z-3)]) +
-            a[4] * (current_s[indexTo1D(x+4,y,z)] + current_s[indexTo1D(x-4,y,z)] +
-              current_s[indexTo1D(x,y+4,z)] + current_s[indexTo1D(x,y-4,z)] +
-              current_s[indexTo1D(x,y,z+4)] + current_s[indexTo1D(x,y,z-4)]);
+      cgh.parallel_for<class kernel1>( nd_range<3>(range<3>(nz_pad, ny_pad, nx_pad), 
+          range<3>(1, groupSize, groupSize)), [=] (nd_item<3> item) {
+        int x = item.get_global_id(2);
+        int y = item.get_global_id(1);
+        int z = item.get_global_id(0);
+        float div;
+        if ((4 <= x && x < (nx - 4) ) && (4 <= y && y < (ny - 4)) && (4 <= z && z < (nz - 4))){
+	  div = a[0] * current_s[indexTo1D(x,y,z)] +
+	  a[1] * (current_s[indexTo1D(x+1,y,z)] + current_s[indexTo1D(x-1,y,z)] +
+	  		current_s[indexTo1D(x,y+1,z)] + current_s[indexTo1D(x,y-1,z)] +
+	  		current_s[indexTo1D(x,y,z+1)] + current_s[indexTo1D(x,y,z-1)]) +
+	  a[2] * (current_s[indexTo1D(x+2,y,z)] + current_s[indexTo1D(x-2,y,z)] +
+	  		current_s[indexTo1D(x,y+2,z)] + current_s[indexTo1D(x,y-2,z)] +
+	  		current_s[indexTo1D(x,y,z+2)] + current_s[indexTo1D(x,y,z-2)]) +
+	  a[3] * (current_s[indexTo1D(x+3,y,z)] + current_s[indexTo1D(x-3,y,z)] +
+	  		current_s[indexTo1D(x,y+3,z)] + current_s[indexTo1D(x,y-3,z)] +
+	  		current_s[indexTo1D(x,y,z+3)] + current_s[indexTo1D(x,y,z-3)]) +
+	  a[4] * (current_s[indexTo1D(x+4,y,z)] + current_s[indexTo1D(x-4,y,z)] +
+	  		current_s[indexTo1D(x,y+4,z)] + current_s[indexTo1D(x,y-4,z)] +
+	  		current_s[indexTo1D(x,y,z+4)] + current_s[indexTo1D(x,y,z-4)]);
 
-          next_s[indexTo1D(x,y,z)] = 2*current_s[indexTo1D(x,y,z)] - next_s[indexTo1D(x,y,z)]
-            + vsq[indexTo1D(x,y,z)]*div;
-          div =
-            a[0] * current_r[indexTo1D(x,y,z)] +
-            a[1] * (current_r[indexTo1D(x+1,y,z)] + current_r[indexTo1D(x-1,y,z)] +
-                current_r[indexTo1D(x,y+1,z)] + current_r[indexTo1D(x,y-1,z)] +
-                current_r[indexTo1D(x,y,z+1)] + current_r[indexTo1D(x,y,z-1)]) +
-            a[2] * (current_r[indexTo1D(x+2,y,z)] + current_r[indexTo1D(x-2,y,z)] +
-                current_r[indexTo1D(x,y+2,z)] + current_r[indexTo1D(x,y-2,z)] +
-                current_r[indexTo1D(x,y,z+2)] + current_r[indexTo1D(x,y,z-2)]) +
-            a[3] * (current_r[indexTo1D(x+3,y,z)] + current_r[indexTo1D(x-3,y,z)] +
-                current_r[indexTo1D(x,y+3,z)] + current_r[indexTo1D(x,y-3,z)] +
-                current_r[indexTo1D(x,y,z+3)] + current_r[indexTo1D(x,y,z-3)]) +
-            a[4] * (current_r[indexTo1D(x+4,y,z)] + current_r[indexTo1D(x-4,y,z)] +
-                current_r[indexTo1D(x,y+4,z)] + current_r[indexTo1D(x,y-4,z)] +
-                current_r[indexTo1D(x,y,z+4)] + current_r[indexTo1D(x,y,z-4)]);
+	  next_s[indexTo1D(x,y,z)] = 2*current_s[indexTo1D(x,y,z)] - next_s[indexTo1D(x,y,z)]
+	  	+ vsq[indexTo1D(x,y,z)]*div;
+	  div = a[0] * current_r[indexTo1D(x,y,z)] +
+	  	a[1] * (current_r[indexTo1D(x+1,y,z)] + current_r[indexTo1D(x-1,y,z)] +
+	  			current_r[indexTo1D(x,y+1,z)] + current_r[indexTo1D(x,y-1,z)] +
+	  			current_r[indexTo1D(x,y,z+1)] + current_r[indexTo1D(x,y,z-1)]) +
+	  	a[2] * (current_r[indexTo1D(x+2,y,z)] + current_r[indexTo1D(x-2,y,z)] +
+	  			current_r[indexTo1D(x,y+2,z)] + current_r[indexTo1D(x,y-2,z)] +
+	  			current_r[indexTo1D(x,y,z+2)] + current_r[indexTo1D(x,y,z-2)]) +
+	  	a[3] * (current_r[indexTo1D(x+3,y,z)] + current_r[indexTo1D(x-3,y,z)] +
+	  			current_r[indexTo1D(x,y+3,z)] + current_r[indexTo1D(x,y-3,z)] +
+	  			current_r[indexTo1D(x,y,z+3)] + current_r[indexTo1D(x,y,z-3)]) +
+	  	a[4] * (current_r[indexTo1D(x+4,y,z)] + current_r[indexTo1D(x-4,y,z)] +
+	  			current_r[indexTo1D(x,y+4,z)] + current_r[indexTo1D(x,y-4,z)] +
+	  			current_r[indexTo1D(x,y,z+4)] + current_r[indexTo1D(x,y,z-4)]);
 
-          next_r[indexTo1D(x,y,z)] = 2 * current_r[indexTo1D(x,y,z)]
-            - next_r[indexTo1D(x,y,z)] + vsq[indexTo1D(x,y,z)] * div;
+	  next_r[indexTo1D(x,y,z)] = 2 * current_r[indexTo1D(x,y,z)]
+	  	- next_r[indexTo1D(x,y,z)] + vsq[indexTo1D(x,y,z)] * div;
 
-          image[indexTo1D(x,y,z)] = next_s[indexTo1D(x,y,z)] * next_r[indexTo1D(x,y,z)];
-            }
-          });
-        });
+	  image[indexTo1D(x,y,z)] = next_s[indexTo1D(x,y,z)] * next_r[indexTo1D(x,y,z)];
+        }
+      });
+    });
   }
   q.submit([&](handler& cgh) {
     auto image_acc = image_d.get_access<sycl_read>(cgh);
@@ -204,6 +196,8 @@ int main() {
   q.wait();
   t1 = mysecond();
   dt = t1 - t0;
+
+  }
 
   t0 = mysecond();
   for (int t = 0; t < nt; t++) {
