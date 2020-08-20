@@ -25,22 +25,22 @@ void GpuParallel( std::vector<Projectile>& in_vect, std::vector<Projectile>& out
   Projectile *obj = in_vect.data();
   Projectile *pObj = out_vect.data();
 
-  //for (int i = 0; i < 100; i++)
-  // Submit Command group function object to the queue
   #pragma omp target data map(to: obj[0:num_elements]) map(from: pObj[0:num_elements])
   {
-    #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
-    for (int i = 0; i < num_elements; i++) {
-      float proj_angle = obj[i].getangle();
-      float proj_vel = obj[i].getvelocity();
-      // for trignometric functions use cl::sycl::sin/cos
-      float sin_value = sinf(proj_angle * kPIValue / 180.0f);
-      float cos_value = cosf(proj_angle * kPIValue / 180.0f);
-      float total_time =fabsf((2 * proj_vel * sin_value)) / kGValue;
-      float max_range = fabsf(proj_vel * total_time * cos_value);
-      float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
-                         kGValue;  // h = v^2 * sin^2theta/2g
-      pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
+    for (int i = 0; i < 100; i++) {
+      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+      for (int i = 0; i < num_elements; i++) {
+        float proj_angle = obj[i].getangle();
+        float proj_vel = obj[i].getvelocity();
+        // for trignometric functions use cl::sycl::sin/cos
+        float sin_value = sinf(proj_angle * kPIValue / 180.0f);
+        float cos_value = cosf(proj_angle * kPIValue / 180.0f);
+        float total_time = fabsf((2 * proj_vel * sin_value)) / kGValue;
+        float max_range = fabsf(proj_vel * total_time * cos_value);
+        float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
+                           kGValue;  // h = v^2 * sin^2theta/2g
+        pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
+      }
     }
   }
 }
