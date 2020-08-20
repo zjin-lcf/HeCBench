@@ -435,15 +435,18 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
 
-### xsbench
-  The nuclear reactor simulation proxy applications in SYCL  
-  (https://github.com/ANL-CESAR/XSBench/tree/master/sycl)
+### rtm8
+  A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
 ### stencil
   1D stencil using shared memory
+
+### xsbench
+  The nuclear reactor simulation proxy applications in SYCL  
+  (https://github.com/ANL-CESAR/XSBench/tree/master/sycl)
 
 
 ## Development Team
