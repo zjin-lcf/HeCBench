@@ -167,6 +167,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1 | 0.95 | 1.0 | 1.13 |
 
 
+| rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 32 | 38 | 38 | 220 |
+| host timing(s) | 4.7 | 4.8 | 5.0 | 8.7 |
+| device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
@@ -339,6 +346,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 325 | 326 | 326 | 975 |
 | host timing(s) | 1.61 | 1.93 | 1.94 | 4.8 |
 | device timing(s) | 1.2 | 1.17 | 1.18 | 1.3 |
+
+
+| rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 32 | 38 | 38 | 220 |
+| host timing(s) | 3.7 | 4.0 | 4.1 | 7.3 |
+| device timing(s) | 3.1 | 3.1 | 3.2 | 3.6 |
 
 
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
