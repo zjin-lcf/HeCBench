@@ -79,6 +79,7 @@ int main() {
   double pts, t0, t1, dt, flops, pt_rate, flop_rate, speedup, memory;
 
   memory = ArraySize*sizeof(float)*6; 
+  pts = nt;
   pts = pts*(nx-8)*(ny-8)*(nz-8);
   flops = 67*pts;
   printf("memory (MB) = %f\n", memory/1e6);
