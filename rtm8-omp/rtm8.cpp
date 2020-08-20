@@ -110,6 +110,7 @@ int main() {
 #pragma omp target data map(to: current_s[0:ArraySize]) \
                         map(to: current_r[0:ArraySize]) \
                         map(to: a[0:5]) \
+                        map(to: vsq[0:ArraySize]) \
                         map(alloc: next_r[0:ArraySize]) \
                         map(alloc: next_s[0:ArraySize]) \
                         map(from: image_gpu[0:ArraySize]) 
