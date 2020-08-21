@@ -201,7 +201,6 @@ int main(int argc, char **argv) {
   init_spins(lattice_b, randvals, nx, ny / 2);
   init_spins(lattice_w, randvals, nx, ny / 2);
 
-  auto t0 = std::chrono::high_resolution_clock::now();
   // Warmup iterations
   printf("Starting warmup...\n");
   for (int i = 0; i < nwarmup; i++) {
@@ -209,6 +208,7 @@ int main(int argc, char **argv) {
   }
 
   printf("Starting trial iterations...\n");
+  auto t0 = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < niters; i++) {
     update( lattice_b, lattice_w, randvals, inv_temp, nx, ny);
     if (i % 1000 == 0) printf("Completed %d/%d iterations...\n", i+1, niters);
@@ -235,9 +235,7 @@ int main(int argc, char **argv) {
     naivesum += lattice_w[i];
   }
   printf("checksum = %lf\n", naivesum);
-#ifndef MKLRAND
   free(randvals);
-#endif
   free(lattice_b);
   free(lattice_w);
   return 0;
