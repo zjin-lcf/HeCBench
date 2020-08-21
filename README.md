@@ -98,6 +98,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.93 | 2.65 | 1.99 | 3.85 |
 
 
+| ising | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 404 | 405 | 405 | 4018 |
+| host timing(s) | 6.2 | 4.4 | 4.3 |  9.9 |
+| device timing(s) | 5.8 | 3.67 | 3.49 | 6.2 |
+
+
 | iso2dfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1001 | 1004 | 1004 | 10010 |
@@ -285,6 +292,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.91 | 4.37 | 3.94 | 6.1  |
 
 
+| ising | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 404 | 405 | 405 | 4018 |
+| host timing(s) | 9.2 | 5.4 | 5.4 |  12.2 |
+| device timing(s) | 8.8 | 4.6 | 4.6 | 8.7 |
+
+
 | iso2dfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1001 | 1004 | 1004 |  10010 |
@@ -424,6 +438,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
+
+### ising
+  Monte Carlo simulations of 2D Ising Model (https://github.com/NVIDIA/ising-gpu/)
 
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
