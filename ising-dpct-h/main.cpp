@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
 
 #ifndef CURAND
   dpct::dpct_memcpy(randvals, randvals_host,
-                                nx * ny / 2 * sizeof(*lattice_w),
+                                nx * ny / 2 * sizeof(float),
                                 dpct::host_to_device);
 #endif
 
