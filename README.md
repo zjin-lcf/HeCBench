@@ -174,6 +174,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
 
 
+| softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 |  507 |
+| host timing(s) | 1.6 | 4.5 | 1.9 | 5.1 |
+| device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
@@ -355,6 +362,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.1 | 3.1 | 3.2 | 3.6 |
 
 
+| softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 |  507 |
+| host timing(s) | 5.3 | 4.6 | 5.7 | 7.4 |
+| device timing(s) | 4.9 | 3.9 | 5.1 | 3.9 |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 | 13512 |
@@ -437,6 +451,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
+
+### softmax
+  The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
