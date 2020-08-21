@@ -171,7 +171,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 102 | 102 |  507 |
 | host timing(s) | 1.6 | 4.5 | 1.9 | 5.1 |
-| device timing(s) | 1.3 | 3.8 | 1.3 | 1.48 |
+| device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
+
+
+| rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 32 | 38 | 38 | 220 |
+| host timing(s) | 4.7 | 4.8 | 5.0 | 8.7 |
+| device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
 
 
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -348,6 +355,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.2 | 1.17 | 1.18 | 1.3 |
 
 
+| rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 32 | 38 | 38 | 220 |
+| host timing(s) | 3.7 | 4.0 | 4.1 | 7.3 |
+| device timing(s) | 3.1 | 3.1 | 3.2 | 3.6 |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 | 13512 |
@@ -428,15 +442,18 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
 
-### xsbench
-  The nuclear reactor simulation proxy applications in SYCL  
-  (https://github.com/ANL-CESAR/XSBench/tree/master/sycl)
+### rtm8
+  A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
 ### stencil
   1D stencil using shared memory
+
+### xsbench
+  The nuclear reactor simulation proxy applications in SYCL  
+  (https://github.com/ANL-CESAR/XSBench/tree/master/sycl)
 
 
 ## Development Team
