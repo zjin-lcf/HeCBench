@@ -95,7 +95,7 @@ void update(queue &q, buffer<signed char,1> &d_lattice_b,
             mkl::rng::philox4x32x10 &rng,
             mkl::rng::uniform<float> &distr,
 #endif
-	    float inv_temp, long long nx, long long ny) {
+	    const float inv_temp, const long long nx, const long long ny) {
 
 
   int blocks = (nx * ny/2 + THREADS - 1) / THREADS * THREADS;
@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
   long long ny = 5120;
   float alpha = 0.1f;
   int nwarmup = 100;
-  int niters = 1000;
+  int niters = 100;
   unsigned long long seed = 1234ULL;
 
   while (1) {
@@ -240,18 +240,16 @@ int main(int argc, char **argv) {
     randvals_host[i] = (float)rand() / (float)RAND_MAX;
 #endif
 
+#ifdef MKLRAND
   buffer<float, 1> d_randvals (nx * ny / 2);
+#else
+  buffer<float, 1> d_randvals (randvals_host, nx * ny / 2);
+#endif
+
   buffer<signed char, 1> d_lattice_b (nx * ny / 2);
   buffer<signed char, 1> d_lattice_w (nx * ny / 2);
 
   int blocks = (nx * ny/2 + THREADS - 1) / THREADS * THREADS ;
-
-#ifndef MKLRAND
-  q.submit([&](handler &cgh) {
-    auto randvals_acc = d_randvals.get_access<sycl_write>(cgh);
-    cgh.copy(randvals_host, randvals_acc);
-  });
-#endif
 
 #ifdef MKLRAND
   mkl::rng::generate(distr, rng, nx * ny / 2, d_randvals);
