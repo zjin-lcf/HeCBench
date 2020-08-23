@@ -256,36 +256,32 @@ int main() {
     const char* result2_filename = "cuda_float_infer_result_2.hpp";
 #endif
 
-
-    init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
-    auto start = std::chrono::steady_clock::now();
-
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
-
-    auto end = std::chrono::steady_clock::now();
-    auto elapsedTime =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+    for (int n = 0; n < 10; n++) {
+      init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
+      auto start = std::chrono::steady_clock::now();
+      lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
+      auto end = std::chrono::steady_clock::now();
+      auto elapsedTime =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
 	
 #ifdef DEBUG
-    dump(work_path, result1_filename, infer1_out);
+      dump(work_path, result1_filename, infer1_out);
 #endif
 
 
-    init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
-
-    start = std::chrono::steady_clock::now();
-
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
-
-    end = std::chrono::steady_clock::now();
-    elapsedTime =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+      init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
+      start = std::chrono::steady_clock::now();
+      lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
+      end = std::chrono::steady_clock::now();
+      elapsedTime =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
 
 #ifdef DEBUG
-    dump(work_path, result2_filename, infer2_out);
+      dump(work_path, result2_filename, infer2_out);
 #endif
+    }
 
     free(sample_input);
     free(infer1_out);

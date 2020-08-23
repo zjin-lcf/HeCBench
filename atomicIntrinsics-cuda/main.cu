@@ -148,7 +148,7 @@ int main(int argc, char **argv)
     int *dOData;
     cudaMalloc((void **) &dOData, memSize);
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 1; i++) {
       // copy host memory to device to initialize to zero
       cudaMemcpy(dOData, gpuData, memSize, cudaMemcpyHostToDevice);
 
