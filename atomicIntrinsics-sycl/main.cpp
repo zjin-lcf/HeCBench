@@ -152,7 +152,7 @@ int main(int argc, char **argv)
   range<1> global_work_size (numBlocks);
   range<1> local_work_size (numThreads);
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     q.submit([&](handler &h) {
       auto d = dOData.get_access<sycl_write>(h);
       h.copy(gpuData, d);

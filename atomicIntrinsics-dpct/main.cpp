@@ -150,7 +150,7 @@ int main(int argc, char **argv)
     int *dOData;
     dOData = (int *)sycl::malloc_device(memSize, q_ct1);
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 1; i++) {
       // copy host memory to device to initialize to zero
         q_ct1.memcpy(dOData, gpuData, memSize).wait();
 
