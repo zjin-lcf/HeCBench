@@ -111,9 +111,13 @@ void  lstm_n5(
 {
 
 #pragma omp target map(to: x[0:N*SAMPLE_TEST_LEN], \
-                           inW[0:20], intW[0:100], intB[0:20], outW[0:5], outB[0:1]) \
+                           inW[0:20], \
+                           intW[0:100], \
+                           intB[0:20], \
+                           outW[0:5], \
+                           outB[0:1]) \
                    map(from: y[0:N*SAMPLE_TEST_LEN])
-#pragma omp teams distribute parallel for thread_limit(WGS)
+  #pragma omp teams distribute parallel for thread_limit(WGS)
   for (int gid = 0; gid < N; gid++) {
 
 				    int t,i,j;
@@ -174,8 +178,6 @@ void  lstm_n5(
 
 int main() {
 
-    int i, j, k;
-
     float* sample_input = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
     float* infer1_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
     float* infer2_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
@@ -192,35 +194,31 @@ int main() {
     const char* result2_filename = "omp_float_infer_result_2.hpp";
 #endif
 
-    init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
-    auto start = std::chrono::steady_clock::now();
-
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
-
-    auto end = std::chrono::steady_clock::now();
-    auto elapsedTime =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+    for (int n = 0; n < 10; n++) {
+      init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
+      auto start = std::chrono::steady_clock::now();
+      lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
+      auto end = std::chrono::steady_clock::now();
+      auto elapsedTime =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
 	
 #ifdef DEBUG
-    dump(work_path, result1_filename, infer1_out);
+      dump(work_path, result1_filename, infer1_out);
 #endif
 
-
-    init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
-
-    start = std::chrono::steady_clock::now();
-
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
-
-    end = std::chrono::steady_clock::now();
-    elapsedTime =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+      init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
+      start = std::chrono::steady_clock::now();
+      lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
+      end = std::chrono::steady_clock::now();
+      elapsedTime =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
 
 #ifdef DEBUG
-    dump(work_path, result2_filename, infer2_out);
+      dump(work_path, result2_filename, infer2_out);
 #endif
+    }
 
     free(sample_input);
     free(infer1_out);
