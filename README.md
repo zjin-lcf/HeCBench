@@ -28,6 +28,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.14 | 0.14 | 0.14 | 0.16 |  
 
 
+| atomicIntrinsics | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 3 | 3 | 3 | NA |
+| host timing(s) | 9.3 | 9.7 | 9.7 | NA | 
+| device timing(s) | 9.1 | 9.1 | 9.1 | NA |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 |
@@ -61,6 +68,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 502 | 502  | 502 | 3011 |
 | host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
 | device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
+
+
+| clink | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 40 | 160  | 160 | 205 |
+| host timing(s) | 19.5 | 20.4 | 24.3 | 25.1 |
+| device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -222,6 +236,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.27 | 0.27 | 0.27 | 0.31 |  
 
 
+| atomicIntrinsics | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 3 | 3 | 3 | NA |
+| host timing(s) | 1.0 | 1.37 | 1.35 | NA | 
+| device timing(s) | 0.73 | 0.73 | 0.73 | NA |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 | 
@@ -255,6 +276,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 502 | 502  | 502 | 3011 |
 | host timing(s) | 16.7 | 16.4 | 16.8 | 20.1 |
 | device timing(s) | 15.99 | 15.7 | 15.93 | 15.99  |
+
+
+| clink | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 40 | 160  | 160 | 205 |
+| host timing(s) | 22.6 | 24.2 | 25.4 | 30.4 |
+| device timing(s) | 19.2 | 19.8 | 20.7 | 24.7  |
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -409,6 +437,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### aobench
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
+### atomicIntrinsics
+  Atomic add, subtract, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
 
@@ -423,6 +454,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### clenergy
   Direct Coulomb summation kernel (http://www.ks.uiuc.edu/Training/Workshop/GPU_Aug2010/resources/clenergy.tar.gz)
+
+### clink
+  Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
