@@ -181,6 +181,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.7 | 2.7 | 2.7 | 2.85 |
 
 
+| randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 4 | 4 | 4 | 21 |
+| host timing(s) | 2.6 | 2.9 | 2.9 | 7.1 | 
+| device timing(s) | 2 | 2.1 | 2.0 | 3.3 |
+
+
 | reduction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 325 | 326 | 326 | 975 |
@@ -390,6 +397,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.75 | 1.75 | 1.74 | 1.82 |
 
 
+| randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 4 | 4 | 4 | 21 |
+| host timing(s) | 1.94 | 2.2 | 2.3 | 6.4 | 
+| device timing(s) | 1.45 | 1.45 | 1.45 | 2.8 |
+
+
 | reduction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 325 | 326 | 326 | 975 |
@@ -496,6 +510,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
+
+### randomAccess
+  Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
 
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
