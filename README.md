@@ -139,6 +139,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.7 | 8.68 | 8.44 | 9.56 |
 
 
+| matrix-rotate | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 705 | 
+| host timing(s) | 1.58 | 0.63 | 2.04 | 11.2 |
+| device timing(s) | 1.33 | 1.62 | 1.37 | 6.65 |
+
+
 | md | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1002 | 1002 | 1002 | 8008 |
@@ -355,6 +362,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.44 | 7.09 | 7.1 | 9.95 |
 
 
+| matrix-rotate | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 705 | 
+| host timing(s) | 8.7 | 3.4 | 9.13 | 16.9 |
+| device timing(s) | 8.39 | 8.42 | 8.43 | 13.0 |
+
+
 | md | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1002 | 1002 | 1002 | 8008 |
@@ -495,6 +509,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
+
+### matrix-rotate
+  In-place matrix rotation
 
 ### md
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
