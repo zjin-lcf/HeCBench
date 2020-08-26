@@ -59,8 +59,8 @@ int main() {
       auto src = d_input.get_access<sycl_read>(h);
       auto dest = d_output.get_access<sycl_discard_write>(h);
       h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
-        int i = item.get_global_id(0);
-	if (i >= numSlice) return;
+        int i = item.get_global_id(0); 
+        if (i >= numSlice) return;
         float max_ = src[i * sliceSize];
         for (int j = 0; j < sliceSize; j++) {
           max_ = cl::sycl::max(max_, src[i * sliceSize + j]);
