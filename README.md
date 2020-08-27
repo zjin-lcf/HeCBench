@@ -160,6 +160,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.6 | 2.6 | 2.8 | 2.6 |
 
 
+| memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 131072 | 131072 | 131072 | 131072 |
+| host timing(s) | 10.4 | 10.9 | 10.6 | 2.4 |
+| device timing(s) | 1.3 | 1.6 | 1.3 | 1.7 |
+
+
 | mkl-sgemm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 80001 | 120004 | 80004 | 80004 |
@@ -383,6 +390,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 5.39 | 5.39 | 5.39 | 5.12 |
 
 
+| memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 131072 | 131072 | 131072 | 131072 |
+| host timing(s) | 36.7 | 38.6 | 37.3 | 1.94 |
+| device timing(s) | 1.49 | 1.86 | 1.49 | 1.13 |
+
+
 | mkl-sgemm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 20004 | 60007 | 20007 | 20007 |
@@ -518,6 +532,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### md5hash
   The MD5 Hash function (https://github.com/vetter/shoc/)
+
+### memcpy
+  Memory copy from a host to a device
 
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
