@@ -15,7 +15,7 @@ void reverse (int* d, const int len, sycl::nd_item<3> item_ct1, int *s)
 
 int main() {
   const int len = 256;
-  const int iteration = 1 << 16;
+  const int iteration = 1 << 20;
   int d[len];
   for (int i = 0; i < len; i++) d[i] = i;
 

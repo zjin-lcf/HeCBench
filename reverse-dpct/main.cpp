@@ -16,7 +16,7 @@ int main() {
   dpct::device_ext &dev_ct1 = dpct::get_current_device();
   sycl::queue &q_ct1 = dev_ct1.default_queue();
   const int len = 256;
-  const int iteration = 1 << 16;
+  const int iteration = 1 << 20;
   int d[len];
   for (int i = 0; i < len; i++) d[i] = i;
 
