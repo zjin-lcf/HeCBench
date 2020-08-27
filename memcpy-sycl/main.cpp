@@ -23,7 +23,7 @@
 #include "common.h"
 
 #define NUM_SIZE 16
-#define NUM_ITER (1 << 16)
+#define NUM_ITER (1 << 13)
 
 void setup(size_t *size) {
   for (int i = 0; i < NUM_SIZE; i++) {
@@ -61,9 +61,9 @@ int main() {
 
     size_t len = size[i] / sizeof(int);
     buffer<int, 1> Ad (len);
+
     clock_t start, end;
     start = clock();
-
     for (int j = 0; j < NUM_ITER; j++) {
       q.submit([&](handler &h) {
         auto Ad_acc = Ad.get_access<sycl_write>(h);
@@ -72,6 +72,7 @@ int main() {
       q.wait();
     }
     end = clock();
+
     double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     std::cout << "Copy " << size[i] << " btyes from host to device takes " 
       << uS <<  " us" << std::endl;

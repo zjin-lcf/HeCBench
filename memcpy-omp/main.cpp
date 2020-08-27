@@ -22,7 +22,7 @@
 #include <time.h>
 
 #define NUM_SIZE 16
-#define NUM_ITER (1 << 16)
+#define NUM_ITER (1 << 13)
 
 void setup(size_t *size) {
   for (int i = 0; i < NUM_SIZE; i++) {
@@ -52,6 +52,7 @@ int main() {
 
     size_t len = size[i] / sizeof(int);
 
+    double uS;
     clock_t start, end;
 
     #pragma omp target enter data map(alloc: A[0:len])
@@ -61,8 +62,8 @@ int main() {
         #pragma omp target update to (A[0:len])
       }
       end = clock();
+      uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     }
-    double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     #pragma omp target exit data map(delete: A[0:len])
 
     std::cout << "Copy " << size[i] << " btyes from host to device takes " 
