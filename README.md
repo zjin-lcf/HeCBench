@@ -209,6 +209,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1 | 0.95 | 1.0 | 1.13 |
 
 
+| reverse | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1048578 | 1048579 | 1048579 | 1048584 |
+| host timing(s) | 33.4 | 27.1 | 74.9 | 43.3 |
+| device timing(s) | 2.3 | 2.44 | 1.47 | 4.14 |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -439,6 +446,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.2 | 1.17 | 1.18 | 1.3 |
 
 
+| reverse | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1048578 | 1048579 | 1048579 | 1048584 |
+| host timing(s) | 31.3 | 28.9 | 57 | 173 |
+| device timing(s) | 3.1 | 3.3 | 1.94 | 3.5 |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -534,7 +548,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   The MD5 Hash function (https://github.com/vetter/shoc/)
 
 ### memcpy
-  Memory copy from a host to a device
+  A benchmark for memory copy from a host to a device
 
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
@@ -550,6 +564,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
+
+### reverse
+   Reverse an input array of size 256 using shared memory
 
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
