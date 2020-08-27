@@ -89,7 +89,6 @@ computeGold(int *gpuData, const int len)
 
     for (int i = 0; i < len; ++i)
     {
-        // 9th element should be 1
         val &= (2 * i + 7);
     }
 
@@ -102,7 +101,6 @@ computeGold(int *gpuData, const int len)
 
     for (int i = 0; i < len; ++i)
     {
-        // 10th element should be 0xff
         val |= (1 << i);
     }
 
@@ -115,7 +113,6 @@ computeGold(int *gpuData, const int len)
 
     for (int i = 0; i < len; ++i)
     {
-        // 11th element should be 0xff
         val ^= i;
     }
 
