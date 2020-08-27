@@ -492,10 +492,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
-## heat
+### heat
   The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
 
-## heat2d
+### heat2d
   Discreet 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
 
 ### inversek2j
