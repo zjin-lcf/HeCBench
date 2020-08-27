@@ -4,7 +4,7 @@
 #include <cuda.h>
 
 #define NUM_SIZE 16
-#define NUM_ITER (1 << 16)
+#define NUM_ITER (1 << 13)
 
 void setup(size_t *size) {
   for (int i = 0; i < NUM_SIZE; i++) {
