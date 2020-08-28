@@ -167,6 +167,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.3 | 1.6 | 1.3 | 1.7 |
 
 
+| mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2049 |  2050 |  2050 | 6151 | 
+| host timing(s) | 5.1 | 5.5 | 5.6 | 9.6 |
+| device timing(s) | 4.8 | 4.8 | 4.8 | 5.8 |
+
+
 | mkl-sgemm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 80001 | 120004 | 80004 | 80004 |
@@ -404,6 +411,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.49 | 1.86 | 1.49 | 1.13 |
 
 
+| mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2049 |  2050 |  2050 | 6151 | 
+| host timing(s) | 8.2 | 8.6 | 8.2 | 11.5 |
+| device timing(s) | 7.52 | 7.5 | 7.47 | 7.56 |
+
+
 | mkl-sgemm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 20004 | 60007 | 20007 | 20007 |
@@ -549,6 +563,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### memcpy
   A benchmark for memory copy from a host to a device
+
+### mixbench
+  A read-only version of mixbench (https://github.com/ekondis/mixbench)
 
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
