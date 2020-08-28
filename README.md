@@ -508,7 +508,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
 ### atomicIntrinsics
-  Atomic add, subtract, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+  Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
