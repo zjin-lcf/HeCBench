@@ -1,7 +1,10 @@
 /** GPU Laplace solver using optimized red-black Gauss–Seidel with SOR solver
  *
+ * \author Kyle E. Niemeyer
+ * \date 09/21/2012
+ *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
- * on GPU using SYCL with the red-black Gauss–Seidel with sucessive overrelaxation
+ * on GPU using CUDA with the red-black Gauss–Seidel with sucessive overrelaxation
  * (SOR) that has been "optimized". This means that the red and black kernels 
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
@@ -14,8 +17,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
 #include "timer.h"
-#include "common.h"
+
+// CUDA libraries
+#include <cuda.h>
 
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 1024
@@ -102,6 +108,89 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/** Function to update temperature for red cells
+ * 
+ * \param[in]			aP					array of self coefficients
+ * \param[in]			aW					array of west neighbor coefficients
+ * \param[in]			aE					array of east neighbor coefficients
+ * \param[in]			aS					array of south neighbor coefficients
+ * \param[in]			aN					array of north neighbor coefficients
+ * \param[in]			b						right-hand side array
+ * \param[in]			temp_black	temperatures of black cells, constant in this function
+ * \param[inout]	temp_red		temperatures of red cells
+ * \param[out]		bl_norm_L2	array with residual information for blocks
+ */
+__global__ void red_kernel (const Real * aP, const Real * aW, const Real * aE,
+    const Real * aS, const Real * aN, const Real * b,
+    const Real * temp_black, Real * temp_red,
+    Real * norm_L2)
+{	
+  int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
+  int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
+
+  int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
+  int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
+
+  Real temp_old = temp_red[ind_red];
+
+  Real res = b[ind]
+    + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
+        + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
+        + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
+        + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
+
+  Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+
+  temp_red[ind_red] = temp_new;
+  res = temp_new - temp_old;
+
+  norm_L2[ind_red] = res * res;
+
+} // end red_kernel
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** Function to update temperature for black cells
+ * 
+ * \param[in]			aP					array of self coefficients
+ * \param[in]			aW					array of west neighbor coefficients
+ * \param[in]			aE					array of east neighbor coefficients
+ * \param[in]			aS					array of south neighbor coefficients
+ * \param[in]			aN					array of north neighbor coefficients
+ * \param[in]			b						right-hand side array
+ * \param[in]			temp_red		temperatures of red cells, constant in this function
+ * \param[inout]	temp_black	temperatures of black cells
+ * \param[out]		bl_norm_L2	array with residual information for blocks
+ */
+__global__ void black_kernel (const Real * aP, const Real * aW, const Real * aE,
+    const Real * aS, const Real * aN, const Real * b,
+    const Real * temp_red, Real * temp_black, 
+    Real * norm_L2)
+{
+  int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
+  int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
+
+  int ind_black = col * ((NUM >> 1) + 2) + row;  				// local (black) index
+  int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1);	// global index
+
+  Real temp_old = temp_black[ind_black];
+
+  Real res = b[ind]
+    + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
+        + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
+        + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
+        + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
+
+  Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+
+  temp_black[ind_black] = temp_new;
+  res = temp_new - temp_old;
+
+  norm_L2[ind_black] = res * res;
+} // end black_kernel
+
+///////////////////////////////////////////////////////////////////////////////
+
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
  * 
  * Contains iteration loop for red-black Gauss-Seidel with SOR GPU kernels
@@ -164,6 +253,10 @@ int main (void) {
     temp_black[i] = ZERO;
   }
 
+  // block and grid dimensions
+  dim3 dimBlock (BLOCK_SIZE, 1);
+  dim3 dimGrid (NUM / (2 * BLOCK_SIZE), NUM);
+
   // residual
   Real *bl_norm_L2;
 
@@ -178,118 +271,57 @@ int main (void) {
   printf("Problem size: %d x %d \n", NUM, NUM);
 
   StartTimer();
-  
-  {
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
 
-  buffer<Real, 1> aP_d (aP, size);
-  buffer<Real, 1> aW_d (aW, size);
-  buffer<Real, 1> aE_d (aE, size);
-  buffer<Real, 1> aS_d (aS, size);
-  buffer<Real, 1> aN_d (aN, size);
-  buffer<Real, 1> b_d (b, size);
-  buffer<Real, 1> temp_red_d (temp_red, size_temp);
-  buffer<Real, 1> temp_black_d (temp_black, size_temp);
-  buffer<Real, 1> bl_norm_L2_d (bl_norm_L2, size_norm);
-  bl_norm_L2_d.set_final_data(nullptr);
+  // allocate device memory
+  Real *aP_d, *aW_d, *aE_d, *aS_d, *aN_d, *b_d;
+  Real *temp_red_d;
+  Real *temp_black_d;
 
-  auto global_range = range<2>(NUM, NUM/2); 
-  auto local_range = range<2>(1, BLOCK_SIZE);
+  cudaMalloc ((void**) &aP_d, size * sizeof(Real));
+  cudaMalloc ((void**) &aW_d, size * sizeof(Real));
+  cudaMalloc ((void**) &aE_d, size * sizeof(Real));
+  cudaMalloc ((void**) &aS_d, size * sizeof(Real));
+  cudaMalloc ((void**) &aN_d, size * sizeof(Real));
+  cudaMalloc ((void**) &b_d, size * sizeof(Real));
+  cudaMalloc ((void**) &temp_red_d, size_temp * sizeof(Real));
+  cudaMalloc ((void**) &temp_black_d, size_temp * sizeof(Real));
 
+  // copy to device memory
+  cudaMemcpy (aP_d, aP, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (aW_d, aW, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (aE_d, aE, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (aS_d, aS, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (aN_d, aN, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (b_d, b, size * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (temp_red_d, temp_red, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
+  cudaMemcpy (temp_black_d, temp_black, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
+
+
+  // residual
+  Real *bl_norm_L2_d;	
+  cudaMalloc ((void**) &bl_norm_L2_d, size_norm * sizeof(Real));
+  cudaMemcpy (bl_norm_L2_d, bl_norm_L2, size_norm * sizeof(Real), cudaMemcpyHostToDevice);
+
+  // iteration loop
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
 
-    q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read_write>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
+    red_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_black_d, temp_red_d, bl_norm_L2_d);
 
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
-        int row = 1 + item.get_global_id(1);
-        int col = 1 + item.get_global_id(0);
-        int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
-
-        Real temp_old = temp_red[ind_red];
-        Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
-
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-
-        temp_red[ind_red] = temp_new;
-        res = temp_new - temp_old;
-
-        bl_norm_L2[ind_red] = res * res;
-      });
-    });
-
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+    // transfer residual value(s) back to CPU
+    cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
 
     // add red cell contributions to residual
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
 
-    q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read_write>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
-
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
-        int row = 1 + item.get_global_id(1);
-        int col = 1 + item.get_global_id(0);
-        int ind_black = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);	// global index
-
-        Real temp_old = temp_black[ind_black];
-        Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
-
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-
-        temp_black[ind_black] = temp_new;
-        res = temp_new - temp_old;
-
-        bl_norm_L2[ind_black] = res * res;
-      });
-    });
-
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+    black_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_red_d, temp_black_d, bl_norm_L2_d);
 
     // transfer residual value(s) back to CPU and 
     // add black cell contributions to residual
+    cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
@@ -306,7 +338,9 @@ int main (void) {
     break;
   }
 
-  }
+  // transfer final temperature values back
+  cudaMemcpy (temp_red, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
+  cudaMemcpy (temp_black, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
 
   double runtime = GetTimer();
 
@@ -330,17 +364,29 @@ int main (void) {
         if ((row + col) % 2 == 0) {
           // even, so red cell
           int ind = col * num_rows + (row + (col % 2)) / 2;
-          fprintf(pfile, "red: %f\t%f\t%f\n", x_pos, y_pos, temp_red[ind]);
+          fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_red[ind]);
         } else {
           // odd, so black cell
           int ind = col * num_rows + (row + ((col + 1) % 2)) / 2;
-          fprintf(pfile, "black: %f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
+          fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
         }	
       }
       fprintf(pfile, "\n");
     }
   }
   fclose(pfile);
+
+  // free device memory
+  cudaFree(aP_d);
+  cudaFree(aW_d);
+  cudaFree(aE_d);
+  cudaFree(aS_d);
+  cudaFree(aN_d);
+  cudaFree(b_d);
+  cudaFree(temp_red_d);
+  cudaFree(temp_black_d);
+  cudaFree(bl_norm_L2_d);
+
 
   free(aP);
   free(aW);
