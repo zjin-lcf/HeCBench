@@ -1,7 +1,7 @@
 /** GPU Laplace solver using optimized red-black Gauss–Seidel with SOR solver
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
- * on GPU using SYCL with the red-black Gauss–Seidel with sucessive overrelaxation
+ * on GPU using OpenMP with the red-black Gauss–Seidel with sucessive overrelaxation
  * (SOR) that has been "optimized". This means that the red and black kernels 
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
 #include "timer.h"
-#include "common.h"
 
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 1024
@@ -178,52 +178,24 @@ int main (void) {
   printf("Problem size: %d x %d \n", NUM, NUM);
 
   StartTimer();
-  
-  {
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
 
-  buffer<Real, 1> aP_d (aP, size);
-  buffer<Real, 1> aW_d (aW, size);
-  buffer<Real, 1> aE_d (aE, size);
-  buffer<Real, 1> aS_d (aS, size);
-  buffer<Real, 1> aN_d (aN, size);
-  buffer<Real, 1> b_d (b, size);
-  buffer<Real, 1> temp_red_d (temp_red, size_temp);
-  buffer<Real, 1> temp_black_d (temp_black, size_temp);
-  buffer<Real, 1> bl_norm_L2_d (bl_norm_L2, size_norm);
-  bl_norm_L2_d.set_final_data(nullptr);
-
-  auto global_range = range<2>(NUM, NUM/2); 
-  auto local_range = range<2>(1, BLOCK_SIZE);
-
+  // iteration loop
+#pragma omp target enter data map(to: aP[0:size], \
+    aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
+    temp_red[0:size_temp], temp_black[0:size_temp], bl_norm_L2[0:size_norm])
+{
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
 
-    q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read_write>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
-
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
-        int row = 1 + item.get_global_id(1);
-        int col = 1 + item.get_global_id(0);
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int row = 1; row <= NUM/2; row++) {
+      for (int col = 1; col <= NUM; col++) {
         int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
         int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
 
         Real temp_old = temp_red[ind_red];
+
         Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
               + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
               + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
@@ -235,39 +207,23 @@ int main (void) {
         res = temp_new - temp_old;
 
         bl_norm_L2[ind_red] = res * res;
-      });
-    });
-
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+      }
+    }
+    #pragma omp target update from (bl_norm_L2[0:size_norm])
 
     // add red cell contributions to residual
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
 
-    q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read_write>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
-
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
-        int row = 1 + item.get_global_id(1);
-        int col = 1 + item.get_global_id(0);
-        int ind_black = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);	// global index
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int row = 1; row <= NUM/2; row++) {
+      for (int col = 1; col <= NUM; col++) {
+        int ind_black = col * ((NUM >> 1) + 2) + row;  				// local (black) index
+        int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1);	// global index
 
         Real temp_old = temp_black[ind_black];
+
         Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
               + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
               + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
@@ -279,14 +235,9 @@ int main (void) {
         res = temp_new - temp_old;
 
         bl_norm_L2[ind_black] = res * res;
-      });
-    });
-
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+      }
+    }
+    #pragma omp target update from (bl_norm_L2[0:size_norm])
 
     // transfer residual value(s) back to CPU and 
     // add black cell contributions to residual
@@ -305,8 +256,9 @@ int main (void) {
     }	
     break;
   }
-
-  }
+}
+  // transfer final temperature values back
+#pragma omp target exit data map(from: temp_red[0:size_temp], temp_black[0:size_temp])
 
   double runtime = GetTimer();
 
