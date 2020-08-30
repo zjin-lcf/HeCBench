@@ -220,8 +220,8 @@ int main (void) {
       h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
-        int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
+        int ind_red = col * ((NUM >> 1) + 2) + row;
+        int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);
 
         Real temp_old = temp_red[ind_red];
         Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
@@ -264,8 +264,8 @@ int main (void) {
       h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
-        int ind_black = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);	// global index
+        int ind_black = col * ((NUM >> 1) + 2) + row;
+        int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);
 
         Real temp_old = temp_black[ind_black];
         Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
@@ -303,7 +303,6 @@ int main (void) {
     if (norm_L2 < tol) {
       break;
     }	
-    break;
   }
 
   }

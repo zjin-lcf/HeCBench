@@ -254,7 +254,6 @@ int main (void) {
     if (norm_L2 < tol) {
       break;
     }	
-    break;
   }
 }
   // transfer final temperature values back
