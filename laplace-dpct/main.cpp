@@ -338,7 +338,6 @@ int main(void) {
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
-    printf("%f\n", norm_L2);
 
         q_ct1.submit([&](sycl::handler &cgh) {
             auto dpct_global_range = dimGrid * dimBlock;
@@ -362,7 +361,6 @@ int main(void) {
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
-    printf("%f\n", norm_L2);
 
     // calculate residual
         norm_L2 = sqrt(norm_L2 / ((Real)size));
@@ -373,7 +371,6 @@ int main(void) {
     if (norm_L2 < tol) {
       break;
     }	
-    break;
   }
 
   // transfer final temperature values back
