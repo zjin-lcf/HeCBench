@@ -125,6 +125,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 2.18 | 2.5 | 2.6 |  5.87 |
 | device timing(s) | 1.91 | 1.94 | 1.92 | 2.1 |
 
+
+| laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 108546 | 108555 | 108555  | NA |
+| host timing(s) | 54 | 52 | 56 | NA |
+| device timing(s) | 47 | 47 | 47 | NA |
+
+
 | mandelbrot | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 303 | 404 | 404 | 611 |
@@ -228,6 +236,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 32 | 38 | 38 | 220 |
 | host timing(s) | 4.7 | 4.8 | 5.0 | 8.7 |
 | device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
+
+
+| scan | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 100001 | 10002 | 10002 | 200007 |
+| host timing(s) | 3.4 | 2.9 | 3.8 | 10.3 |
+| device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
 
 
 | softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -369,6 +384,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.42 | 2.45 | 2.45 | 2.75 |
 
 
+| laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 108546 | 108555 | 108555  | NA |
+| host timing(s) | 153 | 116 | 153 | NA |
+| device timing(s) | 65 | 63 | 65 | NA |
+
+
 | mandelbrot | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 303 | 404 | 404 | 611 |
@@ -474,6 +496,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.1 | 3.1 | 3.2 | 3.6 |
 
 
+| scan | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 100001 | 10002 | 10002 | 200007 |
+| host timing(s) | 34 | 33 | 31 | 50.3 |
+| device timing(s) | 0.79 | 1.28 | 0.93 | 2.6 |
+
+
 | softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 102 | 102 |  507 |
@@ -549,6 +578,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
+### laplace
+  Laplace solver using red-black Gauss–Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+
 ### matrix-mul
   Single-precision floating-point matrix multiply
 
@@ -587,6 +619,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
+
+### scan
+  A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
