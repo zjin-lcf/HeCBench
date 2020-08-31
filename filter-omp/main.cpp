@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <omp.h>
 
-#define NUM_ELEMS 10000000
+#define NUM_ELEMS 100000000
 #define NUM_THREADS_PER_BLOCK 256
 
 
@@ -14,6 +14,7 @@ int main(int argc, char **argv) {
   filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * NUM_ELEMS));
 
   // Generate input data.
+  srand(2);
   for (int i = 0; i < NUM_ELEMS; i++) {
     data_to_filter[i] = rand() % 20;
   }
@@ -86,4 +87,5 @@ int main(int argc, char **argv) {
   free(data_to_filter);
   free(filtered_data);
   free(host_filtered_data);
+  return 0;
 }

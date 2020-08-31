@@ -12,7 +12,7 @@
 #include <cstdio>
 #include "common.h"
 
-#define NUM_ELEMS 10000000
+#define NUM_ELEMS 100000000
 #define NUM_THREADS_PER_BLOCK 256
 
 
@@ -20,7 +20,7 @@
 int main(int argc, char **argv) {
   int nres = 0;
   int *data_to_filter = reinterpret_cast<int *>(malloc(sizeof(int) * NUM_ELEMS));
-  int *filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * nres));
+  int *filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * NUM_ELEMS));
 
   // Generate input data.
   srand(2);
