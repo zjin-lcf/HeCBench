@@ -126,6 +126,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.91 | 1.94 | 1.92 | 2.1 |
 
 
+| keccaktreehash | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 24 | 27 | 27 | 62 |
+| host timing(s) | 0.95 | 1.33 | 1.36 |  17.8 |
+| device timing(s) | 0.57 | 0.58 | 0.57 | 14.1 |
+
+
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 108546 | 108555 | 108555  | NA |
@@ -384,6 +391,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.42 | 2.45 | 2.45 | 2.75 |
 
 
+| keccaktreehash | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 24 | 27 | 27 | 62 |
+| host timing(s) | 1.36 | 1.67 | 1.78 |  17.2 |
+| device timing(s) | 0.92 | 0.96 | 0.93 | 13.7 |
+
+
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 108546 | 108555 | 108555  | NA |
@@ -578,8 +592,11 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
+### keccaktreehash 
+  Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
+
 ### laplace
-  Laplace solver using red-black Gauss–Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+  Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
