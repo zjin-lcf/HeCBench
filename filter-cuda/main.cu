@@ -10,9 +10,10 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <cuda.h>
 
-#define NUM_ELEMS 10000000
+#define NUM_ELEMS 100000000
 #define NUM_THREADS_PER_BLOCK 256
 
 __global__ 
@@ -57,6 +58,7 @@ int main(int argc, char **argv) {
   data_to_filter = reinterpret_cast<int *>(malloc(sizeof(int) * NUM_ELEMS));
 
   // Generate input data.
+  srand(2);
   for (int i = 0; i < NUM_ELEMS; i++) {
     data_to_filter[i] = rand() % 20;
   }
