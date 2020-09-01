@@ -77,6 +77,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
 
 
+| filter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 3 | 5 | 5 | 11 |
+| host timing(s) | 0.62 | 0.92 | 0.98 | 6.4 |
+| device timing(ms) | 85 | 147 | 142 |  2711 |
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -342,6 +349,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 19.2 | 19.8 | 20.7 | 24.7  |
 
 
+| filter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 3 | 5 | 5 | 11 |
+| host timing(s) | 0.62 | 0.87 | 0.90 | 8.4 |
+| device timing(ms) | 61 | 104 | 95 |  4869 |
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -573,6 +587,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
+
+### filter
+  Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
 
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
