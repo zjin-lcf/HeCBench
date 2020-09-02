@@ -19,12 +19,9 @@
 // This agreement shall be governed in all respects by the laws of the State of California and
 // by the laws of the United States of America.
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
-#include <math.h>
-#include <cuda.h>
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "options.h"
 #include "scoped_ptrs.h"
 using namespace aocl_utils;
@@ -69,8 +66,8 @@ double sampleNormal()
   double u = ((double) rand() / (RAND_MAX)) * 2 - 1;     
   double v = ((double) rand() / (RAND_MAX)) * 2 - 1;     
   double r = u * u + v * v;     
-  if (r == 0 || r > 1) return sampleNormal();     
-  double c = sqrt(-2 * log(r) / r);     
+  if (r == 0 || r > 1) return sampleNormal();
+  double c = sqrt(-2 * log(r) / r);
   return u * c; 
 } 
 
@@ -254,7 +251,7 @@ void runOnCPU()
 }
 
 
-  __device__
+  
 ulong mulfp( ulong weight, uint freq )
 {
   uint part1 = weight & 0xFFFFF;         // lower 24-bits of weight
@@ -266,13 +263,15 @@ ulong mulfp( ulong weight, uint freq )
   return (ulong)res1 + (((ulong)res2) << 24);
 }
 
-__global__ void compute ( const uint*  docWordFrequencies_dimm1, 
+void compute ( const uint*  docWordFrequencies_dimm1, 
                           const uint*  docWordFrequencies_dimm2,
                           const ulong*  profileWeights_dimm1,
                           const ulong*  profileWeights_dimm2,
                           const uint*  isWordInProfileHash,
                                 uint*  profileScorePerGroup_highbits_dimm1,
-                                uint*  profileScorePerGroup_lowbits_dimm2 )
+                                uint*  profileScorePerGroup_lowbits_dimm2 ,
+                                sycl::nd_item<3> item_ct1,
+                                ulong *partial)
 {
   uint curr_entry[MANUAL_VECTOR];
   uint word_id[MANUAL_VECTOR];
@@ -282,9 +281,8 @@ __global__ void compute ( const uint*  docWordFrequencies_dimm1,
   bool is_end[MANUAL_VECTOR];
   bool make_access[MANUAL_VECTOR];
 
-  __shared__ ulong partial[NUM_THREADS_PER_WG/MANUAL_VECTOR];
-
-  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int gid = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+            item_ct1.get_local_id(2);
 
   ulong sum = 0;
   //#pragma unroll
@@ -317,24 +315,29 @@ __global__ void compute ( const uint*  docWordFrequencies_dimm1,
     }
   }
 
-  partial[threadIdx.x] = sum;
-  __syncthreads();
+  partial[item_ct1.get_local_id(2)] = sum;
+  item_ct1.barrier();
 
-  if (threadIdx.x == 0) {
-    ulong4 res= *(ulong4*)&partial[0];
-    ulong4 res2= *(ulong4*)&partial[4];
-    ulong final_result = res.x + res.y + res.z + res.w + res2.x + res2.y + res2.z + res2.w;
-    profileScorePerGroup_highbits_dimm1[blockIdx.x] = (uint) (final_result >> 32); 
-    profileScorePerGroup_lowbits_dimm2[blockIdx.x] = (uint) (final_result & 0xFFFFFFFF); 
+  if (item_ct1.get_local_id(2) == 0) {
+    sycl::ulong4 res = *(sycl::ulong4 *)&partial[0];
+    sycl::ulong4 res2 = *(sycl::ulong4 *)&partial[4];
+    ulong final_result = res.x() + res.y() + res.z() + res.w() + res2.x() +
+                         res2.y() + res2.z() + res2.w();
+    profileScorePerGroup_highbits_dimm1[item_ct1.get_group(2)] =
+        (uint)(final_result >> 32);
+    profileScorePerGroup_lowbits_dimm2[item_ct1.get_group(2)] =
+        (uint)(final_result & 0xFFFFFFFF);
   }
 }
 
-__global__ void reduction( const ulong*  docInfo,
+void reduction( const ulong*  docInfo,
                            const uint*   partial_highbits_dimm1,
                            const uint*   partial_lowbits_dimm2,
-                                 ulong*  result)
+                                 ulong*  result,
+                                 sycl::nd_item<3> item_ct1)
 {
-  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int gid = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+            item_ct1.get_local_id(2);
   ulong info = docInfo[gid];
   unsigned start = info >> 32;
   unsigned end = info & 0xFFFFFFFF;
@@ -352,6 +355,8 @@ __global__ void reduction( const ulong*  docInfo,
 
 int main(int argc, char** argv)
 {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   Options options(argc, argv);
   // Optional argument to specify the problem size.
   if(options.has("n")) {
@@ -381,43 +386,132 @@ int main(int argc, char** argv)
   ulong* d_docInfo;
   ulong* d_profileScore;
 
-  cudaMalloc((void**)&d_docWordFrequencies_dimm1, sizeof(uint) * total_doc_size/2);
-  cudaMalloc((void**)&d_docWordFrequencies_dimm2, sizeof(uint) * total_doc_size/2);
-  cudaMalloc((void**)&d_partialSums_dimm1, sizeof(uint) * total_doc_size/(2*block_size));
-  cudaMalloc((void**)&d_partialSums_dimm2, sizeof(uint) * total_doc_size/(2*block_size));
-  cudaMalloc((void**)&d_profileWeights_dimm1, sizeof(ulong) * (1L << 24));
-  cudaMalloc((void**)&d_profileWeights_dimm2, sizeof(ulong) * (1L << 24));
-  cudaMalloc((void**)&d_isWordInProfileHash, sizeof(uint) * (1L << BLOOM_SIZE));
-  cudaMalloc((void**)&d_docInfo, sizeof(ulong) * total_num_docs);
-  cudaMalloc((void**)&d_profileScore, sizeof(ulong) * total_num_docs);
+  dpct::dpct_malloc((void **)&d_docWordFrequencies_dimm1,
+                    sizeof(uint) * total_doc_size / 2);
+  dpct::dpct_malloc((void **)&d_docWordFrequencies_dimm2,
+                    sizeof(uint) * total_doc_size / 2);
+  dpct::dpct_malloc((void **)&d_partialSums_dimm1,
+                    sizeof(uint) * total_doc_size / (2 * block_size));
+  dpct::dpct_malloc((void **)&d_partialSums_dimm2,
+                    sizeof(uint) * total_doc_size / (2 * block_size));
+  dpct::dpct_malloc((void **)&d_profileWeights_dimm1,
+                    sizeof(ulong) * (1L << 24));
+  dpct::dpct_malloc((void **)&d_profileWeights_dimm2,
+                    sizeof(ulong) * (1L << 24));
+  dpct::dpct_malloc((void **)&d_isWordInProfileHash,
+                    sizeof(uint) * (1L << BLOOM_SIZE));
+  dpct::dpct_malloc((void **)&d_docInfo, sizeof(ulong) * total_num_docs);
+  dpct::dpct_malloc((void **)&d_profileScore, sizeof(ulong) * total_num_docs);
 
-  cudaMemcpy(d_docWordFrequencies_dimm1, h_docWordFrequencies_dimm1, sizeof(uint) * total_doc_size/2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_docWordFrequencies_dimm2, h_docWordFrequencies_dimm2, sizeof(uint) * total_doc_size/2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_profileWeights_dimm1, h_profileWeights, sizeof(ulong) * (1L << 24), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_profileWeights_dimm2, h_profileWeights, sizeof(ulong) * (1L << 24), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_isWordInProfileHash, h_isWordInProfileHash, sizeof(uint) * (1L << BLOOM_SIZE), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_docInfo, h_docInfo, sizeof(ulong) * total_num_docs, cudaMemcpyHostToDevice);
-
+  dpct::dpct_memcpy(d_docWordFrequencies_dimm1, h_docWordFrequencies_dimm1,
+                    sizeof(uint) * total_doc_size / 2, dpct::host_to_device);
+  dpct::dpct_memcpy(d_docWordFrequencies_dimm2, h_docWordFrequencies_dimm2,
+                    sizeof(uint) * total_doc_size / 2, dpct::host_to_device);
+  dpct::dpct_memcpy(d_profileWeights_dimm1, h_profileWeights,
+                    sizeof(ulong) * (1L << 24), dpct::host_to_device);
+  dpct::dpct_memcpy(d_profileWeights_dimm2, h_profileWeights,
+                    sizeof(ulong) * (1L << 24), dpct::host_to_device);
+  dpct::dpct_memcpy(d_isWordInProfileHash, h_isWordInProfileHash,
+                    sizeof(uint) * (1L << BLOOM_SIZE), dpct::host_to_device);
+  dpct::dpct_memcpy(d_docInfo, h_docInfo, sizeof(ulong) * total_num_docs,
+                    dpct::host_to_device);
 
   const double start_time = getCurrentTimestamp();
 
   for (int i=0; i<100; i++) {
-    compute<<<global_size, local_size>>>(
-        d_docWordFrequencies_dimm1,
-        d_docWordFrequencies_dimm2, 
-        d_profileWeights_dimm1,
-        d_profileWeights_dimm2,
-        d_isWordInProfileHash,
-        d_partialSums_dimm1,
-        d_partialSums_dimm2);
+    {
+      dpct::buffer_t d_docWordFrequencies_dimm1_buf_ct0 =
+          dpct::get_buffer(d_docWordFrequencies_dimm1);
+      dpct::buffer_t d_docWordFrequencies_dimm2_buf_ct1 =
+          dpct::get_buffer(d_docWordFrequencies_dimm2);
+      dpct::buffer_t d_profileWeights_dimm1_buf_ct2 =
+          dpct::get_buffer(d_profileWeights_dimm1);
+      dpct::buffer_t d_profileWeights_dimm2_buf_ct3 =
+          dpct::get_buffer(d_profileWeights_dimm2);
+      dpct::buffer_t d_isWordInProfileHash_buf_ct4 =
+          dpct::get_buffer(d_isWordInProfileHash);
+      dpct::buffer_t d_partialSums_dimm1_buf_ct5 =
+          dpct::get_buffer(d_partialSums_dimm1);
+      dpct::buffer_t d_partialSums_dimm2_buf_ct6 =
+          dpct::get_buffer(d_partialSums_dimm2);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        sycl::accessor<ulong, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            partial_acc_ct1(
+                sycl::range<1>(8 /*NUM_THREADS_PER_WG/MANUAL_VECTOR*/), cgh);
+        auto d_docWordFrequencies_dimm1_acc_ct0 =
+            d_docWordFrequencies_dimm1_buf_ct0
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_docWordFrequencies_dimm2_acc_ct1 =
+            d_docWordFrequencies_dimm2_buf_ct1
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_profileWeights_dimm1_acc_ct2 =
+            d_profileWeights_dimm1_buf_ct2
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_profileWeights_dimm2_acc_ct3 =
+            d_profileWeights_dimm2_buf_ct3
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_isWordInProfileHash_acc_ct4 =
+            d_isWordInProfileHash_buf_ct4
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_partialSums_dimm1_acc_ct5 =
+            d_partialSums_dimm1_buf_ct5
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_partialSums_dimm2_acc_ct6 =
+            d_partialSums_dimm2_buf_ct6
+                .get_access<sycl::access::mode::read_write>(cgh);
 
-    reduction<<<global_size_reduction, local_size_reduction>>>(
-        d_docInfo, 
-        d_partialSums_dimm1,
-        d_partialSums_dimm2,
-        d_profileScore);
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(1, 1, global_size) *
+                                  sycl::range<3>(1, 1, local_size),
+                              sycl::range<3>(1, 1, local_size)),
+            [=](sycl::nd_item<3> item_ct1) {
+              compute((const uint *)(&d_docWordFrequencies_dimm1_acc_ct0[0]),
+                      (const uint *)(&d_docWordFrequencies_dimm2_acc_ct1[0]),
+                      (const ulong *)(&d_profileWeights_dimm1_acc_ct2[0]),
+                      (const ulong *)(&d_profileWeights_dimm2_acc_ct3[0]),
+                      (const uint *)(&d_isWordInProfileHash_acc_ct4[0]),
+                      (uint *)(&d_partialSums_dimm1_acc_ct5[0]),
+                      (uint *)(&d_partialSums_dimm2_acc_ct6[0]), item_ct1,
+                      partial_acc_ct1.get_pointer());
+            });
+      });
+    }
+
+    {
+      dpct::buffer_t d_docInfo_buf_ct0 = dpct::get_buffer(d_docInfo);
+      dpct::buffer_t d_partialSums_dimm1_buf_ct1 =
+          dpct::get_buffer(d_partialSums_dimm1);
+      dpct::buffer_t d_partialSums_dimm2_buf_ct2 =
+          dpct::get_buffer(d_partialSums_dimm2);
+      dpct::buffer_t d_profileScore_buf_ct3 = dpct::get_buffer(d_profileScore);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        auto d_docInfo_acc_ct0 =
+            d_docInfo_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+        auto d_partialSums_dimm1_acc_ct1 =
+            d_partialSums_dimm1_buf_ct1
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_partialSums_dimm2_acc_ct2 =
+            d_partialSums_dimm2_buf_ct2
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_profileScore_acc_ct3 =
+            d_profileScore_buf_ct3.get_access<sycl::access::mode::read_write>(
+                cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(1, 1, global_size_reduction) *
+                                  sycl::range<3>(1, 1, local_size_reduction),
+                              sycl::range<3>(1, 1, local_size_reduction)),
+            [=](sycl::nd_item<3> item_ct1) {
+              reduction((const ulong *)(&d_docInfo_acc_ct0[0]),
+                        (const uint *)(&d_partialSums_dimm1_acc_ct1[0]),
+                        (const uint *)(&d_partialSums_dimm2_acc_ct2[0]),
+                        (ulong *)(&d_profileScore_acc_ct3[0]), item_ct1);
+            });
+      });
+    }
   }
-  cudaDeviceSynchronize();
+  dev_ct1.queues_wait_and_throw();
 
   const double end_time = getCurrentTimestamp();
   double kernelExecutionTime = (end_time - start_time)/100;
@@ -425,16 +519,17 @@ int main(int argc, char** argv)
   printf("Kernel Time = %f ms (averaged over 100 times)\n", kernelExecutionTime * 1000.0f );
   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
 
-  cudaMemcpy(h_profileScore, d_profileScore, sizeof(ulong) * total_num_docs, cudaMemcpyDeviceToHost);
-  cudaFree(d_docWordFrequencies_dimm1);
-  cudaFree(d_docWordFrequencies_dimm2);
-  cudaFree(d_partialSums_dimm1);
-  cudaFree(d_partialSums_dimm2);
-  cudaFree(d_profileWeights_dimm1);
-  cudaFree(d_profileWeights_dimm2);
-  cudaFree(d_isWordInProfileHash);
-  cudaFree(d_docInfo);
-  cudaFree(d_profileScore);
+  dpct::dpct_memcpy(h_profileScore, d_profileScore,
+                    sizeof(ulong) * total_num_docs, dpct::device_to_host);
+  dpct::dpct_free(d_docWordFrequencies_dimm1);
+  dpct::dpct_free(d_docWordFrequencies_dimm2);
+  dpct::dpct_free(d_partialSums_dimm1);
+  dpct::dpct_free(d_partialSums_dimm2);
+  dpct::dpct_free(d_profileWeights_dimm1);
+  dpct::dpct_free(d_profileWeights_dimm2);
+  dpct::dpct_free(d_isWordInProfileHash);
+  dpct::dpct_free(d_docInfo);
+  dpct::dpct_free(d_profileScore);
   printf("Done\n");
 
   runOnCPU();

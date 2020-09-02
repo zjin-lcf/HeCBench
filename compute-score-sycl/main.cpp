@@ -300,8 +300,6 @@ int main(int argc, char** argv)
    buffer<ulong, 1> d_profileWeights_dimm1 (h_profileWeights, 1L << 24);
    buffer<ulong, 1> d_profileWeights_dimm2 (h_profileWeights, 1L << 24);
    buffer<uint, 1> d_isWordInProfileHash(h_isWordInProfileHash, 1L << BLOOM_SIZE);
-   buffer<uint, 1> d_startingDocID(h_startingDocID, total_num_docs);
-   //buffer<uint, 1> d_numItemsPerThread(h_numItemsPerThread, total_num_docs);
    buffer<ulong, 1> d_docInfo(h_docInfo, total_num_docs);
    buffer<ulong, 1> d_profileScore(h_profileScore, total_num_docs);
    d_partialSums_dimm1.set_final_data(nullptr);
