@@ -180,9 +180,8 @@ int main (void) {
   StartTimer();
 
   // iteration loop
-#pragma omp target enter data map(to: aP[0:size], \
-    aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
-    temp_red[0:size_temp], temp_black[0:size_temp], bl_norm_L2[0:size_norm])
+#pragma omp target enter data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
+                                      temp_red[0:size_temp], temp_black[0:size_temp], bl_norm_L2[0:size_norm])
 {
   for (iter = 1; iter <= it_max; ++iter) {
 
@@ -257,7 +256,10 @@ int main (void) {
   }
 }
   // transfer final temperature values back
-#pragma omp target exit data map(from: temp_red[0:size_temp], temp_black[0:size_temp])
+#pragma omp target exit data map(from: temp_red[0:size_temp], temp_black[0:size_temp]) \
+                             map(delete: aP[0:size], aW[0:size], aE[0:size], aS[0:size], \
+					 aN[0:size], b[0:size], bl_norm_L2[0:size_norm])
+
 
   double runtime = GetTimer();
 
