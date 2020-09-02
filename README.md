@@ -77,6 +77,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
 
 
+| compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 201 | 207  | 207 | 812 |
+| host timing(s) | 8.4 | 8.3 | 9.1 | 20.2 |
+| device timing(s) | 8.0 | 7.4 | 8.1 | 16.3  |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -349,6 +356,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 19.2 | 19.8 | 20.7 | 24.7  |
 
 
+| compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 201 | 207  | 207 | 812 |
+| host timing(s) | 6.9 | 7.1 | 7.3 | 18.4 |
+| device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -584,6 +598,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### clink
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
+
+### compute-score
+  Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html):w
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
