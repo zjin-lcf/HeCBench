@@ -237,7 +237,7 @@ int main(int argc, char** argv) {
 }
   // Copy the GPU output data back to the host and use/store it..
   wkf_timer_start(hostcopytimer);
-  #pragma omp target exit data map(from: energy[0:volmem])
+  #pragma omp target exit data map(from: energy[0:volmem]) map(delete:atominfo[0:MAXATOMS])
   wkf_timer_stop(hostcopytimer);
   hostcopytotal=wkf_timer_time(hostcopytimer);
 

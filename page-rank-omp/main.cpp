@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
 
 	size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
 
-       #pragma omp target enter data map(to: pages[0:n*n]) \
+       #pragma omp target data map(to: pages[0:n*n]) \
 	                       map(to: page_ranks[0:n]) \
                                map(to:noutlinks[0:n]) \
 	                       map(to: diffs[0:n]) \

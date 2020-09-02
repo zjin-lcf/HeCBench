@@ -60,129 +60,129 @@ int main(int argc, char** argv)
     int sum;
 
 
-    #pragma omp target enter data map(to: array[0:arrayLength]) map(alloc: sum)
+    #pragma omp target data map(to: array[0:arrayLength]) map(alloc: sum)
     {
 
-    t1 = std::chrono::high_resolution_clock::now();
-    for(int n=0;n<N;n++) {
-      sum = 0;
-      #pragma omp target update to(sum)
-      #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i++) {
-          sum += array[i];
+      t1 = std::chrono::high_resolution_clock::now();
+      for(int n=0;n<N;n++) {
+        sum = 0;
+        #pragma omp target update to(sum)
+        #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum)
+          for (int i = 0; i < arrayLength; i++) {
+            sum += array[i];
+          }
+      }
+      #pragma omp target update from(sum)
+      t2 = std::chrono::high_resolution_clock::now();
+      double times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+      float GB=(float)arrayLength*sizeof(int)*N;
+      std::cout
+          << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
+
+
+      printf("%d %d\n", sum, checksum);
+      if(sum==checksum)
+          std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
+      else
+          std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+
+      t1 = std::chrono::high_resolution_clock::now();
+      for(int n=0;n<N;n++) {
+        sum = 0;
+        #pragma omp target update to(sum)
+        #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
+        {
+          for (int i = 0; i < arrayLength; i=i+2) { 
+            sum += array[i] + array[i+1];
+        	}
         }
-    }
-    #pragma omp target update from(sum)
-    t2 = std::chrono::high_resolution_clock::now();
-    double times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-    float GB=(float)arrayLength*sizeof(int)*N;
-    std::cout
-        << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-
-    printf("%d %d\n", sum, checksum);
-    if(sum==checksum)
-        std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-    else
-        std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
-
-    t1 = std::chrono::high_resolution_clock::now();
-    for(int n=0;n<N;n++) {
-      sum = 0;
-      #pragma omp target update to(sum)
-      #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
-      {
-        for (int i = 0; i < arrayLength; i=i+2) { 
-          sum += array[i] + array[i+1];
-      	}
       }
-    }
-    #pragma omp target update from(sum)
-    t2 = std::chrono::high_resolution_clock::now();
-    times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-    GB=(float)arrayLength*sizeof(int)*N;
-    std::cout
-        << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
+      #pragma omp target update from(sum)
+      t2 = std::chrono::high_resolution_clock::now();
+      times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+      GB=(float)arrayLength*sizeof(int)*N;
+      std::cout
+          << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
 
-    if(sum==checksum)
-        std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-    else
-        std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+      if(sum==checksum)
+          std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
+      else
+          std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
 
-    t1 = std::chrono::high_resolution_clock::now();
-    for(int n=0;n<N;n++) {
-      sum = 0;
-      #pragma omp target update to(sum)
-      #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
-      {
-        for (int i = 0; i < arrayLength; i=i+4) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3];
-      	}
+      t1 = std::chrono::high_resolution_clock::now();
+      for(int n=0;n<N;n++) {
+        sum = 0;
+        #pragma omp target update to(sum)
+        #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
+        {
+          for (int i = 0; i < arrayLength; i=i+4) { 
+            sum += array[i] + array[i+1] + array[i+2] + array[i+3];
+        	}
+        }
       }
-    }
-    #pragma omp target update from(sum)
-    t2 = std::chrono::high_resolution_clock::now();
-    times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-    GB=(float)arrayLength*sizeof(int)*N;
-    std::cout
-        << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
+      #pragma omp target update from(sum)
+      t2 = std::chrono::high_resolution_clock::now();
+      times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+      GB=(float)arrayLength*sizeof(int)*N;
+      std::cout
+          << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
 
-    if(sum==checksum)
-        std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-    else
-        std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+      if(sum==checksum)
+          std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
+      else
+          std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
 
-    t1 = std::chrono::high_resolution_clock::now();
-    for(int n=0;n<N;n++) {
-      sum = 0;
-      #pragma omp target update to(sum)
-      #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
-      {
-        for (int i = 0; i < arrayLength; i=i+8) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
-		 array[i+4] + array[i+5] + array[i+6] + array[i+7];
-      	}
+      t1 = std::chrono::high_resolution_clock::now();
+      for(int n=0;n<N;n++) {
+        sum = 0;
+        #pragma omp target update to(sum)
+        #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
+        {
+          for (int i = 0; i < arrayLength; i=i+8) { 
+            sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
+          	 array[i+4] + array[i+5] + array[i+6] + array[i+7];
+        	}
+        }
       }
-    }
-    #pragma omp target update from(sum)
-    t2 = std::chrono::high_resolution_clock::now();
-    times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-    GB=(float)arrayLength*sizeof(int)*N;
-    std::cout
-        << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
+      #pragma omp target update from(sum)
+      t2 = std::chrono::high_resolution_clock::now();
+      times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+      GB=(float)arrayLength*sizeof(int)*N;
+      std::cout
+          << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
 
-    if(sum==checksum)
-        std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-    else
-        std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+      if(sum==checksum)
+          std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
+      else
+          std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
 
-    t1 = std::chrono::high_resolution_clock::now();
-    for(int n=0;n<N;n++) {
-      sum = 0;
-      #pragma omp target update to(sum)
-      #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
-      {
-        for (int i = 0; i < arrayLength; i=i+16) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
-		 array[i+4] + array[i+5] + array[i+6] + array[i+7] +
-		 array[i+8] + array[i+9] + array[i+10] + array[i+11] +
-		 array[i+12] + array[i+13] + array[i+14] + array[i+15];
-      	}
+      t1 = std::chrono::high_resolution_clock::now();
+      for(int n=0;n<N;n++) {
+        sum = 0;
+        #pragma omp target update to(sum)
+        #pragma omp target teams distribute parallel for thread_limit(threads) reduction(+:sum) 
+        {
+          for (int i = 0; i < arrayLength; i=i+16) { 
+            sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
+          	 array[i+4] + array[i+5] + array[i+6] + array[i+7] +
+          	 array[i+8] + array[i+9] + array[i+10] + array[i+11] +
+          	 array[i+12] + array[i+13] + array[i+14] + array[i+15];
+        	}
+        }
       }
+      #pragma omp target update from(sum)
+      t2 = std::chrono::high_resolution_clock::now();
+      times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+      GB=(float)arrayLength*sizeof(int)*N;
+      std::cout
+          << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
+
+      if(sum==checksum)
+          std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
+      else
+          std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+
     }
-    #pragma omp target update from(sum)
-    t2 = std::chrono::high_resolution_clock::now();
-    times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-    GB=(float)arrayLength*sizeof(int)*N;
-    std::cout
-        << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-    if(sum==checksum)
-        std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-    else
-        std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
-
-    }
-
-  free(array);
+    free(array);
+    return 0;
 }

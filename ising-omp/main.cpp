@@ -216,7 +216,8 @@ int main(int argc, char **argv) {
   auto t1 = std::chrono::high_resolution_clock::now();
   duration = (double) std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count();
 }
-#pragma omp target exit data map(from: lattice_b[0:nx*ny/2], lattice_w[0:nx*ny/2])
+#pragma omp target exit data map(from: lattice_b[0:nx*ny/2], lattice_w[0:nx*ny/2]) \
+	                     map(delete: randvals[0:nx*ny/2])
 
 
   printf("REPORT:\n");
