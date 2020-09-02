@@ -24,7 +24,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
-#include <cuda.h>
+#include <omp.h>
 #include "options.h"
 #include "scoped_ptrs.h"
 using namespace aocl_utils;
@@ -254,7 +254,7 @@ void runOnCPU()
 }
 
 
-  __device__
+#pragma omp declare target
 ulong mulfp( ulong weight, uint freq )
 {
   uint part1 = weight & 0xFFFFF;         // lower 24-bits of weight
@@ -265,90 +265,8 @@ ulong mulfp( ulong weight, uint freq )
 
   return (ulong)res1 + (((ulong)res2) << 24);
 }
+#pragma omp end declare target
 
-__global__ void compute ( const uint*  docWordFrequencies_dimm1, 
-                          const uint*  docWordFrequencies_dimm2,
-                          const ulong*  profileWeights_dimm1,
-                          const ulong*  profileWeights_dimm2,
-                          const uint*  isWordInProfileHash,
-                                uint*  profileScorePerGroup_highbits_dimm1,
-                                uint*  profileScorePerGroup_lowbits_dimm2 )
-{
-  uint curr_entry[MANUAL_VECTOR];
-  uint word_id[MANUAL_VECTOR];
-  uint freq[MANUAL_VECTOR];
-  uint hash1[MANUAL_VECTOR];
-  uint hash2[MANUAL_VECTOR];
-  bool is_end[MANUAL_VECTOR];
-  bool make_access[MANUAL_VECTOR];
-
-  __shared__ ulong partial[NUM_THREADS_PER_WG/MANUAL_VECTOR];
-
-  int gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  ulong sum = 0;
-  //#pragma unroll
-  for (uint i=0; i<MANUAL_VECTOR; i++) {
-    curr_entry[i] = docWordFrequencies_dimm1[gid*MANUAL_VECTOR + i]; 
-    freq[i] = curr_entry[i] & 0xff;
-    word_id[i] = curr_entry[i] >> 8;
-    is_end[i] = curr_entry[i] == docEndingTag;
-    hash1[i] = word_id[i] >> BLOOM_1;
-    hash2[i] = word_id[i] & BLOOM_2;
-    make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-      && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
-    if (make_access[i]) {
-      sum += mulfp(profileWeights_dimm1[word_id[i]],freq[i]);
-    }
-  }
-
-  //#pragma unroll
-  for (uint i=0; i<MANUAL_VECTOR; i++) {
-    curr_entry[i] = docWordFrequencies_dimm2[gid*MANUAL_VECTOR + i]; 
-    freq[i] = curr_entry[i] & 0xff;
-    word_id[i] = curr_entry[i] >> 8;
-    is_end[i] = curr_entry[i] == docEndingTag;
-    hash1[i] = word_id[i] >> BLOOM_1;
-    hash2[i] = word_id[i] & BLOOM_2;
-    make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-      && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
-    if (make_access[i]) {
-      sum += mulfp(profileWeights_dimm2[word_id[i]],freq[i]);
-    }
-  }
-
-  partial[threadIdx.x] = sum;
-  __syncthreads();
-
-  if (threadIdx.x == 0) {
-    ulong4 res= *(ulong4*)&partial[0];
-    ulong4 res2= *(ulong4*)&partial[4];
-    ulong final_result = res.x + res.y + res.z + res.w + res2.x + res2.y + res2.z + res2.w;
-    profileScorePerGroup_highbits_dimm1[blockIdx.x] = (uint) (final_result >> 32); 
-    profileScorePerGroup_lowbits_dimm2[blockIdx.x] = (uint) (final_result & 0xFFFFFFFF); 
-  }
-}
-
-__global__ void reduction( const ulong*  docInfo,
-                           const uint*   partial_highbits_dimm1,
-                           const uint*   partial_lowbits_dimm2,
-                                 ulong*  result)
-{
-  int gid = blockIdx.x * blockDim.x + threadIdx.x;
-  ulong info = docInfo[gid];
-  unsigned start = info >> 32;
-  unsigned end = info & 0xFFFFFFFF;
-
-  ulong total = 0;
-  #pragma unroll 2
-  for (unsigned i=start; i<=end; i++) {
-    ulong upper = partial_highbits_dimm1[i];
-    ulong lower = partial_lowbits_dimm2[i];
-    ulong sum = (upper << 32) | lower;
-    total += sum;
-  }
-  result[gid] = total;
-}
 
 int main(int argc, char** argv)
 {
@@ -364,81 +282,120 @@ int main(int argc, char** argv)
   printf("Allocating and setting up data\n");
   setupData();
 
-  printf("Setting up CUDA\n");
+  printf("Setting up OMP\n");
 
   size_t local_size = (block_size / MANUAL_VECTOR); 
   size_t global_size = total_doc_size / 2 / MANUAL_VECTOR / local_size;
-  size_t local_size_reduction = block_size;
-  size_t global_size_reduction = total_num_docs / block_size;
 
-  uint* d_docWordFrequencies_dimm1;
-  uint* d_docWordFrequencies_dimm2;
-  uint* d_partialSums_dimm1;
-  uint* d_partialSums_dimm2;
-  ulong* d_profileWeights_dimm1;
-  ulong* d_profileWeights_dimm2;
-  uint* d_isWordInProfileHash;
-  uint* d_startingDocID;
-  ulong* d_docInfo;
-  ulong* d_profileScore;
+  scoped_aligned_ptr<uint> h_partialSums_dimm1;
+  scoped_aligned_ptr<uint> h_partialSums_dimm2;
+  h_partialSums_dimm1.reset(total_doc_size/(2*block_size));
+  h_partialSums_dimm2.reset(total_doc_size/(2*block_size));
 
-  cudaMalloc((void**)&d_docWordFrequencies_dimm1, sizeof(uint) * total_doc_size/2);
-  cudaMalloc((void**)&d_docWordFrequencies_dimm2, sizeof(uint) * total_doc_size/2);
-  cudaMalloc((void**)&d_partialSums_dimm1, sizeof(uint) * total_doc_size/(2*block_size));
-  cudaMalloc((void**)&d_partialSums_dimm2, sizeof(uint) * total_doc_size/(2*block_size));
-  cudaMalloc((void**)&d_profileWeights_dimm1, sizeof(ulong) * (1L << 24));
-  cudaMalloc((void**)&d_profileWeights_dimm2, sizeof(ulong) * (1L << 24));
-  cudaMalloc((void**)&d_isWordInProfileHash, sizeof(uint) * (1L << BLOOM_SIZE));
-  cudaMalloc((void**)&d_startingDocID, sizeof(uint) * total_num_docs);
-  cudaMalloc((void**)&d_docInfo, sizeof(ulong) * total_num_docs);
-  cudaMalloc((void**)&d_profileScore, sizeof(ulong) * total_num_docs);
+  uint* d_docWordFrequencies_dimm1 = h_docWordFrequencies_dimm1.get();
+  uint* d_docWordFrequencies_dimm2 = h_docWordFrequencies_dimm2.get();
+  uint* d_partialSums_dimm1 = h_partialSums_dimm1.get() ;
+  uint* d_partialSums_dimm2 = h_partialSums_dimm2.get();
+  ulong* d_profileWeights = h_profileWeights.get();
+  uint* d_isWordInProfileHash = h_isWordInProfileHash.get() ;
+  ulong* d_docInfo = h_docInfo.get();
+  ulong* d_profileScore = h_profileScore.get();
+   
+#pragma omp target data map(to: d_docWordFrequencies_dimm1[0:total_doc_size/2],\
+                                d_docWordFrequencies_dimm2[0:total_doc_size/2],\
+                                d_profileWeights[0:(1L << 24)],\
+                                d_isWordInProfileHash[0:(1L << BLOOM_SIZE)],\
+                                d_docInfo[0: total_num_docs]) \
+                        map(alloc: d_partialSums_dimm1[0:total_doc_size/(2*block_size)], \
+                                   d_partialSums_dimm2[0:total_doc_size/(2*block_size)]) \
+                        map(from: d_profileScore[0: total_num_docs])
 
-  cudaMemcpy(d_docWordFrequencies_dimm1, h_docWordFrequencies_dimm1, sizeof(uint) * total_doc_size/2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_docWordFrequencies_dimm2, h_docWordFrequencies_dimm2, sizeof(uint) * total_doc_size/2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_profileWeights_dimm1, h_profileWeights, sizeof(ulong) * (1L << 24), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_profileWeights_dimm2, h_profileWeights, sizeof(ulong) * (1L << 24), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_isWordInProfileHash, h_isWordInProfileHash, sizeof(uint) * (1L << BLOOM_SIZE), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_startingDocID, h_startingDocID, sizeof(uint) * total_num_docs, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_docInfo, h_docInfo, sizeof(ulong) * total_num_docs, cudaMemcpyHostToDevice);
-
-
+{
   const double start_time = getCurrentTimestamp();
-
   for (int i=0; i<100; i++) {
-    compute<<<global_size, local_size>>>(
-        d_docWordFrequencies_dimm1,
-        d_docWordFrequencies_dimm2, 
-        d_profileWeights_dimm1,
-        d_profileWeights_dimm2,
-        d_isWordInProfileHash,
-        d_partialSums_dimm1,
-        d_partialSums_dimm2);
-
-    reduction<<<global_size_reduction, local_size_reduction>>>(
-        d_docInfo, 
-        d_partialSums_dimm1,
-        d_partialSums_dimm2,
-        d_profileScore);
+    #pragma omp target teams num_teams(global_size) thread_limit(local_size) 
+    {
+       ulong partial[NUM_THREADS_PER_WG/MANUAL_VECTOR];
+       #pragma omp parallel 
+       {
+         //int gid = blockIdx.x * blockDim.x + threadIdx.x;
+         int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+     
+         uint curr_entry[MANUAL_VECTOR];
+         uint word_id[MANUAL_VECTOR];
+         uint freq[MANUAL_VECTOR];
+         uint hash1[MANUAL_VECTOR];
+         uint hash2[MANUAL_VECTOR];
+         bool is_end[MANUAL_VECTOR];
+         bool make_access[MANUAL_VECTOR];
+     
+         ulong sum = 0;
+         //#pragma unroll
+         for (uint i=0; i<MANUAL_VECTOR; i++) {
+           curr_entry[i] = d_docWordFrequencies_dimm1[gid*MANUAL_VECTOR + i]; 
+           freq[i] = curr_entry[i] & 0xff;
+           word_id[i] = curr_entry[i] >> 8;
+           is_end[i] = curr_entry[i] == docEndingTag;
+           hash1[i] = word_id[i] >> BLOOM_1;
+           hash2[i] = word_id[i] & BLOOM_2;
+           make_access[i] = !is_end[i] && ((d_isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+             && ((d_isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           if (make_access[i]) {
+             sum += mulfp(d_profileWeights[word_id[i]],freq[i]);
+           }
+         }
+     
+         //#pragma unroll
+         for (uint i=0; i<MANUAL_VECTOR; i++) {
+           curr_entry[i] = d_docWordFrequencies_dimm2[gid*MANUAL_VECTOR + i]; 
+           freq[i] = curr_entry[i] & 0xff;
+           word_id[i] = curr_entry[i] >> 8;
+           is_end[i] = curr_entry[i] == docEndingTag;
+           hash1[i] = word_id[i] >> BLOOM_1;
+           hash2[i] = word_id[i] & BLOOM_2;
+           make_access[i] = !is_end[i] && ((d_isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+             && ((d_isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           if (make_access[i]) {
+             sum += mulfp(d_profileWeights[word_id[i]],freq[i]);
+           }
+         }
+     
+         partial[omp_get_thread_num()] = sum;
+         #pragma omp barrier
+     
+         if (omp_get_thread_num() == 0) {
+           ulong final_result = partial[0] + partial[1] + partial[2] + partial[3] + 
+                                partial[4] + partial[5] + partial[6] + partial[7] ;
+           d_partialSums_dimm1[omp_get_team_num()] = (uint) (final_result >> 32); 
+           d_partialSums_dimm2[omp_get_team_num()] = (uint) (final_result & 0xFFFFFFFF); 
+         }
+       }
+    }
+     
+    #pragma omp target teams distribute parallel for thread_limit(block_size)
+    for (int gid = 0; gid < total_num_docs; gid++) {
+      ulong info = d_docInfo[gid];
+      unsigned start = info >> 32;
+      unsigned end = info & 0xFFFFFFFF;
+    
+      ulong total = 0;
+      //#pragma unroll 2
+      for (unsigned i=start; i<=end; i++) {
+        ulong upper = d_partialSums_dimm1[i];
+        ulong lower = d_partialSums_dimm2[i];
+        ulong sum = (upper << 32) | lower;
+        total += sum;
+      }
+      d_profileScore[gid] = total;
+    }
   }
-  cudaDeviceSynchronize();
-
   const double end_time = getCurrentTimestamp();
   double kernelExecutionTime = (end_time - start_time)/100;
   printf("======================================================\n");
   printf("Kernel Time = %f ms (averaged over 100 times)\n", kernelExecutionTime * 1000.0f );
   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
+}
 
-  cudaMemcpy(h_profileScore, d_profileScore, sizeof(ulong) * total_num_docs, cudaMemcpyDeviceToHost);
-  cudaFree(d_docWordFrequencies_dimm1);
-  cudaFree(d_docWordFrequencies_dimm2);
-  cudaFree(d_partialSums_dimm1);
-  cudaFree(d_partialSums_dimm2);
-  cudaFree(d_profileWeights_dimm1);
-  cudaFree(d_profileWeights_dimm2);
-  cudaFree(d_isWordInProfileHash);
-  cudaFree(d_startingDocID);
-  cudaFree(d_docInfo);
-  cudaFree(d_profileScore);
   printf("Done\n");
 
   runOnCPU();
