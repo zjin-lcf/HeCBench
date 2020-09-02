@@ -142,7 +142,7 @@ void setupData()
    printf("Creating Documents total_terms=%d (no_pad=%d)\n", total_doc_size, total_doc_size_no_padding);
 
    for (uint i=0; i<total_doc_size/2; i++) {
-      h_docWordFrequencies_dimm2[i] = docEndingTag;
+      h_docWordFrequencies_dimm1[i] = docEndingTag;
       h_docWordFrequencies_dimm2[i] = docEndingTag;
    }
    for (uint doci=0; doci < total_num_docs; doci++)
@@ -186,8 +186,6 @@ void setupData()
       uint hash2 = entry & BLOOM_2;  //this gives me the bottom 16 bits of the 24bit word id
       h_isWordInProfileHash[ hash2 >> 5 ] |= 1 << (hash2 & 0x1f);
    }
-
-   printf( "...\n" ); 
 }
 
 void runOnCPU()
@@ -276,6 +274,7 @@ int main(int argc, char** argv)
    }
    printf("Total number of documents: %u\n", total_num_docs);
 
+   srand(2);
    printf("RAND_MAX: %d\n", RAND_MAX);
    printf("Allocating and setting up data\n");
    setupData();
