@@ -600,7 +600,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
 
 ### compute-score
-  Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html):w
+  Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
