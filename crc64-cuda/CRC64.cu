@@ -1618,7 +1618,7 @@ crc64_kernel(size_t *d_thread_sz,
 uint64_t crc64_parallel(const void *input, size_t nbytes) {
 
   if (nbytes > 2*crc64_min_thread_bytes) {
-    int nthreads = 64; //96*8*32; //omp_get_max_threads();
+    int nthreads = 96*8*32; 
 
     if (nbytes < nthreads*crc64_min_thread_bytes)
       nthreads = nbytes/crc64_min_thread_bytes;
