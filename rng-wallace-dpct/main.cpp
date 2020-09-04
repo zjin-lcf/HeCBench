@@ -48,7 +48,7 @@ int main()
  sycl::range<3> rng_wallace_threads(WALLACE_NUM_THREADS, 1, 1);
   const unsigned seed = 1;
   
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 100; i++) {
   q_ct1.submit([&](sycl::handler &cgh) {
    sycl::accessor<float, 1, sycl::access::mode::read_write,
                   sycl::access::target::local>

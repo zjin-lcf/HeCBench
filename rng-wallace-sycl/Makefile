@@ -50,7 +50,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp constants.h rand_helpers.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
