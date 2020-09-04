@@ -252,6 +252,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.3 | 2.44 | 1.47 | 4.14 |
 
 
+| rng-wallace | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 200 | 202 | 202 |  NA |
+| host timing(s) | 4.3 | 3.9 | 4.6 | NA | 
+| device timing(s) | 3.6 | 3.2 | 3.6 | NA |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -531,6 +538,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.1 | 3.3 | 1.94 | 3.5 |
 
 
+| rng-wallace | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 200 | 202 | 202 |  NA |
+| host timing(s) | 2.6 | 3.2 | 3.2 | NA | 
+| device timing(s) | 2.1 | 2.3 | 2.3 | NA |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -667,6 +681,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### reverse
    Reverse an input array of size 256 using shared memory
+
+### rng-wallace
+   Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
 
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
