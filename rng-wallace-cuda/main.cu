@@ -40,7 +40,7 @@ int main()
   dim3 rng_wallace_threads(WALLACE_NUM_THREADS, 1, 1);
   const unsigned seed = 1;
   
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 100; i++) {
     rng_wallace <<< rng_wallace_grid, rng_wallace_threads >>> (
       seed, devPool, device_randomNumbers, devicerngChi2Corrections);
     cudaMemcpy(randomNumbers, device_randomNumbers, 4 * WALLACE_OUTPUT_SIZE, cudaMemcpyDeviceToHost);

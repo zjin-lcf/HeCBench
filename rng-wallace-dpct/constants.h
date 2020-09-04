@@ -31,7 +31,7 @@ const unsigned WALLACE_NUM_THREADS=WALLACE_POOL_SIZE/(4*WALLACE_RUNS_PER_THREAD)
 const unsigned WALLACE_MAX_OUTPUTS_PER_ITERATION=4; // maximum number of outputs per iteration if combine count is 1
 #define WALLACE_OUTPUT_COMBINE_COUNT_DEF 1
 const unsigned WALLACE_OUTPUT_COMBINE_COUNT=WALLACE_OUTPUT_COMBINE_COUNT_DEF;		// combine this many pool samples for each aggregate (can be 1,2 or 4)
-const unsigned WALLACE_NUM_BLOCKS = 16;
+const unsigned WALLACE_NUM_BLOCKS = 16384;
 const unsigned WALLACE_NUM_POOL_PASSES=1;
 
 const unsigned WALLACE_NUM_OUTPUTS_PER_RUN=1; //2048;

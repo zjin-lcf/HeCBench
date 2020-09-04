@@ -44,7 +44,7 @@ int main()
  sycl::range<3> rng_wallace_threads(WALLACE_NUM_THREADS, 1, 1);
   const unsigned seed = 1;
   
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 100; i++) {
   {
    dpct::buffer_t devPool_buf_ct1 = dpct::get_buffer(devPool);
    dpct::buffer_t device_randomNumbers_buf_ct2 =
