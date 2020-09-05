@@ -210,8 +210,8 @@ int main(int argc, char **argv){
       q.submit([&](handler& cgh) {
           auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
           auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
-          accessor <float, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-          accessor <float, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+          accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
+          accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
           cgh.parallel_for<class kernel2>(
             nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
 #include "kernel2.sycl"
