@@ -210,6 +210,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.38 | 2.52 | 2.38 | 2.53 |
 
 
+| nw | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2048 | 2050 | 2050 | 13314 |
+| host timing(s) | 2.0 | 2.4 | 2.4 | 5.6 |
+| device timing(s) | 0.51 | 0.85 | 0.79 | 1.51 |
+
+
 | page-rank | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 6 | 11 | 11 | 30 |
@@ -496,6 +503,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.45 | 4.0 | 0.45 | 0.64 |
 
 
+| nw | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2048 | 2050 | 2050 | 13314 |
+| host timing(s) | 1.7 | 2.6 | 2.1 | 5.7 |
+| device timing(s) | 0.57 | 0.88 | 0.76 | 1.47 |
+
+
 | page-rank | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 6 | 11 | 11 | 30 |
@@ -666,6 +680,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
+
+### nw
+  Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
