@@ -154,6 +154,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 47 | 47 | 47 | NA |
 
 
+| lud | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1535 | 1536 | 1536 | 6145 |
+| host timing(s) | 8.9 | 11.0 | 11.2 | 14.1 |
+| device timing(s) | 7.8 | 9.6 | 9.7 | 9.7 |
+
+
 | mandelbrot | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 303 | 404 | 404 | 611 |
@@ -447,6 +454,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 65 | 63 | 65 | NA |
 
 
+| lud | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1535 | 1536 | 1536 | 6145 |
+| host timing(s) | 11.1 | 11.9 | 12.0 | 15.6 |
+| device timing(s) | 10.3 | 10.7 | 10.8 | 11.3 |
+
+
 | mandelbrot | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 303 | 404 | 404 | 611 |
@@ -659,6 +673,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### laplace
   Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+
+### lud
+  LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
