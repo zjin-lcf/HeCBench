@@ -8,13 +8,15 @@
 #include <string.h>
 #include <string>
 
-#include <cuda.h>
+#include <CL/sycl.hpp>
 #include "common.h"
 
 
 #define BLOCK_SIZE 16
 
-#include "lud_kernels.cu"
+using namespace cl::sycl;
+constexpr access::mode sycl_read_write = access::mode::read_write;
+
 
 double gettime() {
   struct timeval t;
@@ -32,7 +34,6 @@ static struct option long_options[] = {
   {"verify", 0, NULL, 'v'},
   {0,0,0,0}
 };
-
 
 
   int
@@ -115,24 +116,86 @@ main ( int argc, char *argv[] )
   /* beginning of timing point */
   stopwatch_start(&sw);
 
-  float *d_m;
-  cudaMalloc((void**)&d_m, matrix_dim*matrix_dim*sizeof(float));
-  cudaMemcpy(d_m, m, matrix_dim*matrix_dim*sizeof(float), cudaMemcpyHostToDevice);
+  { // SYCL scope
 
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
+
+  const property_list props = property::buffer::use_host_ptr();
+  buffer<float, 1> d_m (m, matrix_dim*matrix_dim, props);
+
+  range<1> global_work1(BLOCK_SIZE);
+  range<1> local_work1(BLOCK_SIZE);
   int offset;
   int i=0;
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
+
     offset = i;  // add the offset 
-    lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, offset);
-    lud_perimeter<<<(matrix_dim-i)/BLOCK_SIZE-1, 2*BLOCK_SIZE>>>(d_m, matrix_dim, offset);
-    lud_internal<<< dim3((matrix_dim-i)/BLOCK_SIZE-1, (matrix_dim-i)/BLOCK_SIZE-1),
-	    dim3(BLOCK_SIZE, BLOCK_SIZE)>>>(d_m, matrix_dim, offset);
+
+    q.submit([&](handler& cgh) {
+
+      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
+
+      cgh.parallel_for<class diagonal>(nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
+#include "kernel_lud_diagonal.sycl"
+
+          });
+      });
+
+
+    range<1> global_work2 (BLOCK_SIZE * 2 * ((matrix_dim-i)/BLOCK_SIZE-1));
+    range<1> local_work2 (BLOCK_SIZE * 2);
+
+    q.submit([&](handler& cgh) {
+
+      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> dia (BLOCK_SIZE * BLOCK_SIZE, cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
+
+      cgh.parallel_for<class peri>(nd_range<1>(global_work2, local_work2), [=] (nd_item<1> item) {
+#include "kernel_lud_perimeter.sycl"
+
+          });
+      });
+
+
+    range<2> global_work3(BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1), BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1));
+    range<2> local_work3(BLOCK_SIZE, BLOCK_SIZE);
+
+    q.submit([&](handler& cgh) {
+
+      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
+
+      cgh.parallel_for<class internal>(nd_range<2>(global_work3, local_work3) , [=] (nd_item<2> item) {
+#include "kernel_lud_internal.sycl"
+
+          });
+      });
   } // for
 
   offset = i;  // add the offset 
-  lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, offset);
 
-  cudaMemcpy(m, d_m, matrix_dim*matrix_dim*sizeof(float), cudaMemcpyDeviceToHost);
+  q.submit([&](handler& cgh) {
+
+    auto m_acc = d_m.get_access<sycl_read_write>(cgh);
+    accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
+
+    cgh.parallel_for<class diagonal2>(
+        nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
+#include "kernel_lud_diagonal.sycl"
+
+        });
+    });
+
+  } // SYCL scope
 
   /* end of timing point */
   stopwatch_stop(&sw);
@@ -147,6 +210,9 @@ main ( int argc, char *argv[] )
   }
 
   free(m);
-  cudaFree(d_m);
-  return 0;
+
 }        
+
+/* ----------  end of function main  ---------- */
+
+
