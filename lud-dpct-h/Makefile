@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -13,14 +13,16 @@ DEBUG     = no
 
 program = lud
 
-source = lud.cu ./common/common.cu 
+source = lud.cpp ./common/common.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I./common
+CFLAGS := -std=c++14 -Wall -I./common
 
 # Linker Flags
 LDFLAGS = 
@@ -41,8 +43,11 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(source) lud_kernels.cu ./common/common.h Makefile
-	$(CC) $(CFLAGS) $(source) -o $@ $(LDFLAGS)
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
