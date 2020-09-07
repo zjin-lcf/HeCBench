@@ -273,6 +273,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.6 | 3.2 | 3.6 | NA |
 
 
+| rsbench | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 10 | 10 | 68 |
+| host timing(s) | 11.6 | 11.8 | 11.8 | 20.8 |
+| device timing(s) | 8.8 | 8.8 | 8.6 | 12.1 |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -573,6 +580,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.1 | 2.3 | 2.3 | NA |
 
 
+| rsbench | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 10 | 10 | 34 |
+| host timing(s) | 16.3 | 17.2 | 16.9 | 24.7 |
+| device timing(s) | 14.3 | 14.7 | 14.3 | 19.1 |
+
+
 | rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 32 | 38 | 38 | 220 |
@@ -719,6 +733,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### rng-wallace
    Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
 
+### rsbench
+  A proxy application for full neutron transport application like OpenMC that support multipole cross section representations
+  (https://github.com/ANL-CESAR/RSBench/)
+
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
@@ -735,8 +753,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   1D stencil using shared memory
 
 ### xsbench
-  The nuclear reactor simulation proxy applications in SYCL  
-  (https://github.com/ANL-CESAR/XSBench/tree/master/sycl)
+  A proxy application for full neutron transport application like OpenMC
+  (https://github.com/ANL-CESAR/XSBench/)
 
 
 ## Development Team
