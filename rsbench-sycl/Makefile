@@ -3,24 +3,33 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE      = gpu
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = lud
+program = rsbench
 
-source = lud.cu ./common/common.cu 
+source = main.cpp \
+simulation.cpp\
+io.cpp \
+init.cpp \
+material.cpp \
+utils.cpp
+
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I./common
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -37,16 +46,22 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(source) lud_kernels.cu ./common/common.h Makefile
-	$(CC) $(CFLAGS) $(source) -o $@ $(LDFLAGS)
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s 8192
+	./$(program) -s small -m event
 
