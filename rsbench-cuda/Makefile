@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC    = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -11,26 +11,33 @@ DEBUG     = no
 # Program name & source code list
 #===============================================================================
 
-program = lud
+program = rsbench
 
-source = lud.cu ./common/common.cu 
+source = \
+main.cu \
+simulation.cu\
+io.cu \
+init.cu \
+material.cu \
+utils.cu
+
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I./common
+CFLAGS := -std=c++14 -Xcompiler -Wall
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -41,12 +48,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(source) lud_kernels.cu ./common/common.h Makefile
-	$(CC) $(CFLAGS) $(source) -o $@ $(LDFLAGS)
+$(program): $(obj) rsbench.h Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cu rsbench.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s 8192
-
+	./$(program) -m event

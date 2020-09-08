@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE      = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -13,14 +14,16 @@ DEBUG     = no
 
 program = lud
 
-source = lud.cu ./common/common.cu 
+source = lud.cpp common.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I./common
+CFLAGS := -I./common -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -37,15 +40,20 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(source) lud_kernels.cu ./common/common.h Makefile
-	$(CC) $(CFLAGS) $(source) -o $@ $(LDFLAGS)
+$(program): lud.cpp ./common/common.c ./common/common.h Makefile
+	$(CC) $(CFLAGS) lud.cpp ./common/common.c -o $@ $(LDFLAGS)
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) 
 
 run: $(program)
 	./$(program) -s 8192
