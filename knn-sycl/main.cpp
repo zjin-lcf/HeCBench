@@ -37,10 +37,10 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
               int query_width, int height, int k, float *dist_host, int *ind_host) {
 
   // Allocation of global memory for indexes CUDA_CHECK
-  buffer<float, 1> ref_dev (ref_host, ref_width * height);
   buffer<float, 1> query_dev (query_host, query_width * height);
   buffer<float, 1> dist_dev (query_width * ref_width);
   buffer<int, 1> ind_dev (query_width * k);
+  buffer<float, 1> ref_dev (ref_host, ref_width * height);
 
   // Grids ans threads
   range<2> g_16x16((ref_width + 15) / 16 * 16, (query_width + 15) / 16 * 16);
@@ -66,7 +66,7 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
     accessor<int, 1, sycl_read_write, access::target::local> step_A (1, h);
     accessor<int, 1, sycl_read_write, access::target::local> step_B (1, h);
     accessor<int, 1, sycl_read_write, access::target::local> end_A (1, h);
-    h.parallel_for(nd_range<2>(g_16x16, t_16x16), [=] (nd_item<2> item) {
+    h.parallel_for<class ComputeDistanceGlobal>(nd_range<2>(g_16x16, t_16x16), [=] (nd_item<2> item) {
       // Thread index
       int tx = item.get_local_id(1);
       int ty = item.get_local_id(0);
@@ -141,8 +141,7 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
   q.submit([&] (handler &h) {
     auto dist = dist_dev.get_access<sycl_read_write>(h);
     auto ind = ind_dev.get_access<sycl_read_write>(h);
-    h.parallel_for(nd_range<1>(g_256x1, t_256x1), [=] (nd_item<1> item) {
-      // Variables
+    h.parallel_for<class insertionSort>(nd_range<1>(g_256x1, t_256x1), [=] (nd_item<1> item) {
       int l, i, j;
       float *p_dist;
       int *p_ind;
@@ -152,82 +151,10 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
 
       if (xIndex < query_width) {
         // Pointer shift, initialization, and max value
-        //p_dist = &dist[xIndex];
-        //p_ind = &ind[xIndex];
-        //max_dist = p_dist[0];
-        //p_ind[0] = 1;
-        max_dist = dist[xIndex];
-        ind[xIndex] = 0;
-
-        // Part 1 : sort kth firt elementZ
-        for (l = 1; l < k; l++) {
-          curr_row = l * query_width;
-          //curr_dist = p_dist[curr_row];
-          curr_dist = dist[xIndex+curr_row];
-          if (curr_dist < max_dist) {
-            i = l - 1;
-            for (int a = 0; a < l - 1; a++) {
-              //if (p_dist[a * query_width] > curr_dist) {
-              if (dist[xIndex + a * query_width] > curr_dist) {
-                i = a;
-                break;
-              }
-            }
-            for (j = l; j > i; j--) {
-              dist[xIndex+j * query_width] = dist[xIndex+(j - 1) * query_width];
-              ind[xIndex + j * query_width] = ind[xIndex + (j - 1) * query_width];
-              //p_dist[j * query_width] = p_dist[(j - 1) * query_width];
-              //p_ind[j * query_width] = p_ind[(j - 1) * query_width];
-            }
-            //p_dist[i * query_width] = curr_dist;
-              dist[xIndex+i * query_width] = curr_dist;
-            //p_ind[i * query_width] = l + 1;
-              ind[xIndex+i * query_width] = l;
-          } else {
-            //p_ind[l * query_width] = l + 1;
-              ind[xIndex+l * query_width] = l;
-          }
-          //max_dist = p_dist[curr_row];
-          max_dist = dist[xIndex + curr_row];
-        }
-
-        // Part 2 : insert element in the k-th first lines
-        max_row = (k - 1) * query_width;
-        for (l = k; l < ref_width; l++) {
-          //curr_dist = p_dist[l * query_width];
-          curr_dist = dist[xIndex + l * query_width];
-          if (curr_dist < max_dist) {
-            i = k - 1;
-            for (int a = 0; a < k - 1; a++) {
-              //if (p_dist[a * query_width] > curr_dist) {
-              if (dist[xIndex + a * query_width] > curr_dist) {
-                i = a;
-                break;
-              }
-            }
-            for (j = k - 1; j > i; j--) {
-              //p_dist[j * query_width] = p_dist[(j - 1) * query_width];
-              //p_ind[j * query_width] = p_ind[(j - 1) * query_width];
-              dist[xIndex+j * query_width] = dist[xIndex+(j - 1) * query_width];
-              ind[xIndex + j * query_width] = ind[xIndex + (j - 1) * query_width];
-            }
-            //p_dist[i * query_width] = curr_dist;
-            //p_ind[i * query_width] = l + 1;
-            //max_dist = p_dist[max_row];
-            dist[xIndex+i * query_width] = curr_dist;
-            ind[xIndex+i * query_width] = l;
-            max_dist = dist[xIndex + max_row];
-          }
-        }
-      }
-
-      /*
-      if (xIndex < query_width) {
-        // Pointer shift, initialization, and max value
         p_dist = &dist[xIndex];
         p_ind = &ind[xIndex];
         max_dist = p_dist[0];
-        p_ind[0] = 1;
+        p_ind[0] = 0;
 
         // Part 1 : sort kth firt elementZ
         for (l = 1; l < k; l++) {
@@ -246,9 +173,9 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
               p_ind[j * query_width] = p_ind[(j - 1) * query_width];
             }
             p_dist[i * query_width] = curr_dist;
-            p_ind[i * query_width] = l + 1;
+            p_ind[i * query_width] = l;
           } else {
-            p_ind[l * query_width] = l + 1;
+            p_ind[l * query_width] = l;
           }
           max_dist = p_dist[curr_row];
         }
@@ -270,12 +197,11 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
               p_ind[j * query_width] = p_ind[(j - 1) * query_width];
             }
             p_dist[i * query_width] = curr_dist;
-            p_ind[i * query_width] = l + 1;
+            p_ind[i * query_width] = l;
             max_dist = p_dist[max_row];
           }
         }
       }
-      */
     });
   });
 
@@ -301,11 +227,11 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
   //cuParallelSqrt<<<g_k_16x16, t_k_16x16>>>(dist_dev, query_width, k);
   q.submit([&] (handler &h) {
     auto dist = dist_dev.get_access<sycl_write>(h);
-    h.parallel_for(nd_range<2>(g_k_16x16, t_k_16x16), [=] (nd_item<2> item) {
+    h.parallel_for<class parallelSqrt>(nd_range<2>(g_k_16x16, t_k_16x16), [=] (nd_item<2> item) {
       unsigned int xIndex = item.get_global_id(1);
       unsigned int yIndex = item.get_global_id(0);
       if (xIndex < query_width && yIndex < k)
-        dist[yIndex * query_width + xIndex] = sqrt(dist[yIndex * query_width + xIndex]);
+        dist[yIndex * query_width + xIndex] = cl::sycl::sqrt(dist[yIndex * query_width + xIndex]);
     });
   });
 
@@ -410,9 +336,9 @@ int main(void) {
   float *query;        // Pointer to query point array
   float *dist;         // Pointer to distance array
   int *ind;            // Pointer to index array
-  int ref_nb = 256;   // Reference point number, max=65535
-  int query_nb = 256; // Query point number,     max=65535
-  int dim = 32;        // Dimension of points
+  int ref_nb = 4096;   // Reference point number, max=65535
+  int query_nb = 4096; // Query point number,     max=65535
+  int dim = 68;        // Dimension of points
   int k = 20;          // Nearest neighbors to consider
   int iterations = 1;
   int c_iterations = 1;
@@ -492,6 +418,8 @@ int main(void) {
     }
     if (ind[i] == knn_index[i]) {
       nb_correct_indexes++;
+    } else {
+      printf("Mismatch @index %d: %d %d\n", i, ind[i], knn_index[i]);
     }
   }
 
