@@ -5,10 +5,13 @@ for dir in `find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cu
 do
 	cd ${dir}
 	make clean
-	cliloader -q -h -d make run &> report.txt
 	echo "${dir} results:"
-	grep "Total Enqueues" report.txt
-	grep "Total Time" report.txt 
+  for (( i = 0; i < 10; i = i + 1 ))
+  do
+    cliloader -q -h -d make run &> report${i}.txt
+  done
+  grep "Total" report*.txt
+  make clean
 	cd ..
 done
 
@@ -19,9 +22,12 @@ for dir in `find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|sy
 do
 	cd ${dir}
 	make clean
-	cliloader -q -h -d make run &> report.txt
 	echo "${dir} results:"
-	grep "Total Enqueues" report.txt
-	grep "Total Time" report.txt 
+  for (( i = 0; i < 10; i = i + 1 ))
+  do
+    cliloader -q -h -d make run &> report${i}.txt
+  done
+  grep "Total" report*.txt
+  make clean
 	cd ..
 done
