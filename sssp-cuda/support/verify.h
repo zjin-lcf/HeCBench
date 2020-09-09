@@ -34,7 +34,6 @@
  */
 
 #include "common.h"
-#include <math.h>
 
 inline int verify(std::atomic_int *h_cost, int num_of_nodes, const char *file_name) {
 // Compare to output file
