@@ -398,7 +398,7 @@ int main(void) {
   int query_nb = 4096; // Query point number,     max=65535
   int dim = 68;        // Dimension of points
   int k = 20;          // Nearest neighbors to consider
-  int iterations = 10;
+  int iterations = 100;
   int c_iterations = 1;
   int i;
   const float precision = 0.001f; // distance error max
