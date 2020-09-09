@@ -308,6 +308,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 14 | 14.1 | 14.2 | 10.9 |
 
 
+| sssp | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 88395 | 88626 | 88655 | NA |
+| host timing(s) | 6.6 | 8.1 | 8.4 | NA |
+| device timing(s) | 2.3 | 2.2 | 2.2 | NA |
+
+
 | stencil | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 10 | 
@@ -615,6 +622,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 21.1 | 21 | 21.1 | 20.4 |
 
 
+| sssp | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 88355 | 88641 | 88640 | NA |
+| host timing(s) | 18.0 | 24.5 | 24.7 | NA |
+| device timing(s) | 2.6 | 2.3 | 2.3 | NA |
+
+
 | stencil | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 10 |
@@ -748,6 +762,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
+
+### sssp
+  The single-source shortest path (https://github.com/chai-benchmarks/chai)
 
 ### stencil
   1D stencil using shared memory
