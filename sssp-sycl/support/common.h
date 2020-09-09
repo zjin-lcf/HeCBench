@@ -33,41 +33,28 @@
  *
  */
 
-#include "common.h"
+#ifndef _COMMON_H_
+#define _COMMON_H_
 
-inline int verify(std::atomic_int *h_cost, int num_of_nodes, const char *file_name) {
-// Compare to output file
-#if PRINT
-    printf("Comparing outputs...\n");
+#define PRINT 0
+#define PRINT_ALL 0
+
+#define INF -2147483647
+#define UP_LIMIT 16677216 //2^24
+#define WHITE 16677217
+#define GRAY 16677218
+#define GRAY0 16677219
+#define GRAY1 16677220
+#define BLACK 16677221
+#define W_QUEUE_SIZE 1600
+
+typedef struct {
+    int x;
+    int y;
+} Node;
+typedef struct {
+    int x;
+    int y;
+} Edge;
+
 #endif
-    FILE *fpo = fopen(file_name, "r");
-    if(!fpo) {
-        printf("Error Reading output file\n");
-        exit(EXIT_FAILURE);
-    }
-#if PRINT
-    printf("Reading Output: %s\n", file_name);
-#endif
-
-    // the number of nodes in the output
-    int num_of_nodes_o = 0;
-    fscanf(fpo, "%d", &num_of_nodes_o);
-    if(num_of_nodes != num_of_nodes_o) {
-        printf("FAIL: Number of nodes does not match the expected value\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // cost of nodes in the output
-    for(int i = 0; i < num_of_nodes_o; i++) {
-        int j, cost;
-        fscanf(fpo, "%d %d", &j, &cost);
-        if(i != j || h_cost[i].load() * -1 != cost) {
-            printf("FAIL: Computed node %d cost (%d != %d) does not match the expected value\n", i, h_cost[i].load(), 
-                cost);
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    fclose(fpo);
-    return 0;
-}

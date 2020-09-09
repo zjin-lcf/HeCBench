@@ -33,6 +33,8 @@
  *
  */
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "common.h"
 
 inline int verify(std::atomic_int *h_cost, int num_of_nodes, const char *file_name) {
