@@ -33,41 +33,46 @@
  *
  */
 
-#include "common.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <fstream>
 
-inline int verify(std::atomic_int *h_cost, int num_of_nodes, const char *file_name) {
-// Compare to output file
-#if PRINT
-    printf("Comparing outputs...\n");
-#endif
-    FILE *fpo = fopen(file_name, "r");
-    if(!fpo) {
-        printf("Error Reading output file\n");
-        exit(EXIT_FAILURE);
+// Allocation error checking
+#define ERR_1(v1)                                                                                                      \
+    if(v1 == NULL) {                                                                                                   \
+        fprintf(stderr, "Allocation error at %s, %d\n", __FILE__, __LINE__);                                           \
+        exit(-1);                                                                                                      \
     }
-#if PRINT
-    printf("Reading Output: %s\n", file_name);
-#endif
+#define ERR_2(v1,v2) ERR_1(v1) ERR_1(v2)
+#define ERR_3(v1,v2,v3) ERR_2(v1,v2) ERR_1(v3)
+#define ERR_4(v1,v2,v3,v4) ERR_3(v1,v2,v3) ERR_1(v4)
+#define ERR_5(v1,v2,v3,v4,v5) ERR_4(v1,v2,v3,v4) ERR_1(v5)
+#define ERR_6(v1,v2,v3,v4,v5,v6) ERR_5(v1,v2,v3,v4,v5) ERR_1(v6)
+#define GET_ERR_MACRO(_1,_2,_3,_4,_5,_6,NAME,...) NAME
+#define ALLOC_ERR(...) GET_ERR_MACRO(__VA_ARGS__,ERR_6,ERR_5,ERR_4,ERR_3,ERR_2,ERR_1)(__VA_ARGS__)
 
-    // the number of nodes in the output
-    int num_of_nodes_o = 0;
-    fscanf(fpo, "%d", &num_of_nodes_o);
-    if(num_of_nodes != num_of_nodes_o) {
-        printf("FAIL: Number of nodes does not match the expected value\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // cost of nodes in the output
-    for(int i = 0; i < num_of_nodes_o; i++) {
-        int j, cost;
-        fscanf(fpo, "%d %d", &j, &cost);
-        if(i != j || h_cost[i].load() * -1 != cost) {
-            printf("FAIL: Computed node %d cost (%d != %d) does not match the expected value\n", i, h_cost[i].load(), 
-                cost);
-            exit(EXIT_FAILURE);
-        }
+#define CUDA_ERR()                                                                                                     \
+    if(cudaStatus != cudaSuccess) {                                                                                    \
+        fprintf(stderr, "CUDA error: %s\n at %s, %d\n", cudaGetErrorString(cudaStatus), __FILE__, __LINE__);           \
+        exit(-1);                                                                                                      \
     }
 
-    fclose(fpo);
-    return 0;
-}
+struct CUDASetup {
+
+    cudaDeviceProp device_prop;
+
+    CUDASetup(int device) {
+        cudaError_t cudaStatus;
+        cudaStatus = cudaSetDevice(device);
+        CUDA_ERR();
+
+        cudaStatus = cudaGetDeviceProperties(&device_prop, device);
+        CUDA_ERR();
+        fprintf(stderr, "%s\t", device_prop.name);
+
+    }
+
+    int max_gpu_threads() {
+        return device_prop.maxThreadsPerBlock;
+    }
+};
