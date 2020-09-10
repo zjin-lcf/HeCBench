@@ -19,7 +19,7 @@
 #include "common.h"
 
 #define INSTANCES 224   /* # of instances */
-#define ATTRIBUTES 1123 /* # of attributes */
+#define ATTRIBUTES 4096 /* # of attributes */
 #define THREADS 128    /* # of threads per block */
 
 /* CPU implementation */
@@ -119,23 +119,23 @@ int main(int argc, char **argv) {
             int gx = item.get_group(1); //blockIdx.x;
             int gy = item.get_group(0); //blockIdx.y;
 
-	    vec<char, 4> j, k;
+            vec<char, 4> j, k;
             for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-	      j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-	      k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+              j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
+              k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
 
             /* use a local variable (stored in register) to hold intermediate
                values. This reduces writes to global memory */
               int count = 0;
 
               if(j.x() ^ k.x()) 
-              count++; 
-              if((j.y() ^ k.y()) && (i+1 < ATTRIBUTES))
-              count++;
-              if((j.z() ^ k.z()) && (i+2 < ATTRIBUTES))
-              count++;
-              if((j.w() ^ k.w()) && (i+3 < ATTRIBUTES))
-              count++;
+                count++; 
+              if(j.y() ^ k.y())
+                count++;
+              if(j.z() ^ k.z())
+                count++;
+              if(j.w() ^ k.w())
+                count++;
 
               /* Only one atomic write to global memory */
               atomic_fetch_add(distance[INSTANCES*gx + gy], count);
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
         auto data = data_char_device.get_access<sycl_read>(h);
         auto distance = distance_device.get_access<sycl_read_write>(h);
         accessor<int, 1, sycl_read_write, access::target::local> dist(THREADS, h); 
-	h.parallel_for<class GPUshared>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
+        h.parallel_for<class GPUshared>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
             int idx = item.get_local_id(1); //threadIdx.x;
             int gx = item.get_group(1); //blockIdx.x;
             int gy = item.get_group(0); //blockIdx.y;
@@ -187,21 +187,21 @@ int main(int argc, char **argv) {
                the shared array is fully initialized. */
             item.barrier(access::fence_space::local_space);
 
-	    vec<char, 4> j, k;
+            vec<char, 4> j, k;
             for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-	      j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-	      k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+              j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
+              k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
 
             /* use a local variable (stored in register) to hold intermediate
                values. This reduces writes to global memory */
               char count = 0;
               if(j.x() ^ k.x()) 
                 count++; 
-              if((j.y() ^ k.y()) && (i+1 < ATTRIBUTES))
+              if((j.y() ^ k.y())
                 count++;
-              if((j.z() ^ k.z()) && (i+2 < ATTRIBUTES))
+              if((j.z() ^ k.z())
                 count++;
-              if((j.w() ^ k.w()) && (i+3 < ATTRIBUTES))
+              if((j.w() ^ k.w())
                 count++;
 
               /* Increment shared array */

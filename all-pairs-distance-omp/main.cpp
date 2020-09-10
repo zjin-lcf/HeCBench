@@ -19,7 +19,7 @@
 #include <sys/time.h>
 
 #define INSTANCES 224   /* # of instances */
-#define ATTRIBUTES 1123 /* # of attributes */
+#define ATTRIBUTES 4096 /* # of attributes */
 #define THREADS 128    /* # of threads per block */
 
 struct char4 { char x; char y; char z; char w; };
@@ -33,8 +33,8 @@ void CPU(int * data, int * distance) {
   for (int i = 0; i < INSTANCES; i++) {
     for (int j = 0; j < INSTANCES; j++) {
       for (int k = 0; k < ATTRIBUTES; k++) {
-	distance[i + INSTANCES * j] += 
-	  (data[i * ATTRIBUTES + k] != data[j * ATTRIBUTES + k]);
+        distance[i + INSTANCES * j] += 
+          (data[i * ATTRIBUTES + k] != data[j * ATTRIBUTES + k]);
       }
     }
   }
@@ -114,11 +114,11 @@ int main(int argc, char **argv) {
     
           if(j.x ^ k.x) 
             count++; 
-          if((j.y ^ k.y) && (i+1 < ATTRIBUTES))
+          if(j.y ^ k.y)
             count++;
-          if((j.z ^ k.z) && (i+2 < ATTRIBUTES))
+          if(j.z ^ k.z)
             count++;
-          if((j.w ^ k.w) && (i+3 < ATTRIBUTES))
+          if(j.w ^ k.w)
             count++;
     
           /* Only one atomic write to global memory */
@@ -168,11 +168,11 @@ int main(int argc, char **argv) {
     
           if(j.x ^ k.x) 
             count++; 
-          if((j.y ^ k.y) && (i+1 < ATTRIBUTES))
+          if(j.y ^ k.y)
             count++;
-          if((j.z ^ k.z) && (i+2 < ATTRIBUTES))
+          if(j.z ^ k.z)
             count++;
-          if((j.w ^ k.w) && (i+3 < ATTRIBUTES))
+          if(j.w ^ k.w)
             count++;
     
           dist[idx] += count;

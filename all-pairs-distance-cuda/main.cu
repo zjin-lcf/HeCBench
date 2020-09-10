@@ -10,7 +10,7 @@
    To compile, type make.
    After compilation, type ./chapter to run
    Output written to timing.txt
-*/
+ */
 
 #include <cstdio>
 #include <cstdlib>
@@ -19,19 +19,19 @@
 #include <sys/time.h>
 
 #define INSTANCES 224   /* # of instances */
-#define ATTRIBUTES 1123 /* # of attributes */
+#define ATTRIBUTES 4096 /* # of attributes */
 #define THREADS 128    /* # of threads per block */
 
 /* CPU implementation */
 void CPU(int * data, int * distance) {
   /* compare all pairs of instances, accessing the attributes in
      row-major order */
-  #pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
   for (int i = 0; i < INSTANCES; i++) {
     for (int j = 0; j < INSTANCES; j++) {
       for (int k = 0; k < ATTRIBUTES; k++) {
-	distance[i + INSTANCES * j] += 
-	  (data[i * ATTRIBUTES + k] != data[j * ATTRIBUTES + k]);
+        distance[i + INSTANCES * j] += 
+          (data[i * ATTRIBUTES + k] != data[j * ATTRIBUTES + k]);
       }
     }
   }
@@ -40,7 +40,7 @@ void CPU(int * data, int * distance) {
 
 /*  coalesced GPU implementation of the all-pairs kernel using
     character data types and registers */
-__global__ void GPUregister(char *data, int *distance) {
+__global__ void GPUregister(const char *data, int *distance) {
   int idx = threadIdx.x;
   int gx = blockIdx.x;
   int gy = blockIdx.y;
@@ -55,11 +55,11 @@ __global__ void GPUregister(char *data, int *distance) {
 
     if(j.x ^ k.x) 
       count++; 
-    if((j.y ^ k.y) && (i+1 < ATTRIBUTES))
+    if(j.y ^ k.y)
       count++;
-    if((j.z ^ k.z) && (i+2 < ATTRIBUTES))
+    if(j.z ^ k.z)
       count++;
-    if((j.w ^ k.w) && (i+3 < ATTRIBUTES))
+    if(j.w ^ k.w)
       count++;
 
     /* Only one atomic write to global memory */
@@ -69,7 +69,7 @@ __global__ void GPUregister(char *data, int *distance) {
 
 /*  coalesced GPU implementation of the all-pairs kernel using
     character data types, registers, and shared memory */
-__global__ void GPUshared(char *data, int *distance) {
+__global__ void GPUshared(const char *data, int *distance) {
   int idx = threadIdx.x;
   int gx = blockIdx.x;
   int gy = blockIdx.y;
@@ -81,7 +81,7 @@ __global__ void GPUshared(char *data, int *distance) {
      itself. Because the memory is on the chip, it is a lot faster
      than global memory. Multiple threads can still access it, though,
      provided they are in the same block.
-  */
+   */
   __shared__ int dist[THREADS];
 
   /* each thread initializes its own location of the shared array */ 
@@ -98,11 +98,11 @@ __global__ void GPUshared(char *data, int *distance) {
 
     if(j.x ^ k.x) 
       count++;
-    if((j.y ^ k.y) && (i+1 < ATTRIBUTES))
+    if(j.y ^ k.y)
       count++;
-    if((j.z ^ k.z) && (i+2 < ATTRIBUTES))
+    if(j.z ^ k.z)
       count++;
-    if((j.w ^ k.w) && (i+3 < ATTRIBUTES))
+    if(j.w ^ k.w)
       count++;
 
     /* Increment shared array */
@@ -113,11 +113,11 @@ __global__ void GPUshared(char *data, int *distance) {
      of the shared array. Since the distances for each thread are read
      by thread 0 below, this must be ensured. Above, it was not
      necessary because each thread was accessing its own memory
-  */
+   */
   __syncthreads();
 
   /* Reduction: Thread 0 will add the value of all other threads to
-  its own */ 
+     its own */ 
   if(idx == 0) {
     for(int i = 1; i < THREADS; i++) {
       dist[0] += dist[i];
@@ -127,7 +127,7 @@ __global__ void GPUshared(char *data, int *distance) {
        this does not need to be performed atomically, because only one
        thread per block is writing to global memory, and each block
        corresponds to a unique memory address. 
-    */
+     */
     distance[INSTANCES*gy + gx] = dist[0];
   }
 }
@@ -156,7 +156,7 @@ int main(int argc, char **argv) {
   struct timezone tzp;
   /* verification result */ 
   int status;
-  
+
   /* output file for timing results */
   FILE *out = fopen("timing.txt","a");
 
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
   gpu_distance = (int *)malloc(INSTANCES * INSTANCES * sizeof(int));
 
   /* randomly initialize host data */
-  #pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
   for (int i = 0; i < ATTRIBUTES; i++) {
     for (int j = 0; j < INSTANCES; j++) {
       data[i + ATTRIBUTES * j] = data_char[i + ATTRIBUTES * j] = random() % 3;
@@ -179,17 +179,18 @@ int main(int argc, char **argv) {
 
   /* allocate GPU memory */
   cudaMalloc((void **)&data_char_device, 
-	     INSTANCES * ATTRIBUTES * sizeof(char));
+      INSTANCES * ATTRIBUTES * sizeof(char));
 
   cudaMalloc((void **)&distance_device, 
-	     INSTANCES * INSTANCES * sizeof(int));
+      INSTANCES * INSTANCES * sizeof(int));
 
   cudaMemcpy(data_char_device, data_char,
-	     INSTANCES * ATTRIBUTES * sizeof(char),
-	     cudaMemcpyHostToDevice);
+      INSTANCES * ATTRIBUTES * sizeof(char),
+      cudaMemcpyHostToDevice);
 
   /* specify grid and block dimensions */
   dimBlock.x = THREADS; 
+  dimBlock.y = 1; 
   dimGrid.x = INSTANCES;
   dimGrid.y = INSTANCES;
 
@@ -203,18 +204,18 @@ int main(int argc, char **argv) {
   stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
   elapsedTime = stop_cpu - start_cpu;
   fprintf(out,"%f ",elapsedTime);
-  
+
   for (int n = 0; n < 10; n++) {
     /* register GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
     cudaMemcpy(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int),
-               cudaMemcpyHostToDevice);
+        cudaMemcpyHostToDevice);
     GPUregister<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
     cudaMemcpy(gpu_distance, distance_device,
-               INSTANCES * INSTANCES * sizeof(int),
-               cudaMemcpyDeviceToHost); 
+        INSTANCES * INSTANCES * sizeof(int),
+        cudaMemcpyDeviceToHost); 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime = stop_gpu - start_gpu;
@@ -224,18 +225,18 @@ int main(int argc, char **argv) {
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
-  
+
   for (int n = 0; n < 10; n++) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
     cudaMemcpy(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int),
-               cudaMemcpyHostToDevice);
+        cudaMemcpyHostToDevice);
     GPUshared<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
     cudaMemcpy(gpu_distance, distance_device,
-               INSTANCES * INSTANCES * sizeof(int),
-               cudaMemcpyDeviceToHost); 
+        INSTANCES * INSTANCES * sizeof(int),
+        cudaMemcpyDeviceToHost); 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime = stop_gpu - start_gpu;
@@ -254,5 +255,5 @@ int main(int argc, char **argv) {
 
   return status;
 }
- 
+
 
