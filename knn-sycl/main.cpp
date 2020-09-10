@@ -210,15 +210,16 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
     auto AB_h = dist_dev.get_access<sycl_read>(h);
     h.copy(AB_h, dist_host);
     });
-  q.wait();
-  for (int i = 0; i < query_width * ref_width; i++)
-    printf("k2 dist: %d %f\n", i, dist_host[i]);
 
   q.submit([&] (handler &h) {
     auto AB_h = ind_dev.get_access<sycl_read>(h);
     h.copy(AB_h, ind_host);
     });
+
   q.wait();
+  for (int i = 0; i < query_width * ref_width; i++)
+    printf("k2 dist: %d %f\n", i, dist_host[i]);
+
   for (int i = 0; i < query_width * k; i++)
     printf("k2 index: %d %d\n", i, ind_host[i]);
 #endif
@@ -340,7 +341,7 @@ int main(void) {
   int query_nb = 4096; // Query point number,     max=65535
   int dim = 68;        // Dimension of points
   int k = 20;          // Nearest neighbors to consider
-  int iterations = 1;
+  int iterations = 100;
   int c_iterations = 1;
   int i;
   const float precision = 0.001f; // distance error max
