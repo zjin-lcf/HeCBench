@@ -197,11 +197,11 @@ int main(int argc, char **argv) {
               char count = 0;
               if(j.x() ^ k.x()) 
                 count++; 
-              if((j.y() ^ k.y())
+              if(j.y() ^ k.y())
                 count++;
-              if((j.z() ^ k.z())
+              if(j.z() ^ k.z())
                 count++;
-              if((j.w() ^ k.w())
+              if(j.w() ^ k.w())
                 count++;
 
               /* Increment shared array */
