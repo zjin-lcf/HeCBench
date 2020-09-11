@@ -14,6 +14,13 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
 
 ## Results on Platform 1
+| all-pairs-distance | SYCL | DPCT usm | DPCT header | OpenMP |     
+| --- | --- | --- | --- | --- |            
+| total enqueue | 60 | 61 | 61 | 67 | 
+| host timing(s) | 0.41 | 0.79 | 0.85 | 26 | 
+| device timing(s) | 0.13 | 0.19 | 0.18 | 22 |  
+
+
 | amgmk | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |            
 | total enqueue | 501 | 506 | 506 | 2010 | 
@@ -145,6 +152,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 24 | 27 | 27 | 62 |
 | host timing(s) | 0.95 | 1.33 | 1.36 |  17.8 |
 | device timing(s) | 0.57 | 0.58 | 0.57 | 14.1 |
+
+
+| knn | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 500 | 700 | 700 | 2007 |
+| host timing(s) | 9.8 | 12.3 | 12.5 |  16.2 |
+| device timing(s) | 7.6 | 10.1 | 10.4 | 10.7 |
 
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -328,6 +342,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.6 | 2.7 | 2.1 | 3.1 |
 
 ## Results on Platform 2
+| all-pairs-distance | SYCL | DPCT usm | DPCT header | OpenMP |     
+| --- | --- | --- | --- | --- |            
+| total enqueue | 60 | 61 | 61 | 67 | 
+| host timing(s) | 0.49 | 0.87 | 0.93 | 58 | 
+| device timing(s) | 0.14 | 0.22 | 0.22 | 54 |  
+
+
 | amgmk | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |           
 | total enqueue | 501 | 506 | 506 | 2010 | 
@@ -459,6 +480,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 24 | 27 | 27 | 62 |
 | host timing(s) | 1.36 | 1.67 | 1.78 |  17.2 |
 | device timing(s) | 0.92 | 0.96 | 0.93 | 13.7 |
+
+
+| knn | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 500 | 700 | 700 | 2007 |
+| host timing(s) | 12.9 | 15.3  | 14.6 | 17.0 |
+| device timing(s) | 10.4 | 11.4 | 11.4 | 11.6 |
 
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -642,6 +670,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.1 | 2.0 | 2.0 | 2.3 |
 
 # Reference
+### all-pairs-distance
+  All-pairs distance calculation (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2910913/)
+
 ### amgmk 
   The relax kernel in the AMGmk benchmark (https://asc.llnl.gov/CORAL-benchmarks/Micro/amgmk-v1.0.tar.gz)
   
@@ -697,10 +728,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
 ### keccaktreehash 
-  Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
+  A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
+
+### knn
+  K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
 
 ### laplace
-  Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+  A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
