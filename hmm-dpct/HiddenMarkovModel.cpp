@@ -9,8 +9,8 @@
  *
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 
 // forward declaractions
 int initHMM(float *initProb, float *mtState, float *mtObs, const int &nState, const int &nEmit);
