@@ -202,7 +202,9 @@ int main(int argc, char** argv)
   dim3 gridDim ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
   dim3 blockDim(BLOCK_SIZE);
 
-  MurmurHash3_x64_128_kernel<<<gridDim, blockDim>>>(dev_keys, dev_length, key_length, dev_out, numKeys);
+  for (uint32_t n = 0; n < 100; n++)  
+    MurmurHash3_x64_128_kernel<<<gridDim, blockDim>>>(
+      dev_keys, dev_length, key_length, dev_out, numKeys);
 
   cudaMemcpy(d_out, dev_out, sizeof(uint64_t)*(numKeys*2), cudaMemcpyDeviceToHost);
 
