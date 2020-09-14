@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cassert>
+#include "common.h"
 
 #define BLOCK_SIZE 256
 
@@ -14,9 +15,7 @@ inline uint64_t rotl64 ( uint64_t x, int8_t r )
   return (x << r) | (x >> (64 - r));
 }
 
-#define ROTL64(x,y)  rotl64(x,y)
-
-#define BIG_CONSTANT(x) (x##LLU)
+#define BIG_CONSTANT(x) (x##LU)
 
 
 //-----------------------------------------------------------------------------
@@ -46,7 +45,6 @@ FORCE_INLINE uint64_t fmix64 ( uint64_t k )
 }
 
 
-#pragma omp declare target 
 void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
     const uint32_t seed, void * out )
 {
@@ -67,13 +65,13 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
     uint64_t k1 = getblock64(data,i*2+0);
     uint64_t k2 = getblock64(data,i*2+1);
 
-    k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+    k1 *= c1; k1  = rotl64(k1,31); k1 *= c2; h1 ^= k1;
 
-    h1 = ROTL64(h1,27); h1 += h2; h1 = h1*5+0x52dce729;
+    h1 = rotl64(h1,27); h1 += h2; h1 = h1*5+0x52dce729;
 
-    k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
+    k2 *= c2; k2  = rotl64(k2,33); k2 *= c1; h2 ^= k2;
 
-    h2 = ROTL64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
+    h2 = rotl64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
   }
 
   //----------
@@ -93,7 +91,7 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
     case 11: k2 ^= ((uint64_t)tail[10]) << 16;
     case 10: k2 ^= ((uint64_t)tail[ 9]) << 8;
     case  9: k2 ^= ((uint64_t)tail[ 8]) << 0;
-       k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
+       k2 *= c2; k2  = rotl64(k2,33); k2 *= c1; h2 ^= k2;
 
     case  8: k1 ^= ((uint64_t)tail[ 7]) << 56;
     case  7: k1 ^= ((uint64_t)tail[ 6]) << 48;
@@ -103,7 +101,7 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
     case  3: k1 ^= ((uint64_t)tail[ 2]) << 16;
     case  2: k1 ^= ((uint64_t)tail[ 1]) << 8;
     case  1: k1 ^= ((uint64_t)tail[ 0]) << 0;
-       k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+       k1 *= c1; k1  = rotl64(k1,31); k1 *= c2; h1 ^= k1;
   };
 
   //----------
@@ -123,7 +121,6 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
   ((uint64_t*)out)[0] = h1;
   ((uint64_t*)out)[1] = h2;
 }
-#pragma omp end declare target 
 
 int main(int argc, char** argv) 
 {
@@ -166,27 +163,46 @@ int main(int argc, char** argv)
 
   // initialize the key array 
   uint8_t* d_keys = (uint8_t*) malloc (sizeof(uint8_t) * total_length);
+
   for (uint32_t i = 0; i < numKeys; i++) {
     memcpy(d_keys+d_length[i], keys[i], length[i]);
   }
+
   // sanity check
   for (uint32_t i = 0; i < numKeys; i++) {
     assert (0 == memcmp(d_keys+d_length[i], keys[i], length[i]));
   }
 
-
-#pragma omp target data map(to: d_keys[0:total_length], \
-                                d_length[0:numKeys+1], \
-                                length[0:numKeys]) \
-                        map(from: d_out[0:2*numKeys])
   {
-    for (uint32_t n = 0; n < 100; n++) {
-      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
-      for (uint32_t i = 0; i < numKeys; i++) {
-        MurmurHash3_x64_128 (d_keys+d_length[i], length[i], i, d_out+i*2);
-      }
-    }
-  }
+  buffer<uint8_t, 1> dev_keys(d_keys, total_length);
+  buffer<uint64_t, 1> dev_out(d_out, 2*numKeys);
+  buffer<uint32_t, 1> dev_length(d_length, numKeys+1);
+  buffer<uint32_t, 1> key_length(length, numKeys);
+
+#ifdef USE_GPU 
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
+
+  range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  range<1> local_work_size (BLOCK_SIZE);
+
+  for (uint32_t n = 0; n < 100; n++)  
+    q.submit([&](handler &h) {
+      auto d_keys = dev_keys.get_access<sycl_read>(h);
+      auto d_length = dev_length.get_access<sycl_read>(h);
+      auto length = key_length.get_access<sycl_read>(h);
+      auto d_out = dev_out.get_access<sycl_discard_write>(h);
+      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+        int i = item.get_global_id(0); 
+        if (i < numKeys) 
+          MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
+        });
+    });
+
+  } // sycl scope
 
   // verify
   bool error = false;
