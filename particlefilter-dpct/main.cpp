@@ -1,3 +1,5 @@
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +11,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <iostream>
-#include <cuda.h>
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
@@ -59,7 +60,7 @@ float elapsed_time(long long start_time, long long end_time) {
 float randu(int * seed, int index) {
 	int num = A * seed[index] + C;
 	seed[index] = num % M;
-	return fabs(seed[index] / ((float) M));
+ return fabs(seed[index] / ((float)M));
 }
 
 /**
@@ -74,9 +75,9 @@ float randn(int * seed, int index) {
 	/*Box-Muller algorithm*/
 	float u = randu(seed, index);
 	float v = randu(seed, index);
-	float cosine = cos(2 * PI * v);
-	float rt = -2 * log(u);
-	return sqrt(rt) * cosine;
+ float cosine = cos(2 * PI * v);
+ float rt = -2 * log(u);
+ return sqrt(rt) * cosine;
 }
 
 /**
@@ -141,8 +142,9 @@ void strelDisk(int * disk, int radius) {
 	int x, y;
 	for (x = 0; x < diameter; x++) {
 		for (y = 0; y < diameter; y++) {
-			float distance = sqrt(pow((float) (x - radius + 1), 2) + pow((float) (y - radius + 1), 2));
-			if (distance < radius)
+   float distance =
+       sqrt(pow((float)(x - radius + 1), 2) + pow((float)(y - radius + 1), 2));
+                        if (distance < radius)
 				disk[x * diameter + y] = 1;
 			else
 				disk[x * diameter + y] = 0;
@@ -177,8 +179,8 @@ void dilate_matrix(unsigned char * matrix, int posX, int posY, int posZ, int dim
 	int x, y;
 	for (x = startX; x < endX; x++) {
 		for (y = startY; y < endY; y++) {
-			float distance = sqrt(pow((float) (x - posX), 2) + pow((float) (y - posY), 2));
-			if (distance < error)
+   float distance = sqrt(pow((float)(x - posX), 2) + pow((float)(y - posY), 2));
+                        if (distance < error)
 				matrix[x * dimY * dimZ + y * dimZ + posZ] = 1;
 		}
 	}
@@ -252,9 +254,9 @@ void videoSequence(unsigned char * I, int IszX, int IszY, int Nfr, int * seed) {
 	/*move point*/
 	int xk, yk, pos;
 	for (k = 1; k < Nfr; k++) {
-		xk = abs(x0 + (k - 1));
-		yk = abs(y0 - 2 * (k - 1));
-		pos = yk * IszY * Nfr + xk * Nfr + k;
+  xk = abs(x0 + (k - 1));
+  yk = abs(y0 - 2 * (k - 1));
+                pos = yk * IszY * Nfr + xk * Nfr + k;
 		if (pos >= max_size)
 			pos = 0;
 		I[pos] = 1;
@@ -315,8 +317,11 @@ int findIndex(float * CDF, int lengthCDF, float value) {
  * @param seed The seed array used for random number generation
  * @param Nparticles The number of particles to be used
  */
-int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, int Nparticles) {
-	int max_size = IszX * IszY*Nfr;
+int particleFilter(unsigned char *I, int IszX, int IszY, int Nfr, int *seed,
+                   int Nparticles) {
+ dpct::device_ext &dev_ct1 = dpct::get_current_device();
+ sycl::queue &q_ct1 = dev_ct1.default_queue();
+        int max_size = IszX * IszY*Nfr;
 	//original particle centroid
 	float xe = roundFloat(IszY / 2.0);
 	float ye = roundFloat(IszX / 2.0);
@@ -386,45 +391,58 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 	float* weights_GPU;
 	unsigned char* I_GPU;
 
-	cudaMalloc((void**)&likelihood_GPU, (Nparticles + 1)*sizeof(float));
+ likelihood_GPU = sycl::malloc_device<float>((Nparticles + 1), q_ct1);
 
-	cudaMalloc((void**)&arrayX_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&arrayY_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&xj_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&yj_GPU, Nparticles*sizeof(float));
-	cudaMemcpy(xj_GPU, xj, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(yj_GPU, yj, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMalloc((void**)&CDF_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&u_GPU, Nparticles*sizeof(float));
-	//cudaMemcpy(u_GPU, u, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
+ arrayX_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+ arrayY_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+ xj_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+ yj_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+ q_ct1.memcpy(xj_GPU, xj, Nparticles * sizeof(float)).wait();
+ q_ct1.memcpy(yj_GPU, yj, Nparticles * sizeof(float)).wait();
+ CDF_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+ u_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+        //cudaMemcpy(u_GPU, u, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&ind_GPU, countOnes*Nparticles*sizeof(int));
-	//cudaMemcpy(ind_GPU, ind, countOnes*Nparticles*sizeof(int), cudaMemcpyHostToDevice);
+ ind_GPU = sycl::malloc_device<int>(countOnes * Nparticles, q_ct1);
+        //cudaMemcpy(ind_GPU, ind, countOnes*Nparticles*sizeof(int), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&weights_GPU, Nparticles*sizeof(float));
-	// memory copy is not needed, because all the weights are updated first before 
+ weights_GPU = sycl::malloc_device<float>(Nparticles, q_ct1);
+        // memory copy is not needed, because all the weights are updated first before 
 	// they are read in the likelihood kernel. 
-	// Just be consistent with the original cuda version 
-	cudaMemcpy(weights_GPU, weights, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
+	// Just be consistent with the original cuda version
+ q_ct1.memcpy(weights_GPU, weights, Nparticles * sizeof(float)).wait();
 
-	cudaMalloc((void**)&I_GPU, IszX * IszY * Nfr * sizeof(unsigned char));
-	cudaMemcpy(I_GPU, I, IszX * IszY * Nfr * sizeof(unsigned char), cudaMemcpyHostToDevice);
+ I_GPU = sycl::malloc_device<unsigned char>(IszX * IszY * Nfr, q_ct1);
+ q_ct1.memcpy(I_GPU, I, IszX * IszY * Nfr * sizeof(unsigned char)).wait();
 
-	cudaMalloc((void**)&seed_GPU, Nparticles*sizeof(int));
-	cudaMemcpy(seed_GPU, seed, Nparticles*sizeof(int), cudaMemcpyHostToDevice);
+ seed_GPU = sycl::malloc_device<int>(Nparticles, q_ct1);
+ q_ct1.memcpy(seed_GPU, seed, Nparticles * sizeof(int)).wait();
 
-	cudaMalloc((void**)&partial_sums_GPU, (Nparticles+1)*sizeof(float));
-	//cudaMemcpy(partial_sums_GPU, likelihood, (Nparticles+1)*sizeof(float), cudaMemcpyHostToDevice);
+ partial_sums_GPU = sycl::malloc_device<float>((Nparticles + 1), q_ct1);
+        //cudaMemcpy(partial_sums_GPU, likelihood, (Nparticles+1)*sizeof(float), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&objxy_GPU, 2*countOnes*sizeof(int));
-	cudaMemcpy(objxy_GPU, objxy, 2*countOnes*sizeof(int), cudaMemcpyHostToDevice);
+ objxy_GPU = sycl::malloc_device<int>(2 * countOnes, q_ct1);
+ q_ct1.memcpy(objxy_GPU, objxy, 2 * countOnes * sizeof(int)).wait();
 
-	for (int k = 1; k < Nfr; k++) {
+        for (int k = 1; k < Nfr; k++) {
 		/****************** L I K E L I H O O D ************************************/
-		kernel_likelihood<<<num_blocks, BLOCK_SIZE>>>(
-				arrayX_GPU, arrayY_GPU, xj_GPU, yj_GPU, ind_GPU,
-				objxy_GPU, likelihood_GPU, I_GPU, weights_GPU, seed_GPU, partial_sums_GPU,
-				Nparticles, countOnes, IszY, Nfr, k, max_size);
+  q_ct1.submit([&](sycl::handler &cgh) {
+   sycl::accessor<float, 1, sycl::access::mode::read_write,
+                  sycl::access::target::local>
+       weights_local_acc_ct1(sycl::range<1>(256 /*BLOCK_SIZE*/), cgh);
+
+   cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                                          sycl::range<3>(1, 1, BLOCK_SIZE),
+                                      sycl::range<3>(1, 1, BLOCK_SIZE)),
+                    [=](sycl::nd_item<3> item_ct1) {
+                     kernel_likelihood(arrayX_GPU, arrayY_GPU, xj_GPU, yj_GPU,
+                                       ind_GPU, objxy_GPU, likelihood_GPU,
+                                       I_GPU, weights_GPU, seed_GPU,
+                                       partial_sums_GPU, Nparticles, countOnes,
+                                       IszY, Nfr, k, max_size, item_ct1,
+                                       weights_local_acc_ct1.get_pointer());
+                    });
+  });
 
 #ifdef DEBUG
 	  float * sum = (float *) calloc(Nparticles + 1, sizeof (float));
@@ -434,7 +452,13 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     printf("\n");
 #endif
 
-		kernel_sum<<<1, 1>>>(partial_sums_GPU, Nparticles);
+  q_ct1.submit([&](sycl::handler &cgh) {
+   cgh.parallel_for(
+       sycl::nd_range<3>(sycl::range<3>(1, 1, 1), sycl::range<3>(1, 1, 1)),
+       [=](sycl::nd_item<3> item_ct1) {
+        kernel_sum(partial_sums_GPU, Nparticles);
+       });
+  });
 
 #ifdef DEBUG
 		// this shows the sum of all partial_sum results
@@ -442,43 +466,56 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 		printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
 #endif
 
-		kernel_normalize_weights<<<num_blocks, BLOCK_SIZE>>>(
-				weights_GPU,
-				partial_sums_GPU,
-				CDF_GPU,
-				u_GPU,
-				seed_GPU,
-				Nparticles );
+  q_ct1.submit([&](sycl::handler &cgh) {
+   sycl::accessor<float, 0, sycl::access::mode::read_write,
+                  sycl::access::target::local>
+       u1_acc_ct1(cgh);
+   sycl::accessor<float, 0, sycl::access::mode::read_write,
+                  sycl::access::target::local>
+       sumWeights_acc_ct1(cgh);
 
-		kernel_find_index<<<num_blocks, BLOCK_SIZE>>>(
-				arrayX_GPU,
-				arrayY_GPU,
-				CDF_GPU,
-				u_GPU,
-				xj_GPU,
-				yj_GPU,
-				Nparticles );
-	}//end loop
+   cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                                          sycl::range<3>(1, 1, BLOCK_SIZE),
+                                      sycl::range<3>(1, 1, BLOCK_SIZE)),
+                    [=](sycl::nd_item<3> item_ct1) {
+                     kernel_normalize_weights(weights_GPU, partial_sums_GPU,
+                                              CDF_GPU, u_GPU, seed_GPU,
+                                              Nparticles, item_ct1,
+                                              u1_acc_ct1.get_pointer(),
+                                              sumWeights_acc_ct1.get_pointer());
+                    });
+  });
 
-	cudaMemcpy(arrayX, arrayX_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(arrayY, arrayY_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(weights, weights_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
+  q_ct1.submit([&](sycl::handler &cgh) {
+   cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                                          sycl::range<3>(1, 1, BLOCK_SIZE),
+                                      sycl::range<3>(1, 1, BLOCK_SIZE)),
+                    [=](sycl::nd_item<3> item_ct1) {
+                     kernel_find_index(arrayX_GPU, arrayY_GPU, CDF_GPU, u_GPU,
+                                       xj_GPU, yj_GPU, Nparticles, item_ct1);
+                    });
+  });
+        }//end loop
 
-	cudaFree(likelihood_GPU);
-	cudaFree(arrayX_GPU);
-	cudaFree(arrayY_GPU);
-	cudaFree(xj_GPU);
-	cudaFree(yj_GPU);
-	cudaFree(CDF_GPU);
-	cudaFree(partial_sums_GPU);
-	cudaFree(objxy_GPU);
-	cudaFree(u_GPU);
-	cudaFree(ind_GPU);
-	cudaFree(seed_GPU);
-	cudaFree(weights_GPU);
-	cudaFree(I_GPU);
+ q_ct1.memcpy(arrayX, arrayX_GPU, Nparticles * sizeof(float)).wait();
+ q_ct1.memcpy(arrayY, arrayY_GPU, Nparticles * sizeof(float)).wait();
+ q_ct1.memcpy(weights, weights_GPU, Nparticles * sizeof(float)).wait();
 
-	long long offload_end = get_time();
+ sycl::free(likelihood_GPU, q_ct1);
+ sycl::free(arrayX_GPU, q_ct1);
+ sycl::free(arrayY_GPU, q_ct1);
+ sycl::free(xj_GPU, q_ct1);
+ sycl::free(yj_GPU, q_ct1);
+ sycl::free(CDF_GPU, q_ct1);
+ sycl::free(partial_sums_GPU, q_ct1);
+ sycl::free(objxy_GPU, q_ct1);
+ sycl::free(u_GPU, q_ct1);
+ sycl::free(ind_GPU, q_ct1);
+ sycl::free(seed_GPU, q_ct1);
+ sycl::free(weights_GPU, q_ct1);
+ sycl::free(I_GPU, q_ct1);
+
+        long long offload_end = get_time();
 
 	printf("Device offloading time: %lf (s)\n", elapsed_time(offload_start, offload_end));
 
@@ -489,9 +526,10 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 		xe += arrayX[x] * weights[x];
 		ye += arrayY[x] * weights[x];
 	}
-	float distance = sqrt(pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
+ float distance = sqrt(pow((float)(xe - (int)roundFloat(IszY / 2.0)), 2) +
+                       pow((float)(ye - (int)roundFloat(IszX / 2.0)), 2));
 
-	//Output results
+        //Output results
 	FILE *fid;
 	fid=fopen("output.txt", "w+");
 	if( fid == NULL ){

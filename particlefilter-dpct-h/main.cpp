@@ -1,3 +1,6 @@
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +12,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <iostream>
-#include <cuda.h>
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
@@ -59,7 +61,7 @@ float elapsed_time(long long start_time, long long end_time) {
 float randu(int * seed, int index) {
 	int num = A * seed[index] + C;
 	seed[index] = num % M;
-	return fabs(seed[index] / ((float) M));
+ return fabs(seed[index] / ((float)M));
 }
 
 /**
@@ -74,9 +76,9 @@ float randn(int * seed, int index) {
 	/*Box-Muller algorithm*/
 	float u = randu(seed, index);
 	float v = randu(seed, index);
-	float cosine = cos(2 * PI * v);
-	float rt = -2 * log(u);
-	return sqrt(rt) * cosine;
+ float cosine = cos(2 * PI * v);
+ float rt = -2 * log(u);
+ return sqrt(rt) * cosine;
 }
 
 /**
@@ -141,8 +143,9 @@ void strelDisk(int * disk, int radius) {
 	int x, y;
 	for (x = 0; x < diameter; x++) {
 		for (y = 0; y < diameter; y++) {
-			float distance = sqrt(pow((float) (x - radius + 1), 2) + pow((float) (y - radius + 1), 2));
-			if (distance < radius)
+   float distance =
+       sqrt(pow((float)(x - radius + 1), 2) + pow((float)(y - radius + 1), 2));
+                        if (distance < radius)
 				disk[x * diameter + y] = 1;
 			else
 				disk[x * diameter + y] = 0;
@@ -177,8 +180,8 @@ void dilate_matrix(unsigned char * matrix, int posX, int posY, int posZ, int dim
 	int x, y;
 	for (x = startX; x < endX; x++) {
 		for (y = startY; y < endY; y++) {
-			float distance = sqrt(pow((float) (x - posX), 2) + pow((float) (y - posY), 2));
-			if (distance < error)
+   float distance = sqrt(pow((float)(x - posX), 2) + pow((float)(y - posY), 2));
+                        if (distance < error)
 				matrix[x * dimY * dimZ + y * dimZ + posZ] = 1;
 		}
 	}
@@ -252,9 +255,9 @@ void videoSequence(unsigned char * I, int IszX, int IszY, int Nfr, int * seed) {
 	/*move point*/
 	int xk, yk, pos;
 	for (k = 1; k < Nfr; k++) {
-		xk = abs(x0 + (k - 1));
-		yk = abs(y0 - 2 * (k - 1));
-		pos = yk * IszY * Nfr + xk * Nfr + k;
+  xk = abs(x0 + (k - 1));
+  yk = abs(y0 - 2 * (k - 1));
+                pos = yk * IszY * Nfr + xk * Nfr + k;
 		if (pos >= max_size)
 			pos = 0;
 		I[pos] = 1;
@@ -315,8 +318,11 @@ int findIndex(float * CDF, int lengthCDF, float value) {
  * @param seed The seed array used for random number generation
  * @param Nparticles The number of particles to be used
  */
-int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, int Nparticles) {
-	int max_size = IszX * IszY*Nfr;
+int particleFilter(unsigned char *I, int IszX, int IszY, int Nfr, int *seed,
+                   int Nparticles) {
+ dpct::device_ext &dev_ct1 = dpct::get_current_device();
+ sycl::queue &q_ct1 = dev_ct1.default_queue();
+        int max_size = IszX * IszY*Nfr;
 	//original particle centroid
 	float xe = roundFloat(IszY / 2.0);
 	float ye = roundFloat(IszX / 2.0);
@@ -386,45 +392,109 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 	float* weights_GPU;
 	unsigned char* I_GPU;
 
-	cudaMalloc((void**)&likelihood_GPU, (Nparticles + 1)*sizeof(float));
+ dpct::dpct_malloc((void **)&likelihood_GPU, (Nparticles + 1) * sizeof(float));
 
-	cudaMalloc((void**)&arrayX_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&arrayY_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&xj_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&yj_GPU, Nparticles*sizeof(float));
-	cudaMemcpy(xj_GPU, xj, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(yj_GPU, yj, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMalloc((void**)&CDF_GPU, Nparticles*sizeof(float));
-	cudaMalloc((void**)&u_GPU, Nparticles*sizeof(float));
-	//cudaMemcpy(u_GPU, u, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&arrayX_GPU, Nparticles * sizeof(float));
+ dpct::dpct_malloc((void **)&arrayY_GPU, Nparticles * sizeof(float));
+ dpct::dpct_malloc((void **)&xj_GPU, Nparticles * sizeof(float));
+ dpct::dpct_malloc((void **)&yj_GPU, Nparticles * sizeof(float));
+ dpct::dpct_memcpy(xj_GPU, xj, Nparticles * sizeof(float),
+                   dpct::host_to_device);
+ dpct::dpct_memcpy(yj_GPU, yj, Nparticles * sizeof(float),
+                   dpct::host_to_device);
+ dpct::dpct_malloc((void **)&CDF_GPU, Nparticles * sizeof(float));
+ dpct::dpct_malloc((void **)&u_GPU, Nparticles * sizeof(float));
+        //cudaMemcpy(u_GPU, u, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&ind_GPU, countOnes*Nparticles*sizeof(int));
-	//cudaMemcpy(ind_GPU, ind, countOnes*Nparticles*sizeof(int), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&ind_GPU, countOnes * Nparticles * sizeof(int));
+        //cudaMemcpy(ind_GPU, ind, countOnes*Nparticles*sizeof(int), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&weights_GPU, Nparticles*sizeof(float));
-	// memory copy is not needed, because all the weights are updated first before 
+ dpct::dpct_malloc((void **)&weights_GPU, Nparticles * sizeof(float));
+        // memory copy is not needed, because all the weights are updated first before 
 	// they are read in the likelihood kernel. 
-	// Just be consistent with the original cuda version 
-	cudaMemcpy(weights_GPU, weights, Nparticles*sizeof(float), cudaMemcpyHostToDevice);
+	// Just be consistent with the original cuda version
+ dpct::dpct_memcpy(weights_GPU, weights, Nparticles * sizeof(float),
+                   dpct::host_to_device);
 
-	cudaMalloc((void**)&I_GPU, IszX * IszY * Nfr * sizeof(unsigned char));
-	cudaMemcpy(I_GPU, I, IszX * IszY * Nfr * sizeof(unsigned char), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&I_GPU, IszX * IszY * Nfr * sizeof(unsigned char));
+ dpct::dpct_memcpy(I_GPU, I, IszX * IszY * Nfr * sizeof(unsigned char),
+                   dpct::host_to_device);
 
-	cudaMalloc((void**)&seed_GPU, Nparticles*sizeof(int));
-	cudaMemcpy(seed_GPU, seed, Nparticles*sizeof(int), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&seed_GPU, Nparticles * sizeof(int));
+ dpct::dpct_memcpy(seed_GPU, seed, Nparticles * sizeof(int),
+                   dpct::host_to_device);
 
-	cudaMalloc((void**)&partial_sums_GPU, (Nparticles+1)*sizeof(float));
-	//cudaMemcpy(partial_sums_GPU, likelihood, (Nparticles+1)*sizeof(float), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&partial_sums_GPU,
+                   (Nparticles + 1) * sizeof(float));
+        //cudaMemcpy(partial_sums_GPU, likelihood, (Nparticles+1)*sizeof(float), cudaMemcpyHostToDevice);
 
-	cudaMalloc((void**)&objxy_GPU, 2*countOnes*sizeof(int));
-	cudaMemcpy(objxy_GPU, objxy, 2*countOnes*sizeof(int), cudaMemcpyHostToDevice);
+ dpct::dpct_malloc((void **)&objxy_GPU, 2 * countOnes * sizeof(int));
+ dpct::dpct_memcpy(objxy_GPU, objxy, 2 * countOnes * sizeof(int),
+                   dpct::host_to_device);
 
-	for (int k = 1; k < Nfr; k++) {
+        for (int k = 1; k < Nfr; k++) {
 		/****************** L I K E L I H O O D ************************************/
-		kernel_likelihood<<<num_blocks, BLOCK_SIZE>>>(
-				arrayX_GPU, arrayY_GPU, xj_GPU, yj_GPU, ind_GPU,
-				objxy_GPU, likelihood_GPU, I_GPU, weights_GPU, seed_GPU, partial_sums_GPU,
-				Nparticles, countOnes, IszY, Nfr, k, max_size);
+  {
+   dpct::buffer_t arrayX_GPU_buf_ct0 = dpct::get_buffer(arrayX_GPU);
+   dpct::buffer_t arrayY_GPU_buf_ct1 = dpct::get_buffer(arrayY_GPU);
+   dpct::buffer_t xj_GPU_buf_ct2 = dpct::get_buffer(xj_GPU);
+   dpct::buffer_t yj_GPU_buf_ct3 = dpct::get_buffer(yj_GPU);
+   dpct::buffer_t ind_GPU_buf_ct4 = dpct::get_buffer(ind_GPU);
+   dpct::buffer_t objxy_GPU_buf_ct5 = dpct::get_buffer(objxy_GPU);
+   dpct::buffer_t likelihood_GPU_buf_ct6 = dpct::get_buffer(likelihood_GPU);
+   dpct::buffer_t I_GPU_buf_ct7 = dpct::get_buffer(I_GPU);
+   dpct::buffer_t weights_GPU_buf_ct8 = dpct::get_buffer(weights_GPU);
+   dpct::buffer_t seed_GPU_buf_ct9 = dpct::get_buffer(seed_GPU);
+   dpct::buffer_t partial_sums_GPU_buf_ct10 =
+       dpct::get_buffer(partial_sums_GPU);
+   q_ct1.submit([&](sycl::handler &cgh) {
+    sycl::accessor<float, 1, sycl::access::mode::read_write,
+                   sycl::access::target::local>
+        weights_local_acc_ct1(sycl::range<1>(256 /*BLOCK_SIZE*/), cgh);
+    auto arrayX_GPU_acc_ct0 =
+        arrayX_GPU_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+    auto arrayY_GPU_acc_ct1 =
+        arrayY_GPU_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+    auto xj_GPU_acc_ct2 =
+        xj_GPU_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+    auto yj_GPU_acc_ct3 =
+        yj_GPU_buf_ct3.get_access<sycl::access::mode::read_write>(cgh);
+    auto ind_GPU_acc_ct4 =
+        ind_GPU_buf_ct4.get_access<sycl::access::mode::read_write>(cgh);
+    auto objxy_GPU_acc_ct5 =
+        objxy_GPU_buf_ct5.get_access<sycl::access::mode::read_write>(cgh);
+    auto likelihood_GPU_acc_ct6 =
+        likelihood_GPU_buf_ct6.get_access<sycl::access::mode::read_write>(cgh);
+    auto I_GPU_acc_ct7 =
+        I_GPU_buf_ct7.get_access<sycl::access::mode::read_write>(cgh);
+    auto weights_GPU_acc_ct8 =
+        weights_GPU_buf_ct8.get_access<sycl::access::mode::read_write>(cgh);
+    auto seed_GPU_acc_ct9 =
+        seed_GPU_buf_ct9.get_access<sycl::access::mode::read_write>(cgh);
+    auto partial_sums_GPU_acc_ct10 =
+        partial_sums_GPU_buf_ct10.get_access<sycl::access::mode::read_write>(
+            cgh);
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                              sycl::range<3>(1, 1, BLOCK_SIZE),
+                          sycl::range<3>(1, 1, BLOCK_SIZE)),
+        [=](sycl::nd_item<3> item_ct1) {
+         kernel_likelihood(
+             (float *)(&arrayX_GPU_acc_ct0[0]),
+             (float *)(&arrayY_GPU_acc_ct1[0]),
+             (const float *)(&xj_GPU_acc_ct2[0]),
+             (const float *)(&yj_GPU_acc_ct3[0]), (int *)(&ind_GPU_acc_ct4[0]),
+             (const int *)(&objxy_GPU_acc_ct5[0]),
+             (float *)(&likelihood_GPU_acc_ct6[0]),
+             (const unsigned char *)(&I_GPU_acc_ct7[0]),
+             (float *)(&weights_GPU_acc_ct8[0]), (int *)(&seed_GPU_acc_ct9[0]),
+             (float *)(&partial_sums_GPU_acc_ct10[0]), Nparticles, countOnes,
+             IszY, Nfr, k, max_size, item_ct1,
+             weights_local_acc_ct1.get_pointer());
+        });
+   });
+  }
 
 #ifdef DEBUG
 	  float * sum = (float *) calloc(Nparticles + 1, sizeof (float));
@@ -434,7 +504,20 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     printf("\n");
 #endif
 
-		kernel_sum<<<1, 1>>>(partial_sums_GPU, Nparticles);
+  {
+   dpct::buffer_t partial_sums_GPU_buf_ct0 = dpct::get_buffer(partial_sums_GPU);
+   q_ct1.submit([&](sycl::handler &cgh) {
+    auto partial_sums_GPU_acc_ct0 =
+        partial_sums_GPU_buf_ct0.get_access<sycl::access::mode::read_write>(
+            cgh);
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(sycl::range<3>(1, 1, 1), sycl::range<3>(1, 1, 1)),
+        [=](sycl::nd_item<3> item_ct1) {
+         kernel_sum((float *)(&partial_sums_GPU_acc_ct0[0]), Nparticles);
+        });
+   });
+  }
 
 #ifdef DEBUG
 		// this shows the sum of all partial_sum results
@@ -442,43 +525,105 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 		printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
 #endif
 
-		kernel_normalize_weights<<<num_blocks, BLOCK_SIZE>>>(
-				weights_GPU,
-				partial_sums_GPU,
-				CDF_GPU,
-				u_GPU,
-				seed_GPU,
-				Nparticles );
+  {
+   dpct::buffer_t weights_GPU_buf_ct0 = dpct::get_buffer(weights_GPU);
+   dpct::buffer_t partial_sums_GPU_buf_ct1 = dpct::get_buffer(partial_sums_GPU);
+   dpct::buffer_t CDF_GPU_buf_ct2 = dpct::get_buffer(CDF_GPU);
+   dpct::buffer_t u_GPU_buf_ct3 = dpct::get_buffer(u_GPU);
+   dpct::buffer_t seed_GPU_buf_ct4 = dpct::get_buffer(seed_GPU);
+   q_ct1.submit([&](sycl::handler &cgh) {
+    sycl::accessor<float, 0, sycl::access::mode::read_write,
+                   sycl::access::target::local>
+        u1_acc_ct1(cgh);
+    sycl::accessor<float, 0, sycl::access::mode::read_write,
+                   sycl::access::target::local>
+        sumWeights_acc_ct1(cgh);
+    auto weights_GPU_acc_ct0 =
+        weights_GPU_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+    auto partial_sums_GPU_acc_ct1 =
+        partial_sums_GPU_buf_ct1.get_access<sycl::access::mode::read_write>(
+            cgh);
+    auto CDF_GPU_acc_ct2 =
+        CDF_GPU_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+    auto u_GPU_acc_ct3 =
+        u_GPU_buf_ct3.get_access<sycl::access::mode::read_write>(cgh);
+    auto seed_GPU_acc_ct4 =
+        seed_GPU_buf_ct4.get_access<sycl::access::mode::read_write>(cgh);
 
-		kernel_find_index<<<num_blocks, BLOCK_SIZE>>>(
-				arrayX_GPU,
-				arrayY_GPU,
-				CDF_GPU,
-				u_GPU,
-				xj_GPU,
-				yj_GPU,
-				Nparticles );
-	}//end loop
+    cgh.parallel_for(
+        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                              sycl::range<3>(1, 1, BLOCK_SIZE),
+                          sycl::range<3>(1, 1, BLOCK_SIZE)),
+        [=](sycl::nd_item<3> item_ct1) {
+         kernel_normalize_weights(
+             (float *)(&weights_GPU_acc_ct0[0]),
+             (const float *)(&partial_sums_GPU_acc_ct1[0]),
+             (float *)(&CDF_GPU_acc_ct2[0]), (float *)(&u_GPU_acc_ct3[0]),
+             (int *)(&seed_GPU_acc_ct4[0]), Nparticles, item_ct1,
+             u1_acc_ct1.get_pointer(), sumWeights_acc_ct1.get_pointer());
+        });
+   });
+  }
 
-	cudaMemcpy(arrayX, arrayX_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(arrayY, arrayY_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(weights, weights_GPU, Nparticles*sizeof(float), cudaMemcpyDeviceToHost);
+  {
+   dpct::buffer_t arrayX_GPU_buf_ct0 = dpct::get_buffer(arrayX_GPU);
+   dpct::buffer_t arrayY_GPU_buf_ct1 = dpct::get_buffer(arrayY_GPU);
+   dpct::buffer_t CDF_GPU_buf_ct2 = dpct::get_buffer(CDF_GPU);
+   dpct::buffer_t u_GPU_buf_ct3 = dpct::get_buffer(u_GPU);
+   dpct::buffer_t xj_GPU_buf_ct4 = dpct::get_buffer(xj_GPU);
+   dpct::buffer_t yj_GPU_buf_ct5 = dpct::get_buffer(yj_GPU);
+   q_ct1.submit([&](sycl::handler &cgh) {
+    auto arrayX_GPU_acc_ct0 =
+        arrayX_GPU_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+    auto arrayY_GPU_acc_ct1 =
+        arrayY_GPU_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+    auto CDF_GPU_acc_ct2 =
+        CDF_GPU_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+    auto u_GPU_acc_ct3 =
+        u_GPU_buf_ct3.get_access<sycl::access::mode::read_write>(cgh);
+    auto xj_GPU_acc_ct4 =
+        xj_GPU_buf_ct4.get_access<sycl::access::mode::read_write>(cgh);
+    auto yj_GPU_acc_ct5 =
+        yj_GPU_buf_ct5.get_access<sycl::access::mode::read_write>(cgh);
 
-	cudaFree(likelihood_GPU);
-	cudaFree(arrayX_GPU);
-	cudaFree(arrayY_GPU);
-	cudaFree(xj_GPU);
-	cudaFree(yj_GPU);
-	cudaFree(CDF_GPU);
-	cudaFree(partial_sums_GPU);
-	cudaFree(objxy_GPU);
-	cudaFree(u_GPU);
-	cudaFree(ind_GPU);
-	cudaFree(seed_GPU);
-	cudaFree(weights_GPU);
-	cudaFree(I_GPU);
+    cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                                           sycl::range<3>(1, 1, BLOCK_SIZE),
+                                       sycl::range<3>(1, 1, BLOCK_SIZE)),
+                     [=](sycl::nd_item<3> item_ct1) {
+                      kernel_find_index((const float *)(&arrayX_GPU_acc_ct0[0]),
+                                        (const float *)(&arrayY_GPU_acc_ct1[0]),
+                                        (const float *)(&CDF_GPU_acc_ct2[0]),
+                                        (const float *)(&u_GPU_acc_ct3[0]),
+                                        (float *)(&xj_GPU_acc_ct4[0]),
+                                        (float *)(&yj_GPU_acc_ct5[0]),
+                                        Nparticles, item_ct1);
+                     });
+   });
+  }
+        }//end loop
 
-	long long offload_end = get_time();
+ dpct::dpct_memcpy(arrayX, arrayX_GPU, Nparticles * sizeof(float),
+                   dpct::device_to_host);
+ dpct::dpct_memcpy(arrayY, arrayY_GPU, Nparticles * sizeof(float),
+                   dpct::device_to_host);
+ dpct::dpct_memcpy(weights, weights_GPU, Nparticles * sizeof(float),
+                   dpct::device_to_host);
+
+ dpct::dpct_free(likelihood_GPU);
+ dpct::dpct_free(arrayX_GPU);
+ dpct::dpct_free(arrayY_GPU);
+ dpct::dpct_free(xj_GPU);
+ dpct::dpct_free(yj_GPU);
+ dpct::dpct_free(CDF_GPU);
+ dpct::dpct_free(partial_sums_GPU);
+ dpct::dpct_free(objxy_GPU);
+ dpct::dpct_free(u_GPU);
+ dpct::dpct_free(ind_GPU);
+ dpct::dpct_free(seed_GPU);
+ dpct::dpct_free(weights_GPU);
+ dpct::dpct_free(I_GPU);
+
+        long long offload_end = get_time();
 
 	printf("Device offloading time: %lf (s)\n", elapsed_time(offload_start, offload_end));
 
@@ -489,9 +634,10 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 		xe += arrayX[x] * weights[x];
 		ye += arrayY[x] * weights[x];
 	}
-	float distance = sqrt(pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
+ float distance = sqrt(pow((float)(xe - (int)roundFloat(IszY / 2.0)), 2) +
+                       pow((float)(ye - (int)roundFloat(IszX / 2.0)), 2));
 
-	//Output results
+        //Output results
 	FILE *fid;
 	fid=fopen("output.txt", "w+");
 	if( fid == NULL ){
