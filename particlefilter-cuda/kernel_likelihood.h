@@ -32,16 +32,16 @@ kernel_likelihood (float* arrayX,
 
 		weights[i] = 1 / ((float) (Nparticles)); 
 		seed[i] = (A*seed[i] + C) % M;
-		u = fabs(seed[i]/((float)M));
+		u = fabsf(seed[i]/((float)M));
 		seed[i] = (A*seed[i] + C) % M;
-		v = fabs(seed[i]/((float)M));
-		arrayX[i] += 1.0 + 5.0*(sqrt(-2*log(u))*cos(2*PI*v));
+		v = fabsf(seed[i]/((float)M));
+		arrayX[i] += 1.0 + 5.0*(sqrtf(-2*logf(u))*cosf(2*PI*v));
 
 		seed[i] = (A*seed[i] + C) % M;
-		u = fabs(seed[i]/((float)M));
+		u = fabsf(seed[i]/((float)M));
 		seed[i] = (A*seed[i] + C) % M;
-		v = fabs(seed[i]/((float)M));
-		arrayY[i] += -2.0 + 2.0*(sqrt(-2*log(u))*cos(2*PI*v));
+		v = fabsf(seed[i]/((float)M));
+		arrayY[i] += -2.0 + 2.0*(sqrtf(-2*logf(u))*cosf(2*PI*v));
 
 	}
 
@@ -69,7 +69,7 @@ kernel_likelihood (float* arrayX,
 					(I[ind[i*countOnes + x]] - 228) * (I[ind[i*countOnes + x]] - 228)) / 50.0;
 		likelihood[i] = likelihoodSum/countOnes-SCALE_FACTOR;
 
-		weights[i] = weights[i] * exp(likelihood[i]); //Donnie Newell - added the missing exponential function call
+		weights[i] = weights[i] * expf(likelihood[i]); //Donnie Newell - added the missing exponential function call
 
 	}
 
