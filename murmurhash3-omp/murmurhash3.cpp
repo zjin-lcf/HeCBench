@@ -4,6 +4,8 @@
 #include <cstring>
 #include <cassert>
 
+#define BLOCK_SIZE 256
+
 #define  FORCE_INLINE inline __attribute__((always_inline))
 
 
@@ -21,9 +23,13 @@ inline uint64_t rotl64 ( uint64_t x, int8_t r )
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
 
-FORCE_INLINE uint64_t getblock64 ( const uint64_t * p, uint32_t i )
+FORCE_INLINE uint64_t getblock64 ( const uint8_t * p, uint32_t i )
 {
-  return p[i];
+  uint64_t s = 0;
+  for (uint32_t n = 0; n < 8; n++) {
+    s |= ((uint64_t)p[8*i+n] << (n*8));
+  }
+  return s;
 }
 
 //-----------------------------------------------------------------------------
@@ -56,12 +62,10 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
   //----------
   // body
 
-  const uint64_t * blocks = (const uint64_t *)(data);
-
   for(uint32_t i = 0; i < nblocks; i++)
   {
-    uint64_t k1 = getblock64(blocks,i*2+0);
-    uint64_t k2 = getblock64(blocks,i*2+1);
+    uint64_t k1 = getblock64(data,i*2+0);
+    uint64_t k2 = getblock64(data,i*2+1);
 
     k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
 
@@ -134,7 +138,7 @@ int main(int argc, char** argv)
   uint64_t** out = (uint64_t**) malloc (sizeof(uint64_t*) * numKeys);
 
   for (i = 0; i < numKeys; i++) {
-    length[i] = (i+1);
+    length[i] = rand() % 10000;
     keys[i] = (uint8_t*) malloc (length[i]);
     out[i] = (uint64_t*) malloc (2*sizeof(uint64_t));
     for (uint32_t c = 0; c < length[i]; c++) {
@@ -176,7 +180,7 @@ int main(int argc, char** argv)
                                 length[0:numKeys]) \
                         map(from: d_out[0:2*numKeys])
   {
-    #pragma omp target teams distribute parallel for thread_limit(128)
+    #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (uint32_t i = 0; i < numKeys; i++) {
       MurmurHash3_x64_128 (d_keys+d_length[i], length[i], i, d_out+i*2);
     }
