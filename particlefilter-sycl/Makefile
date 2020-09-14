@@ -42,24 +42,24 @@ ifeq ($(DEVICE),gpu)
 endif
 
 
-ALL: SYCL_particlefilter_single
+ALL: main
 
-SYCL_particlefilter_single: ex_particle_SYCL_single_seq.o \
+main: main.o \
 	kernel_find_index.sycl  \
 	kernel_likelihood.sycl  \
 	kernel_normalize_weights.sycl  \
 	kernel_sum.sycl
-	$(CC) $(CFLAGS) ex_particle_SYCL_single_seq.o $(LDFLAGS)  -o SYCL_particlefilter_single 
+	$(CC) $(CFLAGS) main.o $(LDFLAGS)  -o main 
 
 %.o: %.[ch]
 	$(CC) $(CFLAGS) $< -c
 
-ex_particle_SYCL_single_seq.o: ex_particle_SYCL_single_seq.cpp
-	$(CC) $(CFLAGS) ex_particle_SYCL_single_seq.cpp -c
+main.o: main.cpp
+	$(CC) $(CFLAGS) main.cpp -c
 
-run: SYCL_particlefilter_single
-	./SYCL_particlefilter_single -x 128 -y 128 -z 10 -np 400000
-	#./SYCL_particlefilter_single -x 128 -y 128 -z 10 -np 1024
+run: main
+	./main -x 128 -y 128 -z 10 -np 400000
+	#./main -x 128 -y 128 -z 10 -np 1024
 
 clean:
-	rm -f *.o *~ SYCL_particlefilter_single 
+	rm -f *.o *~ main 
