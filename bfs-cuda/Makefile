@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -14,16 +13,16 @@ DEVICE    = gpu
 
 program = main
 
-source = bfs.cpp timer.cpp
+source = bfs.cu timer.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Xcompiler -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -40,11 +39,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,15 +46,15 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-timer.o: timer.cpp timer.h Makefile
+bfs.o: bfs.cu util.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-bfs.o: bfs.cpp util.h 
+timer.o: timer.cu timer.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) /home/cc/Rodinia_SYCL/data/bfs/graph1MW_6.txt
+	./$(program)
 
