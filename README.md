@@ -49,6 +49,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.7 | 0.71 | 0.72 | 0.75 |  
 
 
+| bfs | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 52 | 55 | 55 | 133 |
+| host timing(s) | 0.29 | 0.61 | 0.61 | 3.59 | 
+| device timing(s) | 0.26 | 0.28 | 0.28 | 0.38 |  
+
+
 | bitonic-sort | SYCL | DPCT usm | DPCT header| OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 326 | 327 | 327 | 1957 |
@@ -398,6 +405,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.19 | 1.17 | 1.18 | 0.81 |  
 
 
+| bfs | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 52 | 55 | 55 | 133 |
+| host timing(s) | 0.4 | 0.7 | 0.73 | 3.54 | 
+| device timing(s) | 0.23 | 0.27 | 0.26 | 0.36 |  
+
+
 | bitonic-sort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 326 | 327 | 327 | 1957 |
@@ -719,6 +733,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
+
+### bfs
+  The breadth-first search in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
