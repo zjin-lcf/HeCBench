@@ -1,0 +1,129 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <cuda.h>
+
+typedef float DTYPE;
+
+__global__ void
+maxpool3d(const DTYPE* i_img, DTYPE* o_img, 
+      const int Hstride,
+      const int Vstride,
+      const int pool_width,
+      const int pool_height,
+      const int i_img_width,
+      const int i_img_height,
+      const int o_img_width,
+      const int o_img_height )
+{
+
+  const int x = blockDim.x * blockIdx.x + threadIdx.x;
+  const int y = blockDim.y * blockIdx.y + threadIdx.y;
+  const int z = blockDim.z * blockIdx.z + threadIdx.z;
+  const int xidx = Hstride * x;
+  const int yidx = Vstride * y;
+  DTYPE maxval = (DTYPE)0;
+
+  for (int r = 0; r < pool_height; r++) 
+  { 
+    const int idxIntmp = ((z * i_img_height + yidx + r) * i_img_width) + xidx;
+    for(int c = 0; c < pool_width; c++)
+    {
+      const int idxIn = idxIntmp + c;
+      maxval = fmaxf(maxval, i_img[idxIn]);
+    }
+  }
+  o_img[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
+}
+
+int main(int argc, char** argv)
+{
+  srand(2);
+  int Hstride=2, Vstride=2;
+  int i_img_width  = atoi(argv[1]);  
+  int i_img_height = atoi(argv[2]);
+  int i_img_count = atoi(argv[3]);
+  int o_img_width  = i_img_width/Hstride;
+  int o_img_height = i_img_height/Vstride;
+
+  printf("input image width %d Hstride %d\n", i_img_width, Hstride);
+  printf("input image height %d Vstride %d\n", i_img_height, Vstride);
+  printf("output image width %d\n", o_img_width);
+  printf("output image height %d\n", o_img_height);
+
+  // Generate random values for each image
+  int size_image = i_img_width*i_img_height;
+  int mem_size_image = sizeof(DTYPE) * size_image;
+  DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
+
+  for(int j=0;j<i_img_count;j++)
+  {
+    for(int i=0;i<size_image;i++)
+    {
+      h_image[(j*size_image)+i] = rand()%256 / (DTYPE)255;
+    }
+  }
+
+  int size_output = o_img_width * o_img_height;
+  int mem_size_output = sizeof(DTYPE) * size_output;
+  // host result
+  DTYPE* h_output = (DTYPE*) malloc(mem_size_output*i_img_count);
+  // device result 
+  DTYPE* d_output = (DTYPE*) malloc(mem_size_output*i_img_count);
+
+  // Create the input and output arrays in device memory 
+  DTYPE* d_image;
+  cudaMalloc((void**)&d_image, mem_size_image*i_img_count);
+  cudaMemcpy(d_image, h_image, mem_size_image*i_img_count, cudaMemcpyHostToDevice);
+
+  DTYPE* d_result;
+  cudaMalloc((void**)&d_result, mem_size_output*i_img_count);
+
+
+  // assume output image dimensions are multiple of 16
+  dim3 block_dim (16, 16, 1);
+  dim3 grid_dim(o_img_width/16, o_img_height/16, i_img_count);
+
+  // filter size same as stride size
+  const int pool_width  = Hstride;
+  const int pool_height = Vstride;
+
+  for (int n = 0; n < 100; n++) {
+    maxpool3d<<<grid_dim, block_dim>>>(d_image, d_result, Hstride, Vstride, 
+        pool_width, pool_height, i_img_width, i_img_height, o_img_width, o_img_height);
+  }
+  cudaMemcpy(d_output, d_result, mem_size_output*i_img_count, cudaMemcpyDeviceToHost);
+
+  // verification using the CPU results
+  for (int z = 0; z < i_img_count; z++)
+    for (int y = 0; y < o_img_height; y++)
+      for (int x = 0; x < o_img_width; x++) {
+        const int xidx = Hstride*x;
+        const int yidx = Vstride*y;
+        DTYPE maxval = (DTYPE)0;
+        for (int r = 0; r < pool_height; r++) 
+        { 
+          const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
+          for(int c = 0; c < pool_width; c++)
+          {
+            const int idxIn = idxIntmp + c;
+            maxval = fmaxf(maxval,h_image[idxIn]);
+          }
+        }
+        h_output[(((z*o_img_height)+y)*o_img_width)+x] = maxval;
+      }
+
+  int status = memcmp(h_output, d_output, sizeof(DTYPE)*i_img_count*o_img_width*o_img_height);
+  if (status == 0)
+    printf("PASS\n");
+  else
+    printf("FAIL\n");
+
+  free(h_image);
+  free(h_output);
+  free(d_output);
+  cudaFree(d_image);
+  cudaFree(d_result);
+  return status;
+}
