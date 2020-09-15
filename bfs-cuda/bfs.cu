@@ -4,7 +4,7 @@
 #include <math.h>
 #include <cuda.h>
 
-#define MAX_THREADS_PER_BLOCK 512
+#define MAX_THREADS_PER_BLOCK 256
 
 #ifdef  PROFILING
 #include "timer.h"
