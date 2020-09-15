@@ -53,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 2048 2048 96
 
