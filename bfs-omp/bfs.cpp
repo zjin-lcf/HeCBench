@@ -120,6 +120,7 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
 
 #pragma omp target update from (d_over[0:1])
   } while (d_over[0]);
+}
 
   //--statistics
 #ifdef  PROFILING
@@ -128,6 +129,7 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
   std::cout<<"kernel time(s):"<<kernel_time<<std::endl;    
 #endif
 }
+
 void Usage(int argc, char**argv){
 
   fprintf(stderr,"Usage: %s <input_file>\n", argv[0]);
