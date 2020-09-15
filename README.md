@@ -126,6 +126,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.65 | 1.68 | 1.63 | 1.89 |
 
 
+| hmm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 501 | 504 | 504 | 3249 |
+| host timing(s) | 8.9 | 11.4 | 11.2 | 14.1 |
+| device timing(s) | 8.6 | 10.7 | 10.5 | 10.4 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100004 | 400008 |
@@ -231,6 +238,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.38 | 2.52 | 2.38 | 2.53 |
 
 
+| murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 409 |
+| host timing(s) | 7.6 | 8.4 | 8.4 | 11.2 |
+| device timing(s) | 7.1 | 7.6 | 7.6 | 7.6 |
+
+
 | nw | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2048 | 2050 | 2050 | 13314 |
@@ -250,6 +264,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 7 | 7 | 18 | 
 | host timing(s) | 1.3 | 1.7 | 1.8 | 4.98 |
 | device timing(s) | 0.22 | 0.51 | 0.53 | 1.42 |
+
+
+| particlefilter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | NA | 45 | NA | 179 | 
+| host timing(s) | NA | 29.5 | NA | 33.9 |
+| device timing(s) | NA | 28.5 | NA | 29.7 |
 
 
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -559,6 +580,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.45 | 4.0 | 0.45 | 0.64 |
 
 
+| murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 409 |
+| host timing(s) | 10.3 | 10.9 | 11 | 13.5 |
+| device timing(s) | 9.8 | 10.2 | 10.2 | 10.1 |
+
+
 | nw | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2048 | 2050 | 2050 | 13314 |
@@ -578,6 +606,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 7 | 7 | 18 | 
 | host timing(s) | 1.14 | 1.49 | 1.52 | 4.83 |
 | device timing(s) | 0.24 | 0.48 | 0.41 | 1.32 |
+
+
+| particlefilter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 39 | 45 | 45 | 179 | 
+| host timing(s) | 4.92 | 4.55 | 4.95 | 5.37 |
+| device timing(s) | 4.86 | 4.48 | 4.87 | 5.02 |
 
 
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -760,11 +795,17 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
 
+### murmurhash3
+  MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
+
 ### nw
   Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
+
+### particlefilter
+  Particle Filter in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
