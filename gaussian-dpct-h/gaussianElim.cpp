@@ -1,9 +1,10 @@
 #ifndef __GAUSSIAN_ELIMINATION__
 #define __GAUSSIAN_ELIMINATION__
 
-#include <math.h>
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <sys/time.h>
-#include <cuda.h>
 #include "gaussianElim.h"
 
 #define BLOCK_SIZE_0 256
@@ -27,7 +28,7 @@ create_matrix(float *m, int size){
 
   for (i=0; i < size; i++)
   {
-    coe_i = 10*exp(lamda*i); 
+        coe_i = 10 * exp(lamda * i);
     j=size-1+i;     
     coe[j]=coe_i;
     j=size-1-i;     
@@ -135,21 +136,26 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-__global__ void
-fan1 (const float* a, float* m, const int size, const int t)
+void
+fan1 (const float* a, float* m, const int size, const int t,
+      sycl::nd_item<3> item_ct1)
 {
-  int globalId = blockDim.x * blockIdx.x + threadIdx.x;
+    int globalId = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                   item_ct1.get_local_id(2);
   if (globalId < size-1-t) {
     m[size * (globalId + t + 1)+t] = 
       a[size * (globalId + t + 1) + t] / a[size * t + t];
   }
 }
 
-__global__ void
-fan2 (float* a, float* b, float* m, const int size, const int t)
+void
+fan2 (float* a, float* b, float* m, const int size, const int t,
+      sycl::nd_item<3> item_ct1)
 {
-  int globalIdy = blockDim.x * blockIdx.x + threadIdx.x;
-  int globalIdx = blockDim.y * blockIdx.y + threadIdx.y;
+    int globalIdy = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                    item_ct1.get_local_id(2);
+    int globalIdx = item_ct1.get_local_range().get(1) * item_ct1.get_group(1) +
+                    item_ct1.get_local_id(1);
   if (globalIdx < size-1-t && globalIdy < size-t) {
     a[size*(globalIdx+1+t)+(globalIdy+t)] -= 
       m[size*(globalIdx+1+t)+t] * a[size*t+(globalIdy+t)];
@@ -166,36 +172,93 @@ fan2 (float* a, float* b, float* m, const int size, const int t)
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size, int timing){    
+void ForwardSub(float *a, float *b, float *m, int size, int timing) {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
 
-  dim3 blockDim_fan1 (BLOCK_SIZE_0);
-  dim3 gridDim_fan1 ((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0);
+    sycl::range<3> blockDim_fan1(BLOCK_SIZE_0, 1, 1);
+    sycl::range<3> gridDim_fan1((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0, 1, 1);
 
-  dim3 blockDim_fan2 (BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
-  dim3 gridDim_fan2 ((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y, 
-                     (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X);
+    sycl::range<3> blockDim_fan2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X, 1);
+    sycl::range<3> gridDim_fan2((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y,
+                                (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X,
+                                1);
 
   float *d_a, *d_b, *d_m;
-  cudaMalloc((void**)&d_a, size*size*sizeof(float));
-  cudaMalloc((void**)&d_b, size*sizeof(float));
-  cudaMalloc((void**)&d_m, size*size*sizeof(float));
+    dpct::dpct_malloc((void **)&d_a, size * size * sizeof(float));
+    dpct::dpct_malloc((void **)&d_b, size * sizeof(float));
+    dpct::dpct_malloc((void **)&d_m, size * size * sizeof(float));
 
-  cudaMemcpy(d_a, a, size*size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_b, b, size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_m, m, size*size*sizeof(float), cudaMemcpyHostToDevice);
+    dpct::dpct_memcpy(d_a, a, size * size * sizeof(float),
+                      dpct::host_to_device);
+    dpct::dpct_memcpy(d_b, b, size * sizeof(float), dpct::host_to_device);
+    dpct::dpct_memcpy(d_m, m, size * size * sizeof(float),
+                      dpct::host_to_device);
 
   for (int t=0; t<(size-1); t++) {
-    fan1<<<gridDim_fan1, blockDim_fan1>>> (d_a, d_m, size, t);
-    fan2<<<gridDim_fan2, blockDim_fan2>>> (d_a, d_b, d_m, size, t);
-  } 
+        {
+            dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
+            dpct::buffer_t d_m_buf_ct1 = dpct::get_buffer(d_m);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                auto d_a_acc_ct0 =
+                    d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+                auto d_m_acc_ct1 =
+                    d_m_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
 
-  cudaMemcpy(a, d_a, size*size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(b, d_b, size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(m, d_m, size*size*sizeof(float), cudaMemcpyDeviceToHost);
+                auto dpct_global_range = gridDim_fan1 * blockDim_fan1;
 
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_m);
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(blockDim_fan1.get(2),
+                                                     blockDim_fan1.get(1),
+                                                     blockDim_fan1.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        fan1((const float *)(&d_a_acc_ct0[0]),
+                             (float *)(&d_m_acc_ct1[0]), size, t, item_ct1);
+                    });
+            });
+        }
+        {
+            dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
+            dpct::buffer_t d_b_buf_ct1 = dpct::get_buffer(d_b);
+            dpct::buffer_t d_m_buf_ct2 = dpct::get_buffer(d_m);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                auto d_a_acc_ct0 =
+                    d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+                auto d_b_acc_ct1 =
+                    d_b_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+                auto d_m_acc_ct2 =
+                    d_m_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+
+                auto dpct_global_range = gridDim_fan2 * blockDim_fan2;
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(blockDim_fan2.get(2),
+                                                     blockDim_fan2.get(1),
+                                                     blockDim_fan2.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        fan2((float *)(&d_a_acc_ct0[0]),
+                             (float *)(&d_b_acc_ct1[0]),
+                             (float *)(&d_m_acc_ct2[0]), size, t, item_ct1);
+                    });
+            });
+        }
+  }
+
+    dpct::dpct_memcpy(a, d_a, size * size * sizeof(float),
+                      dpct::device_to_host);
+    dpct::dpct_memcpy(b, d_b, size * sizeof(float), dpct::device_to_host);
+    dpct::dpct_memcpy(m, d_m, size * size * sizeof(float),
+                      dpct::device_to_host);
+
+    dpct::dpct_free(d_a);
+    dpct::dpct_free(d_b);
+    dpct::dpct_free(d_m);
 }
 
 
