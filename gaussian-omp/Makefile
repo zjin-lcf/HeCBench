@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE      = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -13,16 +14,16 @@ DEBUG     = no
 
 program = main
 
-source = gaussianElim.cu utils.cu
+source = gaussianElim.cpp utils.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -39,6 +40,11 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -46,11 +52,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-gaussianElim.o: gaussianElim.cu gaussianElim.h 
+gaussianElim.o: gaussianElim.cpp gaussianElim.h 
 
-utils.o: utils.cu utils.h
+utils.o: utils.cpp utils.h 
 
-%.o: %.cu Makefile
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

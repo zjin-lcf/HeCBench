@@ -3,8 +3,8 @@
 
 #include <math.h>
 #include <sys/time.h>
-#include <cuda.h>
 #include "gaussianElim.h"
+#include "common.h"
 
 #define BLOCK_SIZE_0 256
 #define BLOCK_SIZE_1_X 16
@@ -116,6 +116,8 @@ int main(int argc, char *argv[]) {
     printf("Device offloading time %lld (us)\n\n",offload_end - offload_start);
   }
 
+
+  //end timing
   if (!quiet) {
     printf("The result of array a is after forwardsub: \n");
     PrintMat(a, size, size, size);
@@ -123,6 +125,8 @@ int main(int argc, char *argv[]) {
     PrintAry(b, size);
     printf("The result of matrix m is after forwardsub: \n");
     PrintMat(m, size, size, size);
+
+
     BackSub(a,b,finalVec,size);
     printf("The final solution is: \n");
     PrintAry(finalVec,size);
@@ -132,33 +136,9 @@ int main(int argc, char *argv[]) {
   free(a);
   free(b);
   free(finalVec);
+  //OpenClGaussianElimination(context,timing);
+
   return 0;
-}
-
-__global__ void
-fan1 (const float* a, float* m, const int size, const int t)
-{
-  int globalId = blockDim.x * blockIdx.x + threadIdx.x;
-  if (globalId < size-1-t) {
-    m[size * (globalId + t + 1)+t] = 
-      a[size * (globalId + t + 1) + t] / a[size * t + t];
-  }
-}
-
-__global__ void
-fan2 (float* a, float* b, float* m, const int size, const int t)
-{
-  int globalIdy = blockDim.x * blockIdx.x + threadIdx.x;
-  int globalIdx = blockDim.y * blockIdx.y + threadIdx.y;
-  if (globalIdx < size-1-t && globalIdy < size-t) {
-    a[size*(globalIdx+1+t)+(globalIdy+t)] -= 
-      m[size*(globalIdx+1+t)+t] * a[size*t+(globalIdy+t)];
-
-    if(globalIdy == 0){
-      b[globalIdx+1+t] -= 
-        m[size*(globalIdx+1+t)+(globalIdy+t)] * b[t];
-    }
-  }
 }
 
 /*------------------------------------------------------
@@ -166,36 +146,69 @@ fan2 (float* a, float* b, float* m, const int size, const int t)
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size, int timing){    
+void ForwardSub(float *a, float *b, float *m, int size,int timing){    
 
-  dim3 blockDim_fan1 (BLOCK_SIZE_0);
-  dim3 gridDim_fan1 ((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0);
+#ifdef USE_GPU
+    gpu_selector dev_sel;
+#else
+    cpu_selector dev_sel;
+#endif
+    queue q(dev_sel);
 
-  dim3 blockDim_fan2 (BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
-  dim3 gridDim_fan2 ((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y, 
-                     (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X);
+    const property_list props = property::buffer::use_host_ptr();
+    buffer<float,1> d_a (a, size*size, props);
+    buffer<float,1> d_b(b, size, props);
+    buffer<float,1> d_m(m, size*size, props);
 
-  float *d_a, *d_b, *d_m;
-  cudaMalloc((void**)&d_a, size*size*sizeof(float));
-  cudaMalloc((void**)&d_b, size*sizeof(float));
-  cudaMalloc((void**)&d_m, size*size*sizeof(float));
+    range<1> localWorksizeFan1(BLOCK_SIZE_0);
+    range<1> globalWorksizeFan1((size + BLOCK_SIZE_0 - 1)/ BLOCK_SIZE_0 * BLOCK_SIZE_0);
 
-  cudaMemcpy(d_a, a, size*size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_b, b, size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_m, m, size*size*sizeof(float), cudaMemcpyHostToDevice);
+    range<2> localWorksizeFan2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
+    range<2> globalWorksizeFan2(
+		    (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
+		    (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y );
 
-  for (int t=0; t<(size-1); t++) {
-    fan1<<<gridDim_fan1, blockDim_fan1>>> (d_a, d_m, size, t);
-    fan2<<<gridDim_fan2, blockDim_fan2>>> (d_a, d_b, d_m, size, t);
-  } 
+    // 4. Setup and Run kernels
+    for (int t=0; t<(size-1); t++) {
+      q.submit([&](handler& cgh) {
 
-  cudaMemcpy(a, d_a, size*size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(b, d_b, size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(m, d_m, size*size*sizeof(float), cudaMemcpyDeviceToHost);
+          auto a_acc = d_a.get_access<sycl_read>(cgh);
+          auto m_acc = d_m.get_access<sycl_write>(cgh);
 
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_m);
+          cgh.parallel_for<class fan1>(
+            nd_range<1>(globalWorksizeFan1, localWorksizeFan1), [=] (nd_item<1> item) {
+            int globalId = item.get_global_id(0);
+            if (globalId < size-1-t) {
+              m_acc[size * (globalId + t + 1)+t] = 
+              a_acc[size * (globalId + t + 1) + t] / a_acc[size * t + t];
+              }
+            });
+          });
+
+      q.submit([&](handler& cgh) {
+
+          auto a_acc = d_a.get_access<sycl_read_write>(cgh);
+          auto b_acc = d_b.get_access<sycl_read_write>(cgh);
+          auto m_acc = d_m.get_access<sycl_read>(cgh);
+
+          cgh.parallel_for<class fan2>(
+            nd_range<2>(globalWorksizeFan2, localWorksizeFan2), [=] (nd_item<2> item) {
+            int globalIdx = item.get_global_id(0);
+            int globalIdy = item.get_global_id(1);
+            if (globalIdx < size-1-t && globalIdy < size-t) {
+              a_acc[size*(globalIdx+1+t)+(globalIdy+t)] -= 
+              m_acc[size*(globalIdx+1+t)+t] * a_acc[size*t+(globalIdy+t)];
+
+              if(globalIdy == 0){
+                b_acc[globalIdx+1+t] -= 
+                m_acc[size*(globalIdx+1+t)+(globalIdy+t)] * b_acc[t];
+              }
+            }
+            });
+      });
+
+    } // for (t=0; t<(size-1); t++) 
+
 }
 
 
@@ -223,6 +236,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
           break;
         case 'h': // help
           return 1;
+          break;
         case 'q': // quiet
           *q = 1;
           break;

@@ -3,12 +3,9 @@
 
 #include <math.h>
 #include <sys/time.h>
-#include <cuda.h>
 #include "gaussianElim.h"
 
 #define BLOCK_SIZE_0 256
-#define BLOCK_SIZE_1_X 16
-#define BLOCK_SIZE_1_Y 16
 
 
 long long get_time() {
@@ -45,7 +42,6 @@ create_matrix(float *m, int size){
 
 int main(int argc, char *argv[]) {
 
-  printf("WG size of kernel 1 = %d, WG size of kernel 2= %d X %d\n", BLOCK_SIZE_0, BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
   float *a=NULL, *b=NULL, *finalVec=NULL;
   float *m=NULL;
   int size = -1;
@@ -116,6 +112,7 @@ int main(int argc, char *argv[]) {
     printf("Device offloading time %lld (us)\n\n",offload_end - offload_start);
   }
 
+  //end timing
   if (!quiet) {
     printf("The result of array a is after forwardsub: \n");
     PrintMat(a, size, size, size);
@@ -123,6 +120,8 @@ int main(int argc, char *argv[]) {
     PrintAry(b, size);
     printf("The result of matrix m is after forwardsub: \n");
     PrintMat(m, size, size, size);
+
+
     BackSub(a,b,finalVec,size);
     printf("The final solution is: \n");
     PrintAry(finalVec,size);
@@ -132,33 +131,8 @@ int main(int argc, char *argv[]) {
   free(a);
   free(b);
   free(finalVec);
+
   return 0;
-}
-
-__global__ void
-fan1 (const float* a, float* m, const int size, const int t)
-{
-  int globalId = blockDim.x * blockIdx.x + threadIdx.x;
-  if (globalId < size-1-t) {
-    m[size * (globalId + t + 1)+t] = 
-      a[size * (globalId + t + 1) + t] / a[size * t + t];
-  }
-}
-
-__global__ void
-fan2 (float* a, float* b, float* m, const int size, const int t)
-{
-  int globalIdy = blockDim.x * blockIdx.x + threadIdx.x;
-  int globalIdx = blockDim.y * blockIdx.y + threadIdx.y;
-  if (globalIdx < size-1-t && globalIdy < size-t) {
-    a[size*(globalIdx+1+t)+(globalIdy+t)] -= 
-      m[size*(globalIdx+1+t)+t] * a[size*t+(globalIdy+t)];
-
-    if(globalIdy == 0){
-      b[globalIdx+1+t] -= 
-        m[size*(globalIdx+1+t)+(globalIdy+t)] * b[t];
-    }
-  }
 }
 
 /*------------------------------------------------------
@@ -166,36 +140,29 @@ fan2 (float* a, float* b, float* m, const int size, const int t)
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size, int timing){    
+void ForwardSub(float *a, float *b, float *m, int size,int timing){    
+#pragma omp target data map(tofrom: a[0:size*size], b[0:size], m[0:size*size])
+  {
+    for (int t=0; t<(size-1); t++) {
 
-  dim3 blockDim_fan1 (BLOCK_SIZE_0);
-  dim3 gridDim_fan1 ((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0);
+      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE_0)
+      for (int i = 0; i < size - 1 - t; i++) {
+        m[size * (i + t + 1)+t] = 
+          a[size * (i + t + 1) + t] / a[size * t + t];
+      }
 
-  dim3 blockDim_fan2 (BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
-  dim3 gridDim_fan2 ((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y, 
-                     (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X);
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(BLOCK_SIZE_0)
+      for (int x = 0; x < size - 1 - t; x++) {
+        for (int y = 0; y < size - t; y++) {
+          a[size*(x+1+t)+(y+t)] -= m[size*(x+1+t)+t] * a[size*t+(y+t)];
 
-  float *d_a, *d_b, *d_m;
-  cudaMalloc((void**)&d_a, size*size*sizeof(float));
-  cudaMalloc((void**)&d_b, size*sizeof(float));
-  cudaMalloc((void**)&d_m, size*size*sizeof(float));
-
-  cudaMemcpy(d_a, a, size*size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_b, b, size*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_m, m, size*size*sizeof(float), cudaMemcpyHostToDevice);
-
-  for (int t=0; t<(size-1); t++) {
-    fan1<<<gridDim_fan1, blockDim_fan1>>> (d_a, d_m, size, t);
-    fan2<<<gridDim_fan2, blockDim_fan2>>> (d_a, d_b, d_m, size, t);
+          if(y == 0){
+            b[x+1+t] -= m[size*(x+1+t)+(y+t)] * b[t];
+          }
+        }
+      }
+    } // for (t=0; t<(size-1); t++) 
   } 
-
-  cudaMemcpy(a, d_a, size*size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(b, d_b, size*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(m, d_m, size*size*sizeof(float), cudaMemcpyDeviceToHost);
-
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_m);
 }
 
 
@@ -223,6 +190,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
           break;
         case 'h': // help
           return 1;
+          break;
         case 'q': // quiet
           *q = 1;
           break;
