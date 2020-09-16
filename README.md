@@ -210,6 +210,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.33 | 1.62 | 1.37 | 6.65 |
 
 
+| maxpool3d | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 1807 | 
+| host timing(s) | 12.5 | 12.8 | 12.9 | 15.4 |
+| device timing(s) | 11.5 | 11.7 | 11.7 | 11.5 |
+
+
 | md | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1002 | 1002 | 1002 | 8008 |
@@ -559,6 +566,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 8.39 | 8.42 | 8.43 | 13.0 |
 
 
+| maxpool3d | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 1807 | 
+| host timing(s) | 7.0 | 7.4 | 7.3 | 11.8 |
+| device timing(s) | 6.3 | 6.4 | 6.4 | 8.2 |
+
+
 | md | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1002 | 1002 | 1002 | 8008 |
@@ -796,6 +810,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### matrix-rotate
   In-place matrix rotation
+
+### maxpool3d
+  3D Maxpooling (https://github.com/nachiket/papaa-opencl)
 
 ### md
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
