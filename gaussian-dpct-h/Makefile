@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -13,16 +13,16 @@ DEBUG     = no
 
 program = main
 
-source = gaussianElim.cu utils.cu
+source = gaussianElim.cpp utils.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -46,11 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-gaussianElim.o: gaussianElim.cu gaussianElim.h 
+gaussianElim.o: gaussianElim.cpp gaussianElim.h 
 
-utils.o: utils.cu utils.h
+utils.o: utils.cpp utils.h 
 
-%.o: %.cu Makefile
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
