@@ -112,6 +112,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 14 | 27 | 24 |  73 |
 
 
+| gaussian | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 8193 | 8196 | 8196 | 61437 |
+| host timing(s) | 11.6 | 11.8 | 12.7 | 14.7 |
+| device timing(s) | 11.0 | 11.1 | 11.8 | 9.6 |
+
+
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 11 | 11 | 21 |
@@ -475,6 +482,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 16 | 26 | 23 | 68 |
 
 
+| gaussian | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 8193 | 8196 | 8196 | 61437 |
+| host timing(s) | 11.2 | 12.0 | 11.5 | 15.2 |
+| device timing(s) | 10.7 | 10.7 | 10.7 | 9.0 |
+
+
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 11 | 11 | 21 | 
@@ -769,11 +783,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
+### filter
+  Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
+
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
 
-### filter
-  Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
+### gaussian
+  Gaussian elimination in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
