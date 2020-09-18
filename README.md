@@ -140,6 +140,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.65 | 1.68 | 1.63 | 1.89 |
 
 
+| histogram | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1218 | 1221 | 1221 | NA |
+| host timing(s) | 1.88 | 1.39 | 1.59 | NA |
+| device timing(s) | 0.57 | 0.56 | 0.59 | NA |
+
+
 | hmm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 501 | 504 | 504 | 3249 |
@@ -510,6 +517,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.29 | 2.29 | 2.29 | 1.82 |
 
 
+| histogram | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1218 | 1221 | 1221 | NA |
+| host timing(s) | 2.75 | 2.5 | 2.6 | NA |
+| device timing(s) | 0.83 | 0.86 | 0.85 | NA |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100003 | 400008 |
@@ -800,6 +814,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### heat2d
   Discreet 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
+
+### histogram
+  Histogram (http://github.com/NVlabs/cub/tree/master/experimental)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
