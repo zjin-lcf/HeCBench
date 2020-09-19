@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -38,6 +39,10 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DUMP),yes)
+  CFLAGS += -DOUTPUT
+endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,5 +57,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) ../data/cfd/fvcorr.domn.097K
 
