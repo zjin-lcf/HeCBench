@@ -156,6 +156,8 @@ int main(int argc, char** argv)
       auto d_gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
       cgh.copy(d_gpuSrc_acc, result);
     });
+
+    q.wait();
   } // SYCL scope
 
   double offload_end = get_time();
