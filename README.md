@@ -168,6 +168,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 8.6 | 10.7 | 10.5 | 10.4 |
 
 
+| hotspot3D | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5001 | 5003 | 5003 | 90008 |
+| host timing(s) | 4.5 | 4.6 | 4.9 | 9.4 |
+| device timing(s) | 4.1 | 4.1 | 4.1 | 4.2 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100004 | 400008 |
@@ -573,6 +580,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 10.9 | 11.0 | 10.9 | 21.9 |
 
 
+| hotspot3D | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5001 | 5003 | 5003 | 90008 |
+| host timing(s) | 4.2 | 5.6 | 4.6 | 10.8 |
+| device timing(s) | 3.7 | 4.0 | 3.7 | 4.1 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100003 | 400008 |
@@ -879,6 +893,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### hmm
   Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
+
+### hotspot3D
+  hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
