@@ -25,7 +25,7 @@ int main() {
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+    queue q(dev_sel, {property::queue::in_order()} );
 
   int *A;
   size_t size[NUM_SIZE];
@@ -50,8 +50,8 @@ int main() {
         auto Ad_acc = Ad.get_access<sycl_write>(h);
         h.copy(A, Ad_acc);
       });
-      q.wait();
     }
+    q.wait();
     end = clock();
 
     double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
