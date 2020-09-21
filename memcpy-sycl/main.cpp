@@ -25,7 +25,7 @@ int main() {
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel, {property::queue::in_order()} );
+    queue q(dev_sel);
 
   int *A;
   size_t size[NUM_SIZE];
@@ -47,7 +47,7 @@ int main() {
     start = clock();
     for (int j = 0; j < NUM_ITER; j++) {
       q.submit([&](handler &h) {
-        auto Ad_acc = Ad.get_access<sycl_write>(h);
+        auto Ad_acc = Ad.get_access<sycl_discard_write>(h);
         h.copy(A, Ad_acc);
       });
     }
