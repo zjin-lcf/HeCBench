@@ -41,9 +41,9 @@ int main() {
     clock_t start, end;
     start = clock();
     for (int j = 0; j < NUM_ITER; j++) {
-      cudaMemcpy(Ad, A, size[i], cudaMemcpyHostToDevice);
+      cudaMemcpyAsync(Ad, A, size[i], cudaMemcpyHostToDevice, 0);
     }
-    //cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
     end = clock();
     double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     std::cout << "Copy " << size[i] << " btyes from host to device takes " 
