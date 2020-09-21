@@ -220,8 +220,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
-| host timing(s) | 10.4 | 10.9 | 10.6 | 2.4 |
-| device timing(s) | 1.3 | 1.6 | 1.3 | 1.7 |
+| host timing(s) | 4.3 | 4.9 | 4.6 | 2.4 |
+| device timing(s) | 1.2 | 1.5 | 1.2 | 1.7 |
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -681,8 +681,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
-| host timing(s) | 36.7 | 38.6 | 37.3 | 1.94 |
-| device timing(s) | 1.49 | 1.86 | 1.49 | 1.13 |
+| host timing(s) | 4.3 | 13.2 | 4.7 | 1.94 |
+| device timing(s) | 1.4 | 3.5 | 1.4 | 1.13 |
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
