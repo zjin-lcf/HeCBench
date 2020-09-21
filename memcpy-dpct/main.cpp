@@ -1,8 +1,5 @@
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
-#include <iostream>
-#include <cstdlib>
-#include <time.h>
 
 #define NUM_SIZE 16
 #define NUM_ITER (1 << 13)
@@ -44,10 +41,10 @@ int main() try {
     DPCT1000:1: Error handling if-stmt was detected but could not be rewritten.
     */
     if (err != 0) {
-      std::cerr << "Device memory allocation failed\n";
       /*
       DPCT1001:0: The statement could not be removed.
       */
+      std::cerr << "Device memory allocation failed\n";
       free(A);
       return -1;
     }
@@ -59,9 +56,9 @@ int main() try {
     */
     start = clock();
     for (int j = 0; j < NUM_ITER; j++) {
-      q_ct1.memcpy(Ad, A, size[i]).wait();
+      q_ct1.memcpy(Ad, A, size[i]);
     }
-    //cudaDeviceSynchronize();
+    dev_ct1.queues_wait_and_throw();
     /*
     DPCT1008:4: clock function is not defined in the DPC++. This is a
     hardware-specific feature. Consult with your hardware vendor to find a
