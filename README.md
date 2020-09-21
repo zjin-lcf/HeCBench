@@ -56,6 +56,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.16 | 0.35 | 0.34 | 0.95 |  
 
 
+| bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 120003 |  120007 |  120007 | 228009 | 
+| host timing(s) | 5.8 | 10.5 | 12.0 | 8.4 |
+| device timing(s) | 0.67 | 2.2 | 2.2 | 1.36 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -463,9 +470,16 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | black-scholes | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2 | 3 | 9 |
+| total enqueue | 2 | 3 | 3 | 9 |
 | host timing(s) | 0.71 | 1.42 | 1.43 | 4.49 | 
 | device timing(s) | 0.27 | 0.42 | 0.37 | 0.96 |  
+
+
+| bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 120003 | 120007 | 120007 | 228009 | 
+| host timing(s) | 5.3 | 30 | 31 | 10.4 |
+| device timing(s) | 0.68 | 1.38 | 1.56 | 1.29 |
 
 
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -826,6 +840,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### black-scholes
   The Black Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+
+### bspline-vgh
+  Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
