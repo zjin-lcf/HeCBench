@@ -35,6 +35,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 9.1 | 9.1 | 9.1 | NA |  
 
 
+| backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 9 | 9 | 19 |
+| host timing(s) | 2.0 | 2.4 | 2.8 | 6.1 | 
+| device timing(s) | 0.77 | 1.49 | 1.49 | 2.3 |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 |
@@ -454,6 +461,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.73 | 0.73 | 0.73 | NA |  
 
 
+| backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 9 | 9 | 19 |
+| host timing(s) | 1.6 | 1.98 | 2.66 | 5.8 | 
+| device timing(s) | 0.66 | 1.16 | 1.15 | 1.9 |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 | 
@@ -843,6 +857,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### backprop
+  Backpropagation in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
 
@@ -857,6 +874,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
+
+### cfd
+  The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
