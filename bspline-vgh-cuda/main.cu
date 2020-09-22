@@ -160,19 +160,19 @@ int main(int argc, char ** argv){
 
   float* d_walkers_vals;
   cudaMalloc((void**)&d_walkers_vals, sizeof(float)*WSIZE*NSIZE);
-  cudaMemcpy(d_walkers_vals, walkers_vals, sizeof(float)*WSIZE*NSIZE, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_walkers_vals, walkers_vals, sizeof(float)*WSIZE*NSIZE, cudaMemcpyHostToDevice, 0);
 
   float* d_walkers_grads;
   cudaMalloc((void**)&d_walkers_grads, sizeof(float)*WSIZE*MSIZE);
-  cudaMemcpy(d_walkers_grads, walkers_grads, sizeof(float)*WSIZE*MSIZE, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_walkers_grads, walkers_grads, sizeof(float)*WSIZE*MSIZE, cudaMemcpyHostToDevice, 0);
 
   float* d_walkers_hess;
   cudaMalloc((void**)&d_walkers_hess, sizeof(float)*WSIZE*OSIZE);
-  cudaMemcpy(d_walkers_hess, walkers_hess, sizeof(float)*WSIZE*OSIZE, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_walkers_hess, walkers_hess, sizeof(float)*WSIZE*OSIZE, cudaMemcpyHostToDevice, 0);
 
   float* d_spline_coefs;
   cudaMalloc((void**)&d_spline_coefs, sizeof(float)*SSIZE);
-  cudaMemcpy(d_spline_coefs, spline_coefs, sizeof(float)*SSIZE, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_spline_coefs, spline_coefs, sizeof(float)*SSIZE, cudaMemcpyHostToDevice, 0);
 
   float* d_a;
   cudaMalloc((void**)&d_a, sizeof(float)*4);
@@ -214,24 +214,31 @@ int main(int argc, char ** argv){
     ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
-    eval_abc(Af,ty,&b[0]);
-    eval_abc(Af,tz,&c[0]);
-    eval_abc(dAf,tx,&da[0]);
-    eval_abc(dAf,ty,&db[0]);
-    eval_abc(dAf,tz,&dc[0]);
-    eval_abc(d2Af,tx,&d2a[0]);
-    eval_abc(d2Af,ty,&d2b[0]);
-    eval_abc(d2Af,tz,&d2c[0]);              
+    cudaMemcpyAsync(d_a, a, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
 
-    cudaMemcpy(d_a, a, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_c, c, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_da, da, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_db, db, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_dc, dc, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_d2a, d2a, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_d2b, d2b, sizeof(float)*4, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_d2c, d2c, sizeof(float)*4, cudaMemcpyHostToDevice);
+    eval_abc(Af,ty,&b[0]);
+    cudaMemcpyAsync(d_b, b, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(Af,tz,&c[0]);
+    cudaMemcpyAsync(d_c, c, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(dAf,tx,&da[0]);
+    cudaMemcpyAsync(d_da, da, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(dAf,ty,&db[0]);
+    cudaMemcpyAsync(d_db, db, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(dAf,tz,&dc[0]);
+    cudaMemcpyAsync(d_dc, dc, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(d2Af,tx,&d2a[0]);
+    cudaMemcpyAsync(d_d2a, d2a, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(d2Af,ty,&d2b[0]);
+    cudaMemcpyAsync(d_d2b, d2b, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
+
+    eval_abc(d2Af,tz,&d2c[0]);              
+    cudaMemcpyAsync(d_d2c, d2c, sizeof(float)*4, cudaMemcpyHostToDevice, 0);
 
     dim3 global_size((spline_num_splines+255)/256*256);
     dim3 local_size(256);
@@ -259,9 +266,10 @@ int main(int argc, char ** argv){
     cudaDeviceSynchronize();
   }
 
-  cudaMemcpy(walkers_vals, d_walkers_vals, sizeof(float)*WSIZE*NSIZE, cudaMemcpyDeviceToHost);
-  cudaMemcpy(walkers_grads, d_walkers_grads, sizeof(float)*WSIZE*MSIZE, cudaMemcpyDeviceToHost);
-  cudaMemcpy(walkers_hess, d_walkers_hess, sizeof(float)*WSIZE*OSIZE, cudaMemcpyDeviceToHost);
+  cudaMemcpyAsync(walkers_vals, d_walkers_vals, sizeof(float)*WSIZE*NSIZE, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(walkers_grads, d_walkers_grads, sizeof(float)*WSIZE*MSIZE, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(walkers_hess, d_walkers_hess, sizeof(float)*WSIZE*OSIZE, cudaMemcpyDeviceToHost, 0);
+  cudaDeviceSynchronize();
 
   // collect results for the first walker
   float resVal = 0.0;
