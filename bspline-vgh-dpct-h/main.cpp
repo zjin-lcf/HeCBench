@@ -83,7 +83,8 @@ void bspline (
         spline_z_grid_delta_inv );
 }
 
-int main(int argc, char ** argv){
+int main(int argc, char **argv) {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
 
   float *Af = (float*) malloc (sizeof(float)*16);
   float *dAf = (float*) malloc (sizeof(float)*16);
@@ -162,23 +163,23 @@ int main(int argc, char ** argv){
 
   float* d_walkers_vals;
   dpct::dpct_malloc((void **)&d_walkers_vals, sizeof(float) * WSIZE * NSIZE);
-  dpct::dpct_memcpy(d_walkers_vals, walkers_vals, sizeof(float) * WSIZE * NSIZE,
-                    dpct::host_to_device);
+  dpct::async_dpct_memcpy(d_walkers_vals, walkers_vals,
+                          sizeof(float) * WSIZE * NSIZE, dpct::host_to_device);
 
   float* d_walkers_grads;
   dpct::dpct_malloc((void **)&d_walkers_grads, sizeof(float) * WSIZE * MSIZE);
-  dpct::dpct_memcpy(d_walkers_grads, walkers_grads,
-                    sizeof(float) * WSIZE * MSIZE, dpct::host_to_device);
+  dpct::async_dpct_memcpy(d_walkers_grads, walkers_grads,
+                          sizeof(float) * WSIZE * MSIZE, dpct::host_to_device);
 
   float* d_walkers_hess;
   dpct::dpct_malloc((void **)&d_walkers_hess, sizeof(float) * WSIZE * OSIZE);
-  dpct::dpct_memcpy(d_walkers_hess, walkers_hess, sizeof(float) * WSIZE * OSIZE,
-                    dpct::host_to_device);
+  dpct::async_dpct_memcpy(d_walkers_hess, walkers_hess,
+                          sizeof(float) * WSIZE * OSIZE, dpct::host_to_device);
 
   float* d_spline_coefs;
   dpct::dpct_malloc((void **)&d_spline_coefs, sizeof(float) * SSIZE);
-  dpct::dpct_memcpy(d_spline_coefs, spline_coefs, sizeof(float) * SSIZE,
-                    dpct::host_to_device);
+  dpct::async_dpct_memcpy(d_spline_coefs, spline_coefs, sizeof(float) * SSIZE,
+                          dpct::host_to_device);
 
   float* d_a;
   dpct::dpct_malloc((void **)&d_a, sizeof(float) * 4);
@@ -219,24 +220,34 @@ int main(int argc, char ** argv){
     ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
-    eval_abc(Af,ty,&b[0]);
-    eval_abc(Af,tz,&c[0]);
-    eval_abc(dAf,tx,&da[0]);
-    eval_abc(dAf,ty,&db[0]);
-    eval_abc(dAf,tz,&dc[0]);
-    eval_abc(d2Af,tx,&d2a[0]);
-    eval_abc(d2Af,ty,&d2b[0]);
-    eval_abc(d2Af,tz,&d2c[0]);
+    dpct::async_dpct_memcpy(d_a, a, sizeof(float) * 4, dpct::host_to_device);
 
-    dpct::dpct_memcpy(d_a, a, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_b, b, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_c, c, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_da, da, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_db, db, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_dc, dc, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_d2a, d2a, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_d2b, d2b, sizeof(float) * 4, dpct::host_to_device);
-    dpct::dpct_memcpy(d_d2c, d2c, sizeof(float) * 4, dpct::host_to_device);
+    eval_abc(Af,ty,&b[0]);
+    dpct::async_dpct_memcpy(d_b, b, sizeof(float) * 4, dpct::host_to_device);
+
+    eval_abc(Af,tz,&c[0]);
+    dpct::async_dpct_memcpy(d_c, c, sizeof(float) * 4, dpct::host_to_device);
+
+    eval_abc(dAf,tx,&da[0]);
+    dpct::async_dpct_memcpy(d_da, da, sizeof(float) * 4, dpct::host_to_device);
+
+    eval_abc(dAf,ty,&db[0]);
+    dpct::async_dpct_memcpy(d_db, db, sizeof(float) * 4, dpct::host_to_device);
+
+    eval_abc(dAf,tz,&dc[0]);
+    dpct::async_dpct_memcpy(d_dc, dc, sizeof(float) * 4, dpct::host_to_device);
+
+    eval_abc(d2Af,tx,&d2a[0]);
+    dpct::async_dpct_memcpy(d_d2a, d2a, sizeof(float) * 4,
+                            dpct::host_to_device);
+
+    eval_abc(d2Af,ty,&d2b[0]);
+    dpct::async_dpct_memcpy(d_d2b, d2b, sizeof(float) * 4,
+                            dpct::host_to_device);
+
+    eval_abc(d2Af,tz,&d2c[0]);
+    dpct::async_dpct_memcpy(d_d2c, d2c, sizeof(float) * 4,
+                            dpct::host_to_device);
 
     sycl::range<3> global_size((spline_num_splines + 255) / 256 * 256, 1, 1);
     sycl::range<3> local_size(256, 1, 1);
@@ -317,15 +328,16 @@ int main(int argc, char ** argv){
             });
       });
     }
-    dpct::get_current_device().queues_wait_and_throw();
+    dev_ct1.queues_wait_and_throw();
   }
 
-  dpct::dpct_memcpy(walkers_vals, d_walkers_vals, sizeof(float) * WSIZE * NSIZE,
-                    dpct::device_to_host);
-  dpct::dpct_memcpy(walkers_grads, d_walkers_grads,
-                    sizeof(float) * WSIZE * MSIZE, dpct::device_to_host);
-  dpct::dpct_memcpy(walkers_hess, d_walkers_hess, sizeof(float) * WSIZE * OSIZE,
-                    dpct::device_to_host);
+  dpct::async_dpct_memcpy(walkers_vals, d_walkers_vals,
+                          sizeof(float) * WSIZE * NSIZE, dpct::device_to_host);
+  dpct::async_dpct_memcpy(walkers_grads, d_walkers_grads,
+                          sizeof(float) * WSIZE * MSIZE, dpct::device_to_host);
+  dpct::async_dpct_memcpy(walkers_hess, d_walkers_hess,
+                          sizeof(float) * WSIZE * OSIZE, dpct::device_to_host);
+  dev_ct1.queues_wait_and_throw();
 
   // collect results for the first walker
   float resVal = 0.0;
