@@ -150,54 +150,61 @@ int main(int argc, char ** argv){
     ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
-    eval_abc(Af,ty,&b[0]);
-    eval_abc(Af,tz,&c[0]);
-    eval_abc(dAf,tx,&da[0]);
-    eval_abc(dAf,ty,&db[0]);
-    eval_abc(dAf,tz,&dc[0]);
-    eval_abc(d2Af,tx,&d2a[0]);
-    eval_abc(d2Af,ty,&d2b[0]);
-    eval_abc(d2Af,tz,&d2c[0]);              
-
-    range<1> global_size((spline_num_splines+255)/256*256);
-    range<1> local_size(256);
-
     q.submit([&] (handler &h) {
         auto d_a_acc = d_a.get_access<sycl_write>(h);
         h.copy(a, d_a_acc);
         });
+
+    eval_abc(Af,ty,&b[0]);
     q.submit([&] (handler &h) {
         auto d_b_acc = d_b.get_access<sycl_write>(h);
         h.copy(b, d_b_acc);
         });
+
+    eval_abc(Af,tz,&c[0]);
     q.submit([&] (handler &h) {
         auto d_c_acc = d_c.get_access<sycl_write>(h);
         h.copy(c, d_c_acc);
         });
+
+    eval_abc(dAf,tx,&da[0]);
     q.submit([&] (handler &h) {
         auto d_da_acc = d_da.get_access<sycl_write>(h);
         h.copy(da, d_da_acc);
         });
+
+    eval_abc(dAf,ty,&db[0]);
     q.submit([&] (handler &h) {
         auto d_db_acc = d_db.get_access<sycl_write>(h);
         h.copy(db, d_db_acc);
         });
+
+    eval_abc(dAf,tz,&dc[0]);
     q.submit([&] (handler &h) {
         auto d_dc_acc = d_dc.get_access<sycl_write>(h);
         h.copy(dc, d_dc_acc);
         });
+
+    eval_abc(d2Af,tx,&d2a[0]);
     q.submit([&] (handler &h) {
         auto d_d2a_acc = d_d2a.get_access<sycl_write>(h);
         h.copy(d2a, d_d2a_acc);
         });
+
+    eval_abc(d2Af,ty,&d2b[0]);
     q.submit([&] (handler &h) {
         auto d_d2b_acc = d_d2b.get_access<sycl_write>(h);
         h.copy(d2b, d_d2b_acc);
         });
+
+    eval_abc(d2Af,tz,&d2c[0]);              
     q.submit([&] (handler &h) {
         auto d_d2c_acc = d_d2c.get_access<sycl_write>(h);
         h.copy(d2c, d_d2c_acc);
         });
+
+    range<1> global_size((spline_num_splines+255)/256*256);
+    range<1> local_size(256);
 
     q.submit([&] (handler &h) {
         auto walkers_vals = d_walkers_vals.get_access<sycl_write>(h);

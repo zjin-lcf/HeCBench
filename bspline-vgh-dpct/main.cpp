@@ -164,24 +164,21 @@ int main(int argc, char **argv) {
   float* d_walkers_vals;
   d_walkers_vals =
       (float *)sycl::malloc_device(sizeof(float) * WSIZE * NSIZE, q_ct1);
-  q_ct1.memcpy(d_walkers_vals, walkers_vals, sizeof(float) * WSIZE * NSIZE)
-      .wait();
+  q_ct1.memcpy(d_walkers_vals, walkers_vals, sizeof(float) * WSIZE * NSIZE);
 
   float* d_walkers_grads;
   d_walkers_grads =
       (float *)sycl::malloc_device(sizeof(float) * WSIZE * MSIZE, q_ct1);
-  q_ct1.memcpy(d_walkers_grads, walkers_grads, sizeof(float) * WSIZE * MSIZE)
-      .wait();
+  q_ct1.memcpy(d_walkers_grads, walkers_grads, sizeof(float) * WSIZE * MSIZE);
 
   float* d_walkers_hess;
   d_walkers_hess =
       (float *)sycl::malloc_device(sizeof(float) * WSIZE * OSIZE, q_ct1);
-  q_ct1.memcpy(d_walkers_hess, walkers_hess, sizeof(float) * WSIZE * OSIZE)
-      .wait();
+  q_ct1.memcpy(d_walkers_hess, walkers_hess, sizeof(float) * WSIZE * OSIZE);
 
   float* d_spline_coefs;
   d_spline_coefs = sycl::malloc_device<float>(SSIZE, q_ct1);
-  q_ct1.memcpy(d_spline_coefs, spline_coefs, sizeof(float) * SSIZE).wait();
+  q_ct1.memcpy(d_spline_coefs, spline_coefs, sizeof(float) * SSIZE);
 
   float* d_a;
   d_a = sycl::malloc_device<float>(4, q_ct1);
@@ -222,24 +219,31 @@ int main(int argc, char **argv) {
     ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
-    eval_abc(Af,ty,&b[0]);
-    eval_abc(Af,tz,&c[0]);
-    eval_abc(dAf,tx,&da[0]);
-    eval_abc(dAf,ty,&db[0]);
-    eval_abc(dAf,tz,&dc[0]);
-    eval_abc(d2Af,tx,&d2a[0]);
-    eval_abc(d2Af,ty,&d2b[0]);
-    eval_abc(d2Af,tz,&d2c[0]);
+    q_ct1.memcpy(d_a, a, sizeof(float) * 4);
 
-    q_ct1.memcpy(d_a, a, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_b, b, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_c, c, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_da, da, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_db, db, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_dc, dc, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_d2a, d2a, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_d2b, d2b, sizeof(float) * 4).wait();
-    q_ct1.memcpy(d_d2c, d2c, sizeof(float) * 4).wait();
+    eval_abc(Af,ty,&b[0]);
+    q_ct1.memcpy(d_b, b, sizeof(float) * 4);
+
+    eval_abc(Af,tz,&c[0]);
+    q_ct1.memcpy(d_c, c, sizeof(float) * 4);
+
+    eval_abc(dAf,tx,&da[0]);
+    q_ct1.memcpy(d_da, da, sizeof(float) * 4);
+
+    eval_abc(dAf,ty,&db[0]);
+    q_ct1.memcpy(d_db, db, sizeof(float) * 4);
+
+    eval_abc(dAf,tz,&dc[0]);
+    q_ct1.memcpy(d_dc, dc, sizeof(float) * 4);
+
+    eval_abc(d2Af,tx,&d2a[0]);
+    q_ct1.memcpy(d_d2a, d2a, sizeof(float) * 4);
+
+    eval_abc(d2Af,ty,&d2b[0]);
+    q_ct1.memcpy(d_d2b, d2b, sizeof(float) * 4);
+
+    eval_abc(d2Af,tz,&d2c[0]);
+    q_ct1.memcpy(d_d2c, d2c, sizeof(float) * 4);
 
     sycl::range<3> global_size((spline_num_splines + 255) / 256 * 256, 1, 1);
     sycl::range<3> local_size(256, 1, 1);
@@ -264,12 +268,10 @@ int main(int argc, char **argv) {
     dev_ct1.queues_wait_and_throw();
   }
 
-  q_ct1.memcpy(walkers_vals, d_walkers_vals, sizeof(float) * WSIZE * NSIZE)
-      .wait();
-  q_ct1.memcpy(walkers_grads, d_walkers_grads, sizeof(float) * WSIZE * MSIZE)
-      .wait();
-  q_ct1.memcpy(walkers_hess, d_walkers_hess, sizeof(float) * WSIZE * OSIZE)
-      .wait();
+  q_ct1.memcpy(walkers_vals, d_walkers_vals, sizeof(float) * WSIZE * NSIZE);
+  q_ct1.memcpy(walkers_grads, d_walkers_grads, sizeof(float) * WSIZE * MSIZE);
+  q_ct1.memcpy(walkers_hess, d_walkers_hess, sizeof(float) * WSIZE * OSIZE);
+  dev_ct1.queues_wait_and_throw();
 
   // collect results for the first walker
   float resVal = 0.0;
