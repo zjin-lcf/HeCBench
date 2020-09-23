@@ -224,6 +224,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.6 | 2.6 | 2.8 | 2.6 |
 
 
+| lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 6 | 6 | 15 |
+| host timing(s) | 2.8 | 1.4 | 1.48 | 4.4 |
+| device timing(s) | 2.5 | 0.77 | 0.76 | 0.8 |
+
+
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
@@ -643,6 +650,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 65 | 63 | 65 | NA |
 
 
+| lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 6 | 6 | 15 |
+| host timing(s) | 1.8 | 2.0 | 2.0 | 4.8 |
+| device timing(s) | 1.42 | 1.31 | 1.27 | 1.32 |
+
+
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1535 | 1536 | 1536 | 6145 |
@@ -934,6 +948,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### laplace
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+
+### lavaMD
+  LavaMD in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
