@@ -10,7 +10,7 @@ __global__ void md ( const box_str* d_box_gpu,
   __shared__ FOUR_VECTOR rB_shared[100];
   __shared__ fp qB_shared[100];
 
-  int bx = blockDim.x; 
+  int bx = blockIdx.x; 
   int tx = threadIdx.x;
   int wtx = tx;
 
