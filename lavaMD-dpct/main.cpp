@@ -1,9 +1,7 @@
-#include <stdio.h>          // (in path known to compiler)      needed by printf
-#include <stdlib.h>          // (in path known to compiler)      needed by malloc
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdbool.h>        // (in path known to compiler)      needed by true/false
-#include <string.h>
-#include <cuda.h>
-#include "./util/timer/timer.h"      // (in path specified here)
+#include "./util/timer/timer.h"    // (in path specified here)
 #include "./util/num/num.h"        // (in path specified here)
 #include "./main.h"            // (in the current directory)
 
@@ -12,6 +10,8 @@
 
 int main(  int argc, char *argv [])
 {
+ dpct::device_ext &dev_ct1 = dpct::get_current_device();
+ sycl::queue &q_ct1 = dev_ct1.default_queue();
 
   // counters
   int i, j, k, l, m, n;
@@ -187,26 +187,45 @@ int main(  int argc, char *argv [])
   FOUR_VECTOR* d_rv_gpu;
   fp* d_qv_gpu;
   FOUR_VECTOR* d_fv_gpu;
-  
-  cudaMalloc ((void**)&d_box_gpu, dim_cpu.box_mem);
-  cudaMalloc ((void**)&d_rv_gpu, dim_cpu.space_mem);
-  cudaMalloc ((void**)&d_qv_gpu, dim_cpu.space_mem2);
-  cudaMalloc ((void**)&d_fv_gpu, dim_cpu.space_mem);
 
-  cudaMemcpy(d_box_gpu, box_cpu, dim_cpu.box_mem, cudaMemcpyHostToDevice); 
-  cudaMemcpy(d_rv_gpu, rv_cpu, dim_cpu.space_mem, cudaMemcpyHostToDevice); 
-  cudaMemcpy(d_qv_gpu, qv_cpu, dim_cpu.space_mem2, cudaMemcpyHostToDevice); 
-  cudaMemcpy(d_fv_gpu, fv_cpu, dim_cpu.space_mem, cudaMemcpyHostToDevice); 
+ d_box_gpu = (box_str *)sycl::malloc_device(dim_cpu.box_mem, q_ct1);
+ d_rv_gpu = (FOUR_VECTOR *)sycl::malloc_device(dim_cpu.space_mem, q_ct1);
+ d_qv_gpu = (float *)sycl::malloc_device(dim_cpu.space_mem2, q_ct1);
+ d_fv_gpu = (FOUR_VECTOR *)sycl::malloc_device(dim_cpu.space_mem, q_ct1);
 
-  md<<<dim_cpu_number_boxes, NUMBER_THREADS>>>(
-    d_box_gpu, d_rv_gpu, d_qv_gpu, d_fv_gpu, par_cpu.alpha, dim_cpu_number_boxes);
+ q_ct1.memcpy(d_box_gpu, box_cpu, dim_cpu.box_mem).wait();
+ q_ct1.memcpy(d_rv_gpu, rv_cpu, dim_cpu.space_mem).wait();
+ q_ct1.memcpy(d_qv_gpu, qv_cpu, dim_cpu.space_mem2).wait();
+ q_ct1.memcpy(d_fv_gpu, fv_cpu, dim_cpu.space_mem).wait();
 
-  cudaMemcpy(fv_cpu, d_fv_gpu, dim_cpu.space_mem, cudaMemcpyDeviceToHost); 
+ q_ct1.submit([&](sycl::handler &cgh) {
+  sycl::accessor<FOUR_VECTOR, 1, sycl::access::mode::read_write,
+                 sycl::access::target::local>
+      rA_shared_acc_ct1(sycl::range<1>(100), cgh);
+  sycl::accessor<FOUR_VECTOR, 1, sycl::access::mode::read_write,
+                 sycl::access::target::local>
+      rB_shared_acc_ct1(sycl::range<1>(100), cgh);
+  sycl::accessor<fp, 1, sycl::access::mode::read_write,
+                 sycl::access::target::local>
+      qB_shared_acc_ct1(sycl::range<1>(100), cgh);
 
-  cudaFree(d_box_gpu);
-  cudaFree(d_rv_gpu);
-  cudaFree(d_qv_gpu);
-  cudaFree(d_fv_gpu);
+  cgh.parallel_for(
+      sycl::nd_range<3>(sycl::range<3>(1, 1, dim_cpu_number_boxes) *
+                            sycl::range<3>(1, 1, NUMBER_THREADS),
+                        sycl::range<3>(1, 1, NUMBER_THREADS)),
+      [=](sycl::nd_item<3> item_ct1) {
+       md(d_box_gpu, d_rv_gpu, d_qv_gpu, d_fv_gpu, par_cpu.alpha,
+          dim_cpu_number_boxes, item_ct1, rA_shared_acc_ct1.get_pointer(),
+          rB_shared_acc_ct1.get_pointer(), qB_shared_acc_ct1.get_pointer());
+      });
+ });
+
+ q_ct1.memcpy(fv_cpu, d_fv_gpu, dim_cpu.space_mem).wait();
+
+ sycl::free(d_box_gpu, q_ct1);
+ sycl::free(d_rv_gpu, q_ct1);
+ sycl::free(d_qv_gpu, q_ct1);
+ sycl::free(d_fv_gpu, q_ct1);
 
   long long end = get_time();
   printf("Device offloading time:\n"); 

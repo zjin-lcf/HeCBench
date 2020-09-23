@@ -12,20 +12,6 @@
 
 int main(  int argc, char *argv [])
 {
-
-  // timer
-  long long time0;
-
-  time0 = get_time();
-
-  long long time1;
-  long long time2;
-  long long time3;
-  long long time4;
-  long long time5;
-  long long time6;
-  long long time7;
-
   // counters
   int i, j, k, l, m, n;
 
@@ -40,8 +26,6 @@ int main(  int argc, char *argv [])
 
 
   printf("WG size of kernel = %d \n", NUMBER_THREADS);
-
-  time1 = get_time();
 
   // assing default values
   dim_cpu.arch_arg = 0;
@@ -90,11 +74,7 @@ int main(  int argc, char *argv [])
     return 0;
   }
 
-  time2 = get_time();
-
   par_cpu.alpha = 0.5;
-
-  time3 = get_time();
 
   // total number of boxes
   dim_cpu.number_boxes = dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg; // 8*8*8=512
@@ -106,8 +86,6 @@ int main(  int argc, char *argv [])
 
   // box array
   dim_cpu.box_mem = dim_cpu.number_boxes * sizeof(box_str);
-
-  time4 = get_time();
 
   // allocate boxes
   box_cpu = (box_str*)malloc(dim_cpu.box_mem);
@@ -204,10 +182,10 @@ int main(  int argc, char *argv [])
     fv_cpu[i].z = 0;                // set to 0, because kernels keeps adding to initial value
   }
 
-  time5 = get_time();
+  long long start = get_time();
 
   // only the member number_boxes is used in the kernel
-  long dim_cpu_number_boxes = dim_cpu.number_boxes;
+  int dim_cpu_number_boxes = dim_cpu.number_boxes;
 
 #pragma omp target data map(to: box_cpu[0:dim_cpu.number_boxes], \
                                 rv_cpu[0:dim_cpu.space_elem], \
@@ -353,9 +331,9 @@ int main(  int argc, char *argv [])
   }
 }
 
-  time6 = get_time();
+  long long end = get_time();
   printf("Device offloading time:\n"); 
-  printf("%.12f s\n", (float) (time6-time5) / 1000000);
+  printf("%.12f s\n", (float) (end-start) / 1000000);
 
 #ifdef DEBUG
   int offset = 395;
@@ -375,13 +353,10 @@ int main(  int argc, char *argv [])
   fclose(fptr);
 #endif         
 
-
   free(rv_cpu);
   free(qv_cpu);
   free(fv_cpu);
   free(box_cpu);
-
-  time7 = get_time();
 
   return 0;
 }
