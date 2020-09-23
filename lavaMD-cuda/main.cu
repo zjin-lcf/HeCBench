@@ -13,19 +13,6 @@
 int main(  int argc, char *argv [])
 {
 
-  // timer
-  long long time0;
-
-  time0 = get_time();
-
-  long long time1;
-  long long time2;
-  long long time3;
-  long long time4;
-  long long time5;
-  long long time6;
-  long long time7;
-
   // counters
   int i, j, k, l, m, n;
 
@@ -38,10 +25,7 @@ int main(  int argc, char *argv [])
   FOUR_VECTOR* fv_cpu;
   int nh;
 
-
   printf("WG size of kernel = %d \n", NUMBER_THREADS);
-
-  time1 = get_time();
 
   // assing default values
   dim_cpu.arch_arg = 0;
@@ -90,11 +74,7 @@ int main(  int argc, char *argv [])
     return 0;
   }
 
-  time2 = get_time();
-
   par_cpu.alpha = 0.5;
-
-  time3 = get_time();
 
   // total number of boxes
   dim_cpu.number_boxes = dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg; 
@@ -106,8 +86,6 @@ int main(  int argc, char *argv [])
 
   // box array
   dim_cpu.box_mem = dim_cpu.number_boxes * sizeof(box_str);
-
-  time4 = get_time();
 
   // allocate boxes
   box_cpu = (box_str*)malloc(dim_cpu.box_mem);
@@ -177,20 +155,15 @@ int main(  int argc, char *argv [])
   rv_cpu = (FOUR_VECTOR*)malloc(dim_cpu.space_mem);
   for(i=0; i<dim_cpu.space_elem; i=i+1){
     rv_cpu[i].v = (rand()%10 + 1) / 10.0;      // get a number in the range 0.1 - 1.0
-    // rv_cpu[i].v = 0.1;      // get a number in the range 0.1 - 1.0
     rv_cpu[i].x = (rand()%10 + 1) / 10.0;      // get a number in the range 0.1 - 1.0
-    // rv_cpu[i].x = 0.2;      // get a number in the range 0.1 - 1.0
     rv_cpu[i].y = (rand()%10 + 1) / 10.0;      // get a number in the range 0.1 - 1.0
-    // rv_cpu[i].y = 0.3;      // get a number in the range 0.1 - 1.0
     rv_cpu[i].z = (rand()%10 + 1) / 10.0;      // get a number in the range 0.1 - 1.0
-    // rv_cpu[i].z = 0.4;      // get a number in the range 0.1 - 1.0
   }
 
   // input (charge)
   qv_cpu = (fp*)malloc(dim_cpu.space_mem2);
   for(i=0; i<dim_cpu.space_elem; i=i+1){
     qv_cpu[i] = (rand()%10 + 1) / 10.0;      // get a number in the range 0.1 - 1.0
-    // qv_cpu[i] = 0.5;      // get a number in the range 0.1 - 1.0
   }
 
   // output (forces)
@@ -202,7 +175,7 @@ int main(  int argc, char *argv [])
     fv_cpu[i].z = 0;                // set to 0, because kernels keeps adding to initial value
   }
 
-  time5 = get_time();
+  long long start = get_time();
 
   int dim_cpu_number_boxes = dim_cpu.number_boxes;
 
@@ -235,9 +208,9 @@ int main(  int argc, char *argv [])
   cudaFree(d_qv_gpu);
   cudaFree(d_fv_gpu);
 
-  time6 = get_time();
+  long long end = get_time();
   printf("Device offloading time:\n"); 
-  printf("%.12f s\n", (float) (time6-time5) / 1000000); 
+  printf("%.12f s\n", (float) (end-start) / 1000000); 
 
   // dump results
 #ifdef OUTPUT
@@ -254,8 +227,6 @@ int main(  int argc, char *argv [])
   free(qv_cpu);
   free(fv_cpu);
   free(box_cpu);
-
-  time7 = get_time();
 
   return 0; 
 
