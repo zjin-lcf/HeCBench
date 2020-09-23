@@ -122,7 +122,7 @@
 
 					r2 = rA_shared[wtx].v + rB_shared[j].v - DOT(rA_shared[wtx],rB_shared[j]); 
 					u2 = a2*r2;
-					vij= exp(-u2);
+					vij= cl::sycl::exp(-u2);
 					fs = 2*vij;
 					d.x = rA_shared[wtx].x  - rB_shared[j].x;
 					fxij=fs*d.x;
