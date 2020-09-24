@@ -47,11 +47,11 @@ int main() {
     start = clock();
     for (int j = 0; j < NUM_ITER; j++) {
       q.submit([&](handler &h) {
-        auto Ad_acc = Ad.get_access<sycl_write>(h);
+        auto Ad_acc = Ad.get_access<sycl_discard_write>(h);
         h.copy(A, Ad_acc);
       });
-      q.wait();
     }
+    q.wait();
     end = clock();
 
     double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);

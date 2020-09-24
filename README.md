@@ -14,13 +14,6 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
 
 ## Results on Platform 1
-| all-pairs-distance | SYCL | DPCT usm | DPCT header | OpenMP |     
-| --- | --- | --- | --- | --- |            
-| total enqueue | 60 | 61 | 61 | 67 | 
-| host timing(s) | 0.41 | 0.79 | 0.85 | 26 | 
-| device timing(s) | 0.13 | 0.19 | 0.18 | 22 |  
-
-
 | amgmk | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |            
 | total enqueue | 501 | 506 | 506 | 2010 | 
@@ -42,18 +35,18 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 9.1 | 9.1 | 9.1 | NA |  
 
 
+| backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 9 | 9 | 19 |
+| host timing(s) | 2.0 | 2.4 | 2.8 | 6.1 | 
+| device timing(s) | 0.77 | 1.49 | 1.49 | 2.3 |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 |
 | host timing(s) | 1.5 | 1.79 | 1.87 | 4.47 | 
 | device timing(s) | 0.7 | 0.71 | 0.72 | 0.75 |  
-
-
-| bfs | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 52 | 55 | 55 | 133 |
-| host timing(s) | 0.29 | 0.61 | 0.61 | 3.59 | 
-| device timing(s) | 0.26 | 0.28 | 0.28 | 0.38 |  
 
 
 | bitonic-sort | SYCL | DPCT usm | DPCT header| OpenMP | 
@@ -70,6 +63,20 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.16 | 0.35 | 0.34 | 0.95 |  
 
 
+| bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 120003 |  120007 |  120007 | 228009 | 
+| host timing(s) | 5.8 | 7.6 | 8.1 | 8.4 |
+| device timing(s) | 0.67 | 2.38 | 2.15 | 1.36 |
+
+
+| cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 16005 | NA | NA | 132035 |
+| host timing(s) | 4.4 | NA | NA | 9.95 |
+| device timing(s) | 3.5 | NA | NA | 3.76 |
+
+
 | chi2 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 |
@@ -78,6 +85,20 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 
 | clenergy | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 502 | 502  | 502 | 3011 |
+| host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
+| device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
+
+
+| clink | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 40 | 160  | 160 | 205 |
+| host timing(s) | 19.5 | 20.4 | 24.3 | 25.1 |
+| device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
+
+
+| compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 502 | 502  | 502 | 3011 |
 | host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
@@ -154,6 +175,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 8.6 | 10.7 | 10.5 | 10.4 |
 
 
+| hotspot3D | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5001 | 5003 | 5003 | 90008 |
+| host timing(s) | 4.5 | 4.6 | 4.9 | 9.4 |
+| device timing(s) | 4.1 | 4.1 | 4.1 | 4.2 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100004 | 400008 |
@@ -191,65 +219,23 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 108546 | 108555 | 108555  | NA |
-| host timing(s) | 54 | 52 | 56 | NA |
-| device timing(s) | 47 | 47 | 47 | NA |
-
-
-| lud | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 1535 | 1536 | 1536 | 6145 |
-| host timing(s) | 8.9 | 11.0 | 11.2 | 14.1 |
-| device timing(s) | 7.8 | 9.6 | 9.7 | 9.7 |
-
-
-| mandelbrot | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 303 | 404 | 404 | 611 |
-| host timing(s) | 0.22 | 0.69 | 0.62 |  3.49 |
-| device timing(ms) | 3.29 | 3.65 | 3.58 | 4.25 |
-
-
-| matrix-mul | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 2 | 4 | 4 | 13 | 
-| host timing(s) | 7 | 9.3 | 9.2 | 13.1 |
-| device timing(s) | 6.7 | 8.68 | 8.44 | 9.56 |
-
-
-| matrix-rotate | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 101 | 102 | 102 | 705 | 
-| host timing(s) | 1.58 | 0.63 | 2.04 | 11.2 |
-| device timing(s) | 1.33 | 1.62 | 1.37 | 6.65 |
-
-
-| maxpool3d | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 101 | 102 | 102 | 1807 | 
-| host timing(s) | 12.5 | 12.8 | 12.9 | 15.4 |
-| device timing(s) | 11.5 | 11.7 | 11.7 | 11.5 |
-
-
-| md | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 1002 | 1002 | 1002 | 8008 |
-| host timing(s) | 3.67 | 3.45 | 3.73 | 7.14 |
-| device timing(s) | 3.3 | 2.77 | 3.0 | 3.36 |
-
-
-| md5hash | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
 | total enqueue | 16 | 28 | 28 | 57 |
 | host timing(s) | 3.75 | 3.37 | 3.59 | 6.22 |
 | device timing(s) | 2.6 | 2.6 | 2.8 | 2.6 |
 
 
+| lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 6 | 6 | 15 |
+| host timing(s) | 2.8 | 1.4 | 1.48 | 4.4 |
+| device timing(s) | 2.5 | 0.77 | 0.76 | 0.8 |
+
+
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
-| host timing(s) | 10.4 | 10.9 | 10.6 | 2.4 |
-| device timing(s) | 1.3 | 1.6 | 1.3 | 1.7 |
+| host timing(s) | 4.3 | 4.9 | 4.6 | 2.4 |
+| device timing(s) | 1.2 | 1.5 | 1.2 | 1.7 |
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -266,11 +252,11 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.38 | 2.52 | 2.38 | 2.53 |
 
 
-| murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| nn | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 101 | 104 | 104 | 409 |
-| host timing(s) | 7.6 | 8.4 | 8.4 | 11.2 |
-| device timing(s) | 7.1 | 7.6 | 7.6 | 7.6 |
+| total enqueue | 2 | 3 | 3 | 13 |
+| host timing(s) | 0.2 | 0.55 | 0.59 | 3.5 |
+| device timing(us) | 38 | 49 | 43 | 103 |
 
 
 | nw | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -294,14 +280,77 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.22 | 0.51 | 0.53 | 1.42 |
 
 
-| particlefilter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| pathfinder | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | NA | 45 | NA | 179 | 
-| host timing(s) | NA | 29.5 | NA | 33.9 |
-| device timing(s) | NA | 28.5 | NA | 29.7 |
+| total enqueue | 102 | 104 | 104 | 709 | 
+| host timing(s) | 2.36 | 5.72 | 5.65 | 11.8 |
+| device timing(s) | 1.99 | 5.0 | 4.98 | 8.1 |
 
 
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 102 | 102 | 307 | 
+| host timing(s) | 3.0 | 3.4 | 3.5 | 6.5 |
+| device timing(s) | 2.7 | 2.7 | 2.7 | 2.85 |
+
+
+| randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 4 | 4 | 4 | 21 |
+| host timing(s) | 2.6 | 2.9 | 2.9 | 7.1 | 
+| device timing(s) | 2 | 2.1 | 2.0 | 3.3 |
+
+
+| reduction | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 325 | 326 | 326 | 975 |
+| host timing(s) | 1.3 | 1.74 | 1.8 | 4.65 |
+| device timing(s) | 1 | 0.95 | 1.0 | 1.13 |
+
+
+| reverse | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1048578 | 1048579 | 1048579 | 1048584 |
+| host timing(s) | 33.4 | 27.1 | 74.9 | 43.3 |
+| device timing(s) | 2.3 | 2.44 | 1.47 | 4.14 |
+
+
+| rng-wallace | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 200 | 202 | 202 |  NA |
+| host timing(s) | 4.3 | 3.9 | 4.6 | NA | 
+| device timing(s) | 3.6 | 3.2 | 3.6 | NA |
+
+
+| rsbench | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 10 | 10 | 68 |
+| host timing(s) | 11.6 | 11.8 | 11.8 | 20.8 |
+| device timing(s) | 8.8 | 8.8 | 8.6 | 12.1 |
+
+
+| rtm8 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 32 | 38 | 38 | 220 |
+| host timing(s) | 4.7 | 4.8 | 5.0 | 8.7 |
+| device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
+
+
+| scan | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 100001 | 10002 | 10002 | 200007 |
+| host timing(s) | 3.4 | 2.9 | 3.8 | 10.3 |
+| device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
+
+
+| softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 |  507 |
+| host timing(s) | 1.6 | 4.5 | 1.9 | 5.1 |
+| device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
+
+
+| sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 102 | 102 | 307 | 
 | host timing(s) | 3.0 | 3.4 | 3.5 | 6.5 |
@@ -419,6 +468,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.73 | 0.73 | 0.73 | NA |  
 
 
+| backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 9 | 9 | 19 |
+| host timing(s) | 1.6 | 1.98 | 2.66 | 5.8 | 
+| device timing(s) | 0.66 | 1.16 | 1.15 | 1.9 |  
+
+
 | bezier-surface | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 12 | 
@@ -442,9 +498,23 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | black-scholes | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2 | 3 | 9 |
+| total enqueue | 2 | 3 | 3 | 9 |
 | host timing(s) | 0.71 | 1.42 | 1.43 | 4.49 | 
 | device timing(s) | 0.27 | 0.42 | 0.37 | 0.96 |  
+
+
+| bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 120003 | 120007 | 120007 | 228009 | 
+| host timing(s) | 5.3 | 9.5 | 6.6 | 10.4 |
+| device timing(s) | 0.68 | 1.41 | 1.49 | 1.29 |
+
+
+| cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 16005 | NA | NA | 132035 |
+| host timing(s) | 4.4 | NA | NA | 9.95 |
+| device timing(s) | 3.5 | NA | NA | 3.76 |
 
 
 | chi2 | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -524,6 +594,20 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.83 | 0.86 | 0.85 | NA |
 
 
+| hmm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 501 | 504 | 504 | 6499 |
+| host timing(s) | 11.3 | 11.8 | 11.7 | 25.7 |
+| device timing(s) | 10.9 | 11.0 | 10.9 | 21.9 |
+
+
+| hotspot3D | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5001 | 5003 | 5003 | 90008 |
+| host timing(s) | 4.2 | 5.6 | 4.6 | 10.8 |
+| device timing(s) | 3.7 | 4.0 | 3.7 | 4.1 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100003 | 400008 |
@@ -564,6 +648,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 108546 | 108555 | 108555  | NA |
 | host timing(s) | 153 | 116 | 153 | NA |
 | device timing(s) | 65 | 63 | 65 | NA |
+
+
+| lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 6 | 6 | 15 |
+| host timing(s) | 1.8 | 2.0 | 2.0 | 4.8 |
+| device timing(s) | 1.42 | 1.31 | 1.27 | 1.32 |
 
 
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -618,8 +709,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
-| host timing(s) | 36.7 | 38.6 | 37.3 | 1.94 |
-| device timing(s) | 1.49 | 1.86 | 1.49 | 1.13 |
+| host timing(s) | 4.3 | 13.2 | 4.7 | 1.94 |
+| device timing(s) | 1.4 | 3.5 | 1.4 | 1.13 |
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -669,6 +760,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 39 | 45 | 45 | 179 | 
 | host timing(s) | 4.92 | 4.55 | 4.95 | 5.37 |
 | device timing(s) | 4.86 | 4.48 | 4.87 | 5.02 |
+
+
+| pathfinder | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 104 | 104 | 709 | 
+| host timing(s) | 3.1 | 4.3 | 4.3 | 9.3 |
+| device timing(s) | 2.8 | 3.6 | 3.6 | 5.8 |
 
 
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -773,6 +871,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### backprop
+  Backpropagation in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
 
@@ -784,6 +885,12 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### black-scholes
   The Black Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+
+### bspline-vgh
+  Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
+
+### cfd
+  The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
@@ -818,6 +925,12 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### histogram
   Histogram (http://github.com/NVlabs/cub/tree/master/experimental)
 
+### hmm
+  Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
+
+### hotspot3D
+  hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
 
@@ -835,6 +948,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### laplace
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
+
+### lavaMD
+  LavaMD in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -874,6 +990,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### particlefilter
   Particle Filter in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### pathfinder
+  PathFinder in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
