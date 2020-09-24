@@ -561,9 +561,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | fft | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 201 | NA | NA | NA |
-| host timing(s) | 12.4 | NA | NA | NA |
-| device timing(ms) | 11.4 | NA | NA | NA | 
+| total enqueue | 201 | 202 | 202 | NA |
+| host timing(s) | 12.4 | 27.1 | 27.1 | NA |
+| device timing(ms) | 11.4 | 24.9 | 24.9 | NA | 
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
