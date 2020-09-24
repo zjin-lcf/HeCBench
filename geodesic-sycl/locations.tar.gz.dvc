@@ -1,0 +1,5 @@
+outs:
+- md5: 03ce97e6d0c09f8be45907295e5d78c4
+  size: 18030711
+  hash: md5
+  path: locations.tar.gz
