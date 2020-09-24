@@ -163,9 +163,9 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
   }
 }
 
-void verify(unsigned int size, const float *output, const float *expected_output) {
+void verify( int size, const float *output, const float *expected_output) {
   float error_rate = 0;
-  for (unsigned int i = 0; i < size; i++) {
+  for ( int i = 0; i < size; i++) {
     if (fabs(output[i] - expected_output[i]) > error_rate) {
       error_rate = fabs(output[i] - expected_output[i]);
     }
@@ -177,11 +177,11 @@ int main(int argc, char** argv) {
 
   int iteration = atoi(argv[1]);
 
-  unsigned int num_cities = 2097152; // 2 ** 21
-  unsigned int num_ref_cities = 6; // bombay, melbourne, waltham, moscow, glasgow, morocco
-  unsigned int index_map[] ={436483, 1952407, 627919, 377884, 442703, 1863423};
-  unsigned int N = num_cities * num_ref_cities;
-  unsigned int city = 0;
+  int num_cities = 2097152; // 2 ** 21
+  int num_ref_cities = 6; // bombay, melbourne, waltham, moscow, glasgow, morocco
+  int index_map[] ={436483, 1952407, 627919, 377884, 442703, 1863423};
+  int N = num_cities * num_ref_cities;
+  int city = 0;
   float lat, lon;
 
   const char* filename = "locations.txt";
@@ -210,8 +210,8 @@ int main(int argc, char** argv) {
   }
   // each reference city is compared with 'num_cities' cities
   for (int c = 0;  c < num_ref_cities; c++) {
-    unsigned index = index_map[c] - 1;
-    for(unsigned j = c*num_cities; j < (c+1)*num_cities; ++j) {
+    int index = index_map[c] - 1;
+    for(int j = c*num_cities; j < (c+1)*num_cities; ++j) {
       input[j].s2() = input[index].s0();
       input[j].s3() = input[index].s1();
     }
