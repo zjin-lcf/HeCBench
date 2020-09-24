@@ -1,12 +1,6 @@
-#include <iostream>
-#include <sstream>
-#include <chrono>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <time.h>
-#include "common.h"
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 
 using namespace std;
 
@@ -15,8 +9,9 @@ using namespace std;
 #define T2 float2
 #else
 #define T double
-#define T2 double2
+#define T2 sycl::double2
 #endif
+
 
 #ifndef M_SQRT1_2
 # define M_SQRT1_2      0.70710678118654752440f
@@ -31,17 +26,21 @@ using namespace std;
 #define iexp_1_4   (T2){  0, 1 }
 #define iexp_3_8   (T2){ -1, 1 }//requires post-multiply by 1/sqrt(2)
 
-inline T2 exp_i( T phi ) {
-  return (T2){ cl::sycl::cos(phi), cl::sycl::sin(phi) };
+SYCL_EXTERNAL
+T2 exp_i( T phi ) {
+  return (T2){sycl::cos(phi), sycl::sin(phi)};
 }
 
+SYCL_EXTERNAL
+T2 cmplx_mul(T2 a, T2 b) {
+  return (T2){a.x() * b.x() - a.y() * b.y(), a.x() * b.y() + a.y() * b.x()};
+}
 
-inline T2 cmplx_mul( T2 a, T2 b ) { return (T2){ a.x()*b.x()-a.y()*b.y(), a.x()*b.y()+a.y()*b.x() }; }
-inline T2 cm_fl_mul( T2 a, T  b ) { return (T2){ b*a.x(), b*a.y() }; }
-inline T2 cmplx_add( T2 a, T2 b ) { return (T2){ a.x() + b.x(), a.y() + b.y() }; }
-inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() }; }
+T2 cm_fl_mul(T2 a, T b) { return (T2){b * a.x(), b *a.y()}; }
 
-
+T2 cmplx_add(T2 a, T2 b) { return (T2){a.x() + b.x(), a.y() + b.y()}; }
+SYCL_EXTERNAL
+T2 cmplx_sub(T2 a, T2 b) { return (T2){a.x() - b.x(), a.y() - b.y()}; }
 
 #define FFT2(a0, a1)                            \
 {                                               \
@@ -100,8 +99,14 @@ inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() };
   IFFT4( &a[4], &a[5], &a[6], &a[7] );                        \
 }
 
+// CUDA kernels
+#include "fft1D_512.h"
+#include "ifft1D_512.h"
+
 int main(int argc, char** argv)
 {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
 
   srand(2);
   int i;
@@ -119,22 +124,23 @@ int main(int argc, char** argv)
   const int half_n_ffts = bytes / (512*sizeof(T2)*2);
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
-  unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
+  const unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
   const double N = (double)half_n_cmplx*2.0;
 
   fprintf(stdout, "used_bytes=%lu, N=%g\n", used_bytes, N);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
+
   T2 *reference = (T2*) malloc (used_bytes);
 
 
   // init host memory...
   for (i = 0; i < half_n_cmplx; i++) {
-    source[i].x() = (rand()/(float)RAND_MAX)*2-1;
-    source[i].y() = (rand()/(float)RAND_MAX)*2-1;
-    source[i+half_n_cmplx].x() = source[i].x();
-    source[i+half_n_cmplx].y()= source[i].y();
+    source[i].x() = (rand() / (float)RAND_MAX) * 2 - 1;
+    source[i].y() = (rand() / (float)RAND_MAX) * 2 - 1;
+    source[i + half_n_cmplx].x() = source[i].x();
+    source[i + half_n_cmplx].y() = source[i].y();
   }
 
   memcpy(reference, source, used_bytes);
@@ -146,45 +152,53 @@ int main(int argc, char** argv)
 
   auto start = std::chrono::steady_clock::now();
 
-  { // sycl scope
+  T2 *d_source;
+  dpct::dpct_malloc((void **)&d_source, (long)N * sizeof(T2));
+  dpct::dpct_memcpy(d_source, source, (long)N * sizeof(T2),
+                    dpct::host_to_device);
 
-#ifdef GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
+  for (int k=0; k<passes; k++) {
+    {
+      dpct::buffer_t d_source_buf_ct0 = dpct::get_buffer(d_source);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        sycl::accessor<T, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            smem_acc_ct1(sycl::range<1>(576 /*8*8*9*/), cgh);
+        auto d_source_acc_ct0 =
+            d_source_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
 
-    queue q(dev_sel);
-
-    const property_list props = property::buffer::use_host_ptr();
-
-    buffer<T2, 1> d_work(source, (long)N, props); 
-
-    // local and global sizes are the same for the three kernels
-    size_t localsz = 64;
-    size_t globalsz = localsz * n_ffts; 
-
-    for (int k=0; k<passes; k++) {
-
-      q.submit([&](handler& cgh) {
-          auto work = d_work.get_access<sycl_read_write>(cgh) ;
-          accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-          cgh.parallel_for<class fftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-#include "fft1D_512.sycl"
-              });
-          });
-
-
-      q.submit([&](handler& cgh) {
-          auto work = d_work.get_access<sycl_read_write>(cgh) ;
-          accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-          cgh.parallel_for<class ifftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-#include "ifft1D_512.sycl"
-              });
-          });
+        cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, n_ffts) *
+                                               sycl::range<3>(1, 1, 64),
+                                           sycl::range<3>(1, 1, 64)),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           fft1D_512((sycl::double2 *)(&d_source_acc_ct0[0]),
+                                     item_ct1, smem_acc_ct1.get_pointer());
+                         });
+      });
     }
-    q.wait();
+    {
+      dpct::buffer_t d_source_buf_ct0 = dpct::get_buffer(d_source);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        sycl::accessor<T, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            smem_acc_ct1(sycl::range<1>(576 /*8*8*9*/), cgh);
+        auto d_source_acc_ct0 =
+            d_source_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+
+        cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, n_ffts) *
+                                               sycl::range<3>(1, 1, 64),
+                                           sycl::range<3>(1, 1, 64)),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           ifft1D_512((sycl::double2 *)(&d_source_acc_ct0[0]),
+                                      item_ct1, smem_acc_ct1.get_pointer());
+                         });
+      });
+    }
   }
+
+  dpct::dpct_memcpy(source, d_source, (long)N * sizeof(T2),
+                    dpct::device_to_host);
+  dpct::dpct_free(d_source);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -193,12 +207,12 @@ int main(int argc, char** argv)
   // Verification
   bool error = false;
   for (int i = 0; i < N; i++) {
-    if ( fabs((T)source[i].x() - (T)reference[i].x()) > 1e-6) {
+    if (fabs((T)source[i].x() - (T)reference[i].x()) > 1e-6) {
       //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
       error = true;
       break;
     }
-    if ( fabs((T)source[i].y() - (T)reference[i].y()) > 1e-6) {
+    if (fabs((T)source[i].y() - (T)reference[i].y()) > 1e-6) {
       //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
       error = true;
       break;

@@ -6,7 +6,6 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +22,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -40,9 +39,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -50,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp fft1D_512.sycl ifft1D_512.sycl Makefile
+%.o: %.cpp fft1D_512.h ifft1D_512.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

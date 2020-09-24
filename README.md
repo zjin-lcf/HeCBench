@@ -126,6 +126,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 85 | 147 | 142 |  2711 |
 
 
+| fft | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 201 | 202 | NA | NA |
+| host timing(s) | 31.4 | 22.9 | NA | NA |
+| device timing(ms) | 30.6 | 20.2 | NA | NA | 
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -552,6 +559,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 61 | 104 | 95 |  4869 |
 
 
+| fft | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 201 | NA | NA | NA |
+| host timing(s) | 12.4 | NA | NA | NA |
+| device timing(ms) | 11.4 | NA | NA | NA | 
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -906,6 +920,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
+
+### fft
+  FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
