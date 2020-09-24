@@ -147,13 +147,13 @@ void kernel_distance(const sycl::float4 *d_A, float *d_C, const int N,
 void distance_device(const sycl::float4 *VA, float *VC, const size_t N,
                      const int iteration) {
 
-  sycl::range<3> grids((N + 255) / 256 * 256, 1, 1);
+  sycl::range<3> grids((N + 255) / 256, 1, 1);
   sycl::range<3> threads(256, 1, 1);
 
   sycl::float4 *d_VA;
   float *d_VC;
-  dpct::dpct_malloc((void **)&d_VA, sizeof(float) * N);
-  dpct::dpct_memcpy(d_VA, VA, sizeof(float) * N, dpct::host_to_device);
+  dpct::dpct_malloc((void **)&d_VA, sizeof(sycl::float4) * N);
+  dpct::dpct_memcpy(d_VA, VA, sizeof(sycl::float4) * N, dpct::host_to_device);
   dpct::dpct_malloc((void **)&d_VC, sizeof(float) * N);
 
   for (int n = 0; n < iteration; n++) {
@@ -184,9 +184,9 @@ void distance_device(const sycl::float4 *VA, float *VC, const size_t N,
   dpct::dpct_free(d_VC);
 }
 
-void verify(unsigned int size, const float *output, const float *expected_output) {
+void verify(int size, const float *output, const float *expected_output) {
   float error_rate = 0;
-  for (unsigned int i = 0; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     if (fabs(output[i] - expected_output[i]) > error_rate) {
       error_rate = fabs(output[i] - expected_output[i]);
     }
@@ -198,11 +198,11 @@ int main(int argc, char** argv) {
 
   int iteration = atoi(argv[1]);
 
-  unsigned int num_cities = 2097152; // 2 ** 21
-  unsigned int num_ref_cities = 6; // bombay, melbourne, waltham, moscow, glasgow, morocco
-  unsigned int index_map[] ={436483, 1952407, 627919, 377884, 442703, 1863423};
-  unsigned int N = num_cities * num_ref_cities;
-  unsigned int city = 0;
+  int num_cities = 2097152; // 2 ** 21
+  int num_ref_cities = 6; // bombay, melbourne, waltham, moscow, glasgow, morocco
+  int index_map[] ={436483, 1952407, 627919, 377884, 442703, 1863423};
+  int N = num_cities * num_ref_cities;
+  int city = 0;
   float lat, lon;
 
   const char* filename = "locations.txt";
@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
   float*  output = (float*) aligned_alloc(4096, N*sizeof(float));
   float*  expected_output = (float*) malloc(N*sizeof(float));
 
-  while (fscanf(fp, "%f %f\n", &lat, &lon) != EOF) { 
+  while (fscanf(fp, "%f %f\n", &lat, &lon) != EOF) {
     input[city].x() = lat;
     input[city].y() = lon;
     city++;
@@ -232,8 +232,8 @@ int main(int argc, char** argv) {
   }
   // each reference city is compared with 'num_cities' cities
   for (int c = 0;  c < num_ref_cities; c++) {
-    unsigned index = index_map[c] - 1;
-    for(unsigned j = c*num_cities; j < (c+1)*num_cities; ++j) {
+    int index = index_map[c] - 1;
+    for(int j = c*num_cities; j < (c+1)*num_cities; ++j) {
       input[j].z() = input[index].x();
       input[j].w() = input[index].y();
     }
