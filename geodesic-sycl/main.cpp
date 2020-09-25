@@ -76,7 +76,7 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
 }
 
 void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {
-#ifdef GPU
+#ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
@@ -161,6 +161,7 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
         });
     });
   }
+  q.wait();
 }
 
 void verify( int size, const float *output, const float *expected_output) {
