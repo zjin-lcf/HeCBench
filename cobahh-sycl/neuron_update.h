@@ -119,6 +119,7 @@ void neurongroup_stateupdater (
       });
     });
   }
+  q.wait();
 }
 
 
