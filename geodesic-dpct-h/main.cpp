@@ -1,10 +1,12 @@
 /* This example is a very small one designed to show how compact SYCL code
  * can be. That said, it includes no error checking and is rather terse. */
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
-#include <cuda.h>
-
+#include <cmath>
 
 float  distance_host ( int i, float  latitude_1, float  longitude_1, float  latitude_2, float  longitude_2 )
 {
@@ -30,27 +32,25 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
   rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
 
-  TU1 = GDC_ECCENTRICITY * sinf ( rad_latitude_1 ) /
-    cosf ( rad_latitude_1 ) ;
-  TU2 = GDC_ECCENTRICITY * sinf ( rad_latitude_2 ) /
-    cosf ( rad_latitude_2 ) ;
+  TU1 = GDC_ECCENTRICITY * sinf(rad_latitude_1) / cosf(rad_latitude_1);
+  TU2 = GDC_ECCENTRICITY * sinf(rad_latitude_2) / cosf(rad_latitude_2);
 
-  CU1 = 1.0f / sqrtf ( TU1 * TU1 + 1.0f ) ;
+  CU1 = 1.0f / sqrtf(TU1 * TU1 + 1.0f);
   SU1 = CU1 * TU1 ;
-  CU2 = 1.0f / sqrtf ( TU2 * TU2 + 1.0f ) ;
+  CU2 = 1.0f / sqrtf(TU2 * TU2 + 1.0f);
   dist = CU1 * CU2 ;
   BAZ = dist * TU2 ;
   FAZ = BAZ * TU1 ;
   X = rad_longitude_2 - rad_longitude_1 ;
 
   do {
-    SX = sinf ( X ) ;
-    CX = cosf ( X ) ;
+    SX = sinf(X);
+    CX = cosf(X);
     TU1 = CU2 * SX ;
     TU2 = BAZ - SU1 * CU2 * CX ;
-    SY = sqrtf ( TU1 * TU1 + TU2 * TU2 ) ;
+    SY = sqrtf(TU1 * TU1 + TU2 * TU2);
     CY = dist * CX + FAZ ;
-    Y = atan2f ( SY, CY ) ;
+    Y = atan2f(SY, CY);
     SA = dist * SX / SY ;
     C2A = - SA * SA + 1.0f;
     CZ = FAZ + FAZ ;
@@ -61,9 +61,9 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
     D = X ;
     X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA ;
     X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_longitude_2 - rad_longitude_1 ;
-  } while ( fabsf ( D - X ) > EPS );
+  } while (fabsf(D - X) > EPS);
 
-  X = sqrtf ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f ;
+  X = sqrtf(GDC_ELLIPSOIDAL * C2A + 1.0f) + 1.0f;
   X = ( X - 2.0f ) / X ;
   C = 1.0f - X ;
   C = ( X * X / 4.0f + 1.0f ) / C ;
@@ -75,10 +75,11 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   return dist;
 }
 
-__global__ void 
-kernel_distance (const float4 *d_A, float *d_C, const int N) {
+void kernel_distance(const sycl::float4 *d_A, float *d_C, const int N,
+                     sycl::nd_item<3> item_ct1) {
 
-  const int wiID = blockIdx.x * blockDim.x + threadIdx.x;
+  const int wiID = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+                   item_ct1.get_local_id(2);
   if (wiID >= N) return;
 
   const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
@@ -88,37 +89,37 @@ kernel_distance (const float4 *d_A, float *d_C, const int N) {
   const float GC_SEMI_MINOR = 6356752.31424518f;
   const float EPS                    = 0.5e-5f;
   float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
-         D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
+         D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ;
 
-  const float latitude_1 = d_A[wiID].x ;
-  const float longitude_1 = d_A[wiID].y;
-  const float latitude_2 = d_A[wiID].z ;
-  const float longitude_2 = d_A[wiID].w;
+  const float latitude_1 = d_A[wiID].x();
+  const float longitude_1 = d_A[wiID].y();
+  const float latitude_2 = d_A[wiID].z();
+  const float longitude_2 = d_A[wiID].w();
   const float rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
   const float rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
   const float rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
   const float rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
-  TU1 = GDC_ECCENTRICITY * sinf ( rad_latitude_1 ) /
-    cosf ( rad_latitude_1 ) ;
-  TU2 = GDC_ECCENTRICITY * sinf ( rad_latitude_2 ) /
-    cosf ( rad_latitude_2 ) ;
+  TU1 = GDC_ECCENTRICITY * sycl::sin((float)rad_latitude_1) /
+        sycl::cos((float)rad_latitude_1);
+  TU2 = GDC_ECCENTRICITY * sycl::sin((float)rad_latitude_2) /
+        sycl::cos((float)rad_latitude_2);
 
-  CU1 = 1.0f / sqrtf ( TU1 * TU1 + 1.0f ) ;
+  CU1 = 1.0f / sycl::sqrt(TU1 * TU1 + 1.0f);
   SU1 = CU1 * TU1 ;
-  CU2 = 1.0f / sqrtf ( TU2 * TU2 + 1.0f ) ;
+  CU2 = 1.0f / sycl::sqrt(TU2 * TU2 + 1.0f);
   dist = CU1 * CU2 ;
   BAZ = dist * TU2 ;
   FAZ = BAZ * TU1 ;
   X = rad_longitude_2 - rad_longitude_1 ;
 
   do {
-    SX = sinf ( X ) ;
-    CX = cosf ( X ) ;
+    SX = sycl::sin(X);
+    CX = sycl::cos(X);
     TU1 = CU2 * SX ;
     TU2 = BAZ - SU1 * CU2 * CX ;
-    SY = sqrtf ( TU1 * TU1 + TU2 * TU2 ) ;
+    SY = sycl::sqrt(TU1 * TU1 + TU2 * TU2);
     CY = dist * CX + FAZ ;
-    Y = atan2f ( SY, CY ) ;
+    Y = sycl::atan2(SY, CY);
     SA = dist * SX / SY ;
     C2A = - SA * SA + 1.0f;
     CZ = FAZ + FAZ ;
@@ -129,9 +130,9 @@ kernel_distance (const float4 *d_A, float *d_C, const int N) {
     D = X ;
     X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA ;
     X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_longitude_2 - rad_longitude_1 ;
-  } while ( fabsf ( D - X ) > EPS ) ;
+  } while (sycl::fabs(D - X) > EPS);
 
-  X = sqrtf ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f ;
+  X = sycl::sqrt(GDC_ELLIPSOIDAL * C2A + 1.0f) + 1.0f;
   X = ( X - 2.0f ) / X ;
   C = 1.0f - X ;
   C = ( X * X / 4.0f + 1.0f ) / C ;
@@ -143,24 +144,44 @@ kernel_distance (const float4 *d_A, float *d_C, const int N) {
   d_C[wiID] = dist;
 }
 
-void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {
+void distance_device(const sycl::float4 *VA, float *VC, const size_t N,
+                     const int iteration) {
 
-  dim3 grids ((N+255)/256);
-  dim3 threads (256);
+  sycl::range<3> grids((N + 255) / 256, 1, 1);
+  sycl::range<3> threads(256, 1, 1);
 
-  float4 *d_VA;
+  sycl::float4 *d_VA;
   float *d_VC;
-  cudaMalloc((void**)&d_VA, sizeof(float4)*N);
-  cudaMemcpy(d_VA, VA, sizeof(float4)*N, cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_VC, sizeof(float)*N);
+  dpct::dpct_malloc((void **)&d_VA, sizeof(sycl::float4) * N);
+  dpct::dpct_memcpy(d_VA, VA, sizeof(sycl::float4) * N, dpct::host_to_device);
+  dpct::dpct_malloc((void **)&d_VC, sizeof(float) * N);
 
   for (int n = 0; n < iteration; n++) {
-    kernel_distance<<<grids, threads>>>(d_VA, d_VC, N);
+    dpct::buffer_t d_VA_buf_ct0 = dpct::get_buffer(d_VA);
+    dpct::buffer_t d_VC_buf_ct1 = dpct::get_buffer(d_VC);
+    dpct::get_default_queue().submit([&](sycl::handler &cgh) {
+      auto d_VA_acc_ct0 =
+          d_VA_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_VC_acc_ct1 =
+          d_VC_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            kernel_distance((const sycl::float4 *)(&d_VA_acc_ct0[0]),
+                            (float *)(&d_VC_acc_ct1[0]), N, item_ct1);
+          });
+    });
   }
 
-  cudaMemcpy(VC, d_VC, sizeof(float)*N, cudaMemcpyDeviceToHost);
-  cudaFree(d_VA);
-  cudaFree(d_VC);
+  dpct::dpct_memcpy(VC, d_VC, sizeof(float) * N, dpct::device_to_host);
+  dpct::dpct_free(d_VA);
+  dpct::dpct_free(d_VC);
 }
 
 void verify(int size, const float *output, const float *expected_output) {
@@ -192,13 +213,14 @@ int main(int argc, char** argv) {
     exit(-1);
   }
 
-  float4* input  = (float4*) aligned_alloc(4096, N*sizeof(float4));
+  sycl::float4 *input =
+      (sycl::float4 *)aligned_alloc(4096, N * sizeof(sycl::float4));
   float*  output = (float*) aligned_alloc(4096, N*sizeof(float));
   float*  expected_output = (float*) malloc(N*sizeof(float));
 
-  while (fscanf(fp, "%f %f\n", &lat, &lon) != EOF) { 
-    input[city].x = lat;
-    input[city].y = lon;
+  while (fscanf(fp, "%f %f\n", &lat, &lon) != EOF) {
+    input[city].x() = lat;
+    input[city].y() = lon;
     city++;
     if (city == num_cities) break;  
   }
@@ -212,18 +234,18 @@ int main(int argc, char** argv) {
   for (int c = 0;  c < num_ref_cities; c++) {
     int index = index_map[c] - 1;
     for(int j = c*num_cities; j < (c+1)*num_cities; ++j) {
-      input[j].z = input[index].x;
-      input[j].w = input[index].y;
+      input[j].z() = input[index].x();
+      input[j].w() = input[index].y();
     }
   }
 
   // run on the host for verification
   for (int i = 0; i < N; i++)
   {
-    float lat1 = input[i].x;
-    float lon1 = input[i].y;
-    float lat2 = input[i].z;
-    float lon2 = input[i].w;
+    float lat1 = input[i].x();
+    float lon1 = input[i].y();
+    float lat2 = input[i].z();
+    float lon2 = input[i].w();
     expected_output[i] = distance_host(i, lat1, lon1, lat2, lon2);
   }
 
