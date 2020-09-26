@@ -31,6 +31,7 @@ char **g_argv;
 
 #include "lattice.hpp"
 
+#ifndef MILC_COMPLEX
 template<class T>
 bool almost_equal(thrust::complex<T> x, thrust::complex<T> y, double tol)
 {
@@ -39,6 +40,25 @@ bool almost_equal(thrust::complex<T> x, thrust::complex<T> y, double tol)
 	  return (0);
   return thrust::abs( x - y ) < tol ;
 }
+#else
+template<class T>
+bool almost_equal(T x, T y, double tol)
+{
+  if (std::isnan(x) || std::isnan(y))
+	  return (0);
+  return std::abs( x - y ) < tol ;
+}
+
+// std::isnan() lacks complex support, so need a complex template
+template<class T>
+bool almost_equal(std::complex<T> x, std::complex<T> y, double tol)
+{
+  if (std::isnan(x.real()) || std::isnan(x.imag())
+  ||  std::isnan(y.real()) || std::isnan(y.imag()) )
+	  return (0);
+  return std::abs( x - y ) < tol ;
+}
+#endif
 
 // initializes su3_matrix to a given value
 void init_link(su3_matrix *s, Complx val) {
@@ -68,7 +88,9 @@ void make_lattice(site *s, size_t n, Complx val) {
 }
 
 // Include the programming model specific function for su3_mat_nn()
+#ifdef USE_THRUST
 #include <thrust/host_vector.h>
+#endif
 #include "mat_nn_cuda.hpp"
 
 // Main
@@ -116,9 +138,15 @@ int main(int argc, char **argv)
 
   // allocate and initialize the working lattices and B su3 matrices
   size_t total_sites = ldim*ldim*ldim*ldim;
+#ifdef MILC_COMPLEX
+  std::vector<site> a(total_sites);
+  std::vector<su3_matrix> b(4);
+  std::vector<site> c(total_sites);
+#else
   thrust::host_vector<site> a(total_sites);
   thrust::host_vector<su3_matrix> b(4);
   thrust::host_vector<site> c(total_sites);
+#endif
 
   // initialize the lattices
   make_lattice(a.data(), ldim, Complx{1.0,0.0});
