@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -DUSE_WORKAROUND
+CFLAGS := -std=c++14 -Wall -I../include -DUSE_WORKAROUND -DMILC_COMPLEX
 
 # Linker Flags
 LDFLAGS = 
@@ -48,9 +48,9 @@ endif
 #===============================================================================
 
 $(program): $(obj) Makefile
-	$(CC) $(CFLAGS) $(obj) $(ONEAPI_ROOT)/compiler/latest/linux/lib/libsycl-complex-fp64.o -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp lattice.hpp  mat_nn_sycl.hpp  su3.hpp  Makefile
+%.o: %.cpp lattice.hpp  mat_nn_sycl.hpp su3.h su3.hpp  Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
