@@ -98,18 +98,11 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
 
 
-| compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
+| cobahh | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 502 | 502  | 502 | 3011 |
-| host timing(s) | 12.3 | 11.6 | 11.8 | 14.9 |
-| device timing(s) | 11.8 | 10.8 | 10.9 | 11.2  |
-
-
-| clink | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 40 | 160  | 160 | 205 |
-| host timing(s) | 19.5 | 20.4 | 24.3 | 25.1 |
-| device timing(s) | 13.5 | 13.3 | 16.9 | 17.6  |
+| total enqueue | 17 | 24 | 24 | 109 |
+| host timing(s) | 2.83 | 4.2 | 4.4 | 7.6 |
+| device timing(s) | 2.53 | 3.2 | 3.2 | 4.0 |
 
 
 | compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -145,6 +138,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 8193 | 8196 | 8196 | 61437 |
 | host timing(s) | 11.6 | 11.8 | 12.7 | 14.7 |
 | device timing(s) | 11.0 | 11.1 | 11.8 | 9.6 |
+
+
+| geodesic | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 407 |
+| host timing(s) | 5.5 | 5.8 | 5.8 | 9.2 |
+| device timing(s) | 5.1 | 5.1 | 5.1 | 5.6 |
 
 
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -545,6 +545,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 19.2 | 19.8 | 20.7 | 24.7  |
 
 
+| cobahh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 17 | 24 | 24 | 109 |
+| host timing(s) | 1.93 | 3.0 | 3.1 | 6.56 |
+| device timing(s) | 1.56 | 2.0 | 1.99 | 3.0 |
+
+
 | compute-score | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 201 | 207  | 207 | 812 |
@@ -578,6 +585,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 8193 | 8196 | 8196 | 61437 |
 | host timing(s) | 11.2 | 12.0 | 11.5 | 15.2 |
 | device timing(s) | 10.7 | 10.7 | 10.7 | 9.0 |
+
+
+| geodesic | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 102 | 102 | 407 |
+| host timing(s) | 10.7 | 10.8 | 10.7 | 13.8 |
+| device timing(s) | 10.2 | 9.99 | 9.99 | 10.2 |
 
 
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -915,6 +929,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### clink
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
 
+### cobahh
+  Simulation of Random Network of Hodgkin and Huxley Neurons with Exponential Synaptic Conductances (https://dl.acm.org/doi/10.1145/3307339.3343460)
+
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
@@ -929,6 +946,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### gaussian
   Gaussian elimination in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### geodesic
+  Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
 
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
