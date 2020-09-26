@@ -26,7 +26,7 @@ double su3_mat_nn(std::vector<site> &a, std::vector<su3_matrix> &b, std::vector<
   // This code improves performance over above baseline
   // Similar to Cuda and OpenCL work item approach
   // Initial contribution by Xinmin Tian, Intel
-  size_t num_work_items = total_sites * THREADS_PER_SITE;
+  size_t num_work_items = total_sites * threads_per_team; 
 
   if (verbose >= 1) {
     std::cout << "Number of teams = " << total_sites << std::endl;
