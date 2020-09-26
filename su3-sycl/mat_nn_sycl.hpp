@@ -20,7 +20,7 @@ double su3_mat_nn(const std::vector<site> &a, const std::vector<su3_matrix> &b, 
     wgsize = THREADS_PER_SITE;
 
   // set the total number of work items
-  size_t total_wi = total_sites * THREADS_PER_SITE;
+  size_t total_wi = total_sites * wgsize;
   if (verbose >= 1) {
     std::cout << "Setting number of work items " << total_wi << std::endl;
     std::cout << "Workgroup size is " << wgsize << std::endl;
