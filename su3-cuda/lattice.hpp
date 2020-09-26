@@ -2,7 +2,11 @@
 #define _LATTICE_HPP
 // Adapted from lattice.h in MILC version 7
 
-#include "su3.hpp"
+#if defined(USE_OPENCL)  || defined(MILC_COMPLEX)
+#  include "su3.h"
+#else
+#  include "su3.hpp"
+#endif
 
 #define EVEN 0x02
 #define ODD  0x01

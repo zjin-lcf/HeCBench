@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -DMILC_COMPLEX
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu lattice.hpp  mat_nn_cuda.hpp  su3.hpp  Makefile
+%.o: %.cu lattice.hpp  mat_nn_cuda.hpp su3.h su3.hpp  Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
