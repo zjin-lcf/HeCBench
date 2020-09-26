@@ -60,8 +60,7 @@ main.o:	./common.h \
 
 ./kernel/kernel_wrapper.o:	./common.h \
 	./kernel/kernel_wrapper.h \
-	./kernel/kernel_wrapper.c \
-	./kernel/findK.sycl
+	./kernel/kernel_wrapper.c
 	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel_wrapper.c \
 		-c \
 		-o ./kernel/kernel_wrapper.o
