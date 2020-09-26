@@ -70,6 +70,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.67 | 2.38 | 2.15 | 1.36 |
 
 
+| b+tree | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 20 | 20 | 32 |
+| host timing(s) | 3.5 | 0.58 | 0.65 | 3.48 |
+| device timing(s) | 3.1 | 0.0068 | 0.0068 | 0.0082 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -517,6 +524,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.68 | 1.41 | 1.49 | 1.29 |
 
 
+| b+tree | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 20 | 20 | 32 |
+| host timing(s) | 1.04 | 0.68 | 0.69 | 3.44 |
+| device timing(s) | 0.56 | 0.0073 | 0.0065 | 0.0075 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -916,6 +930,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
+
+### b+tree
+  B+Tree in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### cfd
   The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
