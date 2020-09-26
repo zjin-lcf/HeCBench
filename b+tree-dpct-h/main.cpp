@@ -3,9 +3,7 @@
 // 2011.10; Lukasz G. Szafaryn; code converted to portable form, to C, OpenMP, CUDA, PGI versions; 
 // 2011.12; Lukasz G. Szafaryn; Split different versions for Rodinia.
 // 2011.12; Lukasz G. Szafaryn; code converted to OpenCL;
-// 2020.06; Zheming Jin; code converted to SYCL
-// 2020.09; Zheming Jin; update SYCL sources
-
+// 2012.10; Ke Wang; Change it to non-interactive mode. Use command option read command from file. And also add output for easy verification among different platforms and devices.Merged into Rodinia main distribution 2.2.
 //======================================================================================================================================================150
 //  DESCRIPTION
 //======================================================================================================================================================150
@@ -17,7 +15,7 @@
 //======================================================================================================================================================150
 
 // EXAMPLE:
-// ./a.out -file ./input/mil.txt
+// ./b+tree file ./input/mil.txt command ./command.txt
 // ...then enter any of the following commands after the prompt > :
 // f <x>  -- Find the value under key <x>
 // p <x> -- Print the path from the root to key k and its associated value
@@ -42,15 +40,20 @@
 //  LIBRARIES
 //======================================================================================================================================================150
 
-#include <stdio.h>                  // (in directory known to compiler)      needed by printf, stderr
-#include <limits.h>                  // (in directory known to compiler)      needed by INT_MIN, INT_MAX
-#include <math.h>                  // (in directory known to compiler)      needed by log, pow
-#include <string.h>                  // (in directory known to compiler)      needed by ::memset
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+// (in directory known to compiler)      needed by printf, stderr
+// (in directory known to compiler)      needed by INT_MIN, INT_MAX
+// (in directory known to compiler)      needed by log, pow
+// (in directory known to compiler)      needed by memset
+// (in directory known to compiler)      needed by memset
 
 //======================================================================================================================================================150
 //  COMMON
 //======================================================================================================================================================150
 
+#include <sys/time.h>
 #include "./common.h"                // (in directory provided here)
 
 //======================================================================================================================================================150
@@ -74,6 +77,8 @@
 //======================================================================================================================================================150
 //  HEADER
 //======================================================================================================================================================150
+
+#include "./main.h"                  // (in directory provided here)
 
 //======================================================================================================================================================150
 //  END
@@ -104,12 +109,12 @@ long maxheight;
  */
 int order = DEFAULT_ORDER;
 
-/* The tree_queue is used to print the tree in
+/* The queue is used to print the tree in
  * level order, starting from the root
  * printing each entire rank on a separate
  * line, finishing with the leaves.
  */
-node *tree_queue = NULL;
+node *queue = NULL;
 
 /* The user can toggle on and off the "verbose"
  * property, which causes the pointer addresses
@@ -632,7 +637,7 @@ transform_to_cuda(  node * root,
   struct timeval one,two;
   double time;
   gettimeofday (&one, NULL);
-  long max_nodes = (long)(pow(order,log(size)/log(order/2.0)-1) + 1);
+  long max_nodes = (long)(pow(order, log(size) / log(order / 2.0) - 1) + 1);
   malloc_size = size*sizeof(record) + max_nodes*sizeof(knode); 
   mem = (char*)malloc(malloc_size);
   if(mem==NULL){
@@ -646,7 +651,7 @@ transform_to_cuda(  node * root,
   knodes = (knode *)kmalloc(max_nodes*sizeof(knode));
   // printf("%d knodes\n", max_nodes);
 
-  tree_queue = NULL;
+  queue = NULL;
   enqueue(root);
   node * n;
   knode * k;
@@ -656,7 +661,7 @@ transform_to_cuda(  node * root,
   long queueindex = 0;
   knodes[0].location = nodeindex++;
 
-  while( tree_queue != NULL ) {
+  while( queue != NULL ) {
     n = dequeue();
     k = &knodes[queueindex];
     k->location = queueindex++;
@@ -803,12 +808,12 @@ usage_2( void )
 enqueue( node* new_node ) 
 {
   node * c;
-  if (tree_queue == NULL) {
-    tree_queue = new_node;
-    tree_queue->next = NULL;
+  if (queue == NULL) {
+    queue = new_node;
+    queue->next = NULL;
   }
   else {
-    c = tree_queue;
+    c = queue;
     while(c->next != NULL) {
       c = c->next;
     }
@@ -821,8 +826,8 @@ enqueue( node* new_node )
   node *
 dequeue( void ) 
 {
-  node * n = tree_queue;
-  tree_queue = tree_queue->next;
+  node * n = queue;
+  queue = queue->next;
   n->next = NULL;
   return n;
 }
@@ -897,9 +902,9 @@ print_tree( node* root )
     printf("Empty tree.\n");
     return;
   }
-  tree_queue = NULL;
+  queue = NULL;
   enqueue(root);
-  while( tree_queue != NULL ) {
+  while( queue != NULL ) {
     n = dequeue();
     if (n->parent != NULL && n == n->parent->pointers[0]) {
       new_rank = path_to_root( root, n );
@@ -1293,7 +1298,7 @@ insert_into_parent(  node* root,
 
 
   /* Simple case: the new key fits into the node. 
-  */
+   */
 
   if (parent->num_keys < order - 1)
     return insert_into_node(root, parent, left_index, key, right);
@@ -1456,7 +1461,7 @@ adjust_root(node* root)
     return root;
 
   /* Case: empty root. 
-  */
+   */
 
   // If it has a child, promote 
   // the first (only) child
@@ -1532,7 +1537,7 @@ coalesce_nodes(  node* root,
   if (!n->is_leaf) {
 
     /* Append k_prime.
-    */
+     */
 
     neighbor->keys[neighbor_insertion_index] = k_prime;
     neighbor->num_keys++;
@@ -1581,7 +1586,7 @@ coalesce_nodes(  node* root,
     }
 
     /* All children must now point up to the same parent.
-    */
+     */
 
     for (i = 0; i < neighbor->num_keys + 1; i++) {
       tmp = (node *)neighbor->pointers[i];
@@ -1718,7 +1723,7 @@ delete_entry(  node* root,
   n = remove_entry_from_node(n, key, (node *) pointer);
 
   /* Case:  deletion from the root. 
-  */
+   */
 
   if (n == root) 
     return adjust_root(root);
@@ -1828,7 +1833,8 @@ main(  int argc,
 {
 
   srand(2);
-  printf("WG size of kernel 1 = %d WG size of kernel 2 = %d \n", DEFAULT_ORDER, DEFAULT_ORDER_2);
+  printf("WG size of kernel 1 & 2  = %d \n", DEFAULT_ORDER);
+
   // ------------------------------------------------------------60
   // figure out and display whether 32-bit or 64-bit architecture
   // ------------------------------------------------------------60
@@ -1841,19 +1847,24 @@ main(  int argc,
   // }
 
   // ------------------------------------------------------------60
+  // set GPU
+  // ------------------------------------------------------------60
+
+  int device = 0;
+  dpct::dev_mgr::instance().select_device(device);
+  printf("Selecting device %d\n", device);
+
+  // ------------------------------------------------------------60
   // read inputs
   // ------------------------------------------------------------60
 
   // assing default values
   int cur_arg;
-  int arch_arg;
-  arch_arg = 0;
-  int cores_arg;
-  cores_arg = 1;
   char *input_file = NULL;
   char *command_file = NULL;
   const char *output="output.txt";
   FILE * pFile;
+
 
   // go through arguments
   for(cur_arg=1; cur_arg<argc; cur_arg++){
@@ -1892,7 +1903,6 @@ main(  int argc,
   // For debug
   printf("Input File: %s \n", input_file);
   printf("Command File: %s \n", command_file);
-
 
   FILE * commandFile;
   long lSize;
@@ -1943,7 +1953,7 @@ main(  int argc,
   record *r;
   int input;
   char instruction;
-  order = DEFAULT_ORDER_2;
+  order = DEFAULT_ORDER;
   verbose_output = false;
 
   //usage_1();  
@@ -1955,7 +1965,7 @@ main(  int argc,
 
   if (input_file != NULL) {
 
-    printf("Getting input from file %s...\n", argv[1]);
+    printf("Getting input from file %s...\n", input_file);
 
     // open input file
     file_pointer = fopen(input_file, "r");
@@ -1994,21 +2004,11 @@ main(  int argc,
   maxheight = height(root);
   long rootLoc = (long)knodes - (long)mem;
 
-
-  // ------------------------------------------------------------60
-  // Create SYCL queue only once
-  // ------------------------------------------------------------60
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
   // ------------------------------------------------------------60
   // process commands
   // ------------------------------------------------------------60
   char *commandPointer=commandBuffer;
+
   printf("Waiting for command\n");
   printf("> ");
   while (sscanf(commandPointer, "%c", &instruction) != EOF) {
@@ -2154,13 +2154,13 @@ main(  int argc,
           long *currKnode;
           currKnode = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset(currKnode, 0, count*sizeof(long));
+          memset(currKnode, 0, count*sizeof(long));
 
           // INPUT: offset CPU allocation
           long *offset;
           offset = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset(offset, 0, count*sizeof(long));
+          memset(offset, 0, count*sizeof(long));
 
           // INPUT: keys CPU allocation
           int *keys;
@@ -2178,14 +2178,12 @@ main(  int argc,
             ans[i].value = -1;
           }
 
-          // kernel
-          kernel_wrapper(  
-              q,
-              records,
-              records_elem, //records_mem,
+          // CUDA kernel
+          kernel_wrapper(records,
+              records_mem,
               knodes,
               knodes_elem,
-              knodes_elem,//knodes_mem,
+              knodes_mem,
 
               order,
               maxheight,
@@ -2195,6 +2193,14 @@ main(  int argc,
               offset,
               keys,
               ans);
+
+          /* printf("ans: \n"); */
+          /* for(i = 0; i < count; i++){ */
+          /*   printf("%d    ",ans[i].value); */
+          /* } */
+
+          /* printf(" \n"); */
+
 
           pFile = fopen (output,"aw+");
           if (pFile==NULL)
@@ -2208,7 +2214,6 @@ main(  int argc,
           }
           fprintf(pFile, " \n");
           fclose(pFile);
-
 
           // free memory
           free(currKnode);
@@ -2263,7 +2268,6 @@ main(  int argc,
             commandPointer++;
 
           printf("\n******command: j count=%d, rSize=%d \n",count, rSize);
-
           if(rSize > size || rSize < 0) {
             printf("Search range size is larger than data set size %d.\n", (int)size);
             exit(0);
@@ -2279,25 +2283,25 @@ main(  int argc,
           long *currKnode;
           currKnode = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset (currKnode, 0, count*sizeof(long));
+          memset (currKnode, 0, count*sizeof(long));
 
           // INPUT: offset CPU allocation
           long *offset;
           offset = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset (offset, 0, count*sizeof(long));
+          memset (offset, 0, count*sizeof(long));
 
           // INPUT: lastKnode CPU allocation
           long *lastKnode;
           lastKnode = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset (lastKnode, 0, count*sizeof(long));
+          memset (lastKnode, 0, count*sizeof(long));
 
           // INPUT: offset_2 CPU allocation
           long *offset_2;
           offset_2 = (long *)malloc(count*sizeof(long));
           // INPUT: offset CPU initialization
-          ::memset (offset_2, 0, count*sizeof(long));
+          memset (offset_2, 0, count*sizeof(long));
 
           // INPUT: start, end CPU allocation
           int *start;
@@ -2327,11 +2331,9 @@ main(  int argc,
           }
 
           // CUDA kernel
-          kernel2_wrapper(
-              q,
-              knodes,
+          kernel2_wrapper(  knodes,
               knodes_elem,
-              knodes_elem, // knodes_mem,
+              knodes_mem,
 
               order,
               maxheight,
@@ -2359,6 +2361,7 @@ main(  int argc,
           }
           fprintf(pFile, " \n");
           fclose(pFile);
+
 
           // free memory
           free(currKnode);
@@ -2401,8 +2404,3 @@ main(  int argc,
   return EXIT_SUCCESS;
 
 }
-
-//========================================================================================================================================================================================================200
-//  END
-//========================================================================================================================================================================================================200
-
