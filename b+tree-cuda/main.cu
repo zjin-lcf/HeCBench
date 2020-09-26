@@ -1828,6 +1828,7 @@ main(  int argc,
     char** argv ) 
 {
 
+  srand(2);
   printf("WG size of kernel 1 & 2  = %d \n", DEFAULT_ORDER);
 
   // ------------------------------------------------------------60
