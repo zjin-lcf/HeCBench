@@ -79,6 +79,7 @@ double su3_mat_nn(const std::vector<site> &a, const std::vector<su3_matrix> &b, 
        }); // end of the kernel lambda function
     });   // end of command group
   } // end of iteration loop
+  q.wait();
 
   double ttotal = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-tstart).count();
 
