@@ -3,143 +3,146 @@
 #include "../common.h"
 #include "../util/timer/timer.h"
 #include "./kernel.cu"
-#include "./kernel_wrapper.h"				// (in current directory)
+#include "./kernel_wrapper.h"        // (in current directory)
 
 void 
 kernel_wrapper(record *records,
-						long records_mem,
-						knode *knodes,
-						long knodes_elem,
-						long knodes_mem,
+    long records_mem,
+    knode *knodes,
+    long knodes_elem,
+    long knodes_mem,
 
-						int order,
-						long maxheight,
-						int count,
+    int order,
+    long maxheight,
+    int count,
 
-						long *currKnode,
-						long *offset,
-						int *keys,
-						record *ans)
+    long *currKnode,
+    long *offset,
+    int *keys,
+    record *ans)
 {
 
-	long long offload_start = get_time();
+  long long offload_start = get_time();
 
-	int numBlocks;
-	numBlocks = count;									// max # of blocks can be 65,535
-	int threadsPerBlock;
-	threadsPerBlock = order < 256 ? order : 256;
+  int numBlocks;
+  numBlocks = count;                  // max # of blocks can be 65,535
+  int threadsPerBlock;
+  threadsPerBlock = order < 256 ? order : 256;
 
-	printf("# of blocks = %d, # of threads/block = %d (ensure that device can handle)\n", numBlocks, threadsPerBlock);
+  printf("# of blocks = %d, # of threads/block = %d (ensure that device can handle)\n", numBlocks, threadsPerBlock);
 
-	//==================================================50
-	//	recordsD
-	//==================================================50
+  //==================================================50
+  //  recordsD
+  //==================================================50
 
-	record *recordsD;
-	cudaMalloc((void**)&recordsD, records_mem);
+  record *recordsD;
+  cudaMalloc((void**)&recordsD, records_mem);
 
-	//==================================================50
-	//	knodesD
-	//==================================================50
+  //==================================================50
+  //  knodesD
+  //==================================================50
 
-	knode *knodesD;
-	cudaMalloc((void**)&knodesD, knodes_mem);
+  knode *knodesD;
+  cudaMalloc((void**)&knodesD, knodes_mem);
 
-	//==================================================50
-	//	currKnodeD
-	//==================================================50
+  //==================================================50
+  //  currKnodeD
+  //==================================================50
 
-	long *currKnodeD;
-	cudaMalloc((void**)&currKnodeD, count*sizeof(long));
+  long *currKnodeD;
+  cudaMalloc((void**)&currKnodeD, count*sizeof(long));
 
-	//==================================================50
-	//	offsetD
-	//==================================================50
+  //==================================================50
+  //  offsetD
+  //==================================================50
 
-	long *offsetD;
-	cudaMalloc((void**)&offsetD, count*sizeof(long));
+  long *offsetD;
+  cudaMalloc((void**)&offsetD, count*sizeof(long));
 
-	//==================================================50
-	//	keysD
-	//==================================================50
+  //==================================================50
+  //  keysD
+  //==================================================50
 
-	int *keysD;
-	cudaMalloc((void**)&keysD, count*sizeof(int));
+  int *keysD;
+  cudaMalloc((void**)&keysD, count*sizeof(int));
 
-	//==================================================50
-	//	ansD
-	//==================================================50
+  //==================================================50
+  //  ansD
+  //==================================================50
 
-	record *ansD;
-	cudaMalloc((void**)&ansD, count*sizeof(record));
+  record *ansD;
+  cudaMalloc((void**)&ansD, count*sizeof(record));
 
-	//==================================================50
-	//	recordsD
-	//==================================================50
+  //==================================================50
+  //  recordsD
+  //==================================================50
 
-	cudaMemcpyAsync(recordsD, records, records_mem, cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(recordsD, records, records_mem, cudaMemcpyHostToDevice, 0);
 
-	//==================================================50
-	//	knodesD
-	//==================================================50
+  //==================================================50
+  //  knodesD
+  //==================================================50
 
-	cudaMemcpyAsync(knodesD, knodes, knodes_mem, cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(knodesD, knodes, knodes_mem, cudaMemcpyHostToDevice, 0);
 
-	//==================================================50
-	//	currKnodeD
-	//==================================================50
+  //==================================================50
+  //  currKnodeD
+  //==================================================50
 
-	cudaMemcpyAsync(currKnodeD, currKnode, count*sizeof(long), cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(currKnodeD, currKnode, count*sizeof(long), cudaMemcpyHostToDevice, 0);
 
-	//==================================================50
-	//	offsetD
-	//==================================================50
+  //==================================================50
+  //  offsetD
+  //==================================================50
 
-	cudaMemcpyAsync(offsetD, offset, count*sizeof(long), cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(offsetD, offset, count*sizeof(long), cudaMemcpyHostToDevice, 0);
 
-	//==================================================50
-	//	keysD
-	//==================================================50
+  //==================================================50
+  //  keysD
+  //==================================================50
 
-	cudaMemcpyAsync(keysD, keys, count*sizeof(int), cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(keysD, keys, count*sizeof(int), cudaMemcpyHostToDevice, 0);
 
-	//==================================================50
-	//	ansD
-	//==================================================50
+  //==================================================50
+  //  ansD
+  //==================================================50
 
-	cudaMemcpyAsync(ansD, ans, count*sizeof(record), cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(ansD, ans, count*sizeof(record), cudaMemcpyHostToDevice, 0);
 
-	//======================================================================================================================================================150
-	// findK kernel
-	//======================================================================================================================================================150
+  //======================================================================================================================================================150
+  // findK kernel
+  //======================================================================================================================================================150
 
-	findK<<<numBlocks, threadsPerBlock>>>(	maxheight,
+  findK<<<numBlocks, threadsPerBlock>>>(  maxheight,
+      knodesD,
+      knodes_elem,
+      recordsD,
+      currKnodeD,
+      offsetD,
+      keysD,
+      ansD);
 
-											knodesD,
-											knodes_elem,
+  //==================================================50
+  //  ansD
+  //==================================================50
 
-											recordsD,
+  cudaMemcpy(ans, ansD, count*sizeof(record), cudaMemcpyDeviceToHost);
 
-											currKnodeD,
-											offsetD,
-											keysD,
-											ansD);
+  cudaFree(recordsD);
+  cudaFree(knodesD);
+  cudaFree(currKnodeD);
+  cudaFree(offsetD);
+  cudaFree(keysD);
+  cudaFree(ansD);
 
-	//==================================================50
-	//	ansD
-	//==================================================50
+  long long offload_end = get_time();
 
-	cudaMemcpy(ans, ansD, count*sizeof(record), cudaMemcpyDeviceToHost);
+#ifdef DEBUG
+  for (int i = 0; i < count; i++)
+    printf("ans[%d] = %d\n", i, ans[i].value);
+  printf("\n");
+#endif
 
-	cudaFree(recordsD);
-	cudaFree(knodesD);
-	cudaFree(currKnodeD);
-	cudaFree(offsetD);
-	cudaFree(keysD);
-	cudaFree(ansD);
-
-	long long offload_end = get_time();
-
-	printf("Total time:\n");
+  printf("Total time:\n");
   printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000); 
 }
