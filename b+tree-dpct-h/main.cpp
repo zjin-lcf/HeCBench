@@ -40,16 +40,20 @@
 //  LIBRARIES
 //======================================================================================================================================================150
 
-#include <stdio.h>                  // (in directory known to compiler)      needed by printf, stderr
-#include <limits.h>                  // (in directory known to compiler)      needed by INT_MIN, INT_MAX
-#include <math.h>                  // (in directory known to compiler)      needed by log, pow
-#include <string.h>                  // (in directory known to compiler)      needed by memset
-#include <sys/time.h>                  // (in directory known to compiler)      needed by memset
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+// (in directory known to compiler)      needed by printf, stderr
+// (in directory known to compiler)      needed by INT_MIN, INT_MAX
+// (in directory known to compiler)      needed by log, pow
+// (in directory known to compiler)      needed by memset
+// (in directory known to compiler)      needed by memset
 
 //======================================================================================================================================================150
 //  COMMON
 //======================================================================================================================================================150
 
+#include <sys/time.h>
 #include "./common.h"                // (in directory provided here)
 
 //======================================================================================================================================================150
@@ -633,7 +637,7 @@ transform_to_cuda(  node * root,
   struct timeval one,two;
   double time;
   gettimeofday (&one, NULL);
-  long max_nodes = (long)(pow(order,log(size)/log(order/2.0)-1) + 1);
+  long max_nodes = (long)(pow(order, log(size) / log(order / 2.0) - 1) + 1);
   malloc_size = size*sizeof(record) + max_nodes*sizeof(knode); 
   mem = (char*)malloc(malloc_size);
   if(mem==NULL){
@@ -1847,7 +1851,7 @@ main(  int argc,
   // ------------------------------------------------------------60
 
   int device = 0;
-  cudaSetDevice(device);
+  dpct::dev_mgr::instance().select_device(device);
   printf("Selecting device %d\n", device);
 
   // ------------------------------------------------------------60
