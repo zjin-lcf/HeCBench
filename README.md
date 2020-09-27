@@ -447,6 +447,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 0.73 | 1.13 | 1.12 | 4.1 |
 | device timing(s) | 0.12 | 0.19 | 0.18 | 0.51 |
 
+
+| su3 | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 104 | 104 | 715 |
+| host timing(s) | 7.9 | 8.2 | 8.3 | 11 |
+| device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -894,6 +902,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 0.68 | 0.89 | 0.98 | 4 |
 | device timing(s) | 0.09 | 0.14 | 0.13 | 0.48 |
 
+
+| su3 | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 104 | 104 | 715 |
+| host timing(s) | 6.8 | 6.7 | 6.7 | 10.1 |
+| device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -1084,6 +1100,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### stencil
   1D stencil using shared memory
+
+### su3
+  Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
