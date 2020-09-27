@@ -40,11 +40,13 @@
 //  LIBRARIES
 //======================================================================================================================================================150
 
-#include <stdio.h>                  // (in directory known to compiler)      needed by printf, stderr
-#include <limits.h>                  // (in directory known to compiler)      needed by INT_MIN, INT_MAX
-#include <math.h>                  // (in directory known to compiler)      needed by log, pow
-#include <string.h>                  // (in directory known to compiler)      needed by memset
-#include <sys/time.h>                  // (in directory known to compiler)      needed by memset
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+// (in directory known to compiler)      needed by printf, stderr
+// (in directory known to compiler)      needed by INT_MIN,
+// INT_MAX (in directory known to compiler)      needed by log,
+// pow (in directory known to compiler)      needed by memset (in
+// directory known to compiler)      needed by memset
 
 //======================================================================================================================================================150
 //  COMMON
@@ -633,7 +635,7 @@ transform_to_cuda(  node * root,
   struct timeval one,two;
   double time;
   gettimeofday (&one, NULL);
-  long max_nodes = (long)(pow(order,log(size)/log(order/2.0)-1) + 1);
+  long max_nodes = (long)(pow(order, log(size) / log(order / 2.0) - 1) + 1);
   malloc_size = size*sizeof(record) + max_nodes*sizeof(knode); 
   mem = (char*)malloc(malloc_size);
   if(mem==NULL){
@@ -1294,7 +1296,7 @@ insert_into_parent(  node* root,
 
 
   /* Simple case: the new key fits into the node. 
-   */
+  */
 
   if (parent->num_keys < order - 1)
     return insert_into_node(root, parent, left_index, key, right);
@@ -1457,7 +1459,7 @@ adjust_root(node* root)
     return root;
 
   /* Case: empty root. 
-   */
+  */
 
   // If it has a child, promote 
   // the first (only) child
@@ -1533,7 +1535,7 @@ coalesce_nodes(  node* root,
   if (!n->is_leaf) {
 
     /* Append k_prime.
-     */
+    */
 
     neighbor->keys[neighbor_insertion_index] = k_prime;
     neighbor->num_keys++;
@@ -1582,7 +1584,7 @@ coalesce_nodes(  node* root,
     }
 
     /* All children must now point up to the same parent.
-     */
+    */
 
     for (i = 0; i < neighbor->num_keys + 1; i++) {
       tmp = (node *)neighbor->pointers[i];
@@ -1719,7 +1721,7 @@ delete_entry(  node* root,
   n = remove_entry_from_node(n, key, (node *) pointer);
 
   /* Case:  deletion from the root. 
-   */
+  */
 
   if (n == root) 
     return adjust_root(root);
@@ -1827,7 +1829,6 @@ destroy_tree(node* root)
 main(  int argc, 
     char** argv ) 
 {
-
   srand(2);
   printf("WG size of kernel 1 & 2  = %d \n", DEFAULT_ORDER);
 
@@ -1847,7 +1848,7 @@ main(  int argc,
   // ------------------------------------------------------------60
 
   int device = 0;
-  cudaSetDevice(device);
+  dpct::dev_mgr::instance().select_device(device);
   printf("Selecting device %d\n", device);
 
   // ------------------------------------------------------------60

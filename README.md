@@ -70,6 +70,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.67 | 2.38 | 2.15 | 1.36 |
 
 
+| b+tree | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 20 | 20 | 32 |
+| host timing(s) | 3.5 | 0.58 | 0.65 | 3.48 |
+| device timing(s) | 3.1 | 0.0068 | 0.0068 | 0.0082 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -440,6 +447,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 0.73 | 1.13 | 1.12 | 4.1 |
 | device timing(s) | 0.12 | 0.19 | 0.18 | 0.51 |
 
+
+| su3 | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 104 | 104 | 715 |
+| host timing(s) | 7.9 | 8.2 | 8.3 | 11 |
+| device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -517,6 +532,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.68 | 1.41 | 1.49 | 1.29 |
 
 
+| b+tree | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5 | 20 | 20 | 32 |
+| host timing(s) | 1.04 | 0.68 | 0.69 | 3.44 |
+| device timing(s) | 0.56 | 0.0073 | 0.0065 | 0.0075 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -568,9 +590,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | fft | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 201 | NA | NA | NA |
-| host timing(s) | 12.4 | NA | NA | NA |
-| device timing(ms) | 11.4 | NA | NA | NA | 
+| total enqueue | 201 | 202 | 202 | NA |
+| host timing(s) | 12.4 | 27.1 | 27.1 | NA |
+| device timing(ms) | 11.4 | 24.9 | 24.9 | NA | 
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -880,6 +902,14 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 0.68 | 0.89 | 0.98 | 4 |
 | device timing(s) | 0.09 | 0.14 | 0.13 | 0.48 |
 
+
+| su3 | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 104 | 104 | 715 |
+| host timing(s) | 6.8 | 6.7 | 6.7 | 10.1 |
+| device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -916,6 +946,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
+
+### b+tree
+  B+Tree in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### cfd
   The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -1067,6 +1100,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### stencil
   1D stencil using shared memory
+
+### su3
+  Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
