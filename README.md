@@ -350,27 +350,6 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
 
 
-| scan | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 100001 | 10002 | 10002 | 200007 |
-| host timing(s) | 3.4 | 2.9 | 3.8 | 10.3 |
-| device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
-
-
-| softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 101 | 102 | 102 |  507 |
-| host timing(s) | 1.6 | 4.5 | 1.9 | 5.1 |
-| device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
-
-
-| sph | SYCL | DPCT usm | DPCT header | OpenMP | 
-| --- | --- | --- | --- | --- |
-| total enqueue | 102 | 102 | 102 | 307 | 
-| host timing(s) | 3.0 | 3.4 | 3.5 | 6.5 |
-| device timing(s) | 2.7 | 2.7 | 2.7 | 2.85 |
-
-
 | randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 4 | 4 | 21 |
@@ -432,6 +411,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
 | host timing(s) | 14.6 | 15.2 | 15.4 | 12.2 |
 | device timing(s) | 14 | 14.1 | 14.2 | 10.9 |
+
+
+| srad | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 8003 | 8008 | 8008 | 36026 |
+| host timing(s) | 1.3 | 1.54 | 1.79 | 5.0 |
+| device timing(s) | 0.62 | 0.78 | 0.77 | 0.84 |
 
 
 | sssp | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -889,6 +875,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 21.1 | 21 | 21.1 | 20.4 |
 
 
+| srad | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 8003 | 8008 | 8008 | 36026 |
+| host timing(s) | 2.2 | 2.75 | 2.2 | 6.4 |
+| device timing(s) | 0.74 | 0.94 | 0.78 | 0.84 |
+
+
 | sssp | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 88355 | 88641 | 88640 | NA |
@@ -1094,6 +1087,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
+
+### srad
+  SRAD (version 1) in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### sssp
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
