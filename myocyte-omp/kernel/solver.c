@@ -166,8 +166,10 @@ solver(  fp **y,
   //    SOLVING
   //========================================================================================================================
 
+#ifdef DEBUG
   printf("Time Steps: ");
   fflush(0);
+#endif
 
 #pragma omp target enter data map(alloc: params[0:PARAMETERS], com[0:3])
 
@@ -296,14 +298,18 @@ solver(  fp **y,
       return -1; 
     }
 
+#ifdef DEBUG
     printf("%d ", k);
     fflush(0);
+#endif
 
   }
 #pragma omp target exit data map(release: params[0:PARAMETERS], com[0:3])
 
+#ifdef DEBUG
   printf("\n");
   fflush(0);
+#endif
 
   //========================================================================================================================
   //    FREE MEMORY

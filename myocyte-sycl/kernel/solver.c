@@ -182,8 +182,10 @@ solver(	fp **y,
 	//		SOLVING
 	//========================================================================================================================
 
+#ifdef DEBUG
 	printf("Time Steps: ");
 	fflush(0);
+#endif
 
 	for(k=1; k<=xmax; k++) {											// start after initial value
 
@@ -317,13 +319,17 @@ solver(	fp **y,
 			return -1; 
 		}
 
+#ifdef DEBUG
 		printf("%d ", k);
 		fflush(0);
+#endif
 
 	}
 
+#ifdef DEBUG
 	printf("\n");
 	fflush(0);
+#endif
 
 	//========================================================================================================================
 	//		FREE MEMORY
