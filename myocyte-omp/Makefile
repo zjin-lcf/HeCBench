@@ -1,5 +1,5 @@
-CC        = xlc
-#CC        = clang
+#CC        = xlc
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -14,9 +14,8 @@ CFLAGS :=  -Wall
 LDFLAGS = -lm
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qsmp -qoffload 
-  #CFLAGS +=-fopenmp -fopenmp-targets=nvptx64
-	#--qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  #CFLAGS +=-qsmp -qoffload 
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
