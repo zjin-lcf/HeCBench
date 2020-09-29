@@ -1,4 +1,5 @@
-CC        = icpc
+CC        = xlc
+#CC        = clang
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -6,13 +7,16 @@ DEVICE    = gpu
 
 
 # Standard flags
-CFLAGS := -std=c++11 -Wall
+#CFLAGS := -std=c++11 -Wall
+CFLAGS :=  -Wall
 
 # Linker flags
 LDFLAGS = -lm
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-qsmp -qoffload 
+  #CFLAGS +=-fopenmp -fopenmp-targets=nvptx64
+	#--qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -106,7 +110,7 @@ run: myocyte.out
 	./myocyte.out -time 100
 
 clean:
-	rm	*.o *.out \
+	rm -rf	*.o *.out \
 		./kernel/*.o \
 		./util/file/*.o \
 		./util/timer/*.o \

@@ -125,7 +125,7 @@ embedded_fehlberg_7_8(  fp timeinst,
   static const fp a4 = 1.0 / 6.0;
   static const fp a5 = 5.0 / 12.0;
   static const fp a6 = 1.0 / 2.0;
-  //static const fp a7 = 5.0 / 6.0;
+  static const fp a7 = 5.0 / 6.0;
   static const fp a8 = 1.0 / 6.0;
   static const fp a9 = 2.0 / 3.0;
   static const fp a10 = 1.0 / 3.0;
@@ -140,10 +140,10 @@ embedded_fehlberg_7_8(  fp timeinst,
   static const fp b61 = 1.0 / 20.0;
   static const fp b64 = 5.0 / 20.0;
   static const fp b65 = 4.0 / 20.0;
-  //static const fp b71 = -25.0 / 108.0;
-  //static const fp b74 =  125.0 / 108.0;
-  //static const fp b75 = -260.0 / 108.0;
-  //static const fp b76 =  250.0 / 108.0;
+  static const fp b71 = -25.0 / 108.0;
+  static const fp b74 =  125.0 / 108.0;
+  static const fp b75 = -260.0 / 108.0;
+  static const fp b76 =  250.0 / 108.0;
   static const fp b81 = 31.0/300.0;
   static const fp b85 = 61.0/225.0;
   static const fp b86 = -2.0/9.0;
@@ -217,12 +217,15 @@ embedded_fehlberg_7_8(  fp timeinst,
   timeinst_temp = timeinst;
   for(i=0; i<EQUATIONS; i++){
     initvalu_temp[i] = initvalu[i] ;
-    printf("initvalu[%d] = %f\n", i, initvalu[i]);
+    //printf("initvalu[%d] = %f\n", i, initvalu[i]);
   }
 
 #pragma omp target data map (alloc: initvalu[0:EQUATIONS], finavalu[0:EQUATIONS])
 {
 
+#ifdef DEBUG
+  printf("master 1\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -244,7 +247,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     //initvalu_temp[i] = initvalu[i] + h2_7 * (finavalu_temp[0][i]);
     initvalu[i] = initvalu_temp[i] + h2_7 * (finavalu_temp[0][i]);
   }
-
+#ifdef DEBUG
+  printf("master 2\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -267,6 +272,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b31*finavalu_temp[0][i] + b32*finavalu_temp[1][i]);
   }
 
+#ifdef DEBUG
+  printf("master 3\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -289,6 +297,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b41*finavalu_temp[0][i] + b43*finavalu_temp[2][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 4\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -311,6 +322,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b51*finavalu_temp[0][i] + b53*finavalu_temp[2][i] + b54*finavalu_temp[3][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 5\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -333,6 +347,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b61*finavalu_temp[0][i] + b64*finavalu_temp[3][i] + b65*finavalu_temp[4][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 6\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -346,6 +363,32 @@ embedded_fehlberg_7_8(  fp timeinst,
   memcpy(finavalu_temp[5], finavalu, sizeof(fp)*EQUATIONS);
 
   //===================================================================================================
+  //    7
+  //===================================================================================================
+
+#ifdef DEBUG
+  printf("master 7\n");
+#endif
+  timeinst_temp = timeinst+a7*h;
+  for(i=0; i<EQUATIONS; i++){
+		//initvalu_temp[i] = initvalu[i] + h * ( b71*finavalu_temp[0][i] + b74*finavalu_temp[3][i] + b75*finavalu_temp[4][i] + b76*finavalu_temp[5][i]);
+    initvalu[i] = initvalu_temp[i] + h * ( b71*finavalu_temp[0][i] + b74*finavalu_temp[3][i] + b75*finavalu_temp[4][i] + b76*finavalu_temp[5][i]) ;
+  }
+
+  master(  timeinst_temp,
+      //initvalu_temp,
+      initvalu,
+      params,
+      //finavalu_temp[6],
+      finavalu,
+      com,
+      timecopyin,
+      timecopykernel,
+      timecopyout);
+  memcpy(finavalu_temp[6], finavalu, sizeof(fp)*EQUATIONS);
+
+
+  //===================================================================================================
   //    8
   //===================================================================================================
 
@@ -355,6 +398,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b81*finavalu_temp[0][i] + b85*finavalu_temp[4][i] + b86*finavalu_temp[5][i] + b87*finavalu_temp[6][i]);
   }
 
+#ifdef DEBUG
+  printf("master 8\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -377,6 +423,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b91*finavalu_temp[0][i] + b94*finavalu_temp[3][i] + b95*finavalu_temp[4][i] + b96*finavalu_temp[5][i] + b97*finavalu_temp[6][i]+ b98*finavalu_temp[7][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 9\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -399,6 +448,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b10_1*finavalu_temp[0][i] + b10_4*finavalu_temp[3][i] + b10_5*finavalu_temp[4][i] + b10_6*finavalu_temp[5][i] + b10_7*finavalu_temp[6][i] + b10_8*finavalu_temp[7][i] + b10_9*finavalu_temp[8] [i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 10\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -421,6 +473,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b11_1*finavalu_temp[0][i] + b11_4*finavalu_temp[3][i] + b11_5*finavalu_temp[4][i] + b11_6*finavalu_temp[5][i] + b11_7*finavalu_temp[6][i] + b11_8*finavalu_temp[7][i] + b11_9*finavalu_temp[8][i]+ b11_10 * finavalu_temp[9][i]);
   }
 
+#ifdef DEBUG
+  printf("master 11\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -443,6 +498,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b12_1*finavalu_temp[0][i] + b12_6*finavalu_temp[5][i] + b12_7*finavalu_temp[6][i] + b12_8*finavalu_temp[7][i] + b12_9*finavalu_temp[8][i] + b12_10 * finavalu_temp[9][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 12\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,
@@ -465,6 +523,9 @@ embedded_fehlberg_7_8(  fp timeinst,
     initvalu[i] = initvalu_temp[i] + h * ( b13_1*finavalu_temp[0][i] + b13_4*finavalu_temp[3][i] + b13_5*finavalu_temp[4][i] + b13_6*finavalu_temp[5][i] + b13_7*finavalu_temp[6][i] + b13_8*finavalu_temp[7][i] + b13_9*finavalu_temp[8][i] + b13_10*finavalu_temp[9][i] + finavalu_temp[11][i]) ;
   }
 
+#ifdef DEBUG
+  printf("master 13\n");
+#endif
   master(  timeinst_temp,
       //initvalu_temp,
       initvalu,

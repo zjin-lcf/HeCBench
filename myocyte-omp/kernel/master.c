@@ -216,10 +216,10 @@ master(  fp timeinst,
   //======================================================================================================================================================150
 
   for(i=0; i<EQUATIONS; i++){
-    if (isnan(finavalu[i]) == 1){ 
+    if (isnan(finavalu[i])){ 
       finavalu[i] = 0.0001;                        // for NAN set rate of change to 0.0001
     }
-    else if (isinf(finavalu[i]) == 1){ 
+    else if (isinf(finavalu[i])){ 
       finavalu[i] = 0.0001;                        // for INF set rate of change to 0.0001
     }
   }
