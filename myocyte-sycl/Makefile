@@ -1,28 +1,33 @@
-#CC        = xlc
-CC        = icpc
-OPTIMIZE  = yes
-DEBUG     = no
-DEVICE    = gpu
+VENDOR      = intel
+OPTIMIZE    = yes
+DEBUG       = no
+DEVICE      = gpu
 
 
 
 # Standard flags
-#CFLAGS := -std=c++11 -Wall
-CFLAGS :=  -Wall
+CFLAGS := -std=c++11 -Wall
 
 # Linker flags
 LDFLAGS = -lm
 
-ifeq ($(DEVICE),gpu)
-  #CFLAGS +=-qsmp -qoffload 
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
+# Codeplay Compiler
+ifneq (,$(findstring codeplay,$(VENDOR)))
+	CC = compute++
+	CFLAGS += -no-serial-memop -sycl -sycl-driver
+	LDFLAGS += -lComputeCpp
+endif
+
+# Intel DPC++ Compiler
+ifneq (,$(findstring intel,$(VENDOR)))
+	CC = dpcpp
+	CFLAGS += 
+	LDFLAGS += 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-	CFLAGS += -g  -DDEBUG
+	CFLAGS += -g -DDEBUG
 endif
 
 # Optimization Flags
@@ -30,6 +35,9 @@ ifeq ($(OPTIMIZE),yes)
 	CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+	CFLAGS +=-DUSE_GPU
+endif
 
 # ========================================================================================================================================================================================================200
 #	EXECUTABLES (LINK OBJECTS TOGETHER INTO BINARY)
@@ -40,7 +48,7 @@ endif
 	./util/file/file.o \
 	./util/num/num.o \
 	./util/timer/timer.o 
-	$(CC) $(CFLAGS) ./main.o \
+	$(CC)	./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/file/file.o \
 		./util/num/num.o \
@@ -55,10 +63,9 @@ endif
 ./main.o:	./common.h \
 	./main.h \
 	./main.c
-	$(CC) ./main.c \
+	$(CC) $(CFLAGS)	./main.c \
 		-c \
-		-o ./main.o \
-		-O3
+		-o ./main.o 
 
 # ======================================================================================================================================================150
 #	KERNELS
@@ -70,8 +77,8 @@ endif
 	./kernel/solver.c \
 	./kernel/embedded_fehlberg_7_8.c \
 	./kernel/master.c \
-	./kernel/kernel_cam.h \
-	./kernel/kernel_ecc.h
+	./kernel/kernel_cam.sycl \
+	./kernel/kernel_ecc.sycl
 	$(CC) $(CFLAGS)	./kernel/kernel_wrapper.c \
 		-c \
 		-o ./kernel/kernel_wrapper.o 
@@ -109,7 +116,7 @@ run: myocyte.out
 	./myocyte.out -time 100
 
 clean:
-	rm -rf	*.o *.out \
+	rm	*.o *.out \
 		./kernel/*.o \
 		./util/file/*.o \
 		./util/timer/*.o \
