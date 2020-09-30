@@ -224,6 +224,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.57 | 0.58 | 0.57 | 14.1 |
 
 
+| kmeans | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 21500 | 21501 | 21501 | 71703 |
+| host timing(s) | 110 | 112 | 114 |  116 |
+| device timing(s) | 106 | 109 | 110 | 111 |
+
+
 | knn | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 500 | 700 | 700 | 2007 |
@@ -672,6 +679,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.92 | 0.96 | 0.93 | 13.7 |
 
 
+| kmeans | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 21500 | 21501 | 21501 | 71703 |
+| host timing(s) | 119 | 121 | 123 |  122.5 |
+| device timing(s) | 114.1 | 114.1 | 114.3 | 114.6 |
+
+
 | knn | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 500 | 700 | 700 | 2007 |
@@ -1005,6 +1019,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### keccaktreehash 
   A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
+
+### kmeans 
+  K-means in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### knn
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
