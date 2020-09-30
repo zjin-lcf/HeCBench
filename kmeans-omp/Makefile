@@ -18,7 +18,7 @@ LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g  -DOUTPUT
+  CFLAGS += -g
 endif
 
 # Optimization Flags
@@ -38,6 +38,7 @@ kmeans: cluster.o getopt.o read_input.o rmse.o kmeans.c
 	$(CC) $(KERNEL_DIM) $(CFLAGS) $^ -o kmeans $(LDFLAGS)
 
 %.o: %.c
+	$(CC) $(CFLAGS) $< -c
 
 kmeans.o: kmeans.c kmeans.h
 
