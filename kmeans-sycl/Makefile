@@ -2,7 +2,6 @@ VENDOR      = intel
 OPTIMIZE    = yes
 DEBUG       = no
 DEVICE      = gpu
-INORDER     = no
 
 
 # Standard flags
@@ -27,7 +26,7 @@ endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g  -DOUTPUT
+  CFLAGS += -g
 endif
 
 # Optimization Flags
