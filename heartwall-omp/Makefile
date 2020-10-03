@@ -99,7 +99,7 @@ heartwall:	./main.o \
 			-o ./util/timer/timer.o 
 
 run: heartwall
-	./heartwall 1
+	./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \
