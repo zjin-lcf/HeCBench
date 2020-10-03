@@ -192,7 +192,7 @@ kernel_gpu_wrapper(  params_common common,
   // unique
   //buffer<fp,1> d_in2_sqr(common.in2_elem * common.allPoints);
   //printf("%d\n", common.in2_elem * common.allPoints);
-  fp* in2_sqr = (fp*) malloc (sizeof(fp) * common.in2_sqr_elem * common.allPoints);
+  fp* in2_sqr = (fp*) malloc (sizeof(fp) * common.in2_elem * common.allPoints);
 
   //==================================================50
   //  SELECTION 2, SUBTRACTION
@@ -207,7 +207,7 @@ kernel_gpu_wrapper(  params_common common,
   // unique
   //buffer<fp,1> d_in2_sqr_sub2(common.in2_sub2_elem * common.allPoints);
   //printf("%d\n", common.in2_sub2_elem * common.allPoints);
-  fp* in2_sqr_sub2 = (fp*) malloc (sizeof(fp) * common.in2_sqr_sub2_elem * common.allPoints);
+  fp* in2_sqr_sub2 = (fp*) malloc (sizeof(fp) * common.in2_sub2_elem * common.allPoints);
 
   //====================================================================================================100
   //  FINAL  (LOCAL)
@@ -381,7 +381,7 @@ kernel_gpu_wrapper(  params_common common,
                                     in2_sub_cumh_sel[0:common.in2_sub_cumh_sel_elem * common.allPoints],\
                                     in2_sub2[0:common.in2_sub2_elem * common.allPoints],\
                                     in2_sqr[0:common.in2_elem * common.allPoints],\
-                                    in2_sqr_sub2[0:common.in2_sub2_elem * common.allPoints],\
+                                    in2_sqr_sub2[0:common.in2_sqr_sub2_elem * common.allPoints],\
                                     in_sqr[0:common.in_elem * common.allPoints],\
                                     tMask[0:common.tMask_elem * common.allPoints],\
                                     mask_conv[0:common.mask_conv_elem * common.allPoints],\
