@@ -470,7 +470,11 @@ kernel_gpu_wrapper(  params_common common,
            d_in2_sub_cumh, d_in2_sub_cumh_sel, d_in2_sub2, d_in2_sqr,
            d_in2_sqr_sub2, d_in_sqr, d_tMask, d_mask_conv, d_in_mod_temp,
            d_in_partial_sum, d_in_sqr_partial_sum, d_par_max_val, d_par_max_coo,
-           d_in_final_sum, d_in_sqr_final_sum, d_denomT, d_checksum, item_ct1);
+           d_in_final_sum, d_in_sqr_final_sum, d_denomT, 
+#ifdef TEST_CHECKSUM
+	   d_checksum, 
+#endif
+	   item_ct1);
        });
   });
 
