@@ -1,5 +1,6 @@
-#include <cuda.h>
-#include "./../main.h"                // (in main directory)            needed to recognized input parameters
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+#include "./../main.h" // (in main directory)            needed to recognized input parameters
 #include "./../util/avi/avilib.h"          // (in directory)              needed by avi functions
 #include "./../util/avi/avimod.h"          // (in directory)              needed by avi functions
 
@@ -18,6 +19,8 @@ kernel_gpu_wrapper(  params_common common,
     int* tEpiColLoc,
     avi_t* frames)
 {
+ dpct::device_ext &dev_ct1 = dpct::get_current_device();
+ sycl::queue &q_ct1 = dev_ct1.default_queue();
 
   // common
   //printf("tSize is %d, sSize is %d\n", common.tSize, common.sSize);
@@ -31,7 +34,8 @@ kernel_gpu_wrapper(  params_common common,
   //==================================================50
 
   fp* d_endoT;
-  cudaMalloc((void**)&d_endoT, common.in_mem * common.endoPoints);
+ d_endoT =
+     (float *)sycl::malloc_device(common.in_mem * common.endoPoints, q_ct1);
   //printf("%d\n", common.in_elem * common.endoPoints);
 
   //==================================================50
@@ -39,7 +43,7 @@ kernel_gpu_wrapper(  params_common common,
   //==================================================50
 
   fp* d_epiT;
-  cudaMalloc((void**)&d_epiT, common.in_mem * common.epiPoints);
+ d_epiT = (float *)sycl::malloc_device(common.in_mem * common.epiPoints, q_ct1);
 
   //====================================================================================================100
   //   AREA AROUND POINT    FROM  FRAME  (LOCAL)
@@ -52,7 +56,7 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_mem = sizeof(fp) * common.in2_elem;
 
   fp* d_in2;
-  cudaMalloc((void**)&d_in2, common.in2_mem * common.allPoints);
+ d_in2 = (float *)sycl::malloc_device(common.in2_mem * common.allPoints, q_ct1);
   //printf("%d\n", common.in2_elem * common.allPoints);
 
   //====================================================================================================100
@@ -69,7 +73,8 @@ kernel_gpu_wrapper(  params_common common,
 
   // unique
   fp* d_conv;
-  cudaMalloc((void**)&d_conv, common.conv_mem * common.allPoints);
+ d_conv =
+     (float *)sycl::malloc_device(common.conv_mem * common.allPoints, q_ct1);
 
   //====================================================================================================100
   //   CUMULATIVE SUM  (LOCAL)
@@ -92,7 +97,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_pad_cumv(common.in2_pad_cumv_elem * common.allPoints);
   //printf("%d\n", common.in2_pad_cumv_elem * common.allPoints);
   fp* d_in2_pad_cumv;
-  cudaMalloc((void**)&d_in2_pad_cumv, common.in2_pad_cumv_mem * common.allPoints);
+ d_in2_pad_cumv = (float *)sycl::malloc_device(
+     common.in2_pad_cumv_mem * common.allPoints, q_ct1);
 
   //==================================================50
   //   SELECTION
@@ -112,7 +118,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_pad_cumv_sel(common.in2_pad_cumv_sel_elem * common.allPoints);
   //printf("%d\n", common.in2_pad_cumv_sel_elem * common.allPoints);
   fp* d_in2_pad_cumv_sel;
-  cudaMalloc((void**)&d_in2_pad_cumv_sel, common.in2_pad_cumv_sel_mem * common.allPoints);
+ d_in2_pad_cumv_sel = (float *)sycl::malloc_device(
+     common.in2_pad_cumv_sel_mem * common.allPoints, q_ct1);
 
   //==================================================50
   //   SELECTION  2, SUBTRACTION, HORIZONTAL CUMULATIVE SUM
@@ -132,7 +139,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_sub_cumh(common.in2_sub_cumh_elem * common.allPoints);
   //printf("%d\n", common.in2_sub_cumh_elem * common.allPoints);
   fp* d_in2_sub_cumh;
-  cudaMalloc((void**)&d_in2_sub_cumh, common.in2_sub_cumh_mem * common.allPoints);
+ d_in2_sub_cumh = (float *)sycl::malloc_device(
+     common.in2_sub_cumh_mem * common.allPoints, q_ct1);
 
   //==================================================50
   //   SELECTION
@@ -152,7 +160,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_sub_cumh_sel(common.in2_sub_cumh_sel_elem * common.allPoints);
   //printf("%d\n", common.in2_sub_cumh_sel_elem * common.allPoints);
   fp* d_in2_sub_cumh_sel;
-  cudaMalloc((void**)&d_in2_sub_cumh_sel, common.in2_sub_cumh_sel_mem * common.allPoints);
+ d_in2_sub_cumh_sel = (float *)sycl::malloc_device(
+     common.in2_sub_cumh_sel_mem * common.allPoints, q_ct1);
 
   //==================================================50
   //  SELECTION 2, SUBTRACTION
@@ -172,7 +181,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_sub2(common.in2_sub2_elem * common.allPoints);
   //printf("%d\n", common.in2_sub2_elem * common.allPoints);
   fp* d_in2_sub2;
-  cudaMalloc((void**)&d_in2_sub2, common.in2_sub2_mem * common.allPoints);
+ d_in2_sub2 = (float *)sycl::malloc_device(
+     common.in2_sub2_mem * common.allPoints, q_ct1);
 
   //====================================================================================================100
   //  CUMULATIVE SUM 2  (LOCAL)
@@ -192,7 +202,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_sqr(common.in2_elem * common.allPoints);
   //printf("%d\n", common.in2_elem * common.allPoints);
   fp* d_in2_sqr;
-  cudaMalloc((void**)&d_in2_sqr, common.in2_sqr_mem * common.allPoints);
+ d_in2_sqr =
+     (float *)sycl::malloc_device(common.in2_sqr_mem * common.allPoints, q_ct1);
 
   //==================================================50
   //  SELECTION 2, SUBTRACTION
@@ -208,7 +219,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in2_sqr_sub2(common.in2_sub2_elem * common.allPoints);
   //printf("%d\n", common.in2_sub2_elem * common.allPoints);
   fp* d_in2_sqr_sub2;
-  cudaMalloc((void**)&d_in2_sqr_sub2, common.in2_sqr_sub2_mem * common.allPoints);
+ d_in2_sqr_sub2 = (float *)sycl::malloc_device(
+     common.in2_sqr_sub2_mem * common.allPoints, q_ct1);
 
   //====================================================================================================100
   //  FINAL  (LOCAL)
@@ -224,7 +236,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_in_sqr(common.in_elem * common.allPoints);
   //printf("%d\n", common.in_elem * common.allPoints);
   fp* d_in_sqr;
-  cudaMalloc((void**)&d_in_sqr, common.in_sqr_mem * common.allPoints);
+ d_in_sqr =
+     (float *)sycl::malloc_device(common.in_sqr_mem * common.allPoints, q_ct1);
 
   //====================================================================================================100
   //  TEMPLATE MASK CREATE  (LOCAL)
@@ -240,7 +253,8 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<fp,1> d_tMask(common.tMask_elem * common.allPoints);
   //printf("%d\n", common.tMask_elem * common.allPoints);
   fp* d_tMask;
-  cudaMalloc((void**)&d_tMask, common.tMask_mem * common.allPoints);
+ d_tMask =
+     (float *)sycl::malloc_device(common.tMask_mem * common.allPoints, q_ct1);
 
   //====================================================================================================100
   //  POINT MASK INITIALIZE  (LOCAL)
@@ -292,90 +306,103 @@ kernel_gpu_wrapper(  params_common common,
   //buffer<int,1> d_tEpiColLoc(tEpiColLoc, common.epiPoints * common.no_frames, props);
 
   int* d_endoRow;
-  cudaMalloc((void**)&d_endoRow, common.endo_mem);
-  cudaMemcpy(d_endoRow, endoRow, common.endo_mem, cudaMemcpyHostToDevice);
+ d_endoRow = (int *)sycl::malloc_device(common.endo_mem, q_ct1);
+ q_ct1.memcpy(d_endoRow, endoRow, common.endo_mem).wait();
 
   int* d_endoCol;
-  cudaMalloc((void**)&d_endoCol, common.endo_mem);
-  cudaMemcpy(d_endoCol, endoCol, common.endo_mem, cudaMemcpyHostToDevice);
+ d_endoCol = (int *)sycl::malloc_device(common.endo_mem, q_ct1);
+ q_ct1.memcpy(d_endoCol, endoCol, common.endo_mem).wait();
 
   int* d_tEndoRowLoc;
   int* d_tEndoColLoc;
-  cudaMalloc((void**)&d_tEndoRowLoc, common.endo_mem*common.no_frames);
-  cudaMemcpy(d_tEndoRowLoc, tEndoRowLoc, common.endo_mem*common.no_frames, cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_tEndoColLoc, common.endo_mem*common.no_frames);
-  cudaMemcpy(d_tEndoColLoc, tEndoColLoc, common.endo_mem*common.no_frames, cudaMemcpyHostToDevice);
+ d_tEndoRowLoc =
+     (int *)sycl::malloc_device(common.endo_mem * common.no_frames, q_ct1);
+ q_ct1.memcpy(d_tEndoRowLoc, tEndoRowLoc, common.endo_mem * common.no_frames)
+     .wait();
+ d_tEndoColLoc =
+     (int *)sycl::malloc_device(common.endo_mem * common.no_frames, q_ct1);
+ q_ct1.memcpy(d_tEndoColLoc, tEndoColLoc, common.endo_mem * common.no_frames)
+     .wait();
 
   int* d_epiRow;
   int* d_epiCol;
-  cudaMalloc((void**)&d_epiRow, common.epi_mem);
-  cudaMemcpy(d_epiRow, epiRow, common.epi_mem, cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_epiCol, common.epi_mem);
-  cudaMemcpy(d_epiCol, epiCol, common.epi_mem, cudaMemcpyHostToDevice);
+ d_epiRow = (int *)sycl::malloc_device(common.epi_mem, q_ct1);
+ q_ct1.memcpy(d_epiRow, epiRow, common.epi_mem).wait();
+ d_epiCol = (int *)sycl::malloc_device(common.epi_mem, q_ct1);
+ q_ct1.memcpy(d_epiCol, epiCol, common.epi_mem).wait();
 
   int* d_tEpiRowLoc;
   int* d_tEpiColLoc;
-  cudaMalloc((void**)&d_tEpiRowLoc, common.epi_mem*common.no_frames);
-  cudaMemcpy(d_tEpiRowLoc, tEpiRowLoc, common.epi_mem*common.no_frames, cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_tEpiColLoc, common.epi_mem*common.no_frames);
-  cudaMemcpy(d_tEpiColLoc, tEpiColLoc, common.epi_mem*common.no_frames, cudaMemcpyHostToDevice);
+ d_tEpiRowLoc =
+     (int *)sycl::malloc_device(common.epi_mem * common.no_frames, q_ct1);
+ q_ct1.memcpy(d_tEpiRowLoc, tEpiRowLoc, common.epi_mem * common.no_frames)
+     .wait();
+ d_tEpiColLoc =
+     (int *)sycl::malloc_device(common.epi_mem * common.no_frames, q_ct1);
+ q_ct1.memcpy(d_tEpiColLoc, tEpiColLoc, common.epi_mem * common.no_frames)
+     .wait();
 
   //buffer<fp,1> d_mask_conv(common.mask_conv_elem * common.allPoints);
   //d_mask_conv.set_final_data(nullptr);
   fp* d_mask_conv;
-  cudaMalloc((void**)&d_mask_conv, common.mask_conv_mem * common.allPoints);
+ d_mask_conv = (float *)sycl::malloc_device(
+     common.mask_conv_mem * common.allPoints, q_ct1);
 
   //printf("%d\n", common.mask_conv_elem * common.allPoints);
   //buffer<fp,1> d_in_mod_temp(common.in_elem * common.allPoints);
   //d_in_mod_temp.set_final_data(nullptr);
   fp* d_in_mod_temp;
-  cudaMalloc((void**)&d_in_mod_temp, common.in_mem * common.allPoints);
+ d_in_mod_temp =
+     (float *)sycl::malloc_device(common.in_mem * common.allPoints, q_ct1);
 
   //printf("%d\n", common.in_elem * common.allPoints);
   //buffer<fp,1> d_in_partial_sum(common.in_cols * common.allPoints);
   //d_in_partial_sum.set_final_data(nullptr);
 
   fp* d_in_partial_sum;
-  cudaMalloc((void**)&d_in_partial_sum, sizeof(fp)*common.in_cols * common.allPoints);
+ d_in_partial_sum = (float *)sycl::malloc_device(
+     sizeof(fp) * common.in_cols * common.allPoints, q_ct1);
 
   //printf("%d\n", common.in_cols * common.allPoints);
   //buffer<fp,1> d_in_sqr_partial_sum(common.in_sqr_rows * common.allPoints);
   //d_in_sqr_partial_sum.set_final_data(nullptr);
 
   fp* d_in_sqr_partial_sum;
-  cudaMalloc((void**)&d_in_sqr_partial_sum, sizeof(fp)*common.in_sqr_rows * common.allPoints);
-
+ d_in_sqr_partial_sum = (float *)sycl::malloc_device(
+     sizeof(fp) * common.in_sqr_rows * common.allPoints, q_ct1);
 
   //printf("%d\n", common.in_sqr_rows * common.allPoints);
   //buffer<fp,1> d_par_max_val(common.mask_conv_rows * common.allPoints);
   //d_par_max_val.set_final_data(nullptr);
 
   fp* d_par_max_val;
-  cudaMalloc((void**)&d_par_max_val, sizeof(fp)*common.mask_conv_rows * common.allPoints);
+ d_par_max_val = (float *)sycl::malloc_device(
+     sizeof(fp) * common.mask_conv_rows * common.allPoints, q_ct1);
 
   //printf("%d\n", common.mask_conv_rows * common.allPoints);
   //buffer<int,1> d_par_max_coo( common.mask_conv_rows * common.allPoints);
   //d_par_max_coo.set_final_data(nullptr);
 
   fp* d_par_max_coo;
-  cudaMalloc((void**)&d_par_max_coo, sizeof(fp)*common.mask_conv_rows * common.allPoints);
+ d_par_max_coo = (float *)sycl::malloc_device(
+     sizeof(fp) * common.mask_conv_rows * common.allPoints, q_ct1);
 
   //buffer<fp,1> d_in_final_sum(common.allPoints);
   //d_in_final_sum.set_final_data(nullptr);
 
   fp* d_in_final_sum;
-  cudaMalloc((void**)&d_in_final_sum, sizeof(fp)*common.allPoints);
+ d_in_final_sum = sycl::malloc_device<float>(common.allPoints, q_ct1);
 
   //buffer<fp,1> d_in_sqr_final_sum(common.allPoints);
   //d_in_sqr_final_sum.set_final_data(nullptr);
   fp* d_in_sqr_final_sum;
-  cudaMalloc((void**)&d_in_sqr_final_sum, sizeof(fp)*common.allPoints);
+ d_in_sqr_final_sum = sycl::malloc_device<float>(common.allPoints, q_ct1);
 
   //buffer<fp,1> d_denomT(common.allPoints);
   //d_denomT.set_final_data(nullptr);
 
   fp* d_denomT;
-  cudaMalloc((void**)&d_denomT, sizeof(fp)*common.allPoints);
+ d_denomT = sycl::malloc_device<float>(common.allPoints, q_ct1);
 
 #ifdef TEST_CHECKSUM
   //buffer<fp,1> d_checksum(CHECK);
@@ -383,7 +410,7 @@ kernel_gpu_wrapper(  params_common common,
   //printf("%d\n", CHECK);
   fp* checksum = (fp*) malloc (sizeof(fp)*CHECK);
   fp* d_checksum;
-  cudaMalloc((void**)&d_checksum, sizeof(fp)*CHECK);
+ d_checksum = sycl::malloc_device<float>(CHECK, q_ct1);
 #endif
 
   //====================================================================================================100
@@ -391,9 +418,8 @@ kernel_gpu_wrapper(  params_common common,
   //====================================================================================================100
 
   // All kernels operations within kernel use same max size of threads. Size of block size is set to the size appropriate for max size operation (on padded matrix). Other use subsets of that.
-  dim3 threads(NUMBER_THREADS);
-  dim3 grids(common.allPoints);
-
+ sycl::range<3> threads(NUMBER_THREADS, 1, 1);
+ sycl::range<3> grids(common.allPoints, 1, 1);
 
   printf("frame progress: ");
   fflush(NULL);
@@ -408,7 +434,7 @@ kernel_gpu_wrapper(  params_common common,
 
   //buffer<fp,1> d_frame(common.frame_elem);
   fp* d_frame;
-  cudaMalloc((void**)&d_frame, sizeof(fp)*common.frame_elem);
+ d_frame = sycl::malloc_device<float>(common.frame_elem, q_ct1);
 
   for(frame_no=0; frame_no<common.frames_processed; frame_no++) {
 
@@ -424,49 +450,29 @@ kernel_gpu_wrapper(  params_common common,
         1);                  // converted
 
     // copy frame to GPU memory
-    cudaMemcpy(d_frame, frame, sizeof(fp)*common.frame_elem, cudaMemcpyHostToDevice);
+  q_ct1.memcpy(d_frame, frame, sizeof(fp) * common.frame_elem).wait();
 
     //==================================================50
     //  launch kernel
     //==================================================50
-    hw<<<grids, threads>>>(
-        frame_no,
-        common,
-        d_frame, 
-        d_endoRow, 
-        d_endoCol, 
-        d_tEndoRowLoc, 
-        d_tEndoColLoc,
-        d_epiRow, 
-        d_epiCol, 
-        d_tEpiRowLoc, 
-        d_tEpiColLoc,
-        d_endoT,
-        d_epiT,
-        d_in2,
-        d_conv,
-        d_in2_pad_cumv,
-        d_in2_pad_cumv_sel,
-        d_in2_sub_cumh,
-        d_in2_sub_cumh_sel,
-        d_in2_sub2,
-        d_in2_sqr,
-        d_in2_sqr_sub2,
-        d_in_sqr,
-        d_tMask,
-        d_mask_conv,
-        d_in_mod_temp,
-        d_in_partial_sum,
-        d_in_sqr_partial_sum,
-        d_par_max_val,
-        d_par_max_coo,
-        d_in_final_sum,
-        d_in_sqr_final_sum,
-        d_denomT
-#ifdef TEST_CHECKSUM
-          ,d_checksum
-#endif
-          );
+  q_ct1.submit([&](sycl::handler &cgh) {
+   auto dpct_global_range = grids * threads;
+
+   cgh.parallel_for(
+       sycl::nd_range<3>(
+           sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                          dpct_global_range.get(0)),
+           sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+       [=](sycl::nd_item<3> item_ct1) {
+        hw(frame_no, common, d_frame, d_endoRow, d_endoCol, d_tEndoRowLoc,
+           d_tEndoColLoc, d_epiRow, d_epiCol, d_tEpiRowLoc, d_tEpiColLoc,
+           d_endoT, d_epiT, d_in2, d_conv, d_in2_pad_cumv, d_in2_pad_cumv_sel,
+           d_in2_sub_cumh, d_in2_sub_cumh_sel, d_in2_sub2, d_in2_sqr,
+           d_in2_sqr_sub2, d_in_sqr, d_tMask, d_mask_conv, d_in_mod_temp,
+           d_in_partial_sum, d_in_sqr_partial_sum, d_par_max_val, d_par_max_coo,
+           d_in_final_sum, d_in_sqr_final_sum, d_denomT, d_checksum, item_ct1);
+       });
+  });
 
     // free frame after each loop iteration, since AVI library allocates memory for every frame fetched
     free(frame);
@@ -484,7 +490,7 @@ kernel_gpu_wrapper(  params_common common,
     //==================================================50
 
 #ifdef TEST_CHECKSUM
-    cudaMemcpy(checksum, d_checksum, sizeof(fp)*CHECK, cudaMemcpyDeviceToHost);
+  q_ct1.memcpy(checksum, d_checksum, sizeof(fp) * CHECK).wait();
     printf("CHECKSUM:\n");
     for(int i=0; i<CHECK; i++){
       printf("i=%d checksum=%f\n", i, checksum[i]);
@@ -494,49 +500,52 @@ kernel_gpu_wrapper(  params_common common,
 
   }
 
-  cudaMemcpy(tEndoRowLoc, d_tEndoRowLoc, common.endo_mem * common.no_frames, cudaMemcpyDeviceToHost);
-  cudaMemcpy(tEndoColLoc, d_tEndoColLoc, common.endo_mem * common.no_frames, cudaMemcpyDeviceToHost);
-  cudaMemcpy(tEpiRowLoc, d_tEpiRowLoc, common.epi_mem * common.no_frames, cudaMemcpyDeviceToHost);
-  cudaMemcpy(tEpiColLoc, d_tEpiColLoc, common.epi_mem * common.no_frames, cudaMemcpyDeviceToHost);
-
+ q_ct1.memcpy(tEndoRowLoc, d_tEndoRowLoc, common.endo_mem * common.no_frames)
+     .wait();
+ q_ct1.memcpy(tEndoColLoc, d_tEndoColLoc, common.endo_mem * common.no_frames)
+     .wait();
+ q_ct1.memcpy(tEpiRowLoc, d_tEpiRowLoc, common.epi_mem * common.no_frames)
+     .wait();
+ q_ct1.memcpy(tEpiColLoc, d_tEpiColLoc, common.epi_mem * common.no_frames)
+     .wait();
 
   //====================================================================================================100
   //  PRINT FRAME PROGRESS END
   //====================================================================================================100
 #ifdef TEST_CHECKSUM
   free(checksum);
-  cudaFree(d_checksum);
+ sycl::free(d_checksum, q_ct1);
 #endif
-  cudaFree(d_epiT);
-  cudaFree(d_in2);
-  cudaFree(d_conv);
-  cudaFree(d_in2_pad_cumv);
-  cudaFree(d_in2_pad_cumv_sel);
-  cudaFree(d_in2_sub_cumh);
-  cudaFree(d_in2_sub_cumh_sel);
-  cudaFree(d_in2_sub2);
-  cudaFree(d_in2_sqr);
-  cudaFree(d_in2_sqr_sub2);
-  cudaFree(d_in_sqr);
-  cudaFree(d_tMask);
-  cudaFree(d_endoRow);
-  cudaFree(d_endoCol);
-  cudaFree(d_tEndoRowLoc);
-  cudaFree(d_tEndoColLoc);
-  cudaFree(d_epiRow);
-  cudaFree(d_epiCol);
-  cudaFree(d_tEpiRowLoc);
-  cudaFree(d_tEpiColLoc);
-  cudaFree(d_mask_conv);
-  cudaFree(d_in_mod_temp);
-  cudaFree(d_in_partial_sum);
-  cudaFree(d_in_sqr_partial_sum);
-  cudaFree(d_par_max_val);
-  cudaFree(d_par_max_coo);
-  cudaFree(d_in_final_sum);
-  cudaFree(d_in_sqr_final_sum);
-  cudaFree(d_denomT);
-  cudaFree(d_frame);
+ sycl::free(d_epiT, q_ct1);
+ sycl::free(d_in2, q_ct1);
+ sycl::free(d_conv, q_ct1);
+ sycl::free(d_in2_pad_cumv, q_ct1);
+ sycl::free(d_in2_pad_cumv_sel, q_ct1);
+ sycl::free(d_in2_sub_cumh, q_ct1);
+ sycl::free(d_in2_sub_cumh_sel, q_ct1);
+ sycl::free(d_in2_sub2, q_ct1);
+ sycl::free(d_in2_sqr, q_ct1);
+ sycl::free(d_in2_sqr_sub2, q_ct1);
+ sycl::free(d_in_sqr, q_ct1);
+ sycl::free(d_tMask, q_ct1);
+ sycl::free(d_endoRow, q_ct1);
+ sycl::free(d_endoCol, q_ct1);
+ sycl::free(d_tEndoRowLoc, q_ct1);
+ sycl::free(d_tEndoColLoc, q_ct1);
+ sycl::free(d_epiRow, q_ct1);
+ sycl::free(d_epiCol, q_ct1);
+ sycl::free(d_tEpiRowLoc, q_ct1);
+ sycl::free(d_tEpiColLoc, q_ct1);
+ sycl::free(d_mask_conv, q_ct1);
+ sycl::free(d_in_mod_temp, q_ct1);
+ sycl::free(d_in_partial_sum, q_ct1);
+ sycl::free(d_in_sqr_partial_sum, q_ct1);
+ sycl::free(d_par_max_val, q_ct1);
+ sycl::free(d_par_max_coo, q_ct1);
+ sycl::free(d_in_final_sum, q_ct1);
+ sycl::free(d_in_sqr_final_sum, q_ct1);
+ sycl::free(d_denomT, q_ct1);
+ sycl::free(d_frame, q_ct1);
 
   printf("\n");
   fflush(NULL);

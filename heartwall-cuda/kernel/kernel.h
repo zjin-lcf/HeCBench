@@ -1,7 +1,7 @@
 __global__ void hw (
   const int frame_no,
   const params_common d_common,
-  fp* d_frame,
+  const fp* d_frame,
   int* d_endoRow,
   int* d_endoCol,
   int* d_tEndoRowLoc,
@@ -33,7 +33,7 @@ __global__ void hw (
   fp* d_in_sqr_final_sum,
   fp* d_denomT
 #ifdef TEST_CHECKSUM
-  , fp* d_checksum
+  , fp* checksum
 #endif
 )
 {
