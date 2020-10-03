@@ -161,6 +161,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 6.8 | 6.7 | 6.8 | 7.6 |
 
 
+| heartwall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 212 | 220 | 220 | 637 |
+| host timing(s) | 17.2 | 9.1 | 9.5 |  11.6 |
+| device timing(s) | 16.1 | 8.3 | 8.4 | 7.92 |
+
+
 | heat | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1003 | 1003 | 1003 | 10029 |
@@ -616,6 +623,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 5.8 | 5.8 | 5.8 |  6.8 |
 
 
+| heartwall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 212 | 220 | 220 | 637 |
+| host timing(s) | 26.6 | 9.4 | 9.7 |  14.2 |
+| device timing(s) | 25.5 | 8.6 | 8.7 | 10.5 |
+
+
 | heat | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1003 | 1003 | 1003 | 10029 |
@@ -992,6 +1006,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
+
+### heartwall
+  Heart Wall in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### heat
   The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
