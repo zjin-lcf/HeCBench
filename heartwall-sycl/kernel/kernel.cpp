@@ -28,6 +28,8 @@ kernel_gpu_wrapper(  params_common common,
 #else
   cpu_selector dev_sel;
 #endif
+
+#ifdef DEBUG
   auto exception_handler = [] (cl::sycl::exception_list exceptions) {
     for (std::exception_ptr const& e : exceptions) {
       try {
@@ -41,12 +43,13 @@ kernel_gpu_wrapper(  params_common common,
   cl::sycl::queue q(dev_sel, exception_handler);
   auto device = q.get_device();
 
-#ifdef DEBUG
   auto deviceName = device.get_info<info::device::name>();
   std::cout << " Device Name: " << deviceName << std::endl;
   auto platformName =
     device.get_platform().get_info<info::platform::name>();
   std::cout << " Platform Name " << platformName << std::endl;
+#else
+  cl::sycl::queue q(dev_sel);
 #endif
 
   const property_list props = property::buffer::use_host_ptr();
@@ -397,11 +400,11 @@ kernel_gpu_wrapper(  params_common common,
         auto d_tEpiColLoc_acc = d_tEpiColLoc.get_access<sycl_read_write>(cgh);
 
         // read/write or write access depending on checksum
-#ifdef TEST_CHECKSUM
+//#ifdef TEST_CHECKSUM
         constexpr access::mode sycl_access_mode     = sycl_read_write;
-#else
-        constexpr access::mode sycl_access_mode     = sycl_write;
-#endif
+//#else
+//        constexpr access::mode sycl_access_mode     = sycl_write;
+//#endif
         auto d_endoT_acc = d_endoT.get_access<sycl_access_mode>(cgh);
         auto d_epiT_acc = d_epiT.get_access<sycl_access_mode>(cgh);
         auto d_in2_all_acc = d_in2.get_access<sycl_access_mode>(cgh);
@@ -434,12 +437,17 @@ kernel_gpu_wrapper(  params_common common,
             });
     });
 
+#ifdef DEBUG
     try {
       q.wait_and_throw();
     } catch (cl::sycl::exception const& e) {
       std::cout << "Caught synchronous SYCL exception:\n"
         << e.what() << std::endl;
     }
+#else
+    q.wait();
+#endif
+
 
     // free frame after each loop iteration, since AVI library allocates memory for every frame fetched
     free(frame);
@@ -470,6 +478,7 @@ kernel_gpu_wrapper(  params_common common,
     //==================================================50
 
   }
+  q.wait();
 
   //====================================================================================================100
   //  PRINT FRAME PROGRESS END
