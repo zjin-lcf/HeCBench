@@ -266,6 +266,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.2 | 1.5 | 1.2 | 1.7 |
 
 
+| miniFE | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2407 | NA | NA | 6645 |
+| host timing(s) | 9.9 | NA | NA | NA | 16.7 |
+| device timing(s) | 8.95 | NA | NA | 12.9 | 
+
+
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2049 |  2050 |  2050 | 6151 | 
@@ -777,6 +784,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.4 | 3.5 | 1.4 | 1.13 |
 
 
+| miniFE | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2407 | NA | NA | 6645 |
+| host timing(s) | 10.9 | NA | NA | NA | 15.5 |
+| device timing(s) | 9.0 | NA | NA | 10.6 | 
+
+
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2049 |  2050 |  2050 | 6151 | 
@@ -1069,6 +1083,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### memcpy
   A benchmark for memory copy from a host to a device
+
+### miniFE
+  MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
 
 ### mixbench
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
