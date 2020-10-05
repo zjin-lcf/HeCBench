@@ -309,31 +309,22 @@ kernel_gpu_wrapper(  params_common common,
 
 
   buffer<fp,1> d_mask_conv(common.mask_conv_elem * common.allPoints);
-  d_mask_conv.set_final_data(nullptr);
   //printf("%d\n", common.mask_conv_elem * common.allPoints);
   buffer<fp,1> d_in_mod_temp(common.in_elem * common.allPoints);
-  d_in_mod_temp.set_final_data(nullptr);
   //printf("%d\n", common.in_elem * common.allPoints);
   buffer<fp,1> d_in_partial_sum(common.in_cols * common.allPoints);
-  d_in_partial_sum.set_final_data(nullptr);
   //printf("%d\n", common.in_cols * common.allPoints);
   buffer<fp,1> d_in_sqr_partial_sum(common.in_sqr_rows * common.allPoints);
-  d_in_sqr_partial_sum.set_final_data(nullptr);
   //printf("%d\n", common.in_sqr_rows * common.allPoints);
   buffer<fp,1> d_par_max_val(common.mask_conv_rows * common.allPoints);
-  d_par_max_val.set_final_data(nullptr);
   //printf("%d\n", common.mask_conv_rows * common.allPoints);
   buffer<int,1> d_par_max_coo( common.mask_conv_rows * common.allPoints);
-  d_par_max_coo.set_final_data(nullptr);
   buffer<fp,1> d_in_final_sum(common.allPoints);
-  d_in_final_sum.set_final_data(nullptr);
   buffer<fp,1> d_in_sqr_final_sum(common.allPoints);
-  d_in_sqr_final_sum.set_final_data(nullptr);
   buffer<fp,1> d_denomT(common.allPoints);
-  d_denomT.set_final_data(nullptr);
+
 #ifdef TEST_CHECKSUM
   buffer<fp,1> d_checksum(CHECK);
-  d_checksum.set_final_data(nullptr);
   //printf("%d\n", CHECK);
 #endif
 
@@ -390,6 +381,7 @@ kernel_gpu_wrapper(  params_common common,
         // read access
         auto d_common_acc = d_common.get_access<sycl_read>(cgh);
         auto d_frame_acc = d_frame.get_access<sycl_read>(cgh);
+
         auto d_endoRow_acc = d_endoRow.get_access<sycl_read_write>(cgh);
         auto d_endoCol_acc = d_endoCol.get_access<sycl_read_write>(cgh);
         auto d_tEndoRowLoc_acc = d_tEndoRowLoc.get_access<sycl_read_write>(cgh);
@@ -399,36 +391,31 @@ kernel_gpu_wrapper(  params_common common,
         auto d_tEpiRowLoc_acc = d_tEpiRowLoc.get_access<sycl_read_write>(cgh);
         auto d_tEpiColLoc_acc = d_tEpiColLoc.get_access<sycl_read_write>(cgh);
 
-        // read/write or write access depending on checksum
-//#ifdef TEST_CHECKSUM
-        constexpr access::mode sycl_access_mode     = sycl_read_write;
-//#else
-//        constexpr access::mode sycl_access_mode     = sycl_write;
-//#endif
-        auto d_endoT_acc = d_endoT.get_access<sycl_access_mode>(cgh);
-        auto d_epiT_acc = d_epiT.get_access<sycl_access_mode>(cgh);
-        auto d_in2_all_acc = d_in2.get_access<sycl_access_mode>(cgh);
-        auto d_conv_all_acc = d_conv.get_access<sycl_access_mode>(cgh);
-        auto d_in2_pad_cumv_all_acc = d_in2_pad_cumv.get_access<sycl_access_mode>(cgh);
-        auto d_in2_pad_cumv_sel_all_acc = d_in2_pad_cumv_sel.get_access<sycl_access_mode>(cgh);
-        auto d_in2_sub_cumh_all_acc = d_in2_sub_cumh.get_access<sycl_access_mode>(cgh);
-        auto d_in2_sub_cumh_sel_all_acc = d_in2_sub_cumh_sel.get_access<sycl_access_mode>(cgh);
-        auto d_in2_sub2_all_acc = d_in2_sub2.get_access<sycl_access_mode>(cgh);
-        auto d_in2_sqr_all_acc = d_in2_sqr.get_access<sycl_access_mode>(cgh);
-        auto d_in2_sqr_sub2_all_acc = d_in2_sqr_sub2.get_access<sycl_access_mode>(cgh);
-        auto d_in_sqr_all_acc = d_in_sqr.get_access<sycl_access_mode>(cgh);
-        auto d_tMask_all_acc = d_tMask.get_access<sycl_access_mode>(cgh);
-        auto d_mask_conv_all_acc = d_mask_conv.get_access<sycl_access_mode>(cgh);
-        auto d_in_mod_temp_all_acc = d_in_mod_temp.get_access<sycl_access_mode>(cgh);
-        auto d_in_partial_sum_all_acc = d_in_partial_sum.get_access<sycl_access_mode>(cgh);
-        auto d_in_sqr_partial_sum_all_acc = d_in_sqr_partial_sum.get_access<sycl_access_mode>(cgh);
-        auto par_max_val_all_acc = d_par_max_val.get_access<sycl_access_mode>(cgh);
-        auto par_max_coo_all_acc = d_par_max_coo.get_access<sycl_access_mode>(cgh);
-        auto d_in_final_sum_all_acc = d_in_final_sum.get_access<sycl_access_mode>(cgh);
-        auto d_in_sqr_final_sum_all_acc = d_in_sqr_final_sum.get_access<sycl_access_mode>(cgh);
-        auto denomT_all_acc = d_denomT.get_access<sycl_access_mode>(cgh);
+        auto d_endoT_acc = d_endoT.get_access<sycl_read_write>(cgh);
+        auto d_epiT_acc = d_epiT.get_access<sycl_read_write>(cgh);
+        auto d_in2_all_acc = d_in2.get_access<sycl_read_write>(cgh);
+        auto d_conv_all_acc = d_conv.get_access<sycl_read_write>(cgh);
+        auto d_in2_pad_cumv_all_acc = d_in2_pad_cumv.get_access<sycl_read_write>(cgh);
+        auto d_in2_pad_cumv_sel_all_acc = d_in2_pad_cumv_sel.get_access<sycl_read_write>(cgh);
+        auto d_in2_sub_cumh_all_acc = d_in2_sub_cumh.get_access<sycl_read_write>(cgh);
+        auto d_in2_sub_cumh_sel_all_acc = d_in2_sub_cumh_sel.get_access<sycl_read_write>(cgh);
+        auto d_in2_sub2_all_acc = d_in2_sub2.get_access<sycl_read_write>(cgh);
+        auto d_in2_sqr_all_acc = d_in2_sqr.get_access<sycl_read_write>(cgh);
+        auto d_in2_sqr_sub2_all_acc = d_in2_sqr_sub2.get_access<sycl_read_write>(cgh);
+        auto d_in_sqr_all_acc = d_in_sqr.get_access<sycl_read_write>(cgh);
+        auto d_tMask_all_acc = d_tMask.get_access<sycl_read_write>(cgh);
+        auto d_mask_conv_all_acc = d_mask_conv.get_access<sycl_read_write>(cgh);
+        auto d_in_mod_temp_all_acc = d_in_mod_temp.get_access<sycl_read_write>(cgh);
+        auto d_in_partial_sum_all_acc = d_in_partial_sum.get_access<sycl_read_write>(cgh);
+        auto d_in_sqr_partial_sum_all_acc = d_in_sqr_partial_sum.get_access<sycl_read_write>(cgh);
+        auto par_max_val_all_acc = d_par_max_val.get_access<sycl_read_write>(cgh);
+        auto par_max_coo_all_acc = d_par_max_coo.get_access<sycl_read_write>(cgh);
+        auto d_in_final_sum_all_acc = d_in_final_sum.get_access<sycl_read_write>(cgh);
+        auto d_in_sqr_final_sum_all_acc = d_in_sqr_final_sum.get_access<sycl_read_write>(cgh);
+        auto denomT_all_acc = d_denomT.get_access<sycl_read_write>(cgh);
+
 #ifdef TEST_CHECKSUM
-        auto checksum_acc = d_checksum.get_access<sycl_access_mode>(cgh);
+        auto checksum_acc = d_checksum.get_access<sycl_read_write>(cgh);
 #endif
 
         cgh.parallel_for<class heartwall>(
@@ -478,7 +465,6 @@ kernel_gpu_wrapper(  params_common common,
     //==================================================50
 
   }
-  q.wait();
 
   //====================================================================================================100
   //  PRINT FRAME PROGRESS END
