@@ -72,7 +72,7 @@ auto d_unique_d_Col = bx < d_common_acc[0].endoPoints ? d_endoCol_acc: d_epiCol_
 auto d_unique_d_tRowLoc = bx < d_common_acc[0].endoPoints ? d_tEndoRowLoc_acc: d_tEpiRowLoc_acc;
 auto d_unique_d_tColLoc = bx < d_common_acc[0].endoPoints ? d_tEndoColLoc_acc: d_tEpiColLoc_acc;
 auto d_in = bx < d_common_acc[0].endoPoints ?  &d_endoT_acc[d_unique_point_no * d_common_acc[0].in_elem] :
-&d_epiT_acc[d_unique_point_no * d_common_acc[0].in_elem] ;
+                                               &d_epiT_acc[d_unique_point_no * d_common_acc[0].in_elem] ;
 
 
 // offsets for all points (one array for all points)
