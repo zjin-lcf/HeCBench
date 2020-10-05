@@ -1,0 +1,17 @@
+The SYCL port of the miniFE is based on the OpenMP4.5-opt. 
+By default, we use the SYCL GPU selector to run the application on an Intel GPU. 
+The source files Vector_functions.hpp and SparseMatrix_functions.hpp contain the SYCL implementations. 
+Verification is always enabled by commenting "if (params.verify_solution > 0)" in driver.hpp.
+Debugging can be enabled by adding the option -DMINIFE_DEBUG. 
+The performance results are collected using the dimensions (128,128,128) 
+
+===============================================================================
+
+Build miniFE:
+   make
+
+Quick run 
+  ./miniFE.x
+
+Performance run 
+  ./miniFE.x -nx 128 -ny 128 -nz 128
