@@ -287,11 +287,18 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.38 | 2.52 | 2.38 | 2.53 |
 
 
+| nbody | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 402 | 402 | 402 | 1308 |
+| host timing(s) | 2.7 | 3.0 | 3.1 | 6.2 |
+| device timing(s) | 2.4 | 2.4 | 2.4 | 2.7 |
+
+
 | nn | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 13 |
-| host timing(s) | 0.2 | 0.55 | 0.59 | 3.5 |
-| device timing(us) | 38 | 49 | 43 | 103 |
+| host timing(s) | 0.3 | 0.60 | 0.65 | 3.1 |
+| device timing(us) | 37 | 57 | 62 | 220 |
 
 
 | nw | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -812,6 +819,20 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 9.8 | 10.2 | 10.2 | 10.1 |
 
 
+| nbody | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 402 | 402 | 402 | 1308 |
+| host timing(s) | 4.1 | 4.3 | 3.1 | 7.3 |
+| device timing(s) | 3.6 | 3.6 | 3.6 | 3.9 |
+
+
+| nn | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 3 | 3 | 13 |
+| host timing(s) | 0.2 | 0.55 | 0.59 | 3.5 |
+| device timing(us) | 38 | 49 | 43 | 103 |
+
+
 | nw | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2048 | 2050 | 2050 | 13314 |
@@ -1095,6 +1116,12 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### murmurhash3
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
+
+### nbody
+  Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
+
+### nn
+  Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### nw
   Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
