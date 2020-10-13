@@ -10,6 +10,7 @@
 #define MAX_RAD (RADIUS * 2)
 #define MaxR  (MAX_RAD + 2)
 
+//#define DEBUG
 
 int main(int argc, char ** argv) {
 
@@ -104,8 +105,8 @@ int main(int argc, char ** argv) {
     }
   }
 
-  ::memset(host_gicov, 0, grad_mem_size);
-
+  // Reset host_gicov and copy it to device
+  for (int i = 0; i < grad_m * grad_n; i++) host_gicov[i] = 0;
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -115,14 +116,18 @@ int main(int argc, char ** argv) {
   queue q(dev_sel);
 
   // Offload the GICOV score computation to the GPU
-  long long GICOV_start_time = get_time();
 
   // Setup execution parameters
   int local_work_size = grad_m - (2 * MaxR); 
   int num_work_groups = grad_n - (2 * MaxR);
+  size_t work_group_size = 256;
+  size_t global_work_size = num_work_groups * local_work_size;
+  if(global_work_size % work_group_size > 0)
+    global_work_size=(global_work_size / work_group_size+1)*work_group_size;
+
+  long long GICOV_start_time = get_time();
 
   const property_list props = property::buffer::use_host_ptr();
-
   buffer<float, 1> d_sin_angle(host_sin_angle, NPOINTS, props);
   buffer<float, 1> d_cos_angle(host_cos_angle, NPOINTS, props);
   buffer<int, 1> d_tX(host_tX, NCIRCLES*NPOINTS, props);
@@ -130,12 +135,9 @@ int main(int argc, char ** argv) {
 
   buffer<float,1> d_grad_x(host_grad_x, grad_m * grad_n, props);
   buffer<float,1> d_grad_y(host_grad_y, grad_m * grad_n, props);
-  buffer<float,1> d_gicov(grad_m * grad_n);
+  buffer<float,1> d_gicov(host_gicov, grad_m * grad_n);
+  d_gicov.set_final_data(nullptr);
 
-  size_t work_group_size = 256;
-  size_t global_work_size = num_work_groups * local_work_size;
-  if(global_work_size % work_group_size > 0)
-    global_work_size=(global_work_size / work_group_size+1)*work_group_size;
 
 #ifdef DEBUG
   printf("Find: local_work_size = %zu, global_work_size = %zu \n" ,work_group_size, global_work_size);
