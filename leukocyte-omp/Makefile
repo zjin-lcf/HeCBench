@@ -72,7 +72,7 @@ $(MATRIX_DIR)/meschach.a:
 	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC); make clean
 
 run: leukocyte
-	./leukocyte ../data/leukocyte/testfile.avi 1
+	./leukocyte ../data/leukocyte/testfile.avi 100
 
 clean:
 	rm -f *.o *~ leukocyte 
