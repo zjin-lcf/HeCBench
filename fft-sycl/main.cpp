@@ -148,7 +148,7 @@ int main(int argc, char** argv)
 
   { // sycl scope
 
-#ifdef GPU
+#ifdef USE_GPU
     gpu_selector dev_sel;
 #else
     cpu_selector dev_sel;

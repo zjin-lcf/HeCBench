@@ -128,9 +128,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | fft | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 201 | 202 | NA | NA |
-| host timing(s) | 31.4 | 22.9 | NA | NA |
-| device timing(ms) | 30.6 | 20.2 | NA | NA | 
+| total enqueue | 201 | 202 | 202 | NA |
+| host timing(s) | 16.4 | 19.5 | 19.5 | NA |
+| device timing(ms) | 14.3 | 17.1 | 17.0 | NA | 
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -203,6 +203,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 4.1 | 4.1 | 4.1 | 4.2 |
 
 
+| hybridsort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 25 | 33 | 33 | 193 |
+| host timing(s) | 1.5 | 1.74 | 1.87 | 4.89 |
+| device timing(s) | 0.82 | 0.87 | 0.86 | 1.21 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100004 | 400008 |
@@ -257,6 +264,20 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 6 | 6 | 15 |
 | host timing(s) | 2.8 | 1.4 | 1.48 | 4.4 |
 | device timing(s) | 2.5 | 0.77 | 0.76 | 0.8 |
+
+
+| leukocyte | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 204 | 711 | 711 | 1334 |
+| host timing(s) | 2.3 | 2.97 | 3.0 | 5.8 |
+| device timing(s) | 1.99 | 2.17 | 2.17 | 2.14 |
+
+
+| lud | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1535 | 1536 | 1536 | 6145 |
+| host timing(s) | 8.9 | 11.0 | 11.2 | 14.1 |
+| device timing(s) | 7.8 | 9.7 | 9.8 | 9.7 |
 
 
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -679,6 +700,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.7 | 4.0 | 3.7 | 4.1 |
 
 
+| hybridsort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 25 | 33 | 33 | 193 |
+| host timing(s) | 1.5 | 1.74 | 1.87 | 4.89 |
+| device timing(s) | 0.82 | 0.87 | 0.86 | 1.21 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100003 | 400008 |
@@ -729,6 +757,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 
 | lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 6 | 6 | 15 |
+| host timing(s) | 1.8 | 2.0 | 2.0 | 4.8 |
+| device timing(s) | 1.42 | 1.31 | 1.27 | 1.32 |
+
+
+| leukocyte | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 6 | 6 | 15 |
 | host timing(s) | 1.8 | 2.0 | 2.0 | 4.8 |
@@ -1059,6 +1094,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### hotspot3D
   hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### hybridsort
+  hybridsort in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
