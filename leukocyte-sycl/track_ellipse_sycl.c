@@ -76,7 +76,6 @@ void IMGVF_SYCL(cl::sycl::queue &q, MAT **IE, MAT **IMGVF,
     size_t num_work_groups = num_cells;
     size_t global_work_size = num_work_groups * LOCAL_WORK_SIZE;
 
-
     // Convert double-precision parameters to single-precision
     float vx_float = (float) vx;
     float vy_float = (float) vy;
