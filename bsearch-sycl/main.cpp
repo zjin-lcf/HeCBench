@@ -47,6 +47,7 @@ void bs ( queue &q,
         acc_r[i] = low;
         });
   });
+  q.wait();
 }
 
 template <typename T>
@@ -87,6 +88,7 @@ void bs2 (queue &q,
       acc_r[i] = idx;
        });
   });
+  q.wait();
 }
 
 template <typename T>
@@ -128,6 +130,7 @@ void bs3 ( queue &q,
        acc_r[i] = idx;
         });
   });
+  q.wait();
 }
 
 template <typename T>
@@ -180,6 +183,7 @@ void bs4 (queue &q,
        acc_r[gid] = idx;
         });
   });
+  q.wait();
 }
 
 void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
