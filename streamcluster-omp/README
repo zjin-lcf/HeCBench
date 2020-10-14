@@ -1,0 +1,1 @@
+The shared memory size is fixed at 256 in streamcluster_cl.h
