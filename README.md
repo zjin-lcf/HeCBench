@@ -63,6 +63,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.16 | 0.35 | 0.34 | 0.95 |  
 
 
+| bsearch | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80 |  160 |  160 | 308 | 
+| host timing(s) | 2.28 | 2.43 | 2.43 | 2.73 |
+| device timing(s) | 2.11 | 2.19 | 2.17 | 2.25 |
+
+
 | bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 120003 |  120007 |  120007 | 228009 | 
@@ -483,6 +490,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.12 | 0.19 | 0.18 | 0.51 |
 
 
+| streamcluster | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 11278 | 11278 | 11278 | 30617 |
+| host timing(s) | 4.5 | 4.7 | 4.9 | 8.5 |
+| device timing(s) | 3.6 | 3.7 | 3.6 | 4.4 |
+
+
 | su3 | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 104 | 104 | 715 |
@@ -558,6 +572,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 3 | 3 | 9 |
 | host timing(s) | 0.71 | 1.42 | 1.43 | 4.49 | 
 | device timing(s) | 0.27 | 0.42 | 0.37 | 0.96 |  
+
+
+| bsearch | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80 |  160 |  160 | 308 | 
+| host timing(s) | 2.3 | 2.5 | 2.5 | 2.5 |
+| device timing(s) | 2.2 | 2.3 | 2.3 | 2.1 |
 
 
 | bspline-vgh | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -703,8 +724,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | hybridsort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 25 | 33 | 33 | 193 |
-| host timing(s) | 1.5 | 1.74 | 1.87 | 4.89 |
-| device timing(s) | 0.82 | 0.87 | 0.86 | 1.21 |
+| host timing(s) | 1.68 | 1.86 | 1.91 | 4.66 |
+| device timing(s) | 1.21 | 1.0 | 1.03 | 1.44 |
 
 
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -765,9 +786,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 | leukocyte | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2 | 6 | 6 | 15 |
-| host timing(s) | 1.8 | 2.0 | 2.0 | 4.8 |
-| device timing(s) | 1.42 | 1.31 | 1.27 | 1.32 |
+| total enqueue | 204 | 711 | 711 | 1334 |
+| host timing(s) | 4.1 | 4.6| 4.6 | 6.8 |
+| device timing(s) | 3.58 | 3.77 | 3.73 | 3.64 |
+
 
 
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -994,6 +1016,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.09 | 0.14 | 0.13 | 0.48 |
 
 
+| streamcluster | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 11278 | 11278 | 11278 | 30617 |
+| host timing(s) | 7.8 | 9.0 | 7.7 | 11.9 |
+| device timing(s) | 5.95 | 6.1 | 5.95 | 6.6 |
+
+
 | su3 | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 104 | 104 | 715 |
@@ -1093,10 +1122,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
 
 ### hotspot3D
-  hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### hybridsort
-  hybridsort in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Hybridsort in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
@@ -1121,6 +1150,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### lavaMD
   LavaMD in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### leukocyte 
+  Leukocyte in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -1212,6 +1244,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### stencil
   1D stencil using shared memory
+
+### streamcluster
+  Streamcluster in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
