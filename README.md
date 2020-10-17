@@ -126,6 +126,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 8.0 | 7.4 | 8.1 | 16.3  |
 
 
+| easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 17293 | 17299  | 17299 | 69183 |
+| host timing(s) | 29.8 | 31.0 | 32.0 | 41.8 |
+| device timing(s) | 28.5 | 29.3 | 29.9 | 36.6  |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -637,6 +644,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
 
 
+| easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 17293 | 17299  | 17299 | 69183 |
+| host timing(s) | 29.6 | 32.9 | 32.3 | 38.3 |
+| device timing(s) | 28.1 | 27.8 | 27.8 | 32.8  |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -1064,6 +1078,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### black-scholes
   The Black Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
 
+### bsearch
+  Classic and vectorizable binary search algorithms (https://www.sciencedirect.com/science/article/abs/pii/S0743731517302836)
+
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
 
@@ -1087,6 +1104,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
+
+### easyWave
+  Simulate of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
