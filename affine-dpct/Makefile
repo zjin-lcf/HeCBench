@@ -53,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) data/CT-MONO2-16-brain.raw result.raw
 
