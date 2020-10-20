@@ -1,0 +1,294 @@
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define m1  0x5555555555555555
+#define m2  0x3333333333333333 
+#define m4  0x0f0f0f0f0f0f0f0f 
+#define h01 0x0101010101010101
+
+#define BLOCK_SIZE 256
+
+// reference implementation
+int popcount_ref(unsigned long x)
+{
+  int count;
+  for (count=0; x; count++)
+    x &= x - 1;
+  return count;
+}
+
+// CUDA kernels
+void
+pc1 (const unsigned long* data, int* r, const int length,
+     sycl::nd_item<3> item_ct1)
+{
+  int i = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+          item_ct1.get_local_id(2);
+  if (i >= length) return;
+  unsigned long x = data[i];
+  x -= (x >> 1) & m1;             //put count of each 2 bits into those 2 bits
+  x = (x & m2) + ((x >> 2) & m2); //put count of each 4 bits into those 4 bits 
+  x = (x + (x >> 4)) & m4;        //put count of each 8 bits into those 8 bits 
+  x += x >>  8;  //put count of each 16 bits into their lowest 8 bits
+  x += x >> 16;  //put count of each 32 bits into their lowest 8 bits
+  x += x >> 32;  //put count of each 64 bits into their lowest 8 bits
+  r[i] = x & 0x7f;
+}
+
+void
+pc2 (const unsigned long* data, int* r, const int length,
+     sycl::nd_item<3> item_ct1)
+{
+  int i = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+          item_ct1.get_local_id(2);
+  if (i >= length) return;
+  unsigned long x = data[i];
+  x -= (x >> 1) & m1;             //put count of each 2 bits into those 2 bits
+  x = (x & m2) + ((x >> 2) & m2); //put count of each 4 bits into those 4 bits 
+  x = (x + (x >> 4)) & m4;        //put count of each 8 bits into those 8 bits 
+  r[i] = (x * h01) >> 56;  //returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... 
+}
+
+void
+pc3 (const unsigned long* data, int* r, const int length,
+     sycl::nd_item<3> item_ct1)
+{
+  int i = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+          item_ct1.get_local_id(2);
+  if (i >= length) return;
+  char count;
+  unsigned long x = data[i];
+  for (count=0; x; count++) x &= x - 1;
+  r[i] = count;
+}
+
+void
+pc4 (const unsigned long* data, int* r, const int length,
+     sycl::nd_item<3> item_ct1)
+{
+  int i = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+          item_ct1.get_local_id(2);
+  if (i >= length) return;
+  unsigned long x = data[i];
+  char cnt = 0;
+  for (char i = 0; i < 64; i++)
+  {
+    cnt = cnt + (x & 0x1);
+    x = x >> 1;
+  }
+  r[i] = cnt;
+}
+
+void
+pc5 (const unsigned long* data, int* r, const int length,
+     sycl::nd_item<3> item_ct1)
+{
+  int i = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+          item_ct1.get_local_id(2);
+  if (i >= length) return;
+  unsigned long x = data[i];
+  const unsigned char a[256] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8};
+  const unsigned char b[256] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8};
+  const unsigned char c[256] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8};
+  const unsigned char d[256] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8};
+
+  unsigned char i1 = a[(x & 0xFF)];
+  unsigned char i2 = a[(x >> 8) & 0xFF];
+  unsigned char i3 = b[(x >> 16) & 0xFF];
+  unsigned char i4 = b[(x >> 24) & 0xFF];
+  unsigned char i5 = c[(x >> 32) & 0xFF];
+  unsigned char i6 = c[(x >> 40) & 0xFF];
+  unsigned char i7 = d[(x >> 48) & 0xFF];
+  unsigned char i8 = d[(x >> 56) & 0xFF];
+  r[i] = (i1+i2)+(i3+i4)+(i5+i6)+(i7+i8);
+}
+
+void checkResults(const unsigned long *d, const int *r, const int length)
+{
+  int error = 0;
+  for (int i=0;i<length;i++)
+    if (popcount_ref(d[i]) != r[i]) {
+      error = 1;
+      break;
+    }
+
+  if (error)
+    printf("Fail\n");
+  else
+    printf("Success\n");
+}
+
+int main(int argc, char* argv[])
+{
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
+  unsigned long length = atol(argv[1]);
+  unsigned long *data = NULL;
+  int* result = NULL;
+  posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
+  posix_memalign((void**)&result, 1024, length*sizeof(int));
+
+  // initialize input
+  srand(2);
+  for (int i = 0; i < length; i++) {
+    unsigned long t = (unsigned long)rand() << 32;
+    data[i] = t | rand();
+  }
+
+  // run each popcount implementation 100 times
+
+  unsigned long* d_data;
+  dpct::dpct_malloc((void **)&d_data, sizeof(unsigned long) * length);
+  dpct::dpct_memcpy(d_data, data, sizeof(unsigned long) * length,
+                    dpct::host_to_device);
+
+  int* d_result;
+  dpct::dpct_malloc((void **)&d_result, sizeof(int) * length);
+
+  sycl::range<3> grids((length + BLOCK_SIZE - 1) / BLOCK_SIZE, 1, 1);
+  sycl::range<3> threads(BLOCK_SIZE, 1, 1);
+
+  for (int n = 0; n < 100; n++) {
+    dpct::buffer_t d_data_buf_ct0 = dpct::get_buffer(d_data);
+    dpct::buffer_t d_result_buf_ct1 = dpct::get_buffer(d_result);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      auto d_data_acc_ct0 =
+          d_data_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_result_acc_ct1 =
+          d_result_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            pc1((const unsigned long *)(&d_data_acc_ct0[0]),
+                (int *)(&d_result_acc_ct1[0]), length, item_ct1);
+          });
+    });
+  }
+  dpct::dpct_memcpy(result, d_result, sizeof(int) * length,
+                    dpct::device_to_host);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  for (int n = 0; n < 100; n++) {
+    dpct::buffer_t d_data_buf_ct0 = dpct::get_buffer(d_data);
+    dpct::buffer_t d_result_buf_ct1 = dpct::get_buffer(d_result);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      auto d_data_acc_ct0 =
+          d_data_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_result_acc_ct1 =
+          d_result_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            pc2((const unsigned long *)(&d_data_acc_ct0[0]),
+                (int *)(&d_result_acc_ct1[0]), length, item_ct1);
+          });
+    });
+  }
+  dpct::dpct_memcpy(result, d_result, sizeof(int) * length,
+                    dpct::device_to_host);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  for (int n = 0; n < 100; n++) {
+    dpct::buffer_t d_data_buf_ct0 = dpct::get_buffer(d_data);
+    dpct::buffer_t d_result_buf_ct1 = dpct::get_buffer(d_result);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      auto d_data_acc_ct0 =
+          d_data_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_result_acc_ct1 =
+          d_result_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            pc3((const unsigned long *)(&d_data_acc_ct0[0]),
+                (int *)(&d_result_acc_ct1[0]), length, item_ct1);
+          });
+    });
+  }
+  dpct::dpct_memcpy(result, d_result, sizeof(int) * length,
+                    dpct::device_to_host);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  for (int n = 0; n < 100; n++) {
+    dpct::buffer_t d_data_buf_ct0 = dpct::get_buffer(d_data);
+    dpct::buffer_t d_result_buf_ct1 = dpct::get_buffer(d_result);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      auto d_data_acc_ct0 =
+          d_data_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_result_acc_ct1 =
+          d_result_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            pc4((const unsigned long *)(&d_data_acc_ct0[0]),
+                (int *)(&d_result_acc_ct1[0]), length, item_ct1);
+          });
+    });
+  }
+  dpct::dpct_memcpy(result, d_result, sizeof(int) * length,
+                    dpct::device_to_host);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  for (int n = 0; n < 100; n++) {
+    dpct::buffer_t d_data_buf_ct0 = dpct::get_buffer(d_data);
+    dpct::buffer_t d_result_buf_ct1 = dpct::get_buffer(d_result);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      auto d_data_acc_ct0 =
+          d_data_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+      auto d_result_acc_ct1 =
+          d_result_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            pc5((const unsigned long *)(&d_data_acc_ct0[0]),
+                (int *)(&d_result_acc_ct1[0]), length, item_ct1);
+          });
+    });
+  }
+  dpct::dpct_memcpy(result, d_result, sizeof(int) * length,
+                    dpct::device_to_host);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  dpct::dpct_free(d_data);
+  dpct::dpct_free(d_result);
+  free(data);
+  free(result);
+  return 0;
+}
