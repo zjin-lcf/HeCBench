@@ -2,6 +2,7 @@
 #include "track_ellipse.h"
 #include "misc_math.h"
 
+
 #define NCIRCLES 7
 #define NPOINTS 150
 #define RADIUS 10
@@ -9,6 +10,8 @@
 #define MAX_RAD (RADIUS * 2)
 #define MaxR  (MAX_RAD + 2)
 
+
+//#define DEBUG
 
 int main(int argc, char ** argv) {
 
@@ -103,7 +106,8 @@ int main(int argc, char ** argv) {
     }
   }
 
-  memset(host_gicov, 0, grad_mem_size);
+  // Reset host_gicov and copy it to device  
+  for (int i = 0; i < grad_m*grad_n; i++) host_gicov[i] = 0;
 
   // Offload the GICOV score computation to the GPU
   long long GICOV_start_time;
@@ -112,14 +116,7 @@ int main(int argc, char ** argv) {
   long long dilate_end_time;
 
   GICOV_start_time = get_time();
-#pragma omp target data map(to: host_sin_angle[0:NPOINTS],\
-		host_cos_angle[0:NPOINTS],\
-		host_grad_x[0:grad_m*grad_n],\
-		host_grad_y[0:grad_m*grad_n],\
-		host_tX[0: NCIRCLES*NPOINTS],\
-		host_tY[0: NCIRCLES*NPOINTS])\
-              map(to:host_gicov[0:grad_m*grad_n])
-{
+
   // Setup execution parameters
   int local_work_size = grad_m - (2 * MaxR); 
   int num_work_groups = grad_n - (2 * MaxR);
@@ -131,9 +128,17 @@ int main(int argc, char ** argv) {
   printf("Find: local_work_size = %zu, global_work_size = %zu \n" ,work_group_size, global_work_size);
 #endif
 
-#include "kernel_GICOV.h"
 
-#pragma omp target update from (host_gicov[0:grad_m*grad_n])
+#pragma omp target data map(to: host_sin_angle[0:NPOINTS],\
+		host_cos_angle[0:NPOINTS],\
+		host_grad_x[0:grad_m*grad_n],\
+		host_grad_y[0:grad_m*grad_n],\
+		host_tX[0: NCIRCLES*NPOINTS],\
+		host_tY[0: NCIRCLES*NPOINTS])\
+              map(tofrom:host_gicov[0:grad_m*grad_n])
+{
+#include "kernel_GICOV.h"
+}
 
   GICOV_end_time = get_time();
   
@@ -145,7 +150,7 @@ int main(int argc, char ** argv) {
   for (int m = 0; m < grad_m; m++)
     for (int n = 0; n < grad_n; n++) {
 #ifdef DEBUG
-      printf("host_gicov: %f\n", host_gicov[(n * grad_m) + m]);
+    printf("host_gicov: %f\n", host_gicov[(n * grad_m) + m]);
 #endif
       m_set_val(gicov, m, n, host_gicov[(n * grad_m) + m]);
     }
@@ -164,20 +169,19 @@ int main(int argc, char ** argv) {
 
   // Setup execution parameters
   global_work_size = max_gicov_m * max_gicov_n;
-  local_work_size = 176;
+  local_work_size = 176; // as an argument in thread_limit()
 
-  // Make sure the global work size is a multiple of the local work size
-  //if (global_work_size % local_work_size != 0) {
-   // global_work_size = ((global_work_size / local_work_size) + 1) * local_work_size;
-  //}
 #ifdef DEBUG
-  printf("image dilate: local_work_size = %zu, global_work_size = %zu \n", local_work_size, global_work_size);
+  printf("image dilate: local_work_size = %zu, global_work_size = %zu \n", 
+		  local_work_size, global_work_size);
 #endif
 
-#pragma omp target data map(to: host_strel[0:strel_m * strel_n]) \
-  map(alloc: host_dilated[0:max_gicov_m * max_gicov_n])
+#pragma omp target data map(to: host_strel[0:strel_m * strel_n], \
+                                host_gicov[0:grad_m*grad_n]) \
+                        map(from: host_dilated[0:max_gicov_m * max_gicov_n])
+{
 #include "kernel_dilated.h"
-#pragma omp target update from(host_dilated[0: max_gicov_m * max_gicov_n])
+}
 
   dilate_end_time = get_time();
 
@@ -377,7 +381,6 @@ int main(int argc, char ** argv) {
   printf("   GICOV dilation: %.5f seconds\n", ((float) (dilate_end_time - dilate_start_time)) / (1000*1000));
   printf("            Total: %.5f seconds\n", ((float) (get_time() - program_start_time)) / (1000*1000));
 
-} // pragma omp target data map
 
   // Now that the cells have been detected in the first frame,
   //  track the ellipses through subsequent frames

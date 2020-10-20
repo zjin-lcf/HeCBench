@@ -28,7 +28,7 @@ endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g  
+  CFLAGS += -g -DDEBUG 
 endif
 
 ifeq ($(DEBUG),yes)
@@ -84,7 +84,7 @@ $(MATRIX_DIR)/meschach.a:
 	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC); make clean
 
 run: leukocyte
-	./leukocyte ../data/leukocyte/testfile.avi 10
+	./leukocyte ../data/leukocyte/testfile.avi 100
 
 clean:
 	rm -f *.o *~ leukocyte 
