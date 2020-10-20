@@ -9,8 +9,6 @@ for (int thread_id = 0; thread_id < global_work_size; thread_id++)
   int i = thread_id % max_gicov_m;
   int j = thread_id / max_gicov_m;
 
-  //if(j < max_gicov_n) {
-
   // Initialize the maximum GICOV score seen so far to zero
   float max = 0.0f;
 
@@ -26,8 +24,7 @@ for (int thread_id = 0; thread_id < global_work_size; thread_id++)
         x = j - el_center_j + el_j;
         // Make sure we have not gone off the edge of the matrix
         //  and that the current structuring element value is not zero
-        if ( (x >= 0) &&
-            (x < max_gicov_n) &&
+        if ( (x >= 0) && (x < max_gicov_n) &&
             (host_strel[(el_i * strel_n) + el_j] != 0) ) {
           // Determine if this is the maximal value seen so far
           int addr = (x * max_gicov_m) + y;
@@ -39,8 +36,6 @@ for (int thread_id = 0; thread_id < global_work_size; thread_id++)
   }
 
   // Store the maximum value found
-  //host_dilated[(i * max_gicov_n) + j] = max;
-  host_dilated[thread_id] = max;
-  //}
-
+  // Warning: thread_id is not equal to i * max_gicov_n + j
+  host_dilated[(i * max_gicov_n) + j] = max;
 }

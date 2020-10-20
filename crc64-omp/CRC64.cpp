@@ -1431,11 +1431,8 @@ uint64_t crc64_omp(const void *input, size_t nbytes) {
     #pragma omp target data map(from: thread_sz[0:nthreads], thread_cs[0:nthreads]) \
                             map(to: data[0:nbytes])
     {
-      #pragma omp target teams num_teams(nthreads/64) thread_limit(64)
-      {
-         #pragma omp parallel 
-         {
-          int tid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+       #pragma omp target teams distribute parallel for num_teams(nthreads/64) thread_limit(64)
+       for (int tid = 0; tid < nthreads; tid++) {
           size_t bpt = nbytes/nthreads;
           const unsigned char *start = data + bpt*tid, *end;
           if (tid != nthreads - 1)
@@ -1446,8 +1443,7 @@ uint64_t crc64_omp(const void *input, size_t nbytes) {
           size_t sz = end - start;
           thread_sz[tid] = sz;
           thread_cs[tid] = crc64(start, sz);
-        }
-      }
+       }
     }
 
     uint64_t cs = thread_cs[0];
