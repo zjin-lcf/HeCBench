@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE      = gpu
@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -41,7 +41,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -50,12 +52,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp black_kernel.h   calculate_F.h  calculate_u.h  red_kernel.h  set_horz_pres_BCs.h  sum_pressure.h \
+           calc_residual.h  calculate_G.h  calculate_v.h  set_BCs.h     set_vert_pres_BCs.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.dat
 
 run: $(program)
-	./$(program) 256 16777216
+	./$(program)
 

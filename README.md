@@ -14,6 +14,20 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
 
 ## Results on Platform 1
+| affine | SYCL | DPCT usm | DPCT header | OpenMP |     
+| --- | --- | --- | --- | --- |            
+| total enqueue | 101 | 102 | 102 | 507 | 
+| host timing(s) | 0.25 | 0.55 | 0.58 | 3.46 | 
+| device timing(ms) | 6.7 | 6.8 | 6.6 | 8.1 |  
+
+
+| all-pairs-distance | SYCL | DPCT usm | DPCT header | OpenMP |     
+| --- | --- | --- | --- | --- |            
+| total enqueue | 60 | 61 | 61 | 67 | 
+| host timing(s) | 0.38 | 0.76 | 0.76 | 25.6 | 
+| device timing(s) | 0.11 | 0.16 | 0.16 | 22 |  
+
+
 | amgmk | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |            
 | total enqueue | 501 | 506 | 506 | 2010 | 
@@ -245,6 +259,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.91 | 1.94 | 1.92 | 2.1 |
 
 
+| jenkins-hash | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 509 |
+| host timing(s) | 6.6  | 7.2 | 7.2 | 9.9 |
+| device timing(s) | 6.3 | 6.4 | 6.4 | 6.3 |
+
+
 | keccaktreehash | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 24 | 27 | 27 | 62 |
@@ -285,6 +306,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 204 | 711 | 711 | 1334 |
 | host timing(s) | 2.3 | 2.97 | 3.0 | 5.8 |
 | device timing(s) | 1.99 | 2.17 | 2.17 | 2.14 |
+
+
+| lid-driven-cavity | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1605667 | 1605673 | 1605673 | 5619820 | 
+| host timing(s) | 216 | 276| 263 | 375 |
+| device timing(s) | 154 | 212 | 228 | 223 |
 
 
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -511,6 +539,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
 
 
+| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 206 | 206 | 1012 |
+| host timing(s) | 13.4 | 12.0 | 13.9 | 14.9 | 
+| device timing(s) | 13.1 | 11.4 | 13.3 | 3.1 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -518,6 +553,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.6 | 2.7 | 2.1 | 3.1 |
 
 ## Results on Platform 2
+| affine | SYCL | DPCT usm | DPCT header | OpenMP |     
+| --- | --- | --- | --- | --- |            
+| total enqueue | 101 | 102 | 102 | 507 | 
+| host timing(s) | 0.33 | 0.62 | 0.62 | 3.1 | 
+| device timing(ms) | 11.5 | 12.7 | 11.0 | 12.4 |  
+
+
 | all-pairs-distance | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |            
 | total enqueue | 60 | 61 | 61 | 67 | 
@@ -763,6 +805,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.42 | 2.45 | 2.45 | 2.75 |
 
 
+| jenkins-hash | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 509 |
+| host timing(s) | 4.9  | 5.4 | 5.6 | 8.1 |
+| device timing(s) | 4.6 | 4.6 | 4.8 | 4.9 |
+
+
 | keccaktreehash | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 24 | 27 | 27 | 62 |
@@ -804,6 +853,12 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | host timing(s) | 4.1 | 4.6| 4.6 | 6.8 |
 | device timing(s) | 3.58 | 3.77 | 3.73 | 3.64 |
 
+
+| lid-driven-cavity | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 1605667 | 1605673 | 1605673 | 5619820 | 
+| host timing(s) | 264 | 573| 289 | 712 |
+| device timing(s) | 201 | 222 | 220 | 231 |
 
 
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1044,6 +1099,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
 
 
+| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 206 | 206 | 1012 |
+| host timing(s) | 20.8 | 20.6 | 20.0 | 23.9 | 
+| device timing(s) | 20.5 | 19.8 | 19.3 | 20.2 |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -1051,6 +1113,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.1 | 2.0 | 2.0 | 2.3 |
 
 # Reference
+### affine
+  Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
+
 ### all-pairs-distance
   All-pairs distance calculation (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2910913/)
 
@@ -1156,6 +1221,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
+### jenkins-hash 
+  Bob Jenkins lookup3 hash function (https://android.googlesource.com/platform/external/jenkins-hash/+/75dbeadebd95869dd623a29b720678c5c5c55630/lookup3.c)
+
 ### keccaktreehash 
   A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
 
@@ -1173,6 +1241,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### leukocyte 
   Leukocyte in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### lid-driven-cavity 
+  GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -1270,6 +1341,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
+
+### interleave
+  interleaved and non-interleaved global memory accesses
 
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
