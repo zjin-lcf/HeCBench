@@ -43,7 +43,7 @@ typedef struct{
 	long segments;
 	int egroups;
 	int nthreads;
-	char* krnl_path;
+	int repeat;
 	size_t nbytes;
 } Input;
 
@@ -73,8 +73,6 @@ typedef struct{
 } SIMD_Vectors;
 
 
-// kernel.c
-int run_kernel( Input * I, Source * S, Source *S2);
 void attenuate_segment( Input * __restrict I, Source * __restrict S,
 		int QSR_id, int FAI_id, float * __restrict state_flux,
 		SIMD_Vectors * __restrict simd_vecs);
