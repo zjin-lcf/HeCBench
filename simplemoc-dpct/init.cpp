@@ -1,4 +1,7 @@
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "SimpleMOC-kernel_header.h"
+#include <time.h>
 
 // Gets I from user and sets defaults
 Input * set_default_input( void )
@@ -103,16 +106,25 @@ SIMD_Vectors allocate_simd_vectors(Input * I)
 }
 
 // Timer function. Depends on if compiled with MPI, openmp, or vanilla
-double get_time(void)
-{
+double get_time(void) try {
 #ifdef OPENMP
   return omp_get_wtime();
 #endif
 
   time_t time;
-  time = clock();
+ /*
+ DPCT1008:0: clock function is not defined in the DPC++. This is a
+ hardware-specific feature. Consult with your hardware vendor to find a
+ replacement.
+ */
+ time = clock();
 
   return (double) time / (double) CLOCKS_PER_SEC;
+}
+catch (sycl::exception const &exc) {
+ std::cerr << exc.what() << "Exception caught at file:" << __FILE__
+           << ", line:" << __LINE__ << std::endl;
+ std::exit(1);
 }
 
 Source* copy_sources( Input * I, Source *S ) 

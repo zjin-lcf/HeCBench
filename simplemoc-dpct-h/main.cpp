@@ -1,5 +1,8 @@
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "SimpleMOC-kernel_header.h"
-#include "common.h"
+#include <cmath>
 
 // host 
 void attenuate_segment( Input * __restrict I, Source * __restrict S,
@@ -146,7 +149,7 @@ void attenuate_segment( Input * __restrict I, Source * __restrict S,
 #endif
   for( int g = 0; g < egroups; g++)
   {
-    expVal[g] = 1.f - expf( -tau[g] ); // exp is faster on many architectures
+  expVal[g] = 1.f - expf(-tau[g]); // exp is faster on many architectures
   }
 
   // Flux Integral
@@ -274,6 +277,151 @@ void attenuate_segment( Input * __restrict I, Source * __restrict S,
   }
 }  
 
+  void 
+att ( const int* QSR_id_acc,
+    const int* FAI_id_acc,
+    float* fine_flux_acc,
+    float* fine_source_acc,
+    float* sigT_acc,
+    float* state_flux_acc,
+    float* v_acc,
+    const int fine_axial_intervals,
+    const int egroups,
+    const int segments ,
+    sycl::nd_item<3> item_ct1)
+{
+
+ int gid = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+           item_ct1.get_local_id(2);
+  if (gid >= segments) return; 
+
+  const float dz = 0.1f;
+  const float zin = 0.3f; 
+  const float weight = 0.5f;
+  const float mu = 0.9f;
+  const float mu2 = 0.3f;
+  const float ds = 0.7f;
+
+  int QSR_id = QSR_id_acc[gid];
+  int FAI_id = FAI_id_acc[gid];
+
+  // load fine source region flux vector
+  int offset = QSR_id * fine_axial_intervals * egroups;
+
+  float *FSR_flux = fine_flux_acc + offset + FAI_id * egroups;
+
+  float* q0 = v_acc;
+  float* q1 = v_acc + egroups;
+  float* q2 = v_acc + egroups * 2;
+  float* sigT = v_acc + egroups * 3;
+  float* tau = v_acc + egroups * 4;
+  float* sigT2 = v_acc + egroups * 5;
+  float* expVal = v_acc + egroups * 6;
+  float* reuse = v_acc + egroups * 7;
+  float* flux_integral = v_acc + egroups * 8;
+  float* tally = v_acc + egroups * 9;
+  float* t1 = v_acc + egroups * 10;
+  float* t2 = v_acc + egroups * 11;
+  float* t3 = v_acc + egroups * 12;
+  float* t4 = v_acc + egroups * 13;
+
+  if( FAI_id == 0 )
+  {
+    float * f2 = fine_source_acc + offset + FAI_id*egroups;
+    float * f3 = fine_source_acc + offset + (FAI_id+1)*egroups; 
+    // cycle over energy groups
+    for( int g = 0; g < egroups; g++)
+    {
+      // load neighboring sources
+      const float y2 = f2[g];
+      const float y3 = f3[g];
+
+      // do linear "fitting"
+      const float c0 = y2;
+      const float c1 = (y3 - y2) / dz;
+
+      // calculate q0, q1, q2
+      q0[g] = c0 + c1*zin;
+      q1[g] = c1;
+      q2[g] = 0;
+    }
+  }
+  else if ( FAI_id == fine_axial_intervals - 1 )
+  {
+    float * f1 = fine_source_acc + offset + (FAI_id-1)*egroups; 
+    float * f2 = fine_source_acc + offset + FAI_id*egroups; 
+
+    for( int g = 0; g < egroups; g++)
+    {
+      // load neighboring sources
+      const float y1 = f1[g];
+      const float y2 = f2[g];
+
+      // do linear "fitting"
+      const float c0 = y2;
+      const float c1 = (y2 - y1) / dz;
+
+      // calculate q0, q1, q2
+      q0[g] = c0 + c1*zin;
+      q1[g] = c1;
+      q2[g] = 0;
+    }
+  }
+  else
+  {
+    float * f1 = fine_source_acc + offset + (FAI_id-1)*egroups; 
+    float * f2 = fine_source_acc + offset + FAI_id*egroups; 
+    float * f3 = fine_source_acc + offset + (FAI_id+1)*egroups; 
+    // cycle over energy groups
+    for( int g = 0; g < egroups; g++)
+    {
+      // load neighboring sources
+      const float y1 = f1[g]; 
+      const float y2 = f2[g];
+      const float y3 = f3[g];
+
+      // do quadratic "fitting"
+      const float c0 = y2;
+      const float c1 = (y1 - y3) / (2.f*dz);
+      const float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
+
+      // calculate q0, q1, q2
+      q0[g] = c0 + c1*zin + c2*zin*zin;
+      q1[g] = c1 + 2.f*c2*zin;
+      q2[g] = c2;
+    }
+  }
+
+
+  // cycle over energy groups
+  offset = QSR_id * egroups;
+  for( int g = 0; g < egroups; g++)
+  {
+    // load total cross section
+    sigT[g] = sigT_acc[offset + g];
+
+    // calculate common values for efficiency
+    tau[g] = sigT[g] * ds;
+    sigT2[g] = sigT[g] * sigT[g];
+
+  expVal[g] = 1.f - sycl::exp(-tau[g]); // exp is faster on many architectures
+    reuse[g] = tau[g] * (tau[g] - 2.f) + 2.f * expVal[g] / (sigT[g] * sigT2[g]); 
+
+    // add contribution to new source flux
+    flux_integral[g] = (q0[g] * tau[g] + (sigT[g] * state_flux_acc[g] - q0[g])
+        * expVal[g]) / sigT2[g] + q1[g] * mu * reuse[g] + q2[g] * mu2 
+      * (tau[g] * (tau[g] * (tau[g] - 3.f) + 6.f) - 6.f * expVal[g]) 
+      / (3.f * sigT2[g] * sigT2[g]);
+
+    tally[g] = weight * flux_integral[g];
+    FSR_flux[g] += tally[g];
+    t1[g] = q0[g] * expVal[g] / sigT[g];  
+    t2[g] = q1[g] * mu * (tau[g] - expVal[g]) / sigT2[g]; 
+    t3[g] = q2[g] * mu2 * reuse[g];
+    t4[g] = state_flux_acc[g] * (1.f - expVal[g]);
+    state_flux_acc[g] = t1[g]+t2[g]+t3[g]+t4[g];
+  }
+}
 
 int main( int argc, char * argv[] )
 {
@@ -286,8 +434,9 @@ int main( int argc, char * argv[] )
   read_CLI( argc, argv, I );
 
   // Calculate Number of 3D Source Regions
-  I->source_3D_regions = (int) ceil((double)I->source_2D_regions *
-      I->coarse_axial_intervals / I->decomp_assemblies_ax);
+ I->source_3D_regions =
+     (int)ceil((double)I->source_2D_regions * I->coarse_axial_intervals /
+               I->decomp_assemblies_ax);
 
   logo(4); // Based on the 4th version
 
@@ -324,7 +473,7 @@ int main( int argc, char * argv[] )
     state_flux_device[i] = rand_r(&seed) / (float) RAND_MAX;
     state_flux[i] = state_flux_device[i];
   }
-  
+
   // Verification is performed for one segment;
   // Attentate segment is not run on CPU to reduce simulation time
   for( long i = 0; i < I->segments; i++ )
@@ -343,198 +492,138 @@ int main( int argc, char * argv[] )
 
     // Attenuate Segment for one segment
 #ifdef VERIFY
-      attenuate_segment( I, S, QSR_id, FAI_id, state_flux, &simd_vecs);
+    attenuate_segment( I, S, QSR_id, FAI_id, state_flux, &simd_vecs);
 #endif
   }
 
 #ifdef VERIFY
-    float* simd_vecs_debug = (float*) malloc (sizeof(float)*I->egroups*14);
+  float* simd_vecs_debug = (float*) malloc (sizeof(float)*I->egroups*14);
 #endif
 
   double start = get_time();
-  { // SYCL scope
 
-#ifdef USE_GPU 
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
+  int fine_axial_intervals = I->fine_axial_intervals;
+  int egroups = I->egroups;
+  int segments = I->segments;
 
+  int *d_QSR_id;
+  int *d_FAI_id;
+  float *d_fine_flux;
+  float *d_fine_source;
+  float *d_sigT;
+  float* d_state_flux;
+  float* d_simd_vecs;
 
-    buffer<int,1> d_QSR_id (QSR_id_arr, I->segments);
-    buffer<int,1> d_FAI_id (FAI_id_arr, I->segments);
-    buffer<float,1> d_fine_flux (S2->fine_flux, 
-        I->source_3D_regions * I->fine_axial_intervals * I->egroups);
-    buffer<float,1> d_fine_source (S2->fine_source, 
-        I->source_3D_regions * I->fine_axial_intervals * I->egroups);
-    buffer<float,1> d_sigT (S2->sigT, I->source_3D_regions * I->egroups);
-    buffer<float,1> d_state_flux (state_flux_device, I->egroups);
+ dpct::dpct_malloc((void **)&d_QSR_id, sizeof(int) * I->segments);
+ dpct::dpct_memcpy(d_QSR_id, QSR_id_arr, sizeof(int) * I->segments,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_FAI_id, sizeof(int) * I->segments);
+ dpct::dpct_memcpy(d_FAI_id, FAI_id_arr, sizeof(int) * I->segments,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_fine_flux, sizeof(float) * I->source_3D_regions *
+                                              I->fine_axial_intervals *
+                                              I->egroups);
+
+ dpct::dpct_memcpy(d_fine_flux, S2->fine_flux,
+                   sizeof(float) * I->source_3D_regions *
+                       I->fine_axial_intervals * I->egroups,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_fine_source,
+                   sizeof(float) * I->source_3D_regions *
+                       I->fine_axial_intervals * I->egroups);
+
+ dpct::dpct_memcpy(d_fine_source, S2->fine_source,
+                   sizeof(float) * I->source_3D_regions *
+                       I->fine_axial_intervals * I->egroups,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_sigT,
+                   sizeof(float) * I->source_3D_regions * I->egroups);
+ dpct::dpct_memcpy(d_sigT, S2->sigT,
+                   sizeof(float) * I->source_3D_regions * I->egroups,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_state_flux, sizeof(float) * I->egroups);
+ dpct::dpct_memcpy(d_state_flux, state_flux_device, sizeof(float) * I->egroups,
+                   dpct::host_to_device);
+
+ dpct::dpct_malloc((void **)&d_simd_vecs, sizeof(float) * I->egroups * 14);
+
+ sycl::range<3> grids((segments + 127) / 128 * 128, 1, 1);
+ sycl::range<3> threads(128, 1, 1);
+
+  for (int n = 0; n < I->repeat; n++)
+ {
+  dpct::buffer_t d_QSR_id_buf_ct0 = dpct::get_buffer(d_QSR_id);
+  dpct::buffer_t d_FAI_id_buf_ct1 = dpct::get_buffer(d_FAI_id);
+  dpct::buffer_t d_fine_flux_buf_ct2 = dpct::get_buffer(d_fine_flux);
+  dpct::buffer_t d_fine_source_buf_ct3 = dpct::get_buffer(d_fine_source);
+  dpct::buffer_t d_sigT_buf_ct4 = dpct::get_buffer(d_sigT);
+  dpct::buffer_t d_state_flux_buf_ct5 = dpct::get_buffer(d_state_flux);
+  dpct::buffer_t d_simd_vecs_buf_ct6 = dpct::get_buffer(d_simd_vecs);
+  dpct::get_default_queue().submit([&](sycl::handler &cgh) {
+   auto d_QSR_id_acc_ct0 =
+       d_QSR_id_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_FAI_id_acc_ct1 =
+       d_FAI_id_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_fine_flux_acc_ct2 =
+       d_fine_flux_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_fine_source_acc_ct3 =
+       d_fine_source_buf_ct3.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_sigT_acc_ct4 =
+       d_sigT_buf_ct4.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_state_flux_acc_ct5 =
+       d_state_flux_buf_ct5.get_access<sycl::access::mode::read_write>(cgh);
+   auto d_simd_vecs_acc_ct6 =
+       d_simd_vecs_buf_ct6.get_access<sycl::access::mode::read_write>(cgh);
+
+   auto dpct_global_range = grids * threads;
+
+   cgh.parallel_for(
+       sycl::nd_range<3>(
+           sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                          dpct_global_range.get(0)),
+           sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+       [=](sycl::nd_item<3> item_ct1) {
+        att((const int *)(&d_QSR_id_acc_ct0[0]),
+            (const int *)(&d_FAI_id_acc_ct1[0]),
+            (float *)(&d_fine_flux_acc_ct2[0]),
+            (float *)(&d_fine_source_acc_ct3[0]), (float *)(&d_sigT_acc_ct4[0]),
+            (float *)(&d_state_flux_acc_ct5[0]),
+            (float *)(&d_simd_vecs_acc_ct6[0]), fine_axial_intervals, egroups,
+            segments, item_ct1);
+       });
+  });
+ }
+
+ dpct::dpct_memcpy(state_flux_device, d_state_flux, sizeof(float) * I->egroups,
+                   dpct::device_to_host);
+
+ dpct::dpct_memcpy(S2->fine_flux, d_fine_flux,
+                   sizeof(float) * I->source_3D_regions *
+                       I->fine_axial_intervals * I->egroups,
+                   dpct::device_to_host);
+
 #ifdef VERIFY
-    buffer<float,1> d_simd_vecs (simd_vecs_debug, I->egroups*14);
-#else
-    buffer<float,1> d_simd_vecs (I->egroups*14);
+ dpct::dpct_memcpy(simd_vecs_debug, d_simd_vecs,
+                   sizeof(float) * I->egroups * 14, dpct::device_to_host);
 #endif
 
-    int fine_axial_intervals = I->fine_axial_intervals;
-    int egroups = I->egroups;
-    int segments = I->segments;
-
-    range<1> gws ((segments+127)/128*128);
-    range<1> lws (128);
-
-    for (int n = 0; n < I->repeat; n++) 
-      q.submit([&](handler &h) {
-        auto FAI_id_acc = d_FAI_id.get_access<sycl_read>(h);
-        auto QSR_id_acc = d_QSR_id.get_access<sycl_read>(h);
-        auto fine_flux_acc = d_fine_flux.get_access<sycl_read_write>(h);
-        auto fine_source_acc = d_fine_source.get_access<sycl_read>(h);
-        auto sigT_acc = d_sigT.get_access<sycl_read>(h);
-        auto state_flux_acc = d_state_flux.get_access<sycl_read_write>(h);
-        auto v_acc = d_simd_vecs.get_access<sycl_write>(h);
-
-        h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-            int gid = item.get_global_id(0);
-            if (gid >= segments) return; 
-
-            const float dz = 0.1f;
-            const float zin = 0.3f; 
-            const float weight = 0.5f;
-            const float mu = 0.9f;
-            const float mu2 = 0.3f;
-            const float ds = 0.7f;
-
-            int QSR_id = QSR_id_acc[gid];
-            int FAI_id = FAI_id_acc[gid];
-
-            // load fine source region flux vector
-            int offset = QSR_id * fine_axial_intervals * egroups;
-
-            float *FSR_flux = fine_flux_acc.get_pointer() + offset + FAI_id * egroups;
-            float *vptr = v_acc.get_pointer();
-            float *fptr = fine_source_acc.get_pointer();
-
-            float* q0 = vptr;
-            float* q1 = vptr + egroups;
-            float* q2 = vptr + egroups * 2;
-            float* sigT = vptr + egroups * 3;
-            float* tau = vptr + egroups * 4;
-            float* sigT2 = vptr + egroups * 5;
-            float* expVal = vptr + egroups * 6;
-            float* reuse = vptr + egroups * 7;
-            float* flux_integral = vptr + egroups * 8;
-            float* tally = vptr + egroups * 9;
-            float* t1 = vptr + egroups * 10;
-            float* t2 = vptr + egroups * 11;
-            float* t3 = vptr + egroups * 12;
-            float* t4 = vptr + egroups * 13;
-
-            if( FAI_id == 0 )
-            {
-              float * f2 = fptr + offset + FAI_id*egroups;
-              float * f3 = fptr + offset + (FAI_id+1)*egroups; 
-              // cycle over energy groups
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y2 = f2[g];
-                const float y3 = f3[g];
-
-                // do linear "fitting"
-                const float c0 = y2;
-                const float c1 = (y3 - y2) / dz;
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin;
-                q1[g] = c1;
-                q2[g] = 0;
-              }
-            }
-            else if ( FAI_id == fine_axial_intervals - 1 )
-            {
-              float * f1 = fptr + offset + (FAI_id-1)*egroups; 
-              float * f2 = fptr + offset + FAI_id*egroups; 
-
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y1 = f1[g];
-                const float y2 = f2[g];
-
-                // do linear "fitting"
-                const float c0 = y2;
-                const float c1 = (y2 - y1) / dz;
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin;
-                q1[g] = c1;
-                q2[g] = 0;
-              }
-            }
-            else
-            {
-              float * f1 = fptr + offset + (FAI_id-1)*egroups; 
-              float * f2 = fptr + offset + FAI_id*egroups; 
-              float * f3 = fptr + offset + (FAI_id+1)*egroups; 
-              // cycle over energy groups
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y1 = f1[g]; 
-                const float y2 = f2[g];
-                const float y3 = f3[g];
-
-                // do quadratic "fitting"
-                const float c0 = y2;
-                const float c1 = (y1 - y3) / (2.f*dz);
-                const float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin + c2*zin*zin;
-                q1[g] = c1 + 2.f*c2*zin;
-                q2[g] = c2;
-              }
-            }
-
-
-            // cycle over energy groups
-            offset = QSR_id * egroups;
-            for( int g = 0; g < egroups; g++)
-            {
-              // load total cross section
-              sigT[g] = sigT_acc[offset + g];
-
-              // calculate common values for efficiency
-              tau[g] = sigT[g] * ds;
-              sigT2[g] = sigT[g] * sigT[g];
-
-              expVal[g] = 1.f - cl::sycl::exp( -tau[g] ); // exp is faster on many architectures
-              reuse[g] = tau[g] * (tau[g] - 2.f) + 2.f * expVal[g] / (sigT[g] * sigT2[g]); 
-
-              // add contribution to new source flux
-              flux_integral[g] = (q0[g] * tau[g] + (sigT[g] * state_flux_acc[g] - q0[g])
-                  * expVal[g]) / sigT2[g] + q1[g] * mu * reuse[g] + q2[g] * mu2 
-                * (tau[g] * (tau[g] * (tau[g] - 3.f) + 6.f) - 6.f * expVal[g]) 
-                / (3.f * sigT2[g] * sigT2[g]);
-
-              tally[g] = weight * flux_integral[g];
-              FSR_flux[g] += tally[g];
-              t1[g] = q0[g] * expVal[g] / sigT[g];  
-              t2[g] = q1[g] * mu * (tau[g] - expVal[g]) / sigT2[g]; 
-              t3[g] = q2[g] * mu2 * reuse[g];
-              t4[g] = state_flux_acc[g] * (1.f - expVal[g]);
-              state_flux_acc[g] = t1[g]+t2[g]+t3[g]+t4[g];
-            }
-        });
-    });
-    q.wait();
-  }
+ dpct::dpct_free(d_QSR_id);
+ dpct::dpct_free(d_FAI_id);
+ dpct::dpct_free(d_fine_flux);
+ dpct::dpct_free(d_fine_source);
+ dpct::dpct_free(d_sigT);
+ dpct::dpct_free(d_state_flux);
+ dpct::dpct_free(d_simd_vecs);
 
   printf("Simulation Complete.\n");
   double stop = get_time();
 
 #ifdef VERIFY
-  int egroups = I->egroups;
   const float* q0 = simd_vecs_debug;
   const float* q1 = simd_vecs_debug + egroups;
   const float* q2 = simd_vecs_debug + egroups * 2;
@@ -565,10 +654,10 @@ int main( int argc, char * argv[] )
     printf("t3[%d] = %f\n", g, t3[g]);
     printf("t4[%d] = %f\n", g, t4[g]);
   }
-
+  
   bool error = false;
   for (int i = 0; i < I->egroups; i++) {
-    if ( fabs(state_flux_device[i] - state_flux[i]) > 1e-1 ) {
+  if (fabs(state_flux_device[i] - state_flux[i]) > 1e-1) {
       printf("%f %f\n", state_flux_device[i], state_flux[i]);
       error = true;
       break;
@@ -578,15 +667,15 @@ int main( int argc, char * argv[] )
     printf("Fail\n");
   else
     printf("Success\n");
-
-#endif
-
+  
+ #endif
+  
   border_print();
   center_print("RESULTS SUMMARY", 79);
   border_print();
 
   double tpi = ((double) (stop - start) /
-      (double)I->segments / (double) I->egroups) * 1.0e9;
+    (double)I->segments / (double) I->egroups) * 1.0e9;
   printf("%-25s%.3lf seconds\n", "Runtime:", stop-start);
   printf("%-25s%.3lf ns\n", "Time per Intersection:", tpi);
   border_print();
