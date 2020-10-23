@@ -1,0 +1,64 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = dpcpp
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = main.cpp read_data.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -I../include
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+main.o: main.cpp filelist.txt 
+	$(CC) $(CFLAGS) -o main.o -c main.cpp
+
+read_data.o: read_data.cpp read_data.h
+	$(CC) $(CFLAGS) -o read_data.o -c read_data.cpp
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) 2000
+
