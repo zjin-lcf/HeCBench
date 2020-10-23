@@ -156,7 +156,7 @@ void extend2(queue &q, struct extend2_dat *d)
             if (m == 0) break;
             if (m > max) {
               max = m, max_i = i, max_j = mj;
-              max_off = max_off > abs(mj - i)? max_off : abs(mj - i);
+              max_off = max_off > cl::sycl::abs(mj - i)? max_off : cl::sycl::abs(mj - i);
             } else if (zdrop > 0) {
               if (i - max_i > mj - max_j) {
                 if (max - m - ((i - max_i) - (mj - max_j)) * e_del > zdrop) break;
