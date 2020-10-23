@@ -1,17 +1,9 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
-
-#include<stdio.h>
-#include<stdlib.h>
-#include<math.h>
-#include<string.h>
-#include<time.h>
-#include<stdbool.h>
-#include<limits.h>
-#include<assert.h>
-#include<pthread.h>
-#include<unistd.h>
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+#include <stdbool.h>
 
 #ifdef OPENMP
 #include<omp.h>
@@ -34,8 +26,8 @@
 // #define t4[g]  simd_vecs[g].sd
 
 // User inputs
-typedef struct{
-	int source_2D_regions;
+typedef struct dpct_type_cda182 {
+        int source_2D_regions;
 	int source_3D_regions;
 	int coarse_axial_intervals;
 	int fine_axial_intervals;
@@ -48,15 +40,15 @@ typedef struct{
 } Input;
 
 // Source Region Structure
-typedef struct{
-	float * fine_flux;
+typedef struct dpct_type_86628c {
+        float * fine_flux;
 	float * fine_source;
 	float * sigT;
 } Source;
 
 // Local SIMD Vector Arrays
-typedef struct{
-	float * q0;
+typedef struct dpct_type_f1910d {
+        float * q0;
 	float * q1;
 	float * q2;
 	float * sigT;

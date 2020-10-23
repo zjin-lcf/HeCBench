@@ -490,6 +490,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
 
 
+| simplemoc | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 12 | 18 | 18 | 73 |
+| host timing(s) | 14.3 | 40.2 | 16.3 | 36.0 |
+| device timing(s) | 14.1 | 39.6 | 15.6 | 32.4 |
+
+
 | softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 102 | 102 |  507 |
@@ -1050,6 +1057,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.79 | 1.28 | 0.93 | 2.6 |
 
 
+| simplemoc | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 12 | 18 | 18 | 73 |
+| host timing(s) | 46.1 | 47.5 | 43.8 | 50.3 |
+| device timing(s) | 45.6 | 46.7 | 43.1 | 47 |
+
+
 | softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 102 | 102 |  507 |
@@ -1320,6 +1334,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+
+### simplemoc
+  The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
