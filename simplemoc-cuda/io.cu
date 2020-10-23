@@ -75,6 +75,7 @@ void print_input_summary(Input * I)
 	#ifdef OPENMP
 	printf("%-25s%d\n", "Number of Threads:", I->nthreads);
 	#endif
+	printf("%-25s%d\n", "Kernel execution times:", I->repeat);
 	printf("%-25s%d\n", "Energy Groups:", I->egroups);
 	printf("%-25s%d\n", "2D Source Regions:", I->source_2D_regions);
 	printf("%-25s%d\n", "Coarse Axial Intervals:", I->coarse_axial_intervals);
@@ -83,15 +84,6 @@ void print_input_summary(Input * I)
 	printf("%-25s%d\n", "3D Source Regions:", I->source_3D_regions);
 	printf("%-25s", "Segments:"); fancy_int(I->segments);
 	printf("%-25s%.2f\n", "Memory Estimate (MB):", I->nbytes/1024.0/1024.0);
-	#ifdef TABLE
-	printf("%-25s%s\n", "Exponential Table:","ON");
-	#else
-	printf("%-25s%s\n", "Exponential Table:","OFF");
-	#endif
-	#ifdef PAPI
-    if( I->papi_event_set == -1)
-        printf("%-25s%s\n", "PAPI event to count:", I->event_name);
-	#endif
 	border_print();
 }
 
@@ -123,7 +115,11 @@ void read_CLI( int argc, char * argv[], Input * input )
 		else if( strcmp(arg, "-s") == 0 )
 		{
 			if( ++i < argc )
+#ifdef VERIFY
+				input->segments = 1;
+#else
 				input->segments = atoi(argv[i]);
+#endif
 			else
 				print_CLI_error();
 		}
@@ -136,29 +132,17 @@ void read_CLI( int argc, char * argv[], Input * input )
 			else
 				print_CLI_error();
 		}
-
-		// fpga kernel bin (-k)
-		else if( strcmp(arg, "-k") == 0 )
+		else if( strcmp(arg, "-n") == 0 )
 		{
-			if( ++i < argc ) {
-				input->krnl_path = argv[i];
-      }
+			if( ++i < argc )
+#ifdef VERIFY
+				input->repeat = 1;
+#else
+				input->repeat = atoi(argv[i]);
+#endif
 			else
 				print_CLI_error();
 		}
-
-        #ifdef PAPI
-        // Add single PAPI event
-        else if( strcmp(arg, "-p") == 0 )
-        {
-            if( ++i < argc ){
-                input->papi_event_set = -1;
-                strcpy(input->event_name, argv[i]);
-            }
-            else
-                print_CLI_error();
-        }
-        #endif
 		else
 			print_CLI_error();
 	}
@@ -177,9 +161,7 @@ void print_CLI_error(void)
 	printf("  -t <threads>        Number of OpenMP threads to run\n");
 	printf("  -s <segments>       Number of segments to process\n");
 	printf("  -e <energy groups>  Number of energy groups\n");
-	printf("  -k <path to kernel binary>  FPGA binary config file path\n");
-    printf("  -p <PAPI event>     PAPI event name to count (1 only) \n");
-	printf("See readme for full description of default run values\n");
+	printf("  -n <kernel runs>    Number of kernel execution on a device (GPU)\n");
 	exit(1);
 }
 
