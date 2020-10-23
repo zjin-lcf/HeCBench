@@ -147,6 +147,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 28.5 | 29.3 | 29.9 | 36.6  |
 
 
+| extend2 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 14000 | 24000  | 24000 | 46005 |
+| host timing(s) | 10.9 | 11.5 | 11.8 | 20.2 |
+| device timing(s) | 9.6 | 9.6 | 9.6 | 16.1 |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -700,6 +707,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 28.1 | 27.8 | 27.8 | 32.8  |
 
 
+| extend2 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 14000 | 24000  | 24000 | 46005 |
+| host timing(s) | 14.9 | 16.1 | 15.5 | 19.8 |
+| device timing(s) | 7.7 | 7.8 | 7.8 | 13.7 |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -1186,6 +1200,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### easyWave
   Simulate of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
+
+### extend2
+  Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
 
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
