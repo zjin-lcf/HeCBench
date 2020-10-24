@@ -1,6 +1,6 @@
 /*
-   written by Kaz Yoshii <ky@anl.gov>
-   */
+   written by Kaz Yoshii kazutomo.yoshii@gmail
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -14,7 +14,7 @@
 /* return non-zero on success */
 static int read_check(int fd, void *buf, size_t sz)
 {
-  if(read(fd, buf, sz) != sz)
+  if(read(fd, buf, sz) != (ssize_t)sz)
     return 0;
   return 1;
 }
