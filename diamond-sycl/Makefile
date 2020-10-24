@@ -127,9 +127,9 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj) *.m8
 
-test:
+test: $(program)
 	./$(program) blastx -q short.fastq.gz -d ARDB -o short_cur.m8 --tmpdir /dev/shm -p1
 
-run:
+run: $(program)
 	./$(program) blastx -q long.fastq.gz -d ARDB -o long_cur.m8 --tmpdir /dev/shm -p1
 
