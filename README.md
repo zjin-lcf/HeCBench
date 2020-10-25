@@ -140,6 +140,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 8.0 | 7.4 | 8.1 | 16.3  |
 
 
+| diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 5  | 5 | 14 |
+| host timing(s) | N/A | 13.1 | N/A | N/A |
+| device timing(s) | N/A | N/A | N/A | N/A  |
+
+
 | easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 17293 | 17299  | 17299 | 69183 |
@@ -700,6 +707,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
 
 
+| diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2 | 5  | 5 | 14 |
+| host timing(s) | 26.1 | 26.7 | 26.1 | 29.4 |
+| device timing(s) | 25.4 | 25.7 | 25.1 | 25.9  |
+
+
 | easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 17293 | 17299  | 17299 | 69183 |
@@ -1197,6 +1211,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
+
+### diamond
+  Mask Sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
 ### easyWave
   Simulate of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
