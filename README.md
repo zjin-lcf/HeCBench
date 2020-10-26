@@ -143,8 +143,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 5  | 5 | 14 |
-| host timing(s) | N/A | 13.1 | N/A | N/A |
-| device timing(s) | N/A | N/A | N/A | N/A  |
+| host timing(s) | 41.6 | 41.9 | 42.3 | 43.8 |
+| device timing(s) | 40.8 | 40.9 | 41.2 | 40.2  |
 
 
 | easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -173,6 +173,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 201 | 202 | 202 | NA |
 | host timing(s) | 16.4 | 19.5 | 19.5 | NA |
 | device timing(ms) | 14.3 | 17.1 | 17.0 | NA | 
+
+
+| fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 400 | 800 | 800 | NA |
+| host timing(s) | 5.1 | 4.1 | 4.2 | NA |
+| device timing(ms) | 0.64 | 1.2 | 1.2 | NA | 
 
 
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -742,6 +749,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 11.4 | 24.9 | 24.9 | NA | 
 
 
+| fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 400 | 800 | 800 | NA |
+| host timing(s) | 3.9 | 4.4 | 4.3 | NA |
+| device timing(ms) | 0.74 | 1.6 | 1.6 | NA | 
+
+
 | gamma-correction | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 9 |
@@ -1226,6 +1240,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### fft
   FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+
+### fpc
+  Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
+388). ACM.)
 
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
