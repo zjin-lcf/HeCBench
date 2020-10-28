@@ -1,0 +1,52 @@
+
+        int region_size = ((size / 4) / item.get_group_range(0)) * 4;
+        int block_start = item.get_group(0) * region_size;
+
+        // Give the last block any extra elements
+        int block_stop  = (item.get_group(0) == item.get_group_range(0) - 1) ?
+            size : block_start + region_size;
+
+        // Calculate starting index for this thread/work item
+        int tid = item.get_local_id(0);
+        int i = block_start + tid;
+
+        // The per thread histogram, initially 0's.
+        int digit_counts[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
+                                 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        // Reduce multiple elements per thread
+        while (i < block_stop)
+        {
+            // This statement
+            // 1) Loads the value in from global memory
+            // 2) Shifts to the right to have the 4 bits of interest
+            //    in the least significant places
+            // 3) Masks any more significant bits away. This leaves us
+            // with the relevant digit (which is also the index into the
+            // histogram). Next increment the histogram to count this occurrence.
+            digit_counts[(in[i] >> shift) & 0xFU]++;
+            i += item.get_local_range(0);
+        }
+
+        for (int d = 0; d < 16; d++)
+        {
+            // Load this thread's sum into local/shared memory
+            lmem[tid] = digit_counts[d];
+	          item.barrier(access::fence_space::local_space);
+
+            // Reduce the contents of shared/local memory
+            for (unsigned int s = item.get_local_range(0) / 2; s > 0; s >>= 1)
+            {
+                if (tid < s)
+                {
+                    lmem[tid] += lmem[tid + s];
+                }
+	              item.barrier(access::fence_space::local_space);
+            }
+
+            // Write result for this block to global memory
+            if (tid == 0)
+            {
+                isums[(d * item.get_group_range(0)) + item.get_group(0)] = lmem[0];
+            }
+        }
