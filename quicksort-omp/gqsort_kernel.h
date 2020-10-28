@@ -85,13 +85,13 @@
       poldend = &pparent->oldend;
       pblockcount = &pparent->blockcount;
       // Atomic increment allocates memory to write to.
-#pragma atomic capture
+#pragma omp atomic capture
       {
         lbeg = *psstart;
         *psstart += ltsum;
       }
 
-#pragma atomic capture
+#pragma omp atomic capture
       {
         gbeg = *psend;
         *psend -= gtsum;
