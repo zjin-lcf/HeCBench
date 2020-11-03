@@ -106,18 +106,19 @@ uint median(uint x1, uint x2, uint x3) {
 // work record contains info about the part of array that is still longer than QUICKSORT_BLOCK_SIZE and 
 // therefore cannot be processed by lqsort_kernel yet. It contins the start and the end indexes into 
 // an array to be sorted, associated pivot and direction of the sort. 
-typedef struct work_record {
+template <class T>
+struct work_record {
 	uint start;
 	uint end;
-	uint pivot;
+	T pivot;
 	uint direction;
 __host__ 
 	work_record() : 
-		start(0), end(0), pivot(0), direction(EMPTY_RECORD) {}
+		start(0), end(0), pivot(T(0)), direction(EMPTY_RECORD) {}
 __host__ __device__
 	work_record(uint s, uint e, uint p, uint d) : 
 		start(s), end(e), pivot(p), direction(d) {}
-} work_record;
+};
 
 
 // parent record contains everything kernels need to know about the parent of a set of blocks:
@@ -134,16 +135,17 @@ __host__
 
 // block record contains everything kernels needs to know about the block:
 // start and end indexes into input array, pivot, direction of sorting and the parent record index
-typedef struct block_record {
+template <class T>
+struct block_record {
 	uint start;
 	uint end;
-	uint pivot;
+	T pivot;
 	uint direction;
 	uint parent;
 __host__
-	block_record() : start(0), end(0), pivot(0), direction(EMPTY_RECORD), parent(0) {}
+	block_record() : start(0), end(0), pivot(T(0)), direction(EMPTY_RECORD), parent(0) {}
 __host__
-	block_record(uint s, uint e, uint p, uint d, uint prnt) : 
+	block_record(uint s, uint e, T p, uint d, uint prnt) : 
 		start(s), end(e), pivot(p), direction(d), parent(prnt) {}
-} block_record;
+};
 #endif // QUICKSORT_H
