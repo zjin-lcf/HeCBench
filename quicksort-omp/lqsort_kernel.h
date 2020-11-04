@@ -3,8 +3,8 @@
   workstack_record workstack[QUICKSORT_BLOCK_SIZE/SORT_THRESHOLD]; 
   int workstack_pointer;
 
-  uint mys[QUICKSORT_BLOCK_SIZE], mysn[QUICKSORT_BLOCK_SIZE], temp[SORT_THRESHOLD];
-  uint *s, *sn;
+  T mys[QUICKSORT_BLOCK_SIZE], mysn[QUICKSORT_BLOCK_SIZE], temp[SORT_THRESHOLD];
+  T *s, *sn;
   uint ltsum, gtsum;
   uint lt[LQSORT_LOCAL_WORKGROUP_SIZE+1], gt[LQSORT_LOCAL_WORKGROUP_SIZE+1];
 #pragma omp parallel
@@ -22,7 +22,7 @@
     // of the stack is 2 :)
     uint i, tmp, ltp, gtp;
 
-    work_record block = seqs[blockid];
+    work_record<T> block = seqs[blockid];
     const uint d_offset = block.start;
     uint start = 0; 
     uint end   = block.end - d_offset;
