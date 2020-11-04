@@ -70,7 +70,6 @@ int main(int argc, char **argv){
     lambda[i+offset] = lambda1;
   }
 
-  // check for correctness
   for(int n=0;n<Ndim;++n){
     dfloat *x = q + n*offset;
     dfloat *Ax = Aq + n*offset; 
@@ -86,25 +85,26 @@ int main(int argc, char **argv){
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+    queue Q(dev_sel);
 
     buffer<dfloat, 1> o_ggeo (ggeo, Np*Nelements*p_Nggeo);
     buffer<dfloat, 1> o_q    (q, Ndim*Np*Nelements);
-    buffer<dfloat, 1> o_Aq   (Aq, Ndim*Np*Nelements);
+    buffer<dfloat, 1> o_Aq   (Ndim*Np*Nelements);
     buffer<dfloat, 1> o_DrV  (DrV, Nq*Nq);
     buffer<dfloat, 1> o_lambda (lambda, 2*offset);
+    o_Aq.set_final_data(q); // store the device result in the 'q' array
 
     range<2> global_work_size(8, Nelements*8);
     range<2> local_work_size(8, 8);
 
     for(int test = 0; test < Ntests; ++test) {
       if (Ndim > 1)
-        q.submit([&] (handler &cgh) {
+        Q.submit([&] (handler &cgh) {
             auto ggeo = o_ggeo.get_access<sycl_read>(cgh);
-            auto D = o_Drv.get_access<sycl_read>(cgh);
+            auto D = o_DrV.get_access<sycl_read>(cgh);
             auto lambda = o_lambda.get_access<sycl_read>(cgh);
             auto q = o_q.get_access<sycl_read>(cgh);
-            auto Aq = o_Aq.get_access<sycl_write>(cgh);
+            auto Aq = o_Aq.get_access<sycl_discard_write>(cgh);
 
             accessor<double, 1, sycl_read_write, access::target::local> s_D(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_U(64, cgh);
@@ -117,14 +117,17 @@ int main(int argc, char **argv){
             accessor<double, 1, sycl_read_write, access::target::local> s_GWr(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_GWs(64, cgh);
 
-            cgh.parallel_for(nd_range<1>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<1> item) {
+            cgh.parallel_for(nd_range<2>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<2> item) {
                 double r_Ut, r_Vt, r_Wt;
                 double r_U[8], r_V[8], r_W[8];
                 double r_AU[8], r_AV[8], r_AW[8];
                 double r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
                 double r_lam0, r_lam1;
-                int j = threadIdx.y;
-                int i = threadIdx.x;
+
+                int e = item.get_group(1); 
+                int j = item.get_local_id(0);
+                int i = item.get_local_id(1);
+
                 s_D[j*8+i] = D[j*8+i];
                 const int base = i + j * 8 + e * 512;
                 for (int k = 0; k < 8; k++) {
@@ -220,32 +223,34 @@ int main(int argc, char **argv){
             });
         });
       else
-        q.submit([&] (handler &cgh) {
+        Q.submit([&] (handler &cgh) {
             auto ggeo = o_ggeo.get_access<sycl_read>(cgh);
-            auto D = o_Drv.get_access<sycl_read>(cgh);
+            auto D = o_DrV.get_access<sycl_read>(cgh);
             auto lambda = o_lambda.get_access<sycl_read>(cgh);
             auto q = o_q.get_access<sycl_read>(cgh);
-            auto Aq = o_Aq.get_access<sycl_write>(cgh);
+            auto Aq = o_Aq.get_access<sycl_discard_write>(cgh);
 
             accessor<double, 1, sycl_read_write, access::target::local> s_D(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_q(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_Gqr(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_Gqs(64, cgh);
 
-            cgh.parallel_for(nd_range<1>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<1> item) {
-                int e = item.get_group(1); 
+            cgh.parallel_for(nd_range<2>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<2> item) {
                 double r_qt, r_Gqt, r_Auk;
                 double r_q[8];
                 double r_Aq[8];
                 double r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
                 double r_lam0, r_lam1;
+
+                int e = item.get_group(1); 
                 int j = item.get_local_id(0);
                 int i = item.get_local_id(1);
+
                 s_D[j*8+i] = D[j*8+i];
                 const int base = i + j * 8 + e * 512;
                 for (int k = 0; k < 8; ++k) {
                 r_q[k] = q[base + k * 8 * 8];
-                r_Aq[k] = 0.00000000e+00f;
+                r_Aq[k] = 0;
                 }
 #pragma unroll 8
                 for (int k = 0; k < 8; ++k) {
@@ -268,8 +273,8 @@ int main(int argc, char **argv){
                   r_qt += s_D[k*8+m] * r_q[m];
                 }
                 item.barrier(access::fence_space::local_space);
-                double qr = 0.00000000e+00f;
-                double qs = 0.00000000e+00f;
+                double qr = 0;
+                double qs = 0;
 #pragma unroll 8
                 for (int m = 0; m < 8; ++m) {
                   qr += s_D[i*8+m] * s_q[j*8+m];
@@ -297,7 +302,7 @@ int main(int argc, char **argv){
             });
         });
     }
-    q.wait();
+    Q.wait();
   }
 
   auto end = std::chrono::high_resolution_clock::now();
