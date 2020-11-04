@@ -11,7 +11,11 @@ template <typename dataType>
 void runTest (dataType *in, dataType *out, int n) 
 {
   const property_list queue_props {property::queue::enable_profiling()};
+#ifdef USE_GPU
   gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
   queue q(dev_sel, queue_props);
 
   buffer<dataType,1> d_in(in, n);
