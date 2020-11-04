@@ -56,5 +56,5 @@ clean:
 
 # run one- and three-dimensional kernels
 run: $(program)
-	./$(program) 1 8000 10
-	./$(program) 3 8000 10
+	./$(program) 1 8000 100
+	./$(program) 3 8000 100
