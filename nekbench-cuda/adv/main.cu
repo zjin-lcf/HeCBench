@@ -25,7 +25,7 @@
 #define p_cubNq 16
 
 // gpu kernel
-#include "advKernel.cpp"
+#include "advKernel-opt.cpp"
 
 dfloat *drandAlloc(int N){
   dfloat *v = (dfloat*) calloc(N, sizeof(dfloat));
@@ -109,8 +109,9 @@ int main(int argc, char **argv){
   auto end = std::chrono::high_resolution_clock::now();
   const double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / Ntests;
 
-  // dump for comparison
-  //for (int i = 0; i < 3*Np*Nelements; i++) std::cout << adv[i] << "\n";
+#ifdef DEBUG
+  for (int i = 0; i < 3*Np*Nelements; i++) std::cout << adv[i] << "\n";
+#endif
 
   // print statistics
   const dfloat GDOFPerSecond = (N*N*N)*Nelements/elapsed;
@@ -121,6 +122,6 @@ int main(int argc, char **argv){
             << " elapsed time=" << elapsed
             << " GDOF/s=" << GDOFPerSecond
             << "\n";
-  exit(0);
+  return 0;
 }
 
