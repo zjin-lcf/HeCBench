@@ -8,15 +8,16 @@
     const uint blockid = omp_get_team_num();
     const uint localid = omp_get_thread_num();
 
-    uint i, lfrom, gfrom, lpivot, gpivot, tmp, ltp = 0, gtp = 0;
+    uint i, lfrom, gfrom, ltp = 0, gtp = 0;
+    T lpivot, gpivot, tmp; 
+    T *s, *sn;
 
     // Get the sequence block assigned to this work group
-    block_record block = blocksb[blockid];
+    block_record<T> block = blocksb[blockid];
     uint start = block.start, end = block.end, pivot = block.pivot, direction = block.direction;
 
     parent_record* pparent = parentsb + block.parent; 
     uint* psstart, *psend, *poldstart, *poldend, *pblockcount;
-    uint *s, *sn;
 
     // GPU-Quicksort cannot sort in place, as the regular quicksort algorithm can.
     // It therefore needs two arrays to sort things out. We start sorting in the 
@@ -148,16 +149,16 @@
           gpivot = median(sn[send],sn[(oldend+send) >> 1], gpivot);
         }
 
-        work_record* result1 = result + 2*blockid;
-        work_record* result2 = result1 + 1;
+        work_record<T>* result1 = result + 2*blockid;
+        work_record<T>* result2 = result1 + 1;
 
         // change the direction of the sort.
         direction ^= 1;
 
-        work_record r1 = {oldstart, sstart, lpivot, direction};
+        work_record<T> r1 = {oldstart, sstart, lpivot, direction};
         *result1 = r1;
 
-        work_record r2 = {send, oldend, gpivot, direction};
+        work_record<T> r2 = {send, oldend, gpivot, direction};
         *result2 = r2;
       }
     }
