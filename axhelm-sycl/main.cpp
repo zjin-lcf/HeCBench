@@ -70,6 +70,13 @@ int main(int argc, char **argv){
     lambda[i+offset] = lambda1;
   }
 
+  // check for correctness
+  for(int n=0;n<Ndim;++n){
+    dfloat *x = q + n*offset;
+    dfloat *Ax = Aq + n*offset; 
+    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
+  }
+
   auto start = std::chrono::high_resolution_clock::now();
 
   {  // sycl scope
@@ -296,12 +303,6 @@ int main(int argc, char **argv){
   auto end = std::chrono::high_resolution_clock::now();
   const double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / Ntests;
 
-  // check for correctness
-  for(int n=0;n<Ndim;++n){
-    dfloat *x = q + n*offset;
-    dfloat *Ax = Aq + n*offset; 
-    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
-  }
 
   dfloat maxDiff = 0;
   for(int n=0;n<Ndim*Np*Nelements;++n){
