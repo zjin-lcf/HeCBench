@@ -22,7 +22,6 @@
 #include "axhelmReference.cpp"
 
 // gpu kernel
-//#include "axhelmKernel-opt.cpp"
 #include "axhelmKernel.cpp"
 
 //=========================================================================
@@ -77,6 +76,13 @@ int main(int argc, char **argv){
     lambda[i+offset] = lambda1;
   }
 
+  // check for correctness
+  for(int n=0;n<Ndim;++n){
+    dfloat *x = q + n*offset;
+    dfloat *Ax = Aq + n*offset; 
+    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
+  }
+
   auto start = std::chrono::high_resolution_clock::now();
 
   dfloat *o_ggeo, *o_q, *o_Aq, *o_DrV, *o_lambda;
@@ -99,13 +105,6 @@ int main(int argc, char **argv){
     else
       axhelm <<< dim3(Nelements,1), dim3(8,8) >>> (
           Nelements, offset, o_ggeo, o_DrV, o_lambda, o_q, o_Aq);
-  }
-
-  // check for correctness
-  for(int n=0;n<Ndim;++n){
-    dfloat *x = q + n*offset;
-    dfloat *Ax = Aq + n*offset; 
-    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
   }
 
   cudaMemcpy(q, o_Aq, Ndim*Np*Nelements*sizeof(dfloat), cudaMemcpyDeviceToHost);
