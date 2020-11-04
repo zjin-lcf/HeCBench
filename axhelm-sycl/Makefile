@@ -19,7 +19,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int  -I../include
 
 # Linker Flags
 LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
@@ -61,5 +61,5 @@ clean:
 
 # run one- and three-dimensional kernels
 run: $(program)
-	./$(program) 1 8000 10
-	./$(program) 3 8000 10
+	./$(program) 1 8000 100
+	./$(program) 3 8000 100
