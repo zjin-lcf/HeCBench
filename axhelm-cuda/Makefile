@@ -18,7 +18,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -std=c++11 -Xcompiler -Wall -Ddfloat=double -Ddlong=int 
 
 # Linker Flags
 LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
@@ -42,10 +42,10 @@ all: build
 
 build: $(program)
 
-main.o : main.cu 
+main.o : main.cu axhelmKernel.cpp axhelmReference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 	
-meshBasis.o : meshBasis.cpp
+meshBasis.o : meshBasis.cpp meshBasis.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(program): main.o meshBasis.o
