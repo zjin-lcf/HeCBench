@@ -1,3 +1,3 @@
-1 Build a static library by typing 'make' in the BlasLapack directory
-2 Then build the application
+Go to the BlasLapack directory, and type 'make' to build a static library 
+Then build the application with 'make'
 
