@@ -22,6 +22,7 @@
 #include "axhelmReference.cpp"
 
 // gpu kernel
+//#include "axhelmKernel-opt.cpp"
 #include "axhelmKernel.cpp"
 
 //=========================================================================
