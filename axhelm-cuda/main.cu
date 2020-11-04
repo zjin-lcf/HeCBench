@@ -76,7 +76,7 @@ int main(int argc, char **argv){
     lambda[i+offset] = lambda1;
   }
 
-  // check for correctness
+  // compute the reference result
   for(int n=0;n<Ndim;++n){
     dfloat *x = q + n*offset;
     dfloat *Ax = Aq + n*offset; 
@@ -94,7 +94,6 @@ int main(int argc, char **argv){
 
   cudaMemcpy(o_ggeo, ggeo, Np*Nelements*p_Nggeo*sizeof(dfloat), cudaMemcpyHostToDevice);
   cudaMemcpy(o_q, q, (Ndim*Np)*Nelements*sizeof(dfloat), cudaMemcpyHostToDevice);
-  cudaMemcpy(o_Aq, Aq, (Ndim*Np)*Nelements*sizeof(dfloat), cudaMemcpyHostToDevice);
   cudaMemcpy(o_DrV, DrV, Nq*Nq*sizeof(dfloat), cudaMemcpyHostToDevice);
   cudaMemcpy(o_lambda, lambda, 2*offset*sizeof(dfloat), cudaMemcpyHostToDevice);
 
@@ -107,6 +106,7 @@ int main(int argc, char **argv){
           Nelements, offset, o_ggeo, o_DrV, o_lambda, o_q, o_Aq);
   }
 
+  // store the device results in the 'q' array
   cudaMemcpy(q, o_Aq, Ndim*Np*Nelements*sizeof(dfloat), cudaMemcpyDeviceToHost);
 
   cudaFree(o_ggeo);
@@ -118,6 +118,7 @@ int main(int argc, char **argv){
   auto end = std::chrono::high_resolution_clock::now();
   const double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / Ntests;
 
+  // verify
   dfloat maxDiff = 0;
   for(int n=0;n<Ndim*Np*Nelements;++n){
     dfloat diff = fabs(q[n]-Aq[n]);
