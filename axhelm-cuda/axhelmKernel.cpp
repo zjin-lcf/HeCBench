@@ -25,7 +25,7 @@ __global__ void axhelm(const int Nelements,
   const int base = i + j * 8 + e * 512;
   for (int k = 0; k < 8; ++k) {
     r_q[k] = q[base + k * 8 * 8];
-    r_Aq[k] = 0.00000000e+00f;
+    r_Aq[k] = 0;
   }
 #pragma unroll 8
   for (int k = 0; k < 8; ++k) {
@@ -48,8 +48,8 @@ __global__ void axhelm(const int Nelements,
       r_qt += s_D[k*8+m] * r_q[m];
     }
     __syncthreads();
-    double qr = 0.00000000e+00f;
-    double qs = 0.00000000e+00f;
+    double qr = 0;
+    double qs = 0;
 #pragma unroll 8
     for (int m = 0; m < 8; ++m) {
       qr += s_D[i*8+m] * s_q[j*8+m];
