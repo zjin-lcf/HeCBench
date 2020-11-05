@@ -14,16 +14,16 @@ DEBUG     = no
 
 program = test
 
-source = ccsd_tengy.cpp  ccsd_trpdrv.cpp  main.cpp
+source = ccsd_tengy.cu  ccsd_trpdrv.cu  main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60
 
 # Linker Flags
 LDFLAGS = 
@@ -47,12 +47,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
-run:
+run: $(program)
 	./$(program) 40 200 100
 
