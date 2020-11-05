@@ -55,7 +55,7 @@ using namespace cl::sycl;
 #define WRITE_ALIGNMENT 4096 // Intel recommended alignment
 
 //#define GET_DETAILED_PERFORMANCE 1
-#define RUN_CPU_SORTS
+//#define RUN_CPU_SORTS
 
 /// return a timestamp with sub-second precision 
 /** QueryPerformanceCounter and clock_gettime have an undefined starting point (null/zero)     
