@@ -51,11 +51,11 @@ void bitonic_sort( T* sh_data, const uint localid)
       uint direction = localid & ulevel;
       uint av = sh_data[pos], bv = sh_data[pos + j];
       const bool sortThem = av > bv;
-      const uint greater = select(bv, av, sortThem);
-      const uint lesser  = select(av, bv, sortThem);
+      const uint greater = Select(bv, av, sortThem);
+      const uint lesser  = Select(av, bv, sortThem);
 
-      sh_data[pos]     = select(lesser, greater, direction);
-      sh_data[pos + j] = select(greater, lesser, direction);
+      sh_data[pos]     = Select(lesser, greater, direction);
+      sh_data[pos + j] = Select(greater, lesser, direction);
 #pragma omp barrier
     }
   }
@@ -65,8 +65,8 @@ void bitonic_sort( T* sh_data, const uint localid)
 
     uint av = sh_data[pos], bv = sh_data[pos + j];
     const bool sortThem = av > bv;
-    sh_data[pos]      = select(av, bv, sortThem);
-    sh_data[pos + j]  = select(bv, av, sortThem);
+    sh_data[pos]      = Select(av, bv, sortThem);
+    sh_data[pos + j]  = Select(bv, av, sortThem);
 
 #pragma omp barrier
   }
