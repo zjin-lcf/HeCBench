@@ -57,7 +57,7 @@ T median_host(T x1, T x2, T x3) {
 
 #pragma omp declare target
 template <typename T, typename P>
-T select (T a, T b, P c) {
+T Select (T a, T b, P c) {
   return c ? b : a;
 }
 
@@ -66,13 +66,13 @@ uint median(uint x1, uint x2, uint x3) {
     if (x2 < x3) {
       return x2;
     } else {
-      return select(x1, x3, x1 < x3);
+      return Select(x1, x3, x1 < x3);
     }
   } else { // x1 >= x2
     if (x1 < x3) {
       return x1;
     } else { // x1 >= x3
-      return select(x2, x3, x2 < x3);
+      return Select(x2, x3, x2 < x3);
     }
   }
 }
