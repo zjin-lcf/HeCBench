@@ -42,8 +42,8 @@
 #include <vector>
 #include <map>
 
-#define RUN_CPU_SORTS
 //#define GET_DETAILED_PERFORMANCE
+//#define RUN_CPU_SORTS
 
 
 #include "QuicksortKernels.h"
@@ -366,7 +366,6 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
   uint num_failures = 0;
   for(uint k = 0; k < NUM_ITERATIONS; k++) {
     std::copy(original.begin(), original.end(), pArray);
-    //std::vector<T> seqs;
     std::vector<T> verify(arraySize);
     std::copy(pArray, pArray + arraySize, verify.begin());
 
@@ -424,6 +423,7 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
   printf("-------done--------------------------------------------------------\n");
   free(pArray);
   free(pArrayCopy);
+  return 0;
 }
 
 
