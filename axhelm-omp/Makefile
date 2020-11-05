@@ -1,0 +1,67 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = icpc
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = axhelm
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int
+
+# Linker Flags
+LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+all: build
+
+build: $(program)
+
+main.o : main.cpp axhelmReference.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(program): main.o meshBasis.o
+	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
+
+clean:
+	rm -rf $(program) main.o meshBasis.o
+
+# run one- and three-dimensional kernels
+run: $(program)
+	./$(program) 1 8000 100
+	./$(program) 3 8000 100
