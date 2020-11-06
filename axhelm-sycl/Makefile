@@ -22,7 +22,7 @@ program = axhelm
 CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int  -I../include
 
 # Linker Flags
-LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
