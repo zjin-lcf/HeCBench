@@ -49,6 +49,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 9.1 | 9.1 | 9.1 | NA |  
 
 
+| axhelm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 105 | 105 | NA | 
+| host timing(s) | 8.15/14.6 | 9.1/15.9 | 9.2/16.0 | NA | 
+| device timing(s) | 4.4/10.8 | 5.0/11.8 | 5.0/11.7 | NA |  
+
+
 | backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 5 | 9 | 9 | 19 |
@@ -98,6 +105,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.1 | 0.0068 | 0.0068 | 0.0082 |
 
 
+| ccsd-trpdrv | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 500 | 2400 | 2400 | 3405 |
+| host timing(s) | 7.9 | 8.3 | 8.2 | 12.7 |
+| device timing(s) | 7.9 | 8.2 | 8.1 | 12.3 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -145,6 +159,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 5  | 5 | 14 |
 | host timing(s) | 41.6 | 41.9 | 42.3 | 43.8 |
 | device timing(s) | 40.8 | 40.9 | 41.2 | 40.2  |
+
+
+| divergence | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 40000 | 100000  | 100000 | 280006 |
+| host timing(s) | 1.6 | 6.2 | 7.4 | 8.6 |
+| device timing(s) | 0.33 | 0.42 | 0.42 | 0.34  |
 
 
 | easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -420,6 +441,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.7 | 2.7 | 2.7 | 2.85 |
 
 
+| quicksort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2862 | NA | NA | 9108 | 
+| host timing(s) | 76 | NA | NA | 141 | 
+| device timing(s) | 73.2 | NA | NA | 120.4 |
+
+
 | randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 4 | 4 | 21 |
@@ -616,6 +644,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.73 | 0.73 | 0.73 | NA |  
 
 
+| axhelm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 105 | 105 | NA | 
+| host timing(s) | 8.15/14.6 | 9.1/15.9 | 9.2/16.0 | NA | 
+| device timing(s) | 4.4/10.8 | 5.0/11.8 | 5.0/11.7 | NA |  
+
+
 | backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 5 | 9 | 9 | 19 |
@@ -672,6 +707,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 0.56 | 0.0073 | 0.0065 | 0.0075 |
 
 
+| ccsd-trpdrv | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 500 | 2400 | 2400 | 3405 |
+| host timing(s) | 14.9 | 18.5 | 19.3 | 15.2 |
+| device timing(s) | 13.7 | 14.2 | 15.9 | 11.0 |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -719,6 +761,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 2 | 5  | 5 | 14 |
 | host timing(s) | 26.1 | 26.7 | 26.1 | 29.4 |
 | device timing(s) | 25.4 | 25.7 | 25.1 | 25.9  |
+
+
+| divergence | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 40000 | 100000  | 100000 | 280006 |
+| host timing(s) | 13.2 | 48.6 | 69.8 | 63.3 |
+| device timing(s) | 0.71 | 0.41 | 0.44 | 0.33  |
 
 
 | easyWave | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1050,6 +1099,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.75 | 1.75 | 1.74 | 1.82 |
 
 
+| quicksort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2862 | NA | NA | 8955 | 
+| host timing(s) | 86 | NA | NA | 187| 
+| device timing(s) | 76 | NA | NA | 1489 |
+
+
 | randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 4 | 4 | 21 |
@@ -1208,6 +1264,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ### b+tree
   B+Tree in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### ccsd-trpdrv
+  The CCSD tengy kernel in NWChem (https://github.com/jeffhammond/nwchem-ccsd-trpdrv)
+
 ### cfd
   The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -1228,6 +1287,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### diamond
   Mask Sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
+
+### divergence
+  CPU and GPU divergence test (https://github.com/E3SM-Project/divergence_cmdvse)
 
 ### easyWave
   Simulate of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
@@ -1364,6 +1426,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
+
+### quicksort
+  Quicksort (https://software.intel.com/content/www/us/en/develop/download/code-for-the-parallel-universe-article-gpu-quicksort-from-opencl-to-data-parallel-c.html)
 
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
