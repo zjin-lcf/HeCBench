@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -19,7 +19,7 @@ program = divergence
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -30,12 +30,14 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -43,7 +45,7 @@ endif
 $(program): divergence.o timer.o 
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-divergence.o: divergence.cu divergence.hpp Makefile
+divergence.o: divergence.cpp divergence.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 timer.o: timer/timer.cpp timer/timer.hpp
@@ -53,5 +55,5 @@ timer.o: timer/timer.cpp timer/timer.hpp
 clean:
 	rm -rf $(program) *.o
 
-run:
+run: $(program)
 	./$(program) input.txt 10000
