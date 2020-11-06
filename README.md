@@ -647,8 +647,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | axhelm | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 105 | 105 | NA | 
-| host timing(s) | 8.15/14.6 | 9.1/15.9 | 9.2/16.0 | NA | 
-| device timing(s) | 4.4/10.8 | 5.0/11.8 | 5.0/11.7 | NA |  
+| host timing(s) | 6.3/9.6 | 7.1/10.7 | 7.1/10.2 | NA | 
+| device timing(s) | 3.2/6.6 | 3.5/6.8 | 3.5/6.8 | NA |  
 
 
 | backprop | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1239,6 +1239,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+
+### axhelm
+  Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
 
 ### backprop
   Backpropagation in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
