@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -19,7 +20,7 @@ program = divergence
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -30,12 +31,16 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -43,7 +48,7 @@ endif
 $(program): divergence.o timer.o 
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-divergence.o: divergence.cu divergence.hpp Makefile
+divergence.o: divergence.cpp divergence.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 timer.o: timer/timer.cpp timer/timer.hpp
@@ -53,5 +58,5 @@ timer.o: timer/timer.cpp timer/timer.hpp
 clean:
 	rm -rf $(program) *.o
 
-run:
+run: $(program)
 	./$(program) input.txt 10000
