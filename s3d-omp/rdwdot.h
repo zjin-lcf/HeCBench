@@ -1,0 +1,23 @@
+    real ROP5 = ROP2(5) + ROP2(6) + ROP2(7) + ROP2(8);
+    real ROP12 = ROP2(12) + ROP2(13) + ROP2(14) + ROP2(15);
+
+    WDOT(2) = (-ROP2(1) +ROP2(2) +ROP2(3) -ROP5 -ROP5
+            -ROP2(9) -ROP2(10) -ROP12 -ROP2(17)
+            -ROP2(18) -ROP2(19) -ROP2(24) -ROP2(25)
+            +ROP2(30) +ROP2(34) +ROP2(35) +ROP2(36)
+            +ROP2(37) -ROP2(41) -ROP2(42) +ROP2(44)
+            +ROP2(46) -ROP2(48) +ROP2(49) +ROP2(50)
+            +ROP2(52) +ROP2(52) +ROP2(53) +ROP2(57)
+            -ROP2(60) +ROP2(62) +ROP2(63) +ROP2(64)
+            +ROP2(65) -ROP2(71) -ROP2(72) +ROP2(77)
+            -ROP2(78) +ROP2(79) +ROP2(87) +ROP2(91)
+            +ROP2(92) +ROP2(94) -ROP2(96) -ROP2(97)
+            -ROP2(98) -ROP2(102) +ROP2(105) -ROP2(108)
+            +ROP2(109) +ROP2(115) +ROP2(116) +ROP2(118)
+            +ROP2(124) -ROP2(126) -ROP2(127) -ROP2(128)
+            -ROP2(132) -ROP2(133) -ROP2(134) +ROP2(135)
+            +ROP2(146) -ROP2(148) -ROP2(149) -ROP2(150)
+            -ROP2(156) -ROP2(157) +ROP2(165) +ROP2(167)
+            -ROP2(170) -ROP2(171) +ROP2(173) -ROP2(180)
+            -ROP2(185) -ROP2(186) -ROP2(190) -ROP2(191)
+            -ROP2(192) +ROP2(193) -ROP2(199) -ROP2(200))*rateconv *molwt[1];

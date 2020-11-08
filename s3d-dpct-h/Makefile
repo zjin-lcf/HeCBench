@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC    = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -14,9 +14,9 @@ DEBUG     = no
 
 program = s3d
 
-source = main.cu  Option.cu  OptionParser.cu  S3D.cu
+source = main.cpp  Option.cpp  OptionParser.cpp  S3D.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
@@ -48,16 +48,16 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 
-main.o: main.cu OptionParser.h Utility.h 
+main.o: main.cpp OptionParser.h Utility.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-Option.o: Option.cu Option.h 
+Option.o: Option.cpp Option.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-OptionParser.o: OptionParser.cu OptionParser.h  Utility.h
+OptionParser.o: OptionParser.cpp OptionParser.h  Utility.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-S3D.o: S3D.cu S3D.h OptionParser.h gr_base.h ratt.h \
+S3D.o: S3D.cpp S3D.h OptionParser.h gr_base.h ratt.h \
        ratt2.h ratx.h qssa.h qssa2.h rdwdot.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
