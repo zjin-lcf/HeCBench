@@ -532,6 +532,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.9 | 3.9 | 3.95 | 4.9 |
 
 
+| s3d | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2701 |  2705 | 5410 | 34441 |
+| host timing(s) | 21 | 161 | 323 | 13 |
+| device timing(s) | 0.24 | 0.29 | 1.45 | 0.42 |
+
+
 | scan | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 10002 | 10002 | 200007 |
@@ -1148,6 +1155,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 3.1 | 3.1 | 3.2 | 3.6 |
 
 
+| s3d | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2701 |  2705 | 5410 | 34441 |
+| host timing(s) | 9.1 | 29 | 64 | 71 |
+| device timing(s) | 0.21 | 0.26 | 0.22 | 0.2 |
+
+
 | scan | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 10002 | 10002 | 200007 |
@@ -1451,6 +1465,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
+
+### s3d
+  S3D in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
