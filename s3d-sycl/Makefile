@@ -69,5 +69,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -q -n 1 -s 1
+	./$(program) -q -n 100 -s 1
 
