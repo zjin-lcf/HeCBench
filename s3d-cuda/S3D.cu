@@ -130,7 +130,7 @@ void RunTest(string testName, OptionParser &op)
 
     // Initialize Test Problem
 
-    // For now these are just 1, to compare results between cpu & gpu
+    // For now these are just 1 for verification
     real rateconv = 1.0;
     real tconv = 1.0;
     real pconv = 1.0;
@@ -142,7 +142,7 @@ void RunTest(string testName, OptionParser &op)
         host_t[i] = 1000.0;
     }
 
-    // Init molwt: for now these are just 1, to compare results betw. cpu & gpu
+    // Init molwt: for now these are just 1 for verification
     for (int i=0; i<WDOT_SIZE; i++)
     {
         host_molwt[i] = 1;
@@ -253,14 +253,6 @@ void RunTest(string testName, OptionParser &op)
     CUDA_SAFE_CALL(cudaMemcpy(host_wdot, gpu_wdot,
                 WDOT_SIZE * n * sizeof(real), cudaMemcpyDeviceToHost));
 
-    // Print out answers to compare with CPU
-    for (int i=0; i<WDOT_SIZE; i++) {
-        printf("% 23.16E ", host_wdot[i*n]);
-        if (i % 3 == 2)
-            printf("\n");
-    }
-    printf("\n");
-
     // Free GPU memory
     CUDA_SAFE_CALL(cudaFree(gpu_t));
     CUDA_SAFE_CALL(cudaFree(gpu_p));
@@ -273,6 +265,14 @@ void RunTest(string testName, OptionParser &op)
     CUDA_SAFE_CALL(cudaFree(gpu_a));
     CUDA_SAFE_CALL(cudaFree(gpu_eg));
     CUDA_SAFE_CALL(cudaFree(gpu_molwt));
+
+    for (int i=0; i<WDOT_SIZE; i++) {
+        printf("% 23.16E ", host_wdot[i*n]);
+        if (i % 3 == 2)
+            printf("\n");
+    }
+    printf("\n");
+
 
     // Free host memory
     CUDA_SAFE_CALL(cudaFreeHost(host_t));

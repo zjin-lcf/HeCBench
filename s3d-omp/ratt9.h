@@ -1,0 +1,102 @@
+
+    const real TEMP = T[i]*tconv;
+    //const real ALOGT = LOG(TEMP);
+    const register real SMALL_INV = 1e37f;
+    const real RU=8.31451e7;
+    const real PATM = 1.01325e6;
+    const real PFAC = DIV (PATM, (RU*(TEMP)));
+    register real rtemp_inv;
+
+    rtemp_inv = DIV ((EG(7)*EG(23)), (EG(8)*EG(22)));
+    RB(176) = RF(176) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(7)*EG(23)), (EG(5)*EG(12)*EG(17)*PFAC));
+    RB(177) = RF(177) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(8)*EG(23)), (EG(7)*EG(24)));
+    RB(178) = RF(178) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(16)*EG(23)), (EG(14)*EG(24)));
+    RB(179) = RF(179) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(24)),  (EG(1)*EG(23)));
+    RB(180) = RF(180) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(3)*EG(24)), (EG(5)*EG(23)));
+    RB(181) = RF(181) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(5)*EG(24)), (EG(6)*EG(23)));
+    RB(182) = RF(182) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(11)*EG(24)), (EG(12)*EG(23)));
+    RB(183) = RF(183) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(12)*EG(24)), (EG(13)*EG(23)));
+    RB(184) = RF(184) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(29)*PFAC), EG(30));
+    RB(185) = RF(185) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(29)), (EG(13)*EG(20)));
+    RB(186) = RF(186) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(7)*EG(29)), (EG(4)*EG(30)));
+    RB(187) = RF(187) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(7)*EG(29)), (EG(5)*EG(17)*EG(21)*PFAC));
+    RB(188) = RF(188) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(16)*EG(29)), (EG(14)*EG(30)));
+    RB(189) = RF(189) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(30)*PFAC), EG(31));
+    RB(190) = RF(190) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(30)), (EG(12)*EG(22)));
+    RB(191) = RF(191) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(30)), (EG(1)*EG(29)));
+    RB(192) = RF(192) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(3)*EG(30)), (EG(2)*EG(12)*EG(26)*PFAC));
+    RB(193) = RF(193) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(3)*EG(30)), (EG(16)*EG(23)));
+    RB(194) = RF(194) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(3)*EG(30)), (EG(5)*EG(29)));
+    RB(195) = RF(195) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(5)*EG(30)), (EG(6)*EG(29)));
+    RB(196) = RF(196) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(7)*EG(30)), (EG(8)*EG(29)));
+    RB(197) = RF(197) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(12)*EG(30)), (EG(13)*EG(29)));
+    RB(198) = RF(198) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(31)), (EG(12)*EG(23)));
+    RB(199) = RF(199) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(2)*EG(31)), (EG(1)*EG(30)));
+    RB(200) = RF(200) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(3)*EG(31)), (EG(17)*EG(23)));
+    RB(201) = RF(201) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(5)*EG(31)), (EG(6)*EG(30)));
+    RB(202) = RF(202) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(4)*EG(31)), (EG(7)*EG(30)));
+    RB(203) = RF(203) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(7)*EG(31)), (EG(5)*EG(17)*EG(23)*PFAC));
+    RB(204) = RF(204) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(12)*EG(31)), (EG(13)*EG(30)));
+    RB(205) = RF(205) * MIN(rtemp_inv, SMALL_INV);
+
+    rtemp_inv = DIV ((EG(21)*EG(23)), (EG(12)*EG(29)));
+    RB(206) = RF(206) * MIN(rtemp_inv, SMALL_INV);
+
