@@ -1158,7 +1158,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | s3d | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2701 |  2705 | 5410 | 34441 |
-| host timing(s) | 9.1 | 29 | 64 | 71 |
+| host timing(s) | 9.1 | 29 | 64 | 7.1 |
 | device timing(s) | 0.21 | 0.26 | 0.22 | 0.2 |
 
 
