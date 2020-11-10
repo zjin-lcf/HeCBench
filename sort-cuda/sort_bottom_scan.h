@@ -1,5 +1,5 @@
 __global__ void
-bottom_scan (T* out, const T* isums, const size_t size)
+bottom_scan (T* out, const T* in, const T* isums, const size_t size, const unsigned int shift)
 {
 
   __shared__ T lmem[256*2];
@@ -50,7 +50,7 @@ bottom_scan (T* out, const T* isums, const size_t size)
 
     if (i < block_stop) // Make sure we don't read out of bounds
     {
-      val_4 = ((VECTYPE*)in4)[i];
+      val_4 = ((VECTYPE*)in)[i];
 
       // Mask the keys to get the appropriate digit
       key_4.x = (val_4.x >> shift) & 0xFU;

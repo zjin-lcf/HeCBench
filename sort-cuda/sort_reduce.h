@@ -1,5 +1,5 @@
 __global__ void
-reduce (const T* in, T* isums, const size_t size)
+reduce (const T* in, T* isums, const size_t size, const unsigned int shift)
 {
   __shared__ T lmem[256];
   int group_range = gridDim.x;
