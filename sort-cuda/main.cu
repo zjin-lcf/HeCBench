@@ -8,11 +8,12 @@
 #include <cuda.h>
 
 typedef unsigned int T;
+typedef uint4 VECTYPE;
 
 // CUDA kernels
-#include "sort_bottom_scan.h"
 #include "sort_reduce.h"
 #include "sort_top_scan.h"
+#include "sort_bottom_scan.h"
 
 bool verifySort(const T *keys, const size_t size)
 {
@@ -65,7 +66,7 @@ int main(int argc, char** argv)
 
   // Initialize host memory
   std::cout << "Initializing host memory." << std::endl;
-  for (int i = 0; i < size; i++)
+  for (unsigned int i = 0; i < size; i++)
   {
     h_idata[i] = i % 16; // Fill with some pattern
     h_odata[i] = -1;
@@ -92,9 +93,12 @@ int main(int argc, char** argv)
   T* d_isums;
 
   cudaMalloc((void**)&d_idata, size * sizeof(T));
-  cudaMemcpy(d_idata, h_idata, size * sizeof(T), cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_idata, h_idata, size * sizeof(T), cudaMemcpyHostToDevice, 0);
   cudaMalloc((void**)&d_odata, size * sizeof(T));
   cudaMalloc((void**)&d_isums, num_work_groups * num_digits * sizeof(T));
+
+  T* d_in;
+  T* d_out;
 
   for (int k = 0; k < passes; k++)
   {
@@ -111,14 +115,12 @@ int main(int argc, char** argv)
       // Also, the sort is not in place, so swap the input and output
       // buffers on each pass.
       bool even = ((shift / radix_width) % 2 == 0) ? true : false;
+      d_in = even ? d_idata : d_odata;
+      d_out = even ? d_odata : d_idata;
 
-      T* d_in = even ? d_idata : d_odata;
-      T* d_out = even ? d_odata : d_idata;
-
-      reduce<<<num_work_groups, local_wsize>>> (d_in, d_isums, size);
-      top_scan<<<num_work_groups, local_wsize>>>(d_isums);
-      bottom_scan<<<num_work_groups, local_wsize>>>(d_out, d_isums, size);
-
+      reduce<<<num_work_groups, local_wsize>>> (d_in, d_isums, size, shift);
+      top_scan<<<num_work_groups, local_wsize>>>(d_isums, num_work_groups);
+      bottom_scan<<<num_work_groups, local_wsize>>>(d_out, d_in, d_isums, size, shift);
     }
     cudaDeviceSynchronize();
   }  // passes

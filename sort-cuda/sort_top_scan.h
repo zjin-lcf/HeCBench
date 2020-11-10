@@ -1,5 +1,5 @@
 __global__ void
-top_scan (T* isums)
+top_scan (T* isums, const size_t num_work_groups)
 {
   __shared__ T lmem[256*2];
   __shared__ T s_seed;
