@@ -560,6 +560,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
 
 
+| sort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 241 | NA | NA | NA |
+| host timing(s) | 4.94 | NA | NA | NA |
+| device timing(s) | 4.49 | NA | NA | NA |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
@@ -1183,6 +1190,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 4.9 | 3.9 | 5.1 | 3.9 |
 
 
+| sort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 241 | NA | NA | NA |
+| host timing(s) | 9.4 | NA | NA | NA |
+| device timing(s) | 8.9 | NA | NA | NA |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 | 13512 |
@@ -1477,6 +1491,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
+
+### sort
+  sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
