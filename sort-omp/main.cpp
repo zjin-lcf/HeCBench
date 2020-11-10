@@ -94,14 +94,12 @@ int main(int argc, char** argv)
   T* isums = (T*) malloc (sizeof(T) * num_work_groups * num_digits);
 
 #pragma omp target data map(to: idata[0:size]) \
-  map(from: odata[0:size]) \
-  map(alloc: isums[0:num_work_groups * num_digits])
+                        map(from: odata[0:size]) \
+                        map(alloc: isums[0:num_work_groups * num_digits])
   {
-
     for (int k = 0; k < passes; k++)
     {
       // Assuming an 8 bit byte.
-      // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
       for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
       {
         // Like scan, we use a reduce-then-scan approach
