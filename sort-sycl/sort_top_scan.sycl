@@ -1,48 +1,49 @@
-    //__local int s_seed;
-    s_seed[0] = 0; 
-	  item.barrier(access::fence_space::local_space);
+int local_range = item.get_local_range(0);
+int lid = item.get_local_id(0);
 
-    // Decide if this is the last thread that needs to
-    // propagate the seed value
-    int last_thread = (item.get_local_id(0) < num_work_groups &&
-                      (item.get_local_id(0)+1) == num_work_groups) ? 1 : 0;
+if (lid == 0) s_seed[0] = 0; 
+item.barrier(access::fence_space::local_space);
 
-    for (int d = 0; d < 16; d++)
-    {
-        T val = 0;
-        // Load each block's count for digit d
-        if (item.get_local_id(0) < num_work_groups)
-        {
-            val = isums[(num_work_groups * d) + item.get_local_id(0)];
-        }
-        // Exclusive scan the counts in local memory
-        //FPTYPE res = scanLocalMem(val, lmem, 1);
-            int idx = item.get_local_id(0);
-            lmem[idx] = 0;
-            idx += item.get_local_range(0);
-            lmem[idx] = val;
-            item.barrier(access::fence_space::local_space);
-            T t;
-            for (int i = 1; i < item.get_local_range(0); i *= 2)
-            {
-                t = lmem[idx -  i]; 
-                item.barrier(access::fence_space::local_space);
-                lmem[idx] += t;     
-                item.barrier(access::fence_space::local_space);
-            }
-            T res = lmem[idx-1];
+// Decide if this is the last thread that needs to
+// propagate the seed value
+int last_thread = (lid < num_work_groups &&
+    (lid+1) == num_work_groups) ? 1 : 0;
 
-        // Write scanned value out to global
-        if (item.get_local_id(0) < num_work_groups)
-        {
-            isums[(num_work_groups * d) + item.get_local_id(0)] = res + s_seed[0];
-        }
-	      item.barrier(access::fence_space::local_space);
+for (int d = 0; d < 16; d++)
+{
+  T val = 0;
+  // Load each block's count for digit d
+  if (lid < num_work_groups)
+  {
+    val = isums[(num_work_groups * d) + lid];
+  }
+  // Exclusive scan the counts in local memory
+  //FPTYPE res = scanLocalMem(val, lmem, 1);
+  int idx = lid;
+  lmem[idx] = 0;
+  idx += local_range;
+  lmem[idx] = val;
+  item.barrier(access::fence_space::local_space);
+  for (int i = 1; i < local_range; i *= 2)
+  {
+    T t = lmem[idx -  i]; 
+    item.barrier(access::fence_space::local_space);
+    lmem[idx] += t;     
+    item.barrier(access::fence_space::local_space);
+  }
+  T res = lmem[idx-1];
 
-        if (last_thread)
-        {
-            s_seed[0] += res + val;
-        }
-        item.barrier(access::fence_space::local_space);
-    }
+  // Write scanned value out to global
+  if (lid < num_work_groups)
+  {
+    isums[(num_work_groups * d) + lid] = res + s_seed[0];
+  }
+  item.barrier(access::fence_space::local_space);
+
+  if (last_thread)
+  {
+    s_seed[0] += res + val;
+  }
+  item.barrier(access::fence_space::local_space);
+}
 
