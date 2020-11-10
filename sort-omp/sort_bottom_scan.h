@@ -5,12 +5,10 @@ int lid = omp_get_thread_num();
 
 // Use local memory to cache the scanned seeds
 
-// Keep a shared histogram of all instances seen by the current
-// block
+// Keep a shared histogram of all instances seen by the current block
 
 // Keep a private histogram as well
-int histogram[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0  };
+int histogram[16];
 
 // Prepare for reading 4-element vectors
 // Assume: divisible by 4
@@ -20,8 +18,7 @@ int n4 = size / 4; //vector type is 4 wide
 int region_size = n4 / group_range;
 int block_start = group * region_size;
 // Give the last block any extra elements
-int block_stop  = (group == group_range - 1) ?
-n4 : block_start + region_size;
+int block_stop  = (group == group_range - 1) ?  n4 : block_start + region_size;
 
 // Calculate starting index for this thread/work item
 int i = block_start + lid;
@@ -32,8 +29,7 @@ int window = block_start;
 if (lid < 16)
 {
   l_block_counts[lid] = 0;
-  l_scanned_seeds[lid] =
-    isums[(lid*group_range)+group];
+  l_scanned_seeds[lid] = isums[(lid*group_range)+group];
 }
 #pragma omp barrier
 
