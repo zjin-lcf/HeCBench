@@ -6,7 +6,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -50,12 +50,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp sort_bottom_scan.sycl  sort_reduce.sycl  sort_top_scan.sycl Makefile
+%.o: %.cpp *.sycl Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 3 100
+	./$(program) 3 10
 
