@@ -66,11 +66,6 @@ int main(int argc, char** argv)
     h_odata[i] = -1;
   }
 
-  // The radix width in bits
-  const int radix_width = 4; // Changing this requires major kernel updates
-  //const int num_digits = (int)pow((double)2, radix_width); // n possible digits
-  const int num_digits = 16;
-
   std::cout << "Running benchmark with input array length " << size << std::endl;
 
   auto start = std::chrono::steady_clock::now();
@@ -91,13 +86,17 @@ int main(int argc, char** argv)
     // 64 work groups
     const size_t num_work_groups = global_wsize / local_wsize;
 
+    // The radix width in bits
+    const int radix_width = 4; // Changing this requires major kernel updates
+    //const int num_digits = (int)pow((double)2, radix_width); // n possible digits
+    const int num_digits = 16;
+
     const property_list props = property::buffer::use_host_ptr();
     buffer<T, 1> d_idata (h_idata, size, props);
     d_idata.set_final_data( nullptr );
     buffer<T, 1> d_odata (size); 
     d_odata.set_final_data( h_odata );
     buffer<T, 1> d_isums (num_work_groups * num_digits);
-
 
     for (int k = 0; k < passes; k++)
     {
