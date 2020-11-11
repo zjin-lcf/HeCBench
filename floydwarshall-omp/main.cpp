@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
 
       for(unsigned int k = 0; k < numPasses; k++)
       {
-#pragma omp target teams distribute parallel for collapse(2) thread_limit (blockSize*blockSize)
+#pragma omp target teams distribute parallel for collapse(2) thread_limit (blockSize*blockSize) nowait
         for(unsigned int y = 0; y < numNodes; ++y)
         {
           for(unsigned int x = 0; x < numNodes; ++x)
