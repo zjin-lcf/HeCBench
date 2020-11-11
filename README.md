@@ -196,6 +196,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 14.3 | 17.1 | 17.0 | NA | 
 
 
+| floydwarshall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 51251 | 51251 | 51251 | 512056 |
+| host timing(s) | 10.3 | 7.2 | 10.7 | 21.8 |
+| device timing(ms) | 8.9 | 6.85 | 8.9 | 10.4 | 
+
+
 | fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 400 | 800 | 800 | NA |
@@ -812,6 +819,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(ms) | 11.4 | 24.9 | 24.9 | NA | 
 
 
+| floydwarshall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 51251 | 51251 | 51251 | 512056 |
+| host timing(s) | 22.4 | 24.4 | 20.4 | 138 |
+| device timing(ms) | 7.2 | 6.7 | 7.2 | 23.3 | 
+
+
 | fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 400 | 800 | 800 | NA |
@@ -1333,6 +1347,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### fft
   FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+
+### floydwarshall
+  FloydWarshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
 
 ### fpc
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
