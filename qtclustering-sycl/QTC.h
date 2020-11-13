@@ -1,6 +1,8 @@
 #ifndef _QTC_COMMON_H_
 #define _QTC_COMMON_H_
 
+#include "OptionParser.h"
+
 #define GLOBAL_MEMORY 0x0
 #define TEXTUR_MEMORY 0x1
 #define COMPACT_STORAGE_MATRIX 0x00
@@ -17,5 +19,7 @@
 #define MAX(_X, _Y) ( ((_X) > (_Y)) ? (_X) : (_Y) )
 
 #define INVALID_POINT_MARKER -42
+
+void QTC(const string& name, OptionParser& op, int matrix_type);
 
 #endif
