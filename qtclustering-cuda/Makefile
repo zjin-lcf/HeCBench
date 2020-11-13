@@ -17,7 +17,7 @@ program = qtc
 cpp_source = main.cpp Option.cpp OptionParser.cpp comm.cpp libdata.cpp
 cuda_source = QTC.cu 
 
-obj = $(cpp_source:.cpp=.o) $(cuda_source: .cu=.o)
+obj = $(cpp_source:.cpp=.o) $(cuda_source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
