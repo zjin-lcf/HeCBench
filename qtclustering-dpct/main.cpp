@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstdlib>
-#include <cuda.h>
 #include "OptionParser.h"
 #include "Utility.h"
 
