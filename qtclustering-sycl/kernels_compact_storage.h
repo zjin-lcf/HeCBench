@@ -61,6 +61,8 @@ do{\
 }
 
 int generate_candidate_cluster_compact_storage(nd_item<1> &item, 
+const accessor<float, 1, sycl_read_write, access::target::local> &dist_array,
+const accessor<int, 1, sycl_read_write, access::target::local> &point_index_array,
 const int seed_point, 
 const int degree, 
 char *Ai_mask, 
@@ -134,7 +136,6 @@ const float threshold)
     item.barrier(access::fence_space::local_space);
 
     while( (cnt < point_count) && flag ){
-        int min_G_index;
         int point_index = -1;
         float min_dist=3*threshold;
         int last_index_checked = 0;
@@ -167,7 +168,26 @@ const float threshold)
         }
         item.barrier(access::fence_space::local_space);
 
-        min_G_index = closest_point_reduction(min_dist, threshold, point_index);
+        //min_G_index = closest_point_reduction(min_dist, threshold, point_index);
+    dist_array[tid] = min_dist;
+    point_index_array[tid] = point_index;
+        item.barrier(access::fence_space::local_space);
+
+    if(tid == 0 ){
+        for(int j=1; j<curThreadCount; j++){
+            float dist = dist_array[j];
+            // look for a point that is closer, or equally far, but with a smaller index.
+            if( (dist < min_dist) || (dist == min_dist && point_index_array[j] < point_index_array[0]) ){
+                min_dist = dist;
+                point_index_array[0] = point_index_array[j];
+            }
+        }
+        if( min_dist > threshold )
+            point_index_array[0] = -1;
+    }
+        item.barrier(access::fence_space::local_space);
+
+    int min_G_index = point_index_array[0];
 
         if(min_G_index >= 0 ){
             if( 0 == tid ){
