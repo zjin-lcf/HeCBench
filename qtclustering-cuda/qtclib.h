@@ -3,9 +3,6 @@
 
 #include "OptionParser.h"
 
-extern int qtcDevice;
-
-void init(OptionParser& op);
 void reduce_card(void *card, int pointCount);
 void allocDeviceBuffer(void** bufferp, unsigned long bytes);
 void freeDeviceBuffer(void* buffer);

@@ -19,22 +19,6 @@ __device__ int find_closest_point_to_cluster(int seed_point, int latest_point, c
 void QTC(const string& name, OptionParser& op, int matrix_type);
 
 
-//
-// arrange blocks into 2D grid that fits into the GPU ( for powers of two only )
-//
-inline dim3 grid2D( int nblocks )
-{
-    int slices = 1;
-
-    if( nblocks < 1 )
-        return dim3(1,1);
-
-    while( nblocks/slices > 65535 )
-        slices *= 2;
-    return dim3( nblocks/slices, slices );
-}
-
-
 inline __device__
 int closest_point_reduction(float min_dist, float threshold, int closest_point){
     __shared__ float dist_array[THREADSPERBLOCK];
