@@ -1,14 +1,16 @@
 # oneAPI Direct Programming
-This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header) .
+This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
 
 
 # Experiments
 We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program. The performance results below were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of low-level OpenCL enqueue commands called by a parallel program. These enqueue commands include "clEnqueueNDRangeKernel", "clEnqueueReadBuffer", and "clEnqueueWriteBuffer". The host timing is the total elapsed time of executing OpenCL API functions on a CPU host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU device. The Plugin Interface is OpenCL.  
  
 ## Setup
-Software: Intel<sup>®</sup> oneAPI Beta08 Toolkit, Ubuntu 18.04  
+Software: Intel<sup>®</sup> oneAPI Beta08* Toolkit, Ubuntu 18.04  
 Platform 1: Intel<sup>®</sup> Xeon E3-1284L with a Gen8 P6300 integrated GPU  
 Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
+
+*newer versions are only used when they can produce results correctly
 
 ## Run
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
@@ -194,6 +196,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 201 | 202 | 202 | NA |
 | host timing(s) | 16.4 | 19.5 | 19.5 | NA |
 | device timing(ms) | 14.3 | 17.1 | 17.0 | NA | 
+
+
+| floydwarshall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 51251 | 51251 | 51251 | 512056 |
+| host timing(s) | 10.3 | 7.2 | 10.7 | 21.8 |
+| device timing(ms) | 8.9 | 6.85 | 8.9 | 10.4 | 
 
 
 | fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -560,6 +569,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.3 | 3.8 | 1.3 | 1.5 |
 
 
+| sort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 241 | NA | NA | NA |
+| host timing(s) | 4.94 | NA | NA | NA |
+| device timing(s) | 4.49 | NA | NA | NA |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
@@ -803,6 +819,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | total enqueue | 201 | 202 | 202 | NA |
 | host timing(s) | 12.4 | 27.1 | 27.1 | NA |
 | device timing(ms) | 11.4 | 24.9 | 24.9 | NA | 
+
+
+| floydwarshall | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 51251 | 51251 | 51251 | 512056 |
+| host timing(s) | 22.4 | 24.4 | 20.4 | 138 |
+| device timing(ms) | 7.2 | 6.7 | 7.2 | 23.3 | 
 
 
 | fpc | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1183,6 +1206,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 4.9 | 3.9 | 5.1 | 3.9 |
 
 
+| sort | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 241 | NA | NA | NA |
+| host timing(s) | 9.4 | NA | NA | NA |
+| device timing(s) | 8.9 | NA | NA | NA |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 | 13512 |
@@ -1319,6 +1349,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### fft
   FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+
+### floydwarshall
+  FloydWarshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
 
 ### fpc
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
@@ -1477,6 +1510,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
+
+### sort
+  sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
