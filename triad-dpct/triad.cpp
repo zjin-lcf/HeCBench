@@ -96,7 +96,7 @@ void RunBenchmark(OptionParser &op)
 
   // Create some host memory pattern
   srand48(8650341L);
-  float *h_mem = (float*) malloc (sizeof(float) * numMaxFloats);
+  float *h_mem = sycl::malloc_host<float>(numMaxFloats, q_ct1);
 
   // Allocate some device memory
   float* d_memA0, *d_memB0, *d_memC0;
