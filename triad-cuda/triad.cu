@@ -96,7 +96,8 @@ void RunBenchmark(OptionParser &op)
 
   // Create some host memory pattern
   srand48(8650341L);
-  float *h_mem = (float*) malloc (sizeof(float) * numMaxFloats);
+  float *h_mem;
+  cudaMallocHost((void**)&h_mem, sizeof(float) * numMaxFloats);
 
   // Allocate some device memory
   float* d_memA0, *d_memB0, *d_memC0;
