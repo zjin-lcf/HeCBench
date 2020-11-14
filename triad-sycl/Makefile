@@ -15,7 +15,7 @@ DEVICE    = gpu
 
 program = triad
 
-source = main.cpp  Option.cpp  OptionParser.cpp  triad.cpp Timer
+source = main.cpp  Option.cpp  OptionParser.cpp  triad.cpp Timer.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -63,7 +63,7 @@ OptionParser.o: OptionParser.cpp OptionParser.h  Utility.h
 triad.o: triad.cpp Timer.h OptionParser.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-Timer.o: Timer.cpp Timer.h 
+Timer.o: Timer.cpp Timer.h config.h  
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
@@ -71,5 +71,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 
+	./$(program) --passes 100 
 
