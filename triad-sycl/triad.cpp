@@ -97,12 +97,13 @@ void RunBenchmark(OptionParser &op)
         h_mem[j] = h_mem[halfNumFloats + j] = (float) (drand48() * 10.0);
 
       // Copy input memory to the device
-      if (verbose)
-        cout << ">> Executing Triad with vectors of length "
+      if (verbose) {
+        std::cout << ">> Executing Triad with vectors of length "
           << numMaxFloats << " and block size of "
           << elemsInBlock << " elements." << "\n";
       //sprintf(sizeStr, "Block:%05ldKB", blockSizes[i]);
-      printf("Block:%05ldKB", blockSizes[i]);
+        printf("Block:%05ldKB\n", blockSizes[i]);
+      }
 
       // start submitting blocks of data of size elemsInBlock
       // overlap the computation of one block with the data
@@ -114,17 +115,17 @@ void RunBenchmark(OptionParser &op)
       int TH = Timer::Start();
 
       q.submit([&] (handler &cgh) {
-          auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elementsInBlock));
+          auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
           cgh.copy(h_mem, d_memA0_acc);
           });
       q.submit([&] (handler &cgh) {
-          auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(elementsInBlock));
+          auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
           cgh.copy(h_mem, d_memB0_acc);
           });
       q.submit([&] (handler &cgh) {
-          auto A = d_memA0.get_access<sycl_read>(cgh, range<1>(elementsInBlock));
-          auto B = d_memA0.get_access<sycl_read>(cgh, range<1>(elementsInBlock));
-          auto C = d_memA0.get_access<sycl_write>(cgh, range<1>(elementsInBlock));
+          auto A = d_memA0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
+          auto B = d_memB0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
+          auto C = d_memC0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
           cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
               int gid = item.get_global_id(0); 
               C[gid] = A[gid] + scalar*B[gid];
@@ -136,11 +137,11 @@ void RunBenchmark(OptionParser &op)
       {
         // start downloading data for next block
         q.submit([&] (handler &cgh) {
-            auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(elementsInBlock));
+            auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
             cgh.copy(h_mem+elemsInBlock, d_memA1_acc);
             });
         q.submit([&] (handler &cgh) {
-            auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(elementsInBlock));
+            auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
             cgh.copy(h_mem+elemsInBlock, d_memB1_acc);
             });
       }
@@ -174,9 +175,9 @@ void RunBenchmark(OptionParser &op)
           if (currStream)
           {
             q.submit([&] (handler &cgh) {
-                auto A = d_memA0.get_access<sycl_read>(cgh);
-                auto B = d_memB0.get_access<sycl_read>(cgh);
-                auto C = d_memC0.get_access<sycl_write>(cgh);
+                auto A = d_memA1.get_access<sycl_read>(cgh);
+                auto B = d_memB1.get_access<sycl_read>(cgh);
+                auto C = d_memC1.get_access<sycl_write>(cgh);
                 cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
                     int gid = item.get_global_id(0); 
                     C[gid] = A[gid] + scalar*B[gid];
@@ -186,9 +187,9 @@ void RunBenchmark(OptionParser &op)
           else
           {
             q.submit([&] (handler &cgh) {
-                auto A = d_memA1.get_access<sycl_read>(cgh);
-                auto B = d_memB1.get_access<sycl_read>(cgh);
-                auto C = d_memC1.get_access<sycl_write>(cgh);
+                auto A = d_memA0.get_access<sycl_read>(cgh);
+                auto B = d_memB0.get_access<sycl_read>(cgh);
+                auto C = d_memC0.get_access<sycl_write>(cgh);
                 cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
                     int gid = item.get_global_id(0); 
                     C[gid] = A[gid] + scalar*B[gid];
@@ -203,22 +204,22 @@ void RunBenchmark(OptionParser &op)
           if (currStream)
           {
             q.submit([&] (handler &cgh) {
-                auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(blockSizes[i] * 256));
+                auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
                 cgh.copy(h_mem+crtIdx+elemsInBlock, d_memA0_acc);
                 });
             q.submit([&] (handler &cgh) {
-                auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(blockSizes[i] * 256));
+                auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
                 cgh.copy(h_mem+crtIdx+elemsInBlock, d_memB0_acc);
                 });
           }
           else
           {
             q.submit([&] (handler &cgh) {
-                auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(blockSizes[i] * 256));
+                auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
                 cgh.copy(h_mem+crtIdx+elemsInBlock, d_memA1_acc);
                 });
             q.submit([&] (handler &cgh) {
-                auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(blockSizes[i] * 256));
+                auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
                 cgh.copy(h_mem+crtIdx+elemsInBlock, d_memB1_acc);
                 });
           }
@@ -230,30 +231,32 @@ void RunBenchmark(OptionParser &op)
       double time = Timer::Stop(TH, "thread synchronize");
 
       double triad = ((double)numMaxFloats * 2.0) / (time*1e9);
-      cout << "TriadFlops " << triad << " GFLOPS/s\n";
+      if (verbose)
+        std::cout << "TriadFlops " << triad << " GFLOPS/s\n";
 
       //resultDB.AddResult("TriadFlops", sizeStr, "GFLOP/s", triad);
 
       double bdwth = ((double)numMaxFloats*sizeof(float)*3.0)
         / (time*1000.*1000.*1000.);
       //resultDB.AddResult("TriadBdwth", sizeStr, "GB/s", bdwth);
-      cout << "TriadBdwth " << bdwth << " GB/s\n";
+      if (verbose)
+        std::cout << "TriadBdwth " << bdwth << " GB/s\n";
 
       // Checking memory for correctness. The two halves of the array
       // should have the same results.
-      if (verbose) cout << ">> checking memory\n";
+      if (verbose) std::cout << ">> checking memory\n";
       for (int j=0; j<halfNumFloats; ++j)
       {
         if (h_mem[j] != h_mem[j+halfNumFloats])
         {
-          cout << "Error; hostMem[" << j << "]=" << h_mem[j]
+          std::cout << "Error; hostMem[" << j << "]=" << h_mem[j]
             << " is different from its twin element hostMem["
             << (j+halfNumFloats) << "]: "
             << h_mem[j+halfNumFloats] << "stopping check\n";
           break;
         }
       }
-      if (verbose) cout << ">> finish!" << endl;
+      if (verbose) std::cout << ">> finish!" << std::endl;
 
       // Zero out the test host memory
       for (int j=0; j<numMaxFloats; ++j)
