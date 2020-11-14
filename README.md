@@ -618,6 +618,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
 
 
+| triad | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 204400 | 204400 | 204400  | NA |
+| host timing(s) | 7.2 | 7.3 | 7.4 | NA |
+| device timing(s) | 3.4 | 2.8 | 3.4 | NA |
+
+
 | interleave | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 202 | 206 | 206 | 1012 |
@@ -1255,6 +1262,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
 
 
+| triad | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 204400 | 204400 | 204400  | NA |
+| host timing(s) | 7.9 | 8.8 | 8.4 | NA |
+| device timing(s) | 3.8 | 3.3 | 3.8 | NA |
+
+
 | interleave | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 202 | 206 | 206 | 1012 |
@@ -1531,6 +1545,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
+
+### triad
+  Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### interleave
   interleaved and non-interleaved global memory accesses
