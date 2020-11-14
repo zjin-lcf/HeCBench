@@ -366,6 +366,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 154 | 212 | 228 | 223 |
 
 
+| lombscargle | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 309 |
+| host timing(s) | 10.4 | 10.7 | 10.7 | 13.6 |
+| device timing(s) | 10.0 | 10.0 | 10.0 | 10.0 |
+
+
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1535 | 1536 | 1536 | 6145 |
@@ -996,6 +1003,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 201 | 222 | 220 | 231 |
 
 
+| lombscargle | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 309 |
+| host timing(s) | 2.4 | 2.96 | 2.91 | 5.6 |
+| device timing(s) | 1.95 | 2.14 | 2.12 | 2.1 |
+
+
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1535 | 1536 | 1536 | 6145 |
@@ -1326,7 +1340,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   B+Tree in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### ccsd-trpdrv
-  The CCSD tengy kernel in NWChem (https://github.com/jeffhammond/nwchem-ccsd-trpdrv)
+  The CCSD tengy kernel, which was converted from Fortran to C by Jeff Hammond, in NWChem (https://github.com/jeffhammond/nwchem-ccsd-trpdrv)
 
 ### cfd
   The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -1436,6 +1450,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
+
+### lombscargle
+   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
 ### lud
   LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
