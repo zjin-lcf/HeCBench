@@ -1316,19 +1316,19 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
 
 ### backprop
-  Backpropagation in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Backpropagation in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### bezier-surface
   The Bezier surface (https://github.com/chai-benchmarks/chai)
 
 ### bfs
-  The breadth-first search in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  The breadth-first search in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
 
 ### black-scholes
-  The Black Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+  The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
 
 ### bsearch
   Classic and vectorizable binary search algorithms (https://www.sciencedirect.com/science/article/abs/pii/S0743731517302836)
@@ -1337,19 +1337,19 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
 
 ### b+tree
-  B+Tree in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### ccsd-trpdrv
   The CCSD tengy kernel, which was converted from Fortran to C by Jeff Hammond, in NWChem (https://github.com/jeffhammond/nwchem-ccsd-trpdrv)
 
 ### cfd
-  The CFD solver in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  The CFD solver in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
 
 ### clenergy
-  Direct Coulomb summation kernel (http://www.ks.uiuc.edu/Training/Workshop/GPU_Aug2010/resources/clenergy.tar.gz)
+  Direct coulomb summation kernel (http://www.ks.uiuc.edu/Training/Workshop/GPU_Aug2010/resources/clenergy.tar.gz)
 
 ### clink
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
@@ -1361,13 +1361,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
 ### diamond
-  Mask Sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
+  Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
 ### divergence
   CPU and GPU divergence test (https://github.com/E3SM-Project/divergence_cmdvse)
 
 ### easyWave
-  Simulate of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
+  Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
@@ -1389,7 +1389,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
 
 ### gaussian
-  Gaussian elimination in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Gaussian elimination in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### geodesic
   Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
@@ -1398,7 +1398,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
 ### heartwall
-  Heart Wall in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Heart Wall in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### heat
   The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
@@ -1413,16 +1413,19 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
 
 ### hotspot3D
-  Hotspot3D in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Hotspot3D in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### hybridsort
-  Hybridsort in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Hybridsort in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### interleave
+  Interleaved and non-interleaved global memory accesses
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
 
 ### ising
-  Monte Carlo simulations of 2D Ising Model (https://github.com/NVIDIA/ising-gpu/)
+  Monte-Carlo simulations of 2D Ising Model (https://github.com/NVIDIA/ising-gpu/)
 
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
@@ -1434,7 +1437,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
 
 ### kmeans 
-  K-means in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  K-means in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### knn
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
@@ -1443,10 +1446,10 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
 
 ### lavaMD
-  LavaMD in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  LavaMD in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### leukocyte 
-  Leukocyte in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
@@ -1455,7 +1458,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
    Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
 ### lud
-  LU decomposition in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  LU decomposition in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
@@ -1470,7 +1473,7 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### md5hash
-  The MD5 Hash function (https://github.com/vetter/shoc/)
+  MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
 ### memcpy
   A benchmark for memory copy from a host to a device
@@ -1491,19 +1494,19 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
 ### nn
-  Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Nearest neighbor in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### nw
-  Needleman-Wunsch in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Needleman-Wunsch in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
 
 ### particlefilter
-  Particle Filter in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Particle Filter in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### pathfinder
-  PathFinder in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  PathFinder in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
@@ -1543,13 +1546,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
 
 ### sort
-  sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+  Sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
 ### srad
-  SRAD (version 1) in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### sssp
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
@@ -1558,16 +1561,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
   1D stencil using shared memory
 
 ### streamcluster
-  Streamcluster in the Rodinia Benchmark (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+  Streamcluster in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
 ### triad
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
-
-### interleave
-  interleaved and non-interleaved global memory accesses
 
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
