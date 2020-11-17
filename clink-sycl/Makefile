@@ -6,7 +6,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -30,7 +30,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
