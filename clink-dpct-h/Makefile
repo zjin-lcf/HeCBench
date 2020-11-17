@@ -29,7 +29,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
