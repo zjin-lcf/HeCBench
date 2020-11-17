@@ -56,5 +56,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) ../data/bfs/graph1MW_6.txt
 
