@@ -62,5 +62,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) /home/cc/Rodinia_SYCL/data/bfs/graph1MW_6.txt
+	./$(program) ../data/bfs/graph1MW_6.txt
 
