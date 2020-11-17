@@ -450,6 +450,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 1.99 | 5.0 | 4.98 | 8.1 |
 
 
+| popcount | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 505 | 506 | 506 | 2015 |
+| host timing(s) | 6.03 | 6.37 | 6.43 | 9.5 |
+| device timing(s) | 5.7 | 5.7 | 5.7 | 5.9 |
+
+
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 102 | 102 | 307 | 
@@ -1143,6 +1150,13 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 | device timing(s) | 2.8 | 3.6 | 3.6 | 5.8 |
 
 
+| popcount | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 505 | 506 | 506 | 2015 |
+| host timing(s) | 8.8 | 9.4 | 8.9 | 12.5 |
+| device timing(s) | 8.4 | 8.2 | 8.2 | 8.9 |
+
+
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 102 | 102 | 307 | 
@@ -1507,6 +1521,9 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 
 ### pathfinder
   PathFinder in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### popcount
+  Implementations of population count (Jin, Z. and Finkel, H., 2020, May. Population Count on Intel® CPU, GPU and FPGA. In 2020 IEEE International Parallel and Distributed Processing Symposium Workshops (IPDPSW) (pp. 432-439). IEEE.)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
