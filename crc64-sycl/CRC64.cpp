@@ -267,10 +267,10 @@ uint64_t crc64(const void *input, size_t nbytes) {
   return cs[0] ^ UINT64_C(0xffffffffffffffff);
 }
 
-uint64_t crc64_device(const void *input, size_t nbytes, 
+uint64_t crc64_device(const unsigned char *input, size_t nbytes, 
 		const uint64_t *d_crc64_table, 
 		const uint64_t *d_crc64_interleaved_table) {
-  const unsigned char *data = (const unsigned char*) input;
+  const unsigned char *data = input;
   const unsigned char *end = data + nbytes;
   uint64_t cs[5] = { UINT64_C(0xffffffffffffffff), 0, 0, 0, 0 };
 
@@ -562,7 +562,7 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
 
     buffer<size_t, 1> d_thread_sz(thread_sz, nthreads);
     buffer<uint64_t, 1> d_thread_cs(thread_cs, nthreads);
-    buffer<const unsigned char, 1> d_data(data, nbytes);
+    buffer<unsigned char, 1> d_data(data, nbytes);
     buffer<uint64_t, 1> d_crc64_table(crc64_table_1D, 4*256);
     buffer<uint64_t, 1> d_crc64_interleaved_table(crc64_interleaved_table_1D, 4*256);
 
@@ -583,7 +583,7 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
           if (tid != nthreads - 1)
             end = start + bpt;
           else
-            end = data + nbytes;
+            end = d_data_acc.get_pointer() + nbytes;
     
           size_t sz = end - start;
           d_thread_sz_acc[tid] = sz;
