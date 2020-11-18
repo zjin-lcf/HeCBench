@@ -1313,10 +1313,10 @@ uint64_t crc64(const void *input, size_t nbytes) {
 }
 
 __device__
-uint64_t crc64_device(const void *input, size_t nbytes, 
+uint64_t crc64_device(const unsigned char *input, size_t nbytes, 
 		const uint64_t *d_crc64_table, 
 		const uint64_t *d_crc64_interleaved_table) {
-  const unsigned char *data = (const unsigned char*) input;
+  const unsigned char *data = input;
   const unsigned char *end = data + nbytes;
   uint64_t cs[5] = { UINT64_C(0xffffffffffffffff), 0, 0, 0, 0 };
 
