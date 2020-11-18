@@ -1102,6 +1102,7 @@ static const uint64_t crc64_interleaved_table[4][256] = {
     UINT64_C(0xe715e93e8757218f), UINT64_C(0xcac84941713002f7)
   }
 };
+
 #pragma omp end declare target
 
 uint64_t crc64_slow(const void *input, size_t nbytes) {
@@ -1429,7 +1430,7 @@ uint64_t crc64_omp(const void *input, size_t nbytes) {
     const unsigned char *data = (const unsigned char*) input;
 
     #pragma omp target data map(from: thread_sz[0:nthreads], thread_cs[0:nthreads]) \
-                            map(to: data[0:nbytes])
+                            map(to: data[0:nbytes], crc64_table[0:4][0:256], crc64_interleaved_table[0:4][0:256])
     {
        #pragma omp target teams distribute parallel for num_teams(nthreads/64) thread_limit(64)
        for (int tid = 0; tid < nthreads; tid++) {
