@@ -115,7 +115,7 @@ float4* runMergeSort(queue &q, int listsize, int divisions,
   const property_list props = property::buffer::use_host_ptr();
 
   // divided by four 
-  buffer<float4,1> d_resultList_buff (listsize/4, props);
+  buffer<float4,1> d_resultList_buff (listsize/4);
   buffer<float4,1> d_origList_buff (d_origList, listsize/4, props);
   buffer<int, 1> d_constStartAddr (startaddr, (divisions+1), props);
   d_origList_buff.set_final_data(nullptr);
