@@ -7,6 +7,7 @@ CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+VERIFY    = yes
 
 
 #===============================================================================
@@ -40,6 +41,10 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
+endif
+
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-DUSE_GPU
 endif
@@ -57,5 +62,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 3 1000
+	./$(program)
 

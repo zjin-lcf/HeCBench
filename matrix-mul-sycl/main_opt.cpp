@@ -104,10 +104,10 @@ int main() {
 #endif
     queue q(dev_sel);
 
-    // Create 2D buffers for matrices, buffer c is bound with host memory c_back
-    buffer<float, 1> a(reinterpret_cast<float*>(a_host), range(M*N));
-    buffer<float, 1> b(reinterpret_cast<float*>(b_host), range(N*P));
-    buffer<float, 1> c(reinterpret_cast<float*>(c_back), range(M*P));
+    // Create buffers for matrices, buffer c is bound with host memory c_back
+    buffer<float, 1> a(reinterpret_cast<float*>(a_host), range<1>(M*N));
+    buffer<float, 1> b(reinterpret_cast<float*>(b_host), range<1>(N*P));
+    buffer<float, 1> c(reinterpret_cast<float*>(c_back), range<1>(M*P));
 
     cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
          << ") * b(" << N << "," << P << ")\n";

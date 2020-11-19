@@ -120,9 +120,9 @@ int main() {
     queue q(dev_sel);
 
     // Create 2D buffers for matrices, buffer c is bound with host memory c_back
-    buffer<float, 2> a(reinterpret_cast<float*>(a_host), range(M, N));
-    buffer<float, 2> b(reinterpret_cast<float*>(b_host), range(N, P));
-    buffer<float, 2> c(reinterpret_cast<float*>(c_back), range(M, P));
+    buffer<float, 2> a(reinterpret_cast<float*>(a_host), range<2>(M, N));
+    buffer<float, 2> b(reinterpret_cast<float*>(b_host), range<2>(N, P));
+    buffer<float, 2> c(reinterpret_cast<float*>(c_back), range<2>(M, P));
 
     cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
          << ") * b(" << N << "," << P << ")\n";
@@ -137,7 +137,7 @@ int main() {
       int width_a = a.get_range()[1];
 
       // Execute kernel.
-      h.parallel_for(range(M, P), [=](id<2> index) {
+      h.parallel_for(range<2>(M, P), [=](id<2> index) {
         float sum = 0.0f;
         // Compute the result of one element of c
         for (int i = 0; i < width_a; i++) {
