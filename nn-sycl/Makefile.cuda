@@ -1,0 +1,42 @@
+
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+CUDA_ARCH = "--cuda-gpu-arch=sm_35"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+
+# Standard flags
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+          -fsycl-unnamed-lambda \
+          -Xsycl-target-backend $(CUDA_ARCH) \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
+
+
+# Linker flags
+LDFLAGS = -lm
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g  
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+
+SRC = nearestNeighbor.cpp utils.cpp
+
+EXE = nn
+
+$(EXE): $(SRC) nearestNeighbor.h utils.h
+	$(CC) $(CFLAGS) $(SRC) -o $(EXE) $(LDFLAGS)
+
+run: $(EXE)
+	./$(EXE) filelist.txt -r 5 -lat 30 -lng 90  -t
+	
+clean: 
+	rm -f $(EXE) 

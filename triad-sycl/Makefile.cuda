@@ -1,0 +1,77 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+CUDA_ARCH = "--cuda-gpu-arch=sm_35"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = triad
+
+source = main.cpp  Option.cpp  OptionParser.cpp  triad.cpp Timer.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+          -fsycl-unnamed-lambda \
+          -Xsycl-target-backend $(CUDA_ARCH) \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+main.o: main.cpp OptionParser.h Utility.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Option.o: Option.cpp Option.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+OptionParser.o: OptionParser.cpp OptionParser.h  Utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+triad.o: triad2.cpp Timer.h OptionParser.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Timer.o: Timer.cpp Timer.h config.h  
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) --passes 100 
+
