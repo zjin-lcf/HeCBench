@@ -307,7 +307,7 @@ typename TypeTraits<typename Vector::ScalarType>::magnitude_type
     auto ycoefs_acc = d_ycoefs.template get_access<sycl_read>(h);
     auto result_acc = d_result.template get_access<sycl_read_write>(h);
     h.parallel_for(nd_range<1>(global_work_size, local_work_size), 
-      intel::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
+      ONEAPI::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
       [=] (nd_item<1> item, auto& result_acc) {
       int i = item.get_global_id(0);
       if (i < n)
@@ -369,7 +369,7 @@ typename TypeTraits<typename Vector::ScalarType>::magnitude_type
     auto xcoefs_acc = d_xcoefs.template get_access<sycl_read>(h);
     auto result_acc = d_result.template get_access<sycl_read_write>(h);
     h.parallel_for(nd_range<1>(global_work_size, local_work_size), 
-      intel::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
+      ONEAPI::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
       [=] (nd_item<1> item, auto& result_acc) {
       int i = item.get_global_id(0);
       if (i < n)
