@@ -50,7 +50,7 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) result.raw
 
 run: $(program)
 	./$(program) data/CT-MONO2-16-brain.raw result.raw

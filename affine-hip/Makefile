@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -13,16 +13,16 @@ DEBUG     = no
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
