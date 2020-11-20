@@ -1,5 +1,3 @@
-
-#include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -162,9 +160,6 @@ int main(int argc, char* argv[])
     }
 
 maxed_out:
-    printf("");
-
-
     double tsum =  0.0;
     double tmax = -1.0e10;
     double tmin =  1.0e10;

@@ -1,7 +1,3 @@
-
-#include <cuda.h>
-//#include <stdio.h>
-
 void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restrict__ f1t,
                     const double * __restrict__ f2n,    const double * __restrict__ f2t,
                     const double * __restrict__ f3n,    const double * __restrict__ f3t,
