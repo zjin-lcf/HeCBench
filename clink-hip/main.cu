@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <chrono>
 #include <iostream>
 #include <hip/hip_runtime.h>
@@ -184,7 +183,7 @@ void  lstm_n5(
   hipMemcpy(d_outW, outW, 5 * sizeof(float), hipMemcpyHostToDevice);
   hipMemcpy(d_outB, outB, 1 * sizeof(float), hipMemcpyHostToDevice);
 
-  hipLaunchKernelGGL(lstm_inference, dim3(dim3(N/WGS)), dim3(dim3(WGS)), 0, 0, 
+  hipLaunchKernelGGL(lstm_inference, N/WGS, WGS, 0, 0, 
       d_x, d_inW, d_intW, d_intB, d_outW, d_outB, d_y);
 
   hipMemcpy(y, d_y, N * SAMPLE_TEST_LEN * sizeof(float), hipMemcpyDeviceToHost);
