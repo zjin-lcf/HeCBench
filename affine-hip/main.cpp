@@ -167,7 +167,7 @@ int main(int argc, char** argv)
   dim3 threads (16,16);
 
   for (int i = 0; i < 100; i++) {
-    hipLaunchKernelGGL(affine, dim3(grids), dim3(threads), 0, 0, d_input_image, d_output_image);
+    hipLaunchKernelGGL(affine, grids, threads, 0, 0, d_input_image, d_output_image);
   }
 
   hipMemcpy(output_image, d_output_image, sizeof(unsigned short)*X_SIZE*Y_SIZE, hipMemcpyDeviceToHost);
