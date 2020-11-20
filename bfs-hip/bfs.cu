@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
