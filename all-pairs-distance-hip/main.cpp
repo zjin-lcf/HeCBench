@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
     hipMemcpy(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int),
         hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(GPUregister, dim3(dimGrid), dim3(dimBlock), 0, 0, data_char_device, distance_device);
+    hipLaunchKernelGGL(GPUregister, dimGrid, dimBlock, 0, 0, data_char_device, distance_device);
     hipMemcpy(gpu_distance, distance_device,
         INSTANCES * INSTANCES * sizeof(int),
         hipMemcpyDeviceToHost); 
@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
     hipMemcpy(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int),
         hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(GPUshared, dim3(dimGrid), dim3(dimBlock), 0, 0, data_char_device, distance_device);
+    hipLaunchKernelGGL(GPUshared, dimGrid, dimBlock, 0, 0, data_char_device, distance_device);
     hipMemcpy(gpu_distance, distance_device,
         INSTANCES * INSTANCES * sizeof(int),
         hipMemcpyDeviceToHost); 
