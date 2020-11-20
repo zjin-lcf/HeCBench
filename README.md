@@ -3,7 +3,7 @@ This repository contains a collection of data-parallel programs for evaluating o
 
 
 # Experiments
-We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program. The performance results below were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of low-level OpenCL enqueue commands called by a parallel program. These enqueue commands include "clEnqueueNDRangeKernel", "clEnqueueReadBuffer", and "clEnqueueWriteBuffer". The host timing is the total elapsed time of executing OpenCL API functions on a CPU host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU device. The Plugin Interface is OpenCL.  
+We compare the performance of the SYCL, DPCT-generated, and OpenMP implementations of each program on Intel integrated GPUs. The performance results below were obtained with the [Intel OpenCL intercept layer](https://github.com/intel/opencl-intercept-layer). "total enqueue" indicates the total number of low-level OpenCL enqueue commands called by a parallel program. These enqueue commands include "clEnqueueNDRangeKernel", "clEnqueueReadBuffer", and "clEnqueueWriteBuffer". The host timing is the total elapsed time of executing OpenCL API functions on a CPU host while the device timing is the total elapsed time of executing OpenCL API functions on a GPU device. The Plugin Interface is OpenCL.  
  
 ## Setup
 Software: Intel<sup>®</sup> oneAPI Beta08* Toolkit, Ubuntu 18.04  
@@ -14,6 +14,9 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 
 ## Run
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
+
+## Note
+We may build the [software from source with support for Nvidia CUDA](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md). To run a single test on an Nvidia GPU, go to a test directory (e.g. affine-sycl) and type the command " make -f Makefile.cuda run". "Makefile.cuda" may be modified for different versions of Nvidia GPUs and toolchains.
 
 ## Results on Platform 1
 | affine | SYCL | DPCT usm | DPCT header | OpenMP |     

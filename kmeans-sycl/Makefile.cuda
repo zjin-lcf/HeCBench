@@ -1,0 +1,55 @@
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+CUDA_ARCH = "--cuda-gpu-arch=sm_35"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+# Standard flags
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+          -fsycl-unnamed-lambda \
+          -Xsycl-target-backend $(CUDA_ARCH) \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
+
+# Linker flags
+LDFLAGS = -lm
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(INORDER),yes)
+  CFLAGS +=-DUSE_IOQ
+endif
+
+all: kmeans
+
+kmeans: cluster.o getopt.o read_input.o rmse.o kmeans.o
+	$(CC) $(KERNEL_DIM) $(CFLAGS) $^ -o kmeans $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $< -c
+
+kmeans.o: kmeans.c kmeans.h
+
+cluster.o: cluster.c kmeans.h
+
+getopt.o: getopt.c getopt.h
+
+read_input.o: read_input.c kmeans.h
+
+rmse.o: rmse.c kmeans.h
+
+clean:
+	rm -f *.o *~ kmeans *.linkinfo
+
+run: kmeans
+	./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
+
+
