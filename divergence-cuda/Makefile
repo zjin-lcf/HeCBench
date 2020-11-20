@@ -53,5 +53,5 @@ timer.o: timer/timer.cpp timer/timer.hpp
 clean:
 	rm -rf $(program) *.o
 
-run:
+run: $(program)
 	./$(program) input.txt 10000
