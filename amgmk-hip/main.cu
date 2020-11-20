@@ -294,7 +294,7 @@ void test_Relax()
   dim3 grid1D((n + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
   for (i=0; i<testIter; ++i) {
-      hipLaunchKernelGGL(relax, dim3(dim3(grid1D)), dim3(dim3(block1D) ), 0, 0, d_A_diag_data, d_A_diag_i, d_A_diag_j, d_u_data, d_f_data, n);
+      hipLaunchKernelGGL(relax, grid1D, block1D, 0, 0, d_A_diag_data, d_A_diag_i, d_A_diag_j, d_u_data, d_f_data, n);
   }
 
   hipMemcpy(u_data, d_u_data, sizeof(double)*grid_size, hipMemcpyDeviceToHost);
