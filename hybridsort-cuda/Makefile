@@ -1,8 +1,6 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-
 
 
 # Standard flags
@@ -21,14 +19,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
-
-
-ifdef VERIFY
-override VERIFY = -DVERIFY
-endif
 
 ifdef OUTPUT
 override OUTPUT = -DOUTPUT
