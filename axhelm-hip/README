@@ -1,0 +1,3 @@
+Go to the axhelm-cuda/BlasLapack directory, and type 'make' to build a static library 
+Then build the application with 'make'
+
