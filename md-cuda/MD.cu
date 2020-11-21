@@ -80,13 +80,14 @@ bool checkResults(forceVecType* d_force, posVecType *position,
             j++;
         }
         // Check the results
-        T diffx = (d_force[i].x - f.x) / d_force[i].x;
-        T diffy = (d_force[i].y - f.y) / d_force[i].y;
-        T diffz = (d_force[i].z - f.z) / d_force[i].z;
-        T err = sqrt(diffx*diffx) + sqrt(diffy*diffy) + sqrt(diffz*diffz);
-        if (err > (3.0 * EPSILON))
+        if ((fabsf(f.x-d_force[i].x) > EPSILON) || 
+            (fabsf(f.y-d_force[i].y) > EPSILON) || 
+            (fabsf(f.z-d_force[i].z) > EPSILON) || 
+	    isnan(d_force[i].x) || 
+	    isnan(d_force[i].y) || 
+	    isnan(d_force[i].z) )
         {
-            cout << "Test Failed, idx: " << i << " diff: " << err << "\n";
+            cout << "Test Failed, idx: " << i << "\n";
             cout << "f.x: " << f.x << " df.x: " << d_force[i].x << "\n";
             cout << "f.y: " << f.y << " df.y: " << d_force[i].y << "\n";
             cout << "f.z: " << f.z << " df.z: " << d_force[i].z << "\n";
@@ -201,6 +202,9 @@ int main(int argc, char** argv)
     cudaMalloc((void**)&d_force, nAtom * sizeof(FORCEVECTYPE));
     cudaMalloc((void**)&d_position, nAtom * sizeof(POSVECTYPE));
     cudaMalloc((void**)&d_neighborList, nAtom * maxNeighbors * sizeof(int));
+
+    cudaMemcpy(d_position, position, nAtom * sizeof(POSVECTYPE), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neighborList, neighborList, nAtom * maxNeighbors * sizeof(int), cudaMemcpyHostToDevice);
 
     md <<< dim3((globalSize+localSize-1) / localSize), dim3(localSize) >>> (
                        d_position, d_force, d_neighborList,
