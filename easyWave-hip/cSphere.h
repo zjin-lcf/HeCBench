@@ -30,68 +30,39 @@
  * limitations under the Licence.
  */
 
-#ifndef EASYWAVE_H
-#define EASYWAVE_H
+#ifndef ONSPHERE_H
+#define ONSPHERE_H
 
 #define Re 6384.e+3          // Earth radius
-#define Gravity 9.81         // gravity acceleration
-#define Omega 7.29e-5        // Earth rotation period [1/sec]
 
-#define MAX_VARS_PER_NODE 12
+class cObsArray
+{
 
-#define iD    0
-#define iH    1
-#define iHmax 2
-#define iM    3
-#define iN    4
-#define iR1   5
-#define iR2   6
-#define iR3   7
-#define iR4   8
-#define iR5   9
-#define iTime 10
-#define iTopo 11
+public:
 
-#define Node(idx1, idx2) node[(idx1)*MAX_VARS_PER_NODE+idx2] 
+  int nPos;
+  int nObs;
+  char **id;
+  double *lon;
+  double *lat;
+  double **obs;
 
-// Global data
-struct EWPARAMS {
-  char *modelName;
-  char *modelSubset;
-  char *fileBathymetry;
-  char *fileSource;
-  char *filePOIs;
-  int dt;
-  int time;
-  int timeMax;
-  int poiDt;
-  int poiReport;
-  int outDump;
-  int outProgress;
-  int outPropagation;
-  int coriolis;
-  float dmin;
-  float poiDistMax;
-  float poiDepthMin;
-  float poiDepthMax;
-  float ssh0ThresholdRel;
-  float ssh0ThresholdAbs;
-  float sshClipThreshold;
-  float sshZeroThreshold;
-  float sshTransparencyThreshold;
-  float sshArrivalThreshold;
-  bool gpu;
-  bool adjustZtop;
-  bool verbose;
+  cObsArray();
+  ~cObsArray();
+  int read( char *fname );
+  int write( char *fname );
+  int resetObs();
+  int resetObs( int newnobs );
+  int findById( char *id0 );
+  long writeBin( FILE *fp );
+  long readBin( FILE *fp );
+  double residual( cObsArray& ref );
+  double norm();
+
 };
 
 
-#define idx(j,i) ((i-1)*NLat+j-1)
-#define getLon(i) (LonMin+(i-1)*DLon)
-#define getLat(j) (LatMin+(j-1)*DLat)
+double GeoDistOnSphere( double lon1, double lat1, double lon2, double lat2 );
+double GeoStrikeOnSphere( double lon1, double lat1, double lon2, double lat2 );
 
-
-/* verbose printf: only executed if -verbose was set */
-#define printf_v( Args, ... )	if( Par.verbose ) printf( Args, ##__VA_ARGS__);
-
-#endif /* EASYWAVE_H */
+#endif  // ONSPHERE_H

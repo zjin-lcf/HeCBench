@@ -30,68 +30,41 @@
  * limitations under the Licence.
  */
 
-#ifndef EASYWAVE_H
-#define EASYWAVE_H
+#ifndef OKADAEARTHQUAKE_H
+#define OKADAEARTHQUAKE_H
 
-#define Re 6384.e+3          // Earth radius
-#define Gravity 9.81         // gravity acceleration
-#define Omega 7.29e-5        // Earth rotation period [1/sec]
+#include "cOgrd.h"
+#include "cSphere.h"
+#include "cOkadaFault.h"
 
-#define MAX_VARS_PER_NODE 12
 
-#define iD    0
-#define iH    1
-#define iHmax 2
-#define iM    3
-#define iN    4
-#define iR1   5
-#define iR2   6
-#define iR3   7
-#define iR4   8
-#define iR5   9
-#define iTime 10
-#define iTopo 11
+class cOkadaEarthquake
+{
+protected:
 
-#define Node(idx1, idx2) node[(idx1)*MAX_VARS_PER_NODE+idx2] 
+  int finalized;
+  int getDeformArea( int round, double& lonmin, double& lonmax, double& latmin, double& latmax );
+  int setGrid( cOgrd& u );
 
-// Global data
-struct EWPARAMS {
-  char *modelName;
-  char *modelSubset;
-  char *fileBathymetry;
-  char *fileSource;
-  char *filePOIs;
-  int dt;
-  int time;
-  int timeMax;
-  int poiDt;
-  int poiReport;
-  int outDump;
-  int outProgress;
-  int outPropagation;
-  int coriolis;
-  float dmin;
-  float poiDistMax;
-  float poiDepthMin;
-  float poiDepthMax;
-  float ssh0ThresholdRel;
-  float ssh0ThresholdAbs;
-  float sshClipThreshold;
-  float sshZeroThreshold;
-  float sshTransparencyThreshold;
-  float sshArrivalThreshold;
-  bool gpu;
-  bool adjustZtop;
-  bool verbose;
+public:
+
+  int nfault;            // total nuber of Okada faults
+  double m0;             // total earthquake moment
+  cOkadaFault *fault;    // array of composing faults
+
+  cOkadaEarthquake();
+  ~cOkadaEarthquake();
+  int read( char *fname );
+  int finalizeInput();
+  double getM0();
+  double getMw();
+  int calculate( double lon, double lat, double& uz );
+  int calculate( double lon, double lat, double& uz, double& ulon, double &ulat );
+  int calculate( cObsArray& arr );
+  int calculate( cOgrd& uZ );
+  int calculate( cOgrd& uZ, cOgrd& uLon, cOgrd& uLat );
+  char *sprint();
+
 };
 
-
-#define idx(j,i) ((i-1)*NLat+j-1)
-#define getLon(i) (LonMin+(i-1)*DLon)
-#define getLat(j) (LatMin+(j-1)*DLat)
-
-
-/* verbose printf: only executed if -verbose was set */
-#define printf_v( Args, ... )	if( Par.verbose ) printf( Args, ##__VA_ARGS__);
-
-#endif /* EASYWAVE_H */
+#endif // OKADAEARTHQUAKE_H
