@@ -21,7 +21,7 @@
 #include "timer.h"
 
 // CUDA libraries
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 1024
@@ -277,51 +277,51 @@ int main (void) {
   Real *temp_red_d;
   Real *temp_black_d;
 
-  cudaMalloc ((void**) &aP_d, size * sizeof(Real));
-  cudaMalloc ((void**) &aW_d, size * sizeof(Real));
-  cudaMalloc ((void**) &aE_d, size * sizeof(Real));
-  cudaMalloc ((void**) &aS_d, size * sizeof(Real));
-  cudaMalloc ((void**) &aN_d, size * sizeof(Real));
-  cudaMalloc ((void**) &b_d, size * sizeof(Real));
-  cudaMalloc ((void**) &temp_red_d, size_temp * sizeof(Real));
-  cudaMalloc ((void**) &temp_black_d, size_temp * sizeof(Real));
+  hipMalloc ((void**) &aP_d, size * sizeof(Real));
+  hipMalloc ((void**) &aW_d, size * sizeof(Real));
+  hipMalloc ((void**) &aE_d, size * sizeof(Real));
+  hipMalloc ((void**) &aS_d, size * sizeof(Real));
+  hipMalloc ((void**) &aN_d, size * sizeof(Real));
+  hipMalloc ((void**) &b_d, size * sizeof(Real));
+  hipMalloc ((void**) &temp_red_d, size_temp * sizeof(Real));
+  hipMalloc ((void**) &temp_black_d, size_temp * sizeof(Real));
 
   // copy to device memory
-  cudaMemcpy (aP_d, aP, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (aW_d, aW, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (aE_d, aE, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (aS_d, aS, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (aN_d, aN, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (b_d, b, size * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (temp_red_d, temp_red, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
-  cudaMemcpy (temp_black_d, temp_black, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
+  hipMemcpy (aP_d, aP, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (aW_d, aW, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (aE_d, aE, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (aS_d, aS, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (aN_d, aN, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (b_d, b, size * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (temp_red_d, temp_red, size_temp * sizeof(Real), hipMemcpyHostToDevice);
+  hipMemcpy (temp_black_d, temp_black, size_temp * sizeof(Real), hipMemcpyHostToDevice);
 
 
   // residual
   Real *bl_norm_L2_d;	
-  cudaMalloc ((void**) &bl_norm_L2_d, size_norm * sizeof(Real));
-  cudaMemcpy (bl_norm_L2_d, bl_norm_L2, size_norm * sizeof(Real), cudaMemcpyHostToDevice);
+  hipMalloc ((void**) &bl_norm_L2_d, size_norm * sizeof(Real));
+  hipMemcpy (bl_norm_L2_d, bl_norm_L2, size_norm * sizeof(Real), hipMemcpyHostToDevice);
 
   // iteration loop
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
 
-    red_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_black_d, temp_red_d, bl_norm_L2_d);
+    hipLaunchKernelGGL(red_kernel, dimGrid, dimBlock, 0, 0, aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_black_d, temp_red_d, bl_norm_L2_d);
 
     // transfer residual value(s) back to CPU
-    cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
+    hipMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), hipMemcpyDeviceToHost);
 
     // add red cell contributions to residual
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
 
-    black_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_red_d, temp_black_d, bl_norm_L2_d);
+    hipLaunchKernelGGL(black_kernel, dimGrid, dimBlock, 0, 0, aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_red_d, temp_black_d, bl_norm_L2_d);
 
     // transfer residual value(s) back to CPU and 
     // add black cell contributions to residual
-    cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
+    hipMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), hipMemcpyDeviceToHost);
     for (int i = 0; i < size_norm; ++i) {
       norm_L2 += bl_norm_L2[i];
     }
@@ -338,8 +338,8 @@ int main (void) {
   }
 
   // transfer final temperature values back
-  cudaMemcpy (temp_red, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
-  cudaMemcpy (temp_black, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
+  hipMemcpy (temp_red, temp_red_d, size_temp * sizeof(Real), hipMemcpyDeviceToHost);
+  hipMemcpy (temp_black, temp_red_d, size_temp * sizeof(Real), hipMemcpyDeviceToHost);
 
   double runtime = GetTimer();
 
@@ -376,15 +376,15 @@ int main (void) {
   fclose(pfile);
 
   // free device memory
-  cudaFree(aP_d);
-  cudaFree(aW_d);
-  cudaFree(aE_d);
-  cudaFree(aS_d);
-  cudaFree(aN_d);
-  cudaFree(b_d);
-  cudaFree(temp_red_d);
-  cudaFree(temp_black_d);
-  cudaFree(bl_norm_L2_d);
+  hipFree(aP_d);
+  hipFree(aW_d);
+  hipFree(aE_d);
+  hipFree(aS_d);
+  hipFree(aN_d);
+  hipFree(b_d);
+  hipFree(temp_red_d);
+  hipFree(temp_black_d);
+  hipFree(bl_norm_L2_d);
 
 
   free(aP);
