@@ -48,6 +48,7 @@ template <class T, class forceVecType, class posVecType>
 bool checkResults(forceVecType* d_force, posVecType *position,
                   int *neighList, int nAtom)
 {
+    T max_error = 0;
     for (int i = 0; i < nAtom; i++)
     {
         posVecType ipos = position[i];
@@ -58,9 +59,9 @@ bool checkResults(forceVecType* d_force, posVecType *position,
             int jidx = neighList[j*nAtom + i];
             posVecType jpos = position[jidx];
             // Calculate distance
-            T delx = ipos.x - jpos.x;
-            T dely = ipos.y - jpos.y;
-            T delz = ipos.z - jpos.z;
+                              T delx = ipos.x() - jpos.x();
+                              T dely = ipos.y() - jpos.y();
+                              T delz = ipos.z() - jpos.z();
             T r2inv = delx*delx + dely*dely + delz*delz;
 
             // If distance is less than cutoff, calculate force
@@ -70,29 +71,24 @@ bool checkResults(forceVecType* d_force, posVecType *position,
                 T r6inv = r2inv * r2inv * r2inv;
                 T force = r2inv*r6inv*(lj1*r6inv - lj2);
 
-                f.x += delx * force;
-                f.y += dely * force;
-                f.z += delz * force;
+                                        f.x() += delx * force;
+                                        f.y() += dely * force;
+                                        f.z() += delz * force;
             }
             j++;
         }
-        // Check the results
-        if ((fabsf(f.x-d_force[i].x) > EPSILON) || 
-            (fabsf(f.y-d_force[i].y) > EPSILON) || 
-            (fabsf(f.z-d_force[i].z) > EPSILON) || 
-	    isnan(d_force[i].x) || 
-	    isnan(d_force[i].y) || 
-	    isnan(d_force[i].z) )
-        {
-            cout << "Test Failed, idx: " << i << "\n";
-            cout << "f.x: " << f.x << " df.x: " << d_force[i].x << "\n";
-            cout << "f.y: " << f.y << " df.y: " << d_force[i].y << "\n";
-            cout << "f.z: " << f.z << " df.z: " << d_force[i].z << "\n";
-            cout << "Test FAILED\n";
-            return false;
-        }
+        // Check the maximum error when the floating-pont results don't exactly match
+        assert(isnan(d_force[i].x()) == false);
+        assert(isnan(d_force[i].y()) == false);
+        assert(isnan(d_force[i].z()) == false);
+	T fxe = fabs(f.x() - d_force[i].x());
+	T fye = fabs(f.y() - d_force[i].y());
+	T fze = fabs(f.z() - d_force[i].z());
+	if (fxe > max_error) max_error = fxe;
+	if (fye > max_error) max_error = fye;
+	if (fze > max_error) max_error = fze;
     }
-    cout << "Test Passed\n";
+    std::cout << "Max error between host and device: " << max_error <<"\n";
     return true;
 }
 
@@ -182,12 +178,7 @@ int main(int argc, char** argv)
 
     std::cout << "Performing Correctness Check (may take several minutes)\n";
 
-    if (!checkResults<FPTYPE, FORCEVECTYPE, POSVECTYPE>(h_force, position,
-            neighborList, nAtom))
-    {
-        return -1;
-    }
-
+    checkResults<FPTYPE, FORCEVECTYPE, POSVECTYPE>(h_force, position, neighborList, nAtom);
 
     for (int i = 0; i < iteration; i++)
     {
