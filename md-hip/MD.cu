@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <cassert>
 #include <cfloat>
 #include <list>
@@ -80,13 +81,14 @@ bool checkResults(forceVecType* d_force, posVecType *position,
             j++;
         }
         // Check the results
-        T diffx = (d_force[i].x - f.x) / d_force[i].x;
-        T diffy = (d_force[i].y - f.y) / d_force[i].y;
-        T diffz = (d_force[i].z - f.z) / d_force[i].z;
-        T err = sqrt(diffx*diffx) + sqrt(diffy*diffy) + sqrt(diffz*diffz);
-        if (err > (3.0 * EPSILON))
+        if ((fabsf(f.x-d_force[i].x) > EPSILON) || 
+            (fabsf(f.y-d_force[i].y) > EPSILON) || 
+            (fabsf(f.z-d_force[i].z) > EPSILON) || 
+	    isnan(d_force[i].x) || 
+	    isnan(d_force[i].y) || 
+	    isnan(d_force[i].z))
         {
-            cout << "Test Failed, idx: " << i << " diff: " << err << "\n";
+            cout << "Test Failed, idx: " << i << "\n";
             cout << "f.x: " << f.x << " df.x: " << d_force[i].x << "\n";
             cout << "f.y: " << f.y << " df.y: " << d_force[i].y << "\n";
             cout << "f.z: " << f.z << " df.z: " << d_force[i].z << "\n";
@@ -202,7 +204,10 @@ int main(int argc, char** argv)
     hipMalloc((void**)&d_position, nAtom * sizeof(POSVECTYPE));
     hipMalloc((void**)&d_neighborList, nAtom * maxNeighbors * sizeof(int));
 
-    hipLaunchKernelGGL(md, dim3((globalSize+localSize-1) / localSize), dim3(localSize), 0, 0, 
+    hipMemcpy(d_position, position, nAtom * sizeof(POSVECTYPE), hipMemcpyHostToDevice);
+    hipMemcpy(d_neighborList, neighborList, nAtom * maxNeighbors * sizeof(int), hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL(md, dim3(dim3((globalSize+localSize-1) / localSize)), dim3(dim3(localSize) ), 0, 0, 
                        d_position, d_force, d_neighborList,
                        nAtom, maxNeighbors, lj1_t, lj2_t, cutsq_t);
 
@@ -219,7 +224,7 @@ int main(int argc, char** argv)
     for (int j = 0; j < iteration; j++)
     {
         //Launch Kernels
-    	hipLaunchKernelGGL(md, dim3((globalSize+localSize-1) / localSize), dim3(localSize), 0, 0, 
+    	hipLaunchKernelGGL(md, dim3(dim3((globalSize+localSize-1) / localSize)), dim3(dim3(localSize) ), 0, 0, 
     			d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1_t, lj2_t, cutsq_t);
     
     }

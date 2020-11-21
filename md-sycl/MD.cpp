@@ -58,9 +58,9 @@ bool checkResults(forceVecType* d_force, posVecType *position,
             int jidx = neighList[j*nAtom + i];
             posVecType jpos = position[jidx];
             // Calculate distance
-            T delx = ipos.x() - jpos.x();
-            T dely = ipos.y() - jpos.y();
-            T delz = ipos.z() - jpos.z();
+            T delx = ipos.x - jpos.x;
+            T dely = ipos.y - jpos.y;
+            T delz = ipos.z - jpos.z;
             T r2inv = delx*delx + dely*dely + delz*delz;
 
             // If distance is less than cutoff, calculate force
@@ -70,28 +70,29 @@ bool checkResults(forceVecType* d_force, posVecType *position,
                 T r6inv = r2inv * r2inv * r2inv;
                 T force = r2inv*r6inv*(lj1*r6inv - lj2);
 
-                f.x() += delx * force;
-                f.y() += dely * force;
-                f.z() += delz * force;
+                f.x += delx * force;
+                f.y += dely * force;
+                f.z += delz * force;
             }
             j++;
         }
         // Check the results
-        T diffx = (d_force[i].x() - f.x()) / d_force[i].x();
-        T diffy = (d_force[i].y() - f.y()) / d_force[i].y();
-        T diffz = (d_force[i].z() - f.z()) / d_force[i].z();
-        T err = sqrt(diffx*diffx) + sqrt(diffy*diffy) + sqrt(diffz*diffz);
-        if (err > (3.0 * EPSILON))
+        if ((fabsf(f.x-d_force[i].x) > EPSILON) || 
+            (fabsf(f.y-d_force[i].y) > EPSILON) || 
+            (fabsf(f.z-d_force[i].z) > EPSILON) || 
+	    isnan(d_force[i].x) || 
+	    isnan(d_force[i].y) || 
+	    isnan(d_force[i].z) )
         {
-            std::cout << "Test Failed, idx: " << i << " diff: " << err << "\n";
-            std::cout << "f.x: " << f.x() << " df.x: " << d_force[i].x() << "\n";
-            std::cout << "f.y: " << f.y() << " df.y: " << d_force[i].y() << "\n";
-            std::cout << "f.z: " << f.z() << " df.z: " << d_force[i].z() << "\n";
-            std::cout << "Test FAILED\n";
+            cout << "Test Failed, idx: " << i << "\n";
+            cout << "f.x: " << f.x << " df.x: " << d_force[i].x << "\n";
+            cout << "f.y: " << f.y << " df.y: " << d_force[i].y << "\n";
+            cout << "f.z: " << f.z << " df.z: " << d_force[i].z << "\n";
+            cout << "Test FAILED\n";
             return false;
         }
     }
-    std::cout << "Test Passed\n";
+    cout << "Test Passed\n";
     return true;
 }
 
@@ -146,8 +147,6 @@ int main(int argc, char** argv)
     FPTYPE lj2_t   = (FPTYPE) lj2;
     FPTYPE cutsq_t = (FPTYPE) cutsq;
 
-    {  // sycl scope
-
 #ifdef USE_GPU
     gpu_selector dev_sel;
 #else
@@ -164,9 +163,9 @@ int main(int argc, char** argv)
     size_t localSize  = 256;
     size_t globalSize = (nAtom + localSize - 1) / localSize * localSize ;
 
-    /* Warm up the kernel and check correctness
+    // Warm up the kernel and check correctness
     q.submit([&](handler& cgh) {
-        auto force = d_force.template get_access<sycl_write>(cgh);
+        auto force = d_force.template get_access<sycl_discard_write>(cgh);
         auto position = d_position.template get_access<sycl_read>(cgh);
         auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
         cgh.parallel_for<class compute_lj_force>(nd_range<1>(
@@ -181,15 +180,14 @@ int main(int argc, char** argv)
     });
     q.wait();
 
+    std::cout << "Performing Correctness Check (may take several minutes)\n";
 
     if (!checkResults<FPTYPE, FORCEVECTYPE, POSVECTYPE>(h_force, position,
             neighborList, nAtom))
     {
         return -1;
     }
-    */
 
-    std::cout << "Performing Correctness Check (may take several minutes)\n";
 
     for (int i = 0; i < iteration; i++)
     {
@@ -204,8 +202,7 @@ int main(int argc, char** argv)
           });
       });
     }
-
-    } // sycl scope
+    q.wait();
 
     free(position);
     free(h_force);
