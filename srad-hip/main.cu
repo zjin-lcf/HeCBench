@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 #include "main.h"
 #include "extract_kernel.cu"
@@ -233,30 +233,30 @@ int main(int argc, char *argv []){
 
   // allocate memory for entire IMAGE on DEVICE
   mem_size = sizeof(fp) * Ne;                                    // get the size of float representation of input IMAGE
-  cudaMalloc((void **)&d_I, mem_size);                            //
+  hipMalloc((void **)&d_I, mem_size);                            //
 
   // allocate memory for coordinates on DEVICE
-  cudaMalloc((void **)&d_iN, mem_size_i);                          //
-  cudaMemcpy(d_iN, iN, mem_size_i, cudaMemcpyHostToDevice);        //
-  cudaMalloc((void **)&d_iS, mem_size_i);                          // 
-  cudaMemcpy(d_iS, iS, mem_size_i, cudaMemcpyHostToDevice);        //
-  cudaMalloc((void **)&d_jE, mem_size_j);                          //
-  cudaMemcpy(d_jE, jE, mem_size_j, cudaMemcpyHostToDevice);        //
-  cudaMalloc((void **)&d_jW, mem_size_j);                          // 
-  cudaMemcpy(d_jW, jW, mem_size_j, cudaMemcpyHostToDevice);      //
+  hipMalloc((void **)&d_iN, mem_size_i);                          //
+  hipMemcpy(d_iN, iN, mem_size_i, hipMemcpyHostToDevice);        //
+  hipMalloc((void **)&d_iS, mem_size_i);                          // 
+  hipMemcpy(d_iS, iS, mem_size_i, hipMemcpyHostToDevice);        //
+  hipMalloc((void **)&d_jE, mem_size_j);                          //
+  hipMemcpy(d_jE, jE, mem_size_j, hipMemcpyHostToDevice);        //
+  hipMalloc((void **)&d_jW, mem_size_j);                          // 
+  hipMemcpy(d_jW, jW, mem_size_j, hipMemcpyHostToDevice);      //
 
   // allocate memory for partial sums on DEVICE
-  cudaMalloc((void **)&d_sums, mem_size);                          //
-  cudaMalloc((void **)&d_sums2, mem_size);                        //
+  hipMalloc((void **)&d_sums, mem_size);                          //
+  hipMalloc((void **)&d_sums2, mem_size);                        //
 
   // allocate memory for derivatives
-  cudaMalloc((void **)&d_dN, mem_size);                            // 
-  cudaMalloc((void **)&d_dS, mem_size);                            // 
-  cudaMalloc((void **)&d_dW, mem_size);                          // 
-  cudaMalloc((void **)&d_dE, mem_size);                            // 
+  hipMalloc((void **)&d_dN, mem_size);                            // 
+  hipMalloc((void **)&d_dS, mem_size);                            // 
+  hipMalloc((void **)&d_dW, mem_size);                          // 
+  hipMalloc((void **)&d_dE, mem_size);                            // 
 
   // allocate memory for coefficient on DEVICE
-  cudaMalloc((void **)&d_c, mem_size);                            // 
+  hipMalloc((void **)&d_c, mem_size);                            // 
 
   //checkCUDAError("setup");
 
@@ -280,7 +280,7 @@ int main(int argc, char *argv []){
   //   COPY INPUT TO CPU
   //================================================================================80
 
-  cudaMemcpy(d_I, image, mem_size, cudaMemcpyHostToDevice);
+  hipMemcpy(d_I, image, mem_size, hipMemcpyHostToDevice);
 
   time6 = get_time();
 
@@ -288,7 +288,7 @@ int main(int argc, char *argv []){
   //   SCALE IMAGE DOWN FROM 0-255 TO 0-1 AND EXTRACT
   //================================================================================80
 
-  extract<<<blocks, threads>>>(Ne, d_I);
+  hipLaunchKernelGGL(extract, blocks, threads, 0, 0, Ne, d_I);
 
   //checkCUDAError("extract");
 
@@ -307,7 +307,7 @@ int main(int argc, char *argv []){
   // fflush(NULL);
 
     // execute square kernel
-    prepare<<<blocks, threads>>>(  Ne,
+    hipLaunchKernelGGL(prepare, blocks, threads, 0, 0,   Ne,
                     d_I,
                     d_sums,
                     d_sums2);
@@ -325,7 +325,7 @@ int main(int argc, char *argv []){
       //checkCUDAError("before reduce");
 
       // run kernel
-      reduce<<<blocks2, threads>>>(  Ne,
+      hipLaunchKernelGGL(reduce, blocks2, threads, 0, 0,   Ne,
                       no,
                       mul,
                       d_sums, 
@@ -356,8 +356,8 @@ int main(int argc, char *argv []){
 
     // copy total sums to device
     mem_size_single = sizeof(fp) * 1;
-    cudaMemcpy(&total, d_sums, mem_size_single, cudaMemcpyDeviceToHost);
-    cudaMemcpy(&total2, d_sums2, mem_size_single, cudaMemcpyDeviceToHost);
+    hipMemcpy(&total, d_sums, mem_size_single, hipMemcpyDeviceToHost);
+    hipMemcpy(&total2, d_sums2, mem_size_single, hipMemcpyDeviceToHost);
 
     //checkCUDAError("copy sum");
 
@@ -368,7 +368,7 @@ int main(int argc, char *argv []){
     q0sqr = varROI / meanROI2;                      // gets standard deviation of ROI
 
     // execute srad kernel
-    srad<<<blocks, threads>>>(  lambda,                  // SRAD coefficient 
+    hipLaunchKernelGGL(srad, blocks, threads, 0, 0,   lambda,                  // SRAD coefficient 
                   Nr,                    // # of rows in input image
                   Nc,                    // # of columns in input image
                   Ne,                    // # of elements in input image
@@ -387,7 +387,7 @@ int main(int argc, char *argv []){
     //checkCUDAError("srad");
 
     // execute srad2 kernel
-    srad2<<<blocks, threads>>>(  lambda,                  // SRAD coefficient 
+    hipLaunchKernelGGL(srad2, blocks, threads, 0, 0,   lambda,                  // SRAD coefficient 
                   Nr,                    // # of rows in input image
                   Nc,                    // # of columns in input image
                   Ne,                    // # of elements in input image
@@ -414,7 +414,7 @@ int main(int argc, char *argv []){
   //   SCALE IMAGE UP FROM 0-1 TO 0-255 AND COMPRESS
   //================================================================================80
 
-  compress<<<blocks, threads>>>(Ne, d_I);
+  hipLaunchKernelGGL(compress, blocks, threads, 0, 0, Ne, d_I);
 
   //checkCUDAError("compress");
 
@@ -424,7 +424,7 @@ int main(int argc, char *argv []){
   //   COPY RESULTS BACK TO CPU
   //================================================================================80
 
-  cudaMemcpy(image, d_I, mem_size, cudaMemcpyDeviceToHost);
+  hipMemcpy(image, d_I, mem_size, hipMemcpyDeviceToHost);
 
   //checkCUDAError("copy back");
 
@@ -454,18 +454,18 @@ int main(int argc, char *argv []){
   free(jW); 
   free(jE);
 
-  cudaFree(d_I);
-  cudaFree(d_c);
-  cudaFree(d_iN);
-  cudaFree(d_iS);
-  cudaFree(d_jE);
-  cudaFree(d_jW);
-  cudaFree(d_dN);
-  cudaFree(d_dS);
-  cudaFree(d_dE);
-  cudaFree(d_dW);
-  cudaFree(d_sums);
-  cudaFree(d_sums2);
+  hipFree(d_I);
+  hipFree(d_c);
+  hipFree(d_iN);
+  hipFree(d_iS);
+  hipFree(d_jE);
+  hipFree(d_jW);
+  hipFree(d_dN);
+  hipFree(d_dS);
+  hipFree(d_dE);
+  hipFree(d_dW);
+  hipFree(d_sums);
+  hipFree(d_sums2);
 
   time12 = get_time();
 
