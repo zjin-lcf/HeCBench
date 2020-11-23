@@ -58,7 +58,7 @@ int main() {
     q.submit([&](handler &h) {
       auto src = d_input.get_access<sycl_read>(h);
       auto dest = d_output.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class sm>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= numSlice) return;
         float max_ = src[i * sliceSize];
