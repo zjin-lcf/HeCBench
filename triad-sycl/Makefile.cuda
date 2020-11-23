@@ -62,7 +62,7 @@ Option.o: Option.cpp Option.h
 OptionParser.o: OptionParser.cpp OptionParser.h  Utility.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-triad.o: triad2.cpp Timer.h OptionParser.h 
+triad.o: triad.cpp Timer.h OptionParser.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 Timer.o: Timer.cpp Timer.h config.h  
