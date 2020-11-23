@@ -8,7 +8,7 @@
 #ifndef __COMMON
 #define __COMMON
 
-#define fp float
+#define FP float
 
 #define NUMBER_THREADS 2
 

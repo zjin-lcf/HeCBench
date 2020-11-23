@@ -104,16 +104,16 @@
 //========================================================================================================================================================================================================200
 
 int 
-solver(	fp **y,
-		fp *x,
+solver(	FP **y,
+		FP *x,
 		int xmax,
-		fp *params,
-		fp *com,
+		FP *params,
+		FP *com,
 
-		buffer<fp,1>& d_initvalu,
-		buffer<fp,1>& d_finavalu,
-		buffer<fp,1>& d_params,
-		buffer<fp,1>& d_com,
+		buffer<FP,1>& d_initvalu,
+		buffer<FP,1>& d_finavalu,
+		buffer<FP,1>& d_params,
+		buffer<FP,1>& d_com,
 
 		queue &command_queue,
 
@@ -127,20 +127,20 @@ solver(	fp **y,
 	//========================================================================================================================
 
 	// solver parameters
-	fp err_exponent;
+	FP err_exponent;
 	int error;
 	int outside;
-	fp h;
-	fp h_init;
-	fp tolerance;
+	FP h;
+	FP h_init;
+	FP tolerance;
 	int xmin;
 
 	// memory
-	fp scale_min;
-	fp scale_fina;
-	fp* err= (fp *) malloc(EQUATIONS* sizeof(fp));
-	fp* scale= (fp *) malloc(EQUATIONS* sizeof(fp));
-	fp* yy= (fp *) malloc(EQUATIONS* sizeof(fp));
+	FP scale_min;
+	FP scale_fina;
+	FP* err= (FP *) malloc(EQUATIONS* sizeof(FP));
+	FP* scale= (FP *) malloc(EQUATIONS* sizeof(FP));
+	FP* yy= (FP *) malloc(EQUATIONS* sizeof(FP));
 
 	// counters
 	int i, j, k;
@@ -154,7 +154,7 @@ solver(	fp **y,
 	h_init = 1;
 	h = h_init;
 	xmin = 0;
-	tolerance = 10 / (fp)(xmax-xmin);
+	tolerance = 10 / (FP)(xmax-xmin);
 
 	// save value for initial time instance
 	x[0] = 0;
@@ -175,7 +175,7 @@ solver(	fp **y,
 
 	// Insure that the step size h is not larger than the length of the integration interval.                                            //
 	if (h > (xmax - xmin) ) { 
-		h = (fp)xmax - (fp)xmin; 
+		h = (FP)xmax - (FP)xmin; 
 	}
 
 	//========================================================================================================================
@@ -259,9 +259,9 @@ solver(	fp **y,
 					yy[i] = tolerance;
 				}
 				else{
-					yy[i] = fabs(y[k-1][i]);
+					yy[i] = std::fabs(y[k-1][i]);
 				}
-				scale[i] = 0.8 * pow( tolerance * yy[i] / err[i] , err_exponent );
+				scale[i] = 0.8 * std::pow( tolerance * yy[i] / err[i] , err_exponent );
 				if(scale[i]<scale_min){
 					scale_min = scale[i];
 				}
@@ -294,12 +294,12 @@ solver(	fp **y,
 			}
 
 			// if instance+step exceeds range limit, limit to that range
-			if ( x[k] + h > (fp)xmax ){
-				h = (fp)xmax - x[k];
+			if ( x[k] + h > (FP)xmax ){
+				h = (FP)xmax - x[k];
 			}
 
 			// if getting closer to range limit, decrease step
-			else if ( x[k] + h + 0.5 * h > (fp)xmax ){
+			else if ( x[k] + h + 0.5 * h > (FP)xmax ){
 				h = 0.5 * h;
 			}
 

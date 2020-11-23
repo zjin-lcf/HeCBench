@@ -99,18 +99,18 @@
 //========================================================================================================================================================================================================200
 
 void 
-embedded_fehlberg_7_8(  fp timeinst,
-    fp h,
-    fp *initvalu,
-    fp *finavalu,
-    fp *error,
-    fp *parameter,
-    fp *com,
+embedded_fehlberg_7_8(  FP timeinst,
+    FP h,
+    FP *initvalu,
+    FP *finavalu,
+    FP *error,
+    FP *parameter,
+    FP *com,
 
-    buffer<fp,1> &d_initvalu,
-    buffer<fp,1> &d_finavalu,
-    buffer<fp,1> &d_params,
-    buffer<fp,1> &d_com,
+    buffer<FP,1> &d_initvalu,
+    buffer<FP,1> &d_finavalu,
+    buffer<FP,1> &d_params,
+    buffer<FP,1> &d_com,
 
     queue &command_queue,
 
@@ -123,82 +123,82 @@ embedded_fehlberg_7_8(  fp timeinst,
   //  VARIABLES
   //======================================================================================================================================================
 
-  static const fp c_1_11 = 41.0 / 840.0;
-  static const fp c6 = 34.0 / 105.0;
-  static const fp c_7_8= 9.0 / 35.0;
-  static const fp c_9_10 = 9.0 / 280.0;
+  static const FP c_1_11 = 41.0 / 840.0;
+  static const FP c6 = 34.0 / 105.0;
+  static const FP c_7_8= 9.0 / 35.0;
+  static const FP c_9_10 = 9.0 / 280.0;
 
-  static const fp a2 = 2.0 / 27.0;
-  static const fp a3 = 1.0 / 9.0;
-  static const fp a4 = 1.0 / 6.0;
-  static const fp a5 = 5.0 / 12.0;
-  static const fp a6 = 1.0 / 2.0;
-  static const fp a7 = 5.0 / 6.0;
-  static const fp a8 = 1.0 / 6.0;
-  static const fp a9 = 2.0 / 3.0;
-  static const fp a10 = 1.0 / 3.0;
+  static const FP a2 = 2.0 / 27.0;
+  static const FP a3 = 1.0 / 9.0;
+  static const FP a4 = 1.0 / 6.0;
+  static const FP a5 = 5.0 / 12.0;
+  static const FP a6 = 1.0 / 2.0;
+  static const FP a7 = 5.0 / 6.0;
+  static const FP a8 = 1.0 / 6.0;
+  static const FP a9 = 2.0 / 3.0;
+  static const FP a10 = 1.0 / 3.0;
 
-  static const fp b31 = 1.0 / 36.0;
-  static const fp b32 = 3.0 / 36.0;
-  static const fp b41 = 1.0 / 24.0;
-  static const fp b43 = 3.0 / 24.0;
-  static const fp b51 = 20.0 / 48.0;
-  static const fp b53 = -75.0 / 48.0;
-  static const fp b54 = 75.0 / 48.0;
-  static const fp b61 = 1.0 / 20.0;
-  static const fp b64 = 5.0 / 20.0;
-  static const fp b65 = 4.0 / 20.0;
-  static const fp b71 = -25.0 / 108.0;
-  static const fp b74 =  125.0 / 108.0;
-  static const fp b75 = -260.0 / 108.0;
-  static const fp b76 =  250.0 / 108.0;
-  static const fp b81 = 31.0/300.0;
-  static const fp b85 = 61.0/225.0;
-  static const fp b86 = -2.0/9.0;
-  static const fp b87 = 13.0/900.0;
-  static const fp b91 = 2.0;
-  static const fp b94 = -53.0/6.0;
-  static const fp b95 = 704.0 / 45.0;
-  static const fp b96 = -107.0 / 9.0;
-  static const fp b97 = 67.0 / 90.0;
-  static const fp b98 = 3.0;
-  static const fp b10_1 = -91.0 / 108.0;
-  static const fp b10_4 = 23.0 / 108.0;
-  static const fp b10_5 = -976.0 / 135.0;
-  static const fp b10_6 = 311.0 / 54.0;
-  static const fp b10_7 = -19.0 / 60.0;
-  static const fp b10_8 = 17.0 / 6.0;
-  static const fp b10_9 = -1.0 / 12.0;
-  static const fp b11_1 = 2383.0 / 4100.0;
-  static const fp b11_4 = -341.0 / 164.0;
-  static const fp b11_5 = 4496.0 / 1025.0;
-  static const fp b11_6 = -301.0 / 82.0;
-  static const fp b11_7 = 2133.0 / 4100.0;
-  static const fp b11_8 = 45.0 / 82.0;
-  static const fp b11_9 = 45.0 / 164.0;
-  static const fp b11_10 = 18.0 / 41.0;
-  static const fp b12_1 = 3.0 / 205.0;
-  static const fp b12_6 = - 6.0 / 41.0;
-  static const fp b12_7 = - 3.0 / 205.0;
-  static const fp b12_8 = - 3.0 / 41.0;
-  static const fp b12_9 = 3.0 / 41.0;
-  static const fp b12_10 = 6.0 / 41.0;
-  static const fp b13_1 = -1777.0 / 4100.0;
-  static const fp b13_4 = -341.0 / 164.0;
-  static const fp b13_5 = 4496.0 / 1025.0;
-  static const fp b13_6 = -289.0 / 82.0;
-  static const fp b13_7 = 2193.0 / 4100.0;
-  static const fp b13_8 = 51.0 / 82.0;
-  static const fp b13_9 = 33.0 / 164.0;
-  static const fp b13_10 = 12.0 / 41.0;
+  static const FP b31 = 1.0 / 36.0;
+  static const FP b32 = 3.0 / 36.0;
+  static const FP b41 = 1.0 / 24.0;
+  static const FP b43 = 3.0 / 24.0;
+  static const FP b51 = 20.0 / 48.0;
+  static const FP b53 = -75.0 / 48.0;
+  static const FP b54 = 75.0 / 48.0;
+  static const FP b61 = 1.0 / 20.0;
+  static const FP b64 = 5.0 / 20.0;
+  static const FP b65 = 4.0 / 20.0;
+  static const FP b71 = -25.0 / 108.0;
+  static const FP b74 =  125.0 / 108.0;
+  static const FP b75 = -260.0 / 108.0;
+  static const FP b76 =  250.0 / 108.0;
+  static const FP b81 = 31.0/300.0;
+  static const FP b85 = 61.0/225.0;
+  static const FP b86 = -2.0/9.0;
+  static const FP b87 = 13.0/900.0;
+  static const FP b91 = 2.0;
+  static const FP b94 = -53.0/6.0;
+  static const FP b95 = 704.0 / 45.0;
+  static const FP b96 = -107.0 / 9.0;
+  static const FP b97 = 67.0 / 90.0;
+  static const FP b98 = 3.0;
+  static const FP b10_1 = -91.0 / 108.0;
+  static const FP b10_4 = 23.0 / 108.0;
+  static const FP b10_5 = -976.0 / 135.0;
+  static const FP b10_6 = 311.0 / 54.0;
+  static const FP b10_7 = -19.0 / 60.0;
+  static const FP b10_8 = 17.0 / 6.0;
+  static const FP b10_9 = -1.0 / 12.0;
+  static const FP b11_1 = 2383.0 / 4100.0;
+  static const FP b11_4 = -341.0 / 164.0;
+  static const FP b11_5 = 4496.0 / 1025.0;
+  static const FP b11_6 = -301.0 / 82.0;
+  static const FP b11_7 = 2133.0 / 4100.0;
+  static const FP b11_8 = 45.0 / 82.0;
+  static const FP b11_9 = 45.0 / 164.0;
+  static const FP b11_10 = 18.0 / 41.0;
+  static const FP b12_1 = 3.0 / 205.0;
+  static const FP b12_6 = - 6.0 / 41.0;
+  static const FP b12_7 = - 3.0 / 205.0;
+  static const FP b12_8 = - 3.0 / 41.0;
+  static const FP b12_9 = 3.0 / 41.0;
+  static const FP b12_10 = 6.0 / 41.0;
+  static const FP b13_1 = -1777.0 / 4100.0;
+  static const FP b13_4 = -341.0 / 164.0;
+  static const FP b13_5 = 4496.0 / 1025.0;
+  static const FP b13_6 = -289.0 / 82.0;
+  static const FP b13_7 = 2193.0 / 4100.0;
+  static const FP b13_8 = 51.0 / 82.0;
+  static const FP b13_9 = 33.0 / 164.0;
+  static const FP b13_10 = 12.0 / 41.0;
 
-  static const fp err_factor  = -41.0 / 840.0;
+  static const FP err_factor  = -41.0 / 840.0;
 
-  fp h2_7 = a2 * h;
+  FP h2_7 = a2 * h;
 
-  fp timeinst_temp;
-  fp* initvalu_temp;
-  fp** finavalu_temp;
+  FP timeinst_temp;
+  FP* initvalu_temp;
+  FP** finavalu_temp;
 
   int i;
 
@@ -206,11 +206,11 @@ embedded_fehlberg_7_8(  fp timeinst,
   //    TEMPORARY STORAGE ALLOCATION
   //======================================================================================================================================================
 
-  initvalu_temp= (fp *) malloc(EQUATIONS* sizeof(fp));
+  initvalu_temp= (FP *) malloc(EQUATIONS* sizeof(FP));
 
-  finavalu_temp= (fp **) malloc(13* sizeof(fp *));
+  finavalu_temp= (FP **) malloc(13* sizeof(FP *));
   for (i= 0; i<13; i++){
-    finavalu_temp[i]= (fp *) malloc(EQUATIONS* sizeof(fp));
+    finavalu_temp[i]= (FP *) malloc(EQUATIONS* sizeof(FP));
   }
 
   //======================================================================================================================================================
@@ -568,7 +568,7 @@ embedded_fehlberg_7_8(  fp timeinst,
   //======================================================================================================================================================
 
   for(i=0; i<EQUATIONS; i++){
-    error[i] = fabs(err_factor * (finavalu_temp[0][i] + finavalu_temp[10][i] - finavalu_temp[11][i] - finavalu_temp[12][i]));
+    error[i] = std::fabs(err_factor * (finavalu_temp[0][i] + finavalu_temp[10][i] - finavalu_temp[11][i] - finavalu_temp[12][i]));
   }
 
   //======================================================================================================================================================

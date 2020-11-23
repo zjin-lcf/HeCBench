@@ -10,10 +10,10 @@
 int 
 kernel_wrapper(  int xmax,
     int workload,
-    fp ***y,
-    fp **x,
-    fp **params,
-    fp *com)
+    FP ***y,
+    FP **x,
+    FP **params,
+    FP *com)
 {
 
   //======================================================================================================================================================150
@@ -49,10 +49,10 @@ kernel_wrapper(  int xmax,
     //  ALLOCATE MEMORY
     //======================================================================================================================================================150
 
-    buffer<fp,1> d_initvalu(EQUATIONS);
-    buffer<fp,1> d_finavalu(EQUATIONS);
-    buffer<fp,1> d_params(PARAMETERS);
-    buffer<fp,1> d_com(3);
+    buffer<FP,1> d_initvalu(EQUATIONS);
+    buffer<FP,1> d_finavalu(EQUATIONS);
+    buffer<FP,1> d_params(PARAMETERS);
+    buffer<FP,1> d_com(3);
 
 
     //======================================================================================================================================================150
