@@ -174,17 +174,17 @@ int main(int argc, char** argv)
   }
 
   {
-  buffer<uint8_t, 1> dev_keys(d_keys, total_length);
-  buffer<uint64_t, 1> dev_out(d_out, 2*numKeys);
-  buffer<uint32_t, 1> dev_length(d_length, numKeys+1);
-  buffer<uint32_t, 1> key_length(length, numKeys);
-
 #ifdef USE_GPU 
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel);
+
+  buffer<uint8_t, 1> dev_keys(d_keys, total_length);
+  buffer<uint64_t, 1> dev_out(d_out, 2*numKeys);
+  buffer<uint32_t, 1> dev_length(d_length, numKeys+1);
+  buffer<uint32_t, 1> key_length(length, numKeys);
 
   range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
   range<1> local_work_size (BLOCK_SIZE);
@@ -195,7 +195,7 @@ int main(int argc, char** argv)
       auto d_length = dev_length.get_access<sycl_read>(h);
       auto length = key_length.get_access<sycl_read>(h);
       auto d_out = dev_out.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class mmh>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i < numKeys) 
           MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
