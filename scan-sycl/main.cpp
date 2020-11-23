@@ -8,15 +8,14 @@
 #define ITERATION 100000
 
 template <typename dataType>
-void runTest (dataType *in, dataType *out, int n) 
+void runTest (const dataType *in, dataType *out, const int n) 
 {
-  const property_list queue_props {property::queue::enable_profiling()};
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel, queue_props);
+  queue q(dev_sel);
 
   buffer<dataType,1> d_in(in, n);
   buffer<dataType,1> d_out(out, n);
@@ -26,7 +25,7 @@ void runTest (dataType *in, dataType *out, int n)
     auto g_odata = d_out.template get_access<sycl_write>(cgh);
     auto g_idata = d_in.template get_access<sycl_read>(cgh);
     accessor<dataType, 1, sycl_read_write, access::target::local> temp(N, cgh);
-    cgh.parallel_for(nd_range<1>(range<1>(N/2), range<1>(N/2)), [=] (nd_item<1> item) {
+    cgh.parallel_for<class scan_block>(nd_range<1>(range<1>(N/2), range<1>(N/2)), [=] (nd_item<1> item) {
       int thid = item.get_local_id(0);
       int offset = 1;
       temp[2*thid]   = g_idata[2*thid];
