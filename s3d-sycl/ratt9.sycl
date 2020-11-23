@@ -1,11 +1,11 @@
 
     const real TEMP = T[item.get_global_id(0)]*tconv;
     //const real ALOGT = LOG(TEMP);
-    const register real SMALL_INV = 1e37f;
+    const real SMALL_INV = 1e37f;
     const real RU=8.31451e7;
     const real PATM = 1.01325e6;
     const real PFAC = DIV (PATM, (RU*(TEMP)));
-    register real rtemp_inv;
+    real rtemp_inv;
 
     rtemp_inv = DIV ((EG(7)*EG(23)), (EG(8)*EG(22)));
     RB(176) = RF(176) * MIN(rtemp_inv, SMALL_INV);

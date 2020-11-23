@@ -1,5 +1,5 @@
 
-    register real DEN;
+    real DEN;
 
     A(8,0) = A(8,0) + A(8,10)*A(10,0);
     DEN = 1 -A(8,10)*A(10,8);
