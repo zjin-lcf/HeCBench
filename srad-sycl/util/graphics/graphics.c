@@ -20,7 +20,7 @@
 //  Define
 //======================================================================================================================================================150
 
-#define fp float
+#define FP float
 
 //======================================================================================================================================================150
 //  Header File
@@ -38,7 +38,7 @@
 
 void 
 write_graphics(  char* filename,
-    fp* input, 
+    FP* input, 
     int data_rows, 
     int data_cols, 
     int major,
@@ -106,7 +106,7 @@ write_graphics(  char* filename,
 
 bool 
 read_graphics(  char* filename,
-    fp* input,
+    FP* input,
     int data_rows, 
     int data_cols,
     int major){
@@ -150,7 +150,7 @@ read_graphics(  char* filename,
     for(i=0; i<data_rows; i++){
       for(j=0; j<data_cols; j++){
         fscanf(fid, "%d", &temp);
-        input[i*data_cols+j] = (fp)temp;
+        input[i*data_cols+j] = (FP)temp;
       }
     }
   }
@@ -158,7 +158,7 @@ read_graphics(  char* filename,
     for(i=0; i<data_rows; i++){
       for(j=0; j<data_cols; j++){
         fscanf(fid, "%d", &temp);
-        input[j*data_rows+i] = (fp)temp;
+        input[j*data_rows+i] = (FP)temp;
       }
     }
   }

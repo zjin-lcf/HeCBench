@@ -64,19 +64,19 @@ main(	int argc,
 	long long time6;
 
 	// inputs image, input paramenters
-	fp* image_ori;																// originalinput image
+	FP* image_ori;																// originalinput image
 	int image_ori_rows;
 	int image_ori_cols;
 	long image_ori_elem;
 
 	// inputs image, input paramenters
-	fp* image;															// input image
+	FP* image;															// input image
 	int Nr,Nc;													// IMAGE nbr of rows/cols/elements
 	long Ne;
 
 	// algorithm parameters
 	int niter;																// nbr of iterations
-	fp lambda;															// update step size
+	FP lambda;															// update step size
 
 	// size of IMAGE
 	int r1,r2,c1,c2;												// row/col coordinates of uniform ROI
@@ -128,7 +128,7 @@ main(	int argc,
 	image_ori_cols = 458;
 	image_ori_elem = image_ori_rows * image_ori_cols;
 
-	image_ori = (fp*)malloc(sizeof(fp) * image_ori_elem);
+	image_ori = (FP*)malloc(sizeof(FP) * image_ori_elem);
 
 	char* input_image_path = (char*) "../data/srad/image.pgm";
 	if ( !read_graphics( input_image_path, image_ori, image_ori_rows, image_ori_cols, 1) ) 
@@ -140,7 +140,7 @@ main(	int argc,
 
 	Ne = Nr*Nc;
 
-	image = (fp*)malloc(sizeof(fp) * Ne);
+	image = (FP*)malloc(sizeof(FP) * Ne);
 
 	resize(	image_ori,
 			image_ori_rows,
@@ -248,19 +248,19 @@ main(	int argc,
 
 	printf("Time spent in different stages of the application:\n");
 	printf("%.12f s, %.12f : READ COMMAND LINE PARAMETERS\n", 
-			(fp) (time1-time0) / 1000000, (fp) (time1-time0) / (fp) (time5-time0) * 100);
+			(FP) (time1-time0) / 1000000, (FP) (time1-time0) / (FP) (time5-time0) * 100);
 	printf("%.12f s, %.12f : READ AND RESIZE INPUT IMAGE FROM FILE\n",
-		       	(fp) (time2-time1) / 1000000, (fp) (time2-time1) / (fp) (time5-time0) * 100);
+		       	(FP) (time2-time1) / 1000000, (FP) (time2-time1) / (FP) (time5-time0) * 100);
 	printf("%.12f s, %.12f : SETUP\n",
-		       	(fp) (time3-time2) / 1000000, (fp) (time3-time2) / (fp) (time5-time0) * 100);
+		       	(FP) (time3-time2) / 1000000, (FP) (time3-time2) / (FP) (time5-time0) * 100);
 	printf("%.12f s, %.12f : KERNEL\n",
-		       	(fp) (time4-time3) / 1000000, (fp) (time4-time3) / (fp) (time5-time0) * 100);
+		       	(FP) (time4-time3) / 1000000, (FP) (time4-time3) / (FP) (time5-time0) * 100);
 	printf("%.12f s, %.12f : WRITE OUTPUT IMAGE TO FILE\n",
-		       	(fp) (time5-time4) / 1000000, (fp) (time5-time4) / (fp) (time5-time0) * 100);
+		       	(FP) (time5-time4) / 1000000, (FP) (time5-time4) / (FP) (time5-time0) * 100);
 	printf("%.12f s, %.12f : FREE MEMORY\n",
-		       	(fp) (time6-time5) / 1000000, (fp) (time6-time5) / (fp) (time5-time0) * 100);
+		       	(FP) (time6-time5) / 1000000, (FP) (time6-time5) / (FP) (time5-time0) * 100);
 	printf("Total time:\n");
-	printf("%.12f s\n", (fp) (time5-time0) / 1000000);
+	printf("%.12f s\n", (FP) (time5-time0) / 1000000);
 
 }
 

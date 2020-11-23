@@ -5,7 +5,7 @@
 
 void 
 write_graphics(	char* filename,
-				fp* input, 
+				FP* input, 
 				int data_rows, 
 				int data_cols, 
 				int major,
@@ -13,7 +13,7 @@ write_graphics(	char* filename,
 
 bool 
 read_graphics(	char* filename,
-				fp* input,
+				FP* input,
 				int data_rows, 
 				int data_cols,
 				int major);

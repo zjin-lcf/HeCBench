@@ -7,10 +7,10 @@
 	int col;																// row, y position
 
 	// variables
-	fp d_Jc;
-	fp d_dN_acc_loc, d_dS_acc_loc, d_dW_acc_loc, d_dE_acc_loc;
-	fp d_c_loc;
-	fp d_G2,d_L,d_num,d_den,d_qsqr;
+	FP d_Jc;
+	FP d_dN_acc_loc, d_dS_acc_loc, d_dW_acc_loc, d_dE_acc_loc;
+	FP d_c_loc;
+	FP d_G2,d_L,d_num,d_den,d_qsqr;
 	
 	// figure out row/col location in new matrix
 	row = (ei+1) % Nr - 1;													// (0-n) row

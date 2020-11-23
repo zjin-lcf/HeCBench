@@ -6,8 +6,8 @@ int row;                                // column, x position
 int col;                                // row, y position
 
 // variables
-fp d_cN,d_cS,d_cW,d_cE;
-fp d_D;
+FP d_cN,d_cS,d_cW,d_cE;
+FP d_D;
 
 // figure out row/col location in new matrix
 row = (ei+1) % Nr - 1;  // (0-n) row
