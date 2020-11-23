@@ -286,7 +286,7 @@ int main( int argc, char * argv[] )
   read_CLI( argc, argv, I );
 
   // Calculate Number of 3D Source Regions
-  I->source_3D_regions = (int) ceil((double)I->source_2D_regions *
+  I->source_3D_regions = (int) ::ceil((double)I->source_2D_regions *
       I->coarse_axial_intervals / I->decomp_assemblies_ax);
 
   logo(4); // Based on the 4th version
@@ -326,7 +326,7 @@ int main( int argc, char * argv[] )
   }
   
   // Verification is performed for one segment;
-  // Attentate segment is not run on CPU to reduce simulation time
+  // Attenuate segment is not run on CPU to reduce simulation time
   for( long i = 0; i < I->segments; i++ )
   {
     // Pick Random QSR
@@ -393,7 +393,7 @@ int main( int argc, char * argv[] )
         auto state_flux_acc = d_state_flux.get_access<sycl_read_write>(h);
         auto v_acc = d_simd_vecs.get_access<sycl_write>(h);
 
-        h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        h.parallel_for<class attenuate_segment>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
             int gid = item.get_global_id(0);
             if (gid >= segments) return; 
 
