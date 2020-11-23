@@ -124,7 +124,7 @@ void RunTest(string testName, OptionParser &op)
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  cl::sycl::queue q(dev_sel);
 
   // Get kernel launch config, assuming n is divisible by block size
   range<1> lws(BLOCK_SIZE);
@@ -152,7 +152,7 @@ void RunTest(string testName, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto T = gpu_t.template get_access<sycl_read>(cgh);
         auto RF = gpu_rf.template get_access<sycl_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt.sycl"
             });
         });
@@ -161,7 +161,7 @@ void RunTest(string testName, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto T = gpu_t.template get_access<sycl_read>(cgh);
         auto EG = gpu_eg.template get_access<sycl_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdsmh>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdsmh.sycl"
             });
         });
@@ -172,7 +172,7 @@ void RunTest(string testName, OptionParser &op)
         auto T = gpu_t.template get_access<sycl_read>(cgh);
         auto Y = gpu_y.template get_access<sycl_read>(cgh);
         auto C = gpu_c.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class gr_base>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "gr_base.sycl"
             });
         });
@@ -183,7 +183,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt2>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt2.sycl"
             });
         });
@@ -195,7 +195,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt3>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt3.sycl"
             });
         });
@@ -207,7 +207,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt4>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt4.sycl"
             });
         });
@@ -219,7 +219,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt5>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt5.sycl"
             });
         });
@@ -230,7 +230,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt6>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt6.sycl"
             });
         });
@@ -240,7 +240,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt7>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt7.sycl"
             });
         });
@@ -250,7 +250,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt8>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt8.sycl"
             });
         });
@@ -260,7 +260,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RB = gpu_rb.template get_access<sycl_write>(cgh);
         auto EG = gpu_eg.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt9>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt9.sycl"
             });
         });
@@ -268,7 +268,7 @@ void RunTest(string testName, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto T = gpu_t.template get_access<sycl_read>(cgh);
         auto RKLOW = gpu_rklow.template get_access<sycl_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratt10>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratt10.sycl"
             });
         });
@@ -280,7 +280,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
         auto RKLOW = gpu_rklow.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratx>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
 #include "ratx.sycl"
             });
         });
@@ -291,7 +291,7 @@ void RunTest(string testName, OptionParser &op)
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
         auto RKLOW = gpu_rklow.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratxb>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
 #include "ratxb.sycl"
             });
         });
@@ -301,7 +301,7 @@ void RunTest(string testName, OptionParser &op)
         auto C = gpu_c.template get_access<sycl_read>(cgh);
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         //auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratx2>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratx2.sycl"
             });
         });
@@ -310,7 +310,7 @@ void RunTest(string testName, OptionParser &op)
         auto C = gpu_c.template get_access<sycl_read>(cgh);
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class ratx4>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratx4.sycl"
             });
         });
@@ -320,7 +320,7 @@ void RunTest(string testName, OptionParser &op)
         auto A = gpu_a.template get_access<sycl_write>(cgh);
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class qssa>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "qssa.sycl"
             });
         });
@@ -330,7 +330,7 @@ void RunTest(string testName, OptionParser &op)
         auto A = gpu_a.template get_access<sycl_read_write>(cgh);
         //auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         //auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class qssab>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
 #include "qssab.sycl"
             });
         });
@@ -339,7 +339,7 @@ void RunTest(string testName, OptionParser &op)
         auto A = gpu_a.template get_access<sycl_read>(cgh);
         auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class qssa2>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "qssa2.sycl"
             });
         });
@@ -350,7 +350,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot.sycl"
             });
         });
@@ -361,7 +361,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot2>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot2.sycl"
             });
         });
@@ -371,7 +371,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot3>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot3.sycl"
             });
         });
@@ -382,7 +382,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot6>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot6.sycl"
             });
         });
@@ -392,7 +392,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot7>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot7.sycl"
             });
         });
@@ -402,7 +402,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot8>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot8.sycl"
             });
         });
@@ -412,7 +412,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot9>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot9.sycl"
             });
         });
@@ -422,7 +422,7 @@ void RunTest(string testName, OptionParser &op)
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
         auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class rdwdot10>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot10.sycl"
             });
         });
