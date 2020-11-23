@@ -40,7 +40,8 @@ if(i < Nparticles)
 		indX = rnd_iX + objxy_acc[y*2 + 1];
 		indY = rnd_iY + objxy_acc[y*2];
 
-		ind_acc[i*countOnes + y] = cl::sycl::abs(indX*IszY*Nfr + indY*Nfr + k);
+		ind_acc[i*countOnes + y] = (indX*IszY*Nfr + indY*Nfr + k) >= 0 ? 
+                     (indX*IszY*Nfr + indY*Nfr + k) : -(indX*IszY*Nfr + indY*Nfr + k);
 		if(ind_acc[i*countOnes + y] >= max_size)
 			ind_acc[i*countOnes + y] = 0;
 	}

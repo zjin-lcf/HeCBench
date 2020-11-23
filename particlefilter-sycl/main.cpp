@@ -71,7 +71,7 @@ float elapsed_time(long long start_time, long long end_time) {
 float randu(int * seed, int index) {
     int num = A * seed[index] + C;
     seed[index] = num % M;
-    return fabs(seed[index] / ((float) M));
+    return std::fabs(seed[index] / ((float) M));
 }
 
 /**
@@ -86,9 +86,9 @@ float randn(int * seed, int index) {
     /*Box-Muller algorithm*/
     float u = randu(seed, index);
     float v = randu(seed, index);
-    float cosine = cos(2 * PI * v);
-    float rt = -2 * log(u);
-    return sqrt(rt) * cosine;
+    float cosine = std::cos(2 * PI * v);
+    float rt = -2 * std::log(u);
+    return std::sqrt(rt) * cosine;
 }
 
 /**
@@ -153,7 +153,7 @@ void strelDisk(int * disk, int radius) {
     int x, y;
     for (x = 0; x < diameter; x++) {
         for (y = 0; y < diameter; y++) {
-            float distance = sqrt(pow((float) (x - radius + 1), 2) + pow((float) (y - radius + 1), 2));
+            float distance = std::sqrt(pow((float) (x - radius + 1), 2) + pow((float) (y - radius + 1), 2));
             if (distance < radius)
                 disk[x * diameter + y] = 1;
       else
@@ -189,7 +189,7 @@ void dilate_matrix(unsigned char * matrix, int posX, int posY, int posZ, int dim
     int x, y;
     for (x = startX; x < endX; x++) {
         for (y = startY; y < endY; y++) {
-            float distance = sqrt(pow((float) (x - posX), 2) + pow((float) (y - posY), 2));
+            float distance = std::sqrt(std::pow((float) (x - posX), 2) + std::pow((float) (y - posY), 2));
             if (distance < error)
                 matrix[x * dimY * dimZ + y * dimZ + posZ] = 1;
         }
@@ -408,7 +408,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   int k;
   const int threads_per_block = BLOCK_SIZE;
 
-  int num_blocks = ceil((float) Nparticles / (float) threads_per_block);
+  int num_blocks = std::ceil((float) Nparticles / (float) threads_per_block);
   size_t local_work_size = threads_per_block;
   size_t global_work_size = num_blocks*threads_per_block;
 #ifdef DEBUG
@@ -429,7 +429,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   buffer<unsigned char, 1>I_GPU(I, IszX * IszY * Nfr, props);
   buffer<int, 1>seed_GPU(seed, Nparticles, props);
   seed_GPU.set_final_data(nullptr);
-  buffer<float, 1>partial_sums_GPU(Nparticles+1, props);
+  buffer<float, 1>partial_sums_GPU(Nparticles+1);
   buffer<int, 1>objxy_GPU(objxy, 2*countOnes, props);
 
   for (k = 1; k < Nfr; k++) {
@@ -526,7 +526,8 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   printf("total weight: %lf\n", total);
   printf("XE: %lf\n", xe);
   printf("YE: %lf\n", ye);
-  float distance = sqrt(pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
+  float distance = std::sqrt(std::pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + 
+		  std::pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
   printf("distance: %lf\n", distance);
 #endif
 
@@ -557,7 +558,8 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
       xe += arrayX[x] * weights[x];
       ye += arrayY[x] * weights[x];
   }
-  float distance = sqrt(pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
+  float distance = std::sqrt(std::pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + 
+		  std::pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
 
   //Output results
   FILE *fid;
