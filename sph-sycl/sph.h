@@ -8,17 +8,17 @@
 ////////////////////////////////////////////////
 
 struct boundary_particle {
-    double3 pos; // position
-    double3 n;   // position
+    cl::sycl::double3 pos; // position
+    cl::sycl::double3 n;   // position
 } ;
 
 struct fluid_particle {
     double density;
     double pressure;
-    double3 pos;     // position
-    double3 v;       // velocity
-    double3 v_half;  // half step velocity
-    double3 a;       // acceleration
+    cl::sycl::double3 pos;     // position
+    cl::sycl::double3 v;       // velocity
+    cl::sycl::double3 v_half;  // half step velocity
+    cl::sycl::double3 a;       // acceleration
 };
 
 struct param {
