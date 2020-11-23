@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
 
   q.submit([&](handler &h) {
     auto Table = d_Table.get_access<sycl_write>(h);
-    h.parallel_for(nd_range<1>(range<1>(global_work_size), range<1>(K1_BLOCKSIZE)), [=](nd_item<1> item) {
+    h.parallel_for<class init_table>(nd_range<1>(range<1>(global_work_size), range<1>(K1_BLOCKSIZE)), [=](nd_item<1> item) {
       int i = item.get_global_id(0);
       if (i < TableSize) Table[i] = i;
     });
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 
   q.submit([&](handler &h) {
     auto ran = d_ran.get_access<sycl_write>(h);
-    h.parallel_for(nd_range<1>(range<1>(K2_BLOCKSIZE), range<1>(K2_BLOCKSIZE)), [=](nd_item<1> item) {
+    h.parallel_for<class init_ranarray>(nd_range<1>(range<1>(K2_BLOCKSIZE), range<1>(K2_BLOCKSIZE)), [=](nd_item<1> item) {
       int j = item.get_global_id(0);
       ran[j] = HPCC_starts ((NUPDATE/128) * j);
     });
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
   q.submit([&](handler &h) {
     auto Table = d_Table.get_access<sycl_atomic>(h);
     auto ran = d_ran.get_access<sycl_read_write>(h);
-    h.parallel_for(nd_range<1>(range<1>(K3_BLOCKSIZE), range<1>(K3_BLOCKSIZE)), [=](nd_item<1> item) {
+    h.parallel_for<class update>(nd_range<1>(range<1>(K3_BLOCKSIZE), range<1>(K3_BLOCKSIZE)), [=](nd_item<1> item) {
       int j = item.get_global_id(0);
       for (u64Int i=0; i<NUPDATE/128; i++) {
         ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
