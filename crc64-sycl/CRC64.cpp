@@ -575,7 +575,7 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
       auto d_data_acc = d_data.get_access<sycl_read>(h);
       auto d_crc64_table_acc = d_crc64_table.get_access<sycl_read>(h);
       auto d_crc64_interleaved_table_acc = d_crc64_interleaved_table.get_access<sycl_read>(h);
-      h.parallel_for(nd_range<1>(global_size, local_size), [=](nd_item<1> item) {
+      h.parallel_for<class crc64_block>(nd_range<1>(global_size, local_size), [=](nd_item<1> item) {
         int tid = item.get_global_id(0);
           size_t bpt = nbytes/nthreads;
           const unsigned char *start = d_data_acc.get_pointer() + bpt*tid;
