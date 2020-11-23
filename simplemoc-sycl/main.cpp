@@ -286,7 +286,7 @@ int main( int argc, char * argv[] )
   read_CLI( argc, argv, I );
 
   // Calculate Number of 3D Source Regions
-  I->source_3D_regions = (int) ::ceil((double)I->source_2D_regions *
+  I->source_3D_regions = (int) std::ceil((double)I->source_2D_regions *
       I->coarse_axial_intervals / I->decomp_assemblies_ax);
 
   logo(4); // Based on the 4th version

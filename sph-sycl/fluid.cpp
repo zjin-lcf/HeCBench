@@ -286,15 +286,15 @@ void initParams(AABB* water_volume, AABB* boundary_volume, param* params)
   params->mass_particle = params->rest_density * (volume/params->number_fluid_particles);
 
   // Cube calculated spacing
-  params->spacing_particle = ::pow(volume/params->number_fluid_particles,1.0/3.0);
+  params->spacing_particle = std::pow(volume/params->number_fluid_particles,1.0/3.0);
 
   // Smoothing radius, h
   params->smoothing_radius = params->spacing_particle;
 
   // Boundary particles
-  int num_x = ::ceil((boundary_volume->max_x - boundary_volume->min_x)/params->spacing_particle);
-  int num_y = ::ceil((boundary_volume->max_y - boundary_volume->min_y)/params->spacing_particle);
-  int num_z = ::ceil((boundary_volume->max_z - boundary_volume->min_z)/params->spacing_particle);
+  int num_x = std::ceil((boundary_volume->max_x - boundary_volume->min_x)/params->spacing_particle);
+  int num_y = std::ceil((boundary_volume->max_y - boundary_volume->min_y)/params->spacing_particle);
+  int num_z = std::ceil((boundary_volume->max_z - boundary_volume->min_z)/params->spacing_particle);
   int num_boundary_particles = (2 * num_x * num_z) + (2 * num_y * num_z) + (2* num_y * num_z);
   params->number_boundary_particles = num_boundary_particles;
 
@@ -306,7 +306,7 @@ void initParams(AABB* water_volume, AABB* boundary_volume, param* params)
 
   // Calculate speed of sound for simulation
   double max_height = water_volume->max_y;
-  double max_velocity = ::sqrt(2.0*params->g*max_height);
+  double max_velocity = std::sqrt(2.0*params->g*max_height);
   params->speed_sound = max_velocity/::sqrt(0.01);
 
   // Minimum stepsize from Courant-Friedrichs-Lewy condition

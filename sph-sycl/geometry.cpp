@@ -16,9 +16,9 @@ void constructBoundaryBox(boundary_particle *boundary_particles, AABB* boundary,
     double spacing = params->spacing_particle;
     
     // Create boundary particles with spacing h
-    int num_x = ::ceil((boundary->max_x - boundary->min_x)/spacing);
-    int num_y = ::ceil((boundary->max_y - boundary->min_y)/spacing);
-    int num_z = ::ceil((boundary->max_z - boundary->min_z)/spacing);
+    int num_x = std::ceil((boundary->max_x - boundary->min_x)/spacing);
+    int num_y = std::ceil((boundary->max_y - boundary->min_y)/spacing);
+    int num_z = std::ceil((boundary->max_z - boundary->min_z)/spacing);
     double min_x = boundary->min_x;
     double min_y = boundary->min_y;
     double min_z = boundary->min_z;
@@ -31,8 +31,8 @@ void constructBoundaryBox(boundary_particle *boundary_particles, AABB* boundary,
     
     int i,nx,ny,nz;
     
-    double recip_root_three = 1.0/::sqrt(3.0);
-    double recip_root_two   = 1.0/::sqrt(2.0);
+    double recip_root_three = 1.0/std::sqrt(3.0);
+    double recip_root_two   = 1.0/std::sqrt(2.0);
     i = 0;
     // Corner front bottom left
     boundary_particles[i].pos.x() = min_x;
