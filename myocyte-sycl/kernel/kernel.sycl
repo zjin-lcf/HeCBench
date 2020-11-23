@@ -24,9 +24,9 @@
 	int com_offset;																		// kernel1-kernel2 communication offset
 
 	// module parameters
-	fp CaDyad;																			// from ECC model, *** Converting from [mM] to [uM] ***
-	fp CaSL;																			// from ECC model, *** Converting from [mM] to [uM] ***
-	fp CaCyt;																			// from ECC model, *** Converting from [mM] to [uM] ***
+	FP CaDyad;																			// from ECC model, *** Converting from [mM] to [uM] ***
+	FP CaSL;																			// from ECC model, *** Converting from [mM] to [uM] ***
+	FP CaCyt;																			// from ECC model, *** Converting from [mM] to [uM] ***
 
 	//======================================================================================================================================================150
 	// 	COMPUTATION

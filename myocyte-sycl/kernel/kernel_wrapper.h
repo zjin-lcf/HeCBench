@@ -2,7 +2,7 @@
 int 
 kernel_wrapper(	int xmax,
 		int workload,
-		fp*** y,
-		fp** x,
-		fp** params,
-		fp* com);
+		FP*** y,
+		FP** x,
+		FP** params,
+		FP* com);

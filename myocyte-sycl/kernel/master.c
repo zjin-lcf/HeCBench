@@ -35,16 +35,16 @@
 //========================================================================================================================================================================================================200
 
 void 
-master(	fp timeinst,
-    fp *initvalu,
-    fp *parameter,
-    fp *finavalu,
-    fp *com,
+master(	FP timeinst,
+    FP *initvalu,
+    FP *parameter,
+    FP *finavalu,
+    FP *com,
 
-    buffer<fp,1>& d_initvalu,
-    buffer<fp,1>& d_finavalu,
-    buffer<fp,1>& d_params,
-    buffer<fp,1>& d_com,
+    buffer<FP,1>& d_initvalu,
+    buffer<FP,1>& d_finavalu,
+    buffer<FP,1>& d_params,
+    buffer<FP,1>& d_com,
 
     queue &command_queue,
 
@@ -92,13 +92,13 @@ master(	fp timeinst,
   //====================================================================================================100
 
   command_queue.submit([&](handler& cgh) {
-      accessor<fp, 1, access::mode::write, access::target::global_buffer> 
+      accessor<FP, 1, access::mode::write, access::target::global_buffer> 
       d_initvalu_acc(d_initvalu, cgh, range<1>(EQUATIONS), id<1>(0));
       cgh.copy(initvalu, d_initvalu_acc);
   });
 
   command_queue.submit([&](handler& cgh) {
-      accessor<fp, 1, access::mode::write, access::target::global_buffer> 
+      accessor<FP, 1, access::mode::write, access::target::global_buffer> 
       d_params_acc(d_params, cgh, range<1>(PARAMETERS), id<1>(0));
       cgh.copy(parameter, d_params_acc);
   });
@@ -143,13 +143,13 @@ master(	fp timeinst,
   //====================================================================================================100
 
   command_queue.submit([&](handler& cgh) {
-      accessor<fp, 1, sycl_read, access::target::global_buffer> 
+      accessor<FP, 1, sycl_read, access::target::global_buffer> 
       d_finavalu_acc(d_finavalu, cgh, range<1>(EQUATIONS), id<1>(0));
       cgh.copy(d_finavalu_acc, finavalu);
       });
 
   command_queue.submit([&](handler& cgh) {
-      accessor<fp, 1, sycl_read, access::target::global_buffer> 
+      accessor<FP, 1, sycl_read, access::target::global_buffer> 
       d_com_acc(d_com, cgh, range<1>(3), id<1>(0));
       cgh.copy(d_com_acc, com);
       });
@@ -208,10 +208,10 @@ master(	fp timeinst,
   //======================================================================================================================================================150
 
   for(i=0; i<EQUATIONS; i++){
-    if (isnan(finavalu[i])){ 
+    if (std::isnan(finavalu[i])){ 
       finavalu[i] = 0.0001;												// for NAN set rate of change to 0.0001
     }
-    else if (isinf(finavalu[i])){ 
+    else if (std::isinf(finavalu[i])){ 
       finavalu[i] = 0.0001;												// for INF set rate of change to 0.0001
     }
   }

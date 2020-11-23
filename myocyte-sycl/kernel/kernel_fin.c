@@ -21,45 +21,45 @@
 //========================================================================================================================================================================================================200
 
 void 
-kernel_fin(	fp *initvalu,
+kernel_fin(	FP *initvalu,
 			int initvalu_offset_ecc,
 			int initvalu_offset_Dyad,
 			int initvalu_offset_SL,
 			int initvalu_offset_Cyt,
-			fp *parameter,
-			fp *finavalu,
-			fp JCaDyad,
-			fp JCaSL,
-			fp JCaCyt){
+			FP *parameter,
+			FP *finavalu,
+			FP JCaDyad,
+			FP JCaSL,
+			FP JCaCyt){
 
 //=====================================================================
 //	VARIABLES
 //=====================================================================
 
 	// decoded input parameters
-	fp BtotDyad;																		//
-	fp CaMKIItotDyad;																	//
+	FP BtotDyad;																		//
+	FP CaMKIItotDyad;																	//
 
 	// compute variables
-	fp Vmyo;																			// [L]
-	fp Vdyad;																			// [L]
-	fp VSL;																				// [L]
-	// fp kDyadSL;																			// [L/msec]
-	fp kSLmyo;																			// [L/msec]
-	fp k0Boff;																			// [s^-1] 
-	fp k0Bon;																			// [uM^-1 s^-1] kon = koff/Kd
-	fp k2Boff;																			// [s^-1] 
-	fp k2Bon;																			// [uM^-1 s^-1]
-	// fp k4Boff;																			// [s^-1]
-	fp k4Bon;																			// [uM^-1 s^-1]
-	fp CaMtotDyad;
-	fp Bdyad;																			// [uM dyad]
-	fp J_cam_dyadSL;																	// [uM/msec dyad]
-	fp J_ca2cam_dyadSL;																	// [uM/msec dyad]
-	fp J_ca4cam_dyadSL;																	// [uM/msec dyad]
-	fp J_cam_SLmyo;																		// [umol/msec]
-	fp J_ca2cam_SLmyo;																	// [umol/msec]
-	fp J_ca4cam_SLmyo;																	// [umol/msec]
+	FP Vmyo;																			// [L]
+	FP Vdyad;																			// [L]
+	FP VSL;																				// [L]
+	// FP kDyadSL;																			// [L/msec]
+	FP kSLmyo;																			// [L/msec]
+	FP k0Boff;																			// [s^-1] 
+	FP k0Bon;																			// [uM^-1 s^-1] kon = koff/Kd
+	FP k2Boff;																			// [s^-1] 
+	FP k2Bon;																			// [uM^-1 s^-1]
+	// FP k4Boff;																			// [s^-1]
+	FP k4Bon;																			// [uM^-1 s^-1]
+	FP CaMtotDyad;
+	FP Bdyad;																			// [uM dyad]
+	FP J_cam_dyadSL;																	// [uM/msec dyad]
+	FP J_ca2cam_dyadSL;																	// [uM/msec dyad]
+	FP J_ca4cam_dyadSL;																	// [uM/msec dyad]
+	FP J_cam_SLmyo;																		// [umol/msec]
+	FP J_ca2cam_SLmyo;																	// [umol/msec]
+	FP J_ca4cam_SLmyo;																	// [umol/msec]
 
 //=====================================================================
 //	COMPUTATION
