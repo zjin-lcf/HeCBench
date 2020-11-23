@@ -42,12 +42,12 @@
 //========================================================================================================================================================================================================200
 
   void 
-kernel_wrapper(  fp* image,                      // input image
+kernel_wrapper(  FP* image,                      // input image
     int Nr,                        // IMAGE nbr of rows
     int Nc,                        // IMAGE nbr of cols
     long Ne,                      // IMAGE nbr of elem
     int niter,                      // nbr of iterations
-    fp lambda,                      // update step size
+    FP lambda,                      // update step size
     long NeROI,                      // ROI nbr of elements
     int* iN,
     int* iS,
@@ -104,14 +104,14 @@ kernel_wrapper(  fp* image,                      // input image
   try {
 #endif
     const property_list props = property::buffer::use_host_ptr();
-    buffer<fp,1> d_dN (Ne);
-    buffer<fp,1> d_dS (Ne);
-    buffer<fp,1> d_dW (Ne);
-    buffer<fp,1> d_dE (Ne);
-    buffer<fp,1> d_c (Ne);
-    buffer<fp,1> d_sums (Ne);
-    buffer<fp,1> d_sums2 (Ne);
-    buffer<fp,1> d_I (image, Ne, props);
+    buffer<FP,1> d_dN (Ne);
+    buffer<FP,1> d_dS (Ne);
+    buffer<FP,1> d_dW (Ne);
+    buffer<FP,1> d_dE (Ne);
+    buffer<FP,1> d_c (Ne);
+    buffer<FP,1> d_sums (Ne);
+    buffer<FP,1> d_sums2 (Ne);
+    buffer<FP,1> d_I (image, Ne, props);
     buffer<int,1> d_iN (iN, Nr, props);
     buffer<int,1> d_iS (iS, Nr, props);
     buffer<int,1> d_jE (jE, Nc, props);
@@ -162,12 +162,12 @@ kernel_wrapper(  fp* image,                      // input image
     size_t global_work_size2[1];
     long no;
     int mul;
-    fp total;
-    fp total2;
-    fp meanROI;
-    fp meanROI2;
-    fp varROI;
-    fp q0sqr;
+    FP total;
+    FP total2;
+    FP meanROI;
+    FP meanROI2;
+    FP varROI;
+    FP q0sqr;
 
 
     //======================================================================================================================================================150
@@ -211,8 +211,8 @@ kernel_wrapper(  fp* image,                      // input image
         q.submit([&](handler& cgh) {
             auto d_sums_acc = d_sums.get_access<sycl_read_write>(cgh);
             auto d_sums2_acc = d_sums2.get_access<sycl_read_write>(cgh);  // updated every iteration
-            accessor <fp, 1, sycl_read_write, access::target::local> d_psum (NUMBER_THREADS, cgh);
-            accessor <fp, 1, sycl_read_write, access::target::local> d_psum2 (NUMBER_THREADS, cgh);
+            accessor <FP, 1, sycl_read_write, access::target::local> d_psum (NUMBER_THREADS, cgh);
+            accessor <FP, 1, sycl_read_write, access::target::local> d_psum2 (NUMBER_THREADS, cgh);
 
             cgh.parallel_for<class reduce>(
                 nd_range<1>(range<1>(global_work_size2[0]), 
@@ -258,9 +258,9 @@ kernel_wrapper(  fp* image,                      // input image
       // calculate statistics
       //====================================================================================================100
 
-      meanROI  = total / (fp)(NeROI);                    // gets mean (average) value of element in ROI
+      meanROI  = total / (FP)(NeROI);                    // gets mean (average) value of element in ROI
       meanROI2 = meanROI * meanROI;                    //
-      varROI = (total2 / (fp)(NeROI)) - meanROI2;              // gets variance of ROI                
+      varROI = (total2 / (FP)(NeROI)) - meanROI2;              // gets variance of ROI                
       q0sqr = varROI / meanROI2;                      // gets standard deviation of ROI
 
       //====================================================================================================100
