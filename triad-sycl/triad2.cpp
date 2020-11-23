@@ -72,8 +72,8 @@ void RunBenchmark(OptionParser &op)
 #else
   cpu_selector dev_sel;
 #endif
-  queue p(dev_sel);
-  queue q(dev_sel);
+  cl::sycl::queue p(dev_sel);
+  cl::sycl::queue q(dev_sel);
 
   // Allocate device memory of maximum sizes
   buffer<float,1> d_memA0 (blockSizes[nSizes - 1] * 1024);
@@ -127,7 +127,7 @@ void RunBenchmark(OptionParser &op)
           auto A = d_memA0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
           auto B = d_memB0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
           auto C = d_memC0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-          cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+          cgh.parallel_for<class triad_start>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
               int gid = item.get_global_id(0); 
               C[gid] = A[gid] + scalar*B[gid];
               });
@@ -179,7 +179,7 @@ void RunBenchmark(OptionParser &op)
                 auto A = d_memA1.get_access<sycl_read>(cgh);
                 auto B = d_memB1.get_access<sycl_read>(cgh);
                 auto C = d_memC1.get_access<sycl_write>(cgh);
-                cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+                cgh.parallel_for<class triad_curr>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
                     int gid = item.get_global_id(0); 
                     C[gid] = A[gid] + scalar*B[gid];
                     });
@@ -191,7 +191,7 @@ void RunBenchmark(OptionParser &op)
                 auto A = d_memA0.get_access<sycl_read>(cgh);
                 auto B = d_memB0.get_access<sycl_read>(cgh);
                 auto C = d_memC0.get_access<sycl_write>(cgh);
-                cgh.parallel_for(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+                cgh.parallel_for<class triad_next>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
                     int gid = item.get_global_id(0); 
                     C[gid] = A[gid] + scalar*B[gid];
                     });
