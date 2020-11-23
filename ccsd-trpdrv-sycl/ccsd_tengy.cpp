@@ -86,7 +86,7 @@ void ccsd_tengy_gpu(queue &q,
       auto emp4k = d_emp4k.get_access<sycl_read_write>(cgh);
       auto emp5k = d_emp5k.get_access<sycl_read_write>(cgh);
 
-      cgh.parallel_for(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
+      cgh.parallel_for<class tengy>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
         const int b = item.get_global_id(1);
         const int c = item.get_global_id(0); 
 
