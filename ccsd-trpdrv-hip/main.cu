@@ -32,7 +32,7 @@ double * make_array(int n)
 {
     double * a = (double*) malloc(n*sizeof(double));
     for (int i=0; i<n; i++) {
-        a[i] = drand48();
+        a[i] = 0.1; //drand48();
     }
     return a;
 }
