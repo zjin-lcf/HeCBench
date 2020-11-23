@@ -88,7 +88,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) { 
         auto in = d_in.get_access<sycl_read>(cgh);
         auto out = d_out.get_access<sycl_atomic>(cgh);
-        cgh.parallel_for<class reduction>(nd_range<1>(
+        cgh.parallel_for<class reduction_v1>(nd_range<1>(
           range<1>(global_work_size), range<1>(threads)), [=] (nd_item<1> item) {
           int sum = 0;
           int idx = item.get_global_id(0);
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) { 
         auto in = d_in.get_access<sycl_read>(cgh);
         auto out = d_out.get_access<sycl_atomic>(cgh);
-        cgh.parallel_for<class reduction>(nd_range<1>(
+        cgh.parallel_for<class reduction_v2>(nd_range<1>(
           range<1>(global_work_size), range<1>(threads)), [=] (nd_item<1> item) {
           int sum = 0;
           int idx = item.get_global_id(0);
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) { 
         auto in = d_in.get_access<sycl_read>(cgh);
         auto out = d_out.get_access<sycl_atomic>(cgh);
-        cgh.parallel_for<class reduction>(nd_range<1>(
+        cgh.parallel_for<class reduction_v4>(nd_range<1>(
           range<1>(global_work_size), range<1>(threads)), [=] (nd_item<1> item) {
           int sum = 0;
           int idx = item.get_global_id(0);
@@ -206,7 +206,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) { 
         auto in = d_in.get_access<sycl_read>(cgh);
         auto out = d_out.get_access<sycl_atomic>(cgh);
-        cgh.parallel_for<class reduction>(nd_range<1>(
+        cgh.parallel_for<class reduction_v8>(nd_range<1>(
           range<1>(global_work_size), range<1>(threads)), [=] (nd_item<1> item) {
           int sum = 0;
           int idx = item.get_global_id(0);
@@ -245,7 +245,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) { 
         auto in = d_in.get_access<sycl_read>(cgh);
         auto out = d_out.get_access<sycl_atomic>(cgh);
-        cgh.parallel_for<class reduction>(nd_range<1>(
+        cgh.parallel_for<class reduction_v16>(nd_range<1>(
           range<1>(global_work_size), range<1>(threads)), [=] (nd_item<1> item) {
           int sum = 0;
           int idx = item.get_global_id(0);
