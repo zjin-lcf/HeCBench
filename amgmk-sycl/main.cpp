@@ -188,7 +188,7 @@ void test_Matvec()
   error = 0;
   for (i=0; i < nx*ny*nz; i++)
   {
-      diff = fabs(y_data[i]-sol_data[i]);
+      diff = std::fabs(y_data[i]-sol_data[i]);
       if (diff > error) error = diff;
   }
      
@@ -315,7 +315,7 @@ void test_Relax()
   error = 0;
   for (i=0; i < nx*ny*nz; i++)
   {
-      diff = fabs(u_data[i]-1);
+      diff = std::fabs(u_data[i]-1);
       if (diff > error) error = diff;
   }
      
@@ -374,7 +374,7 @@ void test_Axpy()
   error = 0;
   for (i=0; i < nx; i++)
   {
-    diff = fabs(y_data[i]-1-0.5*(double)testIter);
+    diff = std::fabs(y_data[i]-1-0.5*(double)testIter);
       if (diff > error) error = diff;
   }
      
