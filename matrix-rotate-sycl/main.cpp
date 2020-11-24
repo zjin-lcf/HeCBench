@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     rotate_matrix_serial(serial_res, n);
     q.submit([&](handler &h) {
       auto matrix = d_parallel_res.get_access<sycl_read_write>(h);
-      h.parallel_for(nd_range<1>(range<1>((n/2+255)/256*256), range<1>(256)), [=](nd_item<1> item) {
+      h.parallel_for<class matrix_rotate>(nd_range<1>(range<1>((n/2+255)/256*256), range<1>(256)), [=](nd_item<1> item) {
         int layer = item.get_global_id(0); 
         if (layer < n/2) {
           int first = layer;
