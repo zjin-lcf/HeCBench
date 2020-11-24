@@ -156,7 +156,7 @@ int main(int argc, char **argv)
     });
     q.submit([&](handler &h) {
       auto gpuData = dOData.get_access<sycl_atomic>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class test_atomics>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0);
         atomic_fetch_add(gpuData[0], 10);
         atomic_fetch_sub(gpuData[1], 10);
