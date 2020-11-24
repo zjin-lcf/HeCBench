@@ -116,7 +116,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
       printf("j=%d sum=%f\n", j,sum);
 #endif
       sum += net->input_weights[0][j];
-      net-> hidden_units[j] = float(1.0 / (1.0 + exp(-sum)));
+      net-> hidden_units[j] = float(1.0 / (1.0 + std::exp(-sum)));
     }
 
     bpnn_layerforward(net->hidden_units, net->output_units, net->hidden_weights, hid, out);
