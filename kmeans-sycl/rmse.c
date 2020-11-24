@@ -88,7 +88,7 @@ float rms_err	(float **feature,         /* [npoints][nfeatures] */
 		
     }	
 	/* divide by n, then take sqrt */
-	ret = sqrt(sum_euclid / npoints);
+	ret = std::sqrt(sum_euclid / npoints);
 
     return(ret);
 }
