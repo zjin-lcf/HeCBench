@@ -1436,7 +1436,7 @@ We may build the [software from source with support for Nvidia CUDA](https://git
   Hybridsort in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### interleave
-  Interleaved and non-interleaved global memory accesses
+  Interleaved and non-interleaved global memory accesses (Shane Cook. 2012. CUDA Programming: A Developer's Guide to Parallel Computing with GPUs (1st. ed.). Morgan Kaufmann Publishers Inc., San Francisco, CA, USA.)
 
 ### inversek2j
   The inverse kinematics for 2-joint arm (http://axbench.org/)
