@@ -66,7 +66,7 @@ int main(int argc, char** argv)
     q.submit([&] (handler &h) {
       auto i_img = d_image.get_access<sycl_read>(h);
       auto o_img = d_result.get_access<sycl_write>(h);
-      h.parallel_for(nd_range<3>(globalWorkSize, localWorkSize), [=] (nd_item<3> item) {
+      h.parallel_for<class maxpool3>(nd_range<3>(globalWorkSize, localWorkSize), [=] (nd_item<3> item) {
         const int x = item.get_global_id(2); 
         const int y = item.get_global_id(1);
         const int z = item.get_global_id(0);
