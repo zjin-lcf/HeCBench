@@ -77,7 +77,7 @@ void add_test_interleaved(
     q.submit([&](handler &h) {
       auto src_acc = d_src.get_access<sycl_read>(h);
       auto dest_acc = d_dst.get_access<sycl_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class interleaved>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         const unsigned int tid = item.get_global_id(0);
         if (tid < num_elements)
         {
@@ -127,7 +127,7 @@ void add_test_non_interleaved(
     q.submit([&](handler &h) {
       auto src_acc = d_src.get_access<sycl_read>(h);
       auto dest_acc = d_dst.get_access<sycl_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class non_interleaved>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         const unsigned int tid = item.get_global_id(0);
         if (tid < num_elements)
         {
