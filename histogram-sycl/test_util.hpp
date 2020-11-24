@@ -54,8 +54,6 @@ constexpr access::mode sycl_discard_write = access::mode::discard_write;
 constexpr access::mode sycl_atomic = access::mode::atomic;
 
 
-typedef unsigned char uchar1 ;
-
 /******************************************************************************
  * Assertion macros
  ******************************************************************************/
@@ -319,19 +317,19 @@ inline bool IsNaN<float>(float val)
 
 
 template<>
-inline bool IsNaN<float2>(float2 val)
+inline bool IsNaN<cl::sycl::float2>(cl::sycl::float2 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<float3>(float3 val)
+inline bool IsNaN<cl::sycl::float3>(cl::sycl::float3 val)
 {
     return (IsNaN(val.z()) || IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<float4>(float4 val)
+inline bool IsNaN<cl::sycl::float4>(cl::sycl::float4 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()) || IsNaN(val.w()) || IsNaN(val.z()));
 }
@@ -346,28 +344,22 @@ inline bool IsNaN<double>(double val)
 }
 
 template<>
-inline bool IsNaN<double2>(double2 val)
+inline bool IsNaN<cl::sycl::double2>(cl::sycl::double2 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<double3>(double3 val)
+inline bool IsNaN<cl::sycl::double3>(cl::sycl::double3 val)
 {
     return (IsNaN(val.z()) || IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<double4>(double4 val)
+inline bool IsNaN<cl::sycl::double4>(cl::sycl::double4 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()) || IsNaN(val.w()) || IsNaN(val.z()));
 }
-
-
-
-
-
-
 
 /******************************************************************************
  * Console printing utilities
