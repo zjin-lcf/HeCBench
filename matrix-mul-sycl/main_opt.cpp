@@ -1,4 +1,3 @@
-#include <CL/sycl.hpp>
 #include <iostream>
 #include <limits>
 #include <cmath>
@@ -23,7 +22,7 @@ constexpr int P = m_size / 2;
  * Perform matrix multiplication on host to verify results from device.
  */
 bool ValueSame(float a, float b) {
-  return fabs(a - b) < numeric_limits<float>::epsilon();
+  return std::fabs(a - b) < numeric_limits<float>::epsilon();
 }
 
 int VerifyResult(float (*a_host)[N], float (*b_host)[P], float (*c_host)[P], float (*c_back)[P]) {
@@ -102,7 +101,7 @@ int main() {
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+    cl::sycl::queue q(dev_sel);
 
     // Create buffers for matrices, buffer c is bound with host memory c_back
     buffer<float, 1> a(reinterpret_cast<float*>(a_host), range<1>(M*N));
@@ -125,7 +124,7 @@ int main() {
       auto C = c.get_access<sycl_discard_write>(h);
 
       // Execute kernel.
-      h.parallel_for(nd_range<2>(global_ndrange, local_ndrange), [=](nd_item<2> index) {
+      h.parallel_for<class mm>(nd_range<2>(global_ndrange, local_ndrange), [=](nd_item<2> index) {
         int row = index.get_global_id(0);
         int col = index.get_global_id(1);
         if( col < P && row < M) {
