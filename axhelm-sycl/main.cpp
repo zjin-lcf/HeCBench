@@ -117,7 +117,7 @@ int main(int argc, char **argv){
             accessor<double, 1, sycl_read_write, access::target::local> s_GWr(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_GWs(64, cgh);
 
-            cgh.parallel_for(nd_range<2>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<2> item) {
+            cgh.parallel_for<class axhelm_ndim3>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
                 double r_Ut, r_Vt, r_Wt;
                 double r_U[8], r_V[8], r_W[8];
                 double r_AU[8], r_AV[8], r_AW[8];
@@ -235,7 +235,7 @@ int main(int argc, char **argv){
             accessor<double, 1, sycl_read_write, access::target::local> s_Gqr(64, cgh);
             accessor<double, 1, sycl_read_write, access::target::local> s_Gqs(64, cgh);
 
-            cgh.parallel_for(nd_range<2>(range<2>(global_work_size), range<2>(local_work_size)), [=] (nd_item<2> item) {
+            cgh.parallel_for<class axhelm_ndim1>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
                 double r_qt, r_Gqt, r_Auk;
                 double r_q[8];
                 double r_Aq[8];
@@ -311,7 +311,7 @@ int main(int argc, char **argv){
 
   dfloat maxDiff = 0;
   for(int n=0;n<Ndim*Np*Nelements;++n){
-    dfloat diff = fabs(q[n]-Aq[n]);
+    dfloat diff = std::fabs(q[n]-Aq[n]);
     maxDiff = (maxDiff<diff) ? diff:maxDiff;
   }
   std::cout << "Correctness check: maxError = " << maxDiff << "\n";
