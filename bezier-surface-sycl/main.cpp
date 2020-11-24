@@ -150,12 +150,12 @@ inline int compare_output(XYZ *outp, XYZ *outpCPU, int NI, int NJ, int RESOLUTIO
     L1norm2    = 0;
     for(int i = 0; i < RESOLUTIONI; i++) {
         for(int j = 0; j < RESOLUTIONJ; j++) {
-            sum_delta2 += fabs(outp[i * RESOLUTIONJ + j].x - outpCPU[i * RESOLUTIONJ + j].x);
-            sum_ref2 += fabs(outpCPU[i * RESOLUTIONJ + j].x);
-            sum_delta2 += fabs(outp[i * RESOLUTIONJ + j].y - outpCPU[i * RESOLUTIONJ + j].y);
-            sum_ref2 += fabs(outpCPU[i * RESOLUTIONJ + j].y);
-            sum_delta2 += fabs(outp[i * RESOLUTIONJ + j].z - outpCPU[i * RESOLUTIONJ + j].z);
-            sum_ref2 += fabs(outpCPU[i * RESOLUTIONJ + j].z);
+            sum_delta2 += std::fabs(outp[i * RESOLUTIONJ + j].x - outpCPU[i * RESOLUTIONJ + j].x);
+            sum_ref2 += std::fabs(outpCPU[i * RESOLUTIONJ + j].x);
+            sum_delta2 += std::fabs(outp[i * RESOLUTIONJ + j].y - outpCPU[i * RESOLUTIONJ + j].y);
+            sum_ref2 += std::fabs(outpCPU[i * RESOLUTIONJ + j].y);
+            sum_delta2 += std::fabs(outp[i * RESOLUTIONJ + j].z - outpCPU[i * RESOLUTIONJ + j].z);
+            sum_ref2 += std::fabs(outpCPU[i * RESOLUTIONJ + j].z);
         }
     }
     L1norm2 = (double)(sum_delta2 / sum_ref2);
