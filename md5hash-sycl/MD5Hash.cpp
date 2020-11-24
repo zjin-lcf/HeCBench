@@ -374,7 +374,7 @@ void   FindKeyWithDigest_GPU(const unsigned int searchDigest[4],
     // calculate work thread shape
     //
     size_t nthreads = 256;
-    size_t nblocks  = ceil((double(keyspace) / double(valsPerByte)) / double(nthreads));
+    size_t nblocks  = std::ceil((double(keyspace) / double(valsPerByte)) / double(nthreads));
     size_t globalsize = nblocks * nthreads;
     unsigned int searchDigest0 = searchDigest[0];
     unsigned int searchDigest1 = searchDigest[1];
