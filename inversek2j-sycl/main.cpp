@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 	    auto xTarget_in = xTarget_in_d.get_access<sycl_read>(cgh);
 	    auto yTarget_in = yTarget_in_d.get_access<sycl_read>(cgh);
 	    auto angles = angle_out_d.get_access<sycl_discard_write>(cgh);
-	    cgh.parallel_for<class render_kernel>(
+	    cgh.parallel_for<class inversek>(
 	      nd_range<1>(range<1>(global_work_size), range<1>(BLOCK_SIZE)), [=] (nd_item<1> item) {
 
 	      int idx = item.get_global_id(0);
