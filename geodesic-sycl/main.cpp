@@ -75,7 +75,7 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   return dist;
 }
 
-void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {
+void distance_device(const cl::sycl::float4* VA, float* VC, const size_t N, const int iteration) {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -86,7 +86,7 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
   range<1> global_work_size((N+255)/256*256);
   range<1> local_work_size (256);
   const  property_list props = { property::buffer::use_host_ptr()};
-  buffer<float4, 1> bufferA(VA, N, props);
+  buffer<cl::sycl::float4, 1> bufferA(VA, N, props);
   buffer<float, 1> bufferC(VC, N, props);
 
   for (int n = 0; n < iteration; n++) {
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
     exit(-1);
   }
 
-  float4* input  = (float4*) aligned_alloc(4096, N*sizeof(float4));
+  cl::sycl::float4* input  = (cl::sycl::float4*) aligned_alloc(4096, N*sizeof(cl::sycl::float4));
   float*  output = (float*) aligned_alloc(4096, N*sizeof(float));
   float*  expected_output = (float*) malloc(N*sizeof(float));
 
