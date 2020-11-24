@@ -46,8 +46,8 @@ lapl_iter_supersite(supersite *out, float sigma, supersite *in)
   {
     float delta = sigma / (1+4*sigma);
     float norm = 1./(1+4*sigma);
-    __m128 register vnorm = _mm_load1_ps(&norm);
-    __m128 register vdelta = _mm_load1_ps(&delta);
+    __m128 vnorm = _mm_load1_ps(&norm);
+    __m128 vdelta = _mm_load1_ps(&delta);
     /* Do lapl iteration on volume, ommiting boundaries in x-direction */
 #pragma omp for nowait
     for(int y=0; y<Ly; y++)
@@ -59,17 +59,17 @@ lapl_iter_supersite(supersite *out, float sigma, supersite *in)
 	int vp0 = x + ((y+1)%Ly)*lx;
 	int vm0 = x + ((Ly+(y-1))%Ly)*lx;
 	
-	__m128 register in00 = _mm_load_ps(&in[v00].site4[0]);
-	__m128 register in0p = _mm_load_ps(&in[v0p].site4[0]);
-	__m128 register in0m = _mm_load_ps(&in[v0m].site4[0]);
-	__m128 register inp0 = _mm_load_ps(&in[vp0].site4[0]);
-	__m128 register inm0 = _mm_load_ps(&in[vm0].site4[0]);
+	__m128 in00 = _mm_load_ps(&in[v00].site4[0]);
+	__m128 in0p = _mm_load_ps(&in[v0p].site4[0]);
+	__m128 in0m = _mm_load_ps(&in[v0m].site4[0]);
+	__m128 inp0 = _mm_load_ps(&in[vp0].site4[0]);
+	__m128 inm0 = _mm_load_ps(&in[vm0].site4[0]);
 	
-	__m128 register hop = _mm_add_ps(inm0, inp0);
+	__m128 hop = _mm_add_ps(inm0, inp0);
 	hop = _mm_add_ps(hop, in0p);
 	hop = _mm_add_ps(hop, in0m);
 	hop = _mm_mul_ps(hop, vdelta);
-	__m128 register dia = _mm_mul_ps(vnorm, in00);
+	__m128 dia = _mm_mul_ps(vnorm, in00);
 	hop = _mm_add_ps(dia, hop);
 	_mm_store_ps(&out[v00].site4[0], hop);
       }
@@ -84,18 +84,18 @@ lapl_iter_supersite(supersite *out, float sigma, supersite *in)
       int vp0 = x + ((y+1)%Ly)*lx;
       int vm0 = x + ((Ly+(y-1))%Ly)*lx;    
       
-      __m128 register in00 = _mm_load_ps(&in[v00].site4[0]);
-      __m128 register in0p = _mm_load_ps(&in[v0p].site4[0]);
-      __m128 register in0m = _mm_load_ps(&in[v0m].site4[0]);
+      __m128 in00 = _mm_load_ps(&in[v00].site4[0]);
+      __m128 in0p = _mm_load_ps(&in[v0p].site4[0]);
+      __m128 in0m = _mm_load_ps(&in[v0m].site4[0]);
       in0m = _mm_shuffle_ps(in0m, in0m, _MM_SHUFFLE(2,1,0,3));
-      __m128 register inp0 = _mm_load_ps(&in[vp0].site4[0]);
-      __m128 register inm0 = _mm_load_ps(&in[vm0].site4[0]);
+      __m128 inp0 = _mm_load_ps(&in[vp0].site4[0]);
+      __m128 inm0 = _mm_load_ps(&in[vm0].site4[0]);
       
-      __m128 register hop = _mm_add_ps(inm0, inp0);
+      __m128 hop = _mm_add_ps(inm0, inp0);
       hop = _mm_add_ps(hop, in0p);
       hop = _mm_add_ps(hop, in0m);
       hop = _mm_mul_ps(hop, vdelta);
-      __m128 register dia = _mm_mul_ps(vnorm, in00);
+      __m128 dia = _mm_mul_ps(vnorm, in00);
       hop = _mm_add_ps(dia, hop);
       _mm_store_ps(&out[v00].site4[0], hop);
     }
@@ -110,18 +110,18 @@ lapl_iter_supersite(supersite *out, float sigma, supersite *in)
       int vp0 = x + ((y+1)%Ly)*lx;
       int vm0 = x + ((Ly+(y-1))%Ly)*lx;    
       
-      __m128 register in00 = _mm_load_ps(&in[v00].site4[0]);
-      __m128 register in0p = _mm_load_ps(&in[v0p].site4[0]);
+      __m128 in00 = _mm_load_ps(&in[v00].site4[0]);
+      __m128 in0p = _mm_load_ps(&in[v0p].site4[0]);
       in0p = _mm_shuffle_ps(in0p, in0p, _MM_SHUFFLE(0,3,2,1));
-      __m128 register in0m = _mm_load_ps(&in[v0m].site4[0]);
-      __m128 register inp0 = _mm_load_ps(&in[vp0].site4[0]);
-      __m128 register inm0 = _mm_load_ps(&in[vm0].site4[0]);
+      __m128 in0m = _mm_load_ps(&in[v0m].site4[0]);
+      __m128 inp0 = _mm_load_ps(&in[vp0].site4[0]);
+      __m128 inm0 = _mm_load_ps(&in[vm0].site4[0]);
       
-      __m128 register hop = _mm_add_ps(inm0, inp0);
+      __m128 hop = _mm_add_ps(inm0, inp0);
       hop = _mm_add_ps(hop, in0p);
       hop = _mm_add_ps(hop, in0m);
       hop = _mm_mul_ps(hop, vdelta);
-      __m128 register dia = _mm_mul_ps(vnorm, in00);
+      __m128 dia = _mm_mul_ps(vnorm, in00);
       hop = _mm_add_ps(dia, hop);
       _mm_store_ps(&out[v00].site4[0], hop);
     }
