@@ -460,7 +460,7 @@ void KeccakTreeGPU(queue &q, tKeccakLane * h_inBuffer, buffer<tKeccakLane,1> &d_
      auto inBuffer = d_inBuffer.get_access<sycl_read>(h);
      auto outBuffer = d_outBuffer.get_access<sycl_write>(h);
      auto KeccakF_RoundConstants = d_KeccakF_RoundConstants.get_access<sycl_read>(h);
-     h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+     h.parallel_for<class keccak> (nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
        int ind_word,k;
        tKeccakLane Kstate[25];
 
