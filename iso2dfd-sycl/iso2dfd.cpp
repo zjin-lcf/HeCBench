@@ -105,7 +105,7 @@ bool within_epsilon(float* output, float* reference, const size_t dimx,
   }
 
   if (fp != stderr) fclose(fp);
-  norm2 = sqrt(norm2);
+  norm2 = std::sqrt(norm2);
   if (error) printf("error (Euclidean norm): %.9e\n", norm2);
   return error;
 }
@@ -268,12 +268,12 @@ int main(int argc, char* argv[]) {
         auto vel = b_vel.get_access<access::mode::read>(h);
 
         if (k % 2 == 0)
-          h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+          h.template parallel_for<class kernel_next>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
                 iso_2dfd_kernel(item, next.get_pointer(), prev.get_pointer(), vel.get_pointer(),
                                           dtDIVdxy, nRows, nCols);
               });
         else
-          h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+          h.template parallel_for<class kernel_prev>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
                 iso_2dfd_kernel(item, prev.get_pointer(), next.get_pointer(), vel.get_pointer(),
                                           dtDIVdxy, nRows, nCols);
               });
