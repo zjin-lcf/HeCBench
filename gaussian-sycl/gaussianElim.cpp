@@ -27,7 +27,7 @@ create_matrix(float *m, int size){
 
   for (i=0; i < size; i++)
   {
-    coe_i = 10*exp(lamda*i); 
+    coe_i = 10*std::exp(lamda*i); 
     j=size-1+i;     
     coe[j]=coe_i;
     j=size-1-i;     
