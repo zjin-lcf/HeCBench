@@ -44,8 +44,8 @@ int main(int argc, char ** argv) {
   float host_sin_angle[NPOINTS], host_cos_angle[NPOINTS], theta[NPOINTS];
   for(int n = 0; n < NPOINTS; n++) {
     theta[n] = (((double) n) * 2.0 * PI) / ((double) NPOINTS);
-    host_sin_angle[n] = sin(theta[n]);
-    host_cos_angle[n] = cos(theta[n]);
+    host_sin_angle[n] = std::sin(theta[n]);
+    host_cos_angle[n] = std::cos(theta[n]);
 #ifdef DEBUG
     printf("n=%d theta: %lf sin: %lf cos: %lf\n", n,theta[n], host_sin_angle[n], host_cos_angle[n]);
 #endif
@@ -56,10 +56,10 @@ int main(int argc, char ** argv) {
   for (int k = 0; k < NCIRCLES; k++) {
     double rad = (double) (MIN_RAD + (2 * k)); 
     for (int n = 0; n < NPOINTS; n++) {
-      host_tX[(k * NPOINTS) + n] = (int)(cos(theta[n]) * rad);
-      host_tY[(k * NPOINTS) + n] = (int)(sin(theta[n]) * rad);
+      host_tX[(k * NPOINTS) + n] = (int)(std::cos(theta[n]) * rad);
+      host_tY[(k * NPOINTS) + n] = (int)(std::sin(theta[n]) * rad);
 #ifdef DEBUG
-      printf("n=%d %lf tX: %d tY: %d\n", n, cos(theta[n]) * rad, host_tX[(k * NPOINTS) + n], host_tY[(k * NPOINTS) + n]);
+      printf("n=%d %lf tX: %d tY: %d\n", n, std::cos(theta[n]) * rad, host_tX[(k * NPOINTS) + n], host_tY[(k * NPOINTS) + n]);
 #endif
     }
   }
@@ -251,7 +251,7 @@ int main(int argc, char ** argv) {
 
   GICOV_spots = (double *) malloc(sizeof(double) * pair_counter);
   for(i = 0; i < pair_counter; i++)
-    GICOV_spots[i] = sqrt(m_get_val(gicov, crow[i], ccol[i]));
+    GICOV_spots[i] = std::sqrt(m_get_val(gicov, crow[i], ccol[i]));
 
   G = (double *) calloc(pair_counter, sizeof(double));
   x_result = (double *) calloc(pair_counter, sizeof(double));
@@ -278,8 +278,8 @@ int main(int argc, char ** argv) {
   celly = m_get(x_result_len, 36);
   for(i = 0; i < x_result_len; i++) {
     for(j = 0; j < 36; j++) {
-      m_set_val(cellx, i, j, x_result[i] + radius * cos(t[j]));
-      m_set_val(celly, i, j, y_result[i] + radius * sin(t[j]));
+      m_set_val(cellx, i, j, x_result[i] + radius * std::cos(t[j]));
+      m_set_val(celly, i, j, y_result[i] + radius * std::sin(t[j]));
     }
   }
 
@@ -344,11 +344,11 @@ int main(int argc, char ** argv) {
 
         Nx = v_get(Ys->dim);
         for (i = 0; i < Ys->dim; i++)
-          v_set_val(Nx, i, v_get_val(Ys, i) / sqrt(v_get_val(Xs, i)*v_get_val(Xs, i) + v_get_val(Ys, i)*v_get_val(Ys, i)));
+          v_set_val(Nx, i, v_get_val(Ys, i) / std::sqrt(v_get_val(Xs, i)*v_get_val(Xs, i) + v_get_val(Ys, i)*v_get_val(Ys, i)));
 
         Ny = v_get(Xs->dim);
         for (i = 0; i < Xs->dim; i++)
-          v_set_val(Ny, i, -1.0 * v_get_val(Xs, i) / sqrt(v_get_val(Xs, i)*v_get_val(Xs, i) + v_get_val(Ys, i)*v_get_val(Ys, i)));
+          v_set_val(Ny, i, -1.0 * v_get_val(Xs, i) / std::sqrt(v_get_val(Xs, i)*v_get_val(Xs, i) + v_get_val(Ys, i)*v_get_val(Ys, i)));
 
         W = v_get(Nx->dim);
         for (i = 0; i < Nx->dim; i++)
