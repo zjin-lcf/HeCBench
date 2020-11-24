@@ -24,12 +24,12 @@
 #define BLOCK_SIZE 128
 
 #define Real float
-#define ZERO 0.0f
-#define ONE 1.0f
-#define TWO 2.0f
+#define ZERO 0
+#define ONE 1
+#define TWO 2
 
 /** SOR relaxation parameter */
-const Real omega = 1.85f;
+const Real omega = 1.85;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -217,7 +217,7 @@ int main (void) {
       auto aP = aP_d.get_access<sycl_read>(h);
       auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
 
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+      h.template parallel_for<class stencil_black>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
         int ind_red = col * ((NUM >> 1) + 2) + row;
@@ -229,7 +229,7 @@ int main (void) {
               + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
               + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
 
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
 
         temp_red[ind_red] = temp_new;
         res = temp_new - temp_old;
@@ -261,7 +261,7 @@ int main (void) {
       auto aP = aP_d.get_access<sycl_read>(h);
       auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
 
-      h.parallel_for(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+      h.template parallel_for<class stencil_red>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
         int ind_black = col * ((NUM >> 1) + 2) + row;
@@ -273,7 +273,7 @@ int main (void) {
               + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
               + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
 
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
 
         temp_black[ind_black] = temp_new;
         res = temp_new - temp_old;
@@ -295,7 +295,7 @@ int main (void) {
     }
 
     // calculate residual
-    norm_L2 = sqrt(norm_L2 / ((Real)size));
+    norm_L2 = std::sqrt(norm_L2 / ((Real)size));
 
     if (iter % 5000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
