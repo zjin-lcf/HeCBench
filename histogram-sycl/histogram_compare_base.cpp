@@ -46,7 +46,7 @@ bool                    g_report = false;   // Whether to display a full report 
 
 // Decode float4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-inline void DecodePixel(float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+inline void DecodePixel(cl::sycl::float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     float* samples = reinterpret_cast<float*>(&pixel);
 
@@ -57,7 +57,7 @@ inline void DecodePixel(float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 
 // Decode uchar4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-inline void DecodePixel(uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+inline void DecodePixel(cl::sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     unsigned char* samples = reinterpret_cast<unsigned char*>(&pixel);
 
@@ -66,9 +66,9 @@ inline void DecodePixel(uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL]);
 }
 
-// Decode uchar1 pixel into bins
+// Decode unsigned char pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-inline void DecodePixel(uchar1 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+inline void DecodePixel(unsigned char pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     bins[0] = (unsigned int) pixel;
 }
@@ -146,7 +146,7 @@ struct TgaHeader
 /**
  * Decode image byte data into pixel
  */
-void ParseTgaPixel(uchar4 &pixel, unsigned char *tga_pixel, int bytes)
+void ParseTgaPixel(cl::sycl::uchar4 &pixel, unsigned char *tga_pixel, int bytes)
 {
     if (bytes == 4)
     {
@@ -175,7 +175,7 @@ void ParseTgaPixel(uchar4 &pixel, unsigned char *tga_pixel, int bytes)
 /**
  * Reads a .tga image file
  */
-void ReadTga(uchar4* &pixels, int &width, int &height, const char *filename)
+void ReadTga(cl::sycl::uchar4* &pixels, int &width, int &height, const char *filename)
 {
     // Open the file
     FILE *fptr;
@@ -217,8 +217,8 @@ void ReadTga(uchar4* &pixels, int &width, int &height, const char *filename)
     int pixel_bytes = header.bitsperpixel / 8;
 
     // Allocate and initialize pixel data
-    size_t image_bytes = width * height * sizeof(uchar4);
-    if ((pixels == NULL) && ((pixels = (uchar4*) malloc(image_bytes)) == NULL))
+    size_t image_bytes = width * height * sizeof(cl::sycl::uchar4);
+    if ((pixels == NULL) && ((pixels = (cl::sycl::uchar4*) malloc(image_bytes)) == NULL))
     {
         fprintf(stderr, "malloc of image failed\n");
         exit(-1);
@@ -292,11 +292,11 @@ void ReadTga(uchar4* &pixels, int &width, int &height, const char *filename)
 /**
  * Generate a random image with specified entropy
  */
-void GenerateRandomImage(uchar4* &pixels, int width, int height, int entropy_reduction)
+void GenerateRandomImage(cl::sycl::uchar4* &pixels, int width, int height, int entropy_reduction)
 {
     int num_pixels = width * height;
-    size_t image_bytes = num_pixels * sizeof(uchar4);
-    if ((pixels == NULL) && ((pixels = (uchar4*) malloc(image_bytes)) == NULL))
+    size_t image_bytes = num_pixels * sizeof(cl::sycl::uchar4);
+    if ((pixels == NULL) && ((pixels = (cl::sycl::uchar4*) malloc(image_bytes)) == NULL))
     {
         fprintf(stderr, "malloc of image failed\n");
         exit(-1);
@@ -319,7 +319,7 @@ void GenerateRandomImage(uchar4* &pixels, int width, int height, int entropy_red
 
 // Decode float4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-void DecodePixelGold(float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+void DecodePixelGold(cl::sycl::float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     float* samples = reinterpret_cast<float*>(&pixel);
 
@@ -329,7 +329,7 @@ void DecodePixelGold(float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 
 // Decode uchar4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-void DecodePixelGold(uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+void DecodePixelGold(cl::sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     unsigned char* samples = reinterpret_cast<unsigned char*>(&pixel);
 
@@ -337,9 +337,9 @@ void DecodePixelGold(uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL]);
 }
 
-// Decode uchar1 pixel into bins
+// Decode unsigned char pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-void DecodePixelGold(uchar1 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+void DecodePixelGold(unsigned char pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     bins[0] = (unsigned int) pixel;
 }
@@ -500,7 +500,7 @@ void TestMethods(
  * Test different problem genres
  */
 void TestGenres(
-    uchar4*     uchar4_pixels,
+    cl::sycl::uchar4*     uchar4_pixels,
     int         height,
     int         width,
     int         timing_iterations,
@@ -509,10 +509,10 @@ void TestGenres(
     int num_pixels = width * height;
 
     {
-        if (!g_report) printf("1 channel uchar1 tests (256-bin):\n\n"); fflush(stdout);
+        if (!g_report) printf("1 channel unsigned char tests (256-bin):\n\n"); fflush(stdout);
 
-        size_t      image_bytes     = num_pixels * sizeof(uchar1);
-        uchar1*     uchar1_pixels   = (uchar1*) malloc(image_bytes);
+        size_t      image_bytes     = num_pixels * sizeof(unsigned char);
+        unsigned char*     uchar1_pixels   = (unsigned char*) malloc(image_bytes);
 
         // Convert to 1-channel (averaging first 3 channels)
         for (int i = 0; i < num_pixels; ++i)
@@ -536,8 +536,8 @@ void TestGenres(
 
     {
         if (!g_report) printf("3/4 channel float4 tests (256-bin):\n\n"); fflush(stdout);
-        size_t      image_bytes     = num_pixels * sizeof(float4);
-        float4*     float4_pixels   = (float4*) malloc(image_bytes);
+        size_t      image_bytes     = num_pixels * sizeof(cl::sycl::float4);
+	cl::sycl::float4*     float4_pixels   = (cl::sycl::float4*) malloc(image_bytes);
 
         // Convert to float4 with range [0.0, 1.0)
         for (int i = 0; i < num_pixels; ++i)
@@ -604,7 +604,7 @@ int main(int argc, char **argv)
     double bandwidth_GBs = 41;  // hardcoded 
 
     // Run test(s)
-    uchar4* uchar4_pixels = NULL;
+    cl::sycl::uchar4* uchar4_pixels = NULL;
     if (!g_report)
     {
         if (!filename.empty())
