@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     q.submit([&](auto &h) {
       auto out = d_out.get_access<sycl_write>(h);
       auto in = d_in.get_access<sycl_read>(h);
-      h.parallel_for(nd_range<1>(global_range, local_range), [=](nd_item<1> item) {
+      h.template parallel_for<class stencil>(nd_range<1>(global_range, local_range), [=](nd_item<1> item) {
         int idx = item.get_global_id(0);
         int x = idx % lx; 
         int y = idx / lx;
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
   // verification
   for (int i = 0; i < Lx*Ly; i++) {
     // choose 1e-2 because the error rate increases with the iteration from 1 to 100000
-    if ( fabs(cpu_arr[i] - gpu_arr[i]) > 1e-2 ) {
+    if ( std::fabs(cpu_arr[i] - gpu_arr[i]) > 1e-2 ) {
 	    printf("FAILED at %d cpu=%f gpu=%f\n", i, cpu_arr[i], gpu_arr[i]);
             /* free main memory array */
             free(cpu_arr);
