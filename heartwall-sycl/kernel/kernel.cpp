@@ -59,20 +59,20 @@ kernel_gpu_wrapper(  params_common common,
   common.in_rows = common.tSize + 1 + common.tSize;
   common.in_cols = common.in_rows;
   common.in_elem = common.in_rows * common.in_cols;
-  common.in_mem = sizeof(fp) * common.in_elem;
+  common.in_mem = sizeof(FP) * common.in_elem;
 
   //==================================================50
   // endo points templates
   //==================================================50
 
-  buffer<fp,1> d_endoT(common.in_elem * common.endoPoints);
+  buffer<FP,1> d_endoT(common.in_elem * common.endoPoints);
   //printf("%d\n", common.in_elem * common.endoPoints);
 
   //==================================================50
   // epi points templates
   //==================================================50
 
-  buffer<fp,1> d_epiT(common.in_elem * common.epiPoints);
+  buffer<FP,1> d_epiT(common.in_elem * common.epiPoints);
   //printf("%d\n", common.in_elem * common.epiPoints);
 
   //====================================================================================================100
@@ -83,10 +83,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_rows = common.sSize + 1 + common.sSize;
   common.in2_cols = common.in2_rows;
   common.in2_elem = common.in2_rows * common.in2_cols;
-  common.in2_mem = sizeof(fp) * common.in2_elem;
+  common.in2_mem = sizeof(FP) * common.in2_elem;
 
   // unique
-  buffer<fp,1> d_in2(common.in2_elem * common.allPoints);
+  buffer<FP,1> d_in2(common.in2_elem * common.allPoints);
   //printf("%d\n", common.in2_elem * common.allPoints);
 
   //====================================================================================================100
@@ -97,12 +97,12 @@ kernel_gpu_wrapper(  params_common common,
   common.conv_rows = common.in_rows + common.in2_rows - 1;                        // number of rows in I
   common.conv_cols = common.in_cols + common.in2_cols - 1;                        // number of columns in I
   common.conv_elem = common.conv_rows * common.conv_cols;                          // number of elements
-  common.conv_mem = sizeof(fp) * common.conv_elem;
+  common.conv_mem = sizeof(FP) * common.conv_elem;
   common.ioffset = 0;
   common.joffset = 0;
 
   // unique
-  buffer<fp,1> d_conv(common.conv_elem * common.allPoints);
+  buffer<FP,1> d_conv(common.conv_elem * common.allPoints);
   //printf("%d\n", common.conv_elem * common.allPoints);
 
   //====================================================================================================100
@@ -120,10 +120,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_pad_cumv_rows = common.in2_rows + 2*common.in2_pad_add_rows;
   common.in2_pad_cumv_cols = common.in2_cols + 2*common.in2_pad_add_cols;
   common.in2_pad_cumv_elem = common.in2_pad_cumv_rows * common.in2_pad_cumv_cols;
-  common.in2_pad_cumv_mem = sizeof(fp) * common.in2_pad_cumv_elem;
+  common.in2_pad_cumv_mem = sizeof(FP) * common.in2_pad_cumv_elem;
 
   // unique
-  buffer<fp,1> d_in2_pad_cumv(common.in2_pad_cumv_elem * common.allPoints);
+  buffer<FP,1> d_in2_pad_cumv(common.in2_pad_cumv_elem * common.allPoints);
   //printf("%d\n", common.in2_pad_cumv_elem * common.allPoints);
 
   //==================================================50
@@ -138,10 +138,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_pad_cumv_sel_rows = common.in2_pad_cumv_sel_rowhig - common.in2_pad_cumv_sel_rowlow + 1;
   common.in2_pad_cumv_sel_cols = common.in2_pad_cumv_sel_colhig - common.in2_pad_cumv_sel_collow + 1;
   common.in2_pad_cumv_sel_elem = common.in2_pad_cumv_sel_rows * common.in2_pad_cumv_sel_cols;
-  common.in2_pad_cumv_sel_mem = sizeof(fp) * common.in2_pad_cumv_sel_elem;
+  common.in2_pad_cumv_sel_mem = sizeof(FP) * common.in2_pad_cumv_sel_elem;
 
   // unique
-  buffer<fp,1> d_in2_pad_cumv_sel(common.in2_pad_cumv_sel_elem * common.allPoints);
+  buffer<FP,1> d_in2_pad_cumv_sel(common.in2_pad_cumv_sel_elem * common.allPoints);
   //printf("%d\n", common.in2_pad_cumv_sel_elem * common.allPoints);
 
   //==================================================50
@@ -156,10 +156,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_sub_cumh_rows = common.in2_pad_cumv_sel2_rowhig - common.in2_pad_cumv_sel2_rowlow + 1;
   common.in2_sub_cumh_cols = common.in2_pad_cumv_sel2_colhig - common.in2_pad_cumv_sel2_collow + 1;
   common.in2_sub_cumh_elem = common.in2_sub_cumh_rows * common.in2_sub_cumh_cols;
-  common.in2_sub_cumh_mem = sizeof(fp) * common.in2_sub_cumh_elem;
+  common.in2_sub_cumh_mem = sizeof(FP) * common.in2_sub_cumh_elem;
 
   // unique
-  buffer<fp,1> d_in2_sub_cumh(common.in2_sub_cumh_elem * common.allPoints);
+  buffer<FP,1> d_in2_sub_cumh(common.in2_sub_cumh_elem * common.allPoints);
   //printf("%d\n", common.in2_sub_cumh_elem * common.allPoints);
 
   //==================================================50
@@ -174,10 +174,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_sub_cumh_sel_rows = common.in2_sub_cumh_sel_rowhig - common.in2_sub_cumh_sel_rowlow + 1;
   common.in2_sub_cumh_sel_cols = common.in2_sub_cumh_sel_colhig - common.in2_sub_cumh_sel_collow + 1;
   common.in2_sub_cumh_sel_elem = common.in2_sub_cumh_sel_rows * common.in2_sub_cumh_sel_cols;
-  common.in2_sub_cumh_sel_mem = sizeof(fp) * common.in2_sub_cumh_sel_elem;
+  common.in2_sub_cumh_sel_mem = sizeof(FP) * common.in2_sub_cumh_sel_elem;
 
   // unique
-  buffer<fp,1> d_in2_sub_cumh_sel(common.in2_sub_cumh_sel_elem * common.allPoints);
+  buffer<FP,1> d_in2_sub_cumh_sel(common.in2_sub_cumh_sel_elem * common.allPoints);
   //printf("%d\n", common.in2_sub_cumh_sel_elem * common.allPoints);
 
   //==================================================50
@@ -192,10 +192,10 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_sub2_rows = common.in2_sub_cumh_sel2_rowhig - common.in2_sub_cumh_sel2_rowlow + 1;
   common.in2_sub2_cols = common.in2_sub_cumh_sel2_colhig - common.in2_sub_cumh_sel2_collow + 1;
   common.in2_sub2_elem = common.in2_sub2_rows * common.in2_sub2_cols;
-  common.in2_sub2_mem = sizeof(fp) * common.in2_sub2_elem;
+  common.in2_sub2_mem = sizeof(FP) * common.in2_sub2_elem;
 
   // unique
-  buffer<fp,1> d_in2_sub2(common.in2_sub2_elem * common.allPoints);
+  buffer<FP,1> d_in2_sub2(common.in2_sub2_elem * common.allPoints);
   //printf("%d\n", common.in2_sub2_elem * common.allPoints);
 
   //====================================================================================================100
@@ -213,7 +213,7 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_sqr_mem = common.in2_mem;
 
   // unique
-  buffer<fp,1> d_in2_sqr(common.in2_elem * common.allPoints);
+  buffer<FP,1> d_in2_sqr(common.in2_elem * common.allPoints);
   //printf("%d\n", common.in2_elem * common.allPoints);
 
   //==================================================50
@@ -227,7 +227,7 @@ kernel_gpu_wrapper(  params_common common,
   common.in2_sqr_sub2_mem = common.in2_sub2_mem;
 
   // unique
-  buffer<fp,1> d_in2_sqr_sub2(common.in2_sub2_elem * common.allPoints);
+  buffer<FP,1> d_in2_sqr_sub2(common.in2_sub2_elem * common.allPoints);
   //printf("%d\n", common.in2_sub2_elem * common.allPoints);
 
   //====================================================================================================100
@@ -241,7 +241,7 @@ kernel_gpu_wrapper(  params_common common,
   common.in_sqr_mem = common.in_mem;
 
   // unique
-  buffer<fp,1> d_in_sqr(common.in_elem * common.allPoints);
+  buffer<FP,1> d_in_sqr(common.in_elem * common.allPoints);
   //printf("%d\n", common.in_elem * common.allPoints);
 
   //====================================================================================================100
@@ -252,10 +252,10 @@ kernel_gpu_wrapper(  params_common common,
   common.tMask_rows = common.in_rows + (common.sSize+1+common.sSize) - 1;
   common.tMask_cols = common.tMask_rows;
   common.tMask_elem = common.tMask_rows * common.tMask_cols;
-  common.tMask_mem = sizeof(fp) * common.tMask_elem;
+  common.tMask_mem = sizeof(FP) * common.tMask_elem;
 
   // unique
-  buffer<fp,1> d_tMask(common.tMask_elem * common.allPoints);
+  buffer<FP,1> d_tMask(common.tMask_elem * common.allPoints);
   //printf("%d\n", common.tMask_elem * common.allPoints);
 
   //====================================================================================================100
@@ -266,7 +266,7 @@ kernel_gpu_wrapper(  params_common common,
   common.mask_rows = common.maxMove;
   common.mask_cols = common.mask_rows;
   common.mask_elem = common.mask_rows * common.mask_cols;
-  common.mask_mem = sizeof(fp) * common.mask_elem;
+  common.mask_mem = sizeof(FP) * common.mask_elem;
 
   //====================================================================================================100
   //  MASK CONVOLUTION  (LOCAL)
@@ -276,7 +276,7 @@ kernel_gpu_wrapper(  params_common common,
   common.mask_conv_rows = common.tMask_rows;                        // number of rows in I
   common.mask_conv_cols = common.tMask_cols;                        // number of columns in I
   common.mask_conv_elem = common.mask_conv_rows * common.mask_conv_cols;                        // number of elements
-  common.mask_conv_mem = sizeof(fp) * common.mask_conv_elem;
+  common.mask_conv_mem = sizeof(FP) * common.mask_conv_elem;
   common.mask_conv_ioffset = (common.mask_rows-1)/2;
   if((common.mask_rows-1) % 2 > 0.5){
     common.mask_conv_ioffset = common.mask_conv_ioffset + 1;
@@ -308,23 +308,23 @@ kernel_gpu_wrapper(  params_common common,
   buffer<int,1> d_tEpiColLoc(tEpiColLoc, common.epiPoints * common.no_frames, props);
 
 
-  buffer<fp,1> d_mask_conv(common.mask_conv_elem * common.allPoints);
+  buffer<FP,1> d_mask_conv(common.mask_conv_elem * common.allPoints);
   //printf("%d\n", common.mask_conv_elem * common.allPoints);
-  buffer<fp,1> d_in_mod_temp(common.in_elem * common.allPoints);
+  buffer<FP,1> d_in_mod_temp(common.in_elem * common.allPoints);
   //printf("%d\n", common.in_elem * common.allPoints);
-  buffer<fp,1> d_in_partial_sum(common.in_cols * common.allPoints);
+  buffer<FP,1> d_in_partial_sum(common.in_cols * common.allPoints);
   //printf("%d\n", common.in_cols * common.allPoints);
-  buffer<fp,1> d_in_sqr_partial_sum(common.in_sqr_rows * common.allPoints);
+  buffer<FP,1> d_in_sqr_partial_sum(common.in_sqr_rows * common.allPoints);
   //printf("%d\n", common.in_sqr_rows * common.allPoints);
-  buffer<fp,1> d_par_max_val(common.mask_conv_rows * common.allPoints);
+  buffer<FP,1> d_par_max_val(common.mask_conv_rows * common.allPoints);
   //printf("%d\n", common.mask_conv_rows * common.allPoints);
   buffer<int,1> d_par_max_coo( common.mask_conv_rows * common.allPoints);
-  buffer<fp,1> d_in_final_sum(common.allPoints);
-  buffer<fp,1> d_in_sqr_final_sum(common.allPoints);
-  buffer<fp,1> d_denomT(common.allPoints);
+  buffer<FP,1> d_in_final_sum(common.allPoints);
+  buffer<FP,1> d_in_sqr_final_sum(common.allPoints);
+  buffer<FP,1> d_denomT(common.allPoints);
 
 #ifdef TEST_CHECKSUM
-  buffer<fp,1> d_checksum(CHECK);
+  buffer<FP,1> d_checksum(CHECK);
   //printf("%d\n", CHECK);
 #endif
 
@@ -349,10 +349,10 @@ kernel_gpu_wrapper(  params_common common,
   //====================================================================================================100
 
   // variables
-  fp* frame;
+  FP* frame;
   int frame_no;
 
-  buffer<fp,1> d_frame(common.frame_elem);
+  buffer<FP,1> d_frame(common.frame_elem);
 
   for(frame_no=0; frame_no<common.frames_processed; frame_no++){
 

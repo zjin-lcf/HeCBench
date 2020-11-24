@@ -105,7 +105,7 @@ main(	int argc, char* argv []){
 	common.frame_rows = AVI_video_height(frames);
 	common.frame_cols = AVI_video_width(frames);
 	common.frame_elem = common.frame_rows * common.frame_cols;
-	common.frame_mem = sizeof(fp) * common.frame_elem;
+	common.frame_mem = sizeof(FP) * common.frame_elem;
 
 	time1 = get_time();
 
@@ -279,17 +279,17 @@ main(	int argc, char* argv []){
 
 	printf("Time spent in different stages of the application:\n");
 	printf("%15.12f s, %15.12f : READ INITIAL VIDEO FRAME\n",
-			(fp) (time1-time0) / 1000000, (fp) (time1-time0) / (fp) (time5-time0) * 100);
+			(FP) (time1-time0) / 1000000, (FP) (time1-time0) / (FP) (time5-time0) * 100);
 	printf("%15.12f s, %15.12f : READ COMMAND LINE PARAMETERS\n",
-			(fp) (time2-time1) / 1000000, (fp) (time2-time1) / (fp) (time5-time0) * 100);
+			(FP) (time2-time1) / 1000000, (FP) (time2-time1) / (FP) (time5-time0) * 100);
 	printf("%15.12f s, %15.12f : READ INPUTS FROM FILE\n",
-			(fp) (time3-time2) / 1000000, (fp) (time3-time2) / (fp) (time5-time0) * 100);
+			(FP) (time3-time2) / 1000000, (FP) (time3-time2) / (FP) (time5-time0) * 100);
 	printf("%15.12f s, %15.12f : GPU ALLOCATION, COPYING, COMPUTATION\n",
-			(fp) (time4-time3) / 1000000, (fp) (time4-time3) / (fp) (time5-time0) * 100);
+			(FP) (time4-time3) / 1000000, (FP) (time4-time3) / (FP) (time5-time0) * 100);
 	printf("%15.12f s, %15.12f : FREE MEMORY\n",
-			(fp) (time5-time4) / 1000000, (fp) (time5-time4) / (fp) (time5-time0) * 100);
+			(FP) (time5-time4) / 1000000, (FP) (time5-time4) / (FP) (time5-time0) * 100);
 	printf("Total time:\n");
-	printf("%15.12f s\n", (fp) (time5-time0) / 1000000);
+	printf("%15.12f s\n", (FP) (time5-time0) / 1000000);
 
 	//======================================================================================================================================================150
 	//	End
