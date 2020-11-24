@@ -67,14 +67,14 @@ static void vnormalize(Vec *c)
 {
   float length = cl::sycl::sqrt(vdot((*c), (*c)));
 
-  if (fabs(length) > 1.0e-17f) {
+  if (cl::sycl::fabs(length) > 1.0e-17f) {
     c->x /= length;
     c->y /= length;
     c->z /= length;
   }
 }
 
-void ray_sphere_intersect(Isect *isect, const Ray *ray, global_ptr<const Sphere> sphere)
+void ray_sphere_intersect(Isect *isect, const Ray *ray, global_ptr<Sphere> sphere)
 {
   Vec rs;
 
@@ -112,7 +112,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
   float d = -vdot(plane->p, plane->n);
   float v = vdot(ray->dir, plane->n);
 
-  if (fabs(v) < 1.0e-17f) return;
+  if (cl::sycl::fabs(v) < 1.0e-17f) return;
 
   float t = -(vdot(ray->org, plane->n) + d) / v;
 
@@ -173,7 +173,7 @@ class RNG {
 
 
 void ambient_occlusion(Vec *col, const Isect *isect, 
-		       global_ptr<const Sphere> spheres, const Plane *plane, RNG &rng)
+		       global_ptr<Sphere> spheres, const Plane *plane, RNG &rng)
 {
   int    i, j;
   int    ntheta = NAO_SAMPLES;
