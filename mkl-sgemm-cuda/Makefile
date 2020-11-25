@@ -52,6 +52,6 @@ $(program): $(obj) Makefile
 clean:
 	rm -rf $(program) $(obj)
 
-run:
+run: $(program)
 	./$(program) 
 
