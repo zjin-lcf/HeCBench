@@ -43,9 +43,9 @@
 #define My_PI  3.14159265358979
 #define g2r(x)  (((double)(x))*My_PI/180)
 #define r2g(x)  (((double)(x))/My_PI*180)
-#define cosdeg(x) cos(g2r(x))
-#define sindeg(x) sin(g2r(x))
-#define tandeg(x) tan(g2r(x))
+#define cosdeg(x) std::cos(g2r(x))
+#define sindeg(x) std::sin(g2r(x))
+#define tandeg(x) std::tan(g2r(x))
 
 #define My_max(a,b)  (((a) > (b)) ? (a) : (b))
 #define My_min(a,b)  (((a) < (b)) ? (a) : (b))
