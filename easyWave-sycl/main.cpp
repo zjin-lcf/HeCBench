@@ -378,7 +378,7 @@ int main( int argc, char **argv )
       for( j=1; j<=NLat; j++ ) {
         m = idx(j,i);
         if( Node(m, iD) == 0.0f ) continue;
-        dtLoc = My_min( dtLoc, 0.8 * (Dx*cosdeg(getLat(j))) / sqrt(Gravity*Node(m, iD)) );
+        dtLoc = My_min( dtLoc, 0.8 * (Dx*cosdeg(getLat(j))) / std::sqrt(Gravity*Node(m, iD)) );
       }
     }
 
@@ -444,16 +444,16 @@ int main( int argc, char **argv )
 
   for( i=1; i<=NLon; i++ ) {
     C1[i] = 0;
-    if( Node(idx(1,i), iD) != 0 ) C1[i] = 1./sqrt(Gravity*Node(idx(1,i), iD));
+    if( Node(idx(1,i), iD) != 0 ) C1[i] = 1./std::sqrt(Gravity*Node(idx(1,i), iD));
     C3[i] = 0;
-    if( Node(idx(NLat,i), iD) != 0 ) C3[i] = 1./sqrt(Gravity*Node(idx(NLat,i), iD));
+    if( Node(idx(NLat,i), iD) != 0 ) C3[i] = 1./std::sqrt(Gravity*Node(idx(NLat,i), iD));
   }
 
   for( j=1; j<=NLat; j++ ) {
     C2[j] = 0;
-    if( Node(idx(j,1), iD) != 0 ) C2[j] = 1./sqrt(Gravity*Node(idx(j,1), iD));
+    if( Node(idx(j,1), iD) != 0 ) C2[j] = 1./std::sqrt(Gravity*Node(idx(j,1), iD));
     C4[j] = 0;
-    if( Node(idx(j,NLon), iD) != 0 ) C4[j] = 1./sqrt(Gravity*Node(idx(j,NLon), iD));
+    if( Node(idx(j,NLon), iD) != 0 ) C4[j] = 1./std::sqrt(Gravity*Node(idx(j,NLon), iD));
   }
 
   int NPOIs = 0;
@@ -561,14 +561,14 @@ int main( int argc, char **argv )
               n = idx(j,i);
               depth = Node(n, iD);
               if( depth < Par.poiDepthMin || depth > Par.poiDepthMax ) continue;
-              d2 = pow( lenLon*(lon-getLon(i)), 2. ) + pow( lenLat*(lat-getLat(j)), 2. );
+              d2 = std::pow( lenLon*(lon-getLon(i)), 2. ) + std::pow( lenLat*(lat-getLat(j)), 2. );
               if( d2 < d2min ) { d2min = d2; nmin = n; }
             }
 
           if( nmin > 0 ) break;
         }
 
-        if( sqrt(d2min) > Par.poiDistMax ) {
+        if( std::sqrt(d2min) > Par.poiDistMax ) {
           Log.print( "! Closest water node too far: %s", record );
           if( Par.poiReport ) fprintf( fpRej, "%s\n", record );
           continue;
@@ -582,7 +582,7 @@ int main( int argc, char **argv )
         j = nmin - (i-1)*NLat + 1;
         if( Par.poiReport )
           fprintf( fpAcc, "%s %.4f %.4f   %.4f %.4f %.1f   %.3f\n", 
-              id, lon, lat, getLon(i), getLat(j), Node(nmin, iD), sqrt(d2min)/1000 );
+              id, lon, lat, getLon(i), getLat(j), Node(nmin, iD), std::sqrt(d2min)/1000 );
       }
 
       fclose( fp );
@@ -699,11 +699,11 @@ int main( int argc, char **argv )
       for( j=0; j<uZ.ny; j++ ) {
         factLat = Dx*cosdeg(uZ.getY(0,j))*Dy;
         for( i=0; i<uZ.nx; i++ )
-          energy += pow(uZ(i,j),2.)*factLat;
+          energy += std::pow(uZ(i,j),2.)*factLat;
       }
       energy *= (1000*9.81/2);
-      effRad = eq.fault[0].length/sqrt(2*M_PI);
-      effMax = 1./effRad / sqrt(M_PI/2) / sqrt(1000*9.81/2) * sqrt(energy);
+      effRad = eq.fault[0].length/std::sqrt(2*M_PI);
+      effMax = 1./effRad / std::sqrt(M_PI/2) / std::sqrt(1000*9.81/2) * std::sqrt(energy);
       Log.print( "Effective source radius: %g km,  max height: %g m", effRad/1000, effMax );
 
       // transfer uplift onto tsunami grid and define deformed area for acceleration
@@ -711,7 +711,7 @@ int main( int argc, char **argv )
         for( j=0; j<uZ.ny; j++ ) {
           dist = GeoDistOnSphere( uZ.getX(i,j),uZ.getY(i,j), eq.fault[0].lon,eq.fault[0].lat ) * 1000;
           if( dist < effRad ) 
-            uZ(i,j) = effMax*cos(M_PI/2*dist/effRad);
+            uZ(i,j) = effMax * std::cos(M_PI/2*dist/effRad);
           else
             uZ(i,j) = 0.;
         }
@@ -732,14 +732,14 @@ int main( int argc, char **argv )
 
     for( i=0; i<uZ.nx; i++ ) {
       for( j=0; j<uZ.ny; j++ ) {
-        if( fabs(uZ(i,j)) < absuzmin ) uZ(i,j) = 0;
+        if( std::fabs(uZ(i,j)) < absuzmin ) uZ(i,j) = 0;
       }
     }
 
   }
 
   // calculated (if needed) arrival threshold (negative value means it is relative)
-  if( Par.sshArrivalThreshold < 0 ) Par.sshArrivalThreshold = absuzmax * fabs(Par.sshArrivalThreshold);
+  if( Par.sshArrivalThreshold < 0 ) Par.sshArrivalThreshold = absuzmax * std::fabs(Par.sshArrivalThreshold);
 
   // transfer uplift onto tsunami grid and define deformed area for acceleration
 
@@ -761,7 +761,7 @@ int main( int argc, char **argv )
       else
         dz = Node(idx(j,i), iH) = 0.;
 
-      if( fabs(dz) > Par.sshClipThreshold ) {
+      if( std::fabs(dz) > Par.sshClipThreshold ) {
         Imin = My_min( Imin, i );
         Imax = My_max( Imax, i );
         Jmin = My_min( Jmin, j );
@@ -866,7 +866,7 @@ int main( int argc, char **argv )
       for( n=0; n<NPOIs; n++ ) {
         float ampFactor = 1.;
         if( flagRunupPOI[n] )
-          ampFactor = pow( Node(idxPOI[n], iD), 0.25 );
+          ampFactor = std::pow( Node(idxPOI[n], iD), 0.25 );
         sshPOI[n][it] = ampFactor * Node(idxPOI[n], iH);
       }
     }
@@ -875,7 +875,7 @@ int main( int argc, char **argv )
     q.submit([&](handler &h) {
         auto node = d_node.get_access<sycl_read_write>(h);
         auto R6 = d_R6.get_access<sycl_read>(h);
-        h.parallel_for(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
+        h.parallel_for<class mass_conservation>(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
               range<2>(16,16), cl::sycl::id<2>(Imin, Jmin)), [=](nd_item<2> item) {
             int i = item.get_global_id(0);
             int j = item.get_global_id(1);
@@ -901,7 +901,7 @@ int main( int argc, char **argv )
         auto C2 = d_C2.get_access<sycl_read>(h);
         auto C3 = d_C3.get_access<sycl_read>(h);
         auto C4 = d_C4.get_access<sycl_read>(h);
-        h.single_task([=] () {
+        h.single_task<class update_bound>([=] () {
             int i, j, m;
             // open bondary conditions
             if( Jmin <= 2 ) {
@@ -956,7 +956,7 @@ int main( int argc, char **argv )
     // moment conservation
     q.submit([&](handler &h) {
         auto node = d_node.get_access<sycl_read_write>(h);
-        h.parallel_for(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
+        h.parallel_for<class moment_conservation>(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
               range<2>(16,16), cl::sycl::id<2>(Imin, Jmin)), [=](nd_item<2> item) {
             int i = item.get_global_id(0);
             int j = item.get_global_id(1);
@@ -994,7 +994,7 @@ int main( int argc, char **argv )
         auto Imax = d_Imax.get_access<sycl_read_write>(h);
         auto Jmin = d_Jmin.get_access<sycl_read_write>(h);
         auto Jmax = d_Jmax.get_access<sycl_read_write>(h);
-        h.single_task([=] () {
+        h.single_task<class update_bound2>([=] () {
             // open boundaries
             int i, j, m;
             int enlarge;
