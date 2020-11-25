@@ -90,7 +90,7 @@ int main(int argc, char** argv)
       q.submit([&](handler &h) {
           auto src = d_input_image.get_access<sycl_read>(h);
           auto dst = d_output_image.get_access<sycl_discard_write>(h);
-          h.parallel_for<class affine> (nd_range<2>(globalSize, localSize), [=](nd_item<2> item) {
+          h.parallel_for<class affine_transform> (nd_range<2>(globalSize, localSize), [=](nd_item<2> item) {
               int y = item.get_global_id(0); 
               int x = item.get_global_id(1); 
 
