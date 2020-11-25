@@ -77,7 +77,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
     buffer<float,1> input_sycl (net->input_units, in+1, props);
     buffer<float,1> input_weights_sycl (input_weights_one_dim, (in+1)*(hid+1), props);
-    buffer<float,1> hidden_partial_sum (num_blocks*WIDTH, props);
+    buffer<float,1> hidden_partial_sum (num_blocks*WIDTH);
 
     // set global and local workitems
     range<2> global_work(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
