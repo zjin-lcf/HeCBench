@@ -23,14 +23,14 @@
 #define BLOCKSIZE    BLOCKSIZEX * BLOCKSIZEY
 
 
-int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<float4,1> &atominfo) {
+int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<cl::sycl::float4,1> &atominfo) {
 
   if (count > MAXATOMS) {
     printf("Atom count exceeds constant buffer storage capacity\n");
     return -1;
   }
 
-  float4 atompre[MAXATOMS];
+  cl::sycl::float4 atompre[MAXATOMS];
   int i;
   for (i=0; i<count; i++) {
     atompre[i].x() = atoms[i*4    ];
@@ -50,8 +50,8 @@ int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<float4,1> 
 }
 
 
-int initatoms(float **atombuf, int count, int3 volsize, float gridspacing) {
-  float3 size;
+int initatoms(float **atombuf, int count, cl::sycl::int3 volsize, float gridspacing) {
+  cl::sycl::float3 size;
   int i;
   float *atoms;
   srand(2);
@@ -79,7 +79,7 @@ int initatoms(float **atombuf, int count, int3 volsize, float gridspacing) {
 int main(int argc, char** argv) {
   float *energy = NULL;
   float *atoms = NULL;
-  int3 volsize;
+  cl::sycl::int3 volsize;
   wkf_timerhandle runtimer, mastertimer, copytimer, hostcopytimer;
   float copytotal, runtotal, mastertotal, hostcopytotal;
   const char *statestr = "|/-\\.";
@@ -141,9 +141,9 @@ int main(int argc, char** argv) {
   queue q(dev_sel);
 
   //cudaMalloc((void**)&doutput, volmemsz);
-  //cudaMalloc((void**)&datominfo, sizeof(float4) * MAXATOMS);
+  //cudaMalloc((void**)&datominfo, sizeof(cl::sycl::float4) * MAXATOMS);
   buffer<float,1> doutput (volmemsz/sizeof(float));
-  buffer<float4,1> datominfo (MAXATOMS);
+  buffer<cl::sycl::float4,1> datominfo (MAXATOMS);
 
   q.submit([&](auto &h) {
     auto d = doutput.get_access<sycl_write>(h);
