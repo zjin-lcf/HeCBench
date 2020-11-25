@@ -156,12 +156,12 @@ Masking::Masking(const Score_matrix &score_matrix)
     mask_table_bit_[i] = (uint8_t)i | bit_mask;
     for (unsigned j = 0; j < size; ++j)
       if (i < value_traits.alphabet_size && j < value_traits.alphabet_size)
-        likelihoodRatioMatrix_[i][j] = exp(lambda * score_matrix(i, j));
+        likelihoodRatioMatrix_[i][j] = std::exp(lambda * score_matrix(i, j));
   }
   std::copy(likelihoodRatioMatrix_, likelihoodRatioMatrix_ + size, probMatrixPointers_);
   int firstGapCost = score_matrix.gap_extend() + score_matrix.gap_open();
-  firstGapProb_ = exp(-lambda * firstGapCost);
-  otherGapProb_ = exp(-lambda * score_matrix.gap_extend());
+  firstGapProb_ = std::exp(-lambda * firstGapCost);
+  otherGapProb_ = std::exp(-lambda * score_matrix.gap_extend());
   firstGapProb_ /= (1 - otherGapProb_);
 }
 
@@ -239,7 +239,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
         auto seqs = d_seqs.get_access<sycl_read_write>(h);
         auto likelihoodRatioMatrix = d_probMat.get_access<sycl_read>(h);
         auto maskTable = d_mask_table.get_access<sycl_read>(h);
-        h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+        h.parallel_for<class mask_sequences>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
           int gid = item.get_global_id(0); 
           if (gid >= seqs_len) return;
 
