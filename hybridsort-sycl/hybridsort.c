@@ -36,8 +36,8 @@ int compare(const void *a, const void *b) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-float4* runMergeSort(int listsize, int divisions,
-    float4 *d_origList, float4 *d_resultList,
+cl::sycl::float4* runMergeSort(int listsize, int divisions,
+    cl::sycl::float4 *d_origList, cl::sycl::float4 *d_resultList,
     int *sizes, int *nullElements,
     unsigned int *origOffsets);
 
@@ -124,8 +124,8 @@ int main(int argc, char** argv)
   bucketSort(q, cpu_idata,d_output,numElements,sizes,nullElements,datamin,datamax, origOffsets);
   clock_t bucketsort_diff = clock() - bucketsort_start;
 
-  float4 *d_origList = (float4*) d_output;
-  float4 *d_resultList = (float4*) cpu_idata;
+  cl::sycl::float4 *d_origList = (cl::sycl::float4*) d_output;
+  cl::sycl::float4 *d_resultList = (cl::sycl::float4*) cpu_idata;
 
   int newlistsize = 0;
   for(int i = 0; i < DIVISIONS; i++){
@@ -134,7 +134,7 @@ int main(int argc, char** argv)
 
   // time mergesort
   clock_t mergesort_start = clock();
-  float4* mergeresult = runMergeSort(q, newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
+  cl::sycl::float4* mergeresult = runMergeSort(q, newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
   clock_t mergesort_diff = clock() - mergesort_start;
   gpu_odata = (float*)mergeresult;
 

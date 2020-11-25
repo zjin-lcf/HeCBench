@@ -27,8 +27,8 @@
 //        detail::vec_ops::logical_return<sizeof(float)>::type, 1>'
 //              (aka 'vec<int, 1>') to 'bool'
 //                b.z() = a.y() >= b.z() ? a.y() : b.z();
-float4 sortElem(float4 r) {
-  float4 nr;
+cl::sycl::float4 sortElem(cl::sycl::float4 r) {
+  cl::sycl::float4 nr;
 
   float xt = r.x();
   float yt = r.y();
@@ -52,7 +52,7 @@ float4 sortElem(float4 r) {
   return nr;
 }
 
-float4 getLowest(float4 a, float4 b)
+cl::sycl::float4 getLowest(cl::sycl::float4 a, cl::sycl::float4 b)
 {
   float ax = a.x();
   float ay = a.y();
@@ -69,7 +69,7 @@ float4 getLowest(float4 a, float4 b)
   return a;
 }
 
-float4 getHighest(float4 a, float4 b)
+cl::sycl::float4 getHighest(cl::sycl::float4 a, cl::sycl::float4 b)
 {
   float ax = a.x();
   float ay = a.y();
@@ -86,8 +86,8 @@ float4 getHighest(float4 a, float4 b)
   return b;
 }
 
-float4* runMergeSort(queue &q, int listsize, int divisions,
-    float4 *d_origList, float4 *d_resultList,
+cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
+    cl::sycl::float4 *d_origList, cl::sycl::float4 *d_resultList,
     int *sizes, int *nullElements,
     unsigned int *origOffsets){
 
@@ -115,8 +115,8 @@ float4* runMergeSort(queue &q, int listsize, int divisions,
   const property_list props = property::buffer::use_host_ptr();
 
   // divided by four 
-  buffer<float4,1> d_resultList_buff (listsize/4);
-  buffer<float4,1> d_origList_buff (d_origList, listsize/4, props);
+  buffer<cl::sycl::float4,1> d_resultList_buff (listsize/4);
+  buffer<cl::sycl::float4,1> d_origList_buff (d_origList, listsize/4, props);
   buffer<int, 1> d_constStartAddr (startaddr, (divisions+1), props);
   d_origList_buff.set_final_data(nullptr);
 

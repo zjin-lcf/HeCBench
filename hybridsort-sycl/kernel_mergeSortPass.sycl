@@ -8,7 +8,7 @@
 	int Astart = constStartAddr_acc[division] + int_gid * nrElems;
     
 	int Bstart = Astart + nrElems/2;
-	//global float4 *resStart;
+	//global cl::sycl::float4 *resStart;
     	auto resStart= &(result_acc[Astart]);
     
 	if(Astart >= constStartAddr_acc[division + 1])
@@ -24,7 +24,7 @@
 	int aidx = 0;
 	int bidx = 0;
 	int outidx = 0;
-	float4 a, b;
+	cl::sycl::float4 a, b;
 	a = input_acc[Astart + aidx];
 	b = input_acc[Bstart + bidx];
 	
@@ -34,11 +34,11 @@
 		 * For some reason, it's faster to do the texture fetches here than
 		 * after the merge
 		 */
-		float4 nextA = input_acc[Astart + aidx + 1];
-		float4 nextB = input_acc[Bstart + bidx + 1];
+		cl::sycl::float4 nextA = input_acc[Astart + aidx + 1];
+		cl::sycl::float4 nextB = input_acc[Bstart + bidx + 1];
         
-		float4 na = getLowest(a,b);
-		float4 nb = getHighest(a,b);
+		cl::sycl::float4 na = getLowest(a,b);
+		cl::sycl::float4 nb = getHighest(a,b);
 		a = sortElem(na);
 		b = sortElem(nb);
 		// Now, a contains the lowest four elements, sorted
