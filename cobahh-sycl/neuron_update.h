@@ -86,7 +86,7 @@ void neurongroup_stateupdater (
       auto d_v_acc = d_v.get_access<sycl_read_write>(h);
       auto d_lastspike_acc = d_lastspike.get_access<sycl_read>(h);
       auto d_not_refractory_acc = d_not_refractory.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=] (nd_item<1> item) {
+      h.parallel_for<class nstep>(nd_range<1>(global_work_size, local_work_size), [=] (nd_item<1> item) {
         int _idx = item.get_global_id(0);
         if (_idx >= _N) return;
         float h = d_h_acc[_idx];
