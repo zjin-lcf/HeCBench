@@ -108,7 +108,7 @@ void update(queue &q, buffer<signed char,1> &d_lattice_b,
     auto lattice_b = d_lattice_b.get_access<sycl_write>(cgh);
     auto lattice_w = d_lattice_w.get_access<sycl_read>(cgh);
     auto randvals = d_randvals.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
+    cgh.parallel_for<class update_black>(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
                      [=](nd_item<1> item_ct1) {
                        update_lattice<true>(lattice_b, lattice_w, randvals,
                                             inv_temp, nx, ny / 2, item_ct1);
@@ -123,7 +123,7 @@ void update(queue &q, buffer<signed char,1> &d_lattice_b,
     auto lattice_b = d_lattice_b.get_access<sycl_read>(cgh);
     auto lattice_w = d_lattice_w.get_access<sycl_write>(cgh);
     auto randvals = d_randvals.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
+    cgh.parallel_for<class update_white>(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
                      [=](nd_item<1> item_ct1) {
                        update_lattice<false>(lattice_w, lattice_b, randvals,
                                              inv_temp, nx, ny / 2, item_ct1);
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
   q.submit([&](handler &cgh) {
     auto lattice_b = d_lattice_b.get_access<sycl_write>(cgh);
     auto randvals = d_randvals.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
+    cgh.parallel_for<class init_lattice_black>(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
                      [=](nd_item<1> item_ct1) {
                        init_spins(lattice_b, randvals, nx, ny / 2, item_ct1);
                      });
@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
   q.submit([&](handler &cgh) {
     auto lattice_w = d_lattice_w.get_access<sycl_write>(cgh);
     auto randvals = d_randvals.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
+    cgh.parallel_for<class init_lattice_white>(nd_range<1>(range<1>(blocks), range<1>(THREADS)),
                      [=](nd_item<1> item_ct1) {
                        init_spins(lattice_w, randvals, nx, ny / 2, item_ct1);
                      });

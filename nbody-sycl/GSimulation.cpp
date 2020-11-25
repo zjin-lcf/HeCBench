@@ -124,7 +124,7 @@ void GSimulation::Start() {
     // particles
     q.submit([&](handler& h) {
        auto p = pbuf.get_access<sycl_read_write>(h);
-       h.parallel_for(r, [=](id<1> i) {
+       h.parallel_for<class compute_acceleration>(r, [=](id<1> i) {
          RealType acc0 = p[i].acc[0];
          RealType acc1 = p[i].acc[1];
          RealType acc2 = p[i].acc[2];
@@ -139,7 +139,7 @@ void GSimulation::Start() {
 
            distance_sqr =
                dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-           distance_inv = 1.0f / sycl::sqrt(distance_sqr);       // 1div+1sqrt
+           distance_inv = 1.0f / cl::sycl::sqrt(distance_sqr);       // 1div+1sqrt
 
            acc0 += dx * kG * p[j].mass * distance_inv * distance_inv *
                    distance_inv;  // 6flops
@@ -157,7 +157,7 @@ void GSimulation::Start() {
     q.submit([&](handler& h) {
        auto p = pbuf.get_access<sycl_read_write>(h);
        auto e = ebuf.get_access<sycl_read_write>(h);
-       h.parallel_for(r, [=](id<1> i) {
+       h.parallel_for<class update_velocity_position>(r, [=](id<1> i) {
          p[i].vel[0] += p[i].acc[0] * dt;  // 2flops
          p[i].vel[1] += p[i].acc[1] * dt;  // 2flops
          p[i].vel[2] += p[i].acc[2] * dt;  // 2flops
@@ -180,7 +180,7 @@ void GSimulation::Start() {
      */
     q.submit([&](handler& h) {
        auto e = ebuf.get_access<sycl_read_write>(h);
-       h.single_task([=]() {
+       h.single_task<class accumulate_energy>([=]() {
          for (int i = 1; i < n; i++) e[0] += e[i];
        });
      });
@@ -213,7 +213,7 @@ void GSimulation::Start() {
   total_time_ = t0.Elapsed();
   total_flops_ = gflops * get_nsteps();
   av /= (double)(nf - 2);
-  dev = sqrt(dev / (double)(nf - 2) - av * av);
+  dev = std::sqrt(dev / (double)(nf - 2) - av * av);
 
   std::cout << "\n";
   std::cout << "# Total Time (s)     : " << total_time_ << "\n";

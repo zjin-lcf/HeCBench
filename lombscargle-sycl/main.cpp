@@ -132,7 +132,7 @@ int main() {
         auto x = d_x.template get_access<sycl_read>(cgh);
         auto y = d_y.template get_access<sycl_read>(cgh);
         auto f = d_f.template get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class lombscargle>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
           const int tx = item.get_global_id(0);
 	  const int stride = item.get_local_range(0) * item.get_group_range(0);
           for ( int tid = tx; tid < freqs_shape; tid += stride ) {

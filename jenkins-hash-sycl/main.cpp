@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
       auto keys = d_keys.get_access<sycl_read>(h);
       auto out = d_out.get_access<sycl_write>(h);
 
-      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+      h.parallel_for<class jk3_hash>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         unsigned long id = item.get_global_id(0); 
         if (id >= N) return;
         unsigned int length = lengths[id];
