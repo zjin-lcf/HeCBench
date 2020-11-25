@@ -1396,7 +1396,7 @@ We may build the [software from source with support for Nvidia CUDA](https://git
   FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### floydwarshall
-  FloydWarshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
+  Floyd-Warshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
 
 ### fpc
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
