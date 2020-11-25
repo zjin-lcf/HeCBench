@@ -74,7 +74,6 @@ int main(int argc, char** argv)
     odata[i] = -1;
   }
 
-
   std::cout << "Running benchmark with input array length " << size << std::endl;
 
   auto start = std::chrono::steady_clock::now();
