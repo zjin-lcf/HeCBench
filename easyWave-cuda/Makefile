@@ -63,5 +63,5 @@ clean:
 	rm -rf $(program) $(obj) eWave.2D.*
 
 run: $(program)
-	./$(program) -grid ./data/grids/e2Asean.grd -source ./data/faults/BengkuluSept2007.flt -time 120 
+	./$(program) -grid ../easyWave-omp/data/grids/e2Asean.grd -source ../easyWave-omp/data/faults/BengkuluSept2007.flt -time 120 
 
