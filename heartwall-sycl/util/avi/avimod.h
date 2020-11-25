@@ -6,7 +6,7 @@ extern "C" {
 //	DEFINE / INCLUDE
 //========================================================================================================================================================================================================200
 
-#define fp float
+#define FP float
 
 #include "avilib.h"
 
@@ -14,14 +14,14 @@ extern "C" {
 //	DEFINE / INCLUDE
 //========================================================================================================================================================================================================200
 
-fp* chop_flip_image(	char *image, 
+FP* chop_flip_image(	char *image, 
 								int height, 
 								int width, 
 								int cropped,
 								int scaled,
 								int converted) ;
 
-fp* get_frame(	avi_t* cell_file, 
+FP* get_frame(	avi_t* cell_file, 
 						int frame_num, 
 						int cropped, 
 						int scaled,
