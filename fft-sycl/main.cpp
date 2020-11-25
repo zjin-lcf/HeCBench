@@ -12,10 +12,10 @@ using namespace std;
 
 #ifdef SINGLE_PRECISION
 #define T float 
-#define T2 float2
+#define T2 cl::sycl::float2
 #else
 #define T double
-#define T2 double2
+#define T2 cl::sycl::double2
 #endif
 
 #ifndef M_SQRT1_2
@@ -154,7 +154,7 @@ int main(int argc, char** argv)
     cpu_selector dev_sel;
 #endif
 
-    queue q(dev_sel);
+    cl::sycl::queue q(dev_sel);
 
     const property_list props = property::buffer::use_host_ptr();
 
@@ -193,12 +193,12 @@ int main(int argc, char** argv)
   // Verification
   bool error = false;
   for (int i = 0; i < N; i++) {
-    if ( fabs((T)source[i].x() - (T)reference[i].x()) > 1e-6) {
+    if ( std::fabs((T)source[i].x() - (T)reference[i].x()) > 1e-6) {
       //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
       error = true;
       break;
     }
-    if ( fabs((T)source[i].y() - (T)reference[i].y()) > 1e-6) {
+    if ( std::fabs((T)source[i].y() - (T)reference[i].y()) > 1e-6) {
       //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
       error = true;
       break;
