@@ -81,7 +81,7 @@ track_ellipse_sycl.o: track_ellipse_sycl.c track_ellipse.h common.h kernel_IMGVF
 # Use the sycl compiler to build the library
 # Cleanup everything, then clean everything except the static library
 $(MATRIX_DIR)/meschach.a:
-	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC); make clean
+	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC) CFLAGS=-O3; make clean
 
 run: leukocyte
 	./leukocyte ../data/leukocyte/testfile.avi 100
