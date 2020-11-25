@@ -8,14 +8,12 @@ OPTIMIZE  = yes
 DEBUG     = no
 CUDA_ARCH = "--cuda-gpu-arch=sm_35"
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+SP = yes
 
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-
-
-SP = yes
 
 program = md
 
