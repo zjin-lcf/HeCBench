@@ -632,7 +632,7 @@ transform_to_cuda(  node * root,
   struct timeval one,two;
   double time;
   gettimeofday (&one, NULL);
-  long max_nodes = (long)(pow(order,log(size)/log(order/2.0)-1) + 1);
+  long max_nodes = (long)(std::pow(order,std::log(size)/std::log(order/2.0)-1) + 1);
   malloc_size = size*sizeof(record) + max_nodes*sizeof(knode); 
   mem = (char*)malloc(malloc_size);
   if(mem==NULL){
