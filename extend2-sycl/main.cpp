@@ -89,7 +89,7 @@ void extend2(queue &q, struct extend2_dat *d)
         auto max_off_acc = d_max_off.get_access<sycl_discard_write>(h);
         auto score_acc = d_score.get_access<sycl_discard_write>(h);
 
-        h.single_task([=]() {
+        h.single_task<class ebwa>([=]() {
           int oe_del = o_del + e_del;
           int oe_ins = o_ins + e_ins; 
           int i, j, k;
@@ -98,6 +98,7 @@ void extend2(queue &q, struct extend2_dat *d)
           int max_w; // w is not mutable by default
           int gscore;
           int max_off;
+	  int abs_v;
 
           // generate the query profile
           for (k = i = 0; k < m; ++k) {
@@ -177,7 +178,8 @@ void extend2(queue &q, struct extend2_dat *d)
             if (m == 0) break;
             if (m > max) {
               max = m, max_i = i, max_j = mj;
-              max_off = max_off > cl::sycl::abs(mj - i)? max_off : cl::sycl::abs(mj - i);
+	      abs_v = ( mj -i ) < 0 ? i - mj : mj - i;
+              max_off = max_off > abs_v ? max_off : abs_v;
             } else if (zdrop > 0) {
               if (i - max_i > mj - max_j) {
                 if (max - m - ((i - max_i) - (mj - max_j)) * e_del > zdrop) break;
