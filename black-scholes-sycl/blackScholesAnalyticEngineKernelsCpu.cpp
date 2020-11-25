@@ -53,7 +53,7 @@ float errorFunctCpu(normalDistStruct normDist, float x)
 {
     float R,S,P,Q,s,y,z,r, ax;
 
-    ax = fabsf(x);
+    ax = std::fabs(x);
 
     if(ax < 0.84375) 
 	{      
@@ -147,7 +147,7 @@ void initCumNormDistCpu(normalDistStruct& currCumNormDist)
 //device function to initialize variable in the black calculator
 void initBlackCalcVarsCpu(blackCalcStruct& blackCalculator, payoffStruct payoff)
 {
-    	blackCalculator.d1 = log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5*blackCalculator.stdDev;
+    	blackCalculator.d1 = std::log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5*blackCalculator.stdDev;
     	blackCalculator.d2 = blackCalculator.d1 - blackCalculator.stdDev;
 
 	//initialize the cumulative normal distribution structure
