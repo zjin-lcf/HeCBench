@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
         q.submit([&] (handler &cgh) {
           auto pathDistanceBuffer_acc = pathDistanceBuffer.get_access<sycl_read_write>(cgh);
           auto pathBuffer_acc = pathBuffer.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          cgh.parallel_for<class path_distance>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
             int xValue = item.get_global_id(1);
             int yValue = item.get_global_id(0); 
 
