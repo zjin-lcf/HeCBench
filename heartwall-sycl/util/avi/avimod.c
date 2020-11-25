@@ -13,7 +13,7 @@
 
 // Flips the specified image and crops it to the specified dimensions
 // If scaled == true, all values are scaled to the range [0.0, 1.0
-fp* chop_flip_image(	char *image, 
+FP* chop_flip_image(	char *image, 
 								int height, 
 								int width, 
 								int cropped,
@@ -46,15 +46,15 @@ fp* chop_flip_image(	char *image,
 	int i, j;
 
 	// allocate memory for cropped/flipped frame
-	fp* result = (fp *) malloc(height_new * width_new * sizeof(fp));
+	FP* result = (FP *) malloc(height_new * width_new * sizeof(FP));
 
 	// crop/flip and scale frame
-	fp temp;
+	FP temp;
 	if (scaled) {
-		fp scale = 1.0 / 255.0;
+		FP scale = 1.0 / 255.0;
 		for(i = 0; i <height_new; i++){				// rows
 			for(j = 0; j <width_new; j++){			// colums
-				temp = (fp) image[((height - 1 - (i + top)) * width) + (j + left)] * scale;
+				temp = (FP) image[((height - 1 - (i + top)) * width) + (j + left)] * scale;
 				if(temp<0){
 					result[i*width_new+j] = temp + 256;
 				}
@@ -66,7 +66,7 @@ fp* chop_flip_image(	char *image,
 	} else {
 		for(i = 0; i <height_new; i++){				// rows
 			for(j = 0; j <width_new; j++){			// colums
-				temp = (fp) image[((height - 1 - (i + top)) * width) + (j + left)] ;
+				temp = (FP) image[((height - 1 - (i + top)) * width) + (j + left)] ;
 				if(temp<0){
 					result[i*width_new+j] = temp + 256;
 				}
@@ -78,7 +78,7 @@ fp* chop_flip_image(	char *image,
 	}
 
 // convert storage method (from row-major to column-major)
-	fp* result_converted = (fp *) malloc(height_new * width_new * sizeof(fp));
+	FP* result_converted = (FP *) malloc(height_new * width_new * sizeof(FP));
 	if(converted==1){
 		for(i = 0; i <width_new; i++){				// rows
 			for(j = 0; j <height_new; j++){			// colums
@@ -99,7 +99,7 @@ fp* chop_flip_image(	char *image,
 // If cropped == true, the frame is cropped to pre-determined dimensions
 //  (hardcoded to the boundaries of the blood vessel in the test video)
 // If scaled == true, all values are scaled to the range [0.0, 1.0]
-fp* get_frame(	avi_t* cell_file, 
+FP* get_frame(	avi_t* cell_file, 
 						int frame_num, 
 						int cropped, 
 						int scaled,
@@ -123,7 +123,7 @@ fp* get_frame(	avi_t* cell_file,
 	}
 
 	// The image is read in upside-down, so we need to flip it
-	fp* image_chopped;
+	FP* image_chopped;
 	image_chopped = chop_flip_image(	image_buf, 
 														height, 
 														width, 
