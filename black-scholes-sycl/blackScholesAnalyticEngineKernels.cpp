@@ -54,7 +54,7 @@ float errorFunct(normalDistStruct normDist, float x)
 {
 	float R,S,P,Q,s,y,z,r, ax;
 
-	ax = fabs(x);
+	ax = std::fabs(x);
 
 	if(ax < 0.84375) 
 	{      
