@@ -2,12 +2,12 @@
 #define MD_H__
 
 #ifdef SINGLE_PRECISION
-#define POSVECTYPE float4
-#define FORCEVECTYPE float4
+#define POSVECTYPE cl::sycl::float4
+#define FORCEVECTYPE cl::sycl::float4
 #define FPTYPE float
 #else
-#define POSVECTYPE double4
-#define FORCEVECTYPE double4
+#define POSVECTYPE cl::sycl::double4
+#define FORCEVECTYPE cl::sycl::double4
 #define FPTYPE double
 #endif
 
