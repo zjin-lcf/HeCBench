@@ -91,7 +91,7 @@ int main(int argc, char ** argv){
 
   float* spline_coefs = (float*) malloc (sizeof(float)*SSIZE);
   for(size_t i=0;i<SSIZE;i++)
-    spline_coefs[i]=sqrt(0.22+i*1.0)*sin(i*1.0);
+    spline_coefs[i]=std::sqrt(0.22+i*1.0)*std::sin(i*1.0);
 
   int spline_num_splines = NSIZE;
   int spline_x_grid_start = 0; 
@@ -221,7 +221,7 @@ int main(int argc, char ** argv){
         auto d2c = d_d2c.get_access<sycl_read>(h);
         auto spline_coefs = d_spline_coefs.get_access<sycl_read>(h);
 
-        h.parallel_for(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+        h.parallel_for<class vgh_spline>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
             const int n = item.get_global_id(0);
 	    if (n < spline_num_splines)
               eval_UBspline_3d_s_vgh ( 
