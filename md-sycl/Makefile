@@ -7,15 +7,12 @@ CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SP = yes
 
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-
-
-SP = yes
-
 program = md
 
 source = MD.cpp

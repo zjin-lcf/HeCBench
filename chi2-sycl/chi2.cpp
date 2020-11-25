@@ -232,7 +232,7 @@ int main(int argc ,char* argv[]) {
 	/* verify using the cpu results */
 	int error = 0;
 	for(unsigned int k = 0; k < jobs; k++) {
-		if (fabs(cpu_results[k] - host_results[k]) > 1e-4) error++;
+		if (std::fabs(cpu_results[k] - host_results[k]) > 1e-4) error++;
 	}
 
 	free(dataT);
