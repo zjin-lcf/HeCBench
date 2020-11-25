@@ -81,7 +81,7 @@ __attribute__((noinline)) void divergence_sphere_gpu(
     auto div = d_div.template get_access<sycl_discard_read_write>(cgh);
     auto vvtemp = d_vvtemp.template get_access<sycl_discard_read_write>(cgh);
     auto rmetdet = d_rmetdet.template get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
+    cgh.parallel_for<class divergence_test>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
       constexpr const real rrearth = 1.5683814303638645E-7;
       const int l = item.get_global_id(1);
       const int j = item.get_global_id(0); 
