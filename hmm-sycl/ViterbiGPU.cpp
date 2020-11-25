@@ -66,7 +66,7 @@ int ViterbiGPU(float &viterbiProb,
       auto obs = d_obs.get_access<sycl_read>(h);
       auto maxProbNew = d_maxProbNew.get_access<sycl_discard_write>(h);
       auto path = d_path.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+      h.parallel_for<class hmm>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
         // find the most probable previous state leading to iState
         int iState = item.get_global_id(0);
         if (iState < nState) {
