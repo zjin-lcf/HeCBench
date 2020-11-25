@@ -135,7 +135,7 @@ void dump(float *h_variables, int nel, int nelr){
   }
 }
 
-void initialize_buffer(queue &q, buffer<float,1> &mem_d, float val, int number_words)throw(std::string){
+void initialize_buffer(queue &q, buffer<float,1> &mem_d, float val, int number_words) noexcept(false) {
   q.submit([&] (handler& cgh) {
       accessor<float,1,sycl_write,sycl_global_buffer>  \
       mem_d_acc (mem_d, cgh, range<1>(number_words), id<1>(0)); // add workgroup size
@@ -143,7 +143,7 @@ void initialize_buffer(queue &q, buffer<float,1> &mem_d, float val, int number_w
       });
 }
 
-void initialize_variables(queue &q, int nelr, buffer<float,1> &variables, buffer<float,1> &ff_variable) throw(std::string){
+void initialize_variables(queue &q, int nelr, buffer<float,1> &variables, buffer<float,1> &ff_variable) noexcept(false) {
 
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_1;
@@ -276,12 +276,12 @@ int main(int argc, char** argv){
   h_ff_variable[VAR_DENSITY] = float(1.4);
 
   float ff_pressure = float(1.0f);
-  float ff_speed_of_sound = sqrt(GAMMA*ff_pressure / h_ff_variable[VAR_DENSITY]);
+  float ff_speed_of_sound = std::sqrt(GAMMA*ff_pressure / h_ff_variable[VAR_DENSITY]);
   float ff_speed = float(ff_mach)*ff_speed_of_sound;
 
   Float3 ff_velocity;
-  ff_velocity.x = ff_speed*float(cos((float)angle_of_attack));
-  ff_velocity.y = ff_speed*float(sin((float)angle_of_attack));
+  ff_velocity.x = ff_speed*float(std::cos((float)angle_of_attack));
+  ff_velocity.y = ff_speed*float(std::sin((float)angle_of_attack));
   ff_velocity.z = 0.0f;
 
   h_ff_variable[VAR_MOMENTUM+0] = h_ff_variable[VAR_DENSITY] * ff_velocity.x;
