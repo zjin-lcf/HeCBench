@@ -38,7 +38,7 @@ void mixbenchGPU(long size){
   for (int compute_iterations = 0; compute_iterations < 2048; compute_iterations++) {
     q.submit([&](handler &h) {
       auto g_data = d_cd.get_access<sycl_read_write>(h);
-      h.parallel_for(nd_range<1>(range<1>(grid_dim), range<1>(block_dim)), [=](nd_item<1> item) {
+      h.parallel_for<class mixbench>(nd_range<1>(range<1>(grid_dim), range<1>(block_dim)), [=](nd_item<1> item) {
         const unsigned int blockSize = block_dim;
         const int stride = blockSize;
         int idx = item.get_group(0)*blockSize*granularity + item.get_local_id(0);

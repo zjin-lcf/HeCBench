@@ -33,6 +33,11 @@
 #ifdef DOUBLE
 #define Real double
 
+#define FMIN std::fmin
+#define FMAX std::fmax
+#define FABS std::fabs
+#define SQRT std::sqrt
+
 #define ZERO 0.0
 #define ONE 1.0
 #define TWO 2.0
@@ -62,15 +67,6 @@ const Real gy = 0.0;
 #else
 #define Real float
 
-// replace double functions with float versions
-#undef fmin
-#define fmin fminf
-#undef fmax
-#define fmax fmaxf
-#undef fabs
-#define fabs fabsf
-#undef sqrt
-#define sqrt sqrtf
 
 #define ZERO 0.0f
 #define ONE 1.0f
@@ -78,6 +74,10 @@ const Real gy = 0.0;
 #define FOUR 4.0f
 #define SMALL 1.0e-10f;
 
+#define FMIN std::fminf
+#define FMAX std::fmaxf
+#define FABS std::fabsf
+#define SQRT std::sqrtf
 /** Reynolds number */
 const Real Re_num = 1000.0f;
 
@@ -285,7 +285,7 @@ int main (int argc, char *argv[])
   for (int col = 0; col < NUM + 2; ++col) {
 #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
-      max_u = fmax(max_u, fabs( u(col, row) ));
+      max_u = FMAX(max_u, FABS( u(col, row) ));
     }
   }
 
@@ -293,7 +293,7 @@ int main (int argc, char *argv[])
   for (int col = 1; col < NUM + 2; ++col) {
 #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
-      max_v = fmax(max_v, fabs( v(col, row) ));
+      max_v = FMAX(max_v, FABS( v(col, row) ));
     }
   }
 
@@ -331,8 +331,8 @@ int main (int argc, char *argv[])
     while (time < time_end) {
 
       // calculate time step based on stability and CFL
-      dt = fmin((dx / max_u), (dy / max_v));
-      dt = tau * fmin(dt_Re, dt);
+      dt = FMIN((dx / max_u), (dy / max_v));
+      dt = tau * FMIN(dt_Re, dt);
 
       if ((time + dt) >= time_end) {
         dt = time_end - time;
@@ -385,7 +385,7 @@ int main (int argc, char *argv[])
       }
       //printf("p0_norm = %lf\n", p0_norm);
 
-      p0_norm = sqrt(p0_norm / ((Real)(NUM * NUM)));
+      p0_norm = SQRT(p0_norm / ((Real)(NUM * NUM)));
       if (p0_norm < 0.0001) {
         p0_norm = 1.0;
       }
@@ -471,7 +471,7 @@ int main (int argc, char *argv[])
 
       //printf("norm_L2 = %lf\n", norm_L2);
         // calculate residual
-        norm_L2 = sqrt(norm_L2 / ((Real)(NUM * NUM))) / p0_norm;
+        norm_L2 = SQRT(norm_L2 / ((Real)(NUM * NUM))) / p0_norm;
 
         // if tolerance has been reached, end SOR iterations
         if (norm_L2 < tol) {
@@ -528,10 +528,10 @@ int main (int argc, char *argv[])
 #pragma unroll
       for (int i = 0; i < size_max; ++i) {
         Real test_u = max_u_arr[i];
-        max_u = fmax(max_u, test_u);
+        max_u = FMAX(max_u, test_u);
 
         Real test_v = max_v_arr[i];
-        max_v = fmax(max_v, test_v);
+        max_v = FMAX(max_v, test_v);
       }
 
       // set velocity boundary conditions

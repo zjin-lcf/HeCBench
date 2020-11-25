@@ -32,6 +32,8 @@
  * THE SOFTWARE.
  *
  */
+#ifndef KERNEL_H
+#define KERNEL_H
 
 #include <atomic>
 #include "support/common.h"
@@ -40,3 +42,5 @@ void run_cpu_threads(Node *graph_nodes_av, Edge *graph_edges_av, std::atomic_int
     int *q1, int *q2, int *n_t, std::atomic_int *head, std::atomic_int *tail,
     std::atomic_int *threads_end, std::atomic_int *threads_run, std::atomic_int *gray_shade,
     std::atomic_int *iter, int cpu_threads, int LIMIT, const int GPU);
+
+#endif

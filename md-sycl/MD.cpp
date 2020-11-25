@@ -81,9 +81,9 @@ bool checkResults(forceVecType* d_force, posVecType *position,
     assert(isnan(d_force[i].x()) == false);
     assert(isnan(d_force[i].y()) == false);
     assert(isnan(d_force[i].z()) == false);
-    T fxe = fabs(f.x() - d_force[i].x());
-    T fye = fabs(f.y() - d_force[i].y());
-    T fze = fabs(f.z() - d_force[i].z());
+    T fxe = std::fabs(f.x() - d_force[i].x());
+    T fye = std::fabs(f.y() - d_force[i].y());
+    T fze = std::fabs(f.z() - d_force[i].z());
     if (fxe > max_error) max_error = fxe;
     if (fye > max_error) max_error = fye;
     if (fze > max_error) max_error = fze;
@@ -126,9 +126,9 @@ int main(int argc, char** argv)
   // Initialize positions -- random distribution in cubic domain
   for (int i = 0; i < nAtom; i++)
   {
-    position[i].x() = (drand48() * domainEdge);
-    position[i].y() = (drand48() * domainEdge);
-    position[i].z() = (drand48() * domainEdge);
+    position[i].x() = drand48() * domainEdge;
+    position[i].y() = drand48() * domainEdge;
+    position[i].z() = drand48() * domainEdge;
   }
 
 

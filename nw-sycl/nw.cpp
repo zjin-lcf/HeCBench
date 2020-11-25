@@ -71,7 +71,6 @@ void usage(int argc, char **argv)
   fprintf(stderr, "Usage: %s <max_rows/max_cols> <penalty> \n", argv[0]);
   fprintf(stderr, "\t<dimension>  - x and y dimensions\n");
   fprintf(stderr, "\t<penalty> - penalty(positive integer)\n");
-  fprintf(stderr, "\t<file> - filename\n");
   exit(1);
 }
 

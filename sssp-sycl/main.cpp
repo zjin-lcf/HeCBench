@@ -33,15 +33,15 @@
  *
  */
 
+#include <unistd.h>
+#include <thread>
+#include <assert.h>
+#include "common.h"
 #include "kernel.h"
 #include "support/common.h"
 #include "support/timer.h"
 #include "support/verify.h"
 
-#include <unistd.h>
-#include <thread>
-#include <assert.h>
-#include "common.h"
 
 // Params ---------------------------------------------------------------------
 struct Params {
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  cl::sycl::queue q(dev_sel);
 
   // Allocate
   int n_nodes, n_edges;
@@ -183,29 +183,29 @@ int main(int argc, char **argv) {
   Edge * h_edges = (Edge *)malloc(sizeof(Edge) * n_edges);
   buffer<Edge, 1> d_edges (n_edges);
   std::atomic_int *h_color = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  buffer<int, 1> d_color (n_nodes);
+  buffer<std::atomic_int, 1> d_color (n_nodes);
   std::atomic_int *h_cost  = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  buffer<int, 1> d_cost (n_nodes);
+  buffer<std::atomic_int, 1> d_cost (n_nodes);
   int *            h_q1    = (int *)malloc(n_nodes * sizeof(int));
   buffer<int, 1> d_q1 (n_nodes);
   int *            h_q2    = (int *)malloc(n_nodes * sizeof(int));
   buffer<int, 1> d_q2 (n_nodes);
   std::atomic_int  h_head[1];
-  buffer<int, 1> d_head (1);
+  buffer<std::atomic_int, 1> d_head (1);
   std::atomic_int  h_tail[1];
-  buffer<int, 1> d_tail (1);
+  buffer<std::atomic_int, 1> d_tail (1);
   std::atomic_int  h_threads_end[1];
-  buffer<int, 1> d_threads_end (1);
+  buffer<std::atomic_int, 1> d_threads_end (1);
   std::atomic_int  h_threads_run[1];
-  buffer<int, 1> d_threads_run (1);
+  buffer<std::atomic_int, 1> d_threads_run (1);
   int              h_num_t[1];
   buffer<int, 1> d_num_t (1);
   int              h_overflow[1];
   buffer<int, 1> d_overflow (1);
   std::atomic_int  h_gray_shade[1];
-  buffer<int, 1> d_gray_shade (1);
+  buffer<std::atomic_int, 1> d_gray_shade (1);
   std::atomic_int  h_iter[1];
-  buffer<int, 1> d_iter (1);
+  buffer<std::atomic_int, 1> d_iter (1);
   timer.stop("Allocation");
 
   // Initialize
