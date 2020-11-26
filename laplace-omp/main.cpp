@@ -283,11 +283,11 @@ int main (void) {
         if ((row + col) % 2 == 0) {
           // even, so red cell
           int ind = col * num_rows + (row + (col % 2)) / 2;
-          fprintf(pfile, "red: %f\t%f\t%f\n", x_pos, y_pos, temp_red[ind]);
+          fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_red[ind]);
         } else {
           // odd, so black cell
           int ind = col * num_rows + (row + ((col + 1) % 2)) / 2;
-          fprintf(pfile, "black: %f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
+          fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
         }	
       }
       fprintf(pfile, "\n");
