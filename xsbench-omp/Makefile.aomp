@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC          = icpc
+CC          = clang
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
@@ -30,7 +30,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+CFLAGS := -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
 
 # Linker Flags
 LDFLAGS = -lm
