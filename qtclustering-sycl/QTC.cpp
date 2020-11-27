@@ -240,7 +240,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+    cl::sycl::queue q(dev_sel);
 
   // This is the N*Delta indirection matrix
   //allocDeviceBuffer(&distance_matrix_gmem, dst_matrix_elems*sizeof(float));
