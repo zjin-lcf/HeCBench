@@ -16,14 +16,14 @@ MPI         = no
 program = XSBench
 
 source = \
-Main.cpp \
-io.cpp \
-Simulation.cpp \
-GridInit.cpp \
-XSutils.cpp \
-Materials.cpp
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
 
-obj = $(source:.cpp=.o)
+obj = $(source:.c=.o)
 
 #===============================================================================
 # Sets Flags
@@ -66,7 +66,7 @@ endif
 $(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.h Makefile
+%.o: %.c XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
