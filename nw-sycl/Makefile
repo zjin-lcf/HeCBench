@@ -6,7 +6,8 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
+DUMP      = yes
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -42,6 +43,10 @@ endif
 
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-DUSE_GPU
+endif
+
+ifeq ($(DUMP),yes)
+  CFLAGS += -DTRACEBACK
 endif
 #===============================================================================
 # Targets to Build
