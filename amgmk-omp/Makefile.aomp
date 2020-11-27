@@ -3,25 +3,30 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = axhelm
+program = AMGMk
+
+source = csr_matrix.cpp  csr_matvec.cpp  hypre_error.cpp  hypre_memory.cpp  laplace.cpp  main.cpp  vector.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -35,34 +40,28 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
+else
+  CFLAGS +=-fopenmp
 endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
-all: build
 
-build: $(program)
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o : main.cpp axhelmReference.cpp
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
-	
-meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-BlasLapack/libBlasLapack.a: 
-	cd BlasLapack && make -j8 && cd ..
-
-$(program): main.o meshBasis.o ./BlasLapack/libBlasLapack.a 
-	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 clean:
-	cd BlasLapack && make clean && cd ..
-	rm -rf $(program) main.o meshBasis.o 
+	rm -rf $(program) $(obj)
 
-# run one- and three-dimensional kernels
 run: $(program)
-	./$(program) 1 8000 100
-	./$(program) 3 8000 100
+	./$(program)
+

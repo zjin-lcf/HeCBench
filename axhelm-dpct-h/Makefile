@@ -52,11 +52,15 @@ main.o : main.cpp axhelmReference.cpp
 meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(program): main.o meshBasis.o
+BlasLapack/libBlasLapack.a: 
+	cd BlasLapack && make -j8 && cd ..
+
+$(program): main.o meshBasis.o BlasLapack/libBlasLapack.a 
 	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 clean:
-	rm -rf $(program) main.o meshBasis.o
+	cd BlasLapack && make clean && cd ..
+	rm -rf $(program) main.o meshBasis.o 
 
 # run one- and three-dimensional kernels
 run: $(program)
