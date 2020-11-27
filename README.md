@@ -119,9 +119,9 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 16005 | NA | NA | 132035 |
-| host timing(s) | 4.4 | NA | NA | 9.95 |
-| device timing(s) | 3.5 | NA | NA | 3.76 |
+| total enqueue | 16005 | 16013 | NA | 132035 |
+| host timing(s) | 4.4 | 4.2 | NA | 9.95 |
+| device timing(s) | 3.5 | 3.4 | NA | 3.76 |
 
 
 | chi2 | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -763,9 +763,9 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 16005 | NA | NA | 132035 |
-| host timing(s) | 4.4 | NA | NA | 9.95 |
-| device timing(s) | 3.5 | NA | NA | 3.76 |
+| total enqueue | 16005 | 16013 | 16013 | 132035 |
+| host timing(s) | 3.75 | 8.2 | 4.9 | 26.5 |
+| device timing(s) | 3.04 | 3.0 | 3.02 | 18.1 |
 
 
 | chi2 | SYCL | DPCT usm | DPCT header | OpenMP | 

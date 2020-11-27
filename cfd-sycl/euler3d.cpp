@@ -58,24 +58,32 @@ typedef struct{
   float z;
 } Float3;
 
-inline void compute_velocity(float  density, Float3 momentum, Float3* velocity){
+inline void compute_velocity(const float density, const Float3 momentum, Float3* velocity){
   velocity->x = momentum.x / density;
   velocity->y = momentum.y / density;
   velocity->z = momentum.z / density;
 }
 
-inline float compute_speed_sqd(Float3 velocity){
+inline float compute_speed_sqd(const Float3 velocity){
   return velocity.x*velocity.x + velocity.y*velocity.y + velocity.z*velocity.z;
 }
 
-inline float compute_pressure(float density, float density_energy, float speed_sqd){
+inline float compute_pressure(const float density, const float density_energy, const float speed_sqd){
   return ((float)(GAMMA) - (float)(1.0f))*(density_energy - (float)(0.5f)*density*speed_sqd);
 }
 // sqrt is a device function
-inline float compute_speed_of_sound(float density, float pressure){
+inline float compute_speed_of_sound(const float density, const float pressure){
   return cl::sycl::sqrt((float)(GAMMA)*pressure/density);
 }
-inline void compute_flux_contribution(float density, Float3 momentum, float density_energy, float pressure, Float3 velocity, Float3* fc_momentum_x, Float3* fc_momentum_y, Float3* fc_momentum_z, Float3* fc_density_energy)
+inline void compute_flux_contribution(const float density, 
+		Float3 momentum, 
+		const float density_energy, 
+		const float pressure, 
+		const Float3 velocity, 
+		Float3* fc_momentum_x, 
+		Float3* fc_momentum_y, 
+		Float3* fc_momentum_z, 
+		Float3* fc_density_energy)
 {
   fc_momentum_x->x = velocity.x*momentum.x + pressure;
   fc_momentum_x->y = velocity.x*momentum.y;
@@ -90,7 +98,7 @@ inline void compute_flux_contribution(float density, Float3 momentum, float dens
   fc_momentum_z->y = fc_momentum_y->z;
   fc_momentum_z->z = velocity.z*momentum.z + pressure;
 
-  float de_p = density_energy+pressure;
+  const float de_p = density_energy+pressure;
   fc_density_energy->x = velocity.x*de_p;
   fc_density_energy->y = velocity.y*de_p;
   fc_density_energy->z = velocity.z*de_p;
@@ -98,7 +106,7 @@ inline void compute_flux_contribution(float density, Float3 momentum, float dens
 
 
 template <typename T>
-void copy(queue &q, buffer<T,1> &dst, buffer<T,1> &src, int N){
+void copy(queue &q, buffer<T,1> &dst, buffer<T,1> &src, const int N){
 
   q.submit([&](handler& cgh) {
       accessor<T, 1, access::mode::write, sycl_global_buffer> 
@@ -109,7 +117,7 @@ void copy(queue &q, buffer<T,1> &dst, buffer<T,1> &src, int N){
       });
 }
 
-void dump(float *h_variables, int nel, int nelr){
+void dump(const float *h_variables, const int nel, const int nelr){
   {
     std::ofstream file("density");
     file << nel << " " << nelr << std::endl;
@@ -135,7 +143,7 @@ void dump(float *h_variables, int nel, int nelr){
   }
 }
 
-void initialize_buffer(queue &q, buffer<float,1> &mem_d, float val, int number_words) noexcept(false) {
+void initialize_buffer(queue &q, buffer<float,1> &mem_d, const float val, const int number_words) noexcept(false) {
   q.submit([&] (handler& cgh) {
       accessor<float,1,sycl_write,sycl_global_buffer>  \
       mem_d_acc (mem_d, cgh, range<1>(number_words), id<1>(0)); // add workgroup size
@@ -143,7 +151,7 @@ void initialize_buffer(queue &q, buffer<float,1> &mem_d, float val, int number_w
       });
 }
 
-void initialize_variables(queue &q, int nelr, buffer<float,1> &variables, buffer<float,1> &ff_variable) noexcept(false) {
+void initialize_variables(queue &q, const int nelr, buffer<float,1> &variables, buffer<float,1> &ff_variable) noexcept(false) {
 
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_1;
@@ -159,7 +167,7 @@ void initialize_variables(queue &q, int nelr, buffer<float,1> &variables, buffer
       });
 }
 
-void compute_step_factor(queue &q, int nelr, 
+void compute_step_factor(queue &q, const int nelr, 
     buffer<float,1> &variables, 
     buffer<float,1> &areas, 
     buffer<float,1> &step_factors){
@@ -181,7 +189,7 @@ void compute_step_factor(queue &q, int nelr,
 }
 
 void compute_flux(queue &q, 
-    int nelr, 
+    const int nelr, 
     buffer<int,1> &elements_surrounding_elements,
     buffer<float,1> &normals,
     buffer<float,1> &variables,
@@ -214,7 +222,7 @@ void compute_flux(queue &q,
       });
 }
 
-void time_step(queue &q, int j, int nelr, 
+void time_step(queue &q, const int j, const int nelr, 
     buffer<float,1> &old_variables, 
     buffer<float,1> &variables, 
     buffer<float,1> &step_factors, 
@@ -234,26 +242,6 @@ void time_step(queue &q, int j, int nelr,
 #include "kernel_time_step.sycl"
         });
       });
-}
-inline void compute_flux_contribution(float& density, Float3& momentum, float& density_energy, float& pressure, Float3& velocity, Float3& fc_momentum_x, Float3& fc_momentum_y, Float3& fc_momentum_z, Float3& fc_density_energy)
-{
-  fc_momentum_x.x = velocity.x*momentum.x + pressure;
-  fc_momentum_x.y = velocity.x*momentum.y;
-  fc_momentum_x.z = velocity.x*momentum.z;
-
-
-  fc_momentum_y.x = fc_momentum_x.y;
-  fc_momentum_y.y = velocity.y*momentum.y + pressure;
-  fc_momentum_y.z = velocity.y*momentum.z;
-
-  fc_momentum_z.x = fc_momentum_x.z;
-  fc_momentum_z.y = fc_momentum_y.z;
-  fc_momentum_z.z = velocity.z*momentum.z + pressure;
-
-  float de_p = density_energy+pressure;
-  fc_density_energy.x = velocity.x*de_p;
-  fc_density_energy.y = velocity.y*de_p;
-  fc_density_energy.z = velocity.z*de_p;
 }
 
 /*
@@ -288,7 +276,8 @@ int main(int argc, char** argv){
   h_ff_variable[VAR_MOMENTUM+1] = h_ff_variable[VAR_DENSITY] * ff_velocity.y;
   h_ff_variable[VAR_MOMENTUM+2] = h_ff_variable[VAR_DENSITY] * ff_velocity.z;
 
-  h_ff_variable[VAR_DENSITY_ENERGY] = h_ff_variable[VAR_DENSITY]*(float(0.5f)*(ff_speed*ff_speed)) + (ff_pressure / float(GAMMA-1.0f));
+  h_ff_variable[VAR_DENSITY_ENERGY] = h_ff_variable[VAR_DENSITY]*(float(0.5f)*(ff_speed*ff_speed)) 
+	  + (ff_pressure / float(GAMMA-1.0f));
 
   Float3 h_ff_momentum;
   h_ff_momentum.x = *(h_ff_variable+VAR_MOMENTUM+0);
@@ -300,10 +289,11 @@ int main(int argc, char** argv){
   Float3 h_ff_flux_contribution_density_energy;
   compute_flux_contribution(h_ff_variable[VAR_DENSITY], h_ff_momentum, 
       h_ff_variable[VAR_DENSITY_ENERGY], ff_pressure,
-      ff_velocity, h_ff_flux_contribution_momentum_x, 
-      h_ff_flux_contribution_momentum_y, 
-      h_ff_flux_contribution_momentum_z,
-      h_ff_flux_contribution_density_energy);
+      ff_velocity, 
+      &h_ff_flux_contribution_momentum_x, 
+      &h_ff_flux_contribution_momentum_y, 
+      &h_ff_flux_contribution_momentum_z,
+      &h_ff_flux_contribution_density_energy);
 
   int nel;
   int nelr;
