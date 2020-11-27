@@ -156,10 +156,10 @@ void affine_reference(const unsigned short *src, unsigned short *dst)
 
 
       // forward affine transformation 
-      affine[0][0] = lx_expan * std::cosf((float)(lx_rot*PI/180.0f));
-      affine[0][1] = ly_expan * std::sinf((float)(ly_rot*PI/180.0f));
-      affine[1][0] = lx_expan * std::sinf((float)(lx_rot*PI/180.0f));
-      affine[1][1] = ly_expan * std::cosf((float)(ly_rot*PI/180.0f));
+      affine[0][0] = lx_expan * std::cos((float)(lx_rot*PI/180.0f));
+      affine[0][1] = ly_expan * std::sin((float)(ly_rot*PI/180.0f));
+      affine[1][0] = lx_expan * std::sin((float)(lx_rot*PI/180.0f));
+      affine[1][1] = ly_expan * std::cos((float)(ly_rot*PI/180.0f));
       beta[0]      = lx_move;
       beta[1]      = ly_move;
 
@@ -189,8 +189,8 @@ void affine_reference(const unsigned short *src, unsigned short *dst)
       x_new    = i_beta[0] + i_affine[0][0]*(x-X_SIZE/2.0f) + i_affine[0][1]*(y-Y_SIZE/2.0f) + X_SIZE/2.0f;
       y_new    = i_beta[1] + i_affine[1][0]*(x-X_SIZE/2.0f) + i_affine[1][1]*(y-Y_SIZE/2.0f) + Y_SIZE/2.0f;
 
-      m        = (int)std::floorf(x_new);
-      n        = (int)std::floorf(y_new);
+      m        = (int)std::floor(x_new);
+      n        = (int)std::floor(y_new);
 
       x_frac   = x_new - m;
       y_frac   = y_new - n;
