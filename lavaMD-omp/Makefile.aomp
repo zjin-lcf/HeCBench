@@ -3,66 +3,74 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
+OUTPUT    = no
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = axhelm
+program = main
+
+source = main.cpp ./util/num/num.cpp ./util/timer/timer.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
+ifeq ($(OUTPUT),yes)
+  CFLAGS += -DOUTPUT
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
+else
+  CFLAGS +=-fopenmp
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
-all: build
 
-build: $(program)
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o : main.cpp axhelmReference.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
-	
-meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-BlasLapack/libBlasLapack.a: 
-	cd BlasLapack && make -j8 && cd ..
+main.o:	main.cpp main.h 
 
-$(program): main.o meshBasis.o ./BlasLapack/libBlasLapack.a 
-	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
+./util/num/num.o: ./util/num/num.cpp ./util/num/num.h 
+
+./util/timer/timer.o: ./util/timer/timer.cpp ./util/timer/timer.h 
 
 clean:
-	cd BlasLapack && make clean && cd ..
-	rm -rf $(program) main.o meshBasis.o 
+	rm -rf $(program) $(obj)
 
-# run one- and three-dimensional kernels
 run: $(program)
-	./$(program) 1 8000 100
-	./$(program) 3 8000 100
+	./$(program) -boxes1d 30
+

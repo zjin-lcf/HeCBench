@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -18,10 +19,10 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -37,7 +38,12 @@ endif
 
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
+else
+  CFLAGS +=-fopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -55,7 +61,7 @@ meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
 BlasLapack/libBlasLapack.a: 
 	cd BlasLapack && make -j8 && cd ..
 
-$(program): main.o meshBasis.o ./BlasLapack/libBlasLapack.a 
+$(program): main.o meshBasis.o BlasLapack/libBlasLapack.a 
 	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 clean:

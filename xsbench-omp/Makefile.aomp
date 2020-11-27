@@ -3,25 +3,41 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
-OPTIMIZE  = yes
-DEBUG     = no
+CC          = clang
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
+MPI         = no
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = axhelm
+program = XSBench
+
+source = \
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
+
+obj = $(source:.c=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int 
+CFLAGS := -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = -lm
+
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -29,40 +45,38 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+# MPI
+ifeq ($(MPI),yes)
+  CC = mpicc
+  CFLAGS += -DMPI
 endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
-all: build
 
-build: $(program)
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o : main.cpp axhelmReference.cpp
+%.o: %.c XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
-	
-meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-BlasLapack/libBlasLapack.a: 
-	cd BlasLapack && make -j8 && cd ..
-
-$(program): main.o meshBasis.o ./BlasLapack/libBlasLapack.a 
-	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 clean:
-	cd BlasLapack && make clean && cd ..
-	rm -rf $(program) main.o meshBasis.o 
+	rm -rf $(program) $(obj)
 
-# run one- and three-dimensional kernels
+edit:
+	vim -p $(source) XSbench_header.h
+
 run: $(program)
-	./$(program) 1 8000 100
-	./$(program) 3 8000 100
+	./$(program) -s small -m event
