@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -39,6 +40,9 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DUMP),yes)
+  CFLAGS += -DTRACEBACK
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
