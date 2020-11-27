@@ -12,10 +12,11 @@
   on 24/03/2011
  ********************************************************************/
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <iostream>
 #include <fstream>
 #include <math.h>
-#include <cuda.h>
 #include "util.h"
 
 /*
@@ -51,34 +52,34 @@ double get_time() {
 }
 
 //self-defined user type
-typedef struct{
+typedef struct dpct_type_a8441a {
   float x;
   float y;
   float z;
 } Float3;
 
-__device__
+
 inline void compute_velocity(const float density, const Float3 momentum, Float3* velocity){
   velocity->x = momentum.x / density;
   velocity->y = momentum.y / density;
   velocity->z = momentum.z / density;
 }
 
-__device__
+
 inline float compute_speed_sqd(const Float3 velocity){
   return velocity.x*velocity.x + velocity.y*velocity.y + velocity.z*velocity.z;
 }
 
-__device__
+
 inline float compute_pressure(const float density, const float density_energy, const float speed_sqd){
   return ((float)(GAMMA) - (float)(1.0f))*(density_energy - (float)(0.5f)*density*speed_sqd);
 }
 // sqrt is a device function
-__device__
+
 inline float compute_speed_of_sound(const float density, const float pressure){
-  return sqrt((float)(GAMMA)*pressure/density);
+  return sycl::sqrt((float)(GAMMA)*pressure / density);
 }
-  __device__ __host__
+  
 inline void compute_flux_contribution(const float density, 
     Float3 momentum, 
     const float density_energy, 
@@ -110,7 +111,7 @@ inline void compute_flux_contribution(const float density,
 
 
 void copy(float* dst, const float* src, const int N){
-  cudaMemcpy(dst, src, N*sizeof(float), cudaMemcpyDeviceToDevice);
+  dpct::get_default_queue().memcpy(dst, src, N * sizeof(float)).wait();
 }
 
 
@@ -142,26 +143,32 @@ void dump(const float *h_variables, const int nel, const int nelr){
 }
 
 
-__global__ void initialize_buffer(float *d, const float val, const int nelr)
+void initialize_buffer(float *d, const float val, const int nelr,
+                       sycl::nd_item<3> item_ct1)
 {
-  const int i = (blockDim.x*blockIdx.x + threadIdx.x);
+  const int i = (item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2));
   if (i < nelr) d[i] = val;
 }
 
-__global__ void initialize_variables(const int nelr, float* variables, const float* ff_variable)
+void initialize_variables(const int nelr, float* variables, const float* ff_variable,
+                          sycl::nd_item<3> item_ct1)
 {
-  const int i = (blockDim.x*blockIdx.x + threadIdx.x);
+  const int i = (item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2));
   for(int j = 0; j < NVAR; j++)
     variables[i + j*nelr] = ff_variable[j];
 }
 
 
-__global__ void compute_step_factor(const int nelr, 
+void compute_step_factor(const int nelr, 
     float* variables, 
     float* areas, 
-    float* step_factors){
+    float* step_factors,
+    sycl::nd_item<3> item_ct1){
 
-  const int i = (blockDim.x*blockIdx.x + threadIdx.x);
+  const int i = (item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2));
   if( i >= nelr) return;
 
   float density = variables[i + VAR_DENSITY*nelr];
@@ -177,11 +184,12 @@ __global__ void compute_step_factor(const int nelr,
 
   float pressure       = compute_pressure(density, density_energy, speed_sqd);
   float speed_of_sound = compute_speed_of_sound(density, pressure);
-  step_factors[i] = (float)(0.5f) / (sqrt(areas[i]) * (sqrt(speed_sqd) + speed_of_sound));
+  step_factors[i] = (float)(0.5f) / (sycl::sqrt(areas[i]) *
+                                     (sycl::sqrt(speed_sqd) + speed_of_sound));
 }
 
 
-__global__ void 
+void 
 compute_flux(
     int nelr, 
     int* elements_surrounding_elements,
@@ -192,9 +200,11 @@ compute_flux(
     Float3* ff_flux_contribution_density_energy,
     Float3* ff_flux_contribution_momentum_x,
     Float3* ff_flux_contribution_momentum_y,
-    Float3* ff_flux_contribution_momentum_z){
+    Float3* ff_flux_contribution_momentum_z,
+    sycl::nd_item<3> item_ct1){
 
-  const int i = (blockDim.x*blockIdx.x + threadIdx.x);
+  const int i = (item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2));
 
   if( i >= nelr) return;
   const float smoothing_coefficient = (float)(0.2f);
@@ -216,7 +226,7 @@ compute_flux(
   float speed_sqd_i                          = compute_speed_sqd(velocity_i);
   //float speed_sqd_i;
   //compute_speed_sqd(velocity_i, speed_sqd_i);
-  float speed_i                              = sqrt(speed_sqd_i);
+  float speed_i = sycl::sqrt(speed_sqd_i);
   float pressure_i                           = compute_pressure(density_i, density_energy_i, speed_sqd_i);
   float speed_of_sound_i                     = compute_speed_of_sound(density_i, pressure_i);
   Float3 flux_contribution_i_momentum_x, flux_contribution_i_momentum_y, flux_contribution_i_momentum_z;
@@ -246,7 +256,8 @@ compute_flux(
     normal.x = normals[i + (j + 0*NNB)*nelr];
     normal.y = normals[i + (j + 1*NNB)*nelr];
     normal.z = normals[i + (j + 2*NNB)*nelr];
-    normal_len = sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
+    normal_len = sycl::sqrt(normal.x * normal.x + normal.y * normal.y +
+                            normal.z * normal.z);
 
     if(nb >= 0)   // a legitimate neighbor
     {
@@ -264,7 +275,9 @@ compute_flux(
           &flux_contribution_nb_density_energy);
 
       // artificial viscosity
-      factor = -normal_len*smoothing_coefficient*(float)(0.5f)*(speed_i + sqrt(speed_sqd_nb) + speed_of_sound_i + speed_of_sound_nb);
+      factor = -normal_len * smoothing_coefficient * (float)(0.5f) *
+               (speed_i + sycl::sqrt(speed_sqd_nb) + speed_of_sound_i +
+                speed_of_sound_nb);
       flux_i_density += factor*(density_i-density_nb);
       flux_i_density_energy += factor*(density_energy_i-density_energy_nb);
       flux_i_momentum.x += factor*(momentum_i.x-momentum_nb.x);
@@ -333,14 +346,15 @@ compute_flux(
 
 }
 
-__global__ void 
+void 
 time_step(int j, int nelr, 
     const float* old_variables, 
     float* variables, 
     const float* step_factors, 
-    const float* fluxes) {
+    const float* fluxes, sycl::nd_item<3> item_ct1) {
 
-  const int i = (blockDim.x*blockIdx.x + threadIdx.x);
+  const int i = (item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2));
   if( i >= nelr) return;
 
   float factor = step_factors[i]/(float)(RK+1-j);
@@ -356,7 +370,9 @@ time_step(int j, int nelr,
 /*
  * Main function
  */
-int main(int argc, char** argv){
+int main(int argc, char **argv) {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   printf("WG size of kernel:initialize = %d\nWG size of kernel:compute_step_factor = %d\nWG size of kernel:compute_flux = %d\nWG size of kernel:time_step = %d\n", BLOCK_SIZE_1, BLOCK_SIZE_2, BLOCK_SIZE_3, BLOCK_SIZE_4);
 
   if (argc < 2){
@@ -412,7 +428,8 @@ int main(int argc, char** argv){
     throw(std::string("can not find/open file! ")+data_file_name);
   }
   file >> nel;
-  nelr = block_length*((nel / block_length )+ std::min(1, nel % block_length));
+  nelr =
+      block_length * ((nel / block_length) + std::min(1, nel % block_length));
   std::cout<<"--cambine: nel="<<nel<<", nelr="<<nelr<<std::endl;
   float* h_areas = new float[nelr];
   int* h_elements_surrounding_elements = new int[nelr*NNB];
@@ -464,86 +481,158 @@ int main(int argc, char** argv){
   Float3 *d_ff_flux_contribution_momentum_z;
   Float3 *d_ff_flux_contribution_density_energy;
 
-  cudaMalloc((void**)&d_ff_variable, sizeof(float)*NVAR);
-  cudaMemcpy(d_ff_variable, h_ff_variable, sizeof(float)*NVAR, cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_ff_flux_contribution_momentum_x, sizeof(Float3));
-  cudaMemcpy(d_ff_flux_contribution_momentum_x, &h_ff_flux_contribution_momentum_x, sizeof(Float3), cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_ff_flux_contribution_momentum_y, sizeof(Float3));
-  cudaMemcpy(d_ff_flux_contribution_momentum_y, &h_ff_flux_contribution_momentum_y, sizeof(Float3), cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_ff_flux_contribution_momentum_z, sizeof(Float3));
-  cudaMemcpy(d_ff_flux_contribution_momentum_z, &h_ff_flux_contribution_momentum_z, sizeof(Float3), cudaMemcpyHostToDevice);
-  cudaMalloc((void**)&d_ff_flux_contribution_density_energy, sizeof(Float3));
-  cudaMemcpy(d_ff_flux_contribution_density_energy, &h_ff_flux_contribution_density_energy, sizeof(Float3), cudaMemcpyHostToDevice);
+  d_ff_variable = sycl::malloc_device<float>(NVAR, q_ct1);
+  q_ct1.memcpy(d_ff_variable, h_ff_variable, sizeof(float) * NVAR).wait();
+  d_ff_flux_contribution_momentum_x = sycl::malloc_device<Float3>(1, q_ct1);
+  q_ct1
+      .memcpy(d_ff_flux_contribution_momentum_x,
+              &h_ff_flux_contribution_momentum_x, sizeof(Float3))
+      .wait();
+  d_ff_flux_contribution_momentum_y = sycl::malloc_device<Float3>(1, q_ct1);
+  q_ct1
+      .memcpy(d_ff_flux_contribution_momentum_y,
+              &h_ff_flux_contribution_momentum_y, sizeof(Float3))
+      .wait();
+  d_ff_flux_contribution_momentum_z = sycl::malloc_device<Float3>(1, q_ct1);
+  q_ct1
+      .memcpy(d_ff_flux_contribution_momentum_z,
+              &h_ff_flux_contribution_momentum_z, sizeof(Float3))
+      .wait();
+  d_ff_flux_contribution_density_energy = sycl::malloc_device<Float3>(1, q_ct1);
+  q_ct1
+      .memcpy(d_ff_flux_contribution_density_energy,
+              &h_ff_flux_contribution_density_energy, sizeof(Float3))
+      .wait();
 
   float* d_areas;
-  cudaMalloc((void**)&d_areas, sizeof(float)*nelr);
-  cudaMemcpy(d_areas, h_areas, sizeof(float)*nelr, cudaMemcpyHostToDevice);
+  d_areas = sycl::malloc_device<float>(nelr, q_ct1);
+  q_ct1.memcpy(d_areas, h_areas, sizeof(float) * nelr).wait();
 
   float* d_normals;
-  cudaMalloc((void**)&d_normals, sizeof(float)*nelr*NDIM*NNB);
-  cudaMemcpy(d_normals, h_normals, sizeof(float)*nelr*NDIM*NNB, cudaMemcpyHostToDevice);
+  d_normals =
+      (float *)sycl::malloc_device(sizeof(float) * nelr * NDIM * NNB, q_ct1);
+  q_ct1.memcpy(d_normals, h_normals, sizeof(float) * nelr * NDIM * NNB).wait();
 
   int* d_elements_surrounding_elements;
-  cudaMalloc((void**)&d_elements_surrounding_elements, sizeof(int)*nelr*NNB);
-  cudaMemcpy(d_elements_surrounding_elements, h_elements_surrounding_elements, sizeof(int)*nelr*NNB, cudaMemcpyHostToDevice);
+  d_elements_surrounding_elements =
+      (int *)sycl::malloc_device(sizeof(int) * nelr * NNB, q_ct1);
+  q_ct1
+      .memcpy(d_elements_surrounding_elements, h_elements_surrounding_elements,
+              sizeof(int) * nelr * NNB)
+      .wait();
 
   // Create arrays and set initial conditions
   float* d_variables;
-  cudaMalloc((void**)&d_variables, sizeof(float)*nelr*NVAR);
+  d_variables =
+      (float *)sycl::malloc_device(sizeof(float) * nelr * NVAR, q_ct1);
 
   float* d_old_variables;
-  cudaMalloc((void**)&d_old_variables, sizeof(float)*nelr*NVAR);
+  d_old_variables =
+      (float *)sycl::malloc_device(sizeof(float) * nelr * NVAR, q_ct1);
 
   float* d_fluxes;
-  cudaMalloc((void**)&d_fluxes, sizeof(float)*nelr*NVAR);
+  d_fluxes = (float *)sycl::malloc_device(sizeof(float) * nelr * NVAR, q_ct1);
 
   float* d_step_factors;
-  cudaMalloc((void**)&d_step_factors, sizeof(float)*nelr);
+  d_step_factors = sycl::malloc_device<float>(nelr, q_ct1);
 
-  dim3 gridDim1 ((nelr + BLOCK_SIZE_1 - 1)/BLOCK_SIZE_1);
-  dim3 gridDim2 ((nelr + BLOCK_SIZE_2 - 1)/BLOCK_SIZE_2);
-  dim3 gridDim3 ((nelr + BLOCK_SIZE_3 - 1)/BLOCK_SIZE_3);
-  dim3 gridDim4 ((nelr + BLOCK_SIZE_4 - 1)/BLOCK_SIZE_4);
+  sycl::range<3> gridDim1(1, 1, (nelr + BLOCK_SIZE_1 - 1) / BLOCK_SIZE_1);
+  sycl::range<3> gridDim2(1, 1, (nelr + BLOCK_SIZE_2 - 1) / BLOCK_SIZE_2);
+  sycl::range<3> gridDim3(1, 1, (nelr + BLOCK_SIZE_3 - 1) / BLOCK_SIZE_3);
+  sycl::range<3> gridDim4(1, 1, (nelr + BLOCK_SIZE_4 - 1) / BLOCK_SIZE_4);
 
-  initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_variables, d_ff_variable);
-  initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_old_variables, d_ff_variable);  
-  initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_fluxes, d_ff_variable);    
-  initialize_buffer<<<gridDim1, BLOCK_SIZE_1>>>(d_step_factors, 0, nelr);
+  q_ct1.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<3>(gridDim1 * sycl::range<3>(1, 1, BLOCK_SIZE_1),
+                          sycl::range<3>(1, 1, BLOCK_SIZE_1)),
+        [=](sycl::nd_item<3> item_ct1) {
+          initialize_variables(nelr, d_variables, d_ff_variable, item_ct1);
+        });
+  });
+  q_ct1.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<3>(gridDim1 * sycl::range<3>(1, 1, BLOCK_SIZE_1),
+                          sycl::range<3>(1, 1, BLOCK_SIZE_1)),
+        [=](sycl::nd_item<3> item_ct1) {
+          initialize_variables(nelr, d_old_variables, d_ff_variable, item_ct1);
+        });
+  });
+  q_ct1.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<3>(gridDim1 * sycl::range<3>(1, 1, BLOCK_SIZE_1),
+                          sycl::range<3>(1, 1, BLOCK_SIZE_1)),
+        [=](sycl::nd_item<3> item_ct1) {
+          initialize_variables(nelr, d_fluxes, d_ff_variable, item_ct1);
+        });
+  });
+  q_ct1.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<3>(gridDim1 * sycl::range<3>(1, 1, BLOCK_SIZE_1),
+                          sycl::range<3>(1, 1, BLOCK_SIZE_1)),
+        [=](sycl::nd_item<3> item_ct1) {
+          initialize_buffer(d_step_factors, 0, nelr, item_ct1);
+        });
+  });
 
   // Begin iterations
   for(int n = 0; n < iterations; n++){
     copy(d_old_variables, d_variables, nelr*NVAR);
 
     // for the first iteration we compute the time step
-    compute_step_factor<<<gridDim2, BLOCK_SIZE_2>>>(nelr, d_variables, d_areas, d_step_factors);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for(
+          sycl::nd_range<3>(gridDim2 * sycl::range<3>(1, 1, BLOCK_SIZE_2),
+                            sycl::range<3>(1, 1, BLOCK_SIZE_2)),
+          [=](sycl::nd_item<3> item_ct1) {
+            compute_step_factor(nelr, d_variables, d_areas, d_step_factors,
+                                item_ct1);
+          });
+    });
 
 #ifdef DEBUG
     cudaMemcpy(h_step_factors, d_step_factors, sizeof(float)*nelr, cudaMemDeviceToHost);
     for (int i = 0; i < 16; i++) printf("step factor: i=%d %f\n", i, h_step_factors[i]);
 #endif
     for(int j = 0; j < RK; j++){
-      compute_flux<<<gridDim3, BLOCK_SIZE_3>>>(nelr, d_elements_surrounding_elements, d_normals, 
-          d_variables, d_ff_variable, d_fluxes, d_ff_flux_contribution_density_energy, \
-          d_ff_flux_contribution_momentum_x, d_ff_flux_contribution_momentum_y, 
-          d_ff_flux_contribution_momentum_z);
-      time_step<<<gridDim4, BLOCK_SIZE_4>>>(j, nelr, d_old_variables, d_variables, d_step_factors, d_fluxes);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for(
+            sycl::nd_range<3>(gridDim3 * sycl::range<3>(1, 1, BLOCK_SIZE_3),
+                              sycl::range<3>(1, 1, BLOCK_SIZE_3)),
+            [=](sycl::nd_item<3> item_ct1) {
+              compute_flux(nelr, d_elements_surrounding_elements, d_normals,
+                           d_variables, d_ff_variable, d_fluxes,
+                           d_ff_flux_contribution_density_energy,
+                           d_ff_flux_contribution_momentum_x,
+                           d_ff_flux_contribution_momentum_y,
+                           d_ff_flux_contribution_momentum_z, item_ct1);
+            });
+      });
+      q_ct1.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for(
+            sycl::nd_range<3>(gridDim4 * sycl::range<3>(1, 1, BLOCK_SIZE_4),
+                              sycl::range<3>(1, 1, BLOCK_SIZE_4)),
+            [=](sycl::nd_item<3> item_ct1) {
+              time_step(j, nelr, d_old_variables, d_variables, d_step_factors,
+                        d_fluxes, item_ct1);
+            });
+      });
     }
   }
 
-  cudaMemcpy(h_variables, d_variables, sizeof(float)*nelr*NVAR, cudaMemcpyDeviceToHost);
+  q_ct1.memcpy(h_variables, d_variables, sizeof(float) * nelr * NVAR).wait();
 
-  cudaFree(d_ff_variable);
-  cudaFree(d_ff_flux_contribution_momentum_x);
-  cudaFree(d_ff_flux_contribution_momentum_y);
-  cudaFree(d_ff_flux_contribution_momentum_z);
-  cudaFree(d_ff_flux_contribution_density_energy);
-  cudaFree(d_areas);
-  cudaFree(d_normals);
-  cudaFree(d_elements_surrounding_elements);
-  cudaFree(d_variables);
-  cudaFree(d_old_variables);
-  cudaFree(d_fluxes);
-  cudaFree(d_step_factors);
+  sycl::free(d_ff_variable, q_ct1);
+  sycl::free(d_ff_flux_contribution_momentum_x, q_ct1);
+  sycl::free(d_ff_flux_contribution_momentum_y, q_ct1);
+  sycl::free(d_ff_flux_contribution_momentum_z, q_ct1);
+  sycl::free(d_ff_flux_contribution_density_energy, q_ct1);
+  sycl::free(d_areas, q_ct1);
+  sycl::free(d_normals, q_ct1);
+  sycl::free(d_elements_surrounding_elements, q_ct1);
+  sycl::free(d_variables, q_ct1);
+  sycl::free(d_old_variables, q_ct1);
+  sycl::free(d_fluxes, q_ct1);
+  sycl::free(d_step_factors, q_ct1);
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
