@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+VERIFY    = yes
 
 #===============================================================================
 # Program name & source code list
@@ -46,6 +47,9 @@ else
   CFLAGS +=-qopenmp
 endif
 
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
