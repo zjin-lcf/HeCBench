@@ -1315,7 +1315,7 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 
 ## Results on Platform 3
-### Intel<sup>®</sup> Core<sup>TM</sup> i9-10920X CPU with a Gen12LP discrete GPU (DG1)
+#### Intel<sup>®</sup> Core<sup>TM</sup> i9-10920X CPU with a Gen12LP discrete GPU (DG1)
 | minimod | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 8008 | 8011 | 8011 | NA |
