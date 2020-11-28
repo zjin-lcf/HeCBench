@@ -48,10 +48,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c constants.h grid.h pml.h data_setup.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-%.o: %.cu constants.h Makefile
+%.o: %.cu constants.h grid.h pml.h data_setup.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

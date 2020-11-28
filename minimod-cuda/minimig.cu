@@ -6,7 +6,7 @@
 #include "constants.h"
 
 #define N_RADIUS 4
-#define N_THREADS_PER_BLOCK_DIM 4
+#define N_THREADS_PER_BLOCK_DIM 8
 
 __global__ void target_inner_3d_kernel(
     llint nx, llint ny, llint nz,
