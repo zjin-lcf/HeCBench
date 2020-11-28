@@ -119,7 +119,7 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 16005 | 16013 | NA | 132035 |
+| total enqueue | 16005 | NA | NA | 132035 |
 | host timing(s) | 4.4 | 4.2 | NA | 9.95 |
 | device timing(s) | 3.5 | 3.4 | NA | 3.76 |
 
@@ -1313,6 +1313,16 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 | host timing(s) | 2.49 | 2.7 | 2.8 | 5.8 |
 | device timing(s) | 2.1 | 2.0 | 2.0 | 2.3 |
 
+
+## Results on Platform 3
+### Intel<sup>®</sup> Core<sup>TM</sup> i9-10920X CPU with a Gen12LP discrete GPU (DG1)
+| minimod | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 8008 | 8011 | 8011 | NA |
+| host timing(s) | 2.4 | 1.9 | 2.0 | NA | 
+| device timing(s) | 0.69 | 0.68 | 0.68 | NA | 
+
+
 # Reference
 ### affine
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
@@ -1497,6 +1507,9 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 ### miniFE
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
+
+### minimod
+  A finite difference solver for seismic modeling (https://github.com/rsrice/gpa-minimod-artifacts)
 
 ### mixbench
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
