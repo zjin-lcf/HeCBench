@@ -6,7 +6,7 @@
 #include "constants.h"
 
 #define N_RADIUS 4
-#define N_THREADS_PER_BLOCK_DIM 8
+#define N_THREADS_PER_BLOCK_DIM 4
 
 __global__ void target_inner_3d_kernel(
     llint nx, llint ny, llint nz,
@@ -45,7 +45,20 @@ __global__ void target_inner_3d_kernel(
 
     if (i > x4-1 || j > y4-1 || k > z4-1) { return; }
 
-    /*
+    float lap = coef0 * s_u[sui][suj][suk] + 
+              coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
+              coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
+              coefz_1 * (s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1]) +
+              coefx_2 * (s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk]) +
+              coefy_2 * (s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk]) +
+              coefz_2 * (s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2]) +
+              coefx_3 * (s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk]) +
+              coefy_3 * (s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk]) +
+              coefz_3 * (s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3]) +
+              coefx_4 * (s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk]) +
+              coefy_4 * (s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk]) +
+              coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
+/*
     float lap = __fmaf_rn(coef0, s_u[sui][suj][suk]
               , __fmaf_rn(coefx_1, __fadd_rn(s_u[sui+1][suj][suk],s_u[sui-1][suj][suk])
               , __fmaf_rn(coefy_1, __fadd_rn(s_u[sui][suj+1][suk],s_u[sui][suj-1][suk])
@@ -60,27 +73,13 @@ __global__ void target_inner_3d_kernel(
               , __fmaf_rn(coefy_4, __fadd_rn(s_u[sui][suj+4][suk],s_u[sui][suj-4][suk])
               , __fmul_rn(coefz_4, __fadd_rn(s_u[sui][suj][suk+4],s_u[sui][suj][suk-4])
     )))))))))))));
-    */
-    float lap = coef0 * s_u[sui][suj][suk] + 
-              coefx_1 * s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk] +
-              coefy_1 * s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk] +
-              coefz_1 * s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1] +
-              coefx_2 * s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk] +
-              coefy_2 * s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk] +
-              coefz_2 * s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2] +
-              coefx_3 * s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk] +
-              coefy_3 * s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk] +
-              coefz_3 * s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3] +
-              coefx_4 * s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk] +
-              coefy_4 * s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk] +
-              coefz_4 * s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4];
+*/
 
-
-    /*
+/*
     v[IDX3_l(i,j,k)] = __fmaf_rn(2.f, s_u[sui][suj][suk],
         __fmaf_rn(vp[IDX3(i,j,k)], lap, -v[IDX3_l(i,j,k)])
     );
-     */
+*/
     v[IDX3_l(i,j,k)] = 2.f * s_u[sui][suj][suk] + vp[IDX3(i,j,k)] * lap - v[IDX3_l(i,j,k)];
 }
 
@@ -121,7 +120,7 @@ __global__ void target_pml_3d_kernel(
 
     if (i > x4-1 || j > y4-1 || k > z4-1) { return; }
 
-    /*
+/*
     float lap = __fmaf_rn(coef0, s_u[sui][suj][suk]
         , __fmaf_rn(coefx_1, __fadd_rn(s_u[sui+1][suj][suk],s_u[sui-1][suj][suk])
         , __fmaf_rn(coefy_1, __fadd_rn(s_u[sui][suj+1][suk],s_u[sui][suj-1][suk])
@@ -136,45 +135,46 @@ __global__ void target_pml_3d_kernel(
         , __fmaf_rn(coefy_4, __fadd_rn(s_u[sui][suj+4][suk],s_u[sui][suj-4][suk])
         , __fmul_rn(coefz_4, __fadd_rn(s_u[sui][suj][suk+4],s_u[sui][suj][suk-4])
     )))))))))))));
-    */
+*/
     float lap = coef0 * s_u[sui][suj][suk] + 
-              coefx_1 * s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk] +
-              coefy_1 * s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk] +
-              coefz_1 * s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1] +
-              coefx_2 * s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk] +
-              coefy_2 * s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk] +
-              coefz_2 * s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2] +
-              coefx_3 * s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk] +
-              coefy_3 * s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk] +
-              coefz_3 * s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3] +
-              coefx_4 * s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk] +
-              coefy_4 * s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk] +
-              coefz_4 * s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4];
+              coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
+              coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
+              coefz_1 * (s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1]) +
+              coefx_2 * (s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk]) +
+              coefy_2 * (s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk]) +
+              coefz_2 * (s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2]) +
+              coefx_3 * (s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk]) +
+              coefy_3 * (s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk]) +
+              coefz_3 * (s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3]) +
+              coefx_4 * (s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk]) +
+              coefy_4 * (s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk]) +
+              coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
 
     const float s_eta_c = eta[IDX3_eta1(i,j,k)];
 
-    /*
+/*
     v[IDX3_l(i,j,k)] = __fdiv_rn(
-        __fmaf_rn(__fmaf_rn(2.f, s_eta_c, __fsub_rn(2.f, __fmul_rn(s_eta_c, s_eta_c))),
+        __fmaf_rn(
+            __fmaf_rn(2.f, s_eta_c,
+                __fsub_rn(2.f,
+                    __fmul_rn(s_eta_c, s_eta_c)
+                )
+            ),
             s_u[sui][suj][suk],
-            __fmaf_rn( vp[IDX3(i,j,k)], __fadd_rn(lap, phi[IDX3(i,j,k)]), -v[IDX3_l(i,j,k)])
+            __fmaf_rn(
+                vp[IDX3(i,j,k)],
+                __fadd_rn(lap, phi[IDX3(i,j,k)]),
+                -v[IDX3_l(i,j,k)]
+            )
         ),
         __fmaf_rn(2.f, s_eta_c, 1.f)
     );
-    */
+*/
     v[IDX3_l(i,j,k)] = ((2.f*s_eta_c + 2.f - s_eta_c*s_eta_c)*s_u[sui][suj][suk] + 
 		    (vp[IDX3(i,j,k)] * (lap + phi[IDX3(i,j,k)]) - v[IDX3_l(i,j,k)])) / 
 	    (2.f*s_eta_c+1.f);
 
-    phi[IDX3(i,j,k)] = 
-    ((phi[IDX3(i,j,k)] - 
-     ((eta[IDX3_eta1(i+1,j,k)]-eta[IDX3_eta1(i-1,j,k)]) * 
-     (s_u[sui+1][suj][suk]-s_u[sui-1][suj][suk]) * hdx_2 + 
-     (eta[IDX3_eta1(i,j+1,k)]-eta[IDX3_eta1(i,j-1,k)]) *
-     (s_u[sui][suj+1][suk]-s_u[sui][suj-1][suk])) * hdy_2 +
-     (eta[IDX3_eta1(i,j,k+1)]-eta[IDX3_eta1(i,j,k-1)]) *
-     (s_u[sui][suj][suk+1]-s_u[sui][suj][suk-1]) * hdz_2)) / (1.f + s_eta_c);
-    /*
+/*
     phi[IDX3(i,j,k)] = __fdiv_rn(
             __fsub_rn(
                 phi[IDX3(i,j,k)],
@@ -199,7 +199,15 @@ __global__ void target_pml_3d_kernel(
         ,
         __fadd_rn(1.f, s_eta_c)
     );
-    */
+*/
+    phi[IDX3(i,j,k)] = 
+     (phi[IDX3(i,j,k)] - 
+     ((eta[IDX3_eta1(i+1,j,k)]-eta[IDX3_eta1(i-1,j,k)]) * 
+     (s_u[sui+1][suj][suk]-s_u[sui-1][suj][suk]) * hdx_2 + 
+     (eta[IDX3_eta1(i,j+1,k)]-eta[IDX3_eta1(i,j-1,k)]) *
+     (s_u[sui][suj+1][suk]-s_u[sui][suj-1][suk]) * hdy_2 +
+     (eta[IDX3_eta1(i,j,k+1)]-eta[IDX3_eta1(i,j,k-1)]) *
+     (s_u[sui][suj][suk+1]-s_u[sui][suj][suk-1]) * hdz_2)) / (1.f + s_eta_c);
 }
 
 __global__ void kernel_add_source_kernel(float *g_u, llint idx, float source) {
