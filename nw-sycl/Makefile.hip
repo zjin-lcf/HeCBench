@@ -6,6 +6,7 @@
 CC        = syclcc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
@@ -52,6 +53,11 @@ endif
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-DUSE_GPU
 endif
+
+ifeq ($(DUMP),yes)
+  CFLAGS += -DTRACEBACK
+endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================

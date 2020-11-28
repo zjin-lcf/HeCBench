@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 CUDA_ARCH = "--cuda-gpu-arch=sm_35"
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
@@ -45,6 +46,9 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DUMP),yes)
+  CFLAGS += -DTRACEBACK
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
