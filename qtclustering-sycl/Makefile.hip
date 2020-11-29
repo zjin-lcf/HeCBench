@@ -11,6 +11,7 @@ PLATFORM  = rocm
 DEVICE    = gpu
 ROCM_DEVICE_LIB = -nogpulib \
 	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
+	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/hip.bc 
 
 
 #===============================================================================
