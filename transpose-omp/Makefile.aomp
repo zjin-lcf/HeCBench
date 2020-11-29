@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -41,16 +41,21 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=gfx906
+else
+  CFLAGS +=-fopenmp
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

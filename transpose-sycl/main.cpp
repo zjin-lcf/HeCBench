@@ -3,7 +3,7 @@
 #include "common.h"
 
 #define TILE_SIZE 5900
-#define NTHREADS 512
+#define NTHREADS 256
 
 // 1,2,3,4,5,6 -> 2,3,4,6,1,5
 static const int d1 = 41, d2 = 13, d3 = 11, d4 = 9, d5 = 76, d6 = 50;
