@@ -292,6 +292,13 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 | device timing(s) | 0.82 | 0.87 | 0.86 | 1.21 |
 
 
+| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 206 | 206 | 1012 |
+| host timing(s) | 13.4 | 12.0 | 13.9 | 14.9 | 
+| device timing(s) | 13.1 | 11.4 | 13.3 | 3.1 |
+
+
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 100001 | 100004 | 100004 | 400008 |
@@ -635,18 +642,18 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 | device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
 
 
+| transpose | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 51 | NA | 59  | 64 |
+| host timing(s) | 12.9 | NA | 13.6 | 25.8 |
+| device timing(s) | 11.9 | NA | 12.4 | 22 |
+
+
 | triad | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 204400 | 204400 | 204400  | NA |
 | host timing(s) | 7.2 | 7.3 | 7.4 | NA |
 | device timing(s) | 3.4 | 2.8 | 3.4 | NA |
-
-
-| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
-| --- | --- | --- | --- | --- |
-| total enqueue | 202 | 206 | 206 | 1012 |
-| host timing(s) | 13.4 | 12.0 | 13.9 | 14.9 | 
-| device timing(s) | 13.1 | 11.4 | 13.3 | 3.1 |
 
 
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
@@ -934,6 +941,13 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 | total enqueue | 25 | 33 | 33 | 193 |
 | host timing(s) | 1.68 | 1.86 | 1.91 | 4.66 |
 | device timing(s) | 1.21 | 1.0 | 1.03 | 1.44 |
+
+
+| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 206 | 206 | 1012 |
+| host timing(s) | 20.8 | 20.6 | 20.0 | 23.9 | 
+| device timing(s) | 20.5 | 19.8 | 19.3 | 20.2 |
 
 
 | inversek2j | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1293,18 +1307,18 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 | device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
 
 
+| transpose | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 51 | NA | 59  | 64 |
+| host timing(s) | 12.3 | NA | 12.5 | 17.9 |
+| device timing(s) | 11.1 | NA | 11.3 | 14.1 |
+
+
 | triad | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 204400 | 204400 | 204400  | NA |
 | host timing(s) | 7.9 | 8.8 | 8.4 | NA |
 | device timing(s) | 3.8 | 3.3 | 3.8 | NA |
-
-
-| interleave | SYCL | DPCT usm | DPCT header | OpenMP |
-| --- | --- | --- | --- | --- |
-| total enqueue | 202 | 206 | 206 | 1012 |
-| host timing(s) | 20.8 | 20.6 | 20.0 | 23.9 | 
-| device timing(s) | 20.5 | 19.8 | 19.3 | 20.2 |
 
 
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
@@ -1598,6 +1612,9 @@ We may build the [software from source with support for Nvidia CUDA](https://git
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
+
+### transpose
+  Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
 
 ### triad
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
