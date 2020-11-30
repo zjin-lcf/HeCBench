@@ -403,6 +403,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
   free(dist_source);
   free(indr_mtrx_host);
   free(output);
+  free(cardinalities);
 #ifdef DEBUG
   free(cardinalities_debug);
 #endif
