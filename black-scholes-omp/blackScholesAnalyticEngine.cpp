@@ -2,6 +2,7 @@
 //Functions for running black scholes using the analytic engine (from Quantlib) on the GPU
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
 #include <time.h>
