@@ -43,7 +43,7 @@
 #include <stdio.h>									// (in directory known to compiler)			needed by printf, stderr
 #include <limits.h>									// (in directory known to compiler)			needed by INT_MIN, INT_MAX
 #include <math.h>									// (in directory known to compiler)			needed by log, pow
-#include <string.h>									// (in directory known to compiler)			needed by ::memset
+#include <string.h>									// (in directory known to compiler)			needed by memset
 
 //======================================================================================================================================================150
 //	COMMON
@@ -2141,13 +2141,13 @@ main(	int argc,
 				long *currKnode;
 				currKnode = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset(currKnode, 0, count*sizeof(long));
+				memset(currKnode, 0, count*sizeof(long));
 
 				// INPUT: offset CPU allocation
 				long *offset;
 				offset = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset(offset, 0, count*sizeof(long));
+				memset(offset, 0, count*sizeof(long));
 
 				// INPUT: keys CPU allocation
 				int *keys;
@@ -2264,25 +2264,25 @@ main(	int argc,
 				long *currKnode;
 				currKnode = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset (currKnode, 0, count*sizeof(long));
+				memset (currKnode, 0, count*sizeof(long));
 
 				// INPUT: offset CPU allocation
 				long *offset;
 				offset = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset (offset, 0, count*sizeof(long));
+				memset (offset, 0, count*sizeof(long));
 
 				// INPUT: lastKnode CPU allocation
 				long *lastKnode;
 				lastKnode = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset (lastKnode, 0, count*sizeof(long));
+				memset (lastKnode, 0, count*sizeof(long));
 
 				// INPUT: offset_2 CPU allocation
 				long *offset_2;
 				offset_2 = (long *)malloc(count*sizeof(long));
 				// INPUT: offset CPU initialization
-				::memset (offset_2, 0, count*sizeof(long));
+				memset (offset_2, 0, count*sizeof(long));
 
 				// INPUT: start, end CPU allocation
 				int *start;
