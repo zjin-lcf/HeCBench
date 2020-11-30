@@ -22,9 +22,10 @@ void verify(double *input, double *output) {
   int input_offset  = 2 + d1 * (2 + d2 * (2 + d3 * (2 + d4 * (0 + 2 * d5))));
   int output_offset = 2 + d2 * (2 + d3 * (2 + d4 * (2 + d6 * (2 + 0 * d1))));
   for (size_t i = 0; i < d5; i++) {
-    if (input[input_offset + i * d1 * d2 * d3 * d4] != output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
-      printf("Failed!\n");
-      exit(-1);
+    if (input[input_offset + i * d1 * d2 * d3 * d4] != 
+        output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
+      printf("Failed\n");
+      break;
     }
   }
 }

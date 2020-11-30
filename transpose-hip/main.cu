@@ -21,26 +21,27 @@ void verify(double *input, double *output) {
   int input_offset  = 2 + d1 * (2 + d2 * (2 + d3 * (2 + d4 * (0 + 2 * d5))));
   int output_offset = 2 + d2 * (2 + d3 * (2 + d4 * (2 + d6 * (2 + 0 * d1))));
   for (size_t i = 0; i < d5; i++) {
-    if (input[input_offset + i * d1 * d2 * d3 * d4] != output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
-      printf("Failed!\n");
-      exit(-1);
+    if (input[input_offset + i * d1 * d2 * d3 * d4] != 
+        output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
+      printf("Failed\n");
+      break;
     }
   }
 }
 
-  __global__
-void tensor_transpose(int dim_input, 
-    int dim_output, 
-    int nblocks, 
-    int tile_size,
-    int *shape_input, 
-    int *shape_output, 
-    float *shape_input_r, 
-    float *shape_output_r, 
-    int *stride_input,
-    int *stride_output_local, 
-    int *stride_output_global,
-    double *input, 
+__global__ void tensor_transpose(
+    const int dim_input, 
+    const int dim_output, 
+    const int nblocks, 
+    const int tile_size,
+    const int *shape_input, 
+    const int *shape_output, 
+    const float *shape_input_r, 
+    const float *shape_output_r, 
+    const int *stride_input,
+    const int *stride_output_local, 
+    const int *stride_output_global,
+    const double *input, 
     double *output) 
 {
   __shared__ double tile[TILE_SIZE];
@@ -92,63 +93,68 @@ int main(int argv, char **argc) {
   const int tile_size = d1 * d2 * d3;
   const int dim_output = 3;
   const int dim_input = 3;
-  double *device_output, *device_input;
-  int *device_shape_input, *device_shape_output;
-  float *device_shape_input_r, *device_shape_output_r;
-  int *device_stride_output_local, *device_stride_output_global;
-  int *device_stride_input;
+  double *d_output, *d_input;
+  int *d_shape_input, *d_shape_output;
+  float *d_shape_input_r, *d_shape_output_r;
+  int *d_stride_output_local, *d_stride_output_global;
+  int *d_stride_input;
 
-  hipMalloc(&device_output, data_size * sizeof(double));
-  hipMalloc(&device_input, data_size * sizeof(double));
-  hipMalloc(&device_shape_input, dim_input * sizeof(int));
-  hipMalloc(&device_shape_input_r, dim_input * sizeof(float));
-  hipMalloc(&device_shape_output, dim_output * sizeof(int));
-  hipMalloc(&device_shape_output_r, dim_output * sizeof(float));
-  hipMalloc(&device_stride_input, dim_input * sizeof(int));
-  hipMalloc(&device_stride_output_local, dim_output * sizeof(int));
-  hipMalloc(&device_stride_output_global, dim_output * sizeof(int));
+  hipMalloc(&d_output, data_size * sizeof(double));
+  hipMalloc(&d_input, data_size * sizeof(double));
+  hipMalloc(&d_shape_input, dim_input * sizeof(int));
+  hipMalloc(&d_shape_input_r, dim_input * sizeof(float));
+  hipMalloc(&d_shape_output, dim_output * sizeof(int));
+  hipMalloc(&d_shape_output_r, dim_output * sizeof(float));
+  hipMalloc(&d_stride_input, dim_input * sizeof(int));
+  hipMalloc(&d_stride_output_local, dim_output * sizeof(int));
+  hipMalloc(&d_stride_output_global, dim_output * sizeof(int));
 
-  hipMemcpy(device_input, input, 
+  hipMemcpy(d_input, input, 
       data_size * sizeof(double), hipMemcpyHostToDevice );
-  hipMemcpy(device_shape_input, shape_input, 
+  hipMemcpy(d_shape_input, shape_input, 
       dim_input * sizeof(int), hipMemcpyHostToDevice );
-  hipMemcpy(device_shape_input_r, shape_input_r, 
+  hipMemcpy(d_shape_input_r, shape_input_r, 
       dim_input * sizeof(float), hipMemcpyHostToDevice );
-  hipMemcpy(device_shape_output, shape_output, 
+  hipMemcpy(d_shape_output, shape_output, 
       dim_output * sizeof(int), hipMemcpyHostToDevice );
-  hipMemcpy(device_shape_output_r, shape_output_r, 
+  hipMemcpy(d_shape_output_r, shape_output_r, 
       dim_output * sizeof(float), hipMemcpyHostToDevice );
-  hipMemcpy(device_stride_input, stride_input, 
+  hipMemcpy(d_stride_input, stride_input, 
       dim_input * sizeof(int), hipMemcpyHostToDevice );
-  hipMemcpy(device_stride_output_local, stride_output_local, 
+  hipMemcpy(d_stride_output_local, stride_output_local, 
       dim_output * sizeof(int), hipMemcpyHostToDevice );
-  hipMemcpy(device_stride_output_global, stride_output_global, 
+  hipMemcpy(d_stride_output_global, stride_output_global, 
       dim_output * sizeof(int), hipMemcpyHostToDevice );
 
 
   for (size_t i = 0; i < ITER; ++i) {
-    hipLaunchKernelGGL(tensor_transpose, dim3(nblocks), dim3(NTHREADS), 0, 0, dim_input, dim_output, nblocks, tile_size,
-        device_shape_input, 
-        device_shape_output,
-        device_shape_input_r,
-        device_shape_output_r,
-        device_stride_input,
-        device_stride_output_local,
-        device_stride_output_global,
-        device_input, device_output);
+    hipLaunchKernelGGL(tensor_transpose, dim3(nblocks), dim3(NTHREADS), 
+        0, 0, 
+        dim_input, 
+        dim_output, 
+        nblocks, 
+        tile_size,
+        d_shape_input, 
+        d_shape_output,
+        d_shape_input_r,
+        d_shape_output_r,
+        d_stride_input,
+        d_stride_output_local,
+        d_stride_output_global,
+        d_input, d_output);
   }
 
-  hipMemcpy(output, device_output, data_size * sizeof(double), hipMemcpyDeviceToHost);
+  hipMemcpy(output, d_output, data_size * sizeof(double), hipMemcpyDeviceToHost);
 
-  hipFree(device_output);
-  hipFree(device_input);
-  hipFree(device_shape_input);
-  hipFree(device_shape_input_r);
-  hipFree(device_shape_output);
-  hipFree(device_shape_output_r);
-  hipFree(device_stride_input);
-  hipFree(device_stride_output_local);
-  hipFree(device_stride_output_global);
+  hipFree(d_output);
+  hipFree(d_input);
+  hipFree(d_shape_input);
+  hipFree(d_shape_input_r);
+  hipFree(d_shape_output);
+  hipFree(d_shape_output_r);
+  hipFree(d_stride_input);
+  hipFree(d_stride_output_local);
+  hipFree(d_stride_output_global);
 
   verify(input, output);
 
