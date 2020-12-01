@@ -390,8 +390,8 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
 
           int tid = omp_get_thread_num();
           int tblock_id = omp_get_team_num();
-          char *Ai_mask = &Ai_mask[tblock_id * max_point_count];
-          float *dist_to_clust = &dist_to_clust[tblock_id * max_degree];
+          char *Ai_mask_ptr = &Ai_mask[tblock_id * max_point_count];
+          float *dist_to_clust_ptr = &dist_to_clust[tblock_id * max_degree];
           int base_offset = tblock_id*node_count + cwrank;
 
           // for i loop of the algorithm.
@@ -402,11 +402,11 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
             if( degree <= max_cardinality ) continue;
             int  cnt = generate_candidate_cluster_compact_storage( 
                 dist_array, point_index_array,
-                seed_index, degree, Ai_mask, 
+                seed_index, degree, Ai_mask_ptr, 
                 dist_source,
                 clustered_pnts_mask,
                 indr_mtrx_host,
-                dist_to_clust,
+                dist_to_clust_ptr,
                 point_count, max_point_count, max_degree, NULL, threshold);
             if( cnt > max_cardinality ){
               max_cardinality = cnt;
