@@ -21,26 +21,27 @@ void verify(double *input, double *output) {
   int input_offset  = 2 + d1 * (2 + d2 * (2 + d3 * (2 + d4 * (0 + 2 * d5))));
   int output_offset = 2 + d2 * (2 + d3 * (2 + d4 * (2 + d6 * (2 + 0 * d1))));
   for (size_t i = 0; i < d5; i++) {
-    if (input[input_offset + i * d1 * d2 * d3 * d4] != output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
-      printf("Failed!\n");
-      exit(-1);
+    if (input[input_offset + i * d1 * d2 * d3 * d4] != 
+        output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
+      printf("Failed\n");
+      break;
     }
   }
 }
 
-  __global__
-void tensor_transpose(int dim_input, 
-    int dim_output, 
-    int nblocks, 
-    int tile_size,
-    int *shape_input, 
-    int *shape_output, 
-    float *shape_input_r, 
-    float *shape_output_r, 
-    int *stride_input,
-    int *stride_output_local, 
-    int *stride_output_global,
-    double *input, 
+__global__ void tensor_transpose(
+    const int dim_input, 
+    const int dim_output, 
+    const int nblocks, 
+    const int tile_size,
+    const int *shape_input, 
+    const int *shape_output, 
+    const float *shape_input_r, 
+    const float *shape_output_r, 
+    const int *stride_input,
+    const int *stride_output_local, 
+    const int *stride_output_global,
+    const double *input, 
     double *output) 
 {
   __shared__ double tile[TILE_SIZE];
@@ -48,7 +49,7 @@ void tensor_transpose(int dim_input,
   for (int block_idx = blockIdx.x; block_idx < nblocks; block_idx += gridDim.x) {
     int it = block_idx, im = 0, offset1 = 0;
     for (int i = 0; i < dim_input; i++) {
-      im = it * shape_input_r[i];
+      im = it * shape_input_r[i];  // replace division with multiplication
       offset1 += stride_input[i] * (it - im * shape_input[i]);
       it = im;
     }
@@ -63,7 +64,7 @@ void tensor_transpose(int dim_input,
       it = i;
       int offset2 = 0, local_offset = 0;
       for (int j = 0; j < dim_output; j++) {
-        im = it * shape_output_r[j];
+        im = it * shape_output_r[j];  // replace division with multiplication
         int tmp = it - im * shape_output[j];
         offset2 += stride_output_global[j] * tmp;
         local_offset += stride_output_local[j] * tmp;
@@ -92,68 +93,69 @@ int main(int argv, char **argc) {
   const int tile_size = d1 * d2 * d3;
   const int dim_output = 3;
   const int dim_input = 3;
-  double *device_output, *device_input;
-  int *device_shape_input, *device_shape_output;
-  float *device_shape_input_r, *device_shape_output_r;
-  int *device_stride_output_local, *device_stride_output_global;
-  int *device_stride_input;
+  double *d_output, *d_input;
+  int *d_shape_input, *d_shape_output;
+  float *d_shape_input_r, *d_shape_output_r;
+  int *d_stride_output_local, *d_stride_output_global;
+  int *d_stride_input;
 
-  cudaMalloc(&device_output, data_size * sizeof(double));
-  cudaMalloc(&device_input, data_size * sizeof(double));
-  cudaMalloc(&device_shape_input, dim_input * sizeof(int));
-  cudaMalloc(&device_shape_input_r, dim_input * sizeof(float));
-  cudaMalloc(&device_shape_output, dim_output * sizeof(int));
-  cudaMalloc(&device_shape_output_r, dim_output * sizeof(float));
-  cudaMalloc(&device_stride_input, dim_input * sizeof(int));
-  cudaMalloc(&device_stride_output_local, dim_output * sizeof(int));
-  cudaMalloc(&device_stride_output_global, dim_output * sizeof(int));
+  cudaMalloc(&d_output, data_size * sizeof(double));
+  cudaMalloc(&d_input, data_size * sizeof(double));
+  cudaMalloc(&d_shape_input, dim_input * sizeof(int));
+  cudaMalloc(&d_shape_input_r, dim_input * sizeof(float));
+  cudaMalloc(&d_shape_output, dim_output * sizeof(int));
+  cudaMalloc(&d_shape_output_r, dim_output * sizeof(float));
+  cudaMalloc(&d_stride_input, dim_input * sizeof(int));
+  cudaMalloc(&d_stride_output_local, dim_output * sizeof(int));
+  cudaMalloc(&d_stride_output_global, dim_output * sizeof(int));
 
-  cudaMemcpy(device_input, input, 
+  cudaMemcpy(d_input, input, 
       data_size * sizeof(double), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_shape_input, shape_input, 
+  cudaMemcpy(d_shape_input, shape_input, 
       dim_input * sizeof(int), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_shape_input_r, shape_input_r, 
+  cudaMemcpy(d_shape_input_r, shape_input_r, 
       dim_input * sizeof(float), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_shape_output, shape_output, 
+  cudaMemcpy(d_shape_output, shape_output, 
       dim_output * sizeof(int), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_shape_output_r, shape_output_r, 
+  cudaMemcpy(d_shape_output_r, shape_output_r, 
       dim_output * sizeof(float), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_stride_input, stride_input, 
+  cudaMemcpy(d_stride_input, stride_input, 
       dim_input * sizeof(int), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_stride_output_local, stride_output_local, 
+  cudaMemcpy(d_stride_output_local, stride_output_local, 
       dim_output * sizeof(int), cudaMemcpyHostToDevice );
-  cudaMemcpy(device_stride_output_global, stride_output_global, 
+  cudaMemcpy(d_stride_output_global, stride_output_global, 
       dim_output * sizeof(int), cudaMemcpyHostToDevice );
 
 
   for (size_t i = 0; i < ITER; ++i) {
-    tensor_transpose<<<nblocks, NTHREADS>>>(dim_input, dim_output, nblocks, tile_size,
-        device_shape_input, 
-        device_shape_output,
-        device_shape_input_r,
-        device_shape_output_r,
-        device_stride_input,
-        device_stride_output_local,
-        device_stride_output_global,
-        device_input, device_output);
+    tensor_transpose<<<nblocks, NTHREADS>>>(dim_input, 
+        dim_output, 
+        nblocks, 
+        tile_size,
+        d_shape_input, 
+        d_shape_output,
+        d_shape_input_r,
+        d_shape_output_r,
+        d_stride_input,
+        d_stride_output_local,
+        d_stride_output_global,
+        d_input, d_output);
   }
 
-  cudaMemcpy(output, device_output, data_size * sizeof(double), cudaMemcpyDeviceToHost);
-
-  cudaFree(device_output);
-  cudaFree(device_input);
-  cudaFree(device_shape_input);
-  cudaFree(device_shape_input_r);
-  cudaFree(device_shape_output);
-  cudaFree(device_shape_output_r);
-  cudaFree(device_stride_input);
-  cudaFree(device_stride_output_local);
-  cudaFree(device_stride_output_global);
+  cudaMemcpy(output, d_output, data_size * sizeof(double), cudaMemcpyDeviceToHost);
+  cudaFree(d_output);
+  cudaFree(d_input);
+  cudaFree(d_shape_input);
+  cudaFree(d_shape_input_r);
+  cudaFree(d_shape_output);
+  cudaFree(d_shape_output_r);
+  cudaFree(d_stride_input);
+  cudaFree(d_stride_output_local);
+  cudaFree(d_stride_output_global);
 
   verify(input, output);
 
   delete [] input;
   delete [] output;
-
   return 0;
 }
