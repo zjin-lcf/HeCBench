@@ -13,18 +13,17 @@ void setup(size_t *size) {
 
 void valSet(int* A, int val, size_t size) {
   size_t len = size / sizeof(int);
-  for (int i = 0; i < len; i++) {
+  for (size_t i = 0; i < len; i++) {
     A[i] = val;
   }
 }
 
 int main() {
-  int *A;
   size_t size[NUM_SIZE];
 
   setup(size);
   for (int i = 0; i < NUM_SIZE; i++) {
-    A = (int*)malloc(size[i]);
+    int* A = (int*)malloc(size[i]);
     if (A == nullptr) {
       std::cerr << "Host memory allocation failed\n";
       return -1;
@@ -44,10 +43,20 @@ int main() {
       }
       end = clock();
       uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
-    }
 
-    std::cout << "Copy " << size[i] << " btyes from host to device takes " 
-      << uS <<  " us" << std::endl;
+      std::cout << "Copy " << size[i] << " btyes from host to device takes " 
+                << uS <<  " us" << std::endl;
+
+      start = clock();
+      for (int j = 0; j < NUM_ITER; j++) {
+        #pragma omp target update from (A[0:len]) nowait
+      }
+      end = clock();
+      uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
+
+      std::cout << "Copy " << size[i] << " btyes from device to host takes " 
+                << uS <<  " us" << std::endl;
+    }
     free(A);
   }
   return 0;
