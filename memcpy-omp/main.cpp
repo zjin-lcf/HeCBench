@@ -36,7 +36,7 @@ int main() {
     double uS;
     clock_t start, end;
 
-    #pragma omp target enter data map(alloc: A[0:len])
+    #pragma omp target data map(alloc: A[0:len])
     {
       start = clock();
       for (int j = 0; j < NUM_ITER; j++) {
@@ -45,7 +45,6 @@ int main() {
       end = clock();
       uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     }
-    #pragma omp target exit data map(delete: A[0:len])
 
     std::cout << "Copy " << size[i] << " btyes from host to device takes " 
       << uS <<  " us" << std::endl;
