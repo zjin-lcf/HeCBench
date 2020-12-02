@@ -1,6 +1,3 @@
-#ifndef __GAUSSIAN_ELIMINATION__
-#define __GAUSSIAN_ELIMINATION__
-
 #include <math.h>
 #include <sys/time.h>
 #include "gaussianElim.h"
@@ -42,6 +39,25 @@ create_matrix(float *m, int size){
   }
 }
 
+// reference implementation for verification
+void gaussian_reference(float *a, float *b, float *m, float* finalVec, int size) {
+  for (int t=0; t<(size-1); t++) {
+    for (int i = 0; i < size-1-t; i++) {
+      m[size * (i + t + 1)+t] = 
+        a[size * (i + t + 1) + t] / a[size * t + t];
+    }
+    for (int x = 0; x < size-1-t; x++) {
+      for (int y = 0; y < size-t; y++) {
+        a[size * (x + t + 1)+y+t] -= 
+          m[size * (x + t + 1) + t] * a[size * t + y + t];
+        if (y == 0)
+          b[x+1+t] -= m[size*(x+1+t)+(y+t)] * b[t];
+      }
+    }
+  }
+
+  BackSub(a,b,finalVec,size);
+}
 
 int main(int argc, char *argv[]) {
 
@@ -80,8 +96,6 @@ int main(int argc, char *argv[]) {
   }
   else
   {
-    printf("create input internally before create, size = %d \n", size);
-
     a = (float *) malloc(size * size * sizeof(float));
     create_matrix(a, size);
 
@@ -90,6 +104,7 @@ int main(int argc, char *argv[]) {
       b[i]=1.0;
 
   }
+
 
   if (!quiet) {    
     printf("The input matrix a is:\n");
@@ -101,13 +116,24 @@ int main(int argc, char *argv[]) {
 
   // create the solution matrix
   m = (float *) malloc(size * size * sizeof(float));
-
-  // create a new vector to hold the final answer
-
-  finalVec = (float *) malloc(size * sizeof(float));
-
   InitPerRun(size,m);
 
+  // create a new vector to hold the final answer
+  finalVec = (float *) malloc(size * sizeof(float));
+
+  // verification
+  float* a_host = (float *) malloc(size * size * sizeof(float));
+  memcpy(a_host, a, size * size * sizeof(float));
+  float* b_host = (float *) malloc(size * sizeof(float));
+  memcpy(b_host, b, size*sizeof(float));
+  float* m_host = (float *) malloc(size * size * sizeof(float));
+  memcpy(m_host, m, size*size*sizeof(float));
+  float* finalVec_host = (float *) malloc(size * sizeof(float));
+
+  // Compute the reference on a host
+  gaussian_reference(a_host, b_host, m_host, finalVec_host, size);
+
+  // Compute the forward phase on a device
   long long offload_start = get_time();
   ForwardSub(a,b,m,size,timing);
   long long offload_end = get_time();
@@ -116,30 +142,45 @@ int main(int argc, char *argv[]) {
     printf("Device offloading time %lld (us)\n\n",offload_end - offload_start);
   }
 
+  // Compute the backward phase on a host
+  BackSub(a,b,finalVec,size);
 
-  //end timing
   if (!quiet) {
     printf("The result of array a is after forwardsub: \n");
     PrintMat(a, size, size, size);
+    PrintMat(a_host, size, size, size);
     printf("The result of array b is after forwardsub: \n");
     PrintAry(b, size);
+    PrintAry(b_host, size);
     printf("The result of matrix m is after forwardsub: \n");
     PrintMat(m, size, size, size);
-
-
-    BackSub(a,b,finalVec,size);
+    PrintMat(m_host, size, size, size);
     printf("The final solution is: \n");
     PrintAry(finalVec,size);
+  }
+
+  // verification
+  printf("Checking the results..\n");
+  for (int i = 0; i < size; i++) {
+    if (fabsf(finalVec[i] - finalVec_host[i]) > 1e-3) {
+      printf("Result mismatch at index %d: %f(device)  %f(host)\n", 
+          i, finalVec[i], finalVec_host[i]);
+    }
   }
 
   free(m);
   free(a);
   free(b);
   free(finalVec);
-  //OpenClGaussianElimination(context,timing);
 
+  // verification
+  free(a_host);
+  free(m_host);
+  free(b_host);
+  free(finalVec_host);
   return 0;
 }
+
 
 /*------------------------------------------------------
  ** ForwardSub() -- Forward substitution of Gaussian
@@ -165,8 +206,9 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
 
     range<2> localWorksizeFan2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
     range<2> globalWorksizeFan2(
-		    (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
-		    (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y );
+        (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
+        (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y );
+
 
     // 4. Setup and Run kernels
     for (int t=0; t<(size-1); t++) {
@@ -227,7 +269,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
         case 's': // matrix size
           i++;
           *size = atoi(argv[i]);
-          printf("Create matrix internally in parse, size = %d \n", *size);
+          printf("Create matrices internally, size = %d \n", *size);
           break;
         case 'f': // file name
           i++;
@@ -347,5 +389,3 @@ void PrintAry(float *ary, int ary_size)
   }
   printf("\n\n");
 }
-#endif
-
