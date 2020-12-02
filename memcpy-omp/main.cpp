@@ -23,7 +23,7 @@ int main() {
   size_t size[NUM_SIZE];
 
   setup(size);
-  for (int i = 0; i < NUM_SIZE; i++) {
+  for (int i = NUM_SIZE-1; i < NUM_SIZE; i++) {
     A = (int*)malloc(size[i]);
     if (A == nullptr) {
       std::cerr << "Host memory allocation failed\n";
@@ -40,7 +40,7 @@ int main() {
     {
       start = clock();
       for (int j = 0; j < NUM_ITER; j++) {
-        #pragma omp target update to (A[0:len])
+        #pragma omp target update to (A[0:len]) nowait
       }
       end = clock();
       uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
