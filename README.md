@@ -18,6 +18,8 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ## Note
 We may build the [software from source with support for Nvidia CUDA](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md). To run a single test on an Nvidia GPU, go to a test directory (e.g. affine-sycl) and type the command " make -f Makefile.cuda run". "Makefile.cuda" may be modified for different versions of Nvidia GPUs and toolchains.
 
+We may build the [software from source with support for AMD HIP](https://github.com/illuhad/hipSYCL/blob/develop/doc/installing.md). To run a single test on an AMD GPU, go to a test directory (e.g. affine-sycl) and type the command " make -f Makefile.hip run". "Makefile.hip" may be modified for different versions of AMD GPUs and toolchains.
+
 ## Results on Platform 1
 | affine | SYCL | DPCT usm | DPCT header | OpenMP |     
 | --- | --- | --- | --- | --- |            
