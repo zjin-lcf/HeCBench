@@ -1,6 +1,7 @@
 CC          = dpcpp
 OPTIMIZE    = yes
 DEBUG       = no
+DUMP        = yes
 
 
 # Standard flags
@@ -13,6 +14,9 @@ LDFLAGS = -lm
 ifeq ($(DEBUG),yes)
 	CFLAGS += -g  
 	TEST_ON = -DTEST_CHECKSUM 
+endif
+
+ifeq ($(DUMP),yes)
 	OUTPUT  = -DOUTPUT
 endif
 

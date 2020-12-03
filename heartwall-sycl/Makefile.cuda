@@ -1,9 +1,9 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 CUDA_ARCH = "--cuda-gpu-arch=sm_35"
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-OUTPUT    = -DOUTPUT
 
 
 # Standard flags
@@ -20,6 +20,10 @@ LDFLAGS = -lm
 ifeq ($(DEBUG),yes)
 	CFLAGS += -g  
 	TEST_ON = -DTEST_CHECKSUM 
+endif
+
+ifeq ($(DUMP),yes)
+	OUTPUT  = -DOUTPUT
 endif
 
 # Optimization Flags

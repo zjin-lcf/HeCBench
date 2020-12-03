@@ -73,7 +73,6 @@ main(	int argc, char* argv []){
 	long long time5;
 
 	// other
-	int i;
 	avi_t* frames;
 
 	time0 = get_time();

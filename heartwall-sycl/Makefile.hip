@@ -1,6 +1,7 @@
 CC        = syclcc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
@@ -26,6 +27,11 @@ ifeq ($(DEBUG),yes)
 	CFLAGS += -g  
 	TEST_ON = -DTEST_CHECKSUM 
 endif
+
+ifeq ($(DUMP),yes)
+	OUTPUT  = -DOUTPUT
+endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
