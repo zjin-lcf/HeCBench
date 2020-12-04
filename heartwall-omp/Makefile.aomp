@@ -1,6 +1,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = yes
 DEVICE    = gpu
 
 
@@ -15,6 +16,9 @@ LDFLAGS = -lm
 ifeq ($(DEBUG),yes)
   CFLAGS += -g  
   TEST_ON = -DTEST_CHECKSUM 
+endif
+
+ifeq ($(DUMP),yes)
   OUTPUT  = -DOUTPUT
 endif
 
