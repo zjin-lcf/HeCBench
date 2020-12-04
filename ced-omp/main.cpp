@@ -37,21 +37,13 @@
 #include <thread>
 #include <assert.h>
 #include <omp.h>
+#include <math.h>
 
 #include "kernel.h"
 #include "support/partitioner.h"
 #include "support/timer.h"
 #include "support/verify.h"
 
-/*
-#pragma omp declare target
-const float gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-                       0.1250f, 0.250f, 0.1250f, 
-                       0.0625f, 0.125f, 0.0625f};
-const int   sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-const int   soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
-#pragma omp end declare target
-*/
 
 // Params ---------------------------------------------------------------------
 struct Params {
@@ -137,7 +129,7 @@ struct Params {
 
 // Input Data -----------------------------------------------------------------
 void read_input(unsigned char** all_gray_frames, 
-		int &rows, int &cols, int &in_size, const Params &p) {
+    int &rows, int &cols, int &in_size, const Params &p) {
 
   for(int task_id = 0; task_id < p.n_warmup + p.n_reps; task_id++) {
 
@@ -173,7 +165,7 @@ int main(int argc, char **argv) {
   // The maximum number of GPU threads is 1024 for certain GPUs
   const int max_gpu_threads = 256;
   assert(p.n_gpu_threads * p.n_gpu_threads <= max_gpu_threads && \
-   "The thread block size is greater than the maximum thread block size");
+      "The thread block size is greater than the maximum thread block size");
 
   // read data from an 'input' directory which must be available
   const int n_frames = p.n_warmup + p.n_reps;
@@ -202,405 +194,378 @@ int main(int argc, char **argv) {
   unsigned char *interm_gpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *theta_gpu_proxy  = (unsigned char *)malloc(in_size);
 
-  /*
-  buffer<unsigned char, 1> d_in_out(in_size);
-  buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
-  buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
-  buffer<float, 1> d_gaus (c_gaus, 9);
-  buffer<int, 1> d_sobx (c_sobx, 9);
-  buffer<int, 1> d_soby (c_soby, 9);
-  */
-
-  #pragma omp target data map(alloc: gpu_in_out[0:in_size], \
-                                     interm_gpu_proxy[0:in_size], \
-                                     theta_gpu_proxy[0:in_size]) 
-                          //map(to: gaus[0:9], sobx[0:9], soby[0:9])
-  {
-
-
   timer.start("Total Proxies");
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
 
-  proxy_threads.push_back(std::thread([&]() {
+#pragma omp target data map(alloc: gpu_in_out[0:in_size], \
+                                   interm_gpu_proxy[0:in_size], \
+                                   theta_gpu_proxy[0:in_size]) 
+  {
 
-      for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
+    proxy_threads.push_back(std::thread([&]() {
 
-        // Next frame
-        memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
+          for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
+
+          // Next frame
+          memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
 
 
-        // Copy to Device
-        timer.start("Copy To Device");
+          // Copy to Device
+          timer.start("Copy To Device");
 
-        #pragma omp target update to (gpu_in_out[0:in_size])
+#pragma omp target update to (gpu_in_out[0:in_size])
 
-        timer.stop("Copy To Device");
+          timer.stop("Copy To Device");
 
-        timer.start("Kernel Execution");
+          timer.start("Kernel Execution");
 
-        const int threads = 16; //p.n_gpu_threads;
-        int team_size = (rows-2)/threads*(cols-2)/threads;
+          const int threads = 16; //p.n_gpu_threads;
+          int team_size = (rows-2)/threads*(cols-2)/threads;
 
-        // call GAUSSIAN KERNEL
-            #pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
-	{
+          // call GAUSSIAN KERNEL
+#pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
+          {
 
             int l_data[(threads+2)*(threads+2)];
 
-                #pragma omp parallel 
-	    {
-                const int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
-                const int g_row = gid / (cols - 2) + 1;
-                const int g_col = gid % (cols - 2) + 1;
-                const int L_SIZE = threads; 
-                const int l_row = omp_get_thread_num() / L_SIZE + 1;
-                const int l_col = omp_get_thread_num() % L_SIZE + 1;
-                const int pos = g_row * cols + g_col;
-                int sum         = 0;
+#pragma omp parallel
+            {
+              const int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+              const int g_row = gid / (cols - 2) + 1;
+              const int g_col = gid % (cols - 2) + 1;
+              const int L_SIZE = 16; //threads; 
+              const int l_row = omp_get_thread_num() / L_SIZE + 1;
+              const int l_col = omp_get_thread_num() % L_SIZE + 1;
+              const int pos = g_row * cols + g_col;
+              int sum         = 0;
 
-const float gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-                       0.1250f, 0.250f, 0.1250f, 
-                       0.0625f, 0.125f, 0.0625f};
+              const float gaus[9] = {0.0625f, 0.125f, 0.0625f, 
+                0.1250f, 0.250f, 0.1250f, 
+                0.0625f, 0.125f, 0.0625f};
 
-                // copy to local
-                l_data[l_row * (L_SIZE + 2) + l_col] = gpu_in_out[pos];
+              // copy to local
+              l_data[l_row * (L_SIZE + 2) + l_col] = gpu_in_out[pos];
 
-                // top most row
-                if(l_row == 1) {
+              // top most row
+              if(l_row == 1) {
                 l_data[0 * (L_SIZE + 2) + l_col] = gpu_in_out[pos - cols];
                 // top left
                 if(l_col == 1)
-                l_data[0 * (L_SIZE + 2) + 0] = gpu_in_out[pos - cols - 1];
+                  l_data[0 * (L_SIZE + 2) + 0] = gpu_in_out[pos - cols - 1];
 
                 // top right
                 else if(l_col == L_SIZE)
                   l_data[0 * (L_SIZE + 2) + L_SIZE + 1] = gpu_in_out[pos - cols + 1];
-                }
-                // bottom most row
-                else if(l_row == L_SIZE) {
-                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = gpu_in_out[pos + cols];
-                  // bottom left
-                  if(l_col == 1)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = gpu_in_out[pos + cols - 1];
-
-                  // bottom right
-                  else if(l_col == L_SIZE)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + L_SIZE + 1] = gpu_in_out[pos + cols + 1];
-                }
-
+              }
+              // bottom most row
+              else if(l_row == L_SIZE) {
+                l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = gpu_in_out[pos + cols];
+                // bottom left
                 if(l_col == 1)
-                  l_data[l_row * (L_SIZE + 2) + 0] = gpu_in_out[pos - 1];
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = gpu_in_out[pos + cols - 1];
+
+                // bottom right
                 else if(l_col == L_SIZE)
-                  l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = gpu_in_out[pos + 1];
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + L_SIZE + 1] = gpu_in_out[pos + cols + 1];
+              }
 
-                #pragma omp barrier
+              if(l_col == 1)
+                l_data[l_row * (L_SIZE + 2) + 0] = gpu_in_out[pos - 1];
+              else if(l_col == L_SIZE)
+                l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = gpu_in_out[pos + 1];
 
-                for(int i = 0; i < 3; i++) {
-                  for(int j = 0; j < 3; j++) {
-                    sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-                  }
+#pragma omp barrier
+
+              for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                  sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
                 }
-
-                interm_gpu_proxy[pos] = min(255, max(0, sum));
+              }
+              interm_gpu_proxy[pos] = min(255, max(0, sum));
             }
-        }
-#pragma omp target update from (interm_gpu_proxy[0:in_size])
-	for (int i = 0; i < in_size; i++)
-	  printf("%d %d\n", i, interm_gpu_proxy[i]);
+          }
 
-        /* call SOBEL KERNEL
-        q.submit([&] (handler &cgh) {
-            auto data = d_interm_gpu_proxy.get_access<sycl_read>(cgh);
-            auto out = d_in_out.get_access<sycl_discard_write>(cgh);
-            auto theta = d_theta_gpu_proxy.get_access<sycl_discard_write>(cgh);
-            auto sobx = d_sobx.get_access<sycl_read, access::target::constant_buffer>(cgh);
-            auto soby = d_soby.get_access<sycl_read, access::target::constant_buffer>(cgh);
-            accessor<int, 1, sycl_read_write, access::target::local> 
-            l_data((threads+2)*(threads+2), cgh);
-            cgh.parallel_for<class sobel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-                const int L_SIZE = item.get_local_range(0);
-                const float PI    = 3.14159265f;
-                const int   g_row = item.get_global_id(0) + 1;
-                const int   g_col = item.get_global_id(1) + 1;
-                const int   l_row = item.get_local_id(0) + 1;
-                const int   l_col = item.get_local_id(1) + 1;
+          // call SOBEL KERNEL
+#pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
+          {
 
-                const int pos = g_row * cols + g_col;
+            int l_data[(threads+2)*(threads+2)];
 
-                // copy to local
-                l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
+#pragma omp parallel 
+            {
+              const int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+              const int g_row = gid / (cols - 2) + 1;
+              const int g_col = gid % (cols - 2) + 1;
+              const int L_SIZE = threads; 
+              const int l_row = omp_get_thread_num() / L_SIZE + 1;
+              const int l_col = omp_get_thread_num() % L_SIZE + 1;
+              const int pos = g_row * cols + g_col;
+              const float PI    = 3.14159265f;
+              const int   sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+              const int   soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
 
-                // top most row
-                if(l_row == 1) {
-                l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
+              // copy to local
+              l_data[l_row * (L_SIZE + 2) + l_col] = interm_gpu_proxy[pos];
+
+              // top most row
+              if(l_row == 1) {
+                l_data[0 * (L_SIZE + 2) + l_col] = interm_gpu_proxy[pos - cols];
                 // top left
                 if(l_col == 1)
-                l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
+                  l_data[0 * (L_SIZE + 2) + 0] = interm_gpu_proxy[pos - cols - 1];
 
                 // top right
                 else if(l_col == L_SIZE)
-                  l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
-                }
-                // bottom most row
-                else if(l_row == L_SIZE) {
-                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
-                  // bottom left
-                  if(l_col == 1)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
-
-                  // bottom right
-                  else if(l_col == L_SIZE)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
-                }
-
-                // left
+                  l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = interm_gpu_proxy[pos - cols + 1];
+              }
+              // bottom most row
+              else if(l_row == L_SIZE) {
+                l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = interm_gpu_proxy[pos + cols];
+                // bottom left
                 if(l_col == 1)
-                  l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
-                // right
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = interm_gpu_proxy[pos + cols - 1];
+
+                // bottom right
                 else if(l_col == L_SIZE)
-                  l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = interm_gpu_proxy[pos + cols + 1];
+              }
 
-                item.barrier(access::fence_space::local_space);
+              // left
+              if(l_col == 1)
+                l_data[l_row * (L_SIZE + 2) + 0] = interm_gpu_proxy[pos - 1];
+              // right
+              else if(l_col == L_SIZE)
+                l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = interm_gpu_proxy[pos + 1];
 
-                float sumx = 0, sumy = 0, angle = 0;
-                // find x and y derivatives
-                for(int i = 0; i < 3; i++) {
-                  for(int j = 0; j < 3; j++) {
-                    sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-                    sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+#pragma omp barrier
+
+              float sumx = 0, sumy = 0, angle = 0;
+              // find x and y derivatives
+              for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                  sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+                  sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+                }
+              }
+
+              // The output is now the square root of their squares, but they are
+              // constrained to 0 <= value <= 255. Note that hypot is a built in function
+              // defined as: hypot(x,y) = sqrt(x*x, y*y).
+              gpu_in_out[pos] = min(255, max(0, (int)hypotf(sumx, sumy)));
+
+              // Compute the direction angle theta_gpu_proxy in radians
+              // atan2 has a range of (-PI, PI) degrees
+              angle = atan2f(sumy, sumx);
+
+              // If the angle is negative,
+              // shift the range to (0, 2PI) by adding 2PI to the angle,
+              // then perform modulo operation of 2PI
+              if(angle < 0) {
+                angle = fmodf((angle + 2 * PI), (2 * PI));
+              }
+
+              // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
+              // then store it in the theta_gpu_proxy buffer at the proper position
+              //theta_gpu_proxy[pos] = ((int)(degrees(angle * (PI/8) + PI/8-0.0001) / 45) * 45) % 180;
+              if(angle <= PI / 8)
+                theta_gpu_proxy[pos] = 0;
+              else if(angle <= 3 * PI / 8)
+                theta_gpu_proxy[pos] = 45;
+              else if(angle <= 5 * PI / 8)
+                theta_gpu_proxy[pos] = 90;
+              else if(angle <= 7 * PI / 8)
+                theta_gpu_proxy[pos] = 135;
+              else if(angle <= 9 * PI / 8)
+                theta_gpu_proxy[pos] = 0;
+              else if(angle <= 11 * PI / 8)
+                theta_gpu_proxy[pos] = 45;
+              else if(angle <= 13 * PI / 8)
+                theta_gpu_proxy[pos] = 90;
+              else if(angle <= 15 * PI / 8)
+                theta_gpu_proxy[pos] = 135;
+              else
+                theta_gpu_proxy[pos] = 0; // (angle <= 16*PI/8)
+            }
+          }
+
+          // call NON-MAXIMUM SUPPRESSION KERNEL
+#pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
+          {
+
+            int l_data[(threads+2)*(threads+2)];
+
+#pragma omp parallel 
+            {
+              const int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+              const int g_row = gid / (cols - 2) + 1;
+              const int g_col = gid % (cols - 2) + 1;
+              const int L_SIZE = threads; 
+              const int l_row = omp_get_thread_num() / L_SIZE + 1;
+              const int l_col = omp_get_thread_num() % L_SIZE + 1;
+              const int pos = g_row * cols + g_col;
+
+              // copy to l_data
+              l_data[l_row * (L_SIZE + 2) + l_col] = gpu_in_out[pos];
+
+              // top most row
+              if(l_row == 1) {
+                l_data[0 * (L_SIZE + 2) + l_col] = gpu_in_out[pos - cols];
+                // top left
+                if(l_col == 1)
+                  l_data[0 * (L_SIZE + 2) + 0] = gpu_in_out[pos - cols - 1];
+
+                // top right
+                else if(l_col == L_SIZE)
+                  l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = gpu_in_out[pos - cols + 1];
+              }
+              // bottom most row
+              else if(l_row == L_SIZE) {
+                l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = gpu_in_out[pos + cols];
+                // bottom left
+                if(l_col == 1)
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = gpu_in_out[pos + cols - 1];
+
+                // bottom right
+                else if(l_col == L_SIZE)
+                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = gpu_in_out[pos + cols + 1];
+              }
+
+              if(l_col == 1)
+                l_data[l_row * (L_SIZE + 2) + 0] = gpu_in_out[pos - 1];
+              else if(l_col == L_SIZE)
+                l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = gpu_in_out[pos + 1];
+
+#pragma omp barrier
+
+              unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
+
+              // The following variables are used to address the matrices more easily
+              switch(theta_gpu_proxy[pos]) {
+                // A gradient angle of 0 degrees = an edge that is North/South
+                // Check neighbors to the East and West
+                case 0:
+                  // supress me if my neighbor has larger magnitude
+                  if(my_magnitude <= l_data[l_row * (L_SIZE + 2) + l_col + 1] || // east
+                      my_magnitude <= l_data[l_row * (L_SIZE + 2) + l_col - 1]) // west
+                  {
+                    interm_gpu_proxy[pos] = 0;
                   }
-                }
+                  // otherwise, copy my value to the output buffer
+                  else {
+                    interm_gpu_proxy[pos] = my_magnitude;
+                  }
+                  break;
 
-                // The output is now the square root of their squares, but they are
-                // constrained to 0 <= value <= 255. Note that hypot is a built in function
-                // defined as: hypot(x,y) = sqrt(x*x, y*y).
-                out[pos] = cl::sycl::min(255, cl::sycl::max(0, (int)cl::sycl::hypot(sumx, sumy)));
+                  // A gradient angle of 45 degrees = an edge that is NW/SE
+                  // Check neighbors to the NE and SW
+                case 45:
+                  // supress me if my neighbor has larger magnitude
+                  if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col + 1] || // north east
+                      my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col - 1]) // south west
+                  {
+                    interm_gpu_proxy[pos] = 0;
+                  }
+                  // otherwise, copy my value to the output buffer
+                  else {
+                    interm_gpu_proxy[pos] = my_magnitude;
+                  }
+                  break;
 
-                // Compute the direction angle theta in radians
-                // atan2 has a range of (-PI, PI) degrees
-                angle = cl::sycl::atan2(sumy, sumx);
+                  // A gradient angle of 90 degrees = an edge that is E/W
+                  // Check neighbors to the North and South
+                case 90:
+                  // supress me if my neighbor has larger magnitude
+                  if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col] || // north
+                      my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col]) // south
+                  {
+                    interm_gpu_proxy[pos] = 0;
+                  }
+                  // otherwise, copy my value to the output buffer
+                  else {
+                    interm_gpu_proxy[pos] = my_magnitude;
+                  }
+                  break;
 
-                // If the angle is negative,
-                // shift the range to (0, 2PI) by adding 2PI to the angle,
-                // then perform modulo operation of 2PI
-                if(angle < 0) {
-                  angle = cl::sycl::fmod((angle + 2 * PI), (2 * PI));
-                }
+                  // A gradient angle of 135 degrees = an edge that is NE/SW
+                  // Check neighbors to the NW and SE
+                case 135:
+                  // supress me if my neighbor has larger magnitude
+                  if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col - 1] || // north west
+                      my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col + 1]) // south east
+                  {
+                    interm_gpu_proxy[pos] = 0;
+                  }
+                  // otherwise, copy my value to the output buffer
+                  else {
+                    interm_gpu_proxy[pos] = my_magnitude;
+                  }
+                  break;
 
-                // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
-                // then store it in the theta buffer at the proper position
-                //theta[pos] = ((int)(degrees(angle * (PI/8) + PI/8-0.0001) / 45) * 45) % 180;
-                if(angle <= PI / 8)
-                  theta[pos] = 0;
-                else if(angle <= 3 * PI / 8)
-                  theta[pos] = 45;
-                else if(angle <= 5 * PI / 8)
-                  theta[pos] = 90;
-                else if(angle <= 7 * PI / 8)
-                  theta[pos] = 135;
-                else if(angle <= 9 * PI / 8)
-                  theta[pos] = 0;
-                else if(angle <= 11 * PI / 8)
-                  theta[pos] = 45;
-                else if(angle <= 13 * PI / 8)
-                  theta[pos] = 90;
-                else if(angle <= 15 * PI / 8)
-                  theta[pos] = 135;
+                default: interm_gpu_proxy[pos] = my_magnitude; break;
+              }
+            }
+          }
+
+          // call HYSTERESIS KERNEL
+#pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
+          {
+
+#pragma omp parallel 
+            {
+              const int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
+              const int g_row = gid / (cols - 2) + 1;
+              const int g_col = gid % (cols - 2) + 1;
+              const int pos = g_row * cols + g_col;
+              float lowThresh  = 10;
+              float highThresh = 70;
+              const unsigned char EDGE = 255;
+
+              unsigned char magnitude = interm_gpu_proxy[pos];
+
+              if(magnitude >= highThresh)
+                gpu_in_out[pos] = EDGE;
+              else if(magnitude <= lowThresh)
+                gpu_in_out[pos] = 0;
+              else {
+                float med = (highThresh + lowThresh) / 2;
+
+                if(magnitude >= med)
+                  gpu_in_out[pos] = EDGE;
                 else
-                  theta[pos] = 0; // (angle <= 16*PI/8)
-            });
-        });
+                  gpu_in_out[pos] = 0;
+              }
+            }
+          }
 
-        // call NON-MAXIMUM SUPPRESSION KERNEL
-        q.submit([&] (handler &cgh) {
-            auto data = d_in_out.get_access<sycl_read>(cgh);
-            auto theta = d_theta_gpu_proxy.get_access<sycl_read>(cgh);
-            auto out = d_interm_gpu_proxy.get_access<sycl_discard_write>(cgh);
-            accessor<int, 1, sycl_read_write, access::target::local> 
-            l_data((threads+2)*(threads+2), cgh);
-            cgh.parallel_for<class non_max_supress>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-                // These variables are offset by one to avoid seg. fault errors
-                // As such, this kernel ignores the outside ring of pixels
-                const int L_SIZE = item.get_local_range(0);
-                const int g_row = item.get_global_id(0) + 1;
-                const int g_col = item.get_global_id(1) + 1;
-                const int l_row = item.get_local_id(0) + 1;
-                const int l_col = item.get_local_id(1) + 1;
+          timer.stop("Kernel Execution");
 
-                const int pos = g_row * cols + g_col;
+          timer.start("Copy Back");
+#pragma omp target update from(gpu_in_out[0:in_size])
 
-                // copy to l_data
-                l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
+          timer.stop("Copy Back");
 
-                // top most row
-                if(l_row == 1) {
-                l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
-                // top left
-                if(l_col == 1)
-                l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
+          memcpy(all_out_frames[task_id], gpu_in_out, in_size);
 
-                // top right
-                else if(l_col == L_SIZE)
-                  l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
-                }
-                // bottom most row
-                else if(l_row == L_SIZE) {
-                  l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
-                  // bottom left
-                  if(l_col == 1)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
+          }
 
-                  // bottom right
-                  else if(l_col == L_SIZE)
-                    l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
-                }
+          for(int task_id = cpu_first(&partitioner); cpu_more(&partitioner); task_id = cpu_next(&partitioner)) {
 
-                if(l_col == 1)
-                  l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
-                else if(l_col == L_SIZE)
-                  l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
+            // Next frame
+            memcpy(cpu_in_out, all_gray_frames[task_id], in_size);
 
-                item.barrier(access::fence_space::local_space);
+            // Launch CPU threads
+            timer.start("CPU: Kernel Execution");
+            std::thread main_thread(run_cpu_threads, cpu_in_out, h_interm_cpu_proxy, h_theta_cpu_proxy,
+                rows, cols, p.n_threads, task_id);
+            main_thread.join();
+            timer.stop("CPU: Kernel Execution");
 
-                unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
+            memcpy(all_out_frames[task_id], cpu_in_out, in_size);
+          }
 
-                // The following variables are used to address the matrices more easily
-                switch(theta[pos]) {
-                  // A gradient angle of 0 degrees = an edge that is North/South
-                  // Check neighbors to the East and West
-                  case 0:
-                    // supress me if my neighbor has larger magnitude
-                    if(my_magnitude <= l_data[l_row * (L_SIZE + 2) + l_col + 1] || // east
-                        my_magnitude <= l_data[l_row * (L_SIZE + 2) + l_col - 1]) // west
-                    {
-                      out[pos] = 0;
-                    }
-                    // otherwise, copy my value to the output buffer
-                    else {
-                      out[pos] = my_magnitude;
-                    }
-                    break;
-
-                    // A gradient angle of 45 degrees = an edge that is NW/SE
-                    // Check neighbors to the NE and SW
-                  case 45:
-                    // supress me if my neighbor has larger magnitude
-                    if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col + 1] || // north east
-                        my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col - 1]) // south west
-                    {
-                      out[pos] = 0;
-                    }
-                    // otherwise, copy my value to the output buffer
-                    else {
-                      out[pos] = my_magnitude;
-                    }
-                    break;
-
-                    // A gradient angle of 90 degrees = an edge that is E/W
-                    // Check neighbors to the North and South
-                  case 90:
-                    // supress me if my neighbor has larger magnitude
-                    if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col] || // north
-                        my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col]) // south
-                    {
-                      out[pos] = 0;
-                    }
-                    // otherwise, copy my value to the output buffer
-                    else {
-                      out[pos] = my_magnitude;
-                    }
-                    break;
-
-                    // A gradient angle of 135 degrees = an edge that is NE/SW
-                    // Check neighbors to the NW and SE
-                  case 135:
-                    // supress me if my neighbor has larger magnitude
-                    if(my_magnitude <= l_data[(l_row - 1) * (L_SIZE + 2) + l_col - 1] || // north west
-                        my_magnitude <= l_data[(l_row + 1) * (L_SIZE + 2) + l_col + 1]) // south east
-                    {
-                      out[pos] = 0;
-                    }
-                    // otherwise, copy my value to the output buffer
-                    else {
-                      out[pos] = my_magnitude;
-                    }
-                    break;
-
-                  default: out[pos] = my_magnitude; break;
-                }
-            });
-        });
-
-        // call HYSTERESIS KERNEL
-        q.submit([&] (handler &cgh) {
-            auto data = d_interm_gpu_proxy.get_access<sycl_read>(cgh);
-            auto out = d_in_out.get_access<sycl_discard_write>(cgh);
-            accessor<int, 1, sycl_read_write, access::target::local> 
-            l_data((threads+2)*(threads+2), cgh);
-            cgh.parallel_for<class hyst>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-                // These variables are offset by one to avoid seg. fault errors
-                // As such, this kernel ignores the outside ring of pixels
-                // Establish our high and low thresholds as floats
-                float lowThresh  = 10;
-                float highThresh = 70;
-
-                // These variables are offset by one to avoid seg. fault errors
-                // As such, this kernel ignores the outside ring of pixels
-                const int row = item.get_global_id(0) + 1;
-                const int col = item.get_global_id(1) + 1;
-                const int pos = row * cols + col;
-
-                const unsigned char EDGE = 255;
-
-                unsigned char magnitude = data[pos];
-
-                if(magnitude >= highThresh)
-                out[pos] = EDGE;
-                else if(magnitude <= lowThresh)
-                out[pos] = 0;
-                else {
-                  float med = (highThresh + lowThresh) / 2;
-
-                  if(magnitude >= med)
-                    out[pos] = EDGE;
-                  else
-                    out[pos] = 0;
-                }
-            });
-        });
-
-        q.wait();
-	*/
-        timer.stop("Kernel Execution");
-
-        timer.start("Copy Back");
-        #pragma omp target update from(gpu_in_out[0:in_size]);
-
-        timer.stop("Copy Back");
-
-        memcpy(all_out_frames[task_id], gpu_in_out, in_size);
-
-      }
-
-
-      for(int task_id = cpu_first(&partitioner); cpu_more(&partitioner); task_id = cpu_next(&partitioner)) {
-
-        // Next frame
-        memcpy(cpu_in_out, all_gray_frames[task_id], in_size);
-
-        // Launch CPU threads
-        timer.start("CPU: Kernel Execution");
-        std::thread main_thread(run_cpu_threads, cpu_in_out, h_interm_cpu_proxy, h_theta_cpu_proxy,
-            rows, cols, p.n_threads, task_id);
-        main_thread.join();
-        timer.stop("CPU: Kernel Execution");
-
-        memcpy(all_out_frames[task_id], cpu_in_out, in_size);
-
-      }
-  }));
-  std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
+    }));
+    std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
 
   } // #pragma omp target
 
@@ -632,13 +597,15 @@ const float gaus[9] = {0.0625f, 0.125f, 0.0625f,
 
   // Verify answer
   int status = verify(all_out_frames, in_size, p.comparison_file, 
-		  p.n_warmup + p.n_reps, rows, cols, rows, cols);
+      p.n_warmup + p.n_reps, rows, cols, rows, cols);
 
   // Release buffers
   free(gpu_in_out);
   free(cpu_in_out);
   free(h_interm_cpu_proxy);
   free(h_theta_cpu_proxy);
+  free(interm_gpu_proxy);
+  free(theta_gpu_proxy);
   for(int i = 0; i < n_frames; i++) {
     free(all_gray_frames[i]);
   }
