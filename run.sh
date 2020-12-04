@@ -3,7 +3,7 @@
 # For SYCL
 export SYCL_BE=PI_OPENCL
 
-for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cuda|omp')
+for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cuda|omp|hip')
 do
   cd "${dir}"
   make clean
@@ -20,7 +20,7 @@ done
 # For OMP target offloading
 export LIBOMPTARGET_PLUGIN=OPENCL
 
-for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|sycl|dpct')
+for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cuda|sycl|dpct|hip')
 do
   cd "${dir}"
   make clean
