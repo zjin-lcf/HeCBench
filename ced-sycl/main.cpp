@@ -39,12 +39,12 @@
 
 #include "kernel.h"
 #include "support/partitioner.h"
-#include "support/timer.h"
 #include "support/verify.h"
 #include "common.h"
 
 const float c_gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-	0.1250f, 0.250f, 0.1250f, 0.0625f, 0.125f, 0.0625f};
+                         0.1250f, 0.250f, 0.1250f, 
+                         0.0625f, 0.125f, 0.0625f};
 const int   c_sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
 const int   c_soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
 
@@ -140,8 +140,10 @@ void read_input(unsigned char** all_gray_frames,
     sprintf(FileName, "%s%d.txt", p.file_name, task_id);
 
     FILE *fp = fopen(FileName, "r");
-    if(fp == NULL)
+    if(fp == NULL) {
+      perror ("The following error occurred: ");
       exit(EXIT_FAILURE);
+    }
 
     fscanf(fp, "%d\n", &rows);
     fscanf(fp, "%d\n", &cols);
@@ -161,46 +163,19 @@ void read_input(unsigned char** all_gray_frames,
 int main(int argc, char **argv) {
 
   Params      p(argc, argv);
-  Timer        timer;
 
-  // Initialize (part 1)
-  timer.start("Initialization");
+  // The maximum number of GPU threads is 1024 for certain GPUs
   const int max_gpu_threads = 256;
   assert(p.n_gpu_threads * p.n_gpu_threads <= max_gpu_threads && \
    "The thread block size is greater than the maximum thread block size");
+
+  // read data from an 'input' directory which must be available
   const int n_frames = p.n_warmup + p.n_reps;
   unsigned char **all_gray_frames = 
     (unsigned char **)malloc(n_frames * sizeof(unsigned char *));
   int     rows, cols, in_size;
   read_input(all_gray_frames, rows, cols, in_size, p);
-  timer.stop("Initialization");
 
-  timer.start("Allocation buffers");
-  unsigned char* cpu_in_out = (unsigned char *)malloc(in_size);
-  unsigned char* gpu_in_out = (unsigned char *)malloc(in_size);
-
-  unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
-  unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
-
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
-  buffer<unsigned char, 1> d_in_out(in_size);
-  buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
-  buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
-  buffer<float, 1> d_gaus (c_gaus, 9);
-  buffer<int, 1> d_sobx (c_sobx, 9);
-  buffer<int, 1> d_soby (c_soby, 9);
-
-  std::atomic<int> next_frame;
-  timer.stop("Allocation");
-  timer.print("Allocation", 1);
-
-  timer.start("Initialization");
   unsigned char **all_out_frames = (unsigned char **)malloc(n_frames * sizeof(unsigned char *));
   for(int i = 0; i < n_frames; i++) {
     all_out_frames[i] = (unsigned char *)malloc(in_size);
@@ -209,11 +184,32 @@ int main(int argc, char **argv) {
   if(p.alpha < 0.0 || p.alpha > 1.0) { // Dynamic partitioning
     worklist[0].store(0);
   }
+  std::atomic<int> next_frame;
   next_frame.store(0);
-  timer.stop("Initialization");
-  timer.print("Initialization", 1);
 
-  timer.start("Total Proxies");
+  unsigned char* cpu_in_out = (unsigned char *)malloc(in_size);
+  unsigned char* gpu_in_out = (unsigned char *)malloc(in_size);
+
+  unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
+  unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
+
+
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  cl::sycl::queue q(dev_sel);
+
+
+  buffer<unsigned char, 1> d_in_out(in_size);
+  buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
+  buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
+  buffer<float, 1> d_gaus (c_gaus, 9);
+  buffer<int, 1> d_sobx (c_sobx, 9);
+  buffer<int, 1> d_soby (c_soby, 9);
+
+
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
 
@@ -226,17 +222,10 @@ int main(int argc, char **argv) {
 
 
         // Copy to Device
-        timer.start("GPU Proxy: Copy To Device");
-
         q.submit([&] (handler &cgh) {
             auto in_acc = d_in_out.get_access<sycl_discard_write>(cgh);
             cgh.copy(gpu_in_out, in_acc); 
         });
-        q.wait();
-
-        timer.stop("GPU Proxy: Copy To Device");
-
-        timer.start("GPU Proxy: Kernel");
 
         int threads = p.n_gpu_threads;
         range<2> gws (rows-2, cols-2);
@@ -525,7 +514,7 @@ int main(int argc, char **argv) {
             });
         });
 
-        // HYSTERESIS KERNEL
+        // call HYSTERESIS KERNEL
         q.submit([&] (handler &cgh) {
             auto data = d_interm_gpu_proxy.get_access<sycl_read>(cgh);
             auto out = d_in_out.get_access<sycl_discard_write>(cgh);
@@ -563,16 +552,12 @@ int main(int argc, char **argv) {
             });
         });
 
-        q.wait();
-        timer.stop("GPU Proxy: Kernel");
-
-        timer.start("GPU Proxy: Copy Back");
+        // Copy from Device
         q.submit([&] (handler &cgh) {
             auto in_acc = d_in_out.get_access<sycl_read>(cgh);
             cgh.copy(in_acc, gpu_in_out); 
             });
         q.wait();
-        timer.stop("GPU Proxy: Copy Back");
 
         memcpy(all_out_frames[task_id], gpu_in_out, in_size);
 
@@ -585,29 +570,15 @@ int main(int argc, char **argv) {
         memcpy(cpu_in_out, all_gray_frames[task_id], in_size);
 
         // Launch CPU threads
-        timer.start("CPU Proxy: Kernel");
         std::thread main_thread(run_cpu_threads, cpu_in_out, h_interm_cpu_proxy, h_theta_cpu_proxy,
             rows, cols, p.n_threads, task_id);
         main_thread.join();
-        timer.stop("CPU Proxy: Kernel");
 
         memcpy(all_out_frames[task_id], cpu_in_out, in_size);
 
       }
   }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
-  timer.stop("Total Proxies");
-  timer.print("Total Proxies", 1);
-  printf("CPU Proxy:\n");
-  printf("\t");
-  timer.print("CPU Proxy: Kernel", 1);
-  printf("GPU Proxy:\n");
-  printf("\t");
-  timer.print("GPU Proxy: Copy To Device", 1);
-  printf("\t");
-  timer.print("GPU Proxy: Kernel", 1);
-  printf("\t");
-  timer.print("GPU Proxy: Copy Back", 1);
 
 #ifdef CHAI_OPENCV
   // Display the result
