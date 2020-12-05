@@ -32,37 +32,43 @@
  * THE SOFTWARE.
  *
  */
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
+
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
-#include <cuda.h>
-
 #include "kernel.h"
 #include "support/partitioner.h"
 #include "support/verify.h"
 
-__constant__ float c_gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-                                0.1250f, 0.250f, 0.1250f, 
-                                0.0625f, 0.125f, 0.0625f};
-__constant__ int   c_sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-__constant__ int   c_soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+dpct::constant_memory<float, 1> gaus(sycl::range<1>(9),
+                                     {0.0625f, 0.125f, 0.0625f, 0.1250f, 0.250f,
+                                      0.1250f, 0.0625f, 0.125f, 0.0625f});
+dpct::constant_memory<int, 1> sobx(sycl::range<1>(9),
+                                   {-1, 0, 1, -2, 0, 2, -1, 0, 1});
+dpct::constant_memory<int, 1> soby(sycl::range<1>(9),
+                                   {-1, -2, -1, 0, 0, 0, 1, 2, 1});
 
 // https://github.com/smskelley/canny-opencl
 // Gaussian Kernel
 // data: image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out: image output data (8B1C)
-__global__ void 
-gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols) {
+void 
+gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols,
+                sycl::nd_item<3> item_ct1, uint8_t *dpct_local, float *gaus) {
 
-    extern __shared__ int l_mem[];
+    auto l_mem = (int *)dpct_local;
     int* l_data = l_mem;
 
-    const int L_SIZE = blockDim.x;
+    const int L_SIZE = item_ct1.get_local_range().get(2);
     int sum         = 0;
-    const int l_row = threadIdx.y + 1;
-    const int l_col = threadIdx.x + 1;
-    const int g_row = blockIdx.y * blockDim.y + l_row;
-    const int g_col = blockIdx.x * blockDim.x + l_col;
+    const int l_row = item_ct1.get_local_id(1) + 1;
+    const int l_col = item_ct1.get_local_id(2) + 1;
+    const int g_row =
+        item_ct1.get_group(1) * item_ct1.get_local_range().get(1) + l_row;
+    const int g_col =
+        item_ct1.get_group(2) * item_ct1.get_local_range().get(2) + l_col;
 
     const int pos = g_row * cols + g_col;
 
@@ -97,15 +103,15 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
     else if(l_col == L_SIZE)
         l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = data[pos + 1];
 
-    __syncthreads();
+    item_ct1.barrier();
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sum += c_gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
-    out[pos] = min(255, max(0, sum));
+    out[pos] = sycl::min(255, sycl::max(0, sum));
 }
 
 // Sobel kernel. Apply sobx and soby separately, then find the sqrt of their
@@ -113,20 +119,24 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
 // data:  image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out:   image output data (8B1C)
 // theta: angle output data
-__global__ void 
-sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta, const int rows, const int cols) {
+void 
+sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta, const int rows, const int cols,
+             sycl::nd_item<3> item_ct1, uint8_t *dpct_local, int *sobx,
+             int *soby) {
 
-    extern __shared__ int l_mem[];
+    auto l_mem = (int *)dpct_local;
     int* l_data = l_mem;
 
     // collect sums separately. we're storing them into floats because that
     // is what hypot and atan2 will expect.
-    const int L_SIZE = blockDim.x;
+    const int L_SIZE = item_ct1.get_local_range().get(2);
     const float PI    = 3.14159265f;
-    const int   l_row = threadIdx.y + 1;
-    const int   l_col = threadIdx.x + 1;
-    const int   g_row = blockIdx.y * blockDim.y + l_row;
-    const int   g_col = blockIdx.x * blockDim.x + l_col;
+    const int l_row = item_ct1.get_local_id(1) + 1;
+    const int l_col = item_ct1.get_local_id(2) + 1;
+    const int g_row =
+        item_ct1.get_group(1) * item_ct1.get_local_range().get(1) + l_row;
+    const int g_col =
+        item_ct1.get_group(2) * item_ct1.get_local_range().get(2) + l_col;
 
     const int pos = g_row * cols + g_col;
 
@@ -163,31 +173,31 @@ sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta
     else if(l_col == L_SIZE)
         l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-    __syncthreads();
+    item_ct1.barrier();
 
     float sumx = 0, sumy = 0, angle = 0;
     // find x and y derivatives
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sumx += c_sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-            sumy += c_soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
     // The output is now the square root of their squares, but they are
     // constrained to 0 <= value <= 255. Note that hypot is a built in function
     // defined as: hypot(x,y) = sqrt(x*x, y*y).
-    out[pos] = min(255, max(0, (int)hypot(sumx, sumy)));
+    out[pos] = sycl::min(255, sycl::max(0, (int)sycl::hypot(sumx, sumy)));
 
     // Compute the direction angle theta in radians
     // atan2 has a range of (-PI, PI) degrees
-    angle = atan2(sumy, sumx);
+    angle = sycl::atan2(sumy, sumx);
 
     // If the angle is negative,
     // shift the range to (0, 2PI) by adding 2PI to the angle,
     // then perform modulo operation of 2PI
     if(angle < 0) {
-        angle = fmod((angle + 2 * PI), (2 * PI));
+        angle = sycl::fmod((angle + 2 * PI), (2 * PI));
     }
 
     // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
@@ -217,20 +227,23 @@ sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta
 // data: image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out: image output data (8B1C)
 // theta: angle input data
-__global__ void 
+void 
 non_max_supp_kernel(const unsigned char *data, unsigned char *out, 
-                    const unsigned char *theta, const int rows, const int cols) {
+                    const unsigned char *theta, const int rows, const int cols,
+                    sycl::nd_item<3> item_ct1, uint8_t *dpct_local) {
 
-    extern __shared__ int l_mem[];
+    auto l_mem = (int *)dpct_local;
     int* l_data = l_mem;
 
     // These variables are offset by one to avoid seg. fault errors
     // As such, this kernel ignores the outside ring of pixels
-    const int L_SIZE = blockDim.x;
-    const int l_row = threadIdx.y + 1;
-    const int l_col = threadIdx.x + 1;
-    const int g_row = blockIdx.y * blockDim.y + l_row;
-    const int g_col = blockIdx.x * blockDim.x + l_col;
+    const int L_SIZE = item_ct1.get_local_range().get(2);
+    const int l_row = item_ct1.get_local_id(1) + 1;
+    const int l_col = item_ct1.get_local_id(2) + 1;
+    const int g_row =
+        item_ct1.get_group(1) * item_ct1.get_local_range().get(1) + l_row;
+    const int g_col =
+        item_ct1.get_group(2) * item_ct1.get_local_range().get(2) + l_col;
 
     const int pos = g_row * cols + g_col;
 
@@ -265,7 +278,7 @@ non_max_supp_kernel(const unsigned char *data, unsigned char *out,
     else if(l_col == L_SIZE)
         l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-    __syncthreads();
+    item_ct1.barrier();
 
     unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
 
@@ -338,16 +351,19 @@ non_max_supp_kernel(const unsigned char *data, unsigned char *out,
 // Hysteresis Threshold Kernel
 // data: image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out: image output data (8B1C)
-__global__ void 
-hyst_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols) {
+void 
+hyst_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols,
+            sycl::nd_item<3> item_ct1) {
     // Establish our high and low thresholds as floats
     float lowThresh  = 10;
     float highThresh = 70;
 
     // These variables are offset by one to avoid seg. fault errors
     // As such, this kernel ignores the outside ring of pixels
-    const int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
-    const int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    const int row = item_ct1.get_group(1) * item_ct1.get_local_range().get(1) +
+                    item_ct1.get_local_id(1) + 1;
+    const int col = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+                    item_ct1.get_local_id(2) + 1;
     const int pos = row * cols + col;
 
     const unsigned char EDGE = 255;
@@ -460,7 +476,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred");
+      perror ("The following error occurred: ");
       exit(EXIT_FAILURE);
     }
 
@@ -480,6 +496,8 @@ void read_input(unsigned char** all_gray_frames,
 
 // Main ------------------------------------------------------------------------------------------
 int main(int argc, char **argv) {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
 
   Params      p(argc, argv);
 
@@ -514,18 +532,20 @@ int main(int argc, char **argv) {
 
 
   unsigned char* d_in_out;
-  cudaMalloc((void**)&d_in_out, sizeof(unsigned char)*in_size);
-  
+    d_in_out = sycl::malloc_device<unsigned char>(in_size, q_ct1);
+
   unsigned char* d_interm_gpu_proxy;
-  cudaMalloc((void**)&d_interm_gpu_proxy, sizeof(unsigned char)*in_size);
+    d_interm_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
 
   unsigned char* d_theta_gpu_proxy;
-  cudaMalloc((void**)&d_theta_gpu_proxy, sizeof(unsigned char)*in_size);
+    d_theta_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
 
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
 
-  proxy_threads.push_back(std::thread([&]() {
+    proxy_threads.push_back(std::thread([&]() {
+        dpct::device_ext &dev_ct1 = dpct::get_current_device();
+        sycl::queue &q_ct1 = dev_ct1.default_queue();
 
       for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
 
@@ -533,29 +553,103 @@ int main(int argc, char **argv) {
         memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
 
         // Copy to Device
-        cudaMemcpy(d_in_out, gpu_in_out, in_size, cudaMemcpyHostToDevice);
-     
+            q_ct1.memcpy(d_in_out, gpu_in_out, in_size).wait();
+
         int threads = p.n_gpu_threads;
-        dim3 grid ((cols-2)/threads, (rows-2)/threads);
-        dim3 block (threads, threads);
+            sycl::range<3> grid((cols - 2) / threads, (rows - 2) / threads, 1);
+            sycl::range<3> block(threads, threads, 1);
         int smem_size = (threads+2)*(threads+2)*sizeof(int); 
 
         // call GAUSSIAN KERNEL
-        gaussian_kernel<<<grid, block, smem_size>>>(d_in_out, d_interm_gpu_proxy, rows, cols);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                auto gaus_ptr_ct1 = gaus.get_ptr();
+
+                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                               sycl::access::target::local>
+                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+
+                auto dpct_global_range = grid * block;
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(block.get(2), block.get(1),
+                                                     block.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        gaussian_kernel(
+                            d_in_out, d_interm_gpu_proxy, rows, cols, item_ct1,
+                            dpct_local_acc_ct1.get_pointer(), gaus_ptr_ct1);
+                    });
+            });
 
         // call SOBEL KERNEL
-        sobel_kernel<<<grid, block, smem_size>>>(d_interm_gpu_proxy, d_in_out, d_theta_gpu_proxy, rows, cols);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                auto sobx_ptr_ct1 = sobx.get_ptr();
+                auto soby_ptr_ct1 = soby.get_ptr();
+
+                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                               sycl::access::target::local>
+                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+
+                auto dpct_global_range = grid * block;
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(block.get(2), block.get(1),
+                                                     block.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        sobel_kernel(d_interm_gpu_proxy, d_in_out,
+                                     d_theta_gpu_proxy, rows, cols, item_ct1,
+                                     dpct_local_acc_ct1.get_pointer(),
+                                     sobx_ptr_ct1, soby_ptr_ct1);
+                    });
+            });
 
         // call NON-MAXIMUM SUPPRESSION KERNEL
-        non_max_supp_kernel<<<grid, block, smem_size>>>(d_in_out, d_interm_gpu_proxy, d_theta_gpu_proxy, rows, cols);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                               sycl::access::target::local>
+                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+
+                auto dpct_global_range = grid * block;
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(block.get(2), block.get(1),
+                                                     block.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        non_max_supp_kernel(d_in_out, d_interm_gpu_proxy,
+                                            d_theta_gpu_proxy, rows, cols,
+                                            item_ct1,
+                                            dpct_local_acc_ct1.get_pointer());
+                    });
+            });
 
         // call HYSTERESIS KERNEL
-        hyst_kernel<<<grid, block, smem_size>>>(d_interm_gpu_proxy, d_in_out, rows, cols);
+            q_ct1.submit([&](sycl::handler &cgh) {
+                auto dpct_global_range = grid * block;
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                     dpct_global_range.get(1),
+                                                     dpct_global_range.get(0)),
+                                      sycl::range<3>(block.get(2), block.get(1),
+                                                     block.get(0))),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        hyst_kernel(d_interm_gpu_proxy, d_in_out, rows, cols,
+                                    item_ct1);
+                    });
+            });
 
         //cudaDeviceSynchronize();
 
         // Copy from Device
-        cudaMemcpy(gpu_in_out, d_in_out, in_size, cudaMemcpyDeviceToHost);
+            q_ct1.memcpy(gpu_in_out, d_in_out, in_size).wait();
 
         memcpy(all_out_frames[task_id], gpu_in_out, in_size);
       }
@@ -573,7 +667,7 @@ int main(int argc, char **argv) {
         memcpy(all_out_frames[task_id], cpu_in_out, in_size);
 
       }
-  }));
+    }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
 
 
@@ -596,9 +690,9 @@ int main(int argc, char **argv) {
 		  p.n_warmup + p.n_reps, rows, cols, rows, cols);
 
   // Release buffers
-  cudaFree(d_in_out);
-  cudaFree(d_interm_gpu_proxy);
-  cudaFree(d_theta_gpu_proxy);
+    sycl::free(d_in_out, q_ct1);
+    sycl::free(d_interm_gpu_proxy, q_ct1);
+    sycl::free(d_theta_gpu_proxy, q_ct1);
 
   free(gpu_in_out);
   free(cpu_in_out);

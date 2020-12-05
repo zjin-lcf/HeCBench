@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 OPENCV    = no
 
 #===============================================================================
@@ -39,15 +38,6 @@ endif
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
-endif
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906
-else
-  CFLAGS +=-fopenmp
 endif
 
 ifeq ($(OPENCV),yes)
