@@ -119,6 +119,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.9 | 8.2 | 8.1 | 12.3 |
 
 
+| ced | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 660 | 663 | 663 | NA |
+| host timing(s) | NA | NA | NA | NA |
+| device timing(ms) | NA | NA | NA | NA |
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | NA | NA | 132035 |
@@ -770,6 +777,14 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 13.7 | 14.2 | 15.9 | 11.0 |
 
 
+| ced | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 660 | 663 | 663 | NA |
+| host timing(s) | 0.82 | 0.86 | 1.07 | NA |
+| device timing(ms) | 216 | 171 | 80  | NA |
+
+
+
 | cfd | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16005 | 16013 | 16013 | 132035 |
@@ -1384,6 +1399,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### ccsd-trpdrv
   The CCSD tengy kernel, which was converted from Fortran to C by Jeff Hammond, in NWChem (https://github.com/jeffhammond/nwchem-ccsd-trpdrv)
+
+### ced
+  Canny edge detection (https://github.com/chai-benchmarks/chai)
 
 ### cfd
   The CFD solver in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
