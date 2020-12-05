@@ -41,9 +41,10 @@
 
 #include "kernel.h"
 #include "support/partitioner.h"
-#include "support/timer.h"
 #include "support/verify.h"
 
+#define min(a,b) (a) < (b) ? (a) : (b)
+#define max(a,b) (a) < (b) ? (b) : (a)
 
 // Params ---------------------------------------------------------------------
 struct Params {
@@ -160,7 +161,6 @@ void read_input(unsigned char** all_gray_frames,
 int main(int argc, char **argv) {
 
   Params      p(argc, argv);
-  Timer        timer;
 
   // The maximum number of GPU threads is 1024 for certain GPUs
   const int max_gpu_threads = 256;
@@ -194,7 +194,6 @@ int main(int argc, char **argv) {
   unsigned char *interm_gpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *theta_gpu_proxy  = (unsigned char *)malloc(in_size);
 
-  timer.start("Total Proxies");
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
 
@@ -212,13 +211,8 @@ int main(int argc, char **argv) {
 
 
           // Copy to Device
-          timer.start("Copy To Device");
 
 #pragma omp target update to (gpu_in_out[0:in_size])
-
-          timer.stop("Copy To Device");
-
-          timer.start("Kernel Execution");
 
           const int threads = 16; //p.n_gpu_threads;
           int team_size = (rows-2)/threads*(cols-2)/threads;
@@ -538,12 +532,7 @@ int main(int argc, char **argv) {
             }
           }
 
-          timer.stop("Kernel Execution");
-
-          timer.start("Copy Back");
 #pragma omp target update from(gpu_in_out[0:in_size])
-
-          timer.stop("Copy Back");
 
           memcpy(all_out_frames[task_id], gpu_in_out, in_size);
 
@@ -555,11 +544,9 @@ int main(int argc, char **argv) {
             memcpy(cpu_in_out, all_gray_frames[task_id], in_size);
 
             // Launch CPU threads
-            timer.start("CPU: Kernel Execution");
             std::thread main_thread(run_cpu_threads, cpu_in_out, h_interm_cpu_proxy, h_theta_cpu_proxy,
                 rows, cols, p.n_threads, task_id);
             main_thread.join();
-            timer.stop("CPU: Kernel Execution");
 
             memcpy(all_out_frames[task_id], cpu_in_out, in_size);
           }
@@ -568,18 +555,6 @@ int main(int argc, char **argv) {
     std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
 
   } // #pragma omp target
-
-  timer.stop("Total Proxies");
-
-  timer.print("Total Proxies");
-  printf("CPU:\n\t");
-  timer.print("Kernel Execution");
-  printf("GPU:\n\t");
-  timer.print("Copy To Device");
-  printf("\t");
-  timer.print("Kernel Execution");
-  printf("\t");
-  timer.print("Copy Back");
 
 #ifdef CHAI_OPENCV
   // Display the result
