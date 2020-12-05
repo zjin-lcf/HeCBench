@@ -34,21 +34,21 @@
  */
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
-
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+
 #include "kernel.h"
 #include "support/partitioner.h"
 #include "support/verify.h"
 
-dpct::constant_memory<float, 1> c_gaus(sycl::range<1>(9),
-                                     {0.0625f, 0.125f, 0.0625f, 0.1250f, 0.250f,
-                                      0.1250f, 0.0625f, 0.125f, 0.0625f});
+dpct::constant_memory<float, 1>
+    c_gaus(sycl::range<1>(9), {0.0625f, 0.125f, 0.0625f, 0.1250f, 0.250f,
+                               0.1250f, 0.0625f, 0.125f, 0.0625f});
 dpct::constant_memory<int, 1> c_sobx(sycl::range<1>(9),
-                                   {-1, 0, 1, -2, 0, 2, -1, 0, 1});
+                                     {-1, 0, 1, -2, 0, 2, -1, 0, 1});
 dpct::constant_memory<int, 1> c_soby(sycl::range<1>(9),
-                                   {-1, -2, -1, 0, 0, 0, 1, 2, 1});
+                                     {-1, -2, -1, 0, 0, 0, 1, 2, 1});
 
 // https://github.com/smskelley/canny-opencl
 // Gaussian Kernel
@@ -56,7 +56,7 @@ dpct::constant_memory<int, 1> c_soby(sycl::range<1>(9),
 // out: image output data (8B1C)
 void 
 gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols,
-                sycl::nd_item<3> item_ct1, uint8_t *dpct_local, float *gaus) {
+                sycl::nd_item<3> item_ct1, uint8_t *dpct_local, float *c_gaus) {
 
     auto l_mem = (int *)dpct_local;
     int* l_data = l_mem;
@@ -107,7 +107,7 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sum += c_gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
@@ -121,8 +121,8 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
 // theta: angle output data
 void 
 sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta, const int rows, const int cols,
-             sycl::nd_item<3> item_ct1, uint8_t *dpct_local, int *sobx,
-             int *soby) {
+             sycl::nd_item<3> item_ct1, uint8_t *dpct_local, int *c_sobx,
+             int *c_soby) {
 
     auto l_mem = (int *)dpct_local;
     int* l_data = l_mem;
@@ -179,8 +179,8 @@ sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta
     // find x and y derivatives
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-            sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumx += c_sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumy += c_soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
@@ -476,7 +476,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred: ");
+      perror ("The following error occurred");
       exit(EXIT_FAILURE);
     }
 
@@ -532,125 +532,122 @@ int main(int argc, char **argv) {
 
 
   unsigned char* d_in_out;
-    d_in_out = sycl::malloc_device<unsigned char>(in_size, q_ct1);
+  d_in_out = sycl::malloc_device<unsigned char>(in_size, q_ct1);
 
   unsigned char* d_interm_gpu_proxy;
-    d_interm_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
+  d_interm_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
 
   unsigned char* d_theta_gpu_proxy;
-    d_theta_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
+  d_theta_gpu_proxy = sycl::malloc_device<unsigned char>(in_size, q_ct1);
 
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
 
-    proxy_threads.push_back(std::thread([&]() {
-        dpct::device_ext &dev_ct1 = dpct::get_current_device();
-        sycl::queue &q_ct1 = dev_ct1.default_queue();
+  proxy_threads.push_back(std::thread([&]() {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
 
       for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
-      printf("%d ", task_id);
 
         // Next frame
         memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
 
         // Copy to Device
-            q_ct1.memcpy(d_in_out, gpu_in_out, in_size).wait();
+        q_ct1.memcpy(d_in_out, gpu_in_out, in_size).wait();
 
         int threads = p.n_gpu_threads;
-            sycl::range<3> grid((cols - 2) / threads, (rows - 2) / threads, 1);
-            sycl::range<3> block(threads, threads, 1);
+        sycl::range<3> grid(1, (rows - 2) / threads, (cols - 2) / threads);
+        sycl::range<3> block(1, threads, threads);
         int smem_size = (threads+2)*(threads+2)*sizeof(int); 
 
         // call GAUSSIAN KERNEL
-            q_ct1.submit([&](sycl::handler &cgh) {
-                auto gaus_ptr_ct1 = c_gaus.get_ptr();
+        /*
+        DPCT1049:0: The workgroup size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the workgroup size if needed.
+        */
+      q_ct1.submit([&](sycl::handler &cgh) {
+        c_gaus.init();
 
-                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
-                               sycl::access::target::local>
-                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+        auto c_gaus_ptr_ct1 = c_gaus.get_ptr();
 
-                auto dpct_global_range = grid * block;
+        sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
 
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(block.get(2), block.get(1),
-                                                     block.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        gaussian_kernel(
-                            d_in_out, d_interm_gpu_proxy, rows, cols, item_ct1,
-                            dpct_local_acc_ct1.get_pointer(), gaus_ptr_ct1);
-                    });
-            });
+        cgh.parallel_for(sycl::nd_range<3>(grid * block, block),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           gaussian_kernel(d_in_out, d_interm_gpu_proxy, rows,
+                                           cols, item_ct1,
+                                           dpct_local_acc_ct1.get_pointer(),
+                                           c_gaus_ptr_ct1);
+                         });
+      });
 
         // call SOBEL KERNEL
-            q_ct1.submit([&](sycl::handler &cgh) {
-                auto sobx_ptr_ct1 = c_sobx.get_ptr();
-                auto soby_ptr_ct1 = c_soby.get_ptr();
+        /*
+        DPCT1049:1: The workgroup size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the workgroup size if needed.
+        */
+      q_ct1.submit([&](sycl::handler &cgh) {
+        c_sobx.init();
+        c_soby.init();
 
-                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
-                               sycl::access::target::local>
-                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+        auto c_sobx_ptr_ct1 = c_sobx.get_ptr();
+        auto c_soby_ptr_ct1 = c_soby.get_ptr();
 
-                auto dpct_global_range = grid * block;
+        sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
 
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(block.get(2), block.get(1),
-                                                     block.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        sobel_kernel(d_interm_gpu_proxy, d_in_out,
-                                     d_theta_gpu_proxy, rows, cols, item_ct1,
-                                     dpct_local_acc_ct1.get_pointer(),
-                                     sobx_ptr_ct1, soby_ptr_ct1);
-                    });
-            });
+        cgh.parallel_for(sycl::nd_range<3>(grid * block, block),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           sobel_kernel(d_interm_gpu_proxy, d_in_out,
+                                        d_theta_gpu_proxy, rows, cols, item_ct1,
+                                        dpct_local_acc_ct1.get_pointer(),
+                                        c_sobx_ptr_ct1, c_soby_ptr_ct1);
+                         });
+      });
 
         // call NON-MAXIMUM SUPPRESSION KERNEL
-            q_ct1.submit([&](sycl::handler &cgh) {
-                sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
-                               sycl::access::target::local>
-                    dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
+        /*
+        DPCT1049:2: The workgroup size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the workgroup size if needed.
+        */
+      q_ct1.submit([&](sycl::handler &cgh) {
+        sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+            dpct_local_acc_ct1(sycl::range<1>(smem_size), cgh);
 
-                auto dpct_global_range = grid * block;
-
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(block.get(2), block.get(1),
-                                                     block.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        non_max_supp_kernel(d_in_out, d_interm_gpu_proxy,
-                                            d_theta_gpu_proxy, rows, cols,
-                                            item_ct1,
-                                            dpct_local_acc_ct1.get_pointer());
-                    });
-            });
+        cgh.parallel_for(sycl::nd_range<3>(grid * block, block),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           non_max_supp_kernel(
+                               d_in_out, d_interm_gpu_proxy, d_theta_gpu_proxy,
+                               rows, cols, item_ct1,
+                               dpct_local_acc_ct1.get_pointer());
+                         });
+      });
 
         // call HYSTERESIS KERNEL
-            q_ct1.submit([&](sycl::handler &cgh) {
-                auto dpct_global_range = grid * block;
-
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(block.get(2), block.get(1),
-                                                     block.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        hyst_kernel(d_interm_gpu_proxy, d_in_out, rows, cols,
-                                    item_ct1);
-                    });
-            });
+        /*
+        DPCT1049:3: The workgroup size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the workgroup size if needed.
+        */
+      q_ct1.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for(sycl::nd_range<3>(grid * block, block),
+                         [=](sycl::nd_item<3> item_ct1) {
+                           hyst_kernel(d_interm_gpu_proxy, d_in_out, rows, cols,
+                                       item_ct1);
+                         });
+      });
 
         //cudaDeviceSynchronize();
 
         // Copy from Device
-            q_ct1.memcpy(gpu_in_out, d_in_out, in_size).wait();
+        q_ct1.memcpy(gpu_in_out, d_in_out, in_size).wait();
 
         memcpy(all_out_frames[task_id], gpu_in_out, in_size);
       }
@@ -668,7 +665,7 @@ int main(int argc, char **argv) {
         memcpy(all_out_frames[task_id], cpu_in_out, in_size);
 
       }
-    }));
+  }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
 
 
@@ -691,9 +688,9 @@ int main(int argc, char **argv) {
 		  p.n_warmup + p.n_reps, rows, cols, rows, cols);
 
   // Release buffers
-    sycl::free(d_in_out, q_ct1);
-    sycl::free(d_interm_gpu_proxy, q_ct1);
-    sycl::free(d_theta_gpu_proxy, q_ct1);
+  sycl::free(d_in_out, q_ct1);
+  sycl::free(d_interm_gpu_proxy, q_ct1);
+  sycl::free(d_theta_gpu_proxy, q_ct1);
 
   free(gpu_in_out);
   free(cpu_in_out);
