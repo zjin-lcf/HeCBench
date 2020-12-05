@@ -138,7 +138,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred: ");
+      perror ("The following error occurred");
       exit(EXIT_FAILURE);
     }
 
