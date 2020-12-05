@@ -51,12 +51,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernel.h support/partitioner.h support/verify.h Makefile
+%.o: %.cu kernel.h support/partitioner.h support/verify.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 
+	./$(program) -a 0
 

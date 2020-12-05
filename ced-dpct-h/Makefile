@@ -1,0 +1,61 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = dpcpp
+OPTIMIZE  = yes
+DEBUG     = no
+OPENCV    = no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = ced
+
+source = main.cpp kernel_reference.cpp 
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -I../include
+
+# Linker Flags
+LDFLAGS = -lpthread 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(OPENCV),yes)
+  CFLAGS += -DCHAI_OPENCV 
+endif 
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp kernel.h support/partitioner.h support/verify.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) -a 0
+

@@ -41,11 +41,11 @@
 #include "support/partitioner.h"
 #include "support/verify.h"
 
-__constant__ float gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-                              0.1250f, 0.250f, 0.1250f, 
-                              0.0625f, 0.125f, 0.0625f};
-__constant__ int   sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-__constant__ int   soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+__constant__ float c_gaus[9] = {0.0625f, 0.125f, 0.0625f, 
+                                0.1250f, 0.250f, 0.1250f, 
+                                0.0625f, 0.125f, 0.0625f};
+__constant__ int   c_sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+__constant__ int   c_soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
 
 // https://github.com/smskelley/canny-opencl
 // Gaussian Kernel
@@ -101,7 +101,7 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sum += c_gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
@@ -169,8 +169,8 @@ sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta
     // find x and y derivatives
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-            sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumx += c_sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+            sumy += c_soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
         }
     }
 
@@ -460,7 +460,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred: ");
+      perror ("The following error occurred");
       exit(EXIT_FAILURE);
     }
 
