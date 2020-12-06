@@ -10600,7 +10600,9 @@ template <bool c_order, bool pred>
   int active=0, loadj1=0, loadj2=0, loadk1=0, loadk2=0, loadk3=0, loadk4=0;
 
   // Shared memory for 3 wavefields, and for lambda / mu
-  __shared__ float_sw4 shm[3][12+4][16+4][2+4];
+  __shared__ float_sw4 shm0[12+4][16+4][2+4];
+  __shared__ float_sw4 shm1[12+4][16+4][2+4];
+  __shared__ float_sw4 shm2[12+4][16+4][2+4];
 
   float_sw4 cof = 1.0 / (h * h);
 
@@ -10675,133 +10677,133 @@ template <bool c_order, bool pred>
     if (loadj1) {
       int idx = index;
       if (loadk1) {
-	shm[0][tzload][tyload][txload] = a_lambda[idx];
-	shm[1][tzload][tyload][txload] = a_mu[idx];
+	shm0[tzload][tyload][txload] = a_lambda[idx];
+	shm1[tzload][tyload][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk2) {
-	shm[0][tzload+4][tyload][txload] = a_lambda[idx];
-	shm[1][tzload+4][tyload][txload] = a_mu[idx];
+	shm0[tzload+4][tyload][txload] = a_lambda[idx];
+	shm1[tzload+4][tyload][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk3) {
-	shm[0][tzload+8][tyload][txload] = a_lambda[idx];
-	shm[1][tzload+8][tyload][txload] = a_mu[idx];
+	shm0[tzload+8][tyload][txload] = a_lambda[idx];
+	shm1[tzload+8][tyload][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk4) {
-	shm[0][tzload+12][tyload][txload] = a_lambda[idx];
-	shm[1][tzload+12][tyload][txload] = a_mu[idx];
+	shm0[tzload+12][tyload][txload] = a_lambda[idx];
+	shm1[tzload+12][tyload][txload] = a_mu[idx];
       }
     }
     if (loadj2) {
       int idx = index + 16 * ni;
       if (loadk1) {
-	shm[0][tzload][tyload+16][txload] = a_lambda[idx];
-	shm[1][tzload][tyload+16][txload] = a_mu[idx];
+	shm0[tzload][tyload+16][txload] = a_lambda[idx];
+	shm1[tzload][tyload+16][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk2) {
-	shm[0][tzload+4][tyload+16][txload] = a_lambda[idx];
-	shm[1][tzload+4][tyload+16][txload] = a_mu[idx];
+	shm0[tzload+4][tyload+16][txload] = a_lambda[idx];
+	shm1[tzload+4][tyload+16][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk3) {
-	shm[0][tzload+8][tyload+16][txload] = a_lambda[idx];
-	shm[1][tzload+8][tyload+16][txload] = a_mu[idx];
+	shm0[tzload+8][tyload+16][txload] = a_lambda[idx];
+	shm1[tzload+8][tyload+16][txload] = a_mu[idx];
       }
       idx += 4 * nij;
       if (loadk4) {
-	shm[0][tzload+12][tyload+16][txload] = a_lambda[idx];
-	shm[1][tzload+12][tyload+16][txload] = a_mu[idx];
+	shm0[tzload+12][tyload+16][txload] = a_lambda[idx];
+	shm1[tzload+12][tyload+16][txload] = a_mu[idx];
       }
     }
     __syncthreads();
     // Put lambda and mu in registers, using the natural thread mapping
-    la_km2 = shm[0][tk-2][tj][ti];
-    la_km1 = shm[0][tk-1][tj][ti];
-    la_ijk = shm[0][tk  ][tj][ti];
-    la_kp1 = shm[0][tk+1][tj][ti];
-    la_kp2 = shm[0][tk+2][tj][ti];
+    la_km2 = shm0[tk-2][tj][ti];
+    la_km1 = shm0[tk-1][tj][ti];
+    la_ijk = shm0[tk  ][tj][ti];
+    la_kp1 = shm0[tk+1][tj][ti];
+    la_kp2 = shm0[tk+2][tj][ti];
 
-    la_jm2 = shm[0][tk][tj-2][ti];
-    la_jm1 = shm[0][tk][tj-1][ti];
-    la_jp1 = shm[0][tk][tj+1][ti];
-    la_jp2 = shm[0][tk][tj+2][ti];
+    la_jm2 = shm0[tk][tj-2][ti];
+    la_jm1 = shm0[tk][tj-1][ti];
+    la_jp1 = shm0[tk][tj+1][ti];
+    la_jp2 = shm0[tk][tj+2][ti];
 
-    la_im2 = shm[0][tk][tj][ti-2];
-    la_im1 = shm[0][tk][tj][ti-1];
-    la_ip1 = shm[0][tk][tj][ti+1];
-    la_ip2 = shm[0][tk][tj][ti+2];
+    la_im2 = shm0[tk][tj][ti-2];
+    la_im1 = shm0[tk][tj][ti-1];
+    la_ip1 = shm0[tk][tj][ti+1];
+    la_ip2 = shm0[tk][tj][ti+2];
 
-    mu_km2 = shm[1][tk-2][tj][ti];
-    mu_km1 = shm[1][tk-1][tj][ti];
-    mu_ijk = shm[1][tk  ][tj][ti];
-    mu_kp1 = shm[1][tk+1][tj][ti];
-    mu_kp2 = shm[1][tk+2][tj][ti];
+    mu_km2 = shm1[tk-2][tj][ti];
+    mu_km1 = shm1[tk-1][tj][ti];
+    mu_ijk = shm1[tk  ][tj][ti];
+    mu_kp1 = shm1[tk+1][tj][ti];
+    mu_kp2 = shm1[tk+2][tj][ti];
 
-    mu_jm2 = shm[1][tk][tj-2][ti];
-    mu_jm1 = shm[1][tk][tj-1][ti];
-    mu_jp1 = shm[1][tk][tj+1][ti];
-    mu_jp2 = shm[1][tk][tj+2][ti];
+    mu_jm2 = shm1[tk][tj-2][ti];
+    mu_jm1 = shm1[tk][tj-1][ti];
+    mu_jp1 = shm1[tk][tj+1][ti];
+    mu_jp2 = shm1[tk][tj+2][ti];
 
-    mu_im2 = shm[1][tk][tj][ti-2];
-    mu_im1 = shm[1][tk][tj][ti-1];
-    mu_ip1 = shm[1][tk][tj][ti+1];
-    mu_ip2 = shm[1][tk][tj][ti+2];
+    mu_im2 = shm1[tk][tj][ti-2];
+    mu_im1 = shm1[tk][tj][ti-1];
+    mu_ip1 = shm1[tk][tj][ti+1];
+    mu_ip2 = shm1[tk][tj][ti+2];
     __syncthreads();
 
     // Load the 3 wavefields to shared memory
     if (loadj1) {
       int idx = index;
       if (loadk1) {
-	shm[0][tzload][tyload][txload] = u(0,idx);
-	shm[1][tzload][tyload][txload] = u(1,idx);
-	shm[2][tzload][tyload][txload] = u(2,idx);
+	shm0[tzload][tyload][txload] = u(0,idx);
+	shm1[tzload][tyload][txload] = u(1,idx);
+	shm2[tzload][tyload][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk2) {
-	shm[0][tzload+4][tyload][txload] = u(0,idx);
-	shm[1][tzload+4][tyload][txload] = u(1,idx);
-	shm[2][tzload+4][tyload][txload] = u(2,idx);
+	shm0[tzload+4][tyload][txload] = u(0,idx);
+	shm1[tzload+4][tyload][txload] = u(1,idx);
+	shm2[tzload+4][tyload][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk3) {
-	shm[0][tzload+8][tyload][txload] = u(0,idx);
-	shm[1][tzload+8][tyload][txload] = u(1,idx);
-	shm[2][tzload+8][tyload][txload] = u(2,idx);
+	shm0[tzload+8][tyload][txload] = u(0,idx);
+	shm1[tzload+8][tyload][txload] = u(1,idx);
+	shm2[tzload+8][tyload][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk4) {
-	shm[0][tzload+12][tyload][txload] = u(0,idx);
-	shm[1][tzload+12][tyload][txload] = u(1,idx);
-	shm[2][tzload+12][tyload][txload] = u(2,idx);
+	shm0[tzload+12][tyload][txload] = u(0,idx);
+	shm1[tzload+12][tyload][txload] = u(1,idx);
+	shm2[tzload+12][tyload][txload] = u(2,idx);
       }
     }
     if (loadj2) {
       int idx = index + 16 * ni;
       if (loadk1) {
-	shm[0][tzload][tyload+16][txload] = u(0,idx);
-	shm[1][tzload][tyload+16][txload] = u(1,idx);
-	shm[2][tzload][tyload+16][txload] = u(2,idx);
+	shm0[tzload][tyload+16][txload] = u(0,idx);
+	shm1[tzload][tyload+16][txload] = u(1,idx);
+	shm2[tzload][tyload+16][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk2) {
-	shm[0][tzload+4][tyload+16][txload] = u(0,idx);
-	shm[1][tzload+4][tyload+16][txload] = u(1,idx);
-	shm[2][tzload+4][tyload+16][txload] = u(2,idx);
+	shm0[tzload+4][tyload+16][txload] = u(0,idx);
+	shm1[tzload+4][tyload+16][txload] = u(1,idx);
+	shm2[tzload+4][tyload+16][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk3) {
-	shm[0][tzload+8][tyload+16][txload] = u(0,idx);
-	shm[1][tzload+8][tyload+16][txload] = u(1,idx);
-	shm[2][tzload+8][tyload+16][txload] = u(2,idx);
+	shm0[tzload+8][tyload+16][txload] = u(0,idx);
+	shm1[tzload+8][tyload+16][txload] = u(1,idx);
+	shm2[tzload+8][tyload+16][txload] = u(2,idx);
       }
       idx += 4 * nij;
       if (loadk4) {
-	shm[0][tzload+12][tyload+16][txload] = u(0,idx);
-	shm[1][tzload+12][tyload+16][txload] = u(1,idx);
-	shm[2][tzload+12][tyload+16][txload] = u(2,idx);
+	shm0[tzload+12][tyload+16][txload] = u(0,idx);
+	shm1[tzload+12][tyload+16][txload] = u(1,idx);
+	shm2[tzload+12][tyload+16][txload] = u(2,idx);
       }
     }
     __syncthreads();
@@ -10824,23 +10826,23 @@ template <bool c_order, bool pred>
 	mux4 = mu_ip1 * strx_ip1 - tf * (mu_ijk * strx_i + mu_ip2 * strx_ip2);
 
 	r1 = strx_i * ((2 * mux1 + la_im1 * strx_im1 - tf * (la_ijk * strx_i   + la_im2 * strx_im2)) *
-		       (shm[0][tk+0][tj+0][ti-2] - shm[0][tk+0][tj+0][ti+0])+
+		       (shm0[tk+0][tj+0][ti-2] - shm0[tk+0][tj+0][ti+0])+
 		       (2 * mux2 + la_im2 * strx_im2 + la_ip1 * strx_ip1 +
 			3 * (la_ijk * strx_i   + la_im1 * strx_im1)) *
-		       (shm[0][tk+0][tj+0][ti-1] - shm[0][tk+0][tj+0][ti+0]) +
+		       (shm0[tk+0][tj+0][ti-1] - shm0[tk+0][tj+0][ti+0]) +
 		       (2 * mux3 + la_im1 * strx_im1 + la_ip2 * strx_ip2 +
 			3 * (la_ip1 * strx_ip1 + la_ijk * strx_i  )) *
-		       (shm[0][tk+0][tj+0][ti+1] - shm[0][tk+0][tj+0][ti+0]) +
+		       (shm0[tk+0][tj+0][ti+1] - shm0[tk+0][tj+0][ti+0]) +
 		       (2 * mux4 + la_ip1 * strx_ip1 - tf * (la_ijk * strx_i   + la_ip2 * strx_ip2)) *
-		       (shm[0][tk+0][tj+0][ti+2] - shm[0][tk+0][tj+0][ti+0]));
-	r2 = strx_i * (mux1 * (shm[1][tk+0][tj+0][ti-2] - shm[1][tk+0][tj+0][ti+0]) +
-		       mux2 * (shm[1][tk+0][tj+0][ti-1] - shm[1][tk+0][tj+0][ti+0]) +
-		       mux3 * (shm[1][tk+0][tj+0][ti+1] - shm[1][tk+0][tj+0][ti+0]) +
-		       mux4 * (shm[1][tk+0][tj+0][ti+2] - shm[1][tk+0][tj+0][ti+0]));
-	r3 = strx_i * (mux1 * (shm[2][tk+0][tj+0][ti-2] - shm[2][tk+0][tj+0][ti+0]) +
-		       mux2 * (shm[2][tk+0][tj+0][ti-1] - shm[2][tk+0][tj+0][ti+0]) +
-		       mux3 * (shm[2][tk+0][tj+0][ti+1] - shm[2][tk+0][tj+0][ti+0]) +
-		       mux4 * (shm[2][tk+0][tj+0][ti+2] - shm[2][tk+0][tj+0][ti+0]));
+		       (shm0[tk+0][tj+0][ti+2] - shm0[tk+0][tj+0][ti+0]));
+	r2 = strx_i * (mux1 * (shm1[tk+0][tj+0][ti-2] - shm1[tk+0][tj+0][ti+0]) +
+		       mux2 * (shm1[tk+0][tj+0][ti-1] - shm1[tk+0][tj+0][ti+0]) +
+		       mux3 * (shm1[tk+0][tj+0][ti+1] - shm1[tk+0][tj+0][ti+0]) +
+		       mux4 * (shm1[tk+0][tj+0][ti+2] - shm1[tk+0][tj+0][ti+0]));
+	r3 = strx_i * (mux1 * (shm2[tk+0][tj+0][ti-2] - shm2[tk+0][tj+0][ti+0]) +
+		       mux2 * (shm2[tk+0][tj+0][ti-1] - shm2[tk+0][tj+0][ti+0]) +
+		       mux3 * (shm2[tk+0][tj+0][ti+1] - shm2[tk+0][tj+0][ti+0]) +
+		       mux4 * (shm2[tk+0][tj+0][ti+2] - shm2[tk+0][tj+0][ti+0]));
       }
       // Y contribution
       {
@@ -10850,24 +10852,24 @@ template <bool c_order, bool pred>
 	muy3 = mu_jm1 * stry_jm1 + mu_jp2 * stry_jp2 + 3 * (mu_jp1 * stry_jp1 + mu_ijk * stry_j  );
 	muy4 = mu_jp1 * stry_jp1 - tf * (mu_ijk * stry_j + mu_jp2 * stry_jp2);
 
-	r1 += stry_j * (muy1 * (shm[0][tk+0][tj-2][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muy2 * (shm[0][tk+0][tj-1][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muy3 * (shm[0][tk+0][tj+1][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muy4 * (shm[0][tk+0][tj+2][ti+0] - shm[0][tk+0][tj+0][ti+0]));
+	r1 += stry_j * (muy1 * (shm0[tk+0][tj-2][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muy2 * (shm0[tk+0][tj-1][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muy3 * (shm0[tk+0][tj+1][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muy4 * (shm0[tk+0][tj+2][ti+0] - shm0[tk+0][tj+0][ti+0]));
 	r2 += stry_j * ((2 * muy1 + la_jm1 * stry_jm1 - tf * (la_ijk * stry_j + la_jm2 * stry_jm2)) *
-			(shm[1][tk+0][tj-2][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
+			(shm1[tk+0][tj-2][ti+0] - shm1[tk+0][tj+0][ti+0]) +
 			(2 * muy2 + la_jm2 * stry_jm2 + la_jp1 * stry_jp1 +
 			 3 * (la_ijk * stry_j   + la_jm1 * stry_jm1)) *
-			(shm[1][tk+0][tj-1][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
+			(shm1[tk+0][tj-1][ti+0] - shm1[tk+0][tj+0][ti+0]) +
 			(2 * muy3 + la_jm1 * stry_jm1 + la_jp2 * stry_jp2 +
 			 3 * (la_jp1 * stry_jp1 + la_ijk * stry_j  )) *
-			(shm[1][tk+0][tj+1][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
+			(shm1[tk+0][tj+1][ti+0] - shm1[tk+0][tj+0][ti+0]) +
 			(2 * muy4 + la_jp1 * stry_jp1 - tf * (la_ijk * stry_j  + la_jp2 * stry_jp2)) *
-			(shm[1][tk+0][tj+2][ti+0] - shm[1][tk+0][tj+0][ti+0]));
-	r3 += stry_j  *(muy1 * (shm[2][tk+0][tj-2][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
-			muy2 * (shm[2][tk+0][tj-1][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
-			muy3 * (shm[2][tk+0][tj+1][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
-			muy4 * (shm[2][tk+0][tj+2][ti+0] - shm[2][tk+0][tj+0][ti+0]));
+			(shm1[tk+0][tj+2][ti+0] - shm1[tk+0][tj+0][ti+0]));
+	r3 += stry_j  *(muy1 * (shm2[tk+0][tj-2][ti+0] - shm2[tk+0][tj+0][ti+0]) +
+			muy2 * (shm2[tk+0][tj-1][ti+0] - shm2[tk+0][tj+0][ti+0]) +
+			muy3 * (shm2[tk+0][tj+1][ti+0] - shm2[tk+0][tj+0][ti+0]) +
+			muy4 * (shm2[tk+0][tj+2][ti+0] - shm2[tk+0][tj+0][ti+0]));
       }
       // Z contribution
       {
@@ -10876,24 +10878,24 @@ template <bool c_order, bool pred>
 	muz2 = mu_km2 * strz_km2 + mu_kp1 * strz_kp1 + 3 * (mu_ijk * strz_k   + mu_km1 * strz_km1);
 	muz3 = mu_km1 * strz_km1 + mu_kp2 * strz_kp2 + 3 * (mu_kp1 * strz_kp1 + mu_ijk * strz_k);
 	muz4 = mu_kp1 * strz_kp1 - tf * (mu_ijk * strz_k + mu_kp2 * strz_kp2);
-	r1 += strz_k * (muz1 * (shm[0][tk-2][tj+0][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muz2 * (shm[0][tk-1][tj+0][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muz3 * (shm[0][tk+1][tj+0][ti+0] - shm[0][tk+0][tj+0][ti+0]) +
-			muz4 * (shm[0][tk+2][tj+0][ti+0] - shm[0][tk+0][tj+0][ti+0]));
-	r2 += strz_k * (muz1 * (shm[1][tk-2][tj+0][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
-			muz2 * (shm[1][tk-1][tj+0][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
-			muz3 * (shm[1][tk+1][tj+0][ti+0] - shm[1][tk+0][tj+0][ti+0]) +
-			muz4 * (shm[1][tk+2][tj+0][ti+0] - shm[1][tk+0][tj+0][ti+0]));
+	r1 += strz_k * (muz1 * (shm0[tk-2][tj+0][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muz2 * (shm0[tk-1][tj+0][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muz3 * (shm0[tk+1][tj+0][ti+0] - shm0[tk+0][tj+0][ti+0]) +
+			muz4 * (shm0[tk+2][tj+0][ti+0] - shm0[tk+0][tj+0][ti+0]));
+	r2 += strz_k * (muz1 * (shm1[tk-2][tj+0][ti+0] - shm1[tk+0][tj+0][ti+0]) +
+			muz2 * (shm1[tk-1][tj+0][ti+0] - shm1[tk+0][tj+0][ti+0]) +
+			muz3 * (shm1[tk+1][tj+0][ti+0] - shm1[tk+0][tj+0][ti+0]) +
+			muz4 * (shm1[tk+2][tj+0][ti+0] - shm1[tk+0][tj+0][ti+0]));
 	r3 += strz_k * ((2 * muz1 + la_km1 * strz_km1 - tf * (la_ijk * strz_k + la_km2 * strz_km2)) *
-			(shm[2][tk-2][tj+0][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
+			(shm2[tk-2][tj+0][ti+0] - shm2[tk+0][tj+0][ti+0]) +
 			(2 * muz2 + la_km2 * strz_km2 + la_kp1 * strz_kp1 +
 			 3 * (la_ijk * strz_k   + la_km1 * strz_km1)) *
-			(shm[2][tk-1][tj+0][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
+			(shm2[tk-1][tj+0][ti+0] - shm2[tk+0][tj+0][ti+0]) +
 			(2 * muz3 + la_km1 * strz_km1 + la_kp2 * strz_kp2 +
 			 3 * (la_kp1 * strz_kp1 + la_ijk * strz_k  )) *
-			(shm[2][tk+1][tj+0][ti+0] - shm[2][tk+0][tj+0][ti+0]) +
+			(shm2[tk+1][tj+0][ti+0] - shm2[tk+0][tj+0][ti+0]) +
 			(2 * muz4 + la_kp1 * strz_kp1 - tf * (la_ijk * strz_k + la_kp2 * strz_kp2)) *
-			(shm[2][tk+2][tj+0][ti+0] - shm[2][tk+0][tj+0][ti+0]));
+			(shm2[tk+2][tj+0][ti+0] - shm2[tk+0][tj+0][ti+0]));
       }
       r1 *= i6;
       r2 *= i6;
@@ -10903,135 +10905,135 @@ template <bool c_order, bool pred>
       /* Mixed derivatives: */
       /*   (la*v_y)_x */
       r1 += strx_i  * stry_j * i144 * 
-	(la_im2 * (shm[1][tk+0][tj-2][ti-2] - shm[1][tk+0][tj+2][ti-2] + 8 *
-		   (-shm[1][tk+0][tj-1][ti-2] + shm[1][tk+0][tj+1][ti-2])) - 8 *
-	 (la_im1 * (shm[1][tk+0][tj-2][ti-1] - shm[1][tk+0][tj+2][ti-1] + 8 *
-		   (-shm[1][tk+0][tj-1][ti-1] + shm[1][tk+0][tj+1][ti-1]))) + 8 *
-	 (la_ip1 * (shm[1][tk+0][tj-2][ti+1] - shm[1][tk+0][tj+2][ti+1] + 8 *
-		   (-shm[1][tk+0][tj-1][ti+1] + shm[1][tk+0][tj+1][ti+1]))) - 
-	 (la_ip2 * (shm[1][tk+0][tj-2][ti+2] - shm[1][tk+0][tj+2][ti+2] + 8 *
-		   (-shm[1][tk+0][tj-1][ti+2] + shm[1][tk+0][tj+1][ti+2]))))
+	(la_im2 * (shm1[tk+0][tj-2][ti-2] - shm1[tk+0][tj+2][ti-2] + 8 *
+		   (-shm1[tk+0][tj-1][ti-2] + shm1[tk+0][tj+1][ti-2])) - 8 *
+	 (la_im1 * (shm1[tk+0][tj-2][ti-1] - shm1[tk+0][tj+2][ti-1] + 8 *
+		   (-shm1[tk+0][tj-1][ti-1] + shm1[tk+0][tj+1][ti-1]))) + 8 *
+	 (la_ip1 * (shm1[tk+0][tj-2][ti+1] - shm1[tk+0][tj+2][ti+1] + 8 *
+		   (-shm1[tk+0][tj-1][ti+1] + shm1[tk+0][tj+1][ti+1]))) - 
+	 (la_ip2 * (shm1[tk+0][tj-2][ti+2] - shm1[tk+0][tj+2][ti+2] + 8 *
+		   (-shm1[tk+0][tj-1][ti+2] + shm1[tk+0][tj+1][ti+2]))))
 	/*   (la*w_z)_x */
         + strx_i * strz_k * i144 *
-	(la_im2 * (shm[2][tk-2][tj+0][ti-2] - shm[2][tk+2][tj+0][ti-2] + 8 *
-		   (-shm[2][tk-1][tj+0][ti-2] + shm[2][tk+1][tj+0][ti-2])) - 8 *
-	 (la_im1 * (shm[2][tk-2][tj+0][ti-1] - shm[2][tk+2][tj+0][ti-1] + 8 *
-		   (-shm[2][tk-1][tj+0][ti-1] + shm[2][tk+1][tj+0][ti-1]))) + 8 *
-	 (la_ip1 * (shm[2][tk-2][tj+0][ti+1] - shm[2][tk+2][tj+0][ti+1] + 8 *
-		   (-shm[2][tk-1][tj+0][ti+1] + shm[2][tk+1][tj+0][ti+1]))) - 
-	 (la_ip2 * (shm[2][tk-2][tj+0][ti+2] - shm[2][tk+2][tj+0][ti+2] + 8 *
-		   (-shm[2][tk-1][tj+0][ti+2] + shm[2][tk+1][tj+0][ti+2]))))
+	(la_im2 * (shm2[tk-2][tj+0][ti-2] - shm2[tk+2][tj+0][ti-2] + 8 *
+		   (-shm2[tk-1][tj+0][ti-2] + shm2[tk+1][tj+0][ti-2])) - 8 *
+	 (la_im1 * (shm2[tk-2][tj+0][ti-1] - shm2[tk+2][tj+0][ti-1] + 8 *
+		   (-shm2[tk-1][tj+0][ti-1] + shm2[tk+1][tj+0][ti-1]))) + 8 *
+	 (la_ip1 * (shm2[tk-2][tj+0][ti+1] - shm2[tk+2][tj+0][ti+1] + 8 *
+		   (-shm2[tk-1][tj+0][ti+1] + shm2[tk+1][tj+0][ti+1]))) - 
+	 (la_ip2 * (shm2[tk-2][tj+0][ti+2] - shm2[tk+2][tj+0][ti+2] + 8 *
+		   (-shm2[tk-1][tj+0][ti+2] + shm2[tk+1][tj+0][ti+2]))))
 	/*   (mu*v_x)_y */
         + strx_i * stry_j * i144 *
-	(mu_jm2 * (shm[1][tk+0][tj-2][ti-2] - shm[1][tk+0][tj-2][ti+2] + 8 *
-		   (-shm[1][tk+0][tj-2][ti-1] + shm[1][tk+0][tj-2][ti+1])) - 8 *
-	 (mu_jm1 * (shm[1][tk+0][tj-1][ti-2] - shm[1][tk+0][tj-1][ti+2] + 8 *
-		   (-shm[1][tk+0][tj-1][ti-1] + shm[1][tk+0][tj-1][ti+1]))) + 8 *
-	 (mu_jp1 * (shm[1][tk+0][tj+1][ti-2] - shm[1][tk+0][tj+1][ti+2] + 8 *
-		   (-shm[1][tk+0][tj+1][ti-1] + shm[1][tk+0][tj+1][ti+1]))) - 
-	 (mu_jp2 * (shm[1][tk+0][tj+2][ti-2] - shm[1][tk+0][tj+2][ti+2] + 8 *
-		   (-shm[1][tk+0][tj+2][ti-1] + shm[1][tk+0][tj+2][ti+1]))))
+	(mu_jm2 * (shm1[tk+0][tj-2][ti-2] - shm1[tk+0][tj-2][ti+2] + 8 *
+		   (-shm1[tk+0][tj-2][ti-1] + shm1[tk+0][tj-2][ti+1])) - 8 *
+	 (mu_jm1 * (shm1[tk+0][tj-1][ti-2] - shm1[tk+0][tj-1][ti+2] + 8 *
+		   (-shm1[tk+0][tj-1][ti-1] + shm1[tk+0][tj-1][ti+1]))) + 8 *
+	 (mu_jp1 * (shm1[tk+0][tj+1][ti-2] - shm1[tk+0][tj+1][ti+2] + 8 *
+		   (-shm1[tk+0][tj+1][ti-1] + shm1[tk+0][tj+1][ti+1]))) - 
+	 (mu_jp2 * (shm1[tk+0][tj+2][ti-2] - shm1[tk+0][tj+2][ti+2] + 8 *
+		   (-shm1[tk+0][tj+2][ti-1] + shm1[tk+0][tj+2][ti+1]))))
 	/*   (mu*w_x)_z */
         + strx_i * strz_k * i144 *
-	(mu_km2 * (shm[2][tk-2][tj+0][ti-2] - shm[2][tk-2][tj+0][ti+2] + 8 *
-		   (-shm[2][tk-2][tj+0][ti-1] + shm[2][tk-2][tj+0][ti+1])) - 8 *
- 	 (mu_km1 * (shm[2][tk-1][tj+0][ti-2] - shm[2][tk-1][tj+0][ti+2] + 8 *
-		   (-shm[2][tk-1][tj+0][ti-1] + shm[2][tk-1][tj+0][ti+1]))) + 8 *
- 	 (mu_kp1 * (shm[2][tk+1][tj+0][ti-2] - shm[2][tk+1][tj+0][ti+2] + 8 *
-		   (-shm[2][tk+1][tj+0][ti-1] + shm[2][tk+1][tj+0][ti+1]))) -
-	 (mu_kp2 * (shm[2][tk+2][tj+0][ti-2] - shm[2][tk+2][tj+0][ti+2] + 8 *
-		   (-shm[2][tk+2][tj+0][ti-1] + shm[2][tk+2][tj+0][ti+1]))));
+	(mu_km2 * (shm2[tk-2][tj+0][ti-2] - shm2[tk-2][tj+0][ti+2] + 8 *
+		   (-shm2[tk-2][tj+0][ti-1] + shm2[tk-2][tj+0][ti+1])) - 8 *
+ 	 (mu_km1 * (shm2[tk-1][tj+0][ti-2] - shm2[tk-1][tj+0][ti+2] + 8 *
+		   (-shm2[tk-1][tj+0][ti-1] + shm2[tk-1][tj+0][ti+1]))) + 8 *
+ 	 (mu_kp1 * (shm2[tk+1][tj+0][ti-2] - shm2[tk+1][tj+0][ti+2] + 8 *
+		   (-shm2[tk+1][tj+0][ti-1] + shm2[tk+1][tj+0][ti+1]))) -
+	 (mu_kp2 * (shm2[tk+2][tj+0][ti-2] - shm2[tk+2][tj+0][ti+2] + 8 *
+		   (-shm2[tk+2][tj+0][ti-1] + shm2[tk+2][tj+0][ti+1]))));
 
       /*   (mu*u_y)_x */
       r2 += strx_i  *stry_j  *i144*
-	(mu_im2 * (shm[0][tk+0][tj-2][ti-2] - shm[0][tk+0][tj+2][ti-2] + 8 *
-		   (-shm[0][tk+0][tj-1][ti-2] + shm[0][tk+0][tj+1][ti-2])) - 8 *
-	 (mu_im1 * (shm[0][tk+0][tj-2][ti-1] - shm[0][tk+0][tj+2][ti-1] + 8 *
-		   (-shm[0][tk+0][tj-1][ti-1] + shm[0][tk+0][tj+1][ti-1]))) + 8 *
-	 (mu_ip1 * (shm[0][tk+0][tj-2][ti+1] - shm[0][tk+0][tj+2][ti+1] + 8 *
-		   (-shm[0][tk+0][tj-1][ti+1] + shm[0][tk+0][tj+1][ti+1]))) -
-	 (mu_ip2 * (shm[0][tk+0][tj-2][ti+2] - shm[0][tk+0][tj+2][ti+2] + 8 *
-		   (-shm[0][tk+0][tj-1][ti+2] + shm[0][tk+0][tj+1][ti+2]))))
+	(mu_im2 * (shm0[tk+0][tj-2][ti-2] - shm0[tk+0][tj+2][ti-2] + 8 *
+		   (-shm0[tk+0][tj-1][ti-2] + shm0[tk+0][tj+1][ti-2])) - 8 *
+	 (mu_im1 * (shm0[tk+0][tj-2][ti-1] - shm0[tk+0][tj+2][ti-1] + 8 *
+		   (-shm0[tk+0][tj-1][ti-1] + shm0[tk+0][tj+1][ti-1]))) + 8 *
+	 (mu_ip1 * (shm0[tk+0][tj-2][ti+1] - shm0[tk+0][tj+2][ti+1] + 8 *
+		   (-shm0[tk+0][tj-1][ti+1] + shm0[tk+0][tj+1][ti+1]))) -
+	 (mu_ip2 * (shm0[tk+0][tj-2][ti+2] - shm0[tk+0][tj+2][ti+2] + 8 *
+		   (-shm0[tk+0][tj-1][ti+2] + shm0[tk+0][tj+1][ti+2]))))
 	/* (la*u_x)_y */
         + strx_i * stry_j * i144 *
-	(la_jm2 * (shm[0][tk+0][tj-2][ti-2] - shm[0][tk+0][tj-2][ti+2] + 8 *
-		   (-shm[0][tk+0][tj-2][ti-1] + shm[0][tk+0][tj-2][ti+1])) - 8 *
-	 (la_jm1 * (shm[0][tk+0][tj-1][ti-2] - shm[0][tk+0][tj-1][ti+2] + 8 *
-		   (-shm[0][tk+0][tj-1][ti-1] + shm[0][tk+0][tj-1][ti+1]))) + 8 *
-	 (la_jp1 * (shm[0][tk+0][tj+1][ti-2] - shm[0][tk+0][tj+1][ti+2] + 8 *
-		   (-shm[0][tk+0][tj+1][ti-1] + shm[0][tk+0][tj+1][ti+1]))) -
-	 (la_jp2 * (shm[0][tk+0][tj+2][ti-2] - shm[0][tk+0][tj+2][ti+2] + 8 *
-		   (-shm[0][tk+0][tj+2][ti-1] + shm[0][tk+0][tj+2][ti+1]))))
+	(la_jm2 * (shm0[tk+0][tj-2][ti-2] - shm0[tk+0][tj-2][ti+2] + 8 *
+		   (-shm0[tk+0][tj-2][ti-1] + shm0[tk+0][tj-2][ti+1])) - 8 *
+	 (la_jm1 * (shm0[tk+0][tj-1][ti-2] - shm0[tk+0][tj-1][ti+2] + 8 *
+		   (-shm0[tk+0][tj-1][ti-1] + shm0[tk+0][tj-1][ti+1]))) + 8 *
+	 (la_jp1 * (shm0[tk+0][tj+1][ti-2] - shm0[tk+0][tj+1][ti+2] + 8 *
+		   (-shm0[tk+0][tj+1][ti-1] + shm0[tk+0][tj+1][ti+1]))) -
+	 (la_jp2 * (shm0[tk+0][tj+2][ti-2] - shm0[tk+0][tj+2][ti+2] + 8 *
+		   (-shm0[tk+0][tj+2][ti-1] + shm0[tk+0][tj+2][ti+1]))))
 	/* (la*w_z)_y */
         + stry_j * strz_k * i144 *
-	(la_jm2 * (shm[2][tk-2][tj-2][ti+0] - shm[2][tk+2][tj-2][ti+0] + 8 *
-		   (-shm[2][tk-1][tj-2][ti+0] + shm[2][tk+1][tj-2][ti+0])) - 8 *
-	 (la_jm1 * (shm[2][tk-2][tj-1][ti+0] - shm[2][tk+2][tj-1][ti+0] + 8 *
-		   (-shm[2][tk-1][tj-1][ti+0] + shm[2][tk+1][tj-1][ti+0]))) + 8 *
-	 (la_jp1 * (shm[2][tk-2][tj+1][ti+0] - shm[2][tk+2][tj+1][ti+0] + 8 *
-		   (-shm[2][tk-1][tj+1][ti+0] + shm[2][tk+1][tj+1][ti+0]))) -
-	 (la_jp2 * (shm[2][tk-2][tj+2][ti+0] - shm[2][tk+2][tj+2][ti+0] + 8 *
-		   (-shm[2][tk-1][tj+2][ti+0] + shm[2][tk+1][tj+2][ti+0]))))
+	(la_jm2 * (shm2[tk-2][tj-2][ti+0] - shm2[tk+2][tj-2][ti+0] + 8 *
+		   (-shm2[tk-1][tj-2][ti+0] + shm2[tk+1][tj-2][ti+0])) - 8 *
+	 (la_jm1 * (shm2[tk-2][tj-1][ti+0] - shm2[tk+2][tj-1][ti+0] + 8 *
+		   (-shm2[tk-1][tj-1][ti+0] + shm2[tk+1][tj-1][ti+0]))) + 8 *
+	 (la_jp1 * (shm2[tk-2][tj+1][ti+0] - shm2[tk+2][tj+1][ti+0] + 8 *
+		   (-shm2[tk-1][tj+1][ti+0] + shm2[tk+1][tj+1][ti+0]))) -
+	 (la_jp2 * (shm2[tk-2][tj+2][ti+0] - shm2[tk+2][tj+2][ti+0] + 8 *
+		   (-shm2[tk-1][tj+2][ti+0] + shm2[tk+1][tj+2][ti+0]))))
 	/* (mu*w_y)_z */
         + stry_j * strz_k * i144 *
-	(mu_km2 * (shm[2][tk-2][tj-2][ti+0] - shm[2][tk-2][tj+2][ti+0] + 8 *
-		   (-shm[2][tk-2][tj-1][ti+0] + shm[2][tk-2][tj+1][ti+0])) - 8 *
-	 (mu_km1 * (shm[2][tk-1][tj-2][ti+0] - shm[2][tk-1][tj+2][ti+0] + 8 *
-		   (-shm[2][tk-1][tj-1][ti+0] + shm[2][tk-1][tj+1][ti+0]))) + 8 *
-	 (mu_kp1 * (shm[2][tk+1][tj-2][ti+0] - shm[2][tk+1][tj+2][ti+0] + 8 *
-		   (-shm[2][tk+1][tj-1][ti+0] + shm[2][tk+1][tj+1][ti+0]))) -
-	 (mu_kp2 * (shm[2][tk+2][tj-2][ti+0] - shm[2][tk+2][tj+2][ti+0] + 8 *
-		   (-shm[2][tk+2][tj-1][ti+0] + shm[2][tk+2][tj+1][ti+0]))));
+	(mu_km2 * (shm2[tk-2][tj-2][ti+0] - shm2[tk-2][tj+2][ti+0] + 8 *
+		   (-shm2[tk-2][tj-1][ti+0] + shm2[tk-2][tj+1][ti+0])) - 8 *
+	 (mu_km1 * (shm2[tk-1][tj-2][ti+0] - shm2[tk-1][tj+2][ti+0] + 8 *
+		   (-shm2[tk-1][tj-1][ti+0] + shm2[tk-1][tj+1][ti+0]))) + 8 *
+	 (mu_kp1 * (shm2[tk+1][tj-2][ti+0] - shm2[tk+1][tj+2][ti+0] + 8 *
+		   (-shm2[tk+1][tj-1][ti+0] + shm2[tk+1][tj+1][ti+0]))) -
+	 (mu_kp2 * (shm2[tk+2][tj-2][ti+0] - shm2[tk+2][tj+2][ti+0] + 8 *
+		   (-shm2[tk+2][tj-1][ti+0] + shm2[tk+2][tj+1][ti+0]))));
 
       /*  (mu*u_z)_x */
       r3 += strx_i * strz_k * i144 *
-	(mu_im2 * (shm[0][tk-2][tj+0][ti-2] - shm[0][tk+2][tj+0][ti-2] + 8 *
-		   (-shm[0][tk-1][tj+0][ti-2] + shm[0][tk+1][tj+0][ti-2])) - 8 *
-	 (mu_im1 * (shm[0][tk-2][tj+0][ti-1] - shm[0][tk+2][tj+0][ti-1] + 8 *
-		   (-shm[0][tk-1][tj+0][ti-1] + shm[0][tk+1][tj+0][ti-1]))) + 8 *
-	 (mu_ip1 * (shm[0][tk-2][tj+0][ti+1] - shm[0][tk+2][tj+0][ti+1] + 8 *
-		   (-shm[0][tk-1][tj+0][ti+1] + shm[0][tk+1][tj+0][ti+1]))) -
-	 (mu_ip2 * (shm[0][tk-2][tj+0][ti+2] - shm[0][tk+2][tj+0][ti+2] + 8 *
-		   (-shm[0][tk-1][tj+0][ti+2] + shm[0][tk+1][tj+0][ti+2]))))
+	(mu_im2 * (shm0[tk-2][tj+0][ti-2] - shm0[tk+2][tj+0][ti-2] + 8 *
+		   (-shm0[tk-1][tj+0][ti-2] + shm0[tk+1][tj+0][ti-2])) - 8 *
+	 (mu_im1 * (shm0[tk-2][tj+0][ti-1] - shm0[tk+2][tj+0][ti-1] + 8 *
+		   (-shm0[tk-1][tj+0][ti-1] + shm0[tk+1][tj+0][ti-1]))) + 8 *
+	 (mu_ip1 * (shm0[tk-2][tj+0][ti+1] - shm0[tk+2][tj+0][ti+1] + 8 *
+		   (-shm0[tk-1][tj+0][ti+1] + shm0[tk+1][tj+0][ti+1]))) -
+	 (mu_ip2 * (shm0[tk-2][tj+0][ti+2] - shm0[tk+2][tj+0][ti+2] + 8 *
+		   (-shm0[tk-1][tj+0][ti+2] + shm0[tk+1][tj+0][ti+2]))))
 	/* (mu*v_z)_y */
         + stry_j  *strz_k*i144*
-	(mu_jm2 * (shm[1][tk-2][tj-2][ti+0] - shm[1][tk+2][tj-2][ti+0] + 8 *
-		   (- shm[1][tk-1][tj-2][ti+0]+shm[1][tk+1][tj-2][ti+0])) - 8 * 
-	 (mu_jm1 * (shm[1][tk-2][tj-1][ti+0] - shm[1][tk+2][tj-1][ti+0] + 8 *
-		   (- shm[1][tk-1][tj-1][ti+0]+shm[1][tk+1][tj-1][ti+0]))) + 8 * 
-	 (mu_jp1 * (shm[1][tk-2][tj+1][ti+0] - shm[1][tk+2][tj+1][ti+0] + 8 *
-		   (- shm[1][tk-1][tj+1][ti+0]+shm[1][tk+1][tj+1][ti+0]))) -
-	 (mu_jp2 * (shm[1][tk-2][tj+2][ti+0] - shm[1][tk+2][tj+2][ti+0] + 8 *
-		   (- shm[1][tk-1][tj+2][ti+0]+shm[1][tk+1][tj+2][ti+0]))))
+	(mu_jm2 * (shm1[tk-2][tj-2][ti+0] - shm1[tk+2][tj-2][ti+0] + 8 *
+		   (- shm1[tk-1][tj-2][ti+0]+shm1[tk+1][tj-2][ti+0])) - 8 * 
+	 (mu_jm1 * (shm1[tk-2][tj-1][ti+0] - shm1[tk+2][tj-1][ti+0] + 8 *
+		   (- shm1[tk-1][tj-1][ti+0]+shm1[tk+1][tj-1][ti+0]))) + 8 * 
+	 (mu_jp1 * (shm1[tk-2][tj+1][ti+0] - shm1[tk+2][tj+1][ti+0] + 8 *
+		   (- shm1[tk-1][tj+1][ti+0]+shm1[tk+1][tj+1][ti+0]))) -
+	 (mu_jp2 * (shm1[tk-2][tj+2][ti+0] - shm1[tk+2][tj+2][ti+0] + 8 *
+		   (- shm1[tk-1][tj+2][ti+0]+shm1[tk+1][tj+2][ti+0]))))
 	/*   (la*u_x)_z */
         + strx_i  *strz_k*i144*
-	(la_km2*(shm[0][tk-2][tj+0][ti-2] - shm[0][tk-2][tj+0][ti+2] + 8 *
-		   (- shm[0][tk-2][tj+0][ti-1]+shm[0][tk-2][tj+0][ti+1])) - 8*
-	 (la_km1*(shm[0][tk-1][tj+0][ti-2] - shm[0][tk-1][tj+0][ti+2] + 8 *
-		   (- shm[0][tk-1][tj+0][ti-1]+shm[0][tk-1][tj+0][ti+1]))) + 8*
-	 (la_kp1*(shm[0][tk+1][tj+0][ti-2] - shm[0][tk+1][tj+0][ti+2] + 8 *
-		   (- shm[0][tk+1][tj+0][ti-1]+shm[0][tk+1][tj+0][ti+1]))) -
-	 (la_kp2*(shm[0][tk+2][tj+0][ti-2] - shm[0][tk+2][tj+0][ti+2] + 8 *
-		   (- shm[0][tk+2][tj+0][ti-1]+shm[0][tk+2][tj+0][ti+1]))))
+	(la_km2*(shm0[tk-2][tj+0][ti-2] - shm0[tk-2][tj+0][ti+2] + 8 *
+		   (- shm0[tk-2][tj+0][ti-1]+shm0[tk-2][tj+0][ti+1])) - 8*
+	 (la_km1*(shm0[tk-1][tj+0][ti-2] - shm0[tk-1][tj+0][ti+2] + 8 *
+		   (- shm0[tk-1][tj+0][ti-1]+shm0[tk-1][tj+0][ti+1]))) + 8*
+	 (la_kp1*(shm0[tk+1][tj+0][ti-2] - shm0[tk+1][tj+0][ti+2] + 8 *
+		   (- shm0[tk+1][tj+0][ti-1]+shm0[tk+1][tj+0][ti+1]))) -
+	 (la_kp2*(shm0[tk+2][tj+0][ti-2] - shm0[tk+2][tj+0][ti+2] + 8 *
+		   (- shm0[tk+2][tj+0][ti-1]+shm0[tk+2][tj+0][ti+1]))))
 	/* (la*v_y)_z */
         + stry_j  *strz_k*i144*
-	(la_km2*(shm[1][tk-2][tj-2][ti+0] - shm[1][tk-2][tj+2][ti+0] + 8 *
-		   (- shm[1][tk-2][tj-1][ti+0]+shm[1][tk-2][tj+1][ti+0])) - 8*
-	 (la_km1*(shm[1][tk-1][tj-2][ti+0] - shm[1][tk-1][tj+2][ti+0] + 8 *
-		   (- shm[1][tk-1][tj-1][ti+0]+shm[1][tk-1][tj+1][ti+0]))) + 8*
-	 (la_kp1*(shm[1][tk+1][tj-2][ti+0] - shm[1][tk+1][tj+2][ti+0] + 8 *
-		   (- shm[1][tk+1][tj-1][ti+0]+shm[1][tk+1][tj+1][ti+0]))) -
-	 (la_kp2*(shm[1][tk+2][tj-2][ti+0] - shm[1][tk+2][tj+2][ti+0] + 8 *
-		   (- shm[1][tk+2][tj-1][ti+0]+shm[1][tk+2][tj+1][ti+0]))));
+	(la_km2*(shm1[tk-2][tj-2][ti+0] - shm1[tk-2][tj+2][ti+0] + 8 *
+		   (- shm1[tk-2][tj-1][ti+0]+shm1[tk-2][tj+1][ti+0])) - 8*
+	 (la_km1*(shm1[tk-1][tj-2][ti+0] - shm1[tk-1][tj+2][ti+0] + 8 *
+		   (- shm1[tk-1][tj-1][ti+0]+shm1[tk-1][tj+1][ti+0]))) + 8*
+	 (la_kp1*(shm1[tk+1][tj-2][ti+0] - shm1[tk+1][tj+2][ti+0] + 8 *
+		   (- shm1[tk+1][tj-1][ti+0]+shm1[tk+1][tj+1][ti+0]))) -
+	 (la_kp2*(shm1[tk+2][tj-2][ti+0] - shm1[tk+2][tj+2][ti+0] + 8 *
+		   (- shm1[tk+2][tj-1][ti+0]+shm1[tk+2][tj+1][ti+0]))));
 
       // Use the result at point (i,j,k)
       if (pred) {
 	// Apply predictor
 	int idx = k * nij + j * ni + i;
 	float_sw4 fact = dt*dt / a_rho[idx];
-	up(0,idx) = 2 * shm[0][tk][tj][ti] - um(0,idx) + fact * (cof * r1 + fo(0,idx));
-	up(1,idx) = 2 * shm[1][tk][tj][ti] - um(1,idx) + fact * (cof * r2 + fo(1,idx));
-	up(2,idx) = 2 * shm[2][tk][tj][ti] - um(2,idx) + fact * (cof * r3 + fo(2,idx));
+	up(0,idx) = 2 * shm0[tk][tj][ti] - um(0,idx) + fact * (cof * r1 + fo(0,idx));
+	up(1,idx) = 2 * shm1[tk][tj][ti] - um(1,idx) + fact * (cof * r2 + fo(1,idx));
+	up(2,idx) = 2 * shm2[tk][tj][ti] - um(2,idx) + fact * (cof * r3 + fo(2,idx));
       }
       else {
 	// Apply 4th order correction
