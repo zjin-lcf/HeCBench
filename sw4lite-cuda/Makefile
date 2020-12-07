@@ -81,13 +81,14 @@ sw4lite: $(FOBJ)
 	@echo "EXTRA_LINK_FLAGS"= $(EXTRA_LINK_FLAGS)
 	@echo "******************************************************"
 	cd $(builddir); $(NVCC) -L$(MPILIB) $(OMPOPT) -Xlinker "-rpath=$(MPILIB)" -arch=$(gpuarch) -ccbin $(HOSTCOMP) -o $@ $(OBJ) -lcudart  $(linklibs)
-	@cat wave.txt
 	@echo "*** Build directory: " $(builddir) " ***"
 
 $(builddir)/%.o:src/%.C
 	/bin/mkdir -p $(builddir)
 	cd $(builddir); $(CXX) $(CXXFLAGS) -c ../$<
 
+run: sw4lite
+	mpirun -np 1 $(optdir)/sw4lite ./tests/pointsource/pointsource.in
 
 clean:
 	/bin/mkdir -p $(optdir)
