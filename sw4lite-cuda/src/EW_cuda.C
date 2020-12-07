@@ -509,7 +509,7 @@ void EW::find_cuda_device()
 	    ",  Memory (GB) " << (prop.totalGlobalMem  >> 30) << endl;
       }
    }
-   //Added following line for all ranks 
+   /*Added following line for all ranks 
    retcode = cudaGetDeviceProperties(&prop, 0 );
 
    // Check block size
@@ -522,6 +522,8 @@ void EW::find_cuda_device()
    CHECK_INPUT( m_gpu_blocksize[0]*m_gpu_blocksize[1]*m_gpu_blocksize[2] <= prop.maxThreadsPerBlock, 
    "Error: max number of threads per block " << prop.maxThreadsPerBlock <<
 		" is exceeded \n");
+		*/
+
    // Determine grid dimensions.
    int ghost = m_ghost_points;
    int ni=m_iEnd[0]-m_iStart[0]+1-2*ghost;
