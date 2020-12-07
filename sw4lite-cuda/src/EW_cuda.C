@@ -35,13 +35,6 @@
 
 #include "device-routines.h"
 
-#define CHECK_ERROR(str) \
-cudaError err = cudaGetLastError(); \
-if ( cudaSuccess != err ) { \
-  cerr << "Error in " << str << " : " << cudaGetErrorString( err ) << __FILE__ << __LINE__ << endl; \
-  exit(0); }
-
-
   
 //-----------------------------------------------------------------------
 void EW::evalRHSCU(vector<Sarray> & a_U, vector<Sarray>& a_Mu, vector<Sarray>& a_Lambda,
@@ -88,7 +81,6 @@ void EW::evalRHSCU(vector<Sarray> & a_U, vector<Sarray>& a_Mu, vector<Sarray>& a
 	   a_Lambda[g].dev_ptr(), mGridSize[g],
 	   dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g], m_ghost_points );
       }
-      CHECK_ERROR("rhs4center_dev")
    }
 // Boundary operator at upper boundary
    blocksize.z = 1;
@@ -111,7 +103,6 @@ void EW::evalRHSCU(vector<Sarray> & a_U, vector<Sarray>& a_Mu, vector<Sarray>& a
 	      a_Lambda[g].dev_ptr(), mGridSize[g],
 	      dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g], m_ghost_points );
       }
-      CHECK_ERROR("evalRHSCU_upper")
    }
 
    if( m_topography_exists )
@@ -142,7 +133,6 @@ void EW::evalRHSCU(vector<Sarray> & a_U, vector<Sarray>& a_Mu, vector<Sarray>& a
 	          m_kEnd[g], a_U[g].dev_ptr(), a_Mu[g].dev_ptr(), a_Lambda[g].dev_ptr(),
 	          mMetric.dev_ptr(), mJ.dev_ptr(), a_Uacc[g].dev_ptr(), 
 	          dev_sg_str_x[g], dev_sg_str_y[g], m_ghost_points );
-        CHECK_ERROR("rhs4sgcurvupper")
       }
       gridsize.z  = m_gpu_gridsize[2];
       blocksize.z = m_gpu_blocksize[2];
@@ -168,7 +158,6 @@ void EW::evalRHSCU(vector<Sarray> & a_U, vector<Sarray>& a_Mu, vector<Sarray>& a
 	        m_kEnd[g], a_U[g].dev_ptr(), a_Mu[g].dev_ptr(), a_Lambda[g].dev_ptr(),
 	        mMetric.dev_ptr(), mJ.dev_ptr(), a_Uacc[g].dev_ptr(), 
 	        onesided4, dev_sg_str_x[g], dev_sg_str_y[g], m_ghost_points );
-      CHECK_ERROR("rhs4sgcurv")
    }
 }
 
@@ -196,7 +185,6 @@ void EW::evalPredictorCU( vector<Sarray> & a_Up, vector<Sarray> & a_U, vector<Sa
 								   m_kStart[g], m_kEnd[g], a_Up[g].dev_ptr(), a_U[g].dev_ptr(),
 								   a_Um[g].dev_ptr(), a_Lu[g].dev_ptr(), a_F[g].dev_ptr(),
 								   a_Rho[g].dev_ptr(), dt2, m_ghost_points );
-      CHECK_ERROR("evalPredictorCU")
    }
 }
 
@@ -224,7 +212,6 @@ void EW::evalCorrectorCU( vector<Sarray> & a_Up, vector<Sarray>& a_Rho,
 								m_kStart[g], m_kEnd[g], a_Up[g].dev_ptr(), a_Lu[g].dev_ptr(),
 								a_F[g].dev_ptr(), a_Rho[g].dev_ptr(), dt4,
 								m_ghost_points );
-      CHECK_ERROR("evalCorrectorCU")
    }
 }
 
@@ -246,7 +233,6 @@ void EW::evalDpDmInTimeCU(vector<Sarray> & a_Up, vector<Sarray> & a_U, vector<Sa
 								 m_kStart[g], m_kEnd[g], a_Up[g].dev_ptr(), a_U[g].dev_ptr(),
 								 a_Um[g].dev_ptr(), a_Uacc[g].dev_ptr(), dt2i,
 								 m_ghost_points );
-      CHECK_ERROR("evalDpDmInTimeCU")
    }
 }
 
@@ -283,7 +269,6 @@ void EW::addSuperGridDampingCU(vector<Sarray> & a_Up, vector<Sarray> & a_U,
              dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
              dev_sg_corner_x[g], dev_sg_corner_y[g], dev_sg_corner_z[g],
              m_supergrid_damping_coefficient, m_ghost_points );
-           CHECK_ERROR("addsgd4_dev_rev");
          }
 	 else
          {
@@ -303,7 +288,6 @@ void EW::addSuperGridDampingCU(vector<Sarray> & a_Up, vector<Sarray> & a_U,
              dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
              dev_sg_corner_x[g], dev_sg_corner_y[g], dev_sg_corner_z[g],
              m_supergrid_damping_coefficient, m_ghost_points );
-           CHECK_ERROR("addsgd4_dev_rev");
           }
       }
       else if(  m_sg_damping_order == 6 )
@@ -324,7 +308,6 @@ void EW::addSuperGridDampingCU(vector<Sarray> & a_Up, vector<Sarray> & a_U,
 								      dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
 								      dev_sg_corner_x[g], dev_sg_corner_y[g], dev_sg_corner_z[g],
 								      m_supergrid_damping_coefficient, m_ghost_points );
-	 CHECK_ERROR("addsgd6_dev")
       }
    }
 
@@ -620,8 +603,6 @@ bool EW::check_for_nan_GPU( vector<Sarray>& a_U, int verbose, string name )
       check_nan_dev<<<gridsize,blocksize>>>( m_iStart[g], m_iEnd[g], m_jStart[g], m_jEnd[g],
 					     m_kStart[g], m_kEnd[g], a_U[g].dev_ptr(), retval_dev, idx_dev );
 
-      CHECK_ERROR("check_for_nan_GPU")
-
       cudaMemcpy( &retval_host, retval_dev, sizeof(int), cudaMemcpyDeviceToHost );
 
       if ( retval_host != 0) 
@@ -661,7 +642,6 @@ void EW::ForceCU( float_sw4 t, Sarray* dev_F, bool tt, int st )
    blocksize.z = 1;
    forcing_dev<<<gridsize,blocksize,0,m_cuobj->m_stream[st]>>>( t, dev_F, mNumberOfGrids, dev_point_sources, m_point_sources.size(),
 					dev_identsources, m_identsources.size(), tt );
-   CHECK_ERROR("ForceCU")
 }
 
 //-----------------------------------------------------------------------
@@ -675,7 +655,6 @@ void EW::init_point_sourcesCU( )
    blocksize.y = 1;
    blocksize.z = 1;
    init_forcing_dev<<<gridsize,blocksize>>>( dev_point_sources, m_point_sources.size() );
-   CHECK_ERROR("InitPointSourcesCU")
 }
 
 void EW::cartesian_bc_forcingCU( float_sw4 t, vector<float_sw4**> & a_BCForcing,
@@ -829,7 +808,6 @@ void EW::RHSPredCU_center(vector<Sarray> & a_Up, vector<Sarray> & a_U, vector<Sa
                      dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                      mGridSize[g], mDt, m_corder, m_cuobj->m_stream[st]);
 
-      CHECK_ERROR("RHS4_Predictor_rest")
     }  
 }  
 
@@ -887,7 +865,6 @@ void EW::RHSPredCU_boundary(vector<Sarray> & a_Up, vector<Sarray> & a_U, vector<
                             dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                             mGridSize[g], mDt, m_corder, m_cuobj->m_stream[st]);
 
-      CHECK_ERROR("RHS4_Predictor_boundary")
     }  
 }  
 //---------------------------------------------------------------------------
@@ -921,7 +898,6 @@ void EW::RHSCorrCU_center(vector<Sarray> & a_Up, vector<Sarray> & a_U,
                      a_Mu[g].dev_ptr(), a_Lambda[g].dev_ptr(), a_Rho[g].dev_ptr(), a_F[g].dev_ptr(),
                      dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                      mGridSize[g], mDt, m_corder, m_cuobj->m_stream[st]);
-      CHECK_ERROR("RHS4_Corrector_boundary")
     }  
 }  
 
@@ -975,7 +951,6 @@ void EW::RHSCorrCU_boundary(vector<Sarray> & a_Up, vector<Sarray> & a_U,
                             dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                             mGridSize[g], mDt, m_corder, m_cuobj->m_stream[st]);
 
-      CHECK_ERROR("RHS4_Corrector_boundary")
     }  
 }  
 
@@ -1025,7 +1000,6 @@ void EW::addSuperGridDampingCU_upper_boundary(vector<Sarray> & a_Up, vector<Sarr
                          dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                          dev_sg_corner_x[g], dev_sg_corner_y[g], dev_sg_corner_z[g],
                          m_supergrid_damping_coefficient, m_corder, m_cuobj->m_stream[st]);
-         CHECK_ERROR("addsgd4_gpu");
        }
    }
 }
@@ -1055,7 +1029,6 @@ void EW::addSuperGridDampingCU_center(vector<Sarray> & a_Up, vector<Sarray> & a_
                       dev_sg_str_x[g], dev_sg_str_y[g], dev_sg_str_z[g],
                       dev_sg_corner_x[g], dev_sg_corner_y[g], dev_sg_corner_z[g],
                       m_supergrid_damping_coefficient, m_corder, m_cuobj->m_stream[st]);
-         CHECK_ERROR("addsgd4_dev");
       }
    }
 }
