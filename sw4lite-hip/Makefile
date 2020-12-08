@@ -3,7 +3,9 @@ CC = hipcc
 # Specify the path to MPI
 MPIPATH = /usr/lib/x86_64-linux-gnu/openmpi/
 
-EXTRA_LINK_FLAGS = -fgpu-rdc --hip-link -lmpi 
+# Assume Lapack is on the system path
+EXTRA_LINK_FLAGS = -fgpu-rdc --hip-link -lmpi -llapack
+
 MPIINC = $(MPIPATH)/include
 debugdir := debug_hip
 optdir   := optimize_hip
