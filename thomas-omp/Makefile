@@ -50,14 +50,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ThomasMatrix.hpp  utils.hpp Makefile
+%.o: %.cpp ThomasMatrix.hpp  utils.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1024 2560 64
+	./$(program) 1024 16384 64
