@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cuda.h>
 #include "ThomasMatrix.hpp"
 #include "utils.hpp"
 #include "cuThomasBatch.h"
@@ -10,8 +11,7 @@ void solve_seq(const double* l, const double* d, double* u, double* rhs, const i
   for (int j = 0; j < N; ++j)
   {
     first = j*n;
-    last = first + n;
-    last--; 
+    last = first + n - 1;
 
     u[first] /= d[first];
     rhs[first] /= d[first];
@@ -37,59 +37,59 @@ int main(int argc, char const *argv[])
     return -1;
   }
 
-  int M = std::stoi(argv[1]); // c++11
-  int N = std::stoi(argv[2]);
-  int BlockSize  = std::stoi(argv[3]);  // GPU thread block size
+  const int M = std::stoi(argv[1]); // c++11
+  const int N = std::stoi(argv[2]);
+  const int BlockSize  = std::stoi(argv[3]);  // GPU thread block size
+
+  const int matrix_byte_size = M * N * sizeof(double);
 
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
-  double* u_seq = (double*) malloc(N*params.M*sizeof(double));
-  double* u_Thomas_host =  (double*) malloc(N*params.M*sizeof(double));
-  double* u_input = (double*) malloc(N*params.M*sizeof(double));
+  double* u_seq = (double*) malloc(matrix_byte_size);
+  double* u_Thomas_host =  (double*) malloc(matrix_byte_size);
+  double* u_input = (double*) malloc(matrix_byte_size);
 
-  double* d_seq = (double*) malloc(N*params.M*sizeof(double));
-  double* d_Thomas_host =  (double*) malloc(N*params.M*sizeof(double));
-  double* d_input = (double*) malloc(N*params.M*sizeof(double));
+  double* d_seq = (double*) malloc(matrix_byte_size);
+  double* d_Thomas_host =  (double*) malloc(matrix_byte_size);
+  double* d_input = (double*) malloc(matrix_byte_size);
 
-  double* l_seq = (double*) malloc(N*params.M*sizeof(double));
-  double* l_Thomas_host =  (double*) malloc(N*params.M*sizeof(double));
-  double* l_input = (double*) malloc(N*params.M*sizeof(double));
+  double* l_seq = (double*) malloc(matrix_byte_size);
+  double* l_Thomas_host =  (double*) malloc(matrix_byte_size);
+  double* l_input = (double*) malloc(matrix_byte_size);
 
-  double* rhs_seq = (double*) malloc(N*params.M*sizeof(double));
-  double* rhs_Thomas_host = (double*) malloc(N*params.M*sizeof(double));
-  double* rhs_input = (double*) malloc(N*params.M*sizeof(double));
+  double* rhs_seq = (double*) malloc(matrix_byte_size);
+  double* rhs_Thomas_host = (double*) malloc(matrix_byte_size);
+  double* rhs_input = (double*) malloc(matrix_byte_size);
 
-  double* rhs_seq_output = (double*) malloc(N*params.M*sizeof(double));
-  double* rhs_Thomas_output=(double*) malloc(N*params.M*sizeof(double));
-  double* rhs_seq_interleave = (double*) malloc(N*params.M*sizeof(double));
+  double* rhs_seq_output = (double*) malloc(matrix_byte_size);
+  double* rhs_seq_interleave = (double*) malloc(matrix_byte_size);
 
   for (int i = 0; i < N; ++i)
   {
-    for (int j = 0; j < params.M; ++j)
+    for (int j = 0; j < M; ++j)
     {
-      u_seq[(i * params.M) + j] = params.a[j];
-      u_input[(i * params.M) + j] = params.a[j];
+      u_seq[(i * M) + j] = params.a[j];
+      u_input[(i * M) + j] = params.a[j];
 
-      d_seq[(i * params.M) + j] = params.d[j];
-      d_input[(i * params.M) + j] = params.d[j];
+      d_seq[(i * M) + j] = params.d[j];
+      d_input[(i * M) + j] = params.d[j];
 
-      l_seq[(i * params.M) + j] = params.b[j];
-      l_input[(i * params.M) + j] = params.b[j];
+      l_seq[(i * M) + j] = params.b[j];
+      l_input[(i * M) + j] = params.b[j];
 
-      rhs_seq[(i * params.M) + j] = params.rhs[j];
-      rhs_input[(i * params.M) + j] = params.rhs[j];
+      rhs_seq[(i * M) + j] = params.rhs[j];
+      rhs_input[(i * M) + j] = params.rhs[j];
 
     }
   }
 
-
   // Sequantial CPU Execution for correct error check
-  double init = time_wtime();
-  solve_seq( l_seq, d_seq, u_seq, rhs_seq, params.M, N );
-  printf("        CPU SEQ Time(s) %e\n", time_wtime()-init);
+  for (int n = 0; n < 100; n++) {
+    solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
+  }
 
-  for (int i = 0; i < params.M*N; ++i) {
+  for (int i = 0; i < M*N; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
     //printf("%f\n", rhs_seq[i]);
   }
@@ -97,34 +97,34 @@ int main(int argc, char const *argv[])
   // initialize again because u_seq and rhs_seq are modified by solve_seq
   for (int i = 0; i < N; ++i)
   {
-    for (int j = 0; j < params.M; ++j)
+    for (int j = 0; j < M; ++j)
     {
-      u_seq[(i * params.M) + j] = params.a[j];
-      u_input[(i * params.M) + j] = params.a[j];
+      u_seq[(i * M) + j] = params.a[j];
+      u_input[(i * M) + j] = params.a[j];
 
-      d_seq[(i * params.M) + j] = params.d[j];
-      d_input[(i * params.M) + j] = params.d[j];
+      d_seq[(i * M) + j] = params.d[j];
+      d_input[(i * M) + j] = params.d[j];
 
-      l_seq[(i * params.M) + j] = params.b[j];
-      l_input[(i * params.M) + j] = params.b[j];
+      l_seq[(i * M) + j] = params.b[j];
+      l_input[(i * M) + j] = params.b[j];
 
-      rhs_seq[(i * params.M) + j] = params.rhs[j];
-      rhs_input[(i * params.M) + j] = params.rhs[j];
+      rhs_seq[(i * M) + j] = params.rhs[j];
+      rhs_input[(i * M) + j] = params.rhs[j];
 
     }
   }
 
 
   // transpose the inputs for sequential accesses on a GPU 
-  for (int i = 0; i < params.M; ++i)
+  for (int i = 0; i < M; ++i)
   {
     for (int j = 0; j < N; ++j)
     {
-      u_Thomas_host[i*N+j] = u_input[j*params.M+i];
-      l_Thomas_host[i*N+j] = l_input[j*params.M+i];
-      d_Thomas_host[i*N+j] = d_input[j*params.M+i];
-      rhs_Thomas_host[i*N+j] = rhs_input[j*params.M+i];
-      rhs_seq_interleave[i*N+j] = rhs_seq_output[j*params.M+i];
+      u_Thomas_host[i*N+j] = u_input[j*M+i];
+      l_Thomas_host[i*N+j] = l_input[j*M+i];
+      d_Thomas_host[i*N+j] = d_input[j*M+i];
+      rhs_Thomas_host[i*N+j] = rhs_input[j*M+i];
+      rhs_seq_interleave[i*N+j] = rhs_seq_output[j*M+i];
 
     }
   }
@@ -137,25 +137,23 @@ int main(int argc, char const *argv[])
   double *l_device;
   double *rhs_device;
 
-  cudaMalloc((void**)&u_device ,N*params.M*sizeof(double));
-  cudaMalloc((void**)&d_device ,N*params.M*sizeof(double));
-  cudaMalloc((void**)&l_device ,N*params.M*sizeof(double));
-  cudaMalloc((void**)&rhs_device ,N*params.M*sizeof(double));
+  cudaMalloc((void**)&u_device, matrix_byte_size);
+  cudaMalloc((void**)&l_device, matrix_byte_size);
+  cudaMalloc((void**)&d_device, matrix_byte_size);
+  cudaMalloc((void**)&rhs_device, matrix_byte_size);
 
-  init = time_wtime();
+  cudaMemcpyAsync(u_device, u_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(l_device, l_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(d_device, d_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(rhs_device, rhs_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice,  0);
   for (int n = 0; n < 100; n++) {
-    cudaMemcpyAsync(u_device,u_Thomas_host,N*params.M*sizeof(double),cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(l_device,l_Thomas_host,N*params.M*sizeof(double),cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(d_device,d_Thomas_host,N*params.M*sizeof(double),cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(rhs_device,rhs_Thomas_host,N*params.M*sizeof(double),cudaMemcpyHostToDevice, 0);
-    cuThomasBatch<<<(N/BlockSize)+1, BlockSize>>> (l_device, d_device, u_device, rhs_device, params.M, N);
-    cudaMemcpyAsync(rhs_Thomas_output,rhs_device,N*params.M*sizeof(double),cudaMemcpyDeviceToHost, 0);
+    cuThomasBatch<<<(N/BlockSize)+1, BlockSize>>> (l_device, d_device, u_device, rhs_device, M, N);
   }
+  cudaMemcpyAsync(rhs_Thomas_host, rhs_device, matrix_byte_size, cudaMemcpyDeviceToHost, 0);
   cudaDeviceSynchronize();
-  printf("        cuThomasBatch Time(s) %e   ", (time_wtime()-init)/100);
 
   // verify
-  calcError(rhs_seq_interleave,rhs_Thomas_output,N*params.M);
+  calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
 
 
   free(u_seq);  
@@ -175,7 +173,6 @@ int main(int argc, char const *argv[])
   free(rhs_input);
 
   free(rhs_seq_output);
-  free(rhs_Thomas_output);
   free(rhs_seq_interleave);
 
   cudaFree(l_device);

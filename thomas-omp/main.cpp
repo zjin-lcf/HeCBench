@@ -1,8 +1,6 @@
 #include <iostream>
-#include <hip/hip_runtime.h>
 #include "ThomasMatrix.hpp"
 #include "utils.hpp"
-#include "cuThomasBatch.h"
 
 // CPU kernel
 void solve_seq(const double* l, const double* d, double* u, double* rhs, const int n, const int N) 
@@ -46,6 +44,7 @@ int main(int argc, char const *argv[])
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
+  // Allocate host arrays for CPU execution 
   double* u_seq = (double*) malloc(matrix_byte_size);
   double* u_Thomas_host =  (double*) malloc(matrix_byte_size);
   double* u_input = (double*) malloc(matrix_byte_size);
@@ -84,7 +83,9 @@ int main(int argc, char const *argv[])
     }
   }
 
+
   // Sequantial CPU Execution for correct error check
+  // Note each loop iteration updates u_seq and rhs_seq 
   for (int n = 0; n < 100; n++) {
     solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
   }
@@ -93,7 +94,7 @@ int main(int argc, char const *argv[])
     rhs_seq_output[i] = rhs_seq[i];
   }
 
-  // initialize again because u_seq and rhs_seq are modified by solve_seq
+  // Initialize again because u_seq and rhs_seq are modified
   for (int i = 0; i < N; ++i)
   {
     for (int j = 0; j < M; ++j)
@@ -109,12 +110,11 @@ int main(int argc, char const *argv[])
 
       rhs_seq[(i * M) + j] = params.rhs[j];
       rhs_input[(i * M) + j] = params.rhs[j];
-
     }
   }
 
 
-  // transpose the inputs for sequential accesses on a GPU 
+  // Transpose the inputs for sequential accesses on a GPU 
   for (int i = 0; i < M; ++i)
   {
     for (int j = 0; j < N; ++j)
@@ -124,36 +124,45 @@ int main(int argc, char const *argv[])
       d_Thomas_host[i*N+j] = d_input[j*M+i];
       rhs_Thomas_host[i*N+j] = rhs_input[j*M+i];
       rhs_seq_interleave[i*N+j] = rhs_seq_output[j*M+i];
-
     }
   }
 
  
   // Run GPU kernel
+  double *U = u_Thomas_host;
+  double *D = d_Thomas_host;
+  double *L = l_Thomas_host;
+  double *RHS = rhs_Thomas_host;
 
-  double *u_device;
-  double *d_device;
-  double *l_device;
-  double *rhs_device;
 
-  hipMalloc((void**)&u_device, matrix_byte_size);
-  hipMalloc((void**)&l_device, matrix_byte_size);
-  hipMalloc((void**)&d_device, matrix_byte_size);
-  hipMalloc((void**)&rhs_device, matrix_byte_size);
+  #pragma omp target data map(to: L[0:M*N], D[0:M*N], U[0:M*N]) map(tofrom: RHS[0:M*N])
+  {
+    for (int n = 0; n < 100; n++) {
+      #pragma omp target teams distribute parallel for thread_limit(BlockSize) nowait
+      for (int tid = 0; tid < N; tid++) {
+        int first = tid;
+        int last  = N*(M-1)+tid;
 
-  hipMemcpyAsync(u_device, u_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(l_device, l_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(d_device, d_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(rhs_device, rhs_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice,  0);
-  for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(cuThomasBatch, dim3((N/BlockSize)+1), dim3(BlockSize), 0, 0, l_device, d_device, u_device, rhs_device, M, N);
+        U[first] /= D[first];
+        RHS[first] /= D[first];
+
+        for (int i = first + N; i < last; i+=N) {
+          U[i] /= D[i] - L[i] * U[i-N];
+          RHS[i] = ( RHS[i] - L[i] * RHS[i-N] ) / 
+                   ( D[i] - L[i] * U[i-N] );
+        }
+
+        RHS[last] = ( RHS[last] - L[last] * RHS[last-N] ) / 
+                    ( D[last] - L[last] * U[last-N] );
+
+        for (int i = last-N; i >= first; i-=N) {
+          RHS[i] -= U[i] * RHS[i+N];
+        }
+      }
+    }
   }
-  hipMemcpyAsync(rhs_Thomas_host, rhs_device, matrix_byte_size, hipMemcpyDeviceToHost, 0);
-  hipDeviceSynchronize();
 
-  // verify
-  calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
-
+  calcError(rhs_seq_interleave,RHS,N*M);
 
   free(u_seq);  
   free(u_Thomas_host);
@@ -174,13 +183,5 @@ int main(int argc, char const *argv[])
   free(rhs_seq_output);
   free(rhs_seq_interleave);
 
-  hipFree(l_device);
-  hipFree(d_device);
-  hipFree(u_device);
-  hipFree(rhs_device);
-
   return 0;
-
 }
-
-
