@@ -651,6 +651,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.4 | 7.4 | 7.4 | 7.4 |
 
 
+| thomas | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 105 | 105  | 710 |
+| host timing(s) | 5.8 | 2.8 | 6.2 | 9.1 |
+| device timing(s) | 5.4 | 2.2 | 5.5 | 5.6 |
+
+
 | transpose | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 51 | NA | 59  | 64 |
@@ -1324,6 +1331,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 6.3 | 5.8 | 5.8 | 6.5 |
 
 
+| thomas | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 105 | 105  | 710 |
+| host timing(s) | 4.6 | 2.6 | 4.7 | 10.4 |
+| device timing(s) | 4.2 | 2.2 | 4.2 | 7.5 |
+
+
 | transpose | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 51 | NA | 59  | 64 |
@@ -1632,6 +1646,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
+
+### thomas
+  Solve a set of tridiagonal linear systems (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/-/tree/master)
 
 ### transpose
   Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
