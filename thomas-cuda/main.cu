@@ -91,7 +91,6 @@ int main(int argc, char const *argv[])
 
   for (int i = 0; i < M*N; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
-    //printf("%f\n", rhs_seq[i]);
   }
 
   // initialize again because u_seq and rhs_seq are modified by solve_seq
