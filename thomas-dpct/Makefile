@@ -4,12 +4,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_35"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-
+DEVICE      = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -17,7 +15,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp 
+source = main.cpp cuThomasBatch.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -26,12 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
-
+CFLAGS := -std=c++11 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +45,7 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) 
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp ThomasMatrix.hpp  utils.hpp
@@ -62,4 +55,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1024 16384 64
+	./$(program) 1024 8192 64

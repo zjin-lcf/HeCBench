@@ -7,6 +7,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++11 -Xcompiler -Wall
+CFLAGS := -std=c++11 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -40,18 +41,21 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj) 
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ThomasMatrix.hpp  utils.hpp Makefile
+%.o: %.cpp ThomasMatrix.hpp  utils.hpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1024 2560 64
+	./$(program) 1024 16384 64
