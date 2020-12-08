@@ -24,6 +24,7 @@
 #  include <sys/time.h>
 #  include <time.h>
 #endif
+#include <math.h>
 
 /* ////////////////////////////////////////////////////////////////////////////
    -- Emulate gettimeofday on Windows.
@@ -91,11 +92,6 @@ void timef_wtime(double *time)
 }
 
 
-void check(){
-    hipError_t err = hipGetLastError();
-    if (err != hipSuccess) 
-        printf("Error: %s\n", hipGetErrorString(err));
-}
 
 template <typename T>
 void calcError(T* src,T* dst, int size){
@@ -105,9 +101,9 @@ void calcError(T* src,T* dst, int size){
     for (int i = 0; i < size; ++i)
     {
 
-        if (error < abs(abs(src[i]) - abs(dst[i])))
+        if (error < fabs(fabs(src[i]) - fabs(dst[i])))
         {
-            error = abs(abs(src[i]) - abs(dst[i]));
+            error = fabs(fabs(src[i]) - fabs(dst[i]));
         }
 
         
@@ -124,9 +120,9 @@ void calcError_print(T* src,T* dst, int size){
     {
 		printf("src: %e - dst: %e\n",src[i],dst[i]);
 
-        if (error < abs(abs(src[i]) - abs(dst[i])))
+        if (error < fabs(fabs(src[i]) - fabs(dst[i])))
         {
-            error = abs(abs(src[i]) - abs(dst[i]));
+            error = fabs(fabs(src[i]) - fabs(dst[i]));
         }
 
         

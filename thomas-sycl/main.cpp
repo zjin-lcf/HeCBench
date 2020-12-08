@@ -1,8 +1,7 @@
 #include <iostream>
-#include <hip/hip_runtime.h>
+#include "common.h"
 #include "ThomasMatrix.hpp"
 #include "utils.hpp"
-#include "cuThomasBatch.h"
 
 // CPU kernel
 void solve_seq(const double* l, const double* d, double* u, double* rhs, const int n, const int N) 
@@ -46,6 +45,7 @@ int main(int argc, char const *argv[])
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
+  // Allocate host arrays for CPU execution 
   double* u_seq = (double*) malloc(matrix_byte_size);
   double* u_Thomas_host =  (double*) malloc(matrix_byte_size);
   double* u_input = (double*) malloc(matrix_byte_size);
@@ -84,8 +84,9 @@ int main(int argc, char const *argv[])
     }
   }
 
+
   // Sequantial CPU Execution for correct error check
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < 100; n++) { 
     solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
   }
 
@@ -93,7 +94,7 @@ int main(int argc, char const *argv[])
     rhs_seq_output[i] = rhs_seq[i];
   }
 
-  // initialize again because u_seq and rhs_seq are modified by solve_seq
+  // Initialize again because u_seq and rhs_seq are modified by solve_seq
   for (int i = 0; i < N; ++i)
   {
     for (int j = 0; j < M; ++j)
@@ -109,12 +110,11 @@ int main(int argc, char const *argv[])
 
       rhs_seq[(i * M) + j] = params.rhs[j];
       rhs_input[(i * M) + j] = params.rhs[j];
-
     }
   }
 
 
-  // transpose the inputs for sequential accesses on a GPU 
+  // Transpose the inputs for sequential accesses on a GPU 
   for (int i = 0; i < M; ++i)
   {
     for (int j = 0; j < N; ++j)
@@ -124,32 +124,65 @@ int main(int argc, char const *argv[])
       d_Thomas_host[i*N+j] = d_input[j*M+i];
       rhs_Thomas_host[i*N+j] = rhs_input[j*M+i];
       rhs_seq_interleave[i*N+j] = rhs_seq_output[j*M+i];
-
     }
   }
 
+  { // sycl scope
  
-  // Run GPU kernel
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
 
-  double *u_device;
-  double *d_device;
-  double *l_device;
-  double *rhs_device;
 
-  hipMalloc((void**)&u_device, matrix_byte_size);
-  hipMalloc((void**)&l_device, matrix_byte_size);
-  hipMalloc((void**)&d_device, matrix_byte_size);
-  hipMalloc((void**)&rhs_device, matrix_byte_size);
+  buffer<double, 1> u_device (u_Thomas_host, N * M);
+  buffer<double, 1> d_device (d_Thomas_host, N * M);
+  buffer<double, 1> l_device (l_Thomas_host, N * M);
+  buffer<double, 1> rhs_device (rhs_Thomas_host, N * M);
+  d_device.set_final_data(nullptr);
 
-  hipMemcpyAsync(u_device, u_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(l_device, l_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(d_device, d_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(rhs_device, rhs_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice,  0);
+  range<1> gws = (N + BlockSize - 1) / BlockSize * BlockSize; 
+  range<1> lws = BlockSize;
+
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(cuThomasBatch, dim3((N/BlockSize)+1), dim3(BlockSize), 0, 0, l_device, d_device, u_device, rhs_device, M, N);
+
+    q.submit([&] (handler &cgh) {
+      auto L = l_device.get_access<sycl_read>(cgh);
+      auto D = d_device.get_access<sycl_read>(cgh);
+      auto U = u_device.get_access<sycl_read_write>(cgh);
+      auto RHS = rhs_device.get_access<sycl_read_write>(cgh);
+
+      cgh.parallel_for<class thomas>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    
+        int tid = item.get_global_id(0);
+        if (tid < N) {
+          int first = tid;
+          int last  = N*(M-1)+tid;
+
+          U[first] /= D[first];
+          RHS[first] /= D[first];
+
+          for (int i = first + N; i < last; i+=N) {
+            U[i] /= D[i] - L[i] * U[i-N];
+            RHS[i] = ( RHS[i] - L[i] * RHS[i-N] ) / 
+                     ( D[i] - L[i] * U[i-N] );
+          }
+
+          RHS[last] = ( RHS[last] - L[last] * RHS[last-N] ) / 
+                      ( D[last] - L[last] * U[last-N] );
+
+          for (int i = last-N; i >= first; i-=N) {
+            RHS[i] -= U[i] * RHS[i+N];
+          }
+        }
+      });
+    });
   }
-  hipMemcpyAsync(rhs_Thomas_host, rhs_device, matrix_byte_size, hipMemcpyDeviceToHost, 0);
-  hipDeviceSynchronize();
+  q.wait();
+
+  }
 
   // verify
   calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
@@ -174,13 +207,7 @@ int main(int argc, char const *argv[])
   free(rhs_seq_output);
   free(rhs_seq_interleave);
 
-  hipFree(l_device);
-  hipFree(d_device);
-  hipFree(u_device);
-  hipFree(rhs_device);
-
   return 0;
-
 }
 
 
