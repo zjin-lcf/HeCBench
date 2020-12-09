@@ -667,9 +667,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | triad | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
-| total enqueue | 204400 | 204400 | 204400  | NA |
-| host timing(s) | 7.2 | 7.3 | 7.4 | NA |
-| device timing(s) | 3.4 | 2.8 | 3.4 | NA |
+| total enqueue | 204400 | 204400 | 204400  | 407907 |
+| host timing(s) | 7.2 | 7.3 | 7.4 | 98 |
+| device timing(s) | 3.4 | 2.8 | 3.4 | 86 |
 
 
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
@@ -1347,9 +1347,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | triad | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
-| total enqueue | 204400 | 204400 | 204400  | NA |
-| host timing(s) | 7.9 | 8.8 | 8.4 | NA |
-| device timing(s) | 3.8 | 3.3 | 3.8 | NA |
+| total enqueue | 204400 | 204400 | 204400  | 407907 |
+| host timing(s) | 7.9 | 8.8 | 8.4 | 192 |
+| device timing(s) | 3.8 | 3.3 | 3.8 | 96 |
 
 
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
