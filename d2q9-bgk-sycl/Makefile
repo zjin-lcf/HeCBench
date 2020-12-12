@@ -8,11 +8,11 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 
-CheckSize ?= 128x128
+CheckSize ?= 256x256
 FINAL_STATE_FILE = ./final_state.dat
 AV_VELS_FILE = ./av_vels.dat
-REF_FINAL_STATE_FILE = ../check/$(CheckSize).final_state.dat
-REF_AV_VELS_FILE = ../check/$(CheckSize).av_vels.dat
+REF_FINAL_STATE_FILE = ./check/$(CheckSize).final_state.dat
+REF_AV_VELS_FILE = ./check/$(CheckSize).av_vels.dat
 
 
 #===============================================================================
@@ -54,31 +54,20 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.dat
 
 run: $(program)
-	./$(program) Inputs/input_4096x4096.params Obstacles/obstacles_4096x4096.dat
-	make check CheckSize=4096x4096
-
-test: $(program)
 	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
-	make check CheckSize=256x256
 
-
-check:
+check: 
 	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \
         --ref-final-state-file=$(REF_FINAL_STATE_FILE) \
         --av-vels-file=$(AV_VELS_FILE) \
         --final-state-file=$(FINAL_STATE_FILE)
-
-.PHONY: all check clean
-
-clean:
-	rm -f $(program) av_vels.dat final_state.dat $(obj)
