@@ -1,0 +1,299 @@
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+
+#include <unistd.h>
+#include <string.h>
+#include <assert.h>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <algorithm>  // for_each
+#include <omp.h>
+
+#include "support/common.h"
+#include "support/verify.h"
+
+
+// Params ---------------------------------------------------------------------
+struct Params {
+
+  int device;
+  int n_gpu_threads;
+  int n_gpu_blocks;
+  int n_threads;
+  int n_warmup;
+  int n_reps;
+  int m;
+  int n;
+  int s;
+
+  Params(int argc, char **argv) {
+    device        = 0;
+    n_gpu_threads  = 64;
+    n_gpu_blocks = 16;
+    n_threads     = 0;
+    n_warmup      = 10;
+    n_reps        = 100;
+    m             = 197;
+    n             = 35588;
+    s             = 32;
+    int opt;
+    while((opt = getopt(argc, argv, "hd:i:g:t:w:r:m:n:s:")) >= 0) {
+      switch(opt) {
+        case 'h':
+          usage();
+          exit(0);
+          break;
+        case 'i': n_gpu_threads  = atoi(optarg); break;
+        case 'g': n_gpu_blocks = atoi(optarg); break;
+        case 't': n_threads     = atoi(optarg); break;
+        case 'w': n_warmup      = atoi(optarg); break;
+        case 'r': n_reps        = atoi(optarg); break;
+        case 'm': m             = atoi(optarg); break;
+        case 'n': n             = atoi(optarg); break;
+        case 's': s             = atoi(optarg); break;
+        default:
+            fprintf(stderr, "\nUnrecognized option!\n");
+            usage();
+            exit(0);
+      }
+    }
+    assert(((n_gpu_threads > 0 && n_gpu_blocks > 0) ^ (n_threads > 0))
+        && "TRNS only runs on CPU-only or GPU-only: './trns -g 0' or './trns -t 0'");
+  }
+
+  void usage() {
+    fprintf(stderr,
+        "\nUsage:  ./trns [options]"
+        "\n"
+        "\nGeneral options:"
+        "\n    -h        help"
+        "\n    -i <I>    # of device threads per block (default=64)"
+        "\n    -g <G>    # of device blocks (default=16)"
+        "\n    -t <T>    # of host threads (default=0)"
+        "\n    -w <W>    # of warmup iterations (default=10)"
+        "\n    -r <R>    # of repetition iterations (default=100)"
+        "\n"
+        "\nData-partitioning-specific options:"
+        "\n    TRNS only supports CPU-only or GPU-only execution"
+        "\n"
+        "\nBenchmark-specific options:"
+        "\n    -m <M>    matrix height (default=197)"
+        "\n    -n <N>    matrix width (default=35588)"
+        "\n    -s <M>    super-element size (default=32)"
+        "\n");
+  }
+};
+
+// Input Data -----------------------------------------------------------------
+void read_input(T *x_vector, const Params &p) {
+  int tiled_n = divceil(p.n, p.s);
+  int in_size = p.m * tiled_n * p.s;
+  srand(5432);
+  for(int i = 0; i < in_size; i++) {
+    x_vector[i] = ((T)(rand() % 100) / 100);
+  }
+}
+
+// Main ------------------------------------------------------------------------------------------
+int main(int argc, char **argv) {
+
+  const Params p(argc, argv);
+
+  // Allocate
+  int tiled_n       = divceil(p.n, p.s);
+  int in_size       = p.m * tiled_n * p.s;
+  int finished_size = p.m * tiled_n;
+  T *h_in_out = (T *)malloc(in_size * sizeof(T));
+  std::atomic_int *h_finished =
+    (std::atomic_int *)malloc(sizeof(std::atomic_int) * finished_size);
+  std::atomic_int *h_head = (std::atomic_int *)malloc(sizeof(std::atomic_int));
+
+  int blocks = p.n_gpu_blocks;
+  int threads = p.n_gpu_threads;
+
+  T *h_in_backup = (T *)malloc(in_size * sizeof(T));
+
+  // Initialize
+  const int max_gpu_threads = 256;
+  read_input(h_in_out, p);
+  memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
+  h_head[0].store(0);
+  memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
+  const int A = p.m;
+  const int B = tiled_n;
+  const int b = p.s;
+
+#pragma omp target data map(alloc: h_in_out[0:in_size], \
+                                   h_finished[0:finished_size], \
+                                   h_head[0:1])
+  {
+    // Loop over the CPU or GPU kernel
+    for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
+
+      // Reset
+      memcpy(h_in_out, h_in_backup, in_size * sizeof(T));
+      memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
+      h_head[0].store(0);
+
+#pragma omp target update to(h_in_out[0:in_size]) nowait
+#pragma omp target update to(h_finished[0:finished_size]) nowait
+#pragma omp target update to(h_head[0:1]) nowait
+
+      // Launch GPU threads
+      assert(threads <= max_gpu_threads && 
+          "The thread block size is greater than the maximum thread block size that can be used on this device");
+
+#pragma omp target teams num_teams(blocks) thread_limit(threads)
+      {
+        int lmem[2];
+#pragma omp parallel 
+        {
+          const int tid = omp_get_thread_num();
+          int       m   = A * B - 1;
+
+          if(tid == 0) {// Dynamic fetch
+#pragma omp atomic capture
+            lmem[1] = h_head[0]++;
+          }
+#pragma omp barrier
+
+          while(lmem[1] < m) {
+            int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
+            if(next_in_cycle == lmem[1]) {
+              if(tid == 0) {// Dynamic fetch
+#pragma omp atomic capture
+                lmem[1] = h_head[0]++;
+              }
+#pragma omp barrier
+              continue;
+            }
+            T   data1, data2, data3, data4;
+            int i = tid;
+            if(i < b)
+              data1 = h_in_out[lmem[1] * b + i];
+            i += omp_get_num_threads(); //omp_get_num_threads();
+            if(i < b)
+              data2 = h_in_out[lmem[1] * b + i];
+            i += omp_get_num_threads(); //omp_get_num_threads();
+            if(i < b)
+              data3 = h_in_out[lmem[1] * b + i];
+            i += omp_get_num_threads(); //omp_get_num_threads();
+            if(i < b)
+              data4 = omp_get_num_threads(); //h_in_out[lmem[1] * b + i];
+
+            if(tid == 0) {
+#pragma omp atomic read
+              lmem[0] = h_finished[lmem[1]];
+            }
+#pragma omp barrier
+
+            for(; lmem[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
+              T backup1, backup2, backup3, backup4;
+              i = tid;
+              if(i < b)
+                backup1 = h_in_out[next_in_cycle * b + i];
+              i += omp_get_num_threads();
+              if(i < b)
+                backup2 = h_in_out[next_in_cycle * b + i];
+              i += omp_get_num_threads();
+              if(i < b)
+                backup3 = h_in_out[next_in_cycle * b + i];
+              i += omp_get_num_threads();
+              if(i < b)
+                backup4 = h_in_out[next_in_cycle * b + i];
+
+              if(tid == 0) {
+#pragma omp atomic capture
+                {
+                  lmem[0] = h_finished[next_in_cycle];
+                  h_finished[next_in_cycle] = (int)1;
+                }
+              }
+#pragma omp barrier
+
+              if(!lmem[0]) {
+                i = tid;
+                if(i < b)
+                  h_in_out[next_in_cycle * b + i] = data1;
+                i += omp_get_num_threads();
+                if(i < b)
+                  h_in_out[next_in_cycle * b + i] = data2;
+                i += omp_get_num_threads();
+                if(i < b)
+                  h_in_out[next_in_cycle * b + i] = data3;
+                i += omp_get_num_threads();
+                if(i < b)
+                  h_in_out[next_in_cycle * b + i] = data4;
+              }
+              i = tid;
+              if(i < b)
+                data1 = backup1;
+              i += omp_get_num_threads();
+              if(i < b)
+                data2 = backup2;
+              i += omp_get_num_threads();
+              if(i < b)
+                data3 = backup3;
+              i += omp_get_num_threads();
+              if(i < b)
+                data4 = backup4;
+            }
+
+            if(tid == 0) { // Dynamic fetch
+#pragma omp atomic capture
+              lmem[1] = h_head[0]++;
+            }
+#pragma omp barrier
+          }
+        }
+      }
+    }
+    // Copy back
+#pragma omp target update from(h_in_out[0:in_size])
+  }
+
+  // Verify answer
+  int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
+
+  // Free memory
+  free(h_in_out);
+  free(h_finished);
+  free(h_head);
+  free(h_in_backup);
+
+  if (status == 0) printf("Test Passed\n");
+  return 0;
+}
