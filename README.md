@@ -49,6 +49,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.14 | 0.14 | 0.14 | 0.16 |  
 
 
+| asta | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 550 | 550 | 550 | 1105 |
+| host timing(s) | 5.0 | 5.7 | 5.7 | 16.2 | 
+| device timing(s) | 4.7 | 5.2 | 5.1 | 12.6 |  
+
+
 | atomicIntrinsics | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 3 | 3 | NA |
@@ -705,6 +712,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | total enqueue | 20 | 30 | 30 | 85 |
 | host timing(s) | 0.7 | 1.04 | 1.02 | 3.92 | 
 | device timing(s) | 0.27 | 0.27 | 0.27 | 0.31 |  
+
+
+| asta | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 550 | 550 | 550 | 1105 |
+| host timing(s) | 5.6 | 6.1 | 6.1 | 15.8 | 
+| device timing(s) | 5.4 | 5.8 | 5.7 | 12.9 |  
 
 
 | atomicIntrinsics | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1381,6 +1395,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### aobench
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
+### asta
+  Array of atructure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
+
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
@@ -1648,7 +1665,7 @@ We may build the [software from source with support for AMD HIP](https://github.
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
 ### thomas
-  Solve a set of tridiagonal linear systems (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/-/tree/master)
+  solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
 
 ### transpose
   Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
