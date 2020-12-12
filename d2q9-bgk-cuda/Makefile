@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 CheckSize ?= 256x256
 FINAL_STATE_FILE = ./final_state.dat
@@ -21,16 +20,16 @@ REF_AV_VELS_FILE = ./check/$(CheckSize).av_vels.dat
 
 program = main
 
-source = main.cpp
+source = main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Xcompiler -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -47,9 +46,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -57,7 +53,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -66,7 +62,7 @@ clean:
 run: $(program)
 	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
 
-check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
+check: $(AV_VELS_FILE) $(FINAL_STATE_FILE)
 	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \
         --ref-final-state-file=$(REF_FINAL_STATE_FILE) \
         --av-vels-file=$(AV_VELS_FILE) \
