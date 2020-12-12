@@ -35,6 +35,7 @@
 
 #include "common.h"
 #include <math.h>
+#include <stdio.h>
 
 inline int compare_output(T *output, T *ref, int dim) {
     int i;

@@ -36,8 +36,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
-#include <thread>
-#include <atomic>
 #include <vector>
 #include <algorithm>  // for_each
 #include <omp.h>
@@ -52,7 +50,6 @@ struct Params {
   int device;
   int n_gpu_threads;
   int n_gpu_blocks;
-  int n_threads;
   int n_warmup;
   int n_reps;
   int m;
@@ -63,14 +60,13 @@ struct Params {
     device        = 0;
     n_gpu_threads  = 64;
     n_gpu_blocks = 16;
-    n_threads     = 0;
     n_warmup      = 10;
     n_reps        = 100;
     m             = 197;
     n             = 35588;
     s             = 32;
     int opt;
-    while((opt = getopt(argc, argv, "hd:i:g:t:w:r:m:n:s:")) >= 0) {
+    while((opt = getopt(argc, argv, "hd:i:g:w:r:m:n:s:")) >= 0) {
       switch(opt) {
         case 'h':
           usage();
@@ -78,7 +74,6 @@ struct Params {
           break;
         case 'i': n_gpu_threads  = atoi(optarg); break;
         case 'g': n_gpu_blocks = atoi(optarg); break;
-        case 't': n_threads     = atoi(optarg); break;
         case 'w': n_warmup      = atoi(optarg); break;
         case 'r': n_reps        = atoi(optarg); break;
         case 'm': m             = atoi(optarg); break;
@@ -90,8 +85,6 @@ struct Params {
             exit(0);
       }
     }
-    assert(((n_gpu_threads > 0 && n_gpu_blocks > 0) ^ (n_threads > 0))
-        && "TRNS only runs on CPU-only or GPU-only: './trns -g 0' or './trns -t 0'");
   }
 
   void usage() {
@@ -102,12 +95,8 @@ struct Params {
         "\n    -h        help"
         "\n    -i <I>    # of device threads per block (default=64)"
         "\n    -g <G>    # of device blocks (default=16)"
-        "\n    -t <T>    # of host threads (default=0)"
         "\n    -w <W>    # of warmup iterations (default=10)"
         "\n    -r <R>    # of repetition iterations (default=100)"
-        "\n"
-        "\nData-partitioning-specific options:"
-        "\n    TRNS only supports CPU-only or GPU-only execution"
         "\n"
         "\nBenchmark-specific options:"
         "\n    -m <M>    matrix height (default=197)"
@@ -131,27 +120,26 @@ void read_input(T *x_vector, const Params &p) {
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
+  int blocks = p.n_gpu_blocks;
+  int threads = p.n_gpu_threads;
+  const int max_gpu_threads = 256;
+  assert(threads <= max_gpu_threads && 
+          "The thread block size is greater than the maximum thread block size that can be used on this device");
+
 
   // Allocate
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
   T *h_in_out = (T *)malloc(in_size * sizeof(T));
-  std::atomic_int *h_finished =
-    (std::atomic_int *)malloc(sizeof(std::atomic_int) * finished_size);
-  std::atomic_int *h_head = (std::atomic_int *)malloc(sizeof(std::atomic_int));
-
-  int blocks = p.n_gpu_blocks;
-  int threads = p.n_gpu_threads;
-
+  int *h_finished = (int *)malloc(sizeof(int) * finished_size);
+  int *h_head = (int *)malloc(sizeof(int));
   T *h_in_backup = (T *)malloc(in_size * sizeof(T));
 
   // Initialize
-  const int max_gpu_threads = 256;
   read_input(h_in_out, p);
-  memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
-  h_head[0].store(0);
   memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
+
   const int A = p.m;
   const int B = tiled_n;
   const int b = p.s;
@@ -160,23 +148,17 @@ int main(int argc, char **argv) {
                                    h_finished[0:finished_size], \
                                    h_head[0:1])
   {
-    // Loop over the CPU or GPU kernel
     for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-      // Reset
       memcpy(h_in_out, h_in_backup, in_size * sizeof(T));
-      memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
-      h_head[0].store(0);
+      memset((void *)h_finished, 0, sizeof(int) * finished_size);
+      h_head[0] = 0;
 
 #pragma omp target update to(h_in_out[0:in_size]) nowait
 #pragma omp target update to(h_finished[0:finished_size]) nowait
 #pragma omp target update to(h_head[0:1]) nowait
 
-      // Launch GPU threads
-      assert(threads <= max_gpu_threads && 
-          "The thread block size is greater than the maximum thread block size that can be used on this device");
-
-#pragma omp target teams num_teams(blocks) thread_limit(threads)
+#pragma omp target teams num_teams(blocks) thread_limit(threads) 
       {
         int lmem[2];
 #pragma omp parallel 
@@ -204,15 +186,15 @@ int main(int argc, char **argv) {
             int i = tid;
             if(i < b)
               data1 = h_in_out[lmem[1] * b + i];
-            i += omp_get_num_threads(); //omp_get_num_threads();
+            i += omp_get_num_threads();
             if(i < b)
               data2 = h_in_out[lmem[1] * b + i];
-            i += omp_get_num_threads(); //omp_get_num_threads();
+            i += omp_get_num_threads();
             if(i < b)
               data3 = h_in_out[lmem[1] * b + i];
-            i += omp_get_num_threads(); //omp_get_num_threads();
+            i += omp_get_num_threads();
             if(i < b)
-              data4 = omp_get_num_threads(); //h_in_out[lmem[1] * b + i];
+              data4 = omp_get_num_threads();
 
             if(tid == 0) {
 #pragma omp atomic read
@@ -280,9 +262,9 @@ int main(int argc, char **argv) {
           }
         }
       }
+    // Copy back 
+#pragma omp target update from(h_in_out[0:in_size]) nowait
     }
-    // Copy back
-#pragma omp target update from(h_in_out[0:in_size])
   }
 
   // Verify answer
