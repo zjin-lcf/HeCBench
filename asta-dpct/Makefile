@@ -6,7 +6,6 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +22,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++11 -Wall -I../include
+CFLAGS := -std=c++11 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -40,10 +39,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================

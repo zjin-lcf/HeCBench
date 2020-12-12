@@ -33,43 +33,22 @@
  *
  */
 
-#include "common.h"
-#include <math.h>
-#include <stdio.h>
+#ifndef _COMMON_H_
+#define _COMMON_H_
 
-inline int compare_output(T *output, T *ref, int dim) {
-    int i;
-    int fail = 0;
-    for(i = 0; i < dim; i++) {
-        T diff = fabs(ref[i] - output[i]);
-        if((diff - 0.0f) > 0.00001f && diff > 0.01 * fabs(ref[i])) {
-            printf("Failed at line: %d ref: %f actual: %f diff: %f\n", i, ref[i], output[i], diff);
-            fail = 1;
-	    break;
-        }
-    }
-    return fail;
-}
 
-// Sequential transposition for comparison purposes
-//[w][h/t][t] to [h/t][w][t]
-inline void cpu_soa_asta(T *src, T *dst, int height, int width, int tile_size) {
-    // We only support height == multiple of tile size
-    if((height / tile_size) * tile_size == height)
-        for(int k = 0; k < width; k++) {
-            for(int i = 0; i < height / tile_size; i++) { //For all tiles
-                for(int j = 0; j < tile_size; j++) {
-                    //from src[k][i][j] to dst[i][k][j]
-                    dst[i * width * tile_size + k * tile_size + j] = src[k * height + i * tile_size + j];
-                }
-            }
-        }
-}
+#ifndef DOUBLE_PRECISION
+#define DOUBLE_PRECISION 1
+#endif
 
-inline int verify(T *input2, T *input, int height, int width, int tile_size) {
-    T *output = (T *)malloc(width * height * sizeof(T));
-    cpu_soa_asta(input, output, height, width, tile_size);
-    int status = compare_output(input2, output, height * width);
-    free(output);
-    return status;
-}
+#if DOUBLE_PRECISION
+#define T double
+#else
+#define T float
+#endif
+
+#define PRINT 0
+
+#define divceil(n, m) (((n)-1) / (m) + 1)
+
+#endif
