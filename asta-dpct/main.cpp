@@ -33,112 +33,120 @@
  *
  */
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <vector>
 #include <algorithm>  // for_each
-#include <cuda.h>
 
 #include "support/common.h"
 #include "support/verify.h"
 
 // GPU kernel 
-__global__ void PTTWAC_soa_asta(const int A, 
+void PTTWAC_soa_asta(const int A, 
                                 const int B, 
                                 const int b, 
                                   T *input, 
                                 int *finished, 
-                                int *head) 
+                                int *head,
+                                sycl::nd_item<3> item_ct1,
+                                int *lmem) 
 {
-  __shared__ int lmem[2];
 
-  const int tid = threadIdx.x;
+    const int tid = item_ct1.get_local_id(2);
   int       m   = A * B - 1;
 
   if(tid == 0) // Dynamic fetch
-    lmem[1] = atomicAdd(&head[0], 1);
-  __syncthreads();
+        lmem[1] =
+            sycl::atomic<int>(sycl::global_ptr<int>(&head[0])).fetch_add(1);
+    item_ct1.barrier();
 
   while(lmem[1] < m) {
     int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
     if(next_in_cycle == lmem[1]) {
       if(tid == 0) // Dynamic fetch
-        lmem[1] = atomicAdd(&head[0], 1);
-      __syncthreads();
+                lmem[1] = sycl::atomic<int>(sycl::global_ptr<int>(&head[0]))
+                              .fetch_add(1);
+            item_ct1.barrier();
       continue;
     }
     T   data1, data2, data3, data4;
     int i = tid;
     if(i < b)
       data1 = input[lmem[1] * b + i];
-    i += blockDim.x;
+        i += item_ct1.get_local_range().get(2);
     if(i < b)
       data2 = input[lmem[1] * b + i];
-    i += blockDim.x;
+        i += item_ct1.get_local_range().get(2);
     if(i < b)
       data3 = input[lmem[1] * b + i];
-    i += blockDim.x;
+        i += item_ct1.get_local_range().get(2);
     if(i < b)
       data4 = input[lmem[1] * b + i];
 
     if(tid == 0) {
       //make sure the read is not cached
-      lmem[0] = atomicAdd(&finished[lmem[1]], 0);
+            lmem[0] =
+                sycl::atomic<int>(sycl::global_ptr<int>(&finished[lmem[1]]))
+                    .fetch_add(0);
     }
-    __syncthreads();
+        item_ct1.barrier();
 
     for(; lmem[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
       T backup1, backup2, backup3, backup4;
       i = tid;
       if(i < b)
         backup1 = input[next_in_cycle * b + i];
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         backup2 = input[next_in_cycle * b + i];
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         backup3 = input[next_in_cycle * b + i];
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         backup4 = input[next_in_cycle * b + i];
 
       if(tid == 0) {
-        lmem[0] = atomicExch(&finished[next_in_cycle], (int)1);
+                lmem[0] =
+                    dpct::atomic_exchange(&finished[next_in_cycle], (int)1);
       }
-      __syncthreads();
+            item_ct1.barrier();
 
       if(!lmem[0]) {
         i = tid;
         if(i < b)
           input[next_in_cycle * b + i] = data1;
-        i += blockDim.x;
+                i += item_ct1.get_local_range().get(2);
         if(i < b)
           input[next_in_cycle * b + i] = data2;
-        i += blockDim.x;
+                i += item_ct1.get_local_range().get(2);
         if(i < b)
           input[next_in_cycle * b + i] = data3;
-        i += blockDim.x;
+                i += item_ct1.get_local_range().get(2);
         if(i < b)
           input[next_in_cycle * b + i] = data4;
       }
       i = tid;
       if(i < b)
         data1 = backup1;
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         data2 = backup2;
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         data3 = backup3;
-      i += blockDim.x;
+            i += item_ct1.get_local_range().get(2);
       if(i < b)
         data4 = backup4;
     }
 
     if(tid == 0) // Dynamic fetch
-      lmem[1] = atomicAdd(&head[0], 1);
-    __syncthreads();
+            lmem[1] =
+                sycl::atomic<int>(sycl::global_ptr<int>(&head[0])).fetch_add(1);
+        item_ct1.barrier();
   }
 }
 
@@ -217,6 +225,8 @@ void read_input(T *x_vector, const Params &p) {
 
 // Main ------------------------------------------------------------------------------------------
 int main(int argc, char **argv) {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
 
   const Params p(argc, argv);
   int blocks = p.n_gpu_blocks;
@@ -233,16 +243,15 @@ int main(int argc, char **argv) {
   int *h_finished = (int *)malloc(sizeof(int) * finished_size);
   int *h_head = (int *)malloc(sizeof(int));
 
-
-  dim3 dimGrid(blocks);
-  dim3 dimBlock(threads);
+    sycl::range<3> dimGrid(blocks, 1, 1);
+    sycl::range<3> dimBlock(threads, 1, 1);
 
   T * d_in_out;
   int * d_finished;
   int * d_head;
-  cudaMalloc((void**)&d_in_out, in_size * sizeof(T));
-  cudaMalloc((void**)&d_finished, sizeof(int) * finished_size);
-  cudaMalloc((void**)&d_head, sizeof(int));
+    d_in_out = sycl::malloc_device<double>(in_size, q_ct1);
+    d_finished = sycl::malloc_device<int>(finished_size, q_ct1);
+    d_head = sycl::malloc_device<int>(1, q_ct1);
   T *h_in_backup = (T *)malloc(in_size * sizeof(T));
 
   // Initialize
@@ -254,15 +263,34 @@ int main(int argc, char **argv) {
   // Loop over the CPU or GPU kernel
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-    cudaMemcpyAsync(d_in_out, h_in_backup, in_size * sizeof(T), cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(d_finished, h_finished, sizeof(int) * finished_size, cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(d_head, h_head, sizeof(int), cudaMemcpyHostToDevice, 0);
+        q_ct1.memcpy(d_in_out, h_in_backup, in_size * sizeof(T));
+        q_ct1.memcpy(d_finished, h_finished, sizeof(int) * finished_size);
+        q_ct1.memcpy(d_head, h_head, sizeof(int));
 
-    PTTWAC_soa_asta<<<dimGrid, dimBlock>>>(p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
+        q_ct1.submit([&](sycl::handler &cgh) {
+            sycl::accessor<int, 1, sycl::access::mode::read_write,
+                           sycl::access::target::local>
+                lmem_acc_ct1(sycl::range<1>(2), cgh);
 
-    cudaMemcpyAsync(h_in_out, d_in_out, in_size * sizeof(T), cudaMemcpyDeviceToHost, 0);
+            auto dpct_global_range = dimGrid * dimBlock;
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                                 dpct_global_range.get(1),
+                                                 dpct_global_range.get(0)),
+                                  sycl::range<3>(dimBlock.get(2),
+                                                 dimBlock.get(1),
+                                                 dimBlock.get(0))),
+                [=](sycl::nd_item<3> item_ct1) {
+                    PTTWAC_soa_asta(p.m, tiled_n, p.s, d_in_out, d_finished,
+                                    d_head, item_ct1,
+                                    lmem_acc_ct1.get_pointer());
+                });
+        });
+
+        q_ct1.memcpy(h_in_out, d_in_out, in_size * sizeof(T));
   }
-  cudaDeviceSynchronize();
+    dev_ct1.queues_wait_and_throw();
 
   // Verify answer
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
@@ -273,9 +301,9 @@ int main(int argc, char **argv) {
   free(h_head);
   free(h_in_backup);
 
-  cudaFree(d_in_out);
-  cudaFree(d_finished);
-  cudaFree(d_head);
+    sycl::free(d_in_out, q_ct1);
+    sycl::free(d_finished, q_ct1);
+    sycl::free(d_head, q_ct1);
 
   if (status == 0) printf("Test Passed\n");
   return 0;
