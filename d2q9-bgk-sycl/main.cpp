@@ -103,7 +103,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
 int write_values(const t_param params, t_speed* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
-int finalise(const t_param* params, t_speed* cells_ptr, t_speed* tmp_cells_ptr,
+int finalise(t_speed* cells_ptr, t_speed* tmp_cells_ptr,
     int* obstacles_ptr, float* av_vels_ptr);
 
 /* Sum all the densities in the grid.
@@ -215,19 +215,19 @@ int main(int argc, char* argv[])
     buffer<float, 1> speeds7 (speedsHostS7, Y*X);
     buffer<float, 1> speeds8 (speedsHostS8, Y*X);
 
-    buffer<float, 1> tmp_speeds0;
-    buffer<float, 1> tmp_speeds1;
-    buffer<float, 1> tmp_speeds2;
-    buffer<float, 1> tmp_speeds3;
-    buffer<float, 1> tmp_speeds4;
-    buffer<float, 1> tmp_speeds5;
-    buffer<float, 1> tmp_speeds6;
-    buffer<float, 1> tmp_speeds7;
-    buffer<float, 1> tmp_speeds8;
+    buffer<float, 1> tmp_speeds0 (Y*X);
+    buffer<float, 1> tmp_speeds1 (Y*X);
+    buffer<float, 1> tmp_speeds2 (Y*X);
+    buffer<float, 1> tmp_speeds3 (Y*X);
+    buffer<float, 1> tmp_speeds4 (Y*X);
+    buffer<float, 1> tmp_speeds5 (Y*X);
+    buffer<float, 1> tmp_speeds6 (Y*X);
+    buffer<float, 1> tmp_speeds7 (Y*X);
+    buffer<float, 1> tmp_speeds8 (Y*X);
 
-    buffer<int,  1> obstacles (obstaclesHost, Y*X);
+    buffer<int, 1> obstacles (obstaclesHost, Y*X);
     buffer<float,1> partial_sum (tot_up, (Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters);
-    buffer<int, 1> partial_sum2(tot_cellsp, (Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters);
+    buffer<int, 1> partial_sum2 (tot_cellsp, (Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters);
 
     //parameters for kernel
     int nx = params.nx;
@@ -414,7 +414,7 @@ int main(int argc, char* argv[])
               int local_sizei = item.get_local_range(1);
               int local_sizej = item.get_local_range(0);
               /* accumulate the norm of x- and y- velocity components */
-              local_sum[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*nx]) ? 0 :cl::sycl::hypot(u_x,u_y);
+              local_sum[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*nx]) ? 0 : cl::sycl::hypot(u_x,u_y);
               /* increase counter of inspected cells */
               local_sum2[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*nx]) ? 0 : 1 ;
               item.barrier(access::fence_space::local_space);
@@ -467,6 +467,10 @@ int main(int argc, char* argv[])
       speed_tmp = std::move(speeds7);
       speeds7 = std::move(tmp_speeds7);
       tmp_speeds7 = std::move(speed_tmp);
+
+      speed_tmp = std::move(speeds8);
+      speeds8 = std::move(tmp_speeds8);
+      tmp_speeds8 = std::move(speed_tmp);
     }
 
   }//sycl scope
@@ -480,10 +484,10 @@ int main(int argc, char* argv[])
     for(int i = 0; i < params.nx/LOCALSIZEX*params.ny/LOCALSIZEY; i++){
       tot_u += tot_up[i+tt*params.nx/LOCALSIZEX*params.ny/LOCALSIZEY];
       tot_cells += tot_cellsp[i+tt*params.nx/LOCALSIZEX*params.ny/LOCALSIZEY];
+      // printf("%d %f %d\n", i, tot_u, tot_cells);
     }
     av_vels[tt] = tot_u/tot_cells;
   }
-  printf("Total values %d %d\n", tot_u, tot_cells); 
 
   //end timer
   gettimeofday(&timstr, NULL);
@@ -518,7 +522,7 @@ int main(int argc, char* argv[])
   printf("Elapsed user CPU time:\t\t%.6lf (s)\n", usrtim);
   printf("Elapsed system CPU time:\t%.6lf (s)\n", systim);
   write_values(params, cells, obstaclesHost, av_vels);
-  finalise(params, cells, tmp_cells, obstaclesHost, av_vels);
+  finalise(cells, tmp_cells, obstaclesHost, av_vels);
 
 
   free(speedsHostS0);
@@ -592,7 +596,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
     t_param* params, t_speed** cells_ptr, t_speed** tmp_cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr){
   char   message[1024];  /* message buffer */
-  file*   fp;            /* file pointer */
+  FILE*  fp;             /* file pointer */
   int    xx, yy;         /* generic array indices */
   int    blocked;        /* indicates whether a cell is blocked by an obstacle */
   int    retval;         /* to hold return value for checking */
@@ -741,7 +745,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
   return EXIT_SUCCESS;
 }
 
-int finalise(const t_param* params, t_speed* cells_ptr, t_speed* tmp_cells_ptr,
+int finalise(t_speed* cells_ptr, t_speed* tmp_cells_ptr,
     int* obstacles_ptr, float* av_vels_ptr)
 {
   /*
@@ -783,7 +787,7 @@ float total_density(const t_param params, t_speed* cells)
 
 int write_values(const t_param params, t_speed* cells, int* obstacles, float* av_vels)
 {
-  file* fp;                     /* file pointer */
+  FILE* fp;                     /* file pointer */
   const float c_sq = 1.f / 3.f; /* sq. of speed of sound */
   float local_density;         /* per grid cell sum of densities */
   float pressure;              /* fluid pressure in grid cell */
