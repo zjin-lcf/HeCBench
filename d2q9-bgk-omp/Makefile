@@ -1,0 +1,75 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = icpc
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+
+CheckSize ?= 256x256
+FINAL_STATE_FILE = ./final_state.dat
+AV_VELS_FILE = ./av_vels.dat
+REF_FINAL_STATE_FILE = ./check/$(CheckSize).final_state.dat
+REF_AV_VELS_FILE = ./check/$(CheckSize).av_vels.dat
+
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = main.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -I../include
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj) *.dat
+
+run: $(program)
+	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
+
+check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
+	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \
+        --ref-final-state-file=$(REF_FINAL_STATE_FILE) \
+        --av-vels-file=$(AV_VELS_FILE) \
+        --final-state-file=$(FINAL_STATE_FILE)

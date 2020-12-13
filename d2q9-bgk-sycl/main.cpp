@@ -55,7 +55,6 @@
 #include <time.h>
 #include <string.h>
 #include <sys/time.h>
-#include <sys/resource.h>
 
 #include <iostream>
 #include "common.h"
@@ -121,6 +120,12 @@ void die(const char* message, const int line, const char* file);
 void usage(const char* exe);
 
 
+bool 
+isGreater(const float x, const float y) 
+{
+  return x > y ? 1 : 0;
+}
+
 int main(int argc, char* argv[])
 {
   char*    paramfile = NULL;    /* input parameter file */
@@ -131,10 +136,7 @@ int main(int argc, char* argv[])
   int*     obstaclesHost = NULL;/* grid indicating which cells are blocked */
   float*   av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
   struct timeval timstr;        /* structure to hold elapsed time */
-  struct rusage ru;             /* structure to hold CPU time--system and user */
   double tic, toc;              /* floating point numbers to calculate elapsed wallclock time */
-  double usrtim;                /* floating point number to record elapsed user CPU time */
-  double systim;                /* floating point number to record elapsed system CPU time */
 
   /* parse the command line */
   if (argc != 3)
@@ -151,39 +153,39 @@ int main(int argc, char* argv[])
   initialise(paramfile, obstaclefile, &params, &cells, 
       &tmp_cells, &obstaclesHost, &av_vels);
 
-  // declare host arrays
-  unsigned long Y = params.ny;
-  unsigned long X = params.nx;
-  unsigned long MaxIters = params.maxIters;
+  /* assume Ny*Nx*MaxIters/LOCALSIZEX/LOCALSIZEY will not cause integer overload */
+  int Ny = params.ny;
+  int Nx = params.nx;
+  int MaxIters = params.maxIters;
 
-  float *speedsHostS0 = new float[Y*X];
-  float *speedsHostS1 = new float[Y*X];
-  float *speedsHostS2 = new float[Y*X];
-  float *speedsHostS3 = new float[Y*X];
-  float *speedsHostS4 = new float[Y*X];
-  float *speedsHostS5 = new float[Y*X];
-  float *speedsHostS6 = new float[Y*X];
-  float *speedsHostS7 = new float[Y*X];
-  float *speedsHostS8 = new float[Y*X];
+  float *speedsHostS0 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS1 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS2 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS3 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS4 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS5 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS6 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS7 = (float*) malloc (sizeof(float)*Ny*Nx);
+  float *speedsHostS8 = (float*) malloc (sizeof(float)*Ny*Nx);
 
-  float *tot_up =  new float[(Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters];
-  int *tot_cellsp =  new int[(Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters];
+  float *tot_up = (float*) malloc (sizeof(float) * (Ny/LOCALSIZEY) * (Nx/LOCALSIZEX) * MaxIters);
+  int *tot_cellsp = (int*) malloc (sizeof(int) * (Ny/LOCALSIZEY) * (Nx/LOCALSIZEX) * MaxIters);
 
   // Init arrays
   /* loop over _all_ cells */
-  for (int jj = 0; jj < params.ny; jj++)
+  for (int jj = 0; jj < Ny; jj++)
   {
-    for (int ii = 0; ii < params.nx; ii++)
+    for (int ii = 0; ii < Nx; ii++)
     {
-      speedsHostS0[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[0];
-      speedsHostS1[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[1];
-      speedsHostS2[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[2];
-      speedsHostS3[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[3];
-      speedsHostS4[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[4];
-      speedsHostS5[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[5];
-      speedsHostS6[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[6];
-      speedsHostS7[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[7];
-      speedsHostS8[ii + jj*params.nx] = cells[ii + jj*params.nx].speeds[8];
+      speedsHostS0[ii+jj*Nx] = cells[ii+jj*Nx].speeds[0];
+      speedsHostS1[ii+jj*Nx] = cells[ii+jj*Nx].speeds[1];
+      speedsHostS2[ii+jj*Nx] = cells[ii+jj*Nx].speeds[2];
+      speedsHostS3[ii+jj*Nx] = cells[ii+jj*Nx].speeds[3];
+      speedsHostS4[ii+jj*Nx] = cells[ii+jj*Nx].speeds[4];
+      speedsHostS5[ii+jj*Nx] = cells[ii+jj*Nx].speeds[5];
+      speedsHostS6[ii+jj*Nx] = cells[ii+jj*Nx].speeds[6];
+      speedsHostS7[ii+jj*Nx] = cells[ii+jj*Nx].speeds[7];
+      speedsHostS8[ii+jj*Nx] = cells[ii+jj*Nx].speeds[8];
     }
   }
 
@@ -196,50 +198,48 @@ int main(int argc, char* argv[])
     cpu_selector dev_sel; 
 #endif
 
-    queue device_queue(dev_sel);
+    queue q(dev_sel);
     std::cout << "Running on "
-      << device_queue.get_device().get_info<info::device::name>()
+      << q.get_device().get_info<info::device::name>()
       << "\n";
     //start timer
     gettimeofday(&timstr, NULL);
     tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
     // Creating buffers which are bound to host arrays
-    buffer<float, 1> speeds0 (speedsHostS0, Y*X);
-    buffer<float, 1> speeds1 (speedsHostS1, Y*X);
-    buffer<float, 1> speeds2 (speedsHostS2, Y*X);
-    buffer<float, 1> speeds3 (speedsHostS3, Y*X);
-    buffer<float, 1> speeds4 (speedsHostS4, Y*X);
-    buffer<float, 1> speeds5 (speedsHostS5, Y*X);
-    buffer<float, 1> speeds6 (speedsHostS6, Y*X);
-    buffer<float, 1> speeds7 (speedsHostS7, Y*X);
-    buffer<float, 1> speeds8 (speedsHostS8, Y*X);
+    buffer<float, 1> speeds0 (speedsHostS0, Ny*Nx);
+    buffer<float, 1> speeds1 (speedsHostS1, Ny*Nx);
+    buffer<float, 1> speeds2 (speedsHostS2, Ny*Nx);
+    buffer<float, 1> speeds3 (speedsHostS3, Ny*Nx);
+    buffer<float, 1> speeds4 (speedsHostS4, Ny*Nx);
+    buffer<float, 1> speeds5 (speedsHostS5, Ny*Nx);
+    buffer<float, 1> speeds6 (speedsHostS6, Ny*Nx);
+    buffer<float, 1> speeds7 (speedsHostS7, Ny*Nx);
+    buffer<float, 1> speeds8 (speedsHostS8, Ny*Nx);
 
-    buffer<float, 1> tmp_speeds0 (Y*X);
-    buffer<float, 1> tmp_speeds1 (Y*X);
-    buffer<float, 1> tmp_speeds2 (Y*X);
-    buffer<float, 1> tmp_speeds3 (Y*X);
-    buffer<float, 1> tmp_speeds4 (Y*X);
-    buffer<float, 1> tmp_speeds5 (Y*X);
-    buffer<float, 1> tmp_speeds6 (Y*X);
-    buffer<float, 1> tmp_speeds7 (Y*X);
-    buffer<float, 1> tmp_speeds8 (Y*X);
+    buffer<float, 1> tmp_speeds0 (Ny*Nx);
+    buffer<float, 1> tmp_speeds1 (Ny*Nx);
+    buffer<float, 1> tmp_speeds2 (Ny*Nx);
+    buffer<float, 1> tmp_speeds3 (Ny*Nx);
+    buffer<float, 1> tmp_speeds4 (Ny*Nx);
+    buffer<float, 1> tmp_speeds5 (Ny*Nx);
+    buffer<float, 1> tmp_speeds6 (Ny*Nx);
+    buffer<float, 1> tmp_speeds7 (Ny*Nx);
+    buffer<float, 1> tmp_speeds8 (Ny*Nx);
 
-    buffer<int, 1> obstacles (obstaclesHost, Y*X);
-    buffer<float,1> partial_sum (tot_up, (Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters);
-    buffer<int, 1> partial_sum2 (tot_cellsp, (Y/LOCALSIZEY) * (X/LOCALSIZEX) * MaxIters);
+    buffer<int, 1> obstacles (obstaclesHost, Ny*Nx);
+    buffer<float,1> partial_sum (tot_up, (Ny/LOCALSIZEY) * (Nx/LOCALSIZEX) * MaxIters);
+    buffer<int, 1> partial_sum2 (tot_cellsp, (Ny/LOCALSIZEY) * (Nx/LOCALSIZEX) * MaxIters);
 
     //parameters for kernel
-    int nx = params.nx;
-    int ny = params.ny;
     float omega = params.omega;
     float densityaccel = params.density*params.accel;
 
     //Define range
-    auto myRange = nd_range<2>(range<2>(Y,X), range<2>(LOCALSIZEY,LOCALSIZEX));
+    auto myRange = nd_range<2>(range<2>(Ny,Nx), range<2>(LOCALSIZEY,LOCALSIZEX));
 
-    for (int tt = 0; tt < params.maxIters; tt++){
-      device_queue.submit([&](handler &cgh){
+    for (int tt = 0; tt < MaxIters; tt++) {
+      q.submit([&](handler &cgh){
           //Set up accessors
           auto Speed0A = speeds0.get_access<sycl_read>(cgh);
           auto Speed1A = speeds1.get_access<sycl_read>(cgh);
@@ -263,8 +263,8 @@ int main(int argc, char* argv[])
           auto Tmp7A = tmp_speeds7.get_access<sycl_discard_write>(cgh);
           auto Tmp8A = tmp_speeds8.get_access<sycl_discard_write>(cgh);
 
-          auto Partial_Sum = partial_sum.get_access<sycl_write>(cgh);
-          auto Partial_Sum2 = partial_sum2.get_access<sycl_write>(cgh);
+          auto Partial_Sum = partial_sum.get_access<sycl_discard_write>(cgh);
+          auto Partial_Sum2 = partial_sum2.get_access<sycl_discard_write>(cgh);
 
           //setup local memory
           accessor <float, 1, sycl_read_write, access::target::local> 
@@ -272,40 +272,40 @@ int main(int argc, char* argv[])
           accessor <int, 1, sycl_read_write, access::target::local> 
             local_sum2(LOCALSIZEX*LOCALSIZEY, cgh);
 
-          cgh.parallel_for<class lbm1>( myRange, [=] (nd_item<2> item){
+          cgh.parallel_for<class d2q9_bgk>( myRange, [=] (nd_item<2> item){
               /* get column and row indices */
               const int ii = item.get_global_id(1);
               const int jj = item.get_global_id(0);
 
               const float c_sq_inv = 3.f;
-              const float c_sq = 1/c_sq_inv; /* square of speed of sound */
+              const float c_sq = 1.f/c_sq_inv; /* square of speed of sound */
               const float temp1 = 4.5f;
-              const float w1 = 1/9.f;
+              const float w1 = 1.f/9.f;
               const float w0 = 4.f * w1;  /* weighting factor */
-              const float w2 = 1/36.f; /* weighting factor */
+              const float w2 = 1.f/36.f; /* weighting factor */
               const float w11 = densityaccel * w1;
               const float w21 = densityaccel * w2;
 
               /* determine indices of axis-direction neighbours
                ** respecting periodic boundary conditions (wrap around) */
-              const int y_n = (jj + 1) % ny;
-              const int x_e = (ii + 1) % nx;
-              const int y_s = (jj == 0) ? (jj + ny - 1) : (jj - 1);
-              const int x_w = (ii == 0) ? (ii + nx - 1) : (ii - 1);
+              const int y_n = (jj + 1) % Ny;
+              const int x_e = (ii + 1) % Nx;
+              const int y_s = (jj == 0) ? (jj + Ny - 1) : (jj - 1);
+              const int x_w = (ii == 0) ? (ii + Nx - 1) : (ii - 1);
 
               /* propagate densities from neighbouring cells, following
                ** appropriate directions of travel and writing into
                ** scratch space grid */
 
-              float tmp_s0 = Speed0A[ii + jj*nx];
-              float tmp_s1 = (jj == ny-2 && (!ObstaclesA[x_w + jj*nx] && std::isgreater((Speed3A[x_w + jj*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_w + jj*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_w + jj*nx] - w21) , 0.f))) ? Speed1A[x_w + jj*nx]+w11 : Speed1A[x_w + jj*nx];
-              float tmp_s2 = Speed2A[ii + y_s*nx];
-              float tmp_s3 = (jj == ny-2 && (!ObstaclesA[x_e + jj*nx] && std::isgreater((Speed3A[x_e + jj*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_e + jj*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_e + jj*nx] - w21) , 0.f))) ? Speed3A[x_e + jj*nx]-w11 : Speed3A[x_e + jj*nx];
-              float tmp_s4 = Speed4A[ii + y_n*nx];
-              float tmp_s5 = (y_s == ny-2 && (!ObstaclesA[x_w + y_s*nx] && std::isgreater((Speed3A[x_w + y_s*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_w + y_s*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_w + y_s*nx] - w21) , 0.f))) ? Speed5A[x_w + y_s*nx]+w21 : Speed5A[x_w + y_s*nx];
-              float tmp_s6 = (y_s == ny-2 && (!ObstaclesA[x_e + y_s*nx] && std::isgreater((Speed3A[x_e + y_s*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_e + y_s*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_e + y_s*nx] - w21) , 0.f))) ? Speed6A[x_e + y_s*nx]-w21 : Speed6A[x_e + y_s*nx];
-              float tmp_s7 = (y_n == ny-2 && (!ObstaclesA[x_e + y_n*nx] && std::isgreater((Speed3A[x_e + y_n*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_e + y_n*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_e + y_n*nx] - w21) , 0.f))) ? Speed7A[x_e + y_n*nx]-w21 : Speed7A[x_e + y_n*nx];
-              float tmp_s8 = (y_n == ny-2 && (!ObstaclesA[x_w + y_n*nx] && std::isgreater((Speed3A[x_w + y_n*nx] - w11) , 0.f) && std::isgreater((Speed6A[x_w + y_n*nx] - w21) , 0.f) && std::isgreater((Speed7A[x_w + y_n*nx] - w21) , 0.f))) ? Speed8A[x_w + y_n*nx]+w21 : Speed8A[x_w + y_n*nx];
+              float tmp_s0 = Speed0A[ii + jj*Nx];
+              float tmp_s1 = (jj == Ny-2 && (!ObstaclesA[x_w + jj*Nx] && isGreater((Speed3A[x_w + jj*Nx] - w11) , 0.f) && isGreater((Speed6A[x_w + jj*Nx] - w21) , 0.f) && isGreater((Speed7A[x_w + jj*Nx] - w21) , 0.f))) ? Speed1A[x_w + jj*Nx]+w11 : Speed1A[x_w + jj*Nx];
+              float tmp_s2 = Speed2A[ii + y_s*Nx];
+              float tmp_s3 = (jj == Ny-2 && (!ObstaclesA[x_e + jj*Nx] && isGreater((Speed3A[x_e + jj*Nx] - w11) , 0.f) && isGreater((Speed6A[x_e + jj*Nx] - w21) , 0.f) && isGreater((Speed7A[x_e + jj*Nx] - w21) , 0.f))) ? Speed3A[x_e + jj*Nx]-w11 : Speed3A[x_e + jj*Nx];
+              float tmp_s4 = Speed4A[ii + y_n*Nx];
+              float tmp_s5 = (y_s == Ny-2 && (!ObstaclesA[x_w + y_s*Nx] && isGreater((Speed3A[x_w + y_s*Nx] - w11) , 0.f) && isGreater((Speed6A[x_w + y_s*Nx] - w21) , 0.f) && isGreater((Speed7A[x_w + y_s*Nx] - w21) , 0.f))) ? Speed5A[x_w + y_s*Nx]+w21 : Speed5A[x_w + y_s*Nx];
+              float tmp_s6 = (y_s == Ny-2 && (!ObstaclesA[x_e + y_s*Nx] && isGreater((Speed3A[x_e + y_s*Nx] - w11) , 0.f) && isGreater((Speed6A[x_e + y_s*Nx] - w21) , 0.f) && isGreater((Speed7A[x_e + y_s*Nx] - w21) , 0.f))) ? Speed6A[x_e + y_s*Nx]-w21 : Speed6A[x_e + y_s*Nx];
+              float tmp_s7 = (y_n == Ny-2 && (!ObstaclesA[x_e + y_n*Nx] && isGreater((Speed3A[x_e + y_n*Nx] - w11) , 0.f) && isGreater((Speed6A[x_e + y_n*Nx] - w21) , 0.f) && isGreater((Speed7A[x_e + y_n*Nx] - w21) , 0.f))) ? Speed7A[x_e + y_n*Nx]-w21 : Speed7A[x_e + y_n*Nx];
+              float tmp_s8 = (y_n == Ny-2 && (!ObstaclesA[x_w + y_n*Nx] && isGreater((Speed3A[x_w + y_n*Nx] - w11) , 0.f) && isGreater((Speed6A[x_w + y_n*Nx] - w21) , 0.f) && isGreater((Speed7A[x_w + y_n*Nx] - w21) , 0.f))) ? Speed8A[x_w + y_n*Nx]+w21 : Speed8A[x_w + y_n*Nx];
 
               /* compute local density total */
               float local_density = tmp_s0 + tmp_s1 + tmp_s2 + tmp_s3 + tmp_s4  + tmp_s5  + tmp_s6  + tmp_s7  + tmp_s8;
@@ -328,7 +328,7 @@ int main(int argc, char* argv[])
                 * local_density_recip;
 
               /* velocity squared */
-              const float temp2 = - (u_x * u_x + u_y * u_y)* 1/((2.f * c_sq));
+              const float temp2 = - (u_x * u_x + u_y * u_y)/(2.f * c_sq);
 
               /* equilibrium densities */
               float d_equ[NSPEEDS];
@@ -363,7 +363,7 @@ int main(int argc, char* argv[])
                   + temp2);
 
               float tmp;
-              int expression = ObstaclesA[ii + jj*nx];
+              int expression = ObstaclesA[ii + jj*Nx];
               tmp_s0 = expression ? tmp_s0 : (tmp_s0 + omega * (d_equ[0] - tmp_s0));
               tmp = tmp_s1;
               tmp_s1 = expression ? tmp_s3 : (tmp_s1 + omega * (d_equ[1] - tmp_s1));
@@ -379,7 +379,7 @@ int main(int argc, char* argv[])
               tmp_s8 = expression ? tmp : (tmp_s8 + omega * (d_equ[8] - tmp_s8));
 
               /* local density total */
-              local_density =  1/((tmp_s0 + tmp_s1 + tmp_s2 + tmp_s3 + tmp_s4 + tmp_s5 + tmp_s6 + tmp_s7 + tmp_s8));
+              local_density =  1.f/((tmp_s0 + tmp_s1 + tmp_s2 + tmp_s3 + tmp_s4 + tmp_s5 + tmp_s6 + tmp_s7 + tmp_s8));
 
               /* x-component of velocity */
               u_x = (tmp_s1
@@ -398,15 +398,15 @@ int main(int argc, char* argv[])
                   - tmp_s8)
                 * local_density;
 
-              Tmp0A[ii + jj*nx] = tmp_s0;
-              Tmp1A[ii + jj*nx] = tmp_s1;
-              Tmp2A[ii + jj*nx] = tmp_s2;
-              Tmp3A[ii + jj*nx] = tmp_s3;
-              Tmp4A[ii + jj*nx] = tmp_s4;
-              Tmp5A[ii + jj*nx] = tmp_s5;
-              Tmp6A[ii + jj*nx] = tmp_s6;
-              Tmp7A[ii + jj*nx] = tmp_s7;
-              Tmp8A[ii + jj*nx] = tmp_s8;
+              Tmp0A[ii + jj*Nx] = tmp_s0;
+              Tmp1A[ii + jj*Nx] = tmp_s1;
+              Tmp2A[ii + jj*Nx] = tmp_s2;
+              Tmp3A[ii + jj*Nx] = tmp_s3;
+              Tmp4A[ii + jj*Nx] = tmp_s4;
+              Tmp5A[ii + jj*Nx] = tmp_s5;
+              Tmp6A[ii + jj*Nx] = tmp_s6;
+              Tmp7A[ii + jj*Nx] = tmp_s7;
+              Tmp8A[ii + jj*Nx] = tmp_s8;
 
 
               int local_idi = item.get_local_id(1);
@@ -414,14 +414,14 @@ int main(int argc, char* argv[])
               int local_sizei = item.get_local_range(1);
               int local_sizej = item.get_local_range(0);
               /* accumulate the norm of x- and y- velocity components */
-              local_sum[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*nx]) ? 0 : cl::sycl::hypot(u_x,u_y);
+              local_sum[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*Nx]) ? 0 : cl::sycl::hypot(u_x,u_y);
               /* increase counter of inspected cells */
-              local_sum2[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*nx]) ? 0 : 1 ;
+              local_sum2[local_idi + local_idj*local_sizei] = (ObstaclesA[ii + jj*Nx]) ? 0 : 1 ;
               item.barrier(access::fence_space::local_space);
               int group_id = item.get_group(1);
+              int group_id2 = item.get_group(0);
               int group_size = item.get_group_range(1);
               int group_size2 = item.get_group_range(0);
-              int group_id2 = item.get_group(0);
               if(local_idi == 0 && local_idj == 0){
                 float sum = 0.0f;
                 int sum2 = 0;
@@ -478,13 +478,13 @@ int main(int argc, char* argv[])
 
   float tot_u = 0;
   int tot_cells = 0;
-  for (int tt = 0; tt < params.maxIters; tt++){
+  for (int tt = 0; tt < MaxIters; tt++){
     tot_u = 0;
     tot_cells = 0;
-    for(int i = 0; i < params.nx/LOCALSIZEX*params.ny/LOCALSIZEY; i++){
-      tot_u += tot_up[i+tt*params.nx/LOCALSIZEX*params.ny/LOCALSIZEY];
-      tot_cells += tot_cellsp[i+tt*params.nx/LOCALSIZEX*params.ny/LOCALSIZEY];
-      // printf("%d %f %d\n", i, tot_u, tot_cells);
+    for(int i = 0; i < Nx/LOCALSIZEX*Ny/LOCALSIZEY; i++){
+      tot_u += tot_up[i+tt*Nx/LOCALSIZEX*Ny/LOCALSIZEY];
+      tot_cells += tot_cellsp[i+tt*Nx/LOCALSIZEX*Ny/LOCALSIZEY];
+      //printf("%d %f %d\n", i, tot_u, tot_cells);
     }
     av_vels[tt] = tot_u/tot_cells;
   }
@@ -492,26 +492,21 @@ int main(int argc, char* argv[])
   //end timer
   gettimeofday(&timstr, NULL);
   toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-  getrusage(RUSAGE_SELF, &ru);
-  timstr = ru.ru_utime;
-  usrtim = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-  timstr = ru.ru_stime;
-  systim = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
   // put answers back into cells
-  for (int jj = 0; jj < params.ny; jj++)
+  for (int jj = 0; jj < Ny; jj++)
   {
-    for (int ii = 0; ii < params.nx; ii++)
+    for (int ii = 0; ii < Nx; ii++)
     {
-      cells[ii + jj*params.nx].speeds[0] = speedsHostS0[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[1] = speedsHostS1[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[2] = speedsHostS2[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[3] = speedsHostS3[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[4] = speedsHostS4[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[5] = speedsHostS5[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[6] = speedsHostS6[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[7] = speedsHostS7[ii + jj*params.nx];
-      cells[ii + jj*params.nx].speeds[8] = speedsHostS8[ii + jj*params.nx];
+      cells[ii + jj*Nx].speeds[0] = speedsHostS0[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[1] = speedsHostS1[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[2] = speedsHostS2[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[3] = speedsHostS3[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[4] = speedsHostS4[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[5] = speedsHostS5[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[6] = speedsHostS6[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[7] = speedsHostS7[ii + jj*Nx];
+      cells[ii + jj*Nx].speeds[8] = speedsHostS8[ii + jj*Nx];
     }
   }
 
@@ -519,8 +514,6 @@ int main(int argc, char* argv[])
   printf("==done==\n");
   printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells, obstaclesHost));
   printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
-  printf("Elapsed user CPU time:\t\t%.6lf (s)\n", usrtim);
-  printf("Elapsed system CPU time:\t%.6lf (s)\n", systim);
   write_values(params, cells, obstaclesHost, av_vels);
   finalise(cells, tmp_cells, obstaclesHost, av_vels);
 
@@ -671,7 +664,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
   if (*tmp_cells_ptr == NULL) die("cannot allocate memory for tmp_cells", __LINE__, __FILE__);
 
   /* the map of obstacles */
-  *obstacles_ptr = new int[(params->ny * params->nx)];
+  *obstacles_ptr = (int*) malloc (sizeof(int) * params->ny * params->nx);
 
   if (*obstacles_ptr == NULL) die("cannot allocate column memory for obstacles", __LINE__, __FILE__);
 
