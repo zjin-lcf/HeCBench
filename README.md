@@ -175,6 +175,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 8.0 | 7.4 | 8.1 | 16.3  |
 
 
+| d2q9_bgk | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80011 | 80021  | 80021 | 640027 |
+| host timing(s) | 19.3 | 14.7 | 21.4 | 39.2 |
+| device timing(s) | 14.4 | 15.4 | 16.0 | 20.8  |
+
+
 | diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 5  | 5 | 14 |
@@ -848,6 +855,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
 
 
+| d2q9_bgk | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80011 | 80021  | 80021 | 640027 |
+| host timing(s) | 16.4 | 12.9 | 16.7 | 100.1 |
+| device timing(s) | 12.7 | 13.0 | 12.9 | 51  |
+
+
 | diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 5  | 5 | 14 |
@@ -1451,6 +1465,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
+
+### d2q9_bgk 
+  A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
 ### diamond
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
