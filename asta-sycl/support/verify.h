@@ -41,8 +41,8 @@ inline int compare_output(T *output, T *ref, int dim) {
     int i;
     int fail = 0;
     for(i = 0; i < dim; i++) {
-        T diff = fabs(ref[i] - output[i]);
-        if((diff - 0.0f) > 0.00001f && diff > 0.01 * fabs(ref[i])) {
+        T diff = std::fabs(ref[i] - output[i]);
+        if((diff - 0.0f) > 0.00001f && diff > 0.01 * std::fabs(ref[i])) {
             printf("Failed at line: %d ref: %f actual: %f diff: %f\n", i, ref[i], output[i], diff);
             fail = 1;
 	    break;
