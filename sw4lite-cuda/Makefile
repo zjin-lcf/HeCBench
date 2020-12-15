@@ -15,18 +15,16 @@ MPILIB = $(MPIPATH)/lib
 
 ifeq ($(debug),yes)
    FFLAGS    = -g
-   CXXFLAGS  = -g -x cu -I../src -c -dc -arch=$(gpuarch) -DSW4_CROUTINES -DSW4_CUDA -DSW4_NONBLOCKING -ccbin $(HOSTCOMP)
+   CXXFLAGS  = -g -x cu -I../src -c -dc -arch=$(gpuarch) -DSW4_NONBLOCKING -ccbin $(HOSTCOMP)
    CFLAGS    = -g
 else
    FFLAGS   = -O3
-   CXXFLAGS = -O3 -x cu -I../src -c -dc -arch=$(gpuarch) -DSW4_CROUTINES -DSW4_CUDA -DSW4_NONBLOCKING -ccbin $(HOSTCOMP)
+   CXXFLAGS = -O3 -x cu -I../src -c -dc -arch=$(gpuarch) -DSW4_NONBLOCKING -ccbin $(HOSTCOMP)
    CFLAGS   = -O
 endif
 ifdef MPIINC
   CXXFLAGS += -I$(MPIINC)
 endif
-
-#FFLAGS   += -Mcuda
 
 ifeq ($(openmp),yes)
    OMPOPT = -Xcompiler -fopenmp
