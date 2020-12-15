@@ -371,6 +371,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.6 | 10.1 | 10.4 | 10.7 |
 
 
+| langford | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 15 | 20 | 20 | 33 |
+| host timing(s) | 7.68 | 8.1 | 8.1 | 10.2 |
+| device timing(s) | 5.8 | 5.8 | 5.8 | 5.3 |
+
+
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 16 | 28 | 28 | 57 |
@@ -1051,6 +1058,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 10.4 | 11.4 | 11.4 | 11.6 |
 
 
+| langford | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 15 | 20 | 20 | 33 |
+| host timing(s) | 12.9 | 13.0 | 12.8 | 37.4 |
+| device timing(s) | 11.3 | 11.3 | 11.1 | 33 |
+
+
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 108546 | 108555 | 108555  | NA |
@@ -1466,7 +1480,7 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
-### d2q9_bgk 
+### d2q9_bgk
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
 ### diamond
@@ -1550,6 +1564,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### knn
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
+
+### langford
+  Count planar Langford sequences (https://github.com/boris-dimitrov/z4_planar_langford_multigpu)
 
 ### laplace
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
