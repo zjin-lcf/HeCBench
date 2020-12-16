@@ -576,9 +576,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | rng-wallace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 200 | 202 | 202 |  NA |
-| host timing(s) | 4.3 | 3.9 | 4.6 | NA | 
-| device timing(s) | 3.6 | 3.2 | 3.6 | NA |
+| total enqueue | 200 | 202 | 202 |  207 |
+| host timing(s) | 4.3 | 3.9 | 4.6 | 6.6 | 
+| device timing(s) | 3.6 | 3.2 | 3.6 | 3.1 |
 
 
 | rsbench | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1277,9 +1277,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | rng-wallace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 200 | 202 | 202 |  NA |
-| host timing(s) | 2.6 | 3.2 | 3.2 | NA | 
-| device timing(s) | 2.1 | 2.3 | 2.3 | NA |
+| total enqueue | 200 | 202 | 202 |  207 |
+| host timing(s) | 2.6 | 3.2 | 3.2 | 15.0 | 
+| device timing(s) | 2.1 | 2.3 | 2.3 | 11.7 |
 
 
 | rsbench | SYCL | DPCT usm | DPCT header | OpenMP | 
