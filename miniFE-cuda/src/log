@@ -1,0 +1,77 @@
+./get_common_files
+./generate_info_header "nvcc" "-I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX " "miniFE" "MINIFE"
+CXX: /usr/bin/nvcc
+Compiler version: nvcc: NVIDIA (R) Cuda compiler driver
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c main.cpp
+./perform_element_loop.hpp(75): warning: variable "t_gn" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+./perform_element_loop.hpp(75): warning: variable "t_ce" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+./perform_element_loop.hpp(75): warning: variable "t_si" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+./perform_element_loop.hpp(76): warning: variable "t0" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+../fem/Hex8.hpp(285): warning: variable "pt" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::Hex8::diffusionMatrix_symm(const Scalar *, const Scalar *, Scalar *) [with Scalar=double]" 
+../fem/Hex8_ElemData.hpp(68): here
+            instantiation of "void miniFE::compute_element_matrix_and_vector(miniFE::ElemData<GlobalOrdinal, Scalar> &) [with GlobalOrdinal=int, Scalar=double]" 
+./perform_element_loop.hpp(86): here
+            instantiation of "void miniFE::perform_element_loop(const miniFE::simple_mesh_description<GlobalOrdinal> &, const Box &, MatrixType &, VectorType &, miniFE::Parameters &) [with GlobalOrdinal=int, MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./assemble_FE_data.hpp(72): here
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+./SparseMatrix_functions.hpp(195): warning: variable "flag" was declared but never referenced
+          detected during:
+            instantiation of "void miniFE::sum_into_global_linear_system(miniFE::ElemData<GlobalOrdinal, Scalar> &, MatrixType &, VectorType &) [with GlobalOrdinal=int, Scalar=double, MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./perform_element_loop.hpp(87): here
+            instantiation of "void miniFE::perform_element_loop(const miniFE::simple_mesh_description<GlobalOrdinal> &, const Box &, MatrixType &, VectorType &, miniFE::Parameters &) [with GlobalOrdinal=int, MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./assemble_FE_data.hpp(72): here
+            instantiation of "void miniFE::assemble_FE_data(const miniFE::simple_mesh_description<MatrixType::GlobalOrdinalType> &, MatrixType &, VectorType &, miniFE::Parameters &) [with MatrixType=miniFE::CSRMatrix<double, int, int>, VectorType=miniFE::Vector<double, int, int>]" 
+./driver.hpp(195): here
+            instantiation of "int miniFE::driver<Scalar,LocalOrdinal,GlobalOrdinal>(const Box &, Box &, miniFE::Parameters &, YAML_Doc &) [with Scalar=double, LocalOrdinal=int, GlobalOrdinal=int]" 
+main.cpp(178): here
+
+./SparseMatrix_functions.hpp(195): warning: variable "flag" was declared but never referenced
+
+./perform_element_loop.hpp(75): warning: variable "t_gn" was declared but never referenced
+
+./perform_element_loop.hpp(75): warning: variable "t_ce" was declared but never referenced
+
+./perform_element_loop.hpp(75): warning: variable "t_si" was declared but never referenced
+
+./perform_element_loop.hpp(76): warning: variable "t0" was declared but never referenced
+
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c ../utils/BoxPartition.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c YAML_Doc.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c YAML_Element.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c ../utils/param_utils.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c ../utils/utils.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  -DMINIFE_INFO=1 -DMINIFE_KERNELS=0 -c ../utils/mytimer.cpp
+nvcc -I. -I../utils -I../fem -DMINIFE_SCALAR=double -DMINIFE_LOCAL_ORDINAL=int -DMINIFE_GLOBAL_ORDINAL=int -DMINIFE_RESTRICT=__restrict__ -x cu -DMINIFE_CSR_MATRIX  main.o BoxPartition.o YAML_Doc.o YAML_Element.o param_utils.o utils.o mytimer.o  -o miniFE.x -v -O3 -x cu  
+nvcc fatal   : redefinition of argument 'x'
+make_targets:23: recipe for target 'miniFE.x' failed
+make: *** [miniFE.x] Error 1
