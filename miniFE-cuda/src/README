@@ -1,4 +1,4 @@
-The SYCL port of the miniFE is based on the OpenMP4.5-opt.  By default, we use the SYCL GPU selector to run the application on a GPU. The source files Vector_functions.hpp and SparseMatrix_functions.hpp contain the kernel implementations. 
+The CUDA port of the miniFE is based on the OpenMP4.5-opt.  The source files Vector_functions.hpp and SparseMatrix_functions.hpp contain the kernel implementations. The CUDA block size of each kernel is fixed at 256.  The kernels are launched in cg_solve.cpp.
 
 Verification
 Verification is always enabled by commenting "if (params.verify_solution > 0)" in driver.hpp.
@@ -9,6 +9,9 @@ Debugging can be enabled by adding the option -DMINIFE_DEBUG in Makefile
 
 Build miniFE:
    make
+
+Clean miniFE
+   make realclean
 
 Quick run 
   ./miniFE.x
