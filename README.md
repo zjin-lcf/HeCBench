@@ -175,6 +175,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 8.0 | 7.4 | 8.1 | 16.3  |
 
 
+| d2q9_bgk | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80011 | 80021  | 80021 | 640027 |
+| host timing(s) | 19.3 | 14.7 | 21.4 | 39.2 |
+| device timing(s) | 14.4 | 15.4 | 16.0 | 20.8  |
+
+
 | diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 5  | 5 | 14 |
@@ -362,6 +369,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | total enqueue | 500 | 700 | 700 | 2007 |
 | host timing(s) | 9.8 | 12.3 | 12.5 |  16.2 |
 | device timing(s) | 7.6 | 10.1 | 10.4 | 10.7 |
+
+
+| langford | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 15 | 20 | 20 | 33 |
+| host timing(s) | 7.68 | 8.1 | 8.1 | 10.2 |
+| device timing(s) | 5.8 | 5.8 | 5.8 | 5.3 |
 
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -848,6 +862,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
 
 
+| d2q9_bgk | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 80011 | 80021  | 80021 | 640027 |
+| host timing(s) | 16.4 | 12.9 | 16.7 | 100.1 |
+| device timing(s) | 12.7 | 13.0 | 12.9 | 51  |
+
+
 | diamond | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 5  | 5 | 14 |
@@ -1035,6 +1056,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | total enqueue | 500 | 700 | 700 | 2007 |
 | host timing(s) | 12.9 | 15.3  | 14.6 | 17.0 |
 | device timing(s) | 10.4 | 11.4 | 11.4 | 11.6 |
+
+
+| langford | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 15 | 20 | 20 | 33 |
+| host timing(s) | 12.9 | 13.0 | 12.8 | 37.4 |
+| device timing(s) | 11.3 | 11.3 | 11.1 | 33 |
 
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1452,6 +1480,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
+### d2q9_bgk
+  A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
+
 ### diamond
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
@@ -1533,6 +1564,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### knn
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
+
+### langford
+  Count planar Langford sequences (https://github.com/boris-dimitrov/z4_planar_langford_multigpu)
 
 ### laplace
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
