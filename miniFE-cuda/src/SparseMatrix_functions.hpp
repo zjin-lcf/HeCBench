@@ -493,7 +493,7 @@ namespace miniFE {
         MINIFE_SCALAR sum = 0;
 
         // Use the unroll factor in the OpenMP program 
-#pragma unroll(27)
+#pragma unroll 27
         for(MINIFE_GLOBAL_ORDINAL i = row_start; i < row_end; ++i) {
           sum += Acoefs[i] * xcoefs[Acols[i]];
         }
