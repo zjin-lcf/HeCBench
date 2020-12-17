@@ -150,6 +150,14 @@ cg_solve(OperatorType& A,
   buffer<GlobalOrdinalType, 1> d_Acols(Acols, A.packed_cols.size());
   buffer<MINIFE_SCALAR, 1> d_Acoefs(Acoefs, A.packed_coefs.size());
 
+  d_r.set_final_data(nullptr);
+  d_p.set_final_data(nullptr);
+  d_Ap.set_final_data(nullptr);
+  d_b.set_final_data(nullptr);
+  d_Arowoffsets.set_final_data(nullptr);
+  d_Acols.set_final_data(nullptr);
+  d_Acoefs.set_final_data(nullptr);
+
   TICK(); waxpby(one, x, zero, x, p, q, d_x, d_x, d_p); TOCK(tWAXPY);
 
 #ifdef MINIFE_DEBUG
