@@ -208,7 +208,7 @@ std::cout << "rtrans="<<rtrans<<std::endl;
       TOCK(tWAXPY);
     }
 
-    normr = sqrt(rtrans);
+    normr = std::sqrt(rtrans);
 
     if (myproc == 0 && (k%print_freq==0 || k==max_iter)) {
       std::cout << "Iteration = "<<k<<"   Residual = "<<normr<<std::endl;

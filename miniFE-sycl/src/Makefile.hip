@@ -13,19 +13,20 @@ MINIFE_MATRIX_TYPE = -DMINIFE_CSR_MATRIX
 #-----------------------------------------------------------------------
 
 CFLAGS = -O3
-
 CXXFLAGS = $(CFLAGS)
 
-CUDA_ARCH = "--cuda-gpu-arch=sm_35"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+MARCH     = gfx906
+PLATFORM  = rocm
+ROCM_DEVICE_LIB = -nogpulib \
+	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
+	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/hip.bc
 
 CPPFLAGS = -I. -I../utils -I../fem $(MINIFE_TYPES) -I../../include/ \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN) \
-	  -DUSE_GPU \
-	  $(MINIFE_MATRIX_TYPE) \
+	   -DUSE_GPU \
+           --hipsycl-platform=$(PLATFORM) \
+	   --hipsycl-gpu-arch=$(MARCH) \
+	   $(ROCM_DEVICE_LIB) \
+	   $(MINIFE_MATRIX_TYPE) \
 #            -DMINIFE_DEBUG \
 #	-DHAVE_MPI -DMPICH_IGNORE_CXX_SEEK \
 #	-DMINIFE_REPORT_RUSAGE
@@ -36,8 +37,8 @@ LIBS=
 # The MPICH_IGNORE_CXX_SEEK macro is required for some mpich versions,
 # such as the one on my cygwin machine.
 
-CXX=clang++
-CC=clang
+CXX=syclcc
+CC=syclcc
 
 
 include make_targets
