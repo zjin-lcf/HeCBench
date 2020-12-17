@@ -514,15 +514,15 @@ namespace miniFE {
           MINIFE_GLOBAL_ORDINAL row_start = 0;
           MINIFE_GLOBAL_ORDINAL row_end   = 0;
 
-          range<1> global_work_size ((rows_size+255)/256*256);
-          range<1> local_work_size (256);
+          range<1> gws ((rows_size+255)/256*256);
+          range<1> lws (256);
           q.submit([&] (handler &h) {
               auto Arowoffsets = d_Arowoffsets.template get_access<sycl_read>(h);
               auto Acoefs = d_Acoefs.template get_access<sycl_read>(h);
               auto Acols = d_Acols.template get_access<sycl_read>(h);
               auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
               auto ycoefs = d_ycoefs.template get_access<sycl_write>(h);
-              h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=] (nd_item<1> item) {
+              h.parallel_for<class matvec_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
                   MINIFE_LOCAL_ORDINAL row = item.get_global_id(0);
                   if (row < rows_size) {
                     MINIFE_GLOBAL_ORDINAL row_start = Arowoffsets[row];
@@ -530,7 +530,7 @@ namespace miniFE {
                     MINIFE_SCALAR sum = 0;
 
 		    // Use the unroll factor in the OpenMP program 
-                    #pragma unroll(27)
+                    #pragma unroll 27
                     for(MINIFE_GLOBAL_ORDINAL i = row_start; i < row_end; ++i) {
                       sum += Acoefs[i] * xcoefs[Acols[i]];
                     }

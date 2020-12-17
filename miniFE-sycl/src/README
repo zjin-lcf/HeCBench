@@ -10,6 +10,9 @@ Debugging can be enabled by adding the option -DMINIFE_DEBUG in Makefile
 Build miniFE:
    make
 
+Clean miniFE
+   make realclean
+
 Quick run 
   ./miniFE.x
 
