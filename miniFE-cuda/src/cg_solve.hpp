@@ -266,7 +266,6 @@ namespace miniFE {
         cudaFree(d_Ap);
         cudaFree(d_x);
         cudaFree(d_b);
-        cudaFree(d_Acoefs);
         cudaFree(d_Arowoffsets);
         cudaFree(d_Acols);
         cudaFree(d_Acoefs);
