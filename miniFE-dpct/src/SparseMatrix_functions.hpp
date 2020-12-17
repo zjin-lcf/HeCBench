@@ -28,6 +28,8 @@
 // ************************************************************************
 //@HEADER
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <cstddef>
 #include <vector>
 #include <set>
@@ -479,21 +481,24 @@ namespace miniFE {
   //
 #if defined(MINIFE_CSR_MATRIX)
   template<typename MatrixType>
-    __global__ void matvec_kernel(const MINIFE_LOCAL_ORDINAL rows_size,
+    void matvec_kernel(const MINIFE_LOCAL_ORDINAL rows_size,
         const typename MatrixType::LocalOrdinalType *Arowoffsets,
         const typename MatrixType::GlobalOrdinalType *Acols,
         const typename MatrixType::ScalarType *Acoefs,
         const typename MatrixType::ScalarType *xcoefs,
-        typename MatrixType::ScalarType *ycoefs)
+        typename MatrixType::ScalarType *ycoefs,
+        sycl::nd_item<3> item_ct1)
     {
-      MINIFE_LOCAL_ORDINAL row = blockIdx.x * blockDim.x + threadIdx.x;
+  MINIFE_LOCAL_ORDINAL row =
+      item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+      item_ct1.get_local_id(2);
       if (row < rows_size) {
         MINIFE_GLOBAL_ORDINAL row_start = Arowoffsets[row];
         MINIFE_GLOBAL_ORDINAL row_end   = Arowoffsets[row+1];
         MINIFE_SCALAR sum = 0;
 
         // Use the unroll factor in the OpenMP program 
-#pragma unroll 27
+#pragma unroll(27)
         for(MINIFE_GLOBAL_ORDINAL i = row_start; i < row_end; ++i) {
           sum += Acoefs[i] * xcoefs[Acols[i]];
         }
@@ -514,10 +519,21 @@ namespace miniFE {
       {
         exchange_externals(A, x);
         const MINIFE_LOCAL_ORDINAL rows_size = (MINIFE_LOCAL_ORDINAL) A.rows.size();
-        dim3 grids ((rows_size+255)/256);
-        dim3 threads (256);
-        matvec_kernel<MatrixType><<<grids, threads>>>(
-            rows_size, d_Arowoffsets, d_Acols, d_Acoefs, d_xcoefs, d_ycoefs);
+    sycl::range<3> grids((rows_size + 255) / 256, 1, 1);
+    sycl::range<3> threads(256, 1, 1);
+    dpct::get_default_queue().submit([&](sycl::handler &cgh) {
+      auto dpct_global_range = grids * threads;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            matvec_kernel<MatrixType>(rows_size, d_Arowoffsets, d_Acols,
+                                      d_Acoefs, d_xcoefs, d_ycoefs, item_ct1);
+          });
+    });
       }
     };
 #elif defined(MINIFE_ELL_MATRIX)

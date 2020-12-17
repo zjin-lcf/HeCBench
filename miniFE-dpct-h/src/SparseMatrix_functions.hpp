@@ -28,6 +28,9 @@
 // ************************************************************************
 //@HEADER
 
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <cstddef>
 #include <vector>
 #include <set>
@@ -479,14 +482,17 @@ namespace miniFE {
   //
 #if defined(MINIFE_CSR_MATRIX)
   template<typename MatrixType>
-    __global__ void matvec_kernel(const MINIFE_LOCAL_ORDINAL rows_size,
+    void matvec_kernel(const MINIFE_LOCAL_ORDINAL rows_size,
         const typename MatrixType::LocalOrdinalType *Arowoffsets,
         const typename MatrixType::GlobalOrdinalType *Acols,
         const typename MatrixType::ScalarType *Acoefs,
         const typename MatrixType::ScalarType *xcoefs,
-        typename MatrixType::ScalarType *ycoefs)
+        typename MatrixType::ScalarType *ycoefs,
+        sycl::nd_item<3> item_ct1)
     {
-      MINIFE_LOCAL_ORDINAL row = blockIdx.x * blockDim.x + threadIdx.x;
+  MINIFE_LOCAL_ORDINAL row =
+      item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+      item_ct1.get_local_id(2);
       if (row < rows_size) {
         MINIFE_GLOBAL_ORDINAL row_start = Arowoffsets[row];
         MINIFE_GLOBAL_ORDINAL row_end   = Arowoffsets[row+1];
@@ -514,10 +520,71 @@ namespace miniFE {
       {
         exchange_externals(A, x);
         const MINIFE_LOCAL_ORDINAL rows_size = (MINIFE_LOCAL_ORDINAL) A.rows.size();
-        dim3 grids ((rows_size+255)/256);
-        dim3 threads (256);
-        matvec_kernel<MatrixType><<<grids, threads>>>(
-            rows_size, d_Arowoffsets, d_Acols, d_Acoefs, d_xcoefs, d_ycoefs);
+    sycl::range<3> grids((rows_size + 255) / 256, 1, 1);
+    sycl::range<3> threads(256, 1, 1);
+    {
+      std::pair<dpct::buffer_t, size_t> d_Arowoffsets_buf_ct1 =
+          dpct::get_buffer_and_offset(d_Arowoffsets);
+      size_t d_Arowoffsets_offset_ct1 = d_Arowoffsets_buf_ct1.second;
+      std::pair<dpct::buffer_t, size_t> d_Acols_buf_ct2 =
+          dpct::get_buffer_and_offset(d_Acols);
+      size_t d_Acols_offset_ct2 = d_Acols_buf_ct2.second;
+      std::pair<dpct::buffer_t, size_t> d_Acoefs_buf_ct3 =
+          dpct::get_buffer_and_offset(d_Acoefs);
+      size_t d_Acoefs_offset_ct3 = d_Acoefs_buf_ct3.second;
+      std::pair<dpct::buffer_t, size_t> d_xcoefs_buf_ct4 =
+          dpct::get_buffer_and_offset(d_xcoefs);
+      size_t d_xcoefs_offset_ct4 = d_xcoefs_buf_ct4.second;
+      std::pair<dpct::buffer_t, size_t> d_ycoefs_buf_ct5 =
+          dpct::get_buffer_and_offset(d_ycoefs);
+      size_t d_ycoefs_offset_ct5 = d_ycoefs_buf_ct5.second;
+      dpct::get_default_queue().submit([&](sycl::handler &cgh) {
+        auto d_Arowoffsets_acc_ct1 =
+            d_Arowoffsets_buf_ct1.first
+                .get_access<sycl::access::mode::read_write>(cgh);
+        auto d_Acols_acc_ct2 =
+            d_Acols_buf_ct2.first.get_access<sycl::access::mode::read_write>(
+                cgh);
+        auto d_Acoefs_acc_ct3 =
+            d_Acoefs_buf_ct3.first.get_access<sycl::access::mode::read_write>(
+                cgh);
+        auto d_xcoefs_acc_ct4 =
+            d_xcoefs_buf_ct4.first.get_access<sycl::access::mode::read_write>(
+                cgh);
+        auto d_ycoefs_acc_ct5 =
+            d_ycoefs_buf_ct5.first.get_access<sycl::access::mode::read_write>(
+                cgh);
+
+        auto dpct_global_range = grids * threads;
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(
+                sycl::range<3>(dpct_global_range.get(2),
+                               dpct_global_range.get(1),
+                               dpct_global_range.get(0)),
+                sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
+            [=](sycl::nd_item<3> item_ct1) {
+              const typename MatrixType::LocalOrdinalType *d_Arowoffsets_ct1 =
+                  (const typename MatrixType::LocalOrdinalType
+                       *)(&d_Arowoffsets_acc_ct1[0] + d_Arowoffsets_offset_ct1);
+              const typename MatrixType::GlobalOrdinalType *d_Acols_ct2 =
+                  (const typename MatrixType::GlobalOrdinalType
+                       *)(&d_Acols_acc_ct2[0] + d_Acols_offset_ct2);
+              const typename MatrixType::ScalarType *d_Acoefs_ct3 =
+                  (const typename MatrixType::ScalarType
+                       *)(&d_Acoefs_acc_ct3[0] + d_Acoefs_offset_ct3);
+              const typename MatrixType::ScalarType *d_xcoefs_ct4 =
+                  (const typename MatrixType::ScalarType
+                       *)(&d_xcoefs_acc_ct4[0] + d_xcoefs_offset_ct4);
+              typename MatrixType::ScalarType *d_ycoefs_ct5 =
+                  (typename MatrixType::ScalarType *)(&d_ycoefs_acc_ct5[0] +
+                                                      d_ycoefs_offset_ct5);
+              matvec_kernel<MatrixType>(rows_size, d_Arowoffsets_ct1,
+                                        d_Acols_ct2, d_Acoefs_ct3, d_xcoefs_ct4,
+                                        d_ycoefs_ct5, item_ct1);
+            });
+      });
+    }
       }
     };
 #elif defined(MINIFE_ELL_MATRIX)

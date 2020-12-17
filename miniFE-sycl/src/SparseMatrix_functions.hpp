@@ -513,7 +513,6 @@ namespace miniFE {
           const MINIFE_LOCAL_ORDINAL rows_size     = (MINIFE_LOCAL_ORDINAL) A.rows.size();
           MINIFE_GLOBAL_ORDINAL row_start = 0;
           MINIFE_GLOBAL_ORDINAL row_end   = 0;
-printf("row_size = %d\n", rows_size);
 
           range<1> global_work_size ((rows_size+255)/256*256);
           range<1> local_work_size (256);
