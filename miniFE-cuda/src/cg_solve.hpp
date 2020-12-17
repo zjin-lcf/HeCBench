@@ -253,6 +253,8 @@ namespace miniFE {
           num_iters = k;
         }
 
+        cudaMemcpy(x_ptr, d_x, sizeof(MINIFE_SCALAR) * x.coefs.size(), cudaMemcpyDeviceToHost);
+
         my_cg_times[WAXPY] = tWAXPY;
         my_cg_times[DOT] = tDOT;
         my_cg_times[MATVEC] = tMATVEC;
