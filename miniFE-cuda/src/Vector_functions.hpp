@@ -306,20 +306,19 @@ namespace miniFE {
 
     }
 
-  template<typename Vector>
+  template<typename Scalar>
     __global__ void dot_kernel(const MINIFE_LOCAL_ORDINAL n, 
-        const typename Vector::ScalarType* x, 
-        const typename Vector::ScalarType* y, 
-        typename TypeTraits<typename Vector::ScalarType>::magnitude_type *d) 
+        const Scalar* x, 
+        const Scalar* y, 
+              Scalar* d) 
     {
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
-      magnitude sum=0;
+      Scalar sum=0;
       for(int idx=blockIdx.x*blockDim.x+threadIdx.x;idx<n;idx+=gridDim.x*blockDim.x) {
         sum+=x[idx]*y[idx];
       }
 
       //Do a shared memory reduction on the dot product
-      __shared__ magnitude red[256];
+      __shared__ Scalar red[256];
       red[threadIdx.x]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
@@ -362,21 +361,18 @@ namespace miniFE {
         typename Vector::ScalarType *d_ycoefs)
     {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
-
       typedef typename Vector::ScalarType Scalar;
-
-      MINIFE_SCALAR result = 0;
-
+      Scalar result = 0;
       int BLOCK_SIZE = 256;
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      MINIFE_SCALAR* d;
-      cudaMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
-      cudaMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
-      dot_kernel<Vector><<<grids, threads>>>(n, d_xcoefs, d_ycoefs, d);
-      final_reduce<MINIFE_SCALAR><<<1, 256>>>(d);
-      cudaMemcpy(&result, d, sizeof(MINIFE_SCALAR), cudaMemcpyDeviceToHost);
+      Scalar* d;
+      cudaMalloc((void**)&d, sizeof(Scalar)*1024);
+      cudaMemset(d, 0, sizeof(Scalar)*1024);
+      dot_kernel<Scalar><<<grids, threads>>>(n, d_xcoefs, d_ycoefs, d);
+      final_reduce<Scalar><<<1, 256>>>(d);
+      cudaMemcpy(&result, d, sizeof(Scalar), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
@@ -403,26 +399,18 @@ namespace miniFE {
 #endif
 
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
-
       typedef typename Vector::ScalarType Scalar;
-
-      //const MINIFE_SCALAR*  xcoefs = &x.coefs[0];
-      MINIFE_SCALAR result = 0;
-
-      //for(int i=0; i<n; ++i) {
-      // result += xcoefs[i] * xcoefs[i];
-      //}
-
+      Scalar result = 0;
       int BLOCK_SIZE = 256;
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      MINIFE_SCALAR* d;
-      cudaMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
-      cudaMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
-      dot_kernel<Vector><<<grids, threads>>>(n, d_xcoefs, d_xcoefs, d);
-      final_reduce<MINIFE_SCALAR><<<1, 256>>>(d);
-      cudaMemcpy(&result, d, sizeof(MINIFE_SCALAR), cudaMemcpyDeviceToHost);
+      Scalar* d;
+      cudaMalloc((void**)&d, sizeof(Scalar)*1024);
+      cudaMemset(d, 0, sizeof(Scalar)*1024);
+      dot_kernel<Scalar><<<grids, threads>>>(n, d_xcoefs, d_xcoefs, d);
+      final_reduce<Scalar><<<1, 256>>>(d);
+      cudaMemcpy(&result, d, sizeof(Scalar), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
