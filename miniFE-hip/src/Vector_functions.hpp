@@ -364,7 +364,6 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
       MINIFE_SCALAR result = 0;
 
@@ -372,15 +371,16 @@ namespace miniFE {
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      magnitude* d;
-      hipMalloc((void**)&d, sizeof(magnitude)*1024);
-      hipMemset(d, 0, sizeof(magnitude)*1024);
+      MINIFE_SCALAR* d;
+      hipMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
+      hipMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(dot_kernel<Vector>), dim3(grids), dim3(threads), 0, 0, n, d_xcoefs, d_ycoefs, d);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<magnitude>), dim3(1), dim3(256), 0, 0, d);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<MINIFE_SCALAR>), dim3(1), dim3(256), 0, 0, d);
       hipMemcpy(&result, d, sizeof(MINIFE_SCALAR), hipMemcpyDeviceToHost);
       hipFree(d);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
@@ -405,7 +405,6 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
       //const MINIFE_SCALAR*  xcoefs = &x.coefs[0];
       MINIFE_SCALAR result = 0;
@@ -418,15 +417,16 @@ namespace miniFE {
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      magnitude* d;
-      hipMalloc((void**)&d, sizeof(magnitude)*1024);
-      hipMemset(d, 0, sizeof(magnitude)*1024);
+      MINIFE_SCALAR* d;
+      hipMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
+      hipMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(dot_kernel<Vector>), dim3(grids), dim3(threads), 0, 0, n, d_xcoefs, d_xcoefs, d);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<magnitude>), dim3(1), dim3(256), 0, 0, d);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<MINIFE_SCALAR>), dim3(1), dim3(256), 0, 0, d);
       hipMemcpy(&result, d, sizeof(MINIFE_SCALAR), hipMemcpyDeviceToHost);
       hipFree(d);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
