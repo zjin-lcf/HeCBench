@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #ifndef _Vector_functions_hpp_
 #define _Vector_functions_hpp_
 
@@ -375,6 +374,7 @@ namespace miniFE {
       dim3 threads (BLOCK_SIZE);
       magnitude* d;
       hipMalloc((void**)&d, sizeof(magnitude)*1024);
+      hipMemset(d, 0, sizeof(magnitude)*1024);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(dot_kernel<Vector>), dim3(grids), dim3(threads), 0, 0, n, d_xcoefs, d_ycoefs, d);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<magnitude>), dim3(1), dim3(256), 0, 0, d);
       hipMemcpy(&result, d, sizeof(MINIFE_SCALAR), hipMemcpyDeviceToHost);
@@ -420,6 +420,7 @@ namespace miniFE {
       dim3 threads (BLOCK_SIZE);
       magnitude* d;
       hipMalloc((void**)&d, sizeof(magnitude)*1024);
+      hipMemset(d, 0, sizeof(magnitude)*1024);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(dot_kernel<Vector>), dim3(grids), dim3(threads), 0, 0, n, d_xcoefs, d_xcoefs, d);
       hipLaunchKernelGGL(HIP_KERNEL_NAME(final_reduce<magnitude>), dim3(1), dim3(256), 0, 0, d);
       hipMemcpy(&result, d, sizeof(MINIFE_SCALAR), hipMemcpyDeviceToHost);
