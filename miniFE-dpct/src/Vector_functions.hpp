@@ -433,16 +433,15 @@ namespace miniFE {
 
     }
 
-  template<typename Vector>
+  template<typename Scalar>
     void dot_kernel(const MINIFE_LOCAL_ORDINAL n, 
-        const typename Vector::ScalarType* x, 
-        const typename Vector::ScalarType* y, 
-        typename TypeTraits<typename Vector::ScalarType>::magnitude_type *d,
-        sycl::nd_item<3> item_ct1,
-        typename TypeTraits<typename Vector::ScalarType>::magnitude_type *red) 
+        const Scalar* x, 
+        const Scalar* y, 
+              Scalar* d,
+              sycl::nd_item<3> item_ct1,
+              Scalar *red) 
     {
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
-      magnitude sum=0;
+      Scalar sum=0;
   for (int idx = item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
                  item_ct1.get_local_id(2);
        idx < n;
@@ -501,20 +500,17 @@ namespace miniFE {
   dpct::device_ext &dev_ct1 = dpct::get_current_device();
   sycl::queue &q_ct1 = dev_ct1.default_queue();
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
-
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
-
-      MINIFE_SCALAR result = 0;
-
+      Scalar result = 0;
       int BLOCK_SIZE = 256;
   int NUM_BLOCKS = std::min(1024, (n + BLOCK_SIZE - 1) / BLOCK_SIZE);
   sycl::range<3> grids(NUM_BLOCKS, 1, 1);
   sycl::range<3> threads(BLOCK_SIZE, 1, 1);
-      magnitude* d;
-  d = (magnitude *)sycl::malloc_device(sizeof(magnitude) * 1024, q_ct1);
+      Scalar* d;
+  d = (Scalar *)sycl::malloc_device(sizeof(Scalar) * 1024, q_ct1);
+  q_ct1.memset(d, 0, sizeof(Scalar) * 1024).wait();
   q_ct1.submit([&](sycl::handler &cgh) {
-    sycl::accessor<magnitude, 1, sycl::access::mode::read_write,
+    sycl::accessor<Scalar, 1, sycl::access::mode::read_write,
                    sycl::access::target::local>
         red_acc_ct1(sycl::range<1>(256), cgh);
 
@@ -526,25 +522,26 @@ namespace miniFE {
                            dpct_global_range.get(0)),
             sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
         [=](sycl::nd_item<3> item_ct1) {
-          dot_kernel<Vector>(n, d_xcoefs, d_ycoefs, d, item_ct1,
+          dot_kernel<Scalar>(n, d_xcoefs, d_ycoefs, d, item_ct1,
                              red_acc_ct1.get_pointer());
         });
   });
   q_ct1.submit([&](sycl::handler &cgh) {
-    sycl::accessor<magnitude, 1, sycl::access::mode::read_write,
+    sycl::accessor<Scalar, 1, sycl::access::mode::read_write,
                    sycl::access::target::local>
         red_acc_ct1(sycl::range<1>(256), cgh);
 
     cgh.parallel_for(
         sycl::nd_range<3>(sycl::range<3>(1, 1, 256), sycl::range<3>(1, 1, 256)),
         [=](sycl::nd_item<3> item_ct1) {
-          final_reduce<magnitude>(d, item_ct1, red_acc_ct1.get_pointer());
+          final_reduce<Scalar>(d, item_ct1, red_acc_ct1.get_pointer());
         });
   });
-  q_ct1.memcpy(&result, d, sizeof(MINIFE_SCALAR)).wait();
+  q_ct1.memcpy(&result, d, sizeof(Scalar)).wait();
   sycl::free(d, q_ct1);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
@@ -569,25 +566,17 @@ namespace miniFE {
 #endif
 
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
-
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
-
-      //const MINIFE_SCALAR*  xcoefs = &x.coefs[0];
-      MINIFE_SCALAR result = 0;
-
-      //for(int i=0; i<n; ++i) {
-      // result += xcoefs[i] * xcoefs[i];
-      //}
-
+      Scalar result = 0;
       int BLOCK_SIZE = 256;
   int NUM_BLOCKS = std::min(1024, (n + BLOCK_SIZE - 1) / BLOCK_SIZE);
   sycl::range<3> grids(NUM_BLOCKS, 1, 1);
   sycl::range<3> threads(BLOCK_SIZE, 1, 1);
-      magnitude* d;
-  d = (magnitude *)sycl::malloc_device(sizeof(magnitude) * 1024, q_ct1);
+      Scalar* d;
+  d = (Scalar *)sycl::malloc_device(sizeof(Scalar) * 1024, q_ct1);
+  q_ct1.memset(d, 0, sizeof(Scalar) * 1024).wait();
   q_ct1.submit([&](sycl::handler &cgh) {
-    sycl::accessor<magnitude, 1, sycl::access::mode::read_write,
+    sycl::accessor<Scalar, 1, sycl::access::mode::read_write,
                    sycl::access::target::local>
         red_acc_ct1(sycl::range<1>(256), cgh);
 
@@ -599,25 +588,26 @@ namespace miniFE {
                            dpct_global_range.get(0)),
             sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
         [=](sycl::nd_item<3> item_ct1) {
-          dot_kernel<Vector>(n, d_xcoefs, d_xcoefs, d, item_ct1,
+          dot_kernel<Scalar>(n, d_xcoefs, d_xcoefs, d, item_ct1,
                              red_acc_ct1.get_pointer());
         });
   });
   q_ct1.submit([&](sycl::handler &cgh) {
-    sycl::accessor<magnitude, 1, sycl::access::mode::read_write,
+    sycl::accessor<Scalar, 1, sycl::access::mode::read_write,
                    sycl::access::target::local>
         red_acc_ct1(sycl::range<1>(256), cgh);
 
     cgh.parallel_for(
         sycl::nd_range<3>(sycl::range<3>(1, 1, 256), sycl::range<3>(1, 1, 256)),
         [=](sycl::nd_item<3> item_ct1) {
-          final_reduce<magnitude>(d, item_ct1, red_acc_ct1.get_pointer());
+          final_reduce<Scalar>(d, item_ct1, red_acc_ct1.get_pointer());
         });
   });
-  q_ct1.memcpy(&result, d, sizeof(MINIFE_SCALAR)).wait();
+  q_ct1.memcpy(&result, d, sizeof(Scalar)).wait();
   sycl::free(d, q_ct1);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
