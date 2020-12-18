@@ -364,7 +364,6 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
       MINIFE_SCALAR result = 0;
 
@@ -372,14 +371,16 @@ namespace miniFE {
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      magnitude* d;
-      cudaMalloc((void**)&d, sizeof(magnitude)*1024);
+      MINIFE_SCALAR* d;
+      cudaMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
+      cudaMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
       dot_kernel<Vector><<<grids, threads>>>(n, d_xcoefs, d_ycoefs, d);
-      final_reduce<magnitude><<<1, 256>>>(d);
+      final_reduce<MINIFE_SCALAR><<<1, 256>>>(d);
       cudaMemcpy(&result, d, sizeof(MINIFE_SCALAR), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
@@ -404,7 +405,6 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
       typedef typename Vector::ScalarType Scalar;
-      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
       //const MINIFE_SCALAR*  xcoefs = &x.coefs[0];
       MINIFE_SCALAR result = 0;
@@ -417,14 +417,16 @@ namespace miniFE {
       int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
-      magnitude* d;
-      cudaMalloc((void**)&d, sizeof(magnitude)*1024);
+      MINIFE_SCALAR* d;
+      cudaMalloc((void**)&d, sizeof(MINIFE_SCALAR)*1024);
+      cudaMemset(d, 0, sizeof(MINIFE_SCALAR)*1024);
       dot_kernel<Vector><<<grids, threads>>>(n, d_xcoefs, d_xcoefs, d);
-      final_reduce<magnitude><<<1, 256>>>(d);
+      final_reduce<MINIFE_SCALAR><<<1, 256>>>(d);
       cudaMemcpy(&result, d, sizeof(MINIFE_SCALAR), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
+      typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
       MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);

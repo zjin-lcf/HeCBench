@@ -288,7 +288,6 @@ dot(const Vector& x,
   const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
   typedef typename Vector::ScalarType Scalar;
-  typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
   //const Scalar*  xcoefs = &x.coefs[0];
   //const Scalar*  ycoefs = &y.coefs[0];
@@ -325,15 +324,20 @@ dot(const Vector& x,
   int NWI = std::min(1024, (n+255)/256) * 256;
   range<1> gws (NWI);
   range<1> lws (256);
-  buffer<magnitude, 1> d_sop (1024); // sum-of-product
+  buffer<MINIFE_SCALAR, 1> d_sop (1024); // sum-of-product
+
+  q.submit([&] (handler &h) {
+    auto d = d_sop.template get_access<sycl_discard_write>(h);
+    h.fill(d, (MINIFE_SCALAR)0);
+  });
 
   q.submit([&] (handler &h) {
     auto x = d_xcoefs.template get_access<sycl_read>(h);
     auto y = d_ycoefs.template get_access<sycl_read>(h);
-    auto d = d_sop.template get_access<sycl_discard_write>(h);
-    accessor<magnitude, 1, sycl_read_write, access::target::local> red(256, h);
+    auto d = d_sop.template get_access<sycl_write>(h);
+    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
     h.parallel_for<class dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      magnitude sum = 0;
+      MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
       for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
         sum+=x[idx]*y[idx];
@@ -354,10 +358,10 @@ dot(const Vector& x,
 
   q.submit([&] (handler &h) {
     auto d = d_sop.template get_access<sycl_read_write>(h);
-    accessor<magnitude, 1, sycl_read_write, access::target::local> red(256, h);
+    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
     h.parallel_for<class final_reduce>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
       int lid = item.get_local_id(0);
-      magnitude sum = d[lid];
+      MINIFE_SCALAR sum = d[lid];
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
@@ -378,6 +382,7 @@ dot(const Vector& x,
   q.wait();
 
 #ifdef HAVE_MPI
+  typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
   magnitude local_dot = result, global_dot = 0;
   MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
   MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
@@ -402,9 +407,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
   const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
   typedef typename Vector::ScalarType Scalar;
-  typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
 
-  //const MINIFE_SCALAR*  xcoefs = &x.coefs[0];
   MINIFE_SCALAR result = 0;
 
   //for(int i=0; i<n; ++i) {
@@ -438,14 +441,19 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
   int NWI = std::min(1024, (n+255)/256) * 256;
   range<1> gws (NWI);
   range<1> lws (256);
-  buffer<magnitude, 1> d_sop (1024); // sum-of-product
+  buffer<MINIFE_SCALAR, 1> d_sop (1024); // sum-of-product
+
+  q.submit([&] (handler &h) {
+    auto d = d_sop.template get_access<sycl_discard_write>(h);
+    h.fill(d, (MINIFE_SCALAR)0);
+  });
 
   q.submit([&] (handler &h) {
     auto x = d_xcoefs.template get_access<sycl_read>(h);
-    auto d = d_sop.template get_access<sycl_discard_write>(h);
-    accessor<magnitude, 1, sycl_read_write, access::target::local> red(256, h);
+    auto d = d_sop.template get_access<sycl_write>(h);
+    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
     h.parallel_for<class dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      magnitude sum = 0;
+      MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
       for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
         sum+=x[idx]*x[idx];
@@ -466,10 +474,10 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
 
   q.submit([&] (handler &h) {
     auto d = d_sop.template get_access<sycl_read_write>(h);
-    accessor<magnitude, 1, sycl_read_write, access::target::local> red(256, h);
+    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
     h.parallel_for<class final_reduce>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
       int lid = item.get_local_id(0);
-      magnitude sum = d[lid];
+      MINIFE_SCALAR sum = d[lid];
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
@@ -491,6 +499,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
   q.wait();
 
 #ifdef HAVE_MPI
+  typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
   magnitude local_dot = result, global_dot = 0;
   MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
   MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
