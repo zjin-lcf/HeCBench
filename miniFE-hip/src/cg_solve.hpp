@@ -208,9 +208,9 @@ namespace miniFE {
 
           normr = sqrt(rtrans);
 
-          //if (myproc == 0 && (k%print_freq==0 || k==max_iter)) {
+          if (myproc == 0 && (k%print_freq==0 || k==max_iter)) {
             std::cout << "Iteration = "<<k<<"   Residual = "<<normr<<std::endl;
-          //}
+          }
 
           magnitude_type alpha = 0;
           magnitude_type p_ap_dot = 0;
