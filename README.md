@@ -429,9 +429,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | miniFE | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2407 | NA | NA | 6645 |
-| host timing(s) | 9.9 | NA | NA | NA | 16.7 |
-| device timing(s) | 8.95 | NA | NA | 12.9 | 
+| total enqueue | 2404 | 2412 | 2412 | 6645 |
+| host timing(s) | 9.5 | 9.8 | 10.0 | 16.7 |
+| device timing(s) | 8.7 | 8.8 | 8.8 | 12.8 | 
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1158,9 +1158,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | miniFE | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2407 | NA | NA | 6645 |
-| host timing(s) | 10.9 | NA | NA | NA | 15.5 |
-| device timing(s) | 9.0 | NA | NA | 10.6 | 
+| total enqueue | 2404 | 2412 | 2412 | 6638 |
+| host timing(s) | 12.7 | 10.3 | 21.4 | 28.7 |
+| device timing(s) | 11.1 | 9.2 | 19.2 | 23.4 | 
 
 
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
