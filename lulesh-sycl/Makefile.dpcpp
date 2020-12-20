@@ -1,0 +1,65 @@
+# Default build suggestion of MPI + OPENMP with Clang on IBM (Power 8) + NVIDIA GPU machines.
+# You might have to change the compiler name and flags.
+
+SHELL = /bin/sh
+.SUFFIXES: .cc .o
+
+LULESH_EXEC = lulesh2.0-dpcpp
+
+MPI_INC = /opt/local/include/openmpi
+MPI_LIB = /opt/local/lib
+
+# Point your mpicc to Clang
+#CXX = mpiicpc
+CXX = dpcpp
+
+SOURCES2.0 = \
+	lulesh-sycl.cc \
+	lulesh-comm.cc \
+	lulesh-viz.cc \
+	lulesh-util.cc \
+	lulesh-init.cc
+OBJECTS2.0 = $(SOURCES2.0:.cc=.o)
+
+teams = -DTEAMS=24
+threads = -DTHREADS=256
+
+mpi = -DUSE_MPI=0
+
+ifdef USE_MPI
+mpi = -DUSE_MPI=1
+endif
+
+gpu = -DUSE_GPU -DSYCL
+
+# Tuning flags for Power 8
+#CXXFLAGS = -mcpu=pwr8 -mtune=pwr8 -fopenmp=libomp -O3 -omptargets=nvptx64sm_35-nvidia-linux $(shared) $(mpi) $(teams) $(threads) $(gpu)  
+
+#LDFLAGS = -L/usr/local/cuda/nvvm/libdevice
+
+LDFLAGS = 
+CXXFLAGS = -D__STRICT_ANSI__ -I../include \
+           -g $(shared) $(mpi) $(teams) $(threads) $(gpu) \
+	   -DVERIFY
+
+
+.cc.o: lulesh.h
+	@echo "Building $<"
+	$(CXX) -c $(CXXFLAGS) -o $@  $<
+
+all: $(LULESH_EXEC)
+
+$(LULESH_EXEC): $(OBJECTS2.0)
+	@echo "Linking"
+	$(CXX) $(OBJECTS2.0) $(LDFLAGS) -o $@
+
+run: $(LULESH_EXEC)
+	./$(LULESH_EXEC) -i 1 -s 16 -r 11 -b 1 -c 1
+
+clean:
+	/bin/rm -f *.o *~ *.tgt* $(OBJECTS) $(LULESH_EXEC)
+	/bin/rm -rf *.dSYM
+
+tar: clean
+	cd .. ; tar cvf lulesh-2.0.tar LULESH-2.0 ; mv lulesh-2.0.tar LULESH-2.0
+
