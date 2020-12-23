@@ -179,34 +179,35 @@ void jaccard_weight (const int n, const int e,
 
   const T gamma = (T)0.46;  // arbitrary
 
-  T *weight_i, *weight_s, *weight_j, *work;
-  int* csrInd;
-  int* csrPtr;
-    T* csrVal;
+   T *d_weight_i, 
+     *d_weight_s, 
+     *d_weight_j, 
+     *d_work;
+  int *d_csrInd;
+  int *d_csrPtr;
+    T *d_csrVal;
 
-  // dump 
-  T* wj = (T*) malloc (sizeof(T) * e);
 #ifdef DEBUG
-  T* wi = (T*) malloc (sizeof(T) * e);
-  T* ws = (T*) malloc (sizeof(T) * e);
+  T* weight_i = (T*) malloc (sizeof(T) * e);
+  T* weight_s = (T*) malloc (sizeof(T) * e);
 #endif
+  T* weight_j = (T*) malloc (sizeof(T) * e);
 
-  cudaMalloc ((void**)&work, sizeof(T) * n);
-  cudaMalloc ((void**)&weight_i, sizeof(T) * e);
-  cudaMalloc ((void**)&weight_s, sizeof(T) * e);
+  cudaMalloc ((void**)&d_work, sizeof(T) * n);
+  cudaMalloc ((void**)&d_weight_i, sizeof(T) * e);
+  cudaMalloc ((void**)&d_weight_s, sizeof(T) * e);
+  cudaMalloc ((void**)&d_weight_j, sizeof(T) * e);
 
-  // initialize weight
-  cudaMalloc ((void**)&weight_j, sizeof(T) * e);
-  fill<weighted, T><<<(e+255)/256, 256>>>(e, weight_j, (T)1.0);
+  fill<weighted, T><<<(e+255)/256, 256>>>(e, d_weight_j, (T)1.0);
 
-  cudaMalloc ((void**)&csrPtr, sizeof(int) * (n+1));
-  cudaMemcpyAsync(csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
+  cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
+  cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
 
-  cudaMalloc ((void**)&csrInd, sizeof(int) * e);
-  cudaMemcpyAsync(csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice, 0);
+  cudaMalloc ((void**)&d_csrInd, sizeof(int) * e);
+  cudaMemcpyAsync(d_csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice, 0);
 
-  cudaMalloc ((void**)&csrVal, sizeof(T) * e);
-  cudaMemcpyAsync(csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice, 0);
+  cudaMalloc ((void**)&d_csrVal, sizeof(T) * e);
+  cudaMemcpyAsync(d_csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice, 0);
 
   dim3 nthreads, nblocks;
 
@@ -219,10 +220,10 @@ void jaccard_weight (const int n, const int e,
   nblocks.x  = 1; 
   nblocks.y  = (n + nthreads.y - 1)/nthreads.y;  // less than MAX CUDA BLOCKs
   nblocks.z  = 1; 
-  jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n,csrPtr,csrInd,weight_j,work);
+  jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n, d_csrPtr, d_csrInd, d_weight_j, d_work);
 
   // initialize volume of intersections
-  fill<false, T><<<(e+255)/256, 256>>>(e, weight_i, (T)0.0);
+  fill<false, T><<<(e+255)/256, 256>>>(e, d_weight_i, (T)0.0);
 
   // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
   nthreads.x = 32/y;
@@ -231,13 +232,14 @@ void jaccard_weight (const int n, const int e,
   nblocks.x  = 1;
   nblocks.y  = 1;
   nblocks.z  = (n + nthreads.z - 1)/nthreads.z; // less than CUDA_MAX_BLOCKS);
-  jaccard_is<weighted,T><<<nblocks,nthreads>>>(n,e,csrPtr,csrInd,weight_j,work,weight_i,weight_s);
+  jaccard_is<weighted,T><<<nblocks,nthreads>>>(n, e, d_csrPtr,
+    d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
 
 #ifdef DEBUG
-  cudaMemcpy(wi, weight_i, sizeof(T) * e, cudaMemcpyDeviceToHost);
-  cudaMemcpy(ws, weight_s, sizeof(T) * e, cudaMemcpyDeviceToHost);
-  for (int i = 0; i < e; i++) printf("wi: %d %f\n", i, wi[i]);
-  for (int i = 0; i < e; i++) printf("ws: %d %f\n", i, ws[i]);
+  cudaMemcpy(weight_i, d_weight_i, sizeof(T) * e, cudaMemcpyDeviceToHost);
+  cudaMemcpy(weight_s, d_weight_s, sizeof(T) * e, cudaMemcpyDeviceToHost);
+  for (int i = 0; i < e; i++) printf("wi: %d %f\n", i, weight_i[i]);
+  for (int i = 0; i < e; i++) printf("ws: %d %f\n", i, weight_s[i]);
 #endif
 
   // compute jaccard weights
@@ -247,25 +249,26 @@ void jaccard_weight (const int n, const int e,
   nblocks.x  = (e + nthreads.x - 1)/nthreads.x;  // less than MAX CUDA BLOCKs
   nblocks.y  = 1; 
   nblocks.z  = 1;
-  jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e,csrVal,gamma,weight_i,weight_s,weight_j);
+  jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
+    d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
 
 
-  cudaMemcpy(wj, weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
+  cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
 #ifdef DEBUG
-  for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, wj[i]);
+  for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
 #endif
 
-  cudaFree (work);
-  cudaFree (weight_i);
-  cudaFree (weight_s);
-  cudaFree (weight_j);
-  cudaFree (csrInd);
-  cudaFree (csrVal);
-  cudaFree (csrPtr);
-  free(wj);
+  cudaFree (d_work);
+  cudaFree (d_weight_i);
+  cudaFree (d_weight_s);
+  cudaFree (d_weight_j);
+  cudaFree (d_csrInd);
+  cudaFree (d_csrVal);
+  cudaFree (d_csrPtr);
+  free(weight_j);
 #ifdef DEBUG
-  free(wi);
-  free(ws);
+  free(weight_i);
+  free(weight_s);
 #endif
 }
 
