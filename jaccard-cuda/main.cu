@@ -95,6 +95,7 @@ jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T
 }
 
 // Volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
+// Assumption: The number of columns is no larger than the number of rows
 template<bool weighted, typename T>
 __global__ void 
 jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd, 
@@ -147,13 +148,13 @@ jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd,
 }
 
 template<bool weighted, typename T>
-__global__ void 
+  __global__ void 
 jaccard_jw(const int e, 
-		const T *csrVal, 
-		const T gamma, 
-		const T *weight_i, 
-		const T *weight_s, 
-		T *weight_j) 
+    const T *csrVal, 
+    const T gamma, 
+    const T *weight_i, 
+    const T *weight_s, 
+    T *weight_j) 
 {
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
     T Wi =  weight_i[j];
@@ -166,7 +167,8 @@ jaccard_jw(const int e,
 
 template <bool weighted, typename T>
 __global__ void 
-fill(const int e, T* w, const T value) {
+fill(const int e, T* w, const T value) 
+{
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
     w[j] = weighted ? (T)(j+1)/e : value; // non-zeron weights when weighted 
   }
@@ -179,17 +181,18 @@ void jaccard_weight (const int n, const int e,
 
   const T gamma = (T)0.46;  // arbitrary
 
-   T *d_weight_i, 
-     *d_weight_s, 
-     *d_weight_j, 
-     *d_work;
+  T *d_weight_i, 
+    *d_weight_s, 
+    *d_weight_j, 
+    *d_work;
   int *d_csrInd;
   int *d_csrPtr;
-    T *d_csrVal;
+  T *d_csrVal;
 
 #ifdef DEBUG
   T* weight_i = (T*) malloc (sizeof(T) * e);
   T* weight_s = (T*) malloc (sizeof(T) * e);
+  T* work = (T*) malloc (sizeof(T) * n);
 #endif
   T* weight_j = (T*) malloc (sizeof(T) * e);
 
@@ -198,7 +201,14 @@ void jaccard_weight (const int n, const int e,
   cudaMalloc ((void**)&d_weight_s, sizeof(T) * e);
   cudaMalloc ((void**)&d_weight_j, sizeof(T) * e);
 
-  fill<weighted, T><<<(e+255)/256, 256>>>(e, d_weight_j, (T)1.0);
+  dim3 fill_nblocks((e+MAX_KERNEL_THREADS-1)/MAX_KERNEL_THREADS*MAX_KERNEL_THREADS);  
+  dim3 fill_threads(MAX_KERNEL_THREADS);
+
+  fill<weighted, T><<<fill_nblocks, fill_threads>>>(e, d_weight_j, (T)1.0);
+#ifdef DEBUG
+  cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
+  for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
+#endif
 
   cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
   cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
@@ -222,8 +232,13 @@ void jaccard_weight (const int n, const int e,
   nblocks.z  = 1; 
   jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n, d_csrPtr, d_csrInd, d_weight_j, d_work);
 
+#ifdef DEBUG
+  cudaMemcpy(work, d_work, sizeof(T) * n, cudaMemcpyDeviceToHost);
+  for (int i = 0; i < n; i++) printf("work: %d %f\n", i, work[i]);
+#endif
+
   // initialize volume of intersections
-  fill<false, T><<<(e+255)/256, 256>>>(e, d_weight_i, (T)0.0);
+  fill<false, T><<<fill_nblocks, fill_threads>>>(e, d_weight_i, (T)0.0);
 
   // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
   nthreads.x = 32/y;
@@ -233,7 +248,7 @@ void jaccard_weight (const int n, const int e,
   nblocks.y  = 1;
   nblocks.z  = (n + nthreads.z - 1)/nthreads.z; // less than CUDA_MAX_BLOCKS);
   jaccard_is<weighted,T><<<nblocks,nthreads>>>(n, e, d_csrPtr,
-    d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
+      d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
 
 #ifdef DEBUG
   cudaMemcpy(weight_i, d_weight_i, sizeof(T) * e, cudaMemcpyDeviceToHost);
@@ -250,7 +265,7 @@ void jaccard_weight (const int n, const int e,
   nblocks.y  = 1; 
   nblocks.z  = 1;
   jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
-    d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
+      d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
 
 
   cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
@@ -269,6 +284,7 @@ void jaccard_weight (const int n, const int e,
 #ifdef DEBUG
   free(weight_i);
   free(weight_s);
+  free(work);
 #endif
 }
 
@@ -284,7 +300,7 @@ void printMatrix(const matrix& M)
   } 
 } 
 
-template <typename T>
+  template <typename T>
 void printVector(const vector<T>& V, char* msg) 
 { 
   cout << msg << "[ "; 
@@ -299,16 +315,20 @@ int main(int argc, char** argv)
 
 #ifdef DEBUG
   matrix M  = { 
-    { 0, 0, 0, 0, 1 }, 
-    { 5, 8, 0, 0, 0 }, 
-    { 0, 0, 3, 0, 0 }, 
-    { 0, 6, 0, 0, 1 } 
+    { 0, 0, 0, 1}, 
+    { 5, 8, 0, 0}, 
+    { 0, 0, 3, 0}, 
+    { 0, 6, 0, 1} 
   }; 
 #else
-  matrix M;
+
   int numRow = atoi(argv[1]);
   int numCol = atoi(argv[2]);
   iter = atoi(argv[3]);
+
+  srand(2);
+
+  matrix M;
   vector<vtype> rowElems(numCol);
   for (int r = 0; r < numRow; r++) {
     for (int c = 0; c < numCol; c++)
@@ -321,21 +341,22 @@ int main(int argc, char** argv)
   int col = M[0].size();
   printf("Number of matrix rows and cols: %d %d\n", row, col);
   vector<vtype> csr_val;
-  vector<int> csr_ptr = { 0 }; // add -std=c++11  
+  vector<int> csr_ptr = { 0 }; // require -std=c++11  
   vector<int> csr_ind;
-  int NNZ = 0; 
+  int nnz = 0; // count Number of non-zero elements in each row
 
   for (int i = 0; i < row; i++) { 
     for (int j = 0; j < col; j++) { 
       if (M[i][j] != (vtype)0) { 
         csr_val.push_back(M[i][j]); 
         csr_ind.push_back(j); 
-        NNZ++; // count Number of Non Zero Elements in row i 
+        nnz++; 
       } 
     } 
-    csr_ptr.push_back(NNZ); 
+    csr_ptr.push_back(nnz); 
   } 
 
+  // print when the matrix is small
   if (row <= 16 && col <= 16) {
     printMatrix(M); 
     printVector(csr_val, (char*)"values = "); 
@@ -344,8 +365,8 @@ int main(int argc, char** argv)
   }
 
   for (int i = 0; i < iter; i++) {
-    jaccard_weight<true, vtype>(row, col, csr_ptr.data(), csr_ind.data(), csr_val.data());
-    jaccard_weight<false, vtype>(row, col, csr_ptr.data(), csr_ind.data(), csr_val.data());
+    jaccard_weight<true, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
+    jaccard_weight<false, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
   }
 
   return 0; 
