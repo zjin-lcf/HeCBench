@@ -609,6 +609,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
 
 
+| shuffle | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 909 | 910 | 910 | NA |
+| host timing(s) | 28.7 | 26.2 | 29.1 | NA |
+| device timing(s) | 28.2 | 25.4 | 28.1 | NA |
+
+
 | simplemoc | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 12 | 18 | 18 | 73 |
@@ -1310,6 +1317,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.79 | 1.28 | 0.93 | 2.6 |
 
 
+| shuffle | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 909 | 910 | 910 | NA |
+| host timing(s) | 25.3 | 25.3 | 25.4 | NA |
+| device timing(s) | 24.4 | 24.5 | 24.4 | NA |
+
+
 | simplemoc | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 12 | 18 | 18 | 73 |
@@ -1670,6 +1684,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+
+### shuffle
+  shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
 
 ### simplemoc
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
