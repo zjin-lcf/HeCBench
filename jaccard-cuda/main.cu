@@ -30,14 +30,14 @@ typedef vector<vector<vtype>> matrix;
 
 template<typename T>
 __device__
-T parallel_prefix_sum(const int n, const int *ind, const T *w) {
-  int i,j,mn;
-  T v,last;
-  T sum=0.0;
-  bool valid;
+T parallel_prefix_sum(const int n, const int *ind, const T *w) 
+{
 
-  mn =(((n+blockDim.x-1)/blockDim.x)*blockDim.x); //n in multiple of blockDim.x
-  for (i=threadIdx.x; i<mn; i+=blockDim.x) {
+  T sum = 0.0;
+  T last;
+
+  int mn =(((n+blockDim.x-1)/blockDim.x)*blockDim.x); //n in multiple of blockDim.x
+  for (int i=threadIdx.x; i<mn; i+=blockDim.x) {
     //All threads (especially the last one) must always participate
     //in the shfl instruction, otherwise their sum will be undefined.
     //So, the loop stopping condition is based on multiple of n in loop increments,
@@ -45,7 +45,7 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w) {
     //read out of bounds memory checking for the actual size n.
 
     //check if the thread is valid
-    valid  = i<n;
+    bool valid  = i<n;
 
     //Notice that the last thread is used to propagate the prefix sum.
     //For all the threads, in the first iteration the last is 0, in the following
@@ -58,12 +58,12 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w) {
     sum = (valid) ? w[ind[i]] : 0.0;
 
     //do prefix sum (of size warpSize=blockDim.x =< 32)
-    for (j=1; j<blockDim.x; j*=2) {
-      v = __shfl_up(sum, j, blockDim.x);
-      if (threadIdx.x >= j) sum+=v;
+    for (int j=1; j<blockDim.x; j*=2) {
+      T v = __shfl_up(sum, j, blockDim.x);
+      if (threadIdx.x >= j) sum += v;
     }
     //shift by last
-    sum+=last;
+    sum += last;
     //notice that no __threadfence or __syncthreads are needed in this implementation
   }
   //get the value of the last thread (to all threads)
@@ -75,17 +75,16 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w) {
 // Volume of neighboors (*weight_s)
 template<bool weighted, typename T>
 __global__ void 
-jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T *work) {
-  int row,start,end,length;
-  T sum;
+jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T *work) 
+{
 
-  for (row=threadIdx.y+blockIdx.y*blockDim.y; row<n; row+=gridDim.y*blockDim.y) {
-    start = csrPtr[row];
-    end   = csrPtr[row+1];
-    length= end-start;
+  for (int row=threadIdx.y+blockIdx.y*blockDim.y; row<n; row+=gridDim.y*blockDim.y) {
+    int start = csrPtr[row];
+    int end   = csrPtr[row+1];
+    int length= end-start;
     //compute row sums 
     if (weighted) {
-      sum = parallel_prefix_sum(length, csrInd + start, w); 
+      T sum = parallel_prefix_sum(length, csrInd + start, w); 
       if (threadIdx.x == 0) work[row] = sum;
     }
     else {
@@ -95,11 +94,12 @@ jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T
 }
 
 // Volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
-// Assumption: The number of columns is no larger than the number of rows
+// Note the number of columns is constrained by the number of rows
 template<bool weighted, typename T>
 __global__ void 
 jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd, 
-    const T *v, const T *work, T *weight_i, T *weight_s) {
+    const T *v, const T *work, T *weight_i, T *weight_s) 
+{
 
   for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {  
     for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y; j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) { 
@@ -148,7 +148,7 @@ jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd,
 }
 
 template<bool weighted, typename T>
-  __global__ void 
+__global__ void 
 jaccard_jw(const int e, 
     const T *csrVal, 
     const T gamma, 
@@ -170,7 +170,9 @@ __global__ void
 fill(const int e, T* w, const T value) 
 {
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
-    w[j] = weighted ? (T)(j+1)/e : value; // non-zeron weights when weighted 
+    // e.g. w[0] is the weight when csr_ind[i] equals 0. So multiple non-zero
+    // elements on different rows of a matrix may share the same weight value
+    w[j] = weighted ? (T)(j+1)/e : value; 
   }
 }
 
@@ -221,14 +223,13 @@ void jaccard_weight (const int n, const int e,
 
   dim3 nthreads, nblocks;
 
-  const int y=4;
-
   // compute row sum with prefix sum
-  nthreads.x = 32/y; 
+  const int y = 4;
+  nthreads.x = 64/y;
   nthreads.y = y; 
   nthreads.z = 1; 
   nblocks.x  = 1; 
-  nblocks.y  = (n + nthreads.y - 1)/nthreads.y;  // less than MAX CUDA BLOCKs
+  nblocks.y  = (n + nthreads.y - 1) / nthreads.y;  // less than MAX CUDA BLOCKs
   nblocks.z  = 1; 
   jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n, d_csrPtr, d_csrInd, d_weight_j, d_work);
 
@@ -241,6 +242,7 @@ void jaccard_weight (const int n, const int e,
   fill<false, T><<<fill_nblocks, fill_threads>>>(e, d_weight_i, (T)0.0);
 
   // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
+  // nthreads.x * nthreads.y * nthreads.z <= 256
   nthreads.x = 32/y;
   nthreads.y = y;
   nthreads.z = 8;
@@ -267,10 +269,34 @@ void jaccard_weight (const int n, const int e,
   jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
       d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
 
-
   cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
 #ifdef DEBUG
-  for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
+  // verify using known values when weighted is true
+  float error; 
+
+  if (weighted)
+    error = (weight_j[0] - 0.306667) +
+            (weight_j[1] - 0.000000) +
+            (weight_j[2] - 3.680000) +
+            (weight_j[3] - 1.380000) +
+            (weight_j[4] - 0.788571) +
+            (weight_j[5] - 0.460000);
+
+  else
+    error = (weight_j[0] - 0.230000) +
+            (weight_j[1] - 0.000000) +
+            (weight_j[2] - 3.680000) +
+            (weight_j[3] - 1.380000) +
+            (weight_j[4] - 0.920000) +
+            (weight_j[5] - 0.460000);
+
+  if (error > 1e-5) {
+    for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
+    printf("FAILED");
+  } else {
+    printf("PASSED");
+  }
+  printf("\n");
 #endif
 
   cudaFree (d_work);
@@ -366,6 +392,9 @@ int main(int argc, char** argv)
 
   for (int i = 0; i < iter; i++) {
     jaccard_weight<true, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
+  }
+
+  for (int i = 0; i < iter; i++) {
     jaccard_weight<false, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
   }
 
