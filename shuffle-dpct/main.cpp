@@ -22,16 +22,6 @@ THE SOFTWARE.
 #define BUF_SIZE 256
 #define PATTERN 0xDEADBEEF
 
-#define CUDACHECK(code)                                                         \
-  do {                                                                         \
-    cudaerr = code;                                                             \
-    if (cudaerr != cudaSuccess) {                                                \
-      std::cerr << "ERROR on line " << __LINE__ << ": " << (unsigned)cudaerr    \
-                << "\n";                                                       \
-      return 1;                                                                \
-    }                                                                          \
-  } while (0)
-
 // CPU implementation of matrix transpose
 void matrixTransposeCPUReference(float* output, float* input, 
     unsigned int numGroups, unsigned int subGroupSize) {
