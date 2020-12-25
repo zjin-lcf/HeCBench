@@ -125,7 +125,6 @@ void jaccard_row_sum(queue &q, const int n,
           T last;
           int blockDim = item.get_local_range(2);
           int threadIdx = item.get_local_id(2);
-          cl::sycl::intel::sub_group sg = item.get_sub_group();
 
           //the number of nnz elements in a row is a multiple of blockDim.x
           int mn =((length+blockDim-1)/blockDim*blockDim); 
@@ -145,21 +144,21 @@ void jaccard_row_sum(queue &q, const int n,
             //iterations it is the value at the last thread of the previous iterations.
 
             //get the value of the last thread
-            last = sg.shuffle(sum, blockDim-1);
+            last = item.get_sub_group().shuffle(sum, blockDim-1);
 
             //if you are valid read the value from memory, otherwise set your value to 0
             sum = (valid) ? w[csrInd[start+i]] : 0.0;
 
             //do prefix sum (of size warpSize=blockDim =< 32)
             for (int j=1; j<blockDim; j*=2) {
-              T v = sg.shuffle_up(sum, j);
+              T v = item.get_sub_group().shuffle_up(sum, j);
               if (threadIdx >= j) sum += v;
             }
             //shift by last
             sum += last;
           }
           //get the value of the last thread (to all threads)
-          if (threadIdx == 0) work[row] = sg.shuffle(sum, blockDim-1);
+          if (threadIdx == 0) work[row] = item.get_sub_group().shuffle(sum, blockDim-1);
           }
           else {
             work[row] = (T)length;
