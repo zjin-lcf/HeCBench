@@ -170,8 +170,9 @@ __global__ void
 fill(const int e, T* w, const T value) 
 {
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
-    // e.g. w[0] is the weight when csr_ind[i] equals 0. So multiple non-zero
-    // elements on different rows of a matrix may share the same weight value
+    // e.g. w[0] is the weight of a non-zeron element when csr_ind[i] equals 0. 
+    // So multiple non-zero elements on different rows of a matrix may share 
+    // the same weight value
     w[j] = weighted ? (T)(j+1)/e : value; 
   }
 }
@@ -203,14 +204,24 @@ void jaccard_weight (const int n, const int e,
   cudaMalloc ((void**)&d_weight_s, sizeof(T) * e);
   cudaMalloc ((void**)&d_weight_j, sizeof(T) * e);
 
-  dim3 fill_nblocks((e+MAX_KERNEL_THREADS-1)/MAX_KERNEL_THREADS*MAX_KERNEL_THREADS);  
-  dim3 fill_threads(MAX_KERNEL_THREADS);
+  dim3 nthreads, nblocks; // reuse for multiple kernels
 
-  fill<weighted, T><<<fill_nblocks, fill_threads>>>(e, d_weight_j, (T)1.0);
+  nthreads.x = MAX_KERNEL_THREADS;
+  nthreads.y = 1; 
+  nthreads.z = 1; 
+  nblocks.x  = (e+MAX_KERNEL_THREADS-1) / MAX_KERNEL_THREADS;
+  nblocks.y  = 1;
+  nblocks.z  = 1; 
+
+  fill<weighted, T><<<nblocks, nthreads>>>(e, d_weight_j, (T)1.0);
 #ifdef DEBUG
   cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
   for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
 #endif
+
+  // initialize volume of intersections
+  fill<false, T><<<nblocks, nthreads>>>(e, d_weight_i, (T)0.0);
+
 
   cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
   cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
@@ -221,7 +232,6 @@ void jaccard_weight (const int n, const int e,
   cudaMalloc ((void**)&d_csrVal, sizeof(T) * e);
   cudaMemcpyAsync(d_csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice, 0);
 
-  dim3 nthreads, nblocks;
 
   // compute row sum with prefix sum
   const int y = 4;
@@ -237,9 +247,6 @@ void jaccard_weight (const int n, const int e,
   cudaMemcpy(work, d_work, sizeof(T) * n, cudaMemcpyDeviceToHost);
   for (int i = 0; i < n; i++) printf("work: %d %f\n", i, work[i]);
 #endif
-
-  // initialize volume of intersections
-  fill<false, T><<<fill_nblocks, fill_threads>>>(e, d_weight_i, (T)0.0);
 
   // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
   // nthreads.x * nthreads.y * nthreads.z <= 256
@@ -275,20 +282,20 @@ void jaccard_weight (const int n, const int e,
   float error; 
 
   if (weighted)
-    error = (weight_j[0] - 0.306667) +
-            (weight_j[1] - 0.000000) +
-            (weight_j[2] - 3.680000) +
-            (weight_j[3] - 1.380000) +
-            (weight_j[4] - 0.788571) +
-            (weight_j[5] - 0.460000);
+    error = std::fabs(weight_j[0] - 0.306667) +
+            std::fabs(weight_j[1] - 0.000000) +
+            std::fabs(weight_j[2] - 3.680000) +
+            std::fabs(weight_j[3] - 1.380000) +
+            std::fabs(weight_j[4] - 0.788571) +
+            std::fabs(weight_j[5] - 0.460000);
 
   else
-    error = (weight_j[0] - 0.230000) +
-            (weight_j[1] - 0.000000) +
-            (weight_j[2] - 3.680000) +
-            (weight_j[3] - 1.380000) +
-            (weight_j[4] - 0.920000) +
-            (weight_j[5] - 0.460000);
+    error = std::fabs(weight_j[0] - 0.230000) +
+            std::fabs(weight_j[1] - 0.000000) +
+            std::fabs(weight_j[2] - 3.680000) +
+            std::fabs(weight_j[3] - 1.380000) +
+            std::fabs(weight_j[4] - 0.920000) +
+            std::fabs(weight_j[5] - 0.460000);
 
   if (error > 1e-5) {
     for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
