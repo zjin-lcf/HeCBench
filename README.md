@@ -343,6 +343,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 1.91 | 1.94 | 1.92 | 2.1 |
 
 
+| jaccard | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 108 | 108 | NA |
+| host timing(s) | 28.6  | 28.8 | 28.9 | NA |
+| device timing(s) | 28.2 | 28.1 | 28.1 | NA |
+
+
 | jenkins-hash | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 104 | 104 | 509 |
@@ -1037,6 +1044,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 2.42 | 2.45 | 2.45 | 2.75 |
 
 
+| jaccard | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 102 | 108 | 108 | NA |
+| host timing(s) | 41.7  | 42.1 | 41.2 | NA |
+| device timing(s) | 41.3 | 41.7 | 40.6 | NA |
+
+
 | jenkins-hash | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 104 | 104 | 509 |
@@ -1566,6 +1580,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### iso2dfd, mandelbrot, particle-diffusion
   The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
+
+### jaccard
+  Jaccard index for a sparse matrix (https://github.com/rapidsai/nvgraph/blob/main/cpp/src/jaccard_gpu.cu)
 
 ### jenkins-hash 
   Bob Jenkins lookup3 hash function (https://android.googlesource.com/platform/external/jenkins-hash/+/75dbeadebd95869dd623a29b720678c5c5c55630/lookup3.c)
