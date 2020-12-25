@@ -178,7 +178,7 @@ fill(const int e, T* w, const T value)
 }
 
 template <bool weighted, typename T>
-void jaccard_weight (const int n, const int e, 
+void jaccard_weight (const int iteration, const int n, const int e, 
     int* csr_ptr, int* csr_ind, T* csr_val)
 {
 
@@ -203,78 +203,77 @@ void jaccard_weight (const int n, const int e,
   cudaMalloc ((void**)&d_weight_i, sizeof(T) * e);
   cudaMalloc ((void**)&d_weight_s, sizeof(T) * e);
   cudaMalloc ((void**)&d_weight_j, sizeof(T) * e);
-
-  dim3 nthreads, nblocks; // reuse for multiple kernels
-
-  nthreads.x = MAX_KERNEL_THREADS;
-  nthreads.y = 1; 
-  nthreads.z = 1; 
-  nblocks.x  = (e+MAX_KERNEL_THREADS-1) / MAX_KERNEL_THREADS;
-  nblocks.y  = 1;
-  nblocks.z  = 1; 
-
-  fill<weighted, T><<<nblocks, nthreads>>>(e, d_weight_j, (T)1.0);
-#ifdef DEBUG
-  cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
-  for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
-#endif
-
-  // initialize volume of intersections
-  fill<false, T><<<nblocks, nthreads>>>(e, d_weight_i, (T)0.0);
-
-
-  cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
-  cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
-
-  cudaMalloc ((void**)&d_csrInd, sizeof(int) * e);
-  cudaMemcpyAsync(d_csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice, 0);
-
   cudaMalloc ((void**)&d_csrVal, sizeof(T) * e);
+  cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
+  cudaMalloc ((void**)&d_csrInd, sizeof(int) * e);
+
+  cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
+  cudaMemcpyAsync(d_csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice, 0);
   cudaMemcpyAsync(d_csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice, 0);
 
+  for (int i = 0; i < iteration; i++) {
+    dim3 nthreads, nblocks; // reuse for multiple kernels
 
-  // compute row sum with prefix sum
-  const int y = 4;
-  nthreads.x = 64/y;
-  nthreads.y = y; 
-  nthreads.z = 1; 
-  nblocks.x  = 1; 
-  nblocks.y  = (n + nthreads.y - 1) / nthreads.y;  // less than MAX CUDA BLOCKs
-  nblocks.z  = 1; 
-  jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n, d_csrPtr, d_csrInd, d_weight_j, d_work);
+    nthreads.x = MAX_KERNEL_THREADS;
+    nthreads.y = 1; 
+    nthreads.z = 1; 
+    nblocks.x  = (e+MAX_KERNEL_THREADS-1) / MAX_KERNEL_THREADS;
+    nblocks.y  = 1;
+    nblocks.z  = 1; 
 
+    fill<weighted, T><<<nblocks, nthreads>>>(e, d_weight_j, (T)1.0);
 #ifdef DEBUG
-  cudaMemcpy(work, d_work, sizeof(T) * n, cudaMemcpyDeviceToHost);
-  for (int i = 0; i < n; i++) printf("work: %d %f\n", i, work[i]);
+    cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
+    for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
 #endif
 
-  // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
-  // nthreads.x * nthreads.y * nthreads.z <= 256
-  nthreads.x = 32/y;
-  nthreads.y = y;
-  nthreads.z = 8;
-  nblocks.x  = 1;
-  nblocks.y  = 1;
-  nblocks.z  = (n + nthreads.z - 1)/nthreads.z; // less than CUDA_MAX_BLOCKS);
-  jaccard_is<weighted,T><<<nblocks,nthreads>>>(n, e, d_csrPtr,
-      d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
+    // initialize volume of intersections
+    fill<false, T><<<nblocks, nthreads>>>(e, d_weight_i, (T)0.0);
+
+    // compute row sum with prefix sum
+    const int y = 4;
+    nthreads.x = 64/y;
+    nthreads.y = y; 
+    nthreads.z = 1; 
+    nblocks.x  = 1; 
+    nblocks.y  = (n + nthreads.y - 1) / nthreads.y;  // less than MAX CUDA BLOCKs
+    nblocks.z  = 1; 
+    jaccard_row_sum<weighted,T><<<nblocks,nthreads>>>(n, d_csrPtr, d_csrInd, d_weight_j, d_work);
 
 #ifdef DEBUG
-  cudaMemcpy(weight_i, d_weight_i, sizeof(T) * e, cudaMemcpyDeviceToHost);
-  cudaMemcpy(weight_s, d_weight_s, sizeof(T) * e, cudaMemcpyDeviceToHost);
-  for (int i = 0; i < e; i++) printf("wi: %d %f\n", i, weight_i[i]);
-  for (int i = 0; i < e; i++) printf("ws: %d %f\n", i, weight_s[i]);
+    cudaMemcpy(work, d_work, sizeof(T) * n, cudaMemcpyDeviceToHost);
+    for (int i = 0; i < n; i++) printf("work: %d %f\n", i, work[i]);
 #endif
 
-  // compute jaccard weights
-  nthreads.x = std::min(e, MAX_KERNEL_THREADS); 
-  nthreads.y = 1; 
-  nthreads.z = 1;  
-  nblocks.x  = (e + nthreads.x - 1)/nthreads.x;  // less than MAX CUDA BLOCKs
-  nblocks.y  = 1; 
-  nblocks.z  = 1;
-  jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
-      d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
+    // compute volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
+    // nthreads.x * nthreads.y * nthreads.z <= 256
+    nthreads.x = 32/y;
+    nthreads.y = y;
+    nthreads.z = 8;
+    nblocks.x  = 1;
+    nblocks.y  = 1;
+    nblocks.z  = (n + nthreads.z - 1)/nthreads.z; // less than CUDA_MAX_BLOCKS);
+    jaccard_is<weighted,T><<<nblocks,nthreads>>>(n, e, d_csrPtr,
+        d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
+
+#ifdef DEBUG
+    cudaMemcpy(weight_i, d_weight_i, sizeof(T) * e, cudaMemcpyDeviceToHost);
+    cudaMemcpy(weight_s, d_weight_s, sizeof(T) * e, cudaMemcpyDeviceToHost);
+    for (int i = 0; i < e; i++) printf("wi: %d %f\n", i, weight_i[i]);
+    for (int i = 0; i < e; i++) printf("ws: %d %f\n", i, weight_s[i]);
+#endif
+
+    // compute jaccard weights
+    nthreads.x = std::min(e, MAX_KERNEL_THREADS); 
+    nthreads.y = 1; 
+    nthreads.z = 1;  
+    nblocks.x  = (e + nthreads.x - 1)/nthreads.x;  // less than MAX CUDA BLOCKs
+    nblocks.y  = 1; 
+    nblocks.z  = 1;
+    jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
+        d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
+
+  }
 
   cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
 #ifdef DEBUG
@@ -344,7 +343,7 @@ void printVector(const vector<T>& V, char* msg)
 // Reference: https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/
 int main(int argc, char** argv) 
 { 
-  int iter = 1;  
+  int iteration = 10;
 
 #ifdef DEBUG
   matrix M  = { 
@@ -357,7 +356,7 @@ int main(int argc, char** argv)
 
   int numRow = atoi(argv[1]);
   int numCol = atoi(argv[2]);
-  iter = atoi(argv[3]);
+  iteration = atoi(argv[3]);
 
   srand(2);
 
@@ -397,13 +396,8 @@ int main(int argc, char** argv)
     printVector(csr_ind, (char*)"col indices = "); 
   }
 
-  for (int i = 0; i < iter; i++) {
-    jaccard_weight<true, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
-  }
-
-  for (int i = 0; i < iter; i++) {
-    jaccard_weight<false, vtype>(row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
-  }
+  jaccard_weight<true, vtype>(iteration, row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
+  jaccard_weight<false, vtype>(iteration, row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
 
   return 0; 
 } 
