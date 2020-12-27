@@ -1,0 +1,61 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = nvcc
+OPTIMIZE  = yes
+DEBUG     = no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = lulesh
+
+source = lulesh.cu \
+        lulesh-viz.cu \
+        lulesh-util.cu \
+        lulesh-init.cu
+
+
+obj = $(source:.cu=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Xcompiler -Wall
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) 
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cu lulesh.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) -i 1 -s 16 -r 11 -b 1 -c 1
+
