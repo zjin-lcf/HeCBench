@@ -2323,7 +2323,7 @@ int main(int argc, char *argv[])
 
   // factor out the buffers from the loop
   Real_t *d_determ;
-  cudaMalloc((void**)&d_determ, sizeof(Real_t)*numElem8);
+  cudaMalloc((void**)&d_determ, sizeof(Real_t)*numElem);
   Real_t *d_fx_elem;
   cudaMalloc((void**)&d_fx_elem, sizeof(Real_t)*numElem8);
   Real_t *d_fy_elem;
@@ -2563,7 +2563,7 @@ int main(int argc, char *argv[])
 
 
     // check for negative element volume on the host
-    cudaMemcpy(determ, d_determ, sizeof(Real_t)*numElem8, cudaMemcpyDeviceToHost);
+    cudaMemcpy(determ, d_determ, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
 
 #ifdef _OPENMP
 #pragma omp parallel for firstprivate(numElem)
@@ -2618,7 +2618,7 @@ int main(int argc, char *argv[])
     cudaMemcpy(x8n_tmp, d_x8n, sizeof(Real_t)*numElem8, cudaMemcpyDeviceToHost);
     cudaMemcpy(y8n_tmp, d_y8n, sizeof(Real_t)*numElem8, cudaMemcpyDeviceToHost);
     cudaMemcpy(z8n_tmp, d_z8n, sizeof(Real_t)*numElem8, cudaMemcpyDeviceToHost);
-    cudaMemcpy(determ, d_determ, sizeof(Real_t)*numElem8, cudaMemcpyDeviceToHost);
+    cudaMemcpy(determ, d_determ, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
 
     // volumn derivative
     for (int i = 0; i < numElem8; i++) {
