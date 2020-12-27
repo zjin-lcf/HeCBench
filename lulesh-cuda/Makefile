@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+VERIFY    = yes
 
 #===============================================================================
 # Program name & source code list
@@ -37,6 +38,10 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+# Verify kernel results
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
