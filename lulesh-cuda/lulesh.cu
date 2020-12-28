@@ -2483,6 +2483,19 @@ int main(int argc, char *argv[])
   Index_t* d_elemElem;
   cudaMalloc((void**)&d_elemElem, sizeof(Index_t)*numElem);
 
+  // error checking on the host
+  Real_t *determ = Allocate<Real_t>(numElem) ;
+  // resize m_dxx, m_dyy, and m_dzz
+  locDom->AllocateStrains(numElem);
+
+  // resize position and velocity gradients
+  Int_t allElem = numElem +  /* local elem */
+      2*locDom->sizeX()*locDom->sizeY() + /* plane ghosts */
+      2*locDom->sizeX()*locDom->sizeZ() + /* row ghosts */
+      2*locDom->sizeY()*locDom->sizeZ() ; /* col ghosts */
+
+  locDom->AllocateGradients(numElem, allElem);
+
   while((locDom->time() < locDom->stoptime()) && (locDom->cycle() < opts.its)) {
 
     TimeIncrement(*locDom) ;
@@ -2510,9 +2523,6 @@ int main(int argc, char *argv[])
     //=====================================================================
     // CalcVolumeForceForElems(domain) 
     //=====================================================================
-
-    // allocation for error checking on the host
-    Real_t *determ = Allocate<Real_t>(numElem) ;
 
     Real_t  hgcoef = domain.hgcoef() ;
 
@@ -2824,7 +2834,6 @@ int main(int argc, char *argv[])
     // calculate element quantities (i.e. velocity gradient & q), and update material states 
     // LagrangeElements(domain);
     //=========================================================
-    domain.AllocateStrains(numElem);
 
     Real_t *dxx = &domain.m_dxx[0];
     Real_t *dyy = &domain.m_dyy[0];
@@ -2893,17 +2902,10 @@ int main(int argc, char *argv[])
       printf("VolumeError: negative volumn\n");
       exit(VolumeError);
     }
-    domain.DeallocateStrains();
 
     //======================================================= 
     //CalcQForElems(domain, vnew) ;
     //======================================================= 
-    Int_t allElem = numElem +  /* local elem */
-      2*domain.sizeX()*domain.sizeY() + /* plane ghosts */
-      2*domain.sizeX()*domain.sizeZ() + /* row ghosts */
-      2*domain.sizeY()*domain.sizeZ() ; /* col ghosts */
-
-    domain.AllocateGradients(numElem, allElem);
 
     //================================================================
     // Calculate velocity gradients 
@@ -2995,8 +2997,6 @@ int main(int argc, char *argv[])
     free(qq_tmp);
     free(ql_tmp);
 #endif
-
-    domain.DeallocateGradients();
 
 
     /* Don't allow excessive artificial viscosity */
@@ -3107,7 +3107,7 @@ int main(int argc, char *argv[])
     VerifyAndWriteFinalOutput(elapsed_timeG, *locDom, opts.nx, numRanks);
   }
 
-  delete(locDom);
+  //  Release resources
   cudaFree(d_x);
   cudaFree(d_y);
   cudaFree(d_z);
@@ -3173,6 +3173,10 @@ int main(int argc, char *argv[])
   cudaFree(d_e);
   cudaFree(d_elemRep);
   cudaFree(d_elemElem);
+  locDom->DeallocateGradients();
+  locDom->DeallocateStrains();
+  Release(&determ);
+  delete(locDom);
 
   return 0 ;
 }
