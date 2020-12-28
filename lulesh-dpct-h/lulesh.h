@@ -1,8 +1,9 @@
 #ifndef __LULESH
 #define __LULESH
 
-#include <math.h>
-#include <vector>
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 
 // Emulate the number of CPU threads
 #define NT 2
@@ -12,8 +13,6 @@
 //**************************************************
 
 #define MAX(a, b) ( ((a) > (b)) ? (a) : (b))
-
-#include "common.h"
 
 // Precision specification
 typedef float        real4 ;
@@ -26,19 +25,17 @@ typedef int    Int_t ;   // integer representation
 
 enum { VolumeError = -1, QStopError = -2 } ;
 
-#pragma omp declare target
-inline real4  SQRT(real4  arg) { return sqrtf(arg) ; }
-inline real8  SQRT(real8  arg) { return sqrt(arg) ; }
+inline real4 SQRT(real4 arg) { return sqrtf(arg); }
+inline real8 SQRT(real8 arg) { return sqrt(arg); }
 inline real10 SQRT(real10 arg) { return sqrtl(arg) ; }
 
-inline real4  CBRT(real4  arg) { return cbrtf(arg) ; }
-inline real8  CBRT(real8  arg) { return cbrt(arg) ; }
+inline real4 CBRT(real4 arg) { return cbrtf(arg); }
+inline real8 CBRT(real8 arg) { return cbrt(arg); }
 inline real10 CBRT(real10 arg) { return cbrtl(arg) ; }
 
-inline real4  FABS(real4  arg) { return fabsf(arg) ; }
-inline real8  FABS(real8  arg) { return fabs(arg) ; }
+inline real4 FABS(real4 arg) { return fabsf(arg); }
+inline real8 FABS(real8 arg) { return fabs(arg); }
 inline real10 FABS(real10 arg) { return fabsl(arg) ; }
-#pragma omp end declare target
 
 
 // Stuff needed for boundary conditions
@@ -540,10 +537,6 @@ class Domain {
    Index_t m_rowMin, m_rowMax;
    Index_t m_colMin, m_colMax;
    Index_t m_planeMin, m_planeMax ;
-
-   // A SYCL queue
-   cl::sycl::queue device_queue; 
-
 } ;
 
 typedef Real_t &(Domain::* Domain_member )(Index_t) ;
@@ -565,10 +558,8 @@ struct cmdLineOpts {
 
 // Function Prototypes
 
-// lulesh-par
-Real_t CalcElemVolume( const Real_t x[8],
-                       const Real_t y[8],
-                       const Real_t z[8]);
+Real_t CalcElemVolume( const Real_t x[8], const Real_t y[8], const Real_t z[8] );
+
 
 // lulesh-util
 void ParseCommandLineOptions(int argc, char *argv[],

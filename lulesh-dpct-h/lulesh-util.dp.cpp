@@ -1,7 +1,6 @@
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <stdio.h>
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "lulesh.h"
 
 /* Helper function for converting strings to ints, with error checking */

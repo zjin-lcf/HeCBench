@@ -1,7 +1,6 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <math.h>
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "lulesh.h"
 
 #ifdef VIZ_MESH
@@ -31,10 +30,8 @@ void DumpToVisit(Domain& domain, int numFiles, int myRank, int numRanks)
   char basename[32];
   DBfile *db;
 
-
   sprintf(basename, "lulesh_plot_c%d", domain.cycle());
   sprintf(subdirName, "data_%d", myRank);
-
 
   db = (DBfile*)DBCreate(basename, DB_CLOBBER, DB_LOCAL, NULL, DB_HDF5X);
 
@@ -47,7 +44,6 @@ void DumpToVisit(Domain& domain, int numFiles, int myRank, int numRanks)
   else {
      printf("Error writing out viz file - rank %d\n", myRank);
   }
-
 }
 
 
@@ -292,13 +288,12 @@ void DumpMultiblockObjects(DBfile *db, char basename[], int numRanks)
 }
 
 #else
-
+   
 void DumpToVisit(Domain& domain, int numFiles, int myRank, int numRanks)
 {
    if (myRank == 0) {
       printf("Must enable -DVIZ_MESH at compile time to call DumpDomain\n");
    }
 }
-
 #endif
 
