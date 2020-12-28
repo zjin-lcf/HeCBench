@@ -3,10 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 VERIFY    = no
+
 
 #===============================================================================
 # Program name & source code list
@@ -14,20 +16,19 @@ VERIFY    = no
 
 program = lulesh
 
-source = lulesh.cu \
-        lulesh-viz.cu \
-        lulesh-util.cu \
-        lulesh-init.cu
+source = lulesh.cc \
+        lulesh-viz.cc \
+        lulesh-util.cc \
+        lulesh-init.cc
 
-
-obj = $(source:.cu=.o)
+obj = $(source:.cc=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -48,14 +49,19 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) 
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu lulesh.h
+%.o: %.cc lulesh.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

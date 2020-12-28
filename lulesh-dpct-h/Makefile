@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
@@ -14,20 +14,20 @@ VERIFY    = no
 
 program = lulesh
 
-source = lulesh.cu \
-        lulesh-viz.cu \
-        lulesh-util.cu \
-        lulesh-init.cu
+source = lulesh.dp.cpp \
+        lulesh-viz.dp.cpp \
+        lulesh-util.dp.cpp \
+        lulesh-init.dp.cpp
 
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -38,10 +38,11 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-# Verify kernel results
+# Verify Flags
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -52,10 +53,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) 
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu lulesh.h
+%.o: %.cpp lulesh.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

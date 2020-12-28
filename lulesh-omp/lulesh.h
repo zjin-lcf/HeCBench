@@ -13,8 +13,6 @@
 
 #define MAX(a, b) ( ((a) > (b)) ? (a) : (b))
 
-#include "common.h"
-
 // Precision specification
 typedef float        real4 ;
 typedef double       real8 ;
@@ -540,9 +538,6 @@ class Domain {
    Index_t m_rowMin, m_rowMax;
    Index_t m_colMin, m_colMax;
    Index_t m_planeMin, m_planeMax ;
-
-   // A SYCL queue
-   cl::sycl::queue device_queue; 
 
 } ;
 

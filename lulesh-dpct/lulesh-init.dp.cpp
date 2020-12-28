@@ -1,9 +1,5 @@
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
-#include <cstdlib>
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include "lulesh.h"
 
 /////////////////////////////////////////////////////////////////////
@@ -31,13 +27,6 @@ Domain::Domain(Int_t numRanks, Index_t colLoc,
    m_dvovmax(Real_t(0.1)),
    m_refdens(Real_t(1.0))
 {
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    // move assignment
-   device_queue = cl::sycl::queue(dev_sel);
 
    Index_t edgeElems = nx ;
    Index_t edgeNodes = edgeElems+1 ;
@@ -174,7 +163,7 @@ Domain::Domain(Int_t numRanks, Index_t colLoc,
       e(0) = einit;
    }
    //set initial deltatime base on analytic CFL calculation
-   deltatime() = (Real_t(.5)*cbrt(volo(0)))/sqrt(Real_t(2.0)*einit);
+   deltatime() = (Real_t(.5) * cbrt(volo(0))) / sqrt(Real_t(2.0) * einit);
 
 } // End constructor
 
@@ -360,8 +349,9 @@ Domain::CreateRegionIndexSets(Int_t nr, Int_t balance)
       //Determine the relative weights of all the regions.  This is based off the -b flag.  Balance is the value passed into b.  
       for (Index_t i=0 ; i<numReg() ; ++i) {
          regElemSize(i) = 0;
-	 costDenominator += pow((i+1), balance);  //Total sum of all regions weights
-	 regBinEnd[i] = costDenominator;  //Chance of hitting a given region is (regBinEnd[i] - regBinEdn[i-1])/costDenominator
+         costDenominator +=
+             pow((i + 1), balance);       // Total sum of all regions weights
+         regBinEnd[i] = costDenominator;  //Chance of hitting a given region is (regBinEnd[i] - regBinEdn[i-1])/costDenominator
       }
       //Until all elements are assigned
       while (nextIndex < numElem()) {
@@ -603,8 +593,8 @@ void InitMeshDecomp(Int_t numRanks, Int_t myRank,
    Int_t dx, dy, dz;
    Int_t myDom;
    
-   // Assume cube processor layout for now 
-   testProcs = Int_t(cbrt(Real_t(numRanks))+0.5) ;
+   // Assume cube processor layout for now
+   testProcs = Int_t(cbrt(Real_t(numRanks)) + 0.5);
    if (testProcs*testProcs*testProcs != numRanks) {
       printf("Num processors must be a cube of an integer (1, 8, 27, ...)\n") ;
       exit(-1);
