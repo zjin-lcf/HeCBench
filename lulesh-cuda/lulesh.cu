@@ -2725,8 +2725,6 @@ int main(int argc, char *argv[])
 #endif 
     } // if ( hgcoef > Real_t(0.) ) 
 
-    Release(&determ) ;
-
     //===========================================================================
     //CalcAccelerationForNodes(domain, domain.numNode());   // IN: fx  OUT: m_xdd
     //===========================================================================
