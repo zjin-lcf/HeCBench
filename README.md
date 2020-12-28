@@ -427,6 +427,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.8 | 9.7 | 9.8 | 9.7 |
 
 
+| lulesh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2970 | 2986 | 2986 | 6635 |
+| host timing(s) | 35.8 | 30.1 | 35.9 | 33.5 |
+| device timing(s) | 32.0 | 27.4 | 31.5 | 28.1 |
+
+
 | memcpy | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 131072 | 131072 | 131072 | 131072 |
@@ -1121,6 +1128,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 1.95 | 2.14 | 2.12 | 2.1 |
 
 
+| lulesh | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2970 | 2986 | 2986 | 6635 |
+| host timing(s) | 46.9 | 47.3 | 48.8 | 137.9 |
+| device timing(s) | 41.6 | 43.6 | 43.4 | 132 |
+
+
 | lud | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 1535 | 1536 | 1536 | 6145 |
@@ -1616,6 +1630,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### lud
   LU decomposition in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### lulesh
+  Livermore unstructured Lagrangian explicit shock hydrodynamics (https://github.com/LLNL/LULESH)
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
