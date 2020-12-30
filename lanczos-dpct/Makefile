@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -39,11 +38,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -57,9 +51,6 @@ $(program): $(obj) Makefile
 
 clean:
 	rm -rf $(program) $(obj)
-
-debug: $(program)
-	./$(program) -g data/social-small.txt -n 100 -k 3 -d float
 
 run: $(program)
 	./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float

@@ -44,55 +44,6 @@ void saxpy_inplace_kernel(const int n, T* y, const T *x, const T a) {
 }
 #pragma omp end declare target
 
-/**
- * @brief   Cuda kernel function for warp sparse matrix multiplication.
- *
- * @param   group_size  The number of threads used to calculate one row.
- * @param   rows        The row number of the matrix.
- * @param   begin_row   The row to begin from in this kernel launch.
- * @param   row_ptr     Row pointers in the CSR matrix.
- * @param   col_ind     Column indexes in the CSR matrix.
- * @param   values      Data values in the CSR matrix.
- * @param   x           The input vector x to multiply.
- * @param   y           The output vector y.
- */
-#pragma omp declare target
-template <typename T>
-void warp_multiply_kernel(const int group_size, const int rows,
-    const int *row_ptr, const int *col_ind, const T *values, const T *x, T *y) {
-
-  const int groups_per_block = THREADS_PER_BLOCK / group_size;
-  const int multiply_blocks = (rows + groups_per_block - 1) / groups_per_block;
-
-  #pragma omp target teams num_teams(multiply_blocks) thread_limit(THREADS_PER_BLOCK)
-  {
-    T result[THREADS_PER_BLOCK];
-    #pragma omp parallel 
-    {
-      int lid = omp_get_thread_num();
-      int index = omp_get_team_num()*omp_get_num_threads() + lid;
-      int r = index / group_size;
-      int lane = index % group_size;
-
-      result[lid] = 0;
-      if (r < rows) {
-        int start = row_ptr[r];
-        int end = row_ptr[r + 1];
-        for (int i = start + lane; i < end; i+= group_size)
-          result[lid] += values[i] * x[col_ind[i]];
-
-        // Threads in a warp are synchronized, so we can do this
-        int half = group_size / 2;
-        while (half > 0) {
-          if (lane < half) result[lid] += result[lid + half];
-          half /= 2;
-        }
-        if (lane == 0) y[r] = result[lid];
-      }
-    }
-  }
-}
-#pragma omp end declare target
 
 #pragma omp declare target
 template <typename T>
@@ -147,8 +98,7 @@ symm_tridiag_matrix<T> gpu_lanczos(const csr_matrix<T> &m,
   group_size = row_nonzeros > 4 ? group_size : 4;
   group_size = row_nonzeros > 2 ? group_size : 2;
 
-  // Run kernel and the values of alpha and beta are saved in the 'result' array
-  //
+  
 #pragma omp target data map (to: row_ptr[0:rows+1], \
                                  col_ind[0:nonzeros], \
                                  values[0:nonzeros], \
@@ -158,12 +108,40 @@ symm_tridiag_matrix<T> gpu_lanczos(const csr_matrix<T> &m,
   start_time = cycle_timer::current_seconds();
   for (int i = 0; i < steps; i++) {
     // y_i = M*x_i
-    warp_multiply_kernel<T>(group_size,
-        rows, row_ptr, col_ind, values, x, y);
+    const int groups_per_block = THREADS_PER_BLOCK / group_size;
+    const int multiply_blocks = (rows + groups_per_block - 1) / groups_per_block;
+    #pragma omp target teams num_teams(multiply_blocks) thread_limit(THREADS_PER_BLOCK)
+    {
+      T result[THREADS_PER_BLOCK];
+      #pragma omp parallel 
+      {
+        int lid = omp_get_thread_num();
+        int index = omp_get_team_num()*omp_get_num_threads() + lid;
+        int r = index / group_size;
+        int lane = index % group_size;
+
+        result[lid] = 0;
+        if (r < rows) {
+          int start = row_ptr[r];
+          int end = row_ptr[r + 1];
+          for (int i = start + lane; i < end; i+= group_size)
+            result[lid] += values[i] * x[col_ind[i]];
+
+          // Threads in a warp are synchronized, so we can do this
+          int half = group_size / 2;
+          while (half > 0) {
+            if (lane < half) result[lid] += result[lid + half];
+            half /= 2;
+          }
+          if (lane == 0) y[r] = result[lid];
+        }
+      }
+    }
 
     // alpha_i <- y_i*x_i
     T product = device_dot_product(rows, x, y);
 
+    // the values of alpha and beta are saved in the 'result' array
     result.alpha(i) = product;
 
     // y_i <- y_i - alpha_i*x_i - beta_i*x_(i-1)
@@ -188,8 +166,9 @@ symm_tridiag_matrix<T> gpu_lanczos(const csr_matrix<T> &m,
   std::cout << "GPU Lanczos iterations: " << steps << std::endl;
   std::cout << "GPU Lanczos time: " << end_time - start_time << " sec" << std::endl;
 
-  free(y);
-  free(x_prev);
+  // TODO memory leak or double free
+  // free(y);
+  // free(x_prev);
 
   result.resize(steps);
   return result;
