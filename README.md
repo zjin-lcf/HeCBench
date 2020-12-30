@@ -210,6 +210,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 9.6 | 9.6 | 9.6 | 16.1 |
 
 
+| extrema | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 9696 | 9792  | 9792 | 99404 |
+| host timing(s) | 34.2 | 37.9 | 38.6 | 44.8 |
+| device timing(s) | 33.5 | 36.8 | 37.2 | 39.1 |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -925,6 +932,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.7 | 7.8 | 7.8 | 13.7 |
 
 
+| extrema | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 9696 | 9792  | 9792 | 99404 |
+| host timing(s) | 59.4 | 49.4 | 58.5 | 95.1 |
+| device timing(s) | 55.5 | 50.1 | 55.0 | 91.8 |
+
+
 | filter | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 3 | 5 | 5 | 11 |
@@ -1550,6 +1564,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
+
+### extrema
+  Find local maxima (https://github.com/rapidsai/cusignal/)
 
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
