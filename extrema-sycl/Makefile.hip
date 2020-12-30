@@ -39,7 +39,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
 

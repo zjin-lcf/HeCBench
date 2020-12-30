@@ -125,13 +125,9 @@ template <typename T>
 void test_1D (queue &q, const int length, 
               const int order, const bool clip)
 {
-#ifdef DEBUG
-  int x[] = {2,1,2,3,2,0,1,0};
-#else
   T* x = (T*) malloc (sizeof(T)*length);
   for (int i = 0; i < length; i++)
     x[i] = rand() % length;
-#endif
 
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
@@ -143,9 +139,9 @@ void test_1D (queue &q, const int length,
     range<1> gws ((length+255)/256*256);
     range<1> lws (256);
 
-    for (int n = 0; n < 1; n++)
+    for (int n = 0; n < 100; n++)
       q.submit([&] (handler &cgh) {
-        auto results = d_result.template get_access<sycl_discard_write>(cgh);
+        auto results = d_result.get_access<sycl_discard_write>(cgh);
         auto inp = d_x.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class extrema1D>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
           const int tid = item.get_global_id(0);
@@ -157,8 +153,8 @@ void test_1D (queue &q, const int length,
               int plus = tid + o;
               int minus = tid - o;
 
-              clip_plus( clip, n, plus );
-              clip_minus( clip, n, minus );
+              clip_plus( clip, length, plus );
+              clip_minus( clip, length, minus );
 
               temp &= data > inp[plus];
               temp &= data >= inp[minus];
@@ -175,22 +171,18 @@ void test_1D (queue &q, const int length,
   int error = 0;
   for (int i = 0; i < length; i++)
     if (cpu_r[i] != gpu_r[i]) {
-#ifdef DEBUG
-      printf("index=%d %d != %d\n", i, cpu_r[i], gpu_r[i]);
-#else
       error = 1; 
       break;
-#endif
     }
 
-#ifndef DEBUG
   free(x);
-#endif
   free(cpu_r);
   free(gpu_r);
-  if (error) printf("1D test (order=%d): FAILED\n", order);
+  if (error) printf("1D test: FAILED\n");
 }
 
+// length_x is the number of columns
+// length_y is the number of rows
 template <typename T>
 void test_2D (queue &q, const int length_x, const int length_y, 
               const int order, const bool clip, const int axis) 
@@ -207,7 +199,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
     buffer<T, 1> d_x(x, length);
     buffer<bool, 1> d_result(gpu_r, length);
 
-    range<2> gws ((length_y+15)/16, (length_x+15)/16);
+    range<2> gws ((length_y+15)/16*16, (length_x+15)/16*16);
     range<2> lws (16, 16);
 
     for (int n = 0; n < 100; n++) 
@@ -279,10 +271,6 @@ int main() {
 #endif
   queue q(dev_sel);
 
-#ifdef DEBUG
-    test_1D<int>(q, 8, 1, true);
-#else
-
   for (int order = 1; order <= 128; order = order * 2) {
     test_1D<int>(q, 1000000, order, true);
     test_1D<long>(q, 1000000, order, true);
@@ -303,7 +291,6 @@ int main() {
     test_2D<float>(q, 1000, 1000, order, true, 0);
     test_2D<double>(q, 1000, 1000, order, true, 0);
   }
-#endif
 
   return 0;
 }
