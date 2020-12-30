@@ -56,6 +56,9 @@ $(program): $(obj) Makefile
 clean:
 	rm -rf $(program) $(obj)
 
+debug: $(program)
+	./$(program) -g data/social-small.txt -n 100 -k 3 -d float
+
 run: $(program)
 	./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
 
