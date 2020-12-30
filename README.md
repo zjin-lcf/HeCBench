@@ -378,6 +378,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 7.6 | 10.1 | 10.4 | 10.7 |
 
 
+| lanczos | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 9108 | 9156 | 9156 | 37620 |
+| host timing(s) | 16.0 | 17.9 | 18.3 |  2642 |
+| device timing(s) | 14.9 | 16.7 | 16.8 | 2637  |
+
+
 | langford | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 15 | 20 | 20 | 33 |
@@ -1086,6 +1093,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 10.4 | 11.4 | 11.4 | 11.6 |
 
 
+| lanczos | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 9108 | 9156 | 9156 | 37620 |
+| host timing(s) | 37.3 | 40.4 | 26.7 | 82.8
+| device timing(s) | 32.2 | 37.9 | 21.3 | 80.9 |
+
+
 | langford | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 15 | 20 | 20 | 33 |
@@ -1609,6 +1623,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### knn
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
+
+### lanczos
+  Lanczos tridiagonalization (https://github.com/linhr/15618)
 
 ### langford
   Count planar Langford sequences (https://github.com/boris-dimitrov/z4_planar_langford_multigpu)
