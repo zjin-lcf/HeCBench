@@ -21,7 +21,7 @@
 //                                SOSFILT                                    //
 ///////////////////////////////////////////////////////////////////////////////
 #define MAX_THREADS 256
-#define THREADS 256
+#define THREADS 32  
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
 template<typename T>
@@ -60,8 +60,8 @@ __global__ void sosfilt(
 
   __syncthreads( );
 
-  const int load_size { n_sections - 1 };
-  const int unload_size { n_samples - load_size };
+  const int load_size = n_sections - 1 ;
+  const int unload_size = n_samples - load_size ;
 
   T temp;
   T x_n;
