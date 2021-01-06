@@ -11,11 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <cuda.h>
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 //                                SOSFILT                                    //
@@ -25,24 +22,28 @@
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
 template<typename T>
-__global__ void sosfilt( 
+void sosfilt( 
     const int n_signals,
     const int n_samples,
     const int n_sections,
     const int zi_width,
     const T *__restrict__ sos,
     const T *__restrict__ zi,
-    T *__restrict__ x_in)
+    T *__restrict__ x_in,
+    sycl::nd_item<3> item_ct1,
+    uint8_t *dpct_local)
 {
-  extern __shared__ char smem[];
+  auto smem = (char *)dpct_local;
   T *s_out = reinterpret_cast<T *>( smem );
   T *s_zi = reinterpret_cast<T *>( &s_out[n_sections] ) ;
   T *s_sos = reinterpret_cast<T *>( &s_zi[n_sections * zi_width] ) ;
 
   // dim3 blocksPerGrid (1, blocks);
   // dim3 threadsPerBlock (256, 1);
-  const int tx = static_cast<int>( threadIdx.x ) ;
-  const int ty = static_cast<int>( blockIdx.y * blockDim.y + threadIdx.y ) ;
+  const int tx = static_cast<int>(item_ct1.get_local_id(2));
+  const int ty = static_cast<int>(item_ct1.get_group(1) *
+                                      item_ct1.get_local_range().get(1) +
+                                  item_ct1.get_local_id(1));
 
   // Reset shared memory
   s_out[tx] = 0;
@@ -58,7 +59,7 @@ __global__ void sosfilt(
     s_sos[tx * sos_width + i] = sos[tx * sos_width + i];
   }
 
-  __syncthreads( );
+  item_ct1.barrier();
 
   const int load_size = n_sections - 1 ;
   const int unload_size = n_samples - load_size ;
@@ -85,7 +86,7 @@ __global__ void sosfilt(
 
       s_out[tx] = temp;
 
-      __syncthreads( );
+      item_ct1.barrier();
     }
 
     // Processing phase
@@ -110,7 +111,7 @@ __global__ void sosfilt(
         x_in[ty * n_samples + ( n - load_size )] = temp;
       }
 
-      __syncthreads( );
+      item_ct1.barrier();
     }
 
     // Unloading phase
@@ -132,7 +133,7 @@ __global__ void sosfilt(
         } else {
           x_in[ty * n_samples + ( n + unload_size )] = temp;
         }
-        __syncthreads( );
+        item_ct1.barrier();
       }
     }
   }
@@ -141,6 +142,8 @@ __global__ void sosfilt(
   template <typename T>
 void filtering (const int n_signals, const int n_samples, const int n_sections, const int zi_width)
 {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   // the number of second-order sections must be less than max threads per block
   assert(MAX_THREADS >= n_sections);
 
@@ -153,9 +156,8 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
 
   const int blocks = n_signals;
 
-  dim3 blocksPerGrid (1, blocks);
-  dim3 threadsPerBlock (THREADS, 1);
-
+  sycl::range<3> blocksPerGrid(1, blocks, 1);
+  sycl::range<3> threadsPerBlock(THREADS, 1, 1);
 
   // Second-order section digital filter
   const int sos_size = n_sections * sos_width ;
@@ -166,8 +168,8 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
       sos[i*sos_width+j] = (T)1 ; // for test 
 
   T* d_sos;
-  cudaMalloc((void**)&d_sos, sizeof(T) * sos_size);
-  cudaMemcpy(d_sos, sos, sizeof(T) * sos_size, cudaMemcpyHostToDevice);
+  d_sos = (T *)sycl::malloc_device(sizeof(T) * sos_size, q_ct1);
+  q_ct1.memcpy(d_sos, sos, sizeof(T) * sos_size).wait();
 
   // initial  conditions
   const int z_size = (n_sections + 1) * blocks * zi_width;
@@ -175,33 +177,44 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
   for (int i = 0; i < z_size; i++) zi[i] = (T)1; // for test
 
   T* d_zi;
-  cudaMalloc((void**)&d_zi, sizeof(T) * z_size);
-  cudaMemcpy(d_zi, zi, sizeof(T) * z_size, cudaMemcpyHostToDevice);
+  d_zi = (T *)sycl::malloc_device(sizeof(T) * z_size, q_ct1);
+  q_ct1.memcpy(d_zi, zi, sizeof(T) * z_size).wait();
 
   // input signals
   const int x_size = n_signals * n_samples;
   T* x = (T*) malloc (sizeof(T) * x_size);
   for (int i = 0; i < n_signals; i++) 
-    for (int j = 0; j < n_samples; j++) 
-      x[i*n_samples+j] = (T)std::sin(2*3.14*(i+1+j));
+    for (int j = 0; j < n_samples; j++)
+      x[i * n_samples + j] = (T)std::sin(2 * 3.14 * (i + 1 + j));
 
   T* d_x;
-  cudaMalloc((void**)&d_x, sizeof(T) * x_size);
-  cudaMemcpy(d_x, x, sizeof(T) * x_size, cudaMemcpyHostToDevice);
+  d_x = (T *)sycl::malloc_device(sizeof(T) * x_size, q_ct1);
+  q_ct1.memcpy(d_x, x, sizeof(T) * x_size).wait();
 
   const int out_size = n_sections;
   const int shared_mem = (out_size + z_size + sos_size) * sizeof(T); 
 
   for (int n = 0; n < 100; n++)
-    sosfilt<T><<<blocksPerGrid, threadsPerBlock, shared_mem, 0>>>(n_signals, 
-      n_samples,
-      n_sections,
-      zi_width,
-      d_sos,
-      d_zi,
-      d_x);
+    q_ct1.submit([&](sycl::handler &cgh) {
+      sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                     sycl::access::target::local>
+          dpct_local_acc_ct1(sycl::range<1>(shared_mem), cgh);
 
-  cudaMemcpy(x, d_x, sizeof(T) * x_size, cudaMemcpyDeviceToHost);
+      auto dpct_global_range = blocksPerGrid * threadsPerBlock;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                             dpct_global_range.get(0)),
+              sycl::range<3>(threadsPerBlock.get(2), threadsPerBlock.get(1),
+                             threadsPerBlock.get(0))),
+          [=](sycl::nd_item<3> item_ct1) {
+            sosfilt<T>(n_signals, n_samples, n_sections, zi_width, d_sos, d_zi,
+                       d_x, item_ct1, dpct_local_acc_ct1.get_pointer());
+          });
+    });
+
+  q_ct1.memcpy(x, d_x, sizeof(T) * x_size).wait();
 #ifdef DEBUG
   for (int i = 0; i < n_signals; i++) { 
     for (int j = 0; j < n_samples; j++) 
@@ -213,9 +226,9 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
   free(x);
   free(sos);
   free(zi);
-  cudaFree(d_x);
-  cudaFree(d_sos);
-  cudaFree(d_zi);
+  sycl::free(d_x, q_ct1);
+  sycl::free(d_sos, q_ct1);
+  sycl::free(d_zi, q_ct1);
 }
 
 int main(int argc, char** argv) {
