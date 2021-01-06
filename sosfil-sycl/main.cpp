@@ -21,7 +21,7 @@
 //                                SOSFILT                                    //
 ///////////////////////////////////////////////////////////////////////////////
 #define MAX_THREADS 256
-#define THREADS 256
+#define THREADS 32
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
   template <typename T>
