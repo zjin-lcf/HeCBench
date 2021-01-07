@@ -71,7 +71,7 @@ int main(int argc, char** argv)
   for (int i = 0; i < size; i++)
   {
     idata[i] = i % 16; // Fill with some pattern
-    odata[i] = -1;
+    odata[i] = size - i;
   }
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
@@ -165,10 +165,7 @@ int main(int argc, char** argv)
   double second = t / 1.e9; // Convert to seconds
   printf("Total elapsed time %.3f (s)\n", second);
 
-  if (! verifySort(odata, size)) 
-  {
-    return -1;
-  }
+  verifySort(odata, size);
 
   free(idata);
   free(isums);
