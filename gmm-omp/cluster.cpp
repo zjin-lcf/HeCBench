@@ -243,7 +243,9 @@ void setupCluster(clusters_t* c, const int num_clusters, const int num_events, c
   c->means = (float*) malloc(sizeof(float)*num_dimensions*num_clusters);
   c->R = (float*) malloc(sizeof(float)*num_dimensions*num_dimensions*num_clusters);
   c->Rinv = (float*) malloc(sizeof(float)*num_dimensions*num_dimensions*num_clusters);
-  c->memberships = (float*) malloc(sizeof(float)*num_events*num_clusters);
+  //c->memberships = (float*) malloc(sizeof(float)*num_events*num_clusters);
+  c->memberships = (float*) malloc (sizeof(float)*
+		  num_events*(num_clusters+NUM_CLUSTERS_PER_BLOCK-num_clusters % NUM_CLUSTERS_PER_BLOCK));
 }
 
 
@@ -353,7 +355,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   float *clusters_R = clusters.R; 
   float *clusters_Rinv = clusters.Rinv; 
   float *clusters_memberships = clusters.memberships; 
-  float *likelihoods = (float*) malloc (sizeof(float)*NUM_BLOCKS);
+  float *likelihoods = (float*) malloc (sizeof(float)*NUM_BLOCKS); // shared_likelihoods 
 
 #pragma omp target data map(alloc:  \
     clusters_N[0:original_num_clusters], \
@@ -363,11 +365,10 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     clusters_means[0:num_dimensions*original_num_clusters], \
     clusters_R[0:num_dimensions*num_dimensions*original_num_clusters], \
     clusters_Rinv[0:num_dimensions*num_dimensions*original_num_clusters], \
-    clusters_memberships[0:num_events*(original_num_clusters+NUM_CLUSTERS_PER_BLOCK-\
-      original_num_clusters % NUM_CLUSTERS_PER_BLOCK)],\
+    clusters_memberships[0:num_events*(original_num_clusters+NUM_CLUSTERS_PER_BLOCK-original_num_clusters % NUM_CLUSTERS_PER_BLOCK)],\
     likelihoods[0:NUM_BLOCKS]), \
   map(to: fcs_data_by_event[0:num_dimensions*num_events], \
-      fcs_data_by_dimension[0:num_dimensions*num_events]) \
+          fcs_data_by_dimension[0:num_dimensions*num_events])
   {
     //////////////// Initialization done, starting kernels //////////////// 
     DEBUG("Invoking seed_clusters kernel.\n");
@@ -422,10 +423,10 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 #pragma omp barrier
 
         if(tid == 0) {
-          total_variance[0] = 0.0;
+          total_variance = 0.0;
           for(int i=0; i<num_dimensions;i++)
-            total_variance[0] += variances[i];
-          avgvar[0] = total_variance[0] / (float) num_dimensions;
+            total_variance += variances[i];
+          avgvar = total_variance / (float) num_dimensions;
         }
 
 #pragma omp barrier
@@ -456,7 +457,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
           if(tid == 0) {
             clusters_pi[c] = 1.0f/((float)original_num_clusters);
             clusters_N[c] = ((float) num_events) / ((float)original_num_clusters);
-            clusters_avgvar[c] = avgvar[0] / COVARIANCE_DYNAMIC_RANGE;
+            clusters_avgvar[c] = avgvar / COVARIANCE_DYNAMIC_RANGE;
           }
         }
       }
@@ -478,8 +479,8 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
             clusters_constant, 
             clusters_avgvar, 
             matrix,
-            determinant_arg,
-            sum,
+            &determinant_arg,
+            &sum,
             original_num_clusters, 
             num_dimensions);
       }
@@ -588,7 +589,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
       // Copy the likelihood totals from each block, sum them up to get a total
       // CUDA_SAFE_CALL(cudaMemcpy(shared_likelihoods,d_likelihoods,sizeof(float)*NUM_BLOCKS,cudaMemcpyDeviceToHost));
-#pragma omp target update from likelihoods[0:NUM_BLOCK]
+#pragma omp target update from (likelihoods[0:NUM_BLOCKS])
 
       likelihood = 0.0;
       for(int i=0;i<NUM_BLOCKS;i++) {
@@ -610,13 +611,13 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
         // This kernel computes a new N, pi isn't updated until compute_constants though
         //mstep_N<<<num_clusters, NUM_THREADS_MSTEP>>>(d_clusters,num_dimensions,num_clusters,num_events);
-#pragma omp target teams num_teams(num_clusters) thread_limit(NUM_THREADS_ESTEP)
+#pragma omp target teams num_teams(num_clusters) thread_limit(NUM_THREADS_MSTEP)
         {
-          float temp_sums[NUM_THREADS_ESTEP];
+          float temp_sums[NUM_THREADS_MSTEP];
 #pragma omp parallel 
           {
-            int tid = omp_get_num_threads(); 
-            int num_threads = omp_get_thread_num(); 
+            int tid  = omp_get_thread_num(); 
+            int num_threads = omp_get_num_threads(); 
             int c = omp_get_team_num();
 
             // Compute new N
@@ -725,7 +726,9 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
             // Determine what row,col this matrix is handling, also handles the symmetric element
             int row,col,c1;
-            compute_row_col(item, num_dimensions, &row, &col);
+            compute_row_col(
+            omp_get_team_num() / ((num_clusters+NUM_CLUSTERS_PER_BLOCK-1)/NUM_CLUSTERS_PER_BLOCK),
+			    num_dimensions, &row, &col);
 
 #pragma omp barrier
 
@@ -740,7 +743,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
             }
 #endif 
 
-            if ( (tid < min(num_clusters, NUM_CLUSTERS_PER_BLOCK))  // c1 = 0
+            if ( (tid < ((num_clusters < NUM_CLUSTERS_PER_BLOCK) ? num_clusters : NUM_CLUSTERS_PER_BLOCK) )  // c1 = 0
                 && (c1+tid < num_clusters)) { 
               means_row[tid] = clusters_means[(c1+tid)*num_dimensions+row];
               means_col[tid] = clusters_means[(c1+tid)*num_dimensions+col];
@@ -763,8 +766,8 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
             } 
 
             for(int event=tid; event < num_events; event+=NUM_THREADS_MSTEP) {
-              val1 = fcs_data[row*num_events+event];
-              val2 = fcs_data[col*num_events+event];
+              val1 = fcs_data_by_dimension[row*num_events+event];
+              val2 = fcs_data_by_dimension[col*num_events+event];
               cov_sum1 += (val1-means_row[0])*(val2-means_col[0])*clusters_memberships[c1*num_events+event]; 
               cov_sum2 += (val1-means_row[1])*(val2-means_col[1])*clusters_memberships[(c1+1)*num_events+event]; 
               cov_sum3 += (val1-means_row[2])*(val2-means_col[2])*clusters_memberships[(c1+2)*num_events+event]; 
@@ -813,7 +816,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
         //  CUDA_SAFE_CALL(cudaMemcpy(clusters.R,temp_clusters.R,
         //       sizeof(float)*num_clusters*num_dimensions*num_dimensions,cudaMemcpyDeviceToHost));
-#pragma omp target update from (clustes_R[0:num_clusters*num_dimensions*num_dimensions])
+#pragma omp target update from (clusters_R[0:num_clusters*num_dimensions*num_dimensions])
 
         // Reduce R for all clusters, copy back to device
         for(int c=0; c < num_clusters; c++) {
@@ -836,7 +839,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
         // CUDA_SAFE_CALL(cudaMemcpy(temp_clusters.R,clusters.R,
         //     sizeof(float)*num_clusters*num_dimensions*num_dimensions,cudaMemcpyHostToDevice));
-#pragma omp target update to (clustes_R[0:num_clusters*num_dimensions*num_dimensions])
+#pragma omp target update to (clusters_R[0:num_clusters*num_dimensions*num_dimensions])
 
 
         //CUT_CHECK_ERROR("M-step Kernel execution failed: ");
@@ -860,8 +863,8 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
                 clusters_constant, 
                 clusters_avgvar, 
                 matrix,
-                determinant_arg,
-                sum,
+                &determinant_arg,
+                &sum,
                 num_clusters, // original_num_clusters, 
                 num_dimensions);
           }
@@ -870,7 +873,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
         //    CUDA_SAFE_CALL(cudaMemcpy(clusters.constant, temp_clusters.constant, 
         //         sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
 
-#pragma omp target udpate from (clusters_constant[0:num_clusters])
+#pragma omp target update from (clusters_constant[0:num_clusters])
 
         for(int temp_c=0; temp_c < num_clusters; temp_c++)
           DEBUG("Cluster %d constant: %e\n",temp_c,clusters.constant[temp_c]);
@@ -923,7 +926,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
         //    CUDA_SAFE_CALL(cudaMemcpy(shared_likelihoods,d_likelihoods,sizeof(float)*NUM_BLOCKS,cudaMemcpyDeviceToHost));
 #pragma omp target update from(likelihoods[0:NUM_BLOCKS])
         likelihood = 0.0;
-        for(int i=0;i<NUM_BLOCKS;i++) likelihood += ikelihoods[i]; 
+        for(int i=0;i<NUM_BLOCKS;i++) likelihood += likelihoods[i]; 
 
         DEBUG("Likelihood: %e\n",likelihood);
         change = likelihood - old_likelihood;
@@ -939,7 +942,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
           num_clusters, num_dimensions);
 
       //  CUDA_SAFE_CALL(cudaMemcpy(clusters.memberships, temp_clusters.memberships, sizeof(float)*num_events*num_clusters,cudaMemcpyDeviceToHost));
-#pragma omp target update from clusters_memberships[0:num_events*num_clusters])
+#pragma omp target update from (clusters_memberships[0:num_events*num_clusters])
 
 
       DEBUG("GPU done with copying cluster data from device\n");
@@ -1026,7 +1029,6 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   freeCluster(&scratch_cluster);
   freeCluster(&clusters);
   free(fcs_data_by_dimension);
-  free(fcs_data_by_event);
   free(likelihoods);
 
   *final_num_clusters = ideal_num_clusters;
