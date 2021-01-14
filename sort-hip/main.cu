@@ -10,7 +10,7 @@
 typedef unsigned int T;
 typedef uint4 VECTYPE;
 
-// CUDA kernels
+// kernels
 #include "sort_reduce.h"
 #include "sort_top_scan.h"
 #include "sort_bottom_scan.h"
@@ -69,7 +69,7 @@ int main(int argc, char** argv)
   for (unsigned int i = 0; i < size; i++)
   {
     h_idata[i] = i % 16; // Fill with some pattern
-    h_odata[i] = -1;
+    h_odata[i] = size - i;
   }
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
@@ -107,11 +107,9 @@ int main(int argc, char** argv)
     for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
     {
       // Like scan, we use a reduce-then-scan approach
-
       // But before proceeding, update the shift appropriately
       // for each kernel. This is how many bits to shift to the
       // right used in binning.
-
       // Also, the sort is not in place, so swap the input and output
       // buffers on each pass.
       bool even = ((shift / radix_width) % 2 == 0) ? true : false;
@@ -136,10 +134,7 @@ int main(int argc, char** argv)
   double second = t / 1.e9; // Convert to seconds
   printf("Total elapsed time %.3f (s)\n", second);
 
-  if (! verifySort(h_odata, size)) 
-  {
-    return -1;
-  }
+  verifySort(h_odata, size);
 
   free(h_idata);
   free(h_odata);

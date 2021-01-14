@@ -9,6 +9,8 @@
  *
  */
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdio.h> // for FILE typedef
 
 #ifndef GAUSSIAN_H
@@ -77,16 +79,17 @@
 #define EMUPRINT(fmt, ...)
 #endif
 
-#define CUDA_SAFE_CALL( call) do {                                 \
-    cudaError err = call;                                                    \
-    if( cudaSuccess != err) {                                                \
-        fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",        \
-            __FILE__, __LINE__, cudaGetErrorString( err) );                  \
-             exit(EXIT_FAILURE);                                             \
-    } } while (0)
+/*
+DPCT1009:1: SYCL uses exceptions to report errors and does not use the error
+codes. The original code was commented out and a warning string was inserted.
+You need to rewrite this code.
+*/
+#define CUDA_SAFE_CALL(call)                                                   \
+                              do {                                                                       \
+    int err = call;                                                        \
+     } while (0)
 
-
-typedef struct 
+typedef struct dpct_type_7d2421
 {
     // Key for array lengths
     //  N = number of events
