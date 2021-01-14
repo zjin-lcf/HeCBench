@@ -9,7 +9,7 @@
 
 #include "gaussian.h"
 
-
+#pragma omp declare target 
 // Inverts an NxN matrix 'data' stored as a 1D array in-place
 // 'actualsize' is N
 // Computes the log of the determinant of the origianl matrix in the process
@@ -75,6 +75,7 @@ void invert(float* data, int actualsize, float* log_determinant)  {
   }
 }
 
+#pragma omp end declare target 
 /*
  * Computes the row and col of a square matrix based on the index into
  * a lower triangular (with diagonal) matrix
@@ -82,11 +83,12 @@ void invert(float* data, int actualsize, float* log_determinant)  {
  * Used to determine what row/col should be computed for covariance
  * based on a block index.
  */
-void compute_row_col(nd_item<2> &item, const int n, int* row, int* col) {
+#pragma omp declare target 
+void compute_row_col(const int bid, const int n, int* row, int* col) {
   int i = 0;
   for(int r=0; r < n; r++) {
     for(int c=0; c <= r; c++) {
-      if(i == item.get_group(0)) {  
+      if(i == bid) {  
         *row = r;
         *col = c;
         return;
@@ -95,12 +97,14 @@ void compute_row_col(nd_item<2> &item, const int n, int* row, int* col) {
     }
   }
 }
+#pragma omp end declare target 
 
 /*
  * Computes the constant, pi, Rinv for each cluster
  * 
  * Needs to be launched with the number of blocks = number of clusters
  */
+#pragma omp declare target 
 void constants_kernel(
     const float *clusters_R,
     float *clusters_Rinv,
@@ -185,7 +189,9 @@ void constants_kernel(
     }
   }
 }
+#pragma omp end declare target 
 
+#pragma omp declare target 
 void estep1_kernel(
     float *data, 
     const float* clusters_Rinv, 
@@ -266,7 +272,9 @@ void estep1_kernel(
     clusters_memberships[c*num_events+event] = -0.5f * like + constant + logf(cluster_pi);
   }
 }
+#pragma omp end declare target 
 
+#pragma omp declare target 
 void estep2_kernel(
     float* clusters_memberships,
     float* likelihood,
@@ -280,9 +288,9 @@ void estep2_kernel(
   float max_likelihood;
   float denominator_sum;
 
-  int groups = item.get_group_range(0);
-  int tid = item.get_local_id(0);
-  int bid = item.get_group(0);
+  int groups = omp_get_num_teams(); 
+  int tid = omp_get_thread_num();
+  int bid = omp_get_team_num();
 
   // Break up the events evenly between the blocks
   int num_pixels_per_block = num_events / groups; //gridDim.x;
@@ -349,6 +357,7 @@ void estep2_kernel(
     likelihood[bid] = total_likelihoods[tid];
   }
 }
+#pragma omp end declare target 
 
 
 
