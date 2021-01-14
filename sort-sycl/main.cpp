@@ -63,7 +63,7 @@ int main(int argc, char** argv)
   for (int i = 0; i < size; i++)
   {
     h_idata[i] = i % 16; // Fill with some pattern
-    h_odata[i] = -1;
+    h_odata[i] = size - i;
   }
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
@@ -154,10 +154,7 @@ int main(int argc, char** argv)
   double second = t / 1.e9; // Convert to seconds
   printf("Total elapsed time %.3f (s)\n", second);
 
-  if (! verifySort(h_odata, size)) 
-  {
-    return -1;
-  }
+  verifySort(h_odata, size);
 
   free(h_idata);
   free(h_odata);
