@@ -266,6 +266,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 5.1 | 5.1 | 5.1 | 5.6 |
 
 
+| gmm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 20287 | 20291 | NA | 44753 |
+| host timing(s) | 2.7 | 3.6 | NA | 7.0 |
+| device timing(s) | 1.13 | 1.92 | NA | 2.35 |
+
+
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 4 | 11 | 11 | 21 |
@@ -665,6 +672,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 4.49 | NA | NA | NA |
 
 
+| sosfil | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 208 | 208 | 1214 |
+| host timing(s) | 1.82 | 2.01 | 2.03 | 2.59 |
+| device timing(s) | 1.79 | 1.95 | 1.96 | 2.24 |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 |  13512 |
@@ -986,6 +1000,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | total enqueue | 101 | 102 | 102 | 407 |
 | host timing(s) | 10.7 | 10.8 | 10.7 | 13.8 |
 | device timing(s) | 10.2 | 9.99 | 9.99 | 10.2 |
+
+
+| gmm | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 20287 | 20291 | NA | 44753  |
+| host timing(s) | 130 | 450 | NA | 222 |
+| device timing(s) | 1.1 | 2.8 | NA | 15.3 |
 
 
 | haccmk | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1401,6 +1422,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 8.9 | NA | NA | NA |
 
 
+| sosfil | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 202 | 208 | 208 | NA |
+| host timing(s) | 1.78 | 1.95 | 1.95 | NA |
+| device timing(s) | 1.73 | 1.91 | 1.89 | NA |
+
+
 | sph | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2002 | 2004 | 2004 | 13512 |
@@ -1590,6 +1618,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### geodesic
   Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
 
+### gmm
+  Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
+
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
@@ -1764,6 +1795,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### sort
   Sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+
+### sosfil
+  Second-order IIR digital filtering (https://github.com/rapidsai/cusignal/)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
