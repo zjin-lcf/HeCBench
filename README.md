@@ -1522,7 +1522,7 @@ We may build the [software from source with support for AMD HIP](https://github.
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
 ### asta
-  Array of atructure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
+  Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
