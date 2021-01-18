@@ -31,6 +31,7 @@
 #include <vector>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>

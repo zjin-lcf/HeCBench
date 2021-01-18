@@ -30,6 +30,7 @@
 #include <vector>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <fstream>
 #include "test_util.hpp"
