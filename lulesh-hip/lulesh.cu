@@ -163,8 +163,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 #ifdef VERIFY
 #include <assert.h>
 #endif
-#include <hip/hip_runtime.h>
-
 #include "lulesh.h"
 
 #define EPSILON 1e-7

@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <vector>
+#include <hip/hip_runtime.h>
 
 // Emulate the number of CPU threads
 #define NT 2
