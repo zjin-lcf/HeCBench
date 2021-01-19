@@ -3,9 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
-OPTIMIZE  = yes
-DEBUG     = no
+CC        = icpx
+OPTIMIZE  = no
+DEBUG     = yes
 DEVICE    = gpu
 
 #===============================================================================
@@ -46,7 +46,10 @@ endif
 
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  #CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -64,5 +67,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) in-1k.txt kernel-out.txt
+	./$(program) ../minimap2-sycl/in-1k.txt kernel-out.txt
 
