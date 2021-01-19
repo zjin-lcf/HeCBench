@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <float.h>
 #include <math.h>
+#include <string.h>
 #include <time.h>
 #include "constants.h"
 #include "common.h"

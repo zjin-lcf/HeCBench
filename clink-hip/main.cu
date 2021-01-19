@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <cstring>
 #include <hip/hip_runtime.h>
 
 // a multiple of WGS for simplicity

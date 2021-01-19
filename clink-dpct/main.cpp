@@ -2,6 +2,7 @@
 #include <dpct/dpct.hpp>
 #include <chrono>
 #include <iostream>
+#include <cstring>
 
 // a multiple of WGS for simplicity
 #define N 8192
