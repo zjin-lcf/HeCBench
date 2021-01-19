@@ -11,7 +11,7 @@
 __global__
 void device_chain_tiled(
         return_dt *ret, const anchor_dt *a,
-        const control_dt *control, score_dt **max_tracker, parent_dt **j_tracker,
+        const control_dt *control, score_dt **max_tracker_g, parent_dt **j_tracker_g,
         const int max_dist_x, const int max_dist_y, const int bw);
 
 __host__
