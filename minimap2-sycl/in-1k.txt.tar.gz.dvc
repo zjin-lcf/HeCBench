@@ -1,0 +1,5 @@
+outs:
+- md5: 1a9d6bde2cf5246bc7cc955d6c861169
+  size: 22646314
+  hash: md5
+  path: in-1k.txt.tar.gz
