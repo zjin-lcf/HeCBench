@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <cstring>
 #include "common.h"
 
 // a multiple of WGS for simplicity

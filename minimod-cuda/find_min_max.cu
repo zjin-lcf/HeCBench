@@ -2,6 +2,7 @@
 #include <float.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 #include <cuda.h>
 #include "constants.h"
 
