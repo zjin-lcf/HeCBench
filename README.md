@@ -469,6 +469,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 8.7 | 8.8 | 8.8 | 12.8 | 
 
 
+| minimap2 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | NA | 20 | NA | 83 |
+| host timing(s) | NA | 1.95 | NA | 4.86|
+| device timing(s) | NA | 1.14 | NA | 1.29 |
+
+
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2049 |  2050 |  2050 | 6151 | 
@@ -1247,6 +1254,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 11.1 | 9.2 | 19.2 | 23.4 | 
 
 
+| minimap2 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | NA | 20 | NA | 83 |
+| host timing(s) | NA | 1.63 | NA | 9.26 |
+| device timing(s) | NA | 0.93 | NA | 6.09 |
+
+
 | mixbench | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2049 |  2050 |  2050 | 6151 | 
@@ -1719,6 +1733,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### miniFE
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
+
+### minimap2
+  Hardware Acceleration of Long Read Pairwise Overlapping in Genome Sequencing (https://github.com/UCLA-VAST/minimap2-acceleration)
 
 ### minimod
   A finite difference solver for seismic modeling (https://github.com/rsrice/gpa-minimod-artifacts)
