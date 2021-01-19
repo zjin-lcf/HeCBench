@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "host_data_io.h"
-#include "common.h"
+#include "kernel_common.h"
 #include "datatypes.h"
 #include "host_kernel.h"
 #include "device_kernel_wrapper.h"
