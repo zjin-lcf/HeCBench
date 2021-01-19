@@ -2,7 +2,7 @@
 #include <vector>
 
 #include "memory_scheduler.h"
-#include "common.h"
+#include "kernel_common.h"
 #include "host_data_io.h"
 
 

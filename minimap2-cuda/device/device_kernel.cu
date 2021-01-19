@@ -1,4 +1,4 @@
-#include "common.h"
+#include "kernel_common.h"
 #include "datatypes.h"
 
 __device__

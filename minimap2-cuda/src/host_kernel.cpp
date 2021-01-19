@@ -1,6 +1,6 @@
 #include <vector>
 #include "host_kernel.h"
-#include "common.h"
+#include "kernel_common.h"
 
 static const char LogTable256[256] = {
 #define LT(n) n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n

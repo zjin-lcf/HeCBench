@@ -4,7 +4,7 @@
 #include <cstdio>
 #include "device_kernel_wrapper.h"
 #include "datatypes.h"
-#include "common.h"
+#include "kernel_common.h"
 #include "memory_scheduler.h"
 
 
