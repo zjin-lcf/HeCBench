@@ -1,11 +1,11 @@
 #include <vector>
-#include <string>
+#include <cstring>
 #include <ctime>
 #include <cstdio>
+#include <omp.h>
 #include "datatypes.h"
 #include "kernel_common.h"
 #include "memory_scheduler.h"
-#include "common.h"
 
 score_dt device_ilog2(const score_dt v)
 {
@@ -74,48 +74,31 @@ void device_chain_kernel_wrapper(
   struct timespec start, end;
   clock_gettime(CLOCK_BOOTTIME, &start);
 
+  score_dt max_tracker_g[PE_NUM][BACK_SEARCH_COUNT_GPU];
+  parent_dt j_tracker_g[PE_NUM][BACK_SEARCH_COUNT_GPU];
+
+  #pragma omp target data map(to: h_control[0:cont.size()], \
+		                  h_arg[0:arg.size()]) \
+		          map(alloc: max_tracker_g[0:PE_NUM][0:BACK_SEARCH_COUNT_GPU], \
+		                       j_tracker_g[0:PE_NUM][0:BACK_SEARCH_COUNT_GPU]) \
+		          map(from: h_ret[0:batch_count * TILE_SIZE * PE_NUM])
+
   {
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
-
-    buffer<score_dt,2> d_max_tracker (range<2>(PE_NUM, BACK_SEARCH_COUNT_GPU));
-    buffer<parent_dt,2> d_j_tracker (range<2>(PE_NUM, BACK_SEARCH_COUNT_GPU));
-    d_max_tracker.set_final_data(nullptr);
-    d_j_tracker.set_final_data(nullptr);
-
-    int control_size = cont.size();
-    int arg_size = arg.size();
-
-    buffer<control_dt, 1> d_control (h_control, cont.size());
-    buffer<anchor_dt, 1> d_arg (h_arg, arg.size());
-    buffer<return_dt, 1> d_ret (batch_count * TILE_SIZE * PE_NUM);
-
-    range<1> gws (BLOCK_NUM * THREAD_FACTOR * BACK_SEARCH_COUNT_GPU);
-    range<1> lws (THREAD_FACTOR * BACK_SEARCH_COUNT_GPU);
-
     for (auto batch = 0; batch < batch_count; batch++) {
-      q.submit([&] (handler &cgh) {
-        accessor<anchor_dt, 1, sycl_read_write, access::target::local> active_sm(BACK_SEARCH_COUNT_GPU, cgh);
-        accessor<score_dt, 1, sycl_read_write, access::target::local> max_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
-        accessor<parent_dt, 1, sycl_read_write, access::target::local> j_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
-
-        auto ret = d_ret.get_access<sycl_write>(cgh, range<1>(PE_NUM * TILE_SIZE), id<1>(batch * PE_NUM * TILE_SIZE));
-        auto a = d_arg.get_access<sycl_read>(cgh, range<1>(PE_NUM * TILE_SIZE_ACTUAL), id<1>(batch * PE_NUM * TILE_SIZE_ACTUAL));
-        auto cont = d_control.get_access<sycl_read>(cgh,  range<1>(PE_NUM), id<1>(batch * PE_NUM));
-        auto max_tracker_g = d_max_tracker.get_access<sycl_read_write>(cgh);
-        auto j_tracker_g = d_j_tracker.get_access<sycl_read_write>(cgh);
-
-        cgh.parallel_for<class scan_block>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          int block = item.get_group(0); 
-          int id = item.get_local_id(0);
+      #pragma omp target teams num_teams(BLOCK_NUM) thread_limit(BACK_SEARCH_COUNT_GPU)
+      {
+        anchor_dt active_sm[BACK_SEARCH_COUNT_GPU];
+	score_dt max_tracker_sm[BACK_SEARCH_COUNT_GPU];
+	parent_dt j_tracker_sm[BACK_SEARCH_COUNT_GPU];
+        #pragma omp parallel 
+	{
+          int block = omp_get_team_num();
+          int id = omp_get_thread_num();
           int ofs = block;
-          auto control = cont[ofs];
+          auto control = h_control[batch * PE_NUM + ofs];
 
-          update_anchor(a.get_pointer(), active_sm.get_pointer(), ofs*TILE_SIZE_ACTUAL+id, id);
+          update_anchor(h_arg + batch * PE_NUM * TILE_SIZE_ACTUAL, 
+                        active_sm, ofs*TILE_SIZE_ACTUAL+id, id);
 
           if (control.is_new_read) {
             max_tracker_sm[id] = 0;
@@ -127,9 +110,9 @@ void device_chain_kernel_wrapper(
 
           for (int i = BACK_SEARCH_COUNT_GPU, curr_idx = 0; curr_idx < TILE_SIZE; i++, curr_idx++) {
 
-            item.barrier(access::fence_space::local_space);
+            #pragma omp barrier
             anchor_dt curr;
-            update_anchor(active_sm.get_pointer(), &curr, i % BACK_SEARCH_COUNT_GPU, 0);
+            update_anchor(active_sm, &curr, i % BACK_SEARCH_COUNT_GPU, 0);
             score_dt f_curr = max_tracker_sm[i % BACK_SEARCH_COUNT_GPU];
             parent_dt p_curr = j_tracker_sm[i % BACK_SEARCH_COUNT_GPU];
             if (curr.w >= f_curr) {
@@ -138,44 +121,41 @@ void device_chain_kernel_wrapper(
             }
 
             // read in new query anchor, put into active array
-            item.barrier(access::fence_space::local_space);
+            #pragma omp barrier
             if (id == i % BACK_SEARCH_COUNT_GPU) {
-              update_anchor(a.get_pointer(), active_sm.get_pointer(), ofs*TILE_SIZE_ACTUAL+i, id);
+              update_anchor(h_arg + batch * PE_NUM * TILE_SIZE_ACTUAL,
+                            active_sm, ofs*TILE_SIZE_ACTUAL+i, id);
               max_tracker_sm[id] = 0;
               j_tracker_sm[id] = -1;
             }
 
-            item.barrier(access::fence_space::local_space);
-            score_dt sc = chain_dp_score(active_sm.get_pointer(), curr,
+            #pragma omp barrier
+            score_dt sc = chain_dp_score(active_sm, curr,
                 control.avg_qspan, max_dist_x, max_dist_y, bw, id);
 
-            item.barrier(access::fence_space::local_space);
+            #pragma omp barrier
             if (sc + f_curr >= max_tracker_sm[id]) {
               max_tracker_sm[id] = sc + f_curr;
               j_tracker_sm[id] = (parent_dt)curr_idx + (parent_dt)control.tile_num * TILE_SIZE;
             }
 
-            item.barrier(access::fence_space::local_space);
+            #pragma omp barrier
             if (id == curr_idx % BACK_SEARCH_COUNT_GPU) {
               return_dt tmp;
               tmp.score = f_curr;
               tmp.parent = p_curr;
-              update_return(&tmp, ret.get_pointer(), 0, ofs*TILE_SIZE+curr_idx);
+              update_return(&tmp, h_ret + batch * PE_NUM * TILE_SIZE, 0, ofs*TILE_SIZE+curr_idx);
             }
           }
 
-          item.barrier(access::fence_space::local_space);
+          #pragma omp barrier
           max_tracker_g[ofs][id] = max_tracker_sm[id];
           j_tracker_g[ofs][id] = j_tracker_sm[id];
-        });
-      });
+        }
+      }
     }
-    q.submit([&] (handler &cgh) {
-      auto ret = d_ret.get_access<sycl_read>(cgh);
-      cgh.copy(ret, h_ret);
-    });
-    q.wait();
   }
+
 
   clock_gettime(CLOCK_BOOTTIME, &end);
   printf(" ***** offloading took %f seconds for end-to-end\n",
