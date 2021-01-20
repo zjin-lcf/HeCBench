@@ -1,5 +1,5 @@
 #include <vector>
-#include <string>
+#include <cstring>
 #include <ctime>
 #include <cstdio>
 #include "datatypes.h"
