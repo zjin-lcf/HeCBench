@@ -117,7 +117,7 @@ int main(int argc, char** argv)
       d_out = even ? d_odata : d_idata;
 
       hipLaunchKernelGGL(reduce, dim3(num_work_groups), dim3(local_wsize), 0, 0, d_in, d_isums, size, shift);
-      hipLaunchKernelGGL(top_scan, dim3(num_work_groups), dim3(local_wsize), 0, 0, d_isums, num_work_groups);
+      hipLaunchKernelGGL(top_scan, dim3(1), dim3(local_wsize), 0, 0, d_isums, num_work_groups);
       hipLaunchKernelGGL(bottom_scan, dim3(num_work_groups), dim3(local_wsize), 0, 0, d_out, d_in, d_isums, size, shift);
     }
     hipDeviceSynchronize();
