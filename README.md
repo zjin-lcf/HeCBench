@@ -674,9 +674,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | sort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 241 | NA | NA | NA |
-| host timing(s) | 4.94 | NA | NA | NA |
-| device timing(s) | 4.49 | NA | NA | NA |
+| total enqueue | 241 | 242 | 242 | NA |
+| host timing(s) | 4.94 | 22.6 | 22.6 | NA |
+| device timing(s) | 4.49 | 21.8 | 21.8 | NA |
 
 
 | sosfil | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1431,9 +1431,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | sort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 241 | NA | NA | NA |
-| host timing(s) | 9.4 | NA | NA | NA |
-| device timing(s) | 8.9 | NA | NA | NA |
+| total enqueue | 241 | 242 | 242 | NA |
+| host timing(s) | 10.2 | 17.2 | 17.9 | NA |
+| device timing(s) | 9.6 | 16.6 | 17.3 | NA |
 
 
 | sosfil | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1811,7 +1811,7 @@ We may build the [software from source with support for AMD HIP](https://github.
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
 
 ### sort
-  Sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+  Radix sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### sosfil
   Second-order IIR digital filtering (https://github.com/rapidsai/cusignal/)
