@@ -7,7 +7,6 @@
 #include <fstream>
 #include <vector>
 #include <chrono>
-#include <cuda.h>
 
 typedef unsigned int T;
 typedef sycl::uint4 VECTYPE;
