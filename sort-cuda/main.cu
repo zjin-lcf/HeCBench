@@ -117,7 +117,7 @@ int main(int argc, char** argv)
       d_out = even ? d_odata : d_idata;
 
       reduce<<<num_work_groups, local_wsize>>> (d_in, d_isums, size, shift);
-      top_scan<<<num_work_groups, local_wsize>>>(d_isums, num_work_groups);
+      top_scan<<<1, local_wsize>>>(d_isums, num_work_groups);
       bottom_scan<<<num_work_groups, local_wsize>>>(d_out, d_in, d_isums, size, shift);
     }
     cudaDeviceSynchronize();
