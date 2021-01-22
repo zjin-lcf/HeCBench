@@ -29,7 +29,6 @@
 
 #include "hip/hip_runtime.h"
 #include "Quicksort.h"
-#include <climits>  // UINT_MAX
 
 
 
