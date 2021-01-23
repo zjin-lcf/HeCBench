@@ -83,7 +83,7 @@ addBenchmarkSpecOptions(OptionParser &op)
 void RunBenchmark(OptionParser &op)
 {
     RunTest<float>("S3D-SP", op);
-    //RunTest<double>("S3D-DP", op);
+    RunTest<double>("S3D-DP", op);
 }
 
 template <class real> void RunTest(string testName, OptionParser &op) try {

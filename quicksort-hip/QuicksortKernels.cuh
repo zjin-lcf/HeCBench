@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
    Copyright (c) 2014-2019, Intel Corporation
    Redistribution and use in source and binary forms, with or without 
@@ -28,6 +27,7 @@
  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "hip/hip_runtime.h"
 #include "Quicksort.h"
 
 
