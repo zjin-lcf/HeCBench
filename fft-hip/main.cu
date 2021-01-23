@@ -130,9 +130,9 @@ int main(int argc, char** argv)
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
   const unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
-  const double N = (double)half_n_cmplx*2.0;
+  const int N = half_n_cmplx*2;
 
-  fprintf(stdout, "used_bytes=%lu, N=%g\n", used_bytes, N);
+  fprintf(stdout, "used_bytes=%lu, N=%d\n", used_bytes, N);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
@@ -152,14 +152,14 @@ int main(int argc, char** argv)
 
   const char *sizeStr;
   stringstream ss;
-  ss << "N=" << (long)N;
+  ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
   auto start = std::chrono::steady_clock::now();
 
   T2 *d_source;
-  hipMalloc((void**)&d_source, (long)N * sizeof(T2));
-  hipMemcpy(d_source, source, (long)N * sizeof(T2), hipMemcpyHostToDevice);
+  hipMalloc((void**)&d_source, N * sizeof(T2));
+  hipMemcpy(d_source, source, N * sizeof(T2), hipMemcpyHostToDevice);
 
 
   for (int k=0; k<passes; k++) {
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
     hipLaunchKernelGGL(ifft1D_512, n_ffts, 64, 0, 0, d_source);
   }
 
-  hipMemcpy(source, d_source, (long)N * sizeof(T2), hipMemcpyDeviceToHost);
+  hipMemcpy(source, d_source, N * sizeof(T2), hipMemcpyDeviceToHost);
   hipFree(d_source);
 
   auto end = std::chrono::steady_clock::now();

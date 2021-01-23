@@ -38,9 +38,15 @@ typedef struct {
 #define iexp_1_4   (T2){  0, 1 }
 #define iexp_3_8   (T2){ -1, 1 }//requires post-multiply by 1/sqrt(2)
 
+#ifdef SINGLE_PRECISION
+inline T2 exp_i( T phi ) {
+  return (T2){ cosf(phi), sinf(phi) };
+}
+#else
 inline T2 exp_i( T phi ) {
   return (T2){ cos(phi), sin(phi) };
 }
+#endif
 
 
 inline T2 cmplx_mul( T2 a, T2 b ) { return (T2){ a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x }; }
@@ -129,9 +135,9 @@ int main(int argc, char** argv)
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
   unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
-  const double N = (double)half_n_cmplx*2.0;
+  const int N = half_n_cmplx*2;
 
-  fprintf(stdout, "used_bytes=%lu, N=%g\n", used_bytes, N);
+  fprintf(stdout, "used_bytes=%lu, N=%d\n", used_bytes, N);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
@@ -152,12 +158,12 @@ int main(int argc, char** argv)
 
   const char *sizeStr;
   stringstream ss;
-  ss << "N=" << (long)N;
+  ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
   auto start = std::chrono::steady_clock::now();
 
-#pragma omp target data map (tofrom: source[0:(long)N])
+#pragma omp target data map (tofrom: source[0:N])
   {
     for (int k=0; k<passes; k++) {
 

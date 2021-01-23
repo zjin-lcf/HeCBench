@@ -5,8 +5,8 @@
 using namespace std;
 
 #ifdef SINGLE_PRECISION
-#define T float 
-#define T2 float2
+#define T float
+#define T2 sycl::float2
 #else
 #define T double
 #define T2 sycl::double2
@@ -171,7 +171,7 @@ int main(int argc, char** argv)
                                                sycl::range<3>(1, 1, 64),
                                            sycl::range<3>(1, 1, 64)),
                          [=](sycl::nd_item<3> item_ct1) {
-                           fft1D_512((sycl::double2 *)(&d_source_acc_ct0[0]),
+                           fft1D_512((T2 *)(&d_source_acc_ct0[0]),
                                      item_ct1, smem_acc_ct1.get_pointer());
                          });
       });
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
                                                sycl::range<3>(1, 1, 64),
                                            sycl::range<3>(1, 1, 64)),
                          [=](sycl::nd_item<3> item_ct1) {
-                           ifft1D_512((sycl::double2 *)(&d_source_acc_ct0[0]),
+                           ifft1D_512((T2 *)(&d_source_acc_ct0[0]),
                                       item_ct1, smem_acc_ct1.get_pointer());
                          });
       });
