@@ -15,11 +15,11 @@
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
-#define PI 3.1415926535897932
+#define PI 3.1415926535897932f
 #define A 1103515245
 #define C 12345
 #define M INT_MAX
-#define SCALE_FACTOR 300
+#define SCALE_FACTOR 300.0f
 
 #ifndef BLOCK_SIZE
 #define BLOCK_SIZE 256

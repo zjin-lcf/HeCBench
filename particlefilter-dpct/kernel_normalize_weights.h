@@ -26,8 +26,8 @@ void kernel_normalize_weights(float *weights, const float *partial_sums,
 		float p = sycl::fabs(seed[i]/((float)M));
 		seed[i] = (A*seed[i] + C) % M;
 		float q = sycl::fabs(seed[i]/((float)M));
-		u[0] = (1/((float)(Nparticles))) * 
-			(sycl::sqrt(-2*sycl::log(p))*sycl::cos(2*PI*q));
+		u[0] = (1.0f/((float)(Nparticles))) * 
+			(sycl::sqrt(-2.0f*sycl::log(p))*sycl::cos(2.0f*PI*q));
 		// do this to allow all threads in all blocks to use the same u1
 	}
 	item_ct1.barrier();

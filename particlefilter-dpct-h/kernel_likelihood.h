@@ -22,20 +22,20 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
 		arrayX[i] = xj[i]; 
 		arrayY[i] = yj[i]; 
 
-		weights[i] = 1 / ((float) (Nparticles)); 
+		weights[i] = 1.0f / ((float) (Nparticles)); 
 		seed[i] = (A*seed[i] + C) % M;
   u = sycl::fabs(seed[i] / ((float)M));
                 seed[i] = (A*seed[i] + C) % M;
   v = sycl::fabs(seed[i] / ((float)M));
-  arrayX[i] += 1.0 + 5.0 * (sycl::sqrt(-2 * sycl::log(u)) *
-                            sycl::cos((float)(2 * PI * v)));
+  arrayX[i] += 1.0f + 5.0f * (sycl::sqrt(-2.0f * sycl::log(u)) *
+                            sycl::cos((float)(2.0f * PI * v)));
 
                 seed[i] = (A*seed[i] + C) % M;
   u = sycl::fabs(seed[i] / ((float)M));
                 seed[i] = (A*seed[i] + C) % M;
   v = sycl::fabs(seed[i] / ((float)M));
-  arrayY[i] += -2.0 + 2.0 * (sycl::sqrt(-2 * sycl::log(u)) *
-                             sycl::cos((float)(2 * PI * v)));
+  arrayY[i] += -2.0f + 2.0f * (sycl::sqrt(-2.0f * sycl::log(u)) *
+                             sycl::cos((float)(2.0f * PI * v)));
         }
 
  item_ct1.barrier();
@@ -55,10 +55,10 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
                         if(ind[i*countOnes + y] >= max_size)
 				ind[i*countOnes + y] = 0;
 		}
-		float likelihoodSum = 0.0;
+		float likelihoodSum = 0.0f;
 		for(int x = 0; x < countOnes; x++)
 			likelihoodSum += ((I[ind[i*countOnes + x]] - 100) * (I[ind[i*countOnes + x]] - 100) -
-					(I[ind[i*countOnes + x]] - 228) * (I[ind[i*countOnes + x]] - 228)) / 50.0;
+					(I[ind[i*countOnes + x]] - 228) * (I[ind[i*countOnes + x]] - 228)) / 50.0f;
 		likelihood[i] = likelihoodSum/countOnes-SCALE_FACTOR;
 
   weights[i] =
@@ -66,7 +66,7 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
                                              // missing exponential function call
         }
 
-	weights_local[thread_id] = 0.0; //weights_local[thread_id] = i;
+	weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
 
  item_ct1.barrier();
 
