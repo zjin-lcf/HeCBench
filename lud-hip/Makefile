@@ -3,27 +3,24 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = lud
 
-source = main.cpp
-
-obj = $(source:.cpp=.o)
+source = lud.cu ./common/common.cu 
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I./common
 
 # Linker Flags
 LDFLAGS = 
@@ -40,27 +37,16 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906
-else
-  CFLAGS +=-fopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
-
-%.o: %.cpp timer.h 
-	$(CC) $(CFLAGS) -c $< -o $@
+$(program): $(source) lud_kernels.cu ./common/common.h Makefile
+	$(CC) $(CFLAGS) $(source) -o $@ $(LDFLAGS)
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) -s 8192
 

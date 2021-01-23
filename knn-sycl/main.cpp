@@ -10,6 +10,7 @@
 // Includes
 #include <cstdio>
 #include <sys/time.h>
+#include <algorithm>
 #include <time.h>
 #include "common.h"
 
@@ -279,7 +280,7 @@ void modified_insertion_sort(float *dist, int *index, int length, int k) {
     }
 
     // Shift values (and indexes) higher that the current distance to the right
-    int j = min(i, k - 1);
+    int j = std::min(i, k - 1);
     while (j > 0 && dist[j - 1] > curr_dist) {
       dist[j] = dist[j - 1];
       index[j] = index[j - 1];
