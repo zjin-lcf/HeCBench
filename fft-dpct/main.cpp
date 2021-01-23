@@ -4,8 +4,8 @@
 using namespace std;
 
 #ifdef SINGLE_PRECISION
-#define T float 
-#define T2 float2
+#define T float
+#define T2 sycl::float2
 #else
 #define T double
 #define T2 sycl::double2
@@ -124,9 +124,9 @@ int main(int argc, char** argv)
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
   const unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
-  const double N = (double)half_n_cmplx*2.0;
+  const int N = half_n_cmplx*2;
 
-  fprintf(stdout, "used_bytes=%lu, N=%g\n", used_bytes, N);
+  fprintf(stdout, "used_bytes=%lu, N=%d\n", used_bytes, N);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
@@ -146,14 +146,14 @@ int main(int argc, char** argv)
 
   const char *sizeStr;
   stringstream ss;
-  ss << "N=" << (long)N;
+  ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
   auto start = std::chrono::steady_clock::now();
 
   T2 *d_source;
-  d_source = sycl::malloc_device<sycl::double2>((long)N, q_ct1);
-  q_ct1.memcpy(d_source, source, (long)N * sizeof(T2)).wait();
+  d_source = sycl::malloc_device<T2>(N, q_ct1);
+  q_ct1.memcpy(d_source, source, N * sizeof(T2)).wait();
 
   for (int k=0; k<passes; k++) {
     q_ct1.submit([&](sycl::handler &cgh) {
@@ -184,7 +184,7 @@ int main(int argc, char** argv)
     });
   }
 
-  q_ct1.memcpy(source, d_source, (long)N * sizeof(T2)).wait();
+  q_ct1.memcpy(source, d_source, N * sizeof(T2)).wait();
   sycl::free(d_source, q_ct1);
 
   auto end = std::chrono::steady_clock::now();

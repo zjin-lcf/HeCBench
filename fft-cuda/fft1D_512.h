@@ -18,7 +18,7 @@ __global__ void fft1D_512 (T2* work)
 
   //twiddle8( data, tid, 512 );
   for( int j = 1; j < 8; j++ ){                                       
-      data[j] = cmplx_mul( data[j],exp_i((-2*M_PI*reversed[j]/512)*tid) ); 
+      data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)512)*tid) ); 
   }                                                                   
 
   //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
@@ -35,7 +35,7 @@ __global__ void fft1D_512 (T2* work)
 
   //twiddle8( data, hi, 64 );
   for( int j = 1; j < 8; j++ ){                                       
-      data[j] = cmplx_mul( data[j],exp_i((-2*M_PI*reversed[j]/64)*hi) ); 
+      data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) ); 
   }                                                                   
 
   //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
