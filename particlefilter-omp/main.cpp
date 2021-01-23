@@ -12,11 +12,11 @@
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
-#define PI 3.1415926535897932
+#define PI 3.1415926535897932f
 #define A 1103515245
 #define C 12345
 #define M INT_MAX
-#define SCALE_FACTOR 300
+#define SCALE_FACTOR 300.0f
 
 #ifndef BLOCK_SIZE 
 #define BLOCK_SIZE 256
@@ -449,18 +449,18 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
           if(i < Nparticles){
             arrayX[i] = xj[i];
             arrayY[i] = yj[i];
-            weights[i] = 1 / ((float) (Nparticles)); 
+            weights[i] = 1.0f / ((float) (Nparticles)); 
             seed[i] = (A*seed[i] + C) % M;
             u = fabsf(seed[i]/((float)M));
             seed[i] = (A*seed[i] + C) % M;
             v = fabsf(seed[i]/((float)M));
-            arrayX[i] += 1.0 + 5.0*(sqrtf(-2*logf(u))*cosf(2*PI*v));
+            arrayX[i] += 1.0f + 5.0f*(sqrtf(-2.0f*logf(u))*cosf(2.0f*PI*v));
 
             seed[i] = (A*seed[i] + C) % M;
             u = fabsf(seed[i]/((float)M));
             seed[i] = (A*seed[i] + C) % M;
             v = fabsf(seed[i]/((float)M));
-            arrayY[i] += -2.0 + 2.0*(sqrtf(-2*logf(u))*cosf(2*PI*v));
+            arrayY[i] += -2.0f + 2.0f*(sqrtf(-2.0f*logf(u))*cosf(2.0f*PI*v));
           }
 
 #pragma omp barrier
@@ -480,17 +480,17 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
               if(ind[i*countOnes + y] >= max_size)
                 ind[i*countOnes + y] = 0;
             }
-            float likelihoodSum = 0.0;
+            float likelihoodSum = 0.0f;
             for(int x = 0; x < countOnes; x++)
               likelihoodSum += ((I[ind[i*countOnes + x]] - 100) * (I[ind[i*countOnes + x]] - 100) -
-                  (I[ind[i*countOnes + x]] - 228) * (I[ind[i*countOnes + x]] - 228)) / 50.0;
+                  (I[ind[i*countOnes + x]] - 228) * (I[ind[i*countOnes + x]] - 228)) / 50.0f;
             likelihood[i] = likelihoodSum/countOnes-SCALE_FACTOR;
 
             weights[i] = weights[i] * expf(likelihood[i]);
 
           }
 
-          weights_local[thread_id] = 0.0; //weights_local[thread_id] = i;
+          weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
 
 #pragma omp barrier
 
@@ -557,8 +557,8 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
             float p = fabsf(seed[i]/((float)M));
             seed[i] = (A*seed[i] + C) % M;
             float q = fabsf(seed[i]/((float)M));
-            u[0] = (1/((float)(Nparticles))) * 
-              (sqrtf(-2*logf(p))*cosf(2*PI*q));
+            u[0] = (1.0f/((float)(Nparticles))) * 
+              (sqrtf(-2.0f*logf(p))*cosf(2.0f*PI*q));
             // do this to allow all threads in all blocks to use the same u1
           }
 #pragma omp barrier
