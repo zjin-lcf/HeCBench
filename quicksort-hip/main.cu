@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 #include <math.h>
 #include <iostream>
 #include <algorithm>
