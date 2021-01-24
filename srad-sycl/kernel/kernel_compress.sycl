@@ -6,7 +6,7 @@
 	// copy input to output & log uncompress
 	if(ei<Ne){															// do only for the number of elements, omit extra threads
 
-		d_I_acc[ei] = cl::sycl::log(d_I_acc[ei])*255;												// exponentiate input IMAGE and copy to output image
+		d_I_acc[ei] = cl::sycl::log(d_I_acc[ei])*(FP)255;												// exponentiate input IMAGE and copy to output image
 
 	}
 

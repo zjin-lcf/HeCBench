@@ -29,7 +29,7 @@ if(ei<Ne){              // make sure that only threads matching jobs run
   d_D = d_cN*d_dN_acc[ei] + d_cS*d_dS_acc[ei] + d_cW*d_dW_acc[ei] + d_cE*d_dE_acc[ei];
 
   // image update (equ 61) (every element of IMAGE)
-  d_I_acc[ei] = d_I_acc[ei] + 0.25*lambda*d_D; // updates image (based on input time step and divergence)
+  d_I_acc[ei] = d_I_acc[ei] + (FP)0.25*lambda*d_D; // updates image (based on input time step and divergence)
 
 }
 
