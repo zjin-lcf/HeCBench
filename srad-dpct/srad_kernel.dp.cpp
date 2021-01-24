@@ -49,13 +49,13 @@ SYCL_EXTERNAL void srad(fp d_lambda, const int d_Nr, const int d_Nc,
 		d_L = (d_dN_loc + d_dS_loc + d_dW_loc + d_dE_loc) / d_Jc;			// laplacian (based on derivatives)
 
 		// ICOV (equ 31/35)
-		d_num  = (0.5*d_G2) - ((1.0/16.0)*(d_L*d_L)) ;						// num (based on gradient and laplacian)
-		d_den  = 1 + (0.25*d_L);												// den (based on laplacian)
+		d_num  = ((fp)0.5*d_G2) - (((fp)1.0/(fp)16.0)*(d_L*d_L)) ;						// num (based on gradient and laplacian)
+		d_den  = (fp)1.0 + ((fp)0.25*d_L);												// den (based on laplacian)
 		d_qsqr = d_num/(d_den*d_den);										// qsqr (based on num and den)
 	 
 		// diffusion coefficent (equ 33) (every element of IMAGE)
-		d_den = (d_qsqr-d_q0sqr) / (d_q0sqr * (1+d_q0sqr)) ;				// den (based on qsqr and q0sqr)
-		d_c_loc = 1.0 / (1.0+d_den) ;										// diffusion coefficient (based on den)
+		d_den = (d_qsqr-d_q0sqr) / (d_q0sqr * ((fp)1.0+d_q0sqr)) ;				// den (based on qsqr and q0sqr)
+		d_c_loc = (fp)1.0 / ((fp)1.0+d_den) ;										// diffusion coefficient (based on den)
 	    
 		// saturate diffusion coefficent to 0-1 range
 		if (d_c_loc < 0){													// if diffusion coefficient < 0

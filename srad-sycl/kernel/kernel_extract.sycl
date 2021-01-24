@@ -6,6 +6,6 @@
 	// copy input to output & log uncompress
 	if(ei < Ne){															
 
-		d_I_acc[ei] = cl::sycl::exp(d_I_acc[ei]/255); // exponentiate input IMAGE and copy to output image
+		d_I_acc[ei] = cl::sycl::exp(d_I_acc[ei]/(FP)255); // exponentiate input IMAGE and copy to output image
 
 	}

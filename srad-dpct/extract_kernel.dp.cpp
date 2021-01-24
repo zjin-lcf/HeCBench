@@ -15,7 +15,7 @@ extract(const long d_Ne, fp *d_I,
 	if(ei<d_Ne){															// do only for the number of elements, omit extra threads
 
   d_I[ei] = sycl::exp(d_I[ei] /
-                      255); // exponentiate input IMAGE and copy to output image
+                      (fp)255); // exponentiate input IMAGE and copy to output image
         }
 
 }

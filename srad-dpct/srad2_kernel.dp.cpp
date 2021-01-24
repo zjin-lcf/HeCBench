@@ -41,7 +41,7 @@ SYCL_EXTERNAL void srad2(const fp d_lambda, const int d_Nr, const int d_Nc,
 		d_D = d_cN*d_dN[ei] + d_cS*d_dS[ei] + d_cW*d_dW[ei] + d_cE*d_dE[ei];// divergence
 
 		// image update (equ 61) (every element of IMAGE)
-		d_I[ei] = d_I[ei] + 0.25*d_lambda*d_D;								// updates image (based on input time step and divergence)
+		d_I[ei] = d_I[ei] + (fp)0.25*d_lambda*d_D;								// updates image (based on input time step and divergence)
 
 	}
 
