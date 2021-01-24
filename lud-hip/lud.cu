@@ -125,7 +125,7 @@ main ( int argc, char *argv[] )
     offset = i;  // add the offset 
     hipLaunchKernelGGL(lud_diagonal, dim3(1), dim3(BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
     hipLaunchKernelGGL(lud_perimeter, dim3((matrix_dim-i)/BLOCK_SIZE-1), dim3(2*BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
-    hipLaunchKernelGGL(lud_internal, dim3(dim3((matrix_dim-i)/BLOCK_SIZE-1), dim3((matrix_dim-i)/BLOCK_SIZE-1)), dim3(BLOCK_SIZE, BLOCK_SIZE), d_m, matrix_dim, offset);
+    hipLaunchKernelGGL(lud_internal, dim3((matrix_dim-i)/BLOCK_SIZE-1, (matrix_dim-i)/BLOCK_SIZE-1), dim3(BLOCK_SIZE, BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
   } // for
 
   offset = i;  // add the offset 
