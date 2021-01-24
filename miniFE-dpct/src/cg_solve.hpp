@@ -144,16 +144,16 @@ namespace miniFE {
         LocalOrdinalType *d_Arowoffsets;
         GlobalOrdinalType *d_Acols;
 
-  d_r = sycl::malloc_device<double>(r.coefs.size(), q_ct1);
-  d_p = sycl::malloc_device<double>(p.coefs.size(), q_ct1);
-  d_Ap = sycl::malloc_device<double>(Ap.coefs.size(), q_ct1);
-  d_x = sycl::malloc_device<double>(x.coefs.size(), q_ct1);
-  d_b = sycl::malloc_device<double>(b.coefs.size(), q_ct1);
+  d_r = sycl::malloc_device<MINIFE_SCALAR>(r.coefs.size(), q_ct1);
+  d_p = sycl::malloc_device<MINIFE_SCALAR>(p.coefs.size(), q_ct1);
+  d_Ap = sycl::malloc_device<MINIFE_SCALAR>(Ap.coefs.size(), q_ct1);
+  d_x = sycl::malloc_device<MINIFE_SCALAR>(x.coefs.size(), q_ct1);
+  d_b = sycl::malloc_device<MINIFE_SCALAR>(b.coefs.size(), q_ct1);
   d_Arowoffsets = (LocalOrdinalType *)sycl::malloc_device(
       sizeof(LocalOrdinalType) * A.row_offsets.size(), q_ct1);
   d_Acols = (GlobalOrdinalType *)sycl::malloc_device(
       sizeof(GlobalOrdinalType) * A.packed_cols.size(), q_ct1);
-  d_Acoefs = sycl::malloc_device<double>(A.packed_coefs.size(), q_ct1);
+  d_Acoefs = sycl::malloc_device<MINIFE_SCALAR>(A.packed_coefs.size(), q_ct1);
   q_ct1.memcpy(d_r, r_ptr, sizeof(MINIFE_SCALAR) * r.coefs.size()).wait();
   q_ct1.memcpy(d_p, p_ptr, sizeof(MINIFE_SCALAR) * p.coefs.size()).wait();
   q_ct1.memcpy(d_Ap, Ap_ptr, sizeof(MINIFE_SCALAR) * Ap.coefs.size()).wait();

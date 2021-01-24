@@ -482,10 +482,10 @@ namespace miniFE {
                              dpct_global_range.get(0)),
               sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
           [=](sycl::nd_item<3> item_ct1) {
-            double *d_xcoefs_ct1 =
-                (double *)(&d_xcoefs_acc_ct1[0] + d_xcoefs_offset_ct1);
-            double *d_ycoefs_ct2 =
-                (double *)(&d_ycoefs_acc_ct2[0] + d_ycoefs_offset_ct2);
+            MINIFE_SCALAR *d_xcoefs_ct1 =
+                (MINIFE_SCALAR *)(&d_xcoefs_acc_ct1[0] + d_xcoefs_offset_ct1);
+            MINIFE_SCALAR *d_ycoefs_ct2 =
+                (MINIFE_SCALAR *)(&d_ycoefs_acc_ct2[0] + d_ycoefs_offset_ct2);
             dyx_kernel<VectorType>(n, d_xcoefs_ct1, d_ycoefs_ct2, item_ct1);
           });
     });
@@ -512,10 +512,10 @@ namespace miniFE {
                              dpct_global_range.get(0)),
               sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
           [=](sycl::nd_item<3> item_ct1) {
-            double *d_xcoefs_ct2 =
-                (double *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
-            double *d_ycoefs_ct3 =
-                (double *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
+            MINIFE_SCALAR *d_xcoefs_ct2 =
+                (MINIFE_SCALAR *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
+            MINIFE_SCALAR *d_ycoefs_ct3 =
+                (MINIFE_SCALAR *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
             dyax_kernel<VectorType>(n, alpha, d_xcoefs_ct2, d_ycoefs_ct3,
                                     item_ct1);
           });
@@ -543,10 +543,10 @@ namespace miniFE {
                              dpct_global_range.get(0)),
               sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
           [=](sycl::nd_item<3> item_ct1) {
-            double *d_xcoefs_ct1 =
-                (double *)(&d_xcoefs_acc_ct1[0] + d_xcoefs_offset_ct1);
-            double *d_ycoefs_ct3 =
-                (double *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
+            MINIFE_SCALAR *d_xcoefs_ct1 =
+                (MINIFE_SCALAR *)(&d_xcoefs_acc_ct1[0] + d_xcoefs_offset_ct1);
+            MINIFE_SCALAR *d_ycoefs_ct3 =
+                (MINIFE_SCALAR *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
             yxby_kernel<VectorType>(n, d_xcoefs_ct1, beta, d_ycoefs_ct3,
                                     item_ct1);
           });
@@ -574,10 +574,10 @@ namespace miniFE {
                              dpct_global_range.get(0)),
               sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
           [=](sycl::nd_item<3> item_ct1) {
-            double *d_xcoefs_ct2 =
-                (double *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
-            double *d_ycoefs_ct3 =
-                (double *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
+            MINIFE_SCALAR *d_xcoefs_ct2 =
+                (MINIFE_SCALAR *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
+            MINIFE_SCALAR *d_ycoefs_ct3 =
+                (MINIFE_SCALAR *)(&d_ycoefs_acc_ct3[0] + d_ycoefs_offset_ct3);
             wax_kernel<VectorType>(n, alpha, d_xcoefs_ct2, d_ycoefs_ct3,
                                    item_ct1);
           });
@@ -605,10 +605,10 @@ namespace miniFE {
                              dpct_global_range.get(0)),
               sycl::range<3>(threads.get(2), threads.get(1), threads.get(0))),
           [=](sycl::nd_item<3> item_ct1) {
-            double *d_xcoefs_ct2 =
-                (double *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
-            double *d_ycoefs_ct4 =
-                (double *)(&d_ycoefs_acc_ct4[0] + d_ycoefs_offset_ct4);
+            MINIFE_SCALAR *d_xcoefs_ct2 =
+                (MINIFE_SCALAR *)(&d_xcoefs_acc_ct2[0] + d_xcoefs_offset_ct2);
+            MINIFE_SCALAR *d_ycoefs_ct4 =
+                (MINIFE_SCALAR *)(&d_ycoefs_acc_ct4[0] + d_ycoefs_offset_ct4);
             yaxby_kernel<VectorType>(n, alpha, d_xcoefs_ct2, beta, d_ycoefs_ct4,
                                      item_ct1);
           });
