@@ -8,7 +8,7 @@ void top_scan(T *isums, const size_t num_work_groups, sycl::nd_item<3> item_ct1,
   int local_range = item_ct1.get_local_range().get(2);
 
     if (lid == 0) *s_seed = 0;
-  item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
   // Decide if this is the last thread that needs to
   // propagate the seed value
@@ -29,13 +29,13 @@ void top_scan(T *isums, const size_t num_work_groups, sycl::nd_item<3> item_ct1,
     lmem[idx] = 0;
     idx += local_range;
     lmem[idx] = val;
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
     for (int i = 1; i < local_range; i *= 2)
     {
       T t = lmem[idx -  i];
-      item_ct1.barrier();
+      item_ct1.barrier(sycl::access::fence_space::local_space);
       lmem[idx] += t;
-      item_ct1.barrier();
+      item_ct1.barrier(sycl::access::fence_space::local_space);
     }
     T res = lmem[idx-1];
 
@@ -44,12 +44,12 @@ void top_scan(T *isums, const size_t num_work_groups, sycl::nd_item<3> item_ct1,
     {
       isums[(num_work_groups * d) + lid] = res + *s_seed;
     }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
     if (last_thread)
     {
       *s_seed += res + val;
     }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
   }
 }

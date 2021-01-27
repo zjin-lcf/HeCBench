@@ -25,13 +25,13 @@ SYCL_EXTERNAL void findK(const long height, const knode *knodesD,
 				offsetD[bid] = knodesD[offsetD[bid]].indices[thid];
 			}
 		}
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 // set for next tree level
 		if(thid==0){
 			currKnodeD[bid] = offsetD[bid];
 		}
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
         }
 
 	//At this point, we have a candidate leaf node which may contain

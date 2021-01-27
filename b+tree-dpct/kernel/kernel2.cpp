@@ -32,21 +32,21 @@ SYCL_EXTERNAL void findRangeK(const long height, const knode *knodesD,
 				offset_2D[bid] = knodesD[lastKnodeD[bid]].indices[thid];
 			}
 		}
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 // set for next tree level
 		if(thid==0){
 			currKnodeD[bid] = offsetD[bid];
 			lastKnodeD[bid] = offset_2D[bid];
 		}
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
         }
 
 	// Find the index of the starting record
 	if(knodesD[currKnodeD[bid]].keys[thid] == startD[bid]){
 		RecstartD[bid] = knodesD[currKnodeD[bid]].indices[thid];
 	}
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
         // Find the index of the ending record
 	if(knodesD[lastKnodeD[bid]].keys[thid] == endD[bid]){

@@ -103,20 +103,20 @@ kernel1 (int* d_input_itemsets, const int* d_reference, const int offset_r,
   
   if (tx == 0) SCORE(tx, 0) = d_input_itemsets[index_nw + tx];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)  {
     REF(ty, tx) =  d_reference[index + max_cols * ty];
   }
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   SCORE((tx + 1), 0) = d_input_itemsets[index_w + max_cols * tx];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   SCORE(0, (tx + 1)) = d_input_itemsets[index_n];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   for( int m = 0 ; m < BLOCK_SIZE ; m++){
      if ( tx <= m ){
@@ -127,10 +127,10 @@ kernel1 (int* d_input_itemsets, const int* d_reference, const int offset_r,
               SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
               SCORE((t_index_y-1), (t_index_x))   - (penalty));
      }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
   }
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
   
@@ -145,7 +145,7 @@ kernel1 (int* d_input_itemsets, const int* d_reference, const int offset_r,
   
      }
 
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
   }
   
   
@@ -179,15 +179,15 @@ kernel2 (int* d_input_itemsets, const int* d_reference, const int block_width,
    for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
       REF(ty, tx) =  d_reference[index + max_cols * ty];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
    SCORE((tx + 1), 0) = d_input_itemsets[index_w + max_cols * tx];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
    SCORE(0, (tx + 1)) = d_input_itemsets[index_n];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
    for( int m = 0 ; m < BLOCK_SIZE ; m++){
 
@@ -200,7 +200,7 @@ kernel2 (int* d_input_itemsets, const int* d_reference, const int block_width,
                SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
                SCORE((t_index_y-1), (t_index_x))   - (penalty));
       }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
    }
 
    for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
@@ -215,7 +215,7 @@ kernel2 (int* d_input_itemsets, const int* d_reference, const int block_width,
                SCORE((t_index_y-1), (t_index_x))   - (penalty));
 
       }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
    }
 
    for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
