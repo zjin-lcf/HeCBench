@@ -15,7 +15,7 @@ int index_x = tx + 1;
 w[index] += ((ETA * delta[index_x] * ly[index_y]) + (MOMENTUM * oldw[index]));
 oldw[index] = ((ETA * delta[index_x] * ly[index_y]) + (MOMENTUM * oldw[index]));
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
 if (ty == 0 && by ==0){
   w[index_x] += ((ETA * delta[index_x]) + (MOMENTUM * oldw[index_x]));

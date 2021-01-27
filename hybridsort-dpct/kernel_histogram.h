@@ -31,7 +31,7 @@ histogram1024 ( unsigned int* histoOutput,
 
 
   //Read through the entire input buffer, build per-warp histograms
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
   for(int pos = gid; pos < listsize; pos += gsize) {
     uint data4 = ((histoInput[pos] - minimum)/(maximum - minimum)) * HISTOGRAM_BIN_COUNT;
 
@@ -41,7 +41,7 @@ histogram1024 ( unsigned int* histoOutput,
   }
 
   //Per-block histogram reduction
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   for(int pos = lid; pos < HISTOGRAM_BIN_COUNT; pos += lsize){
     uint sum = 0;

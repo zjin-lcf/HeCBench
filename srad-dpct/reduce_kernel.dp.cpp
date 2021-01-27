@@ -31,7 +31,7 @@ reduce(const long d_Ne, // number of elements in array
 	}
 
 	// Lingjie Zhang modifited at Nov 1 / 2015
- item_ct1.barrier();
+ item_ct1.barrier(sycl::access::fence_space::local_space);
     // end Lingjie Zhang's modification
 
 	// reduction of sums if all blocks are full (rare case)	
@@ -44,7 +44,7 @@ reduce(const long d_Ne, // number of elements in array
 				d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
 			}
 			// synchronization
-   item_ct1.barrier();
+   item_ct1.barrier(sycl::access::fence_space::local_space);
                 }
 		// final sumation by last thread in every block
 		if(tx==(NUMBER_THREADS-1)){											// block result stored in global memory
@@ -64,7 +64,7 @@ reduce(const long d_Ne, // number of elements in array
 					d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
 				}
 				// synchronization
-    item_ct1.barrier(); //
+    item_ct1.barrier(sycl::access::fence_space::local_space); //
                         }
 			// final sumation by last thread in every block
 			if(tx==(NUMBER_THREADS-1)){										// block result stored in global memory
@@ -88,7 +88,7 @@ reduce(const long d_Ne, // number of elements in array
 					d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
 				}
 				// synchronization (all threads)
-    item_ct1.barrier(); //
+    item_ct1.barrier(sycl::access::fence_space::local_space); //
                         }
 			// remainder / final summation by last thread
 			if(tx==(df-1)){										//
