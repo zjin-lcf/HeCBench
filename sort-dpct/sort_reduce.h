@@ -42,7 +42,7 @@ void reduce(const T *in, T *isums, const size_t size, const unsigned int shift,
   {
     // Load this thread's sum into local/shared memory
     lmem[tid] = digit_counts[d];
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
     // Reduce the contents of shared/local memory
     for (unsigned int s = local_range / 2; s > 0; s >>= 1)
@@ -51,7 +51,7 @@ void reduce(const T *in, T *isums, const size_t size, const unsigned int shift,
       {
         lmem[tid] += lmem[tid + s];
       }
-      item_ct1.barrier();
+      item_ct1.barrier(sycl::access::fence_space::local_space);
     }
 
     // Write result for this block to global memory

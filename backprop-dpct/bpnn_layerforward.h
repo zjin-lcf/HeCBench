@@ -16,13 +16,13 @@ int index_in = HEIGHT * by + ty + 1;
 
 if ( tx == 0 )
   input_node[ty] = input[index_in] ;
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
 weight_matrix[ty * WIDTH + tx] =  input_weights[index];
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
 weight_matrix[ty * WIDTH + tx]= weight_matrix[ty * WIDTH + tx] * input_node[ty];
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
 for ( int i = 1 ; i <= HEIGHT ; i=i*2){
   int power_two = i; 
@@ -30,12 +30,12 @@ for ( int i = 1 ; i <= HEIGHT ; i=i*2){
   if( ty % power_two == 0 )
   weight_matrix[ty * WIDTH + tx]= weight_matrix[ty * WIDTH + tx] + weight_matrix[(ty + power_two/2)* WIDTH + tx];
 
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 }
 
 input_weights[index] =  weight_matrix[ty * WIDTH + tx];
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
 if ( tx == 0 ) {
   hidden_partial_sum[by * hid + ty] = weight_matrix[tx* WIDTH + ty];

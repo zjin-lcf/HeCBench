@@ -11,11 +11,11 @@ void kernel_normalize_weights(float *weights, const float *partial_sums,
          item_ct1.get_local_id(2);
         if(0 == local_id)
   *sumWeights = partial_sums[0];
- item_ct1.barrier();
+ item_ct1.barrier(sycl::access::fence_space::local_space);
         if(i < Nparticles) {
  weights[i] = weights[i]/(*sumWeights);
 	}
-	item_ct1.barrier();
+	item_ct1.barrier(sycl::access::fence_space::local_space);
 	if(i == 0) {
 		CDF[0] = weights[0];
 		for(int x = 1; x < Nparticles; x++){
@@ -30,11 +30,11 @@ void kernel_normalize_weights(float *weights, const float *partial_sums,
 			(sycl::sqrt(-2.0f*sycl::log(p))*sycl::cos(2.0f*PI*q));
 		// do this to allow all threads in all blocks to use the same u1
 	}
-	item_ct1.barrier();
+	item_ct1.barrier(sycl::access::fence_space::local_space);
 	if(0 == local_id)
 		*u1 = u[0];
 
-	item_ct1.barrier();
+	item_ct1.barrier(sycl::access::fence_space::local_space);
 	if(i < Nparticles)
 	{
 		u[i] = *u1 + i/((float)(Nparticles));

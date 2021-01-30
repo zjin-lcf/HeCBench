@@ -36,7 +36,7 @@ void bottom_scan(T *out, const T *in, const T *isums, const size_t size,
     l_scanned_seeds[lid] =
       isums[(lid*group_range)+group];
   }
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
   // Scan multiple elements per thread
   while (window < block_stop)
@@ -70,18 +70,18 @@ void bottom_scan(T *out, const T *in, const T *isums, const size_t size,
       lmem[idx] = 0;
       idx += local_range;
       lmem[idx] = histogram[digit];
-      item_ct1.barrier();
+      item_ct1.barrier(sycl::access::fence_space::local_space);
       for (int i = 1; i < local_range; i *= 2)
       {
         T t = lmem[idx -  i];
-        item_ct1.barrier();
+        item_ct1.barrier(sycl::access::fence_space::local_space);
         lmem[idx] += t;
-        item_ct1.barrier();
+        item_ct1.barrier(sycl::access::fence_space::local_space);
       }
       histogram[digit] = lmem[idx-1];
 
       //histogram[digit] = scanLocalMem(histogram[digit], lmem, 1);
-      item_ct1.barrier();
+      item_ct1.barrier(sycl::access::fence_space::local_space);
     }
 
     if (i < block_stop) // Make sure we don't write out of bounds
@@ -110,7 +110,7 @@ void bottom_scan(T *out, const T *in, const T *isums, const size_t size,
 
     // Before proceeding, make sure everyone has finished their current
     // indexing computations.
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
     // Now update the seed array.
     if (lid == local_range-1)
     {
@@ -119,7 +119,7 @@ void bottom_scan(T *out, const T *in, const T *isums, const size_t size,
         l_block_counts[q] += histogram[q];
       }
     }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
     // Advance window
     window += local_range;

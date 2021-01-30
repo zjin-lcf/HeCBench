@@ -37,7 +37,7 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
                              sycl::cos((float)(2.0f * PI * v)));
         }
 
- item_ct1.barrier();
+ item_ct1.barrier(sycl::access::fence_space::local_space);
 
         if(i < Nparticles)
 	{
@@ -67,13 +67,13 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
 
 	weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
 
- item_ct1.barrier();
+ item_ct1.barrier(sycl::access::fence_space::local_space);
 
         if(i < Nparticles){
 		weights_local[thread_id] = weights[i];
 	}
 
- item_ct1.barrier();
+ item_ct1.barrier(sycl::access::fence_space::local_space);
 
         for(unsigned int s=BLOCK_SIZE/2; s>0; s>>=1)
 	{
@@ -81,7 +81,7 @@ void kernel_likelihood(float *arrayX, float *arrayY, const float *xj,
 		{
 			weights_local[thread_id] += weights_local[thread_id + s];
 		}
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
         }
 	if(thread_id == 0)
 	{

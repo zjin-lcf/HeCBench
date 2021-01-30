@@ -13,7 +13,7 @@ SYCL_EXTERNAL void lud_diagonal(float *m, const int matrix_dim,
     array_offset += matrix_dim;
   }
 
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
   for(i=0; i < BLOCK_SIZE-1; i++) {
 
@@ -23,14 +23,14 @@ SYCL_EXTERNAL void lud_diagonal(float *m, const int matrix_dim,
       shadow[tx * BLOCK_SIZE + i] /= shadow[i * BLOCK_SIZE + i];
     }
 
-        item_ct1.barrier();
+        item_ct1.barrier(sycl::access::fence_space::local_space);
     if (tx>i){
 
       for(j=0; j < i+1; j++)
         shadow[(i+1) * BLOCK_SIZE + tx] -= shadow[(i+1) * BLOCK_SIZE + j]*shadow[j * BLOCK_SIZE + tx];
     }
 
-        item_ct1.barrier();
+        item_ct1.barrier(sycl::access::fence_space::local_space);
   }
 
   array_offset = (offset+1)*matrix_dim+offset;
@@ -80,7 +80,7 @@ SYCL_EXTERNAL void lud_perimeter(float *m, const int matrix_dim,
     }
 
   }
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
   if (tx < BLOCK_SIZE) { //peri-row
     idx=tx;
@@ -97,7 +97,7 @@ SYCL_EXTERNAL void lud_perimeter(float *m, const int matrix_dim,
     }
   }
 
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
   if (tx < BLOCK_SIZE) { //peri-row
     idx=tx;
@@ -135,7 +135,7 @@ SYCL_EXTERNAL void lud_internal(float *m, const int matrix_dim,
   peri_row[ty * BLOCK_SIZE + tx] = m[(offset+ty)*matrix_dim+global_col_id+tx];
   peri_col[ty * BLOCK_SIZE + tx] = m[(global_row_id+ty)*matrix_dim+offset+tx];
 
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
   sum = 0;
   for (i=0; i < BLOCK_SIZE; i++)
