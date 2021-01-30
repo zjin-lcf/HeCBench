@@ -185,6 +185,7 @@ int main(int argc, const char **argv)
       auto acc = d_Rand.get_access<sycl_read>(cgh); 
       cgh.copy(acc, h_RandGPU);
     });
+    q.wait();
 
     printf("Compute CPU reference solution...\n");
     {
