@@ -490,6 +490,20 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 2.38 | 2.52 | 2.38 | 2.53 |
 
 
+| mt | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 203 | 204 | 204 | 1018 | 
+| host timing(s) | 1.47 | 1.75 | 1.80 | 5.4 |
+| device timing(s) | 1.06 | 1.06 | 1.06 | 1.72 |
+
+
+| murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 | 104 | 104 | 409 |
+| host timing(s) | 6.3 | 7.4 | 7.2 | 20.7 |
+| device timing(s) | 5.9 | 6.7 | 6.4 | 17.0 |
+
+
 | nbody | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 402 | 402 | 402 | 1308 |
@@ -1275,6 +1289,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.45 | 4.0 | 0.45 | 0.64 |
 
 
+| mt | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 203 | 204 | 204 | 1018 | 
+| host timing(s) | 1.48 | 1.42 | 1.57 | 10.8 |
+| device timing(s) | 1.06 | 1.02 | 1.05 | 7.6 |
+
+
 | murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 104 | 104 | 409 |
@@ -1745,6 +1766,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
+
+### mt
+  Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### murmurhash3
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
