@@ -59,10 +59,10 @@ void loadMTGPU(const char *fname,
 
 void BoxMullerTrans(float *u1, float *u2)
 {
-    const float   r = cl::sycl::native::sqrt(-2.0f * cl::sycl::native::log(*u1));
+    const float   r = cl::sycl::sqrt(-2.0f * cl::sycl::log(*u1));
     const float phi = 2 * PI * (*u2);
-    *u1 = r * cl::sycl::native::cos(phi);
-    *u2 = r * cl::sycl::native::sin(phi);
+    *u1 = r * cl::sycl::cos(phi);
+    *u2 = r * cl::sycl::sin(phi);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
