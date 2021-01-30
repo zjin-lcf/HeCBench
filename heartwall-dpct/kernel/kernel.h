@@ -188,7 +188,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//====================================================================================================100
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //====================================================================================================100
 		//	checksum
@@ -204,7 +204,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//====================================================================================================100
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//====================================================================================================100
 		//	End
@@ -256,7 +256,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//====================================================================================================100
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //====================================================================================================100
 		//	checksum
@@ -272,7 +272,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//====================================================================================================100
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//====================================================================================================100
 		//	CONVOLUTION
@@ -309,7 +309,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -325,7 +325,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	ACTUAL CONVOLUTION
@@ -397,7 +397,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -413,7 +413,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -461,7 +461,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -477,7 +477,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	VERTICAL CUMULATIVE SUM
@@ -508,7 +508,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -524,7 +524,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION
@@ -556,7 +556,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -572,7 +572,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION 2
@@ -604,7 +604,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -619,7 +619,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 
 		//==================================================50
@@ -642,7 +642,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -658,7 +658,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	HORIZONTAL CUMULATIVE SUM
@@ -689,7 +689,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -705,7 +705,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION
@@ -737,7 +737,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -753,7 +753,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION 2
@@ -785,7 +785,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -801,7 +801,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SUBTRACTION
@@ -823,7 +823,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -839,7 +839,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -869,7 +869,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -885,7 +885,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	PAD ARRAY, VERTICAL CUMULATIVE SUM
@@ -929,7 +929,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -945,7 +945,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	VERTICAL CUMULATIVE SUM
@@ -976,7 +976,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -992,7 +992,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION
@@ -1024,7 +1024,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1040,7 +1040,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION 2
@@ -1072,7 +1072,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1088,7 +1088,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SUBTRACTION
@@ -1110,7 +1110,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1126,7 +1126,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	HORIZONTAL CUMULATIVE SUM
@@ -1157,7 +1157,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1173,7 +1173,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION
@@ -1205,7 +1205,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1221,7 +1221,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SELECTION 2
@@ -1253,7 +1253,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1269,7 +1269,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	SUBTRACTION
@@ -1291,7 +1291,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1307,7 +1307,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -1341,7 +1341,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1357,7 +1357,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	MULTIPLICATION
@@ -1379,7 +1379,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1395,7 +1395,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	IN SUM
@@ -1422,7 +1422,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1438,7 +1438,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	IN_SQR SUM
@@ -1464,7 +1464,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1480,7 +1480,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	FINAL SUMMATION
@@ -1508,7 +1508,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1522,7 +1522,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	DENOMINATOR T
@@ -1545,7 +1545,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1559,7 +1559,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	DENOMINATOR		SAVE RESULT IN CUMULATIVE SUM A2
@@ -1581,7 +1581,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1597,7 +1597,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	NUMERATOR	SAVE RESULT IN CONVOLUTION
@@ -1619,7 +1619,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1635,7 +1635,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	CORRELATION	SAVE RESULT IN CUMULATIVE SUM A2
@@ -1658,7 +1658,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1674,7 +1674,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -1717,7 +1717,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1733,7 +1733,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -1809,7 +1809,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1825,7 +1825,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -1863,7 +1863,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1879,7 +1879,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	FINAL SEARCH
@@ -1917,7 +1917,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -1931,7 +1931,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End
@@ -1989,7 +1989,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 
                 //==================================================50
 		//	checksum
@@ -2005,7 +2005,7 @@ void hw(const int frame_no, const params_common d_common, fp *d_frame,
 		//	SYNCHRONIZE THREADS
 		//==================================================50
 
-  item_ct1.barrier();
+  item_ct1.barrier(sycl::access::fence_space::local_space);
 #endif
 		//==================================================50
 		//	End

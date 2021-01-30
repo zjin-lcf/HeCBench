@@ -1,6 +1,3 @@
-#ifndef __GAUSSIAN_ELIMINATION__
-#define __GAUSSIAN_ELIMINATION__
-
 #define DPCT_USM_LEVEL_NONE
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
@@ -28,7 +25,7 @@ create_matrix(float *m, int size){
 
   for (i=0; i < size; i++)
   {
-        coe_i = 10 * exp(lamda * i);
+    coe_i = 10 * exp(lamda * i);
     j=size-1+i;     
     coe[j]=coe_i;
     j=size-1-i;     
@@ -43,6 +40,25 @@ create_matrix(float *m, int size){
   }
 }
 
+// reference implementation for verification
+void gaussian_reference(float *a, float *b, float *m, float* finalVec, int size) {
+  for (int t=0; t<(size-1); t++) {
+    for (int i = 0; i < size-1-t; i++) {
+      m[size * (i + t + 1)+t] = 
+        a[size * (i + t + 1) + t] / a[size * t + t];
+    }
+    for (int x = 0; x < size-1-t; x++) {
+      for (int y = 0; y < size-t; y++) {
+        a[size * (x + t + 1)+y+t] -= 
+          m[size * (x + t + 1) + t] * a[size * t + y + t];
+        if (y == 0)
+          b[x+1+t] -= m[size*(x+1+t)+(y+t)] * b[t];
+      }
+    }
+  }
+
+  BackSub(a,b,finalVec,size);
+}
 
 int main(int argc, char *argv[]) {
 
@@ -81,8 +97,6 @@ int main(int argc, char *argv[]) {
   }
   else
   {
-    printf("create input internally before create, size = %d \n", size);
-
     a = (float *) malloc(size * size * sizeof(float));
     create_matrix(a, size);
 
@@ -102,12 +116,22 @@ int main(int argc, char *argv[]) {
 
   // create the solution matrix
   m = (float *) malloc(size * size * sizeof(float));
+  InitPerRun(size,m);
 
   // create a new vector to hold the final answer
-
   finalVec = (float *) malloc(size * sizeof(float));
 
-  InitPerRun(size,m);
+  // verification
+  float* a_host = (float *) malloc(size * size * sizeof(float));
+  memcpy(a_host, a, size * size * sizeof(float));
+  float* b_host = (float *) malloc(size * sizeof(float));
+  memcpy(b_host, b, size*sizeof(float));
+  float* m_host = (float *) malloc(size * size * sizeof(float));
+  memcpy(m_host, m, size*size*sizeof(float));
+  float* finalVec_host = (float *) malloc(size * sizeof(float));
+
+  // Compute the reference on a host
+  gaussian_reference(a_host, b_host, m_host, finalVec_host, size);
 
   long long offload_start = get_time();
   ForwardSub(a,b,m,size,timing);
@@ -117,6 +141,9 @@ int main(int argc, char *argv[]) {
     printf("Device offloading time %lld (us)\n\n",offload_end - offload_start);
   }
 
+  // Compute the backward phase on a host
+  BackSub(a,b,finalVec,size);
+
   if (!quiet) {
     printf("The result of array a is after forwardsub: \n");
     PrintMat(a, size, size, size);
@@ -124,15 +151,29 @@ int main(int argc, char *argv[]) {
     PrintAry(b, size);
     printf("The result of matrix m is after forwardsub: \n");
     PrintMat(m, size, size, size);
-    BackSub(a,b,finalVec,size);
     printf("The final solution is: \n");
     PrintAry(finalVec,size);
+  }
+
+  // verification
+  printf("Checking the results..\n");
+  for (int i = 0; i < size; i++) {
+    if (fabsf(finalVec[i] - finalVec_host[i]) > 1e-3) {
+      printf("Result mismatch at index %d: %f(device)  %f(host)\n", 
+          i, finalVec[i], finalVec_host[i]);
+    }
   }
 
   free(m);
   free(a);
   free(b);
   free(finalVec);
+
+  // verification
+  free(a_host);
+  free(m_host);
+  free(b_host);
+  free(finalVec_host);
   return 0;
 }
 
@@ -140,8 +181,8 @@ void
 fan1 (const float* a, float* m, const int size, const int t,
       sycl::nd_item<3> item_ct1)
 {
-    int globalId = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
-                   item_ct1.get_local_id(2);
+  int globalId = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                 item_ct1.get_local_id(2);
   if (globalId < size-1-t) {
     m[size * (globalId + t + 1)+t] = 
       a[size * (globalId + t + 1) + t] / a[size * t + t];
@@ -152,10 +193,10 @@ void
 fan2 (float* a, float* b, float* m, const int size, const int t,
       sycl::nd_item<3> item_ct1)
 {
-    int globalIdy = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
-                    item_ct1.get_local_id(2);
-    int globalIdx = item_ct1.get_local_range().get(1) * item_ct1.get_group(1) +
-                    item_ct1.get_local_id(1);
+  int globalIdy = item_ct1.get_local_range().get(2) * item_ct1.get_group(2) +
+                  item_ct1.get_local_id(2);
+  int globalIdx = item_ct1.get_local_range().get(1) * item_ct1.get_group(1) +
+                  item_ct1.get_local_id(1);
   if (globalIdx < size-1-t && globalIdy < size-t) {
     a[size*(globalIdx+1+t)+(globalIdy+t)] -= 
       m[size*(globalIdx+1+t)+t] * a[size*t+(globalIdy+t)];
@@ -173,92 +214,86 @@ fan2 (float* a, float* b, float* m, const int size, const int t,
  **------------------------------------------------------
  */
 void ForwardSub(float *a, float *b, float *m, int size, int timing) {
-    dpct::device_ext &dev_ct1 = dpct::get_current_device();
-    sycl::queue &q_ct1 = dev_ct1.default_queue();
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
 
-    sycl::range<3> blockDim_fan1(BLOCK_SIZE_0, 1, 1);
-    sycl::range<3> gridDim_fan1((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0, 1, 1);
+  sycl::range<3> blockDim_fan1(BLOCK_SIZE_0, 1, 1);
+  sycl::range<3> gridDim_fan1((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0, 1, 1);
 
-    sycl::range<3> blockDim_fan2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X, 1);
-    sycl::range<3> gridDim_fan2((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y,
-                                (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X,
-                                1);
+  sycl::range<3> blockDim_fan2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X, 1);
+  sycl::range<3> gridDim_fan2((size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y,
+                              (size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X, 1);
 
   float *d_a, *d_b, *d_m;
-    dpct::dpct_malloc((void **)&d_a, size * size * sizeof(float));
-    dpct::dpct_malloc((void **)&d_b, size * sizeof(float));
-    dpct::dpct_malloc((void **)&d_m, size * size * sizeof(float));
+  dpct::dpct_malloc((void **)&d_a, size * size * sizeof(float));
+  dpct::dpct_malloc((void **)&d_b, size * sizeof(float));
+  dpct::dpct_malloc((void **)&d_m, size * size * sizeof(float));
 
-    dpct::dpct_memcpy(d_a, a, size * size * sizeof(float),
-                      dpct::host_to_device);
-    dpct::dpct_memcpy(d_b, b, size * sizeof(float), dpct::host_to_device);
-    dpct::dpct_memcpy(d_m, m, size * size * sizeof(float),
-                      dpct::host_to_device);
+  dpct::dpct_memcpy(d_a, a, size * size * sizeof(float), dpct::host_to_device);
+  dpct::dpct_memcpy(d_b, b, size * sizeof(float), dpct::host_to_device);
+  dpct::dpct_memcpy(d_m, m, size * size * sizeof(float), dpct::host_to_device);
 
   for (int t=0; t<(size-1); t++) {
-        {
-            dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
-            dpct::buffer_t d_m_buf_ct1 = dpct::get_buffer(d_m);
-            q_ct1.submit([&](sycl::handler &cgh) {
-                auto d_a_acc_ct0 =
-                    d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
-                auto d_m_acc_ct1 =
-                    d_m_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+    {
+      dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
+      dpct::buffer_t d_m_buf_ct1 = dpct::get_buffer(d_m);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        auto d_a_acc_ct0 =
+            d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+        auto d_m_acc_ct1 =
+            d_m_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
 
-                auto dpct_global_range = gridDim_fan1 * blockDim_fan1;
+        auto dpct_global_range = gridDim_fan1 * blockDim_fan1;
 
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(blockDim_fan1.get(2),
-                                                     blockDim_fan1.get(1),
-                                                     blockDim_fan1.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        fan1((const float *)(&d_a_acc_ct0[0]),
-                             (float *)(&d_m_acc_ct1[0]), size, t, item_ct1);
-                    });
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                             dpct_global_range.get(1),
+                                             dpct_global_range.get(0)),
+                              sycl::range<3>(blockDim_fan1.get(2),
+                                             blockDim_fan1.get(1),
+                                             blockDim_fan1.get(0))),
+            [=](sycl::nd_item<3> item_ct1) {
+              fan1((const float *)(&d_a_acc_ct0[0]), (float *)(&d_m_acc_ct1[0]),
+                   size, t, item_ct1);
             });
-        }
-        {
-            dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
-            dpct::buffer_t d_b_buf_ct1 = dpct::get_buffer(d_b);
-            dpct::buffer_t d_m_buf_ct2 = dpct::get_buffer(d_m);
-            q_ct1.submit([&](sycl::handler &cgh) {
-                auto d_a_acc_ct0 =
-                    d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
-                auto d_b_acc_ct1 =
-                    d_b_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
-                auto d_m_acc_ct2 =
-                    d_m_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
+      });
+    }
+    {
+      dpct::buffer_t d_a_buf_ct0 = dpct::get_buffer(d_a);
+      dpct::buffer_t d_b_buf_ct1 = dpct::get_buffer(d_b);
+      dpct::buffer_t d_m_buf_ct2 = dpct::get_buffer(d_m);
+      q_ct1.submit([&](sycl::handler &cgh) {
+        auto d_a_acc_ct0 =
+            d_a_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+        auto d_b_acc_ct1 =
+            d_b_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+        auto d_m_acc_ct2 =
+            d_m_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
 
-                auto dpct_global_range = gridDim_fan2 * blockDim_fan2;
+        auto dpct_global_range = gridDim_fan2 * blockDim_fan2;
 
-                cgh.parallel_for(
-                    sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
-                                                     dpct_global_range.get(1),
-                                                     dpct_global_range.get(0)),
-                                      sycl::range<3>(blockDim_fan2.get(2),
-                                                     blockDim_fan2.get(1),
-                                                     blockDim_fan2.get(0))),
-                    [=](sycl::nd_item<3> item_ct1) {
-                        fan2((float *)(&d_a_acc_ct0[0]),
-                             (float *)(&d_b_acc_ct1[0]),
-                             (float *)(&d_m_acc_ct2[0]), size, t, item_ct1);
-                    });
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(dpct_global_range.get(2),
+                                             dpct_global_range.get(1),
+                                             dpct_global_range.get(0)),
+                              sycl::range<3>(blockDim_fan2.get(2),
+                                             blockDim_fan2.get(1),
+                                             blockDim_fan2.get(0))),
+            [=](sycl::nd_item<3> item_ct1) {
+              fan2((float *)(&d_a_acc_ct0[0]), (float *)(&d_b_acc_ct1[0]),
+                   (float *)(&d_m_acc_ct2[0]), size, t, item_ct1);
             });
-        }
+      });
+    }
   }
 
-    dpct::dpct_memcpy(a, d_a, size * size * sizeof(float),
-                      dpct::device_to_host);
-    dpct::dpct_memcpy(b, d_b, size * sizeof(float), dpct::device_to_host);
-    dpct::dpct_memcpy(m, d_m, size * size * sizeof(float),
-                      dpct::device_to_host);
+  dpct::dpct_memcpy(a, d_a, size * size * sizeof(float), dpct::device_to_host);
+  dpct::dpct_memcpy(b, d_b, size * sizeof(float), dpct::device_to_host);
+  dpct::dpct_memcpy(m, d_m, size * size * sizeof(float), dpct::device_to_host);
 
-    dpct::dpct_free(d_a);
-    dpct::dpct_free(d_b);
-    dpct::dpct_free(d_m);
+  dpct::dpct_free(d_a);
+  dpct::dpct_free(d_b);
+  dpct::dpct_free(d_m);
 }
 
 
@@ -277,7 +312,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
         case 's': // matrix size
           i++;
           *size = atoi(argv[i]);
-          printf("Create matrix internally in parse, size = %d \n", *size);
+          printf("Create matrix internally, size = %d \n", *size);
           break;
         case 'f': // file name
           i++;
@@ -396,5 +431,4 @@ void PrintAry(float *ary, int ary_size)
   }
   printf("\n\n");
 }
-#endif
 

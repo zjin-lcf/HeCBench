@@ -58,14 +58,16 @@ main.o:	./common.h \
 
 ./kernel/kernel_wrapper.o:	./common.h \
 	./kernel/kernel_wrapper.h \
-	./kernel/kernel_wrapper.cpp
+	./kernel/kernel_wrapper.cpp \
+	./kernel/kernel.cpp
 	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel_wrapper.cpp \
 		-c \
 		-o ./kernel/kernel_wrapper.o
 
 ./kernel/kernel2_wrapper.o:	./common.h \
 	./kernel/kernel2_wrapper.h \
-	./kernel/kernel2_wrapper.cpp
+	./kernel/kernel2_wrapper.cpp \
+	./kernel/kernel2.cpp
 	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel2_wrapper.cpp \
 		-c \
 		-o ./kernel/kernel2_wrapper.o 

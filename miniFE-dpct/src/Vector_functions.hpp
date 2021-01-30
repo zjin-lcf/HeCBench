@@ -454,7 +454,7 @@ namespace miniFE {
   red[item_ct1.get_local_id(2)] = sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
     if (item_ct1.get_local_id(2) < n) {
       sum += red[item_ct1.get_local_id(2) + n];
       red[item_ct1.get_local_id(2)] = sum;
@@ -472,7 +472,7 @@ namespace miniFE {
   red[item_ct1.get_local_id(2)] = sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-    item_ct1.barrier();
+    item_ct1.barrier(sycl::access::fence_space::local_space);
     if (item_ct1.get_local_id(2) < n) {
       sum += red[item_ct1.get_local_id(2) + n];
       red[item_ct1.get_local_id(2)] = sum;
