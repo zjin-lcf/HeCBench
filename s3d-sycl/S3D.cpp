@@ -377,7 +377,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot.sycl"
@@ -388,7 +388,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot2<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot2.sycl"
@@ -398,7 +398,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot3<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot3.sycl"
@@ -409,7 +409,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot6<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot6.sycl"
@@ -419,7 +419,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot7<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot7.sycl"
@@ -429,7 +429,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot8<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot8.sycl"
@@ -439,7 +439,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot9<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot9.sycl"
@@ -449,7 +449,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     q.submit([&] (handler &cgh) {
         auto RKF = gpu_rf.template get_access<sycl_read>(cgh);
         auto RKR = gpu_rb.template get_access<sycl_read>(cgh);
-        auto WDOT = gpu_wdot.template get_access<sycl_write>(cgh);
+        auto WDOT = gpu_wdot.template get_access<sycl_discard_write>(cgh);
         auto molwt = gpu_molwt.template get_access<sycl_read>(cgh);
         cgh.parallel_for<class rdwdot10<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "rdwdot10.sycl"
