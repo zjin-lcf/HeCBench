@@ -419,24 +419,25 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   buffer<float, 1>arrayX_GPU(arrayX, Nparticles, props);
   buffer<float, 1>arrayY_GPU(arrayY, Nparticles, props);
   buffer<float, 1>xj_GPU(xj, Nparticles, props);  
-  xj_GPU.set_final_data(nullptr);
   buffer<float, 1>yj_GPU(yj, Nparticles, props);
-  yj_GPU.set_final_data(nullptr);
   buffer<float, 1>CDF_GPU(Nparticles);
   buffer<float, 1>u_GPU(Nparticles);
   buffer<int, 1>ind_GPU(countOnes * Nparticles);
   buffer<float, 1>weights_GPU(weights, Nparticles, props);
   buffer<unsigned char, 1>I_GPU(I, IszX * IszY * Nfr, props);
   buffer<int, 1>seed_GPU(seed, Nparticles, props);
-  seed_GPU.set_final_data(nullptr);
   buffer<float, 1>partial_sums_GPU(Nparticles+1);
   buffer<int, 1>objxy_GPU(objxy, 2*countOnes, props);
+
+  xj_GPU.set_final_data(nullptr);
+  yj_GPU.set_final_data(nullptr);
+  seed_GPU.set_final_data(nullptr);
 
   for (k = 1; k < Nfr; k++) {
     /****************** L I K E L I H O O D ************************************/
     q.submit([&](handler& cgh) {
-    auto arrayX_acc = arrayX_GPU.get_access<sycl_read_write>(cgh);
-    auto arrayY_acc = arrayY_GPU.get_access<sycl_read_write>(cgh);
+    auto arrayX_acc = arrayX_GPU.get_access<sycl_discard_read_write>(cgh);
+    auto arrayY_acc = arrayY_GPU.get_access<sycl_discard_read_write>(cgh);
     auto xj_acc = xj_GPU.get_access<sycl_read>(cgh);
     auto yj_acc = yj_GPU.get_access<sycl_read>(cgh);
     //auto ind_acc = ind_GPU.get_access<sycl_discard_read_write>(cgh);
