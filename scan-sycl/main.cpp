@@ -22,7 +22,7 @@ void runTest (const dataType *in, dataType *out, const int n)
 
   for (int i = 0; i < ITERATION; i++) {
     q.submit([&] (handler &cgh) {
-    auto g_odata = d_out.template get_access<sycl_write>(cgh);
+    auto g_odata = d_out.template get_access<sycl_discard_write>(cgh);
     auto g_idata = d_in.template get_access<sycl_read>(cgh);
     accessor<dataType, 1, sycl_read_write, access::target::local> temp(N, cgh);
     cgh.parallel_for<class scan_block>(nd_range<1>(range<1>(N/2), range<1>(N/2)), [=] (nd_item<1> item) {
