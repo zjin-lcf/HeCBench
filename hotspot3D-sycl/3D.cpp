@@ -118,7 +118,7 @@ int main(int argc, char** argv)
       q.submit([&](handler& cgh) {
           auto pIn_acc = d_pIn.get_access<sycl_read>(cgh); 
           auto tIn_acc = d_tIn.get_access<sycl_read>(cgh);
-          auto tOut_acc = d_tOut.get_access<sycl_write>(cgh);
+          auto tOut_acc = d_tOut.get_access<sycl_discard_write>(cgh);
 
           cgh.parallel_for<class hotspot>(
             nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
