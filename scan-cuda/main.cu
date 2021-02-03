@@ -7,7 +7,7 @@
 
 
 template<typename dataType>
-__global__ void prescan(dataType *g_odata, dataType *g_idata, int n)
+__global__ void prescan(dataType *g_odata, const dataType *g_idata, const int n)
 {
 	__shared__ dataType temp[N];
 	int thid = threadIdx.x; 
