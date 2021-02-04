@@ -33,7 +33,8 @@ obj = $(source:.cpp=.o)
 CFLAGS := -Wall -I../include \
           --hipsycl-platform=$(PLATFORM) \
 	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+	  $(ROCM_DEVICE_LIB) \
+	  -DUNROLL
 
 # Linker Flags
 LDFLAGS = 
