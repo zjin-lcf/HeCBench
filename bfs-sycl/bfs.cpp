@@ -96,6 +96,10 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
     buffer<char,1> d_graph_visited(h_graph_visited, no_of_nodes, props);
     buffer<int,1> d_cost(h_cost, no_of_nodes, props);
 
+    d_graph_mask.set_final_data(nullptr);
+    d_updating_graph_mask.set_final_data(nullptr);
+    d_graph_visited.set_final_data(nullptr);
+
     buffer<char,1> d_over(1);
 
     int global_work_size = (no_of_nodes + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK * MAX_THREADS_PER_BLOCK;
