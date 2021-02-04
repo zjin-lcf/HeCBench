@@ -28,7 +28,8 @@ CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
           -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          --gcc-toolchain=$(GCC_TOOLCHAIN) \
+	  -DUNROLL
 
 # Linker Flags
 LDFLAGS = 

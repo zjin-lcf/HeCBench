@@ -13,9 +13,11 @@ using namespace std;
 #ifdef SINGLE_PRECISION
 #define T float 
 #define T2 cl::sycl::float2
+#define EPISON 1e-4
 #else
 #define T double
 #define T2 cl::sycl::double2
+#define EPISON 1e-6
 #endif
 
 #ifndef M_SQRT1_2
@@ -120,9 +122,9 @@ int main(int argc, char** argv)
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
   unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
-  const double N = (double)half_n_cmplx*2.0;
+  const int N = half_n_cmplx*2;
 
-  fprintf(stdout, "used_bytes=%lu, N=%g\n", used_bytes, N);
+  fprintf(stdout, "used_bytes=%lu, N=%d\n", used_bytes, N);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
@@ -141,7 +143,7 @@ int main(int argc, char** argv)
 
   const char *sizeStr;
   stringstream ss;
-  ss << "N=" << (long)N;
+  ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
   auto start = std::chrono::steady_clock::now();
@@ -158,7 +160,7 @@ int main(int argc, char** argv)
 
     const property_list props = property::buffer::use_host_ptr();
 
-    buffer<T2, 1> d_work(source, (long)N, props); 
+    buffer<T2, 1> d_work(source, N, props); 
 
     // local and global sizes are the same for the three kernels
     size_t localsz = 64;
@@ -193,12 +195,12 @@ int main(int argc, char** argv)
   // Verification
   bool error = false;
   for (int i = 0; i < N; i++) {
-    if ( std::fabs((T)source[i].x() - (T)reference[i].x()) > 1e-6) {
+    if ( std::fabs((T)source[i].x() - (T)reference[i].x()) > EPISON) {
       //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
       error = true;
       break;
     }
-    if ( std::fabs((T)source[i].y() - (T)reference[i].y()) > 1e-6) {
+    if ( std::fabs((T)source[i].y() - (T)reference[i].y()) > EPISON) {
       //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
       error = true;
       break;
