@@ -1431,9 +1431,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | sort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 241 | 242 | 242 | NA |
-| host timing(s) | 10.2 | 17.2 | 17.9 | NA |
-| device timing(s) | 9.6 | 16.6 | 17.3 | NA |
+| total enqueue | 241 | 242 | 242 | 256 |
+| host timing(s) | 10.2 | 17.2 | 17.9 | 26.6 |
+| device timing(s) | 9.6 | 16.6 | 17.3 | 23.1 |
 
 
 | sosfil | SYCL | DPCT usm | DPCT header | OpenMP | 
