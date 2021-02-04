@@ -6,7 +6,7 @@
 
 
 template <typename dataType>
-void runTest (dataType *in, dataType *out, int n) 
+void runTest (const dataType *in, dataType *out, const int n) 
 {
   #pragma omp target data map(to: in[0:N]) map(from: out[0:N])
   {

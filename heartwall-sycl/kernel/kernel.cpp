@@ -293,7 +293,7 @@ kernel_gpu_wrapper(  params_common common,
   //printf("common.endo_mem=%d\n", common.endo_mem); // 80
   //printf("common.epi_mem=%d\n", common.epi_mem); // 124
   //
-  buffer<params_common,1> d_common(&common, 1, props); // range is 1 ?
+  //buffer<params_common,1> d_common(&common, 1, props); // range is 1 ?
   buffer<int,1> d_endoRow(endoRow, common.endoPoints, props);
   d_endoRow.set_final_data(nullptr);
   buffer<int,1> d_endoCol(endoCol, common.endoPoints, props);
@@ -379,7 +379,7 @@ kernel_gpu_wrapper(  params_common common,
     q.submit ([&](handler &cgh) {
 
         // read access
-        auto d_common_acc = d_common.get_access<sycl_read>(cgh);
+        //auto d_common_acc = d_common.get_access<sycl_read>(cgh);
         auto d_frame_acc = d_frame.get_access<sycl_read>(cgh);
 
         auto d_endoRow_acc = d_endoRow.get_access<sycl_read_write>(cgh);

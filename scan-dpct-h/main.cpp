@@ -9,7 +9,7 @@
 
 
 template<typename dataType>
-void prescan(dataType *g_odata, dataType *g_idata, int n,
+void prescan(dataType *g_odata, const dataType *g_idata, const int n,
              sycl::nd_item<3> item_ct1, dataType *temp)
 {
 
@@ -48,7 +48,7 @@ void prescan(dataType *g_odata, dataType *g_idata, int n,
 }
 
 template <typename dataType>
-void runTest (dataType *in, dataType *out, int n) 
+void runTest (const dataType *in, dataType *out, const int n) 
 {
 	dataType *d_in;
 	dataType *d_out;
