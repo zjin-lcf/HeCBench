@@ -11,9 +11,9 @@ DEBUG     = no
 # Program name & source code list
 #===============================================================================
 
-program = ao
+program = clenergy
 
-source = ao.cu
+source = clenergy.cu WKFUtils.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall 
 
 # Linker Flags
 LDFLAGS = 
