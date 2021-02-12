@@ -39,7 +39,9 @@ int main(int ac, const char* av[])
 
 	try {
 
+#if __ibmxl__ == 0
 		check_simd();
+#endif
 		config = Config(ac, av);
 
 		switch (config.command) {

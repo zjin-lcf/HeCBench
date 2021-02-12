@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ****/
 
+#if __ibmxl__ == 0
 #include "simd.h"
 
 #ifdef _WIN32
@@ -58,3 +59,4 @@ void check_simd()
 		throw std::runtime_error("CPU does not support SSE4.1. Please compile the software from source.");
 #endif
 }
+#endif
