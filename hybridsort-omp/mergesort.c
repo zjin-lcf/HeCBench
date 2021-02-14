@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <stdbool.h>
 #include "mergesort.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -147,7 +148,7 @@ float4* runMergeSort(int listsize, int divisions,
     //double mergePassTime = 0;
     int nrElems = 2;
 
-    while(true){
+    while(1){
       int floatsperthread = (nrElems*4);
       //printf("FPT %d \n", floatsperthread);
       int threadsPerDiv = (int)ceil(largestSize/(float)floatsperthread);

@@ -118,10 +118,10 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
 			ycavg[cell_num] = ycavg[cell_num] / (double) (frame_num > 10 ? 10 : frame_num);
 			
 			// Determine the range of the subimage surrounding the current position
-			u1[cell_num] = std::fmax(xci[cell_num] - 4.0 * R + 0.5, 0 );
-			u2[cell_num] = std::fmin(xci[cell_num] + 4.0 * R + 0.5, Iw - 1);
-			v1[cell_num] = std::fmax(yci[cell_num] - 2.0 * R + 1.5, 0 );    
-			v2[cell_num] = std::fmin(yci[cell_num] + 2.0 * R + 1.5, Ih - 1);
+			u1[cell_num] = fmax(xci[cell_num] - 4.0 * R + 0.5, 0 );
+			u2[cell_num] = fmin(xci[cell_num] + 4.0 * R + 0.5, Iw - 1);
+			v1[cell_num] = fmax(yci[cell_num] - 2.0 * R + 1.5, 0 );    
+			v2[cell_num] = fmin(yci[cell_num] + 2.0 * R + 1.5, Ih - 1);
 			
 			// Extract the subimage
 			Isub[cell_num] = m_get(v2[cell_num] - v1[cell_num] + 1, u2[cell_num] - u1[cell_num] + 1);

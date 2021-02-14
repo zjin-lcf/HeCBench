@@ -50,10 +50,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-timer.o: timer.cpp timer.h Makefile
+timer.o: timer.cpp timer.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 bfs.o: bfs.cpp util.h 
