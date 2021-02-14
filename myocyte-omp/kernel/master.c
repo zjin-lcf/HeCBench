@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <math.h>
+#include <cmath>
 #include "../common.h"
 #include "kernel_fin.c"
 #include "kernel_ecc.h"
@@ -216,10 +216,10 @@ master(  fp timeinst,
   //======================================================================================================================================================150
 
   for(i=0; i<EQUATIONS; i++){
-    if (isnan(finavalu[i])){ 
+    if (std::isnan(finavalu[i])){ 
       finavalu[i] = 0.0001;                        // for NAN set rate of change to 0.0001
     }
-    else if (isinf(finavalu[i])){ 
+    else if (std::isinf(finavalu[i])){ 
       finavalu[i] = 0.0001;                        // for INF set rate of change to 0.0001
     }
   }

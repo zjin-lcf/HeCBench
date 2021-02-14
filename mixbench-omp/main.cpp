@@ -15,29 +15,29 @@
 #define seed 0.1
 
 void mixbenchGPU(long size){
-	const char *benchtype = "compute with global memory (block strided)";
-	printf("Trade-off type:%s\n", benchtype);
-	float *cd = (float*) malloc (size*sizeof(float));
+  const char *benchtype = "compute with global memory (block strided)";
+  printf("Trade-off type:%s\n", benchtype);
+  float *cd = (float*) malloc (size*sizeof(float));
   for (int i = 0; i < size; i++) cd[i] = 0;
 
-	const long reduced_grid_size = size/granularity/128;
-	const int block_dim = 256;
-	const int grid_dim = reduced_grid_size/block_dim;
+  const long reduced_grid_size = size/granularity/128;
+  const int block_dim = 256;
+  const int grid_dim = reduced_grid_size/block_dim;
 
-  #pragma omp target enter data map(to: cd[0:size]) 
+#pragma omp target data map(tofrom: cd[0:size]) 
   {
     for (int compute_iterations = 0; compute_iterations < 2048; compute_iterations++) {
-      #pragma omp target teams num_teams(grid_dim) thread_limit(block_dim)
+#pragma omp target teams num_teams(grid_dim) thread_limit(block_dim)
       { 
-        #pragma omp parallel 
+#pragma omp parallel 
         {
-	        const unsigned int blockSize = block_dim;
+          const unsigned int blockSize = block_dim;
           const int stride = blockSize;
           int idx = omp_get_team_num()*blockSize*granularity + omp_get_thread_num();
           const int big_stride = omp_get_num_teams()*blockSize*granularity;
           float tmps[granularity];
           for(int k=0; k<fusion_degree; k++){
-            #pragma unroll
+#pragma unroll
             for(int j=0; j<granularity; j++){
               // Load elements (memory intensive part)
               tmps[j] = cd[idx+j*stride+k*big_stride];
@@ -48,18 +48,17 @@ void mixbenchGPU(long size){
             }
             // Multiply add reduction
             float sum = 0;
-            #pragma unroll
+#pragma unroll
             for(int j=0; j<granularity; j+=2)
               sum += tmps[j]*tmps[j+1];
-              #pragma unroll
-              for(int j=0; j<granularity; j++)
-                cd[idx+k*big_stride] = sum;
+#pragma unroll
+            for(int j=0; j<granularity; j++)
+              cd[idx+k*big_stride] = sum;
           }
         }
       }
     }
   }
-  #pragma omp target exit data map(from: cd[0:size]) 
 
   // verification
   for (int i = 0; i < size; i++) 
@@ -73,11 +72,11 @@ void mixbenchGPU(long size){
 
 int main(int argc, char* argv[]) {
 
-	unsigned int datasize = VECTOR_SIZE*sizeof(float);
+  unsigned int datasize = VECTOR_SIZE*sizeof(float);
 
-	printf("Buffer size: %dMB\n", datasize/(1024*1024));
-	
-	mixbenchGPU(VECTOR_SIZE);
+  printf("Buffer size: %dMB\n", datasize/(1024*1024));
 
-	return 0;
+  mixbenchGPU(VECTOR_SIZE);
+
+  return 0;
 }

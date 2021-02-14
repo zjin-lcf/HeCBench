@@ -1,0 +1,60 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = xlc++
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+SM        = sm_70
+
+
+
+# Standard flags
+CFLAGS := -std=c++14 -Wall  -x c++
+
+# Linker flags
+LDFLAGS = -lm -qsmp -qoffload -qtgtarch=$(SM)
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qsmp -qoffload -qtgtarch=$(SM)
+else
+  CFLAGS +=-qopenmp
+endif
+
+all: kmeans
+
+kmeans: cluster.o getopt.o read_input.o rmse.o kmeans.o
+	$(CC) $(KERNEL_DIM) $^ -o kmeans $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $< -c
+
+kmeans.o: kmeans.c kmeans.h
+
+cluster.o: cluster.c kmeans.h
+
+getopt.o: getopt.c getopt.h
+
+read_input.o: read_input.c kmeans.h
+
+rmse.o: rmse.c kmeans.h
+
+clean:
+	rm -f *.o *~ kmeans *.linkinfo
+
+run: kmeans
+	./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
+
+

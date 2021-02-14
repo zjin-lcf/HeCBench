@@ -14,8 +14,10 @@ using namespace std;
 
 #ifdef SINGLE_PRECISION
 #define T float 
+#define EPISON 1e-4
 #else
 #define T double
+#define EPISON 1e-6
 #endif
 
 typedef struct {
@@ -186,9 +188,19 @@ int main(int argc, char** argv)
           FFT8( data );
 
           //twiddle8( data, tid, 512 );
-          for( int j = 1; j < 8; j++ ){                                       
-            data[j] = cmplx_mul( data[j],exp_i((-2*M_PI*reversed[j]/512)*tid) ); 
-          }                                                                   
+          #ifdef UNROLL
+            data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
+            data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
+            data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
+            data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
+            data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
+            data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
+            data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
+          #else
+            for( int j = 1; j < 8; j++ ){                                       
+                data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)512)*tid) ); 
+            }                                                                   
+          #endif
 
           //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
@@ -203,9 +215,19 @@ int main(int argc, char** argv)
           FFT8( data );
 
           //twiddle8( data, hi, 64 );
-          for( int j = 1; j < 8; j++ ){                                       
-            data[j] = cmplx_mul( data[j],exp_i((-2*M_PI*reversed[j]/64)*hi) ); 
-          }                                                                   
+#ifdef UNROLL
+  data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
+  data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
+  data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
+  data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
+  data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
+  data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
+  data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
+#else
+  for( int j = 1; j < 8; j++ ){                                       
+      data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) ); 
+  }                                                                   
+#endif
 
           //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
@@ -243,8 +265,18 @@ int main(int argc, char** argv)
           IFFT8( data );
 
           //itwiddle8( data, tid, 512 );
-          for( int j = 1; j < 8; j++ )
-            data[j] = cmplx_mul(data[j] , exp_i((2*M_PI*reversed[j]/512)*(tid)) );
+#ifdef UNROLL
+  data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
+  data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
+  data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
+  data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
+  data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
+  data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
+  data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
+#else
+  for( int j = 1; j < 8; j++ )
+      data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)512)*(tid)) );
+#endif
 
           //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
@@ -259,8 +291,18 @@ int main(int argc, char** argv)
           IFFT8( data );
 
           //itwiddle8( data, hi, 64 );
-          for( int j = 1; j < 8; j++ )
-            data[j] = cmplx_mul(data[j] , exp_i((2*M_PI*reversed[j]/64)*hi) );
+#ifdef UNROLL
+  data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
+  data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
+  data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
+  data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
+  data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
+  data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
+  data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
+#else
+  for( int j = 1; j < 8; j++ )
+      data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)64)*hi) );
+#endif
 
 
           //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
@@ -295,12 +337,12 @@ int main(int argc, char** argv)
   // Verification
   bool error = false;
   for (int i = 0; i < N; i++) {
-    if ( fabs((T)source[i].x - (T)reference[i].x) > 1e-6) {
+    if ( fabs((T)source[i].x - (T)reference[i].x) > EPISON) {
       //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
       error = true;
       break;
     }
-    if ( fabs((T)source[i].y - (T)reference[i].y) > 1e-6) {
+    if ( fabs((T)source[i].y - (T)reference[i].y) > EPISON) {
       //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
       error = true;
       break;
