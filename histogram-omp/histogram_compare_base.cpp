@@ -455,9 +455,6 @@ void TestMethods(
     unsigned int *h_hist = (unsigned int *) malloc(histogram_bytes);
     unsigned int *d_hist = (unsigned int *) malloc(histogram_bytes);
 
-#pragma omp target enter data \
-    map(to: h_pixels[0:width*height]) \
-    map(alloc: d_hist[0: NUM_BINS*ACTIVE_CHANNELS]) 
 
     // Compute reference cpu histogram
     HistogramGold<ACTIVE_CHANNELS, NUM_BINS>(h_pixels, width, height, h_hist);
@@ -487,8 +484,6 @@ void TestMethods(
     // Free data
     free(h_hist);
     free(d_hist);
-    #pragma omp target exit data \
-    map(delete: d_hist[0: NUM_BINS*ACTIVE_CHANNELS], h_pixels[0:width*height])
 }
 
 
