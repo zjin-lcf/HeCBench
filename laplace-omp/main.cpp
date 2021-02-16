@@ -18,7 +18,7 @@
 #include "timer.h"
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 1024
+#define NUM 256
 
 // block size
 #define BLOCK_SIZE 128
@@ -180,8 +180,9 @@ int main (void) {
   StartTimer();
 
   // iteration loop
-#pragma omp target enter data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
-                                      temp_red[0:size_temp], temp_black[0:size_temp], bl_norm_L2[0:size_norm])
+#pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
+                                bl_norm_L2[0:size_norm]) \
+                        map(tofrom: temp_red[0:size_temp], temp_black[0:size_temp])
 {
   for (iter = 1; iter <= it_max; ++iter) {
 
@@ -247,7 +248,7 @@ int main (void) {
     // calculate residual
     norm_L2 = sqrt(norm_L2 / ((Real)size));
 
-    if (iter % 5000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
+    if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
     if (norm_L2 < tol) {
@@ -255,11 +256,6 @@ int main (void) {
     }	
   }
 }
-  // transfer final temperature values back
-#pragma omp target exit data map(from: temp_red[0:size_temp], temp_black[0:size_temp]) \
-                             map(delete: aP[0:size], aW[0:size], aE[0:size], aS[0:size], \
-					 aN[0:size], b[0:size], bl_norm_L2[0:size_norm])
-
 
   double runtime = GetTimer();
 
