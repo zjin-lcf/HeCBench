@@ -18,7 +18,7 @@
 #include "common.h"
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 1024
+#define NUM 256
 
 // block size
 #define BLOCK_SIZE 128
@@ -297,7 +297,7 @@ int main (void) {
     // calculate residual
     norm_L2 = std::sqrt(norm_L2 / ((Real)size));
 
-    if (iter % 5000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
+    if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
     if (norm_L2 < tol) {
