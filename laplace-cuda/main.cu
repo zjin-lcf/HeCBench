@@ -1,10 +1,10 @@
-/** GPU Laplace solver using optimized red-black Gauss–Seidel with SOR solver
+/** GPU Laplace solver using optimized red-black Gauss Seidel with SOR solver
  *
  * \author Kyle E. Niemeyer
  * \date 09/21/2012
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
- * on GPU using CUDA with the red-black Gauss–Seidel with sucessive overrelaxation
+ * on GPU using CUDA with the red-black Gauss Seidel with sucessive overrelaxation
  * (SOR) that has been "optimized". This means that the red and black kernels 
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
