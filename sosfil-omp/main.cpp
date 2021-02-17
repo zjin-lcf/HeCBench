@@ -21,7 +21,7 @@
 //                                SOSFILT                                    //
 ///////////////////////////////////////////////////////////////////////////////
 #define MAX_THREADS 256
-#define THREADS 256
+#define THREADS 32
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
   template <typename T>
@@ -57,17 +57,19 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
   T* x_in = (T*) malloc (sizeof(T) * x_size);
   for (int i = 0; i < n_signals; i++) 
     for (int j = 0; j < n_samples; j++) 
-      x_in[i*n_samples+j] = (T)std::sin(2*3.14*(i+1+j));
+      x_in[i*n_samples+j] = (T)sin(2*3.14*(i+1+j));
 
 
-  const int out_size = n_sections;
+  //const int out_size = n_sections;
   //const int shared_mem_size = (out_size + z_size + sos_size);
 #ifdef DEBUG
   // 2820 = 256 + (256+1)*2*2 + 256*6
-  const int shared_mem_size = 2820;
+  // 356 = 32 + (32+1)*2*2 + 32*6
+  const int shared_mem_size = 32 + (32+1)*2*2 + 32*6;
 #else
   // 5904 = 256 + (256+1)*8*2 + 256*6
-  const int shared_mem_size = 5904;
+  // 752 = 32 + (32+1)*8*2 + 32*6
+  const int shared_mem_size = 32 + (32+1)*8*2 + 32*6;
 #endif
 
 #pragma omp target data map(to: sos[0:sos_size], zi[0:z_size]) map (tofrom: x_in[0:x_size])
@@ -186,7 +188,7 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
 #ifdef DEBUG
   for (int i = 0; i < n_signals; i++) { 
     for (int j = 0; j < n_samples; j++) 
-      printf("%.2f ", x[i*n_samples+j]);
+      printf("%.2f ", x_in[i*n_samples+j]);
     printf("\n");
   }
 #endif
