@@ -410,27 +410,29 @@ int main(int argc, const char * const argv[])
   hipMemcpy(Dev_ReadSeq, ReadSeq, sizeof(uint) * NumReads * 8, hipMemcpyHostToDevice);
   hipMemcpy(Dev_RefSeq, RefSeq, sizeof(uint) * NumReads * 8, hipMemcpyHostToDevice);
 
-  for (int loopPar = 0; loopPar <= 25; loopPar++) {
-    F_ErrorThreshold = (loopPar*ReadLength)/100;
+  for (int n = 0; n < 100; n++) {
+    for (int loopPar = 0; loopPar <= 25; loopPar++) {
+      F_ErrorThreshold = (loopPar*ReadLength)/100;
 
-    high_resolution_clock::time_point t1 = high_resolution_clock::now();
+      high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-    hipLaunchKernelGGL(sneaky_snake, dim3(grid), dim3(block), 0, 0, Dev_ReadSeq, Dev_RefSeq, Dev_Results, NumReads, F_ErrorThreshold);
+      hipLaunchKernelGGL(sneaky_snake, dim3(grid), dim3(block), 0, 0, Dev_ReadSeq, Dev_RefSeq, Dev_Results, NumReads, F_ErrorThreshold);
 
-    hipMemcpy(DFinal_Results, Dev_Results, sizeof(int) * NumReads, hipMemcpyDeviceToHost);
+      hipMemcpy(DFinal_Results, Dev_Results, sizeof(int) * NumReads, hipMemcpyDeviceToHost);
 
-    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+      high_resolution_clock::time_point t2 = high_resolution_clock::now();
 
-    double elapsed_time = duration_cast<microseconds>(t2 - t1).count();
-    int accepted = 0;
-    for(int i = 0; i < NumReads; i++)
-    {
-      if(DFinal_Results[i] == 1)
-        accepted += 1;
+      double elapsed_time = duration_cast<microseconds>(t2 - t1).count();
+      int accepted = 0;
+      for(int i = 0; i < NumReads; i++)
+      {
+        if(DFinal_Results[i] == 1)
+          accepted += 1;
+      }
+
+      printf("E: \t %d \t Snake-on-GPU: \t %5.4f \t Accepted: \t %10d \t Rejected: \t %10d\n", 
+          F_ErrorThreshold, elapsed_time, accepted, NumReads - accepted);
     }
-
-    printf("E: \t %d \t Snake-on-GPU: \t %5.4f \t Accepted: \t %10d \t Rejected: \t %10d\n", 
-        F_ErrorThreshold, elapsed_time, accepted, NumReads - accepted);
   }
 
   free(ReadSeq);

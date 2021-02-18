@@ -1457,6 +1457,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 45.6 | 46.7 | 43.1 | 47 |
 
 
+| snake | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 5202 | 5202 | 5202 |  20807 |
+| host timing(s) | 14.6 | 36.7 | 14.8 | 44.7 |
+| device timing(s) | 11.2 | 34.3 | 11.2 | 36.9 |
+
+
 | softmax | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 102 | 102 |  507 |
@@ -1847,6 +1854,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### simplemoc
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
+
+### snake
+  Genome pre-alignment filtering (https://github.com/CMU-SAFARI/SneakySnake)
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
