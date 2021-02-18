@@ -101,7 +101,7 @@ computeGold(int *gpuData, const int len)
 
 int main()
 {
-  const int len = 1 << 27;
+  const int len = 1 << 10;
 
   // add, sub, max, min, and, or, xor
   int gpuData[] = {0, 0, -(1<<8), 1<<8, 0xff, 0, 0xff};

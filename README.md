@@ -408,9 +408,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 16 | 28 | 28 | 57 |
-| host timing(s) | 3.75 | 3.37 | 3.59 | 6.22 |
-| device timing(s) | 2.6 | 2.6 | 2.8 | 2.6 |
+| total enqueue | 12742 | 12751 | 12751 | 38237 |
+| host timing(s) | 1.18 | 1.27 | 1.66 | 4.95 |
+| device timing(s) | 0.28 | 0.28 | 0.27 | 0.67 |
 
 
 | lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -553,6 +553,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 5.7 | 5.7 | 5.7 | 5.9 |
 
 
+| present | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 200 | NA | NA | 512 | 
+| host timing(s) | 1.46 | NA | NA | 4.36 |
+| device timing(s) | 0.94 | NA | NA | 0.67 |
+
+
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 102 | 102 | 307 | 
@@ -562,9 +569,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | quicksort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2862 | NA | NA | 9108 | 
-| host timing(s) | 76 | NA | NA | 141 | 
-| device timing(s) | 73.2 | NA | NA | 120.4 |
+| total enqueue | 2250 | 3670 | NA | NA | 
+| host timing(s) | 9.3 | 16.9 | NA | NA | 
+| device timing(s) | 2.1 | 3.4 | NA | NA |
 
 
 | randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -884,9 +891,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | ced | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 660 | 663 | 663 | NA |
-| host timing(s) | 0.82 | 0.86 | 1.07 | NA |
-| device timing(ms) | 216 | 171 | 80  | NA |
+| total enqueue | 660 | 663 | 663 | 1548 |
+| host timing(s) | 0.43 | 0.75 | 0.84 | 3.75 |
+| device timing(ms) | 44 | 49 | 49  | 60 |
 
 
 
@@ -1058,11 +1065,11 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 2.29 | 2.29 | 2.29 | 1.82 |
 
 
-| histogram | SYCL | DPCT usm | DPCT header | OpenMP | 
+| histogram | SYCL | DPCT usm | DPCT header | OpenMP* (to be optimized) | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 1218 | 1221 | 1221 | NA |
-| host timing(s) | 2.75 | 2.5 | 2.6 | NA |
-| device timing(s) | 0.83 | 0.86 | 0.85 | NA |
+| total enqueue | 1218 | 1221 | 1221 | 3666 |
+| host timing(s) | 2.75 | 2.5 | 2.6 | 15.5 |
+| device timing(s) | 0.83 | 0.86 | 0.85 | 58 |
 
 
 | hmm | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1165,9 +1172,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | laplace | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 108546 | 108555 | 108555  | NA |
-| host timing(s) | 153 | 116 | 153 | NA |
-| device timing(s) | 65 | 63 | 65 | NA |
+| total enqueue | 12742 | 12751 | 12751 | 38237 |
+| host timing(s) | 9.98 | 7.7 | 10.4 | 16.4 |
+| device timing(s) | 0.65 | 0.94 | 0.66 | 3.56 |
 
 
 | lavaMD | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1359,6 +1366,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 8.4 | 8.2 | 8.2 | 8.9 |
 
 
+| present | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 200 | NA | NA | 512 | 
+| host timing(s) | 1.37 | NA | NA | 6.1 |
+| device timing(s) | 0.97 | NA | NA | 2.78 |
+
+
 | projectile | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 102 | 102 | 102 | 307 | 
@@ -1368,9 +1382,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 | quicksort | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
-| total enqueue | 2862 | NA | NA | 8955 | 
-| host timing(s) | 86 | NA | NA | 187| 
-| device timing(s) | 76 | NA | NA | 1489 |
+| total enqueue | 2184 | 3685 | 3700 | 6696 | 
+| host timing(s) | 15.4 | 21.7 | 22.4 | 23.7 | 
+| device timing(s) | 8.4 | 9.4 | 9.45 | 151.3 |
 
 
 | randomAccess | SYCL | DPCT usm | DPCT header | OpenMP | 
@@ -1793,6 +1807,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### popcount
   Implementations of population count (Jin, Z. and Finkel, H., 2020, May. Population Count on Intel® CPU, GPU and FPGA. In 2020 IEEE International Parallel and Distributed Processing Symposium Workshops (IPDPSW) (pp. 432-439). IEEE.)
+
+### present
+  Lightweight cryptography (https://github.com/bozhu/PRESENT-C/blob/master/present.h)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)

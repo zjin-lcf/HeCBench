@@ -1,10 +1,10 @@
-/** GPU Laplace solver using optimized red-black Gauss–Seidel with SOR solver
+/** GPU Laplace solver using optimized red-black Gauss Seidel with SOR solver
  *
  * \author Kyle E. Niemeyer
  * \date 09/21/2012
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
- * on GPU using CUDA with the red-black Gauss–Seidel with sucessive overrelaxation
+ * on GPU using CUDA with the red-black Gauss Seidel with sucessive overrelaxation
  * (SOR) that has been "optimized". This means that the red and black kernels 
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
@@ -24,7 +24,7 @@
 #include <cuda.h>
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 1024
+#define NUM 256
 
 // block size
 #define BLOCK_SIZE 128
@@ -329,7 +329,7 @@ int main (void) {
     // calculate residual
     norm_L2 = sqrt(norm_L2 / ((Real)size));
 
-    if (iter % 5000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
+    if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
     if (norm_L2 < tol) {
