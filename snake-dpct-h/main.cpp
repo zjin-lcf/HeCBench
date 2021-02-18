@@ -28,6 +28,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +38,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <chrono>
-#include <cuda.h>
 
 using namespace std::chrono;
 
@@ -50,10 +52,12 @@ using namespace std::chrono;
 #define BitVal(data,y) ( (data>>y) & 1)    // Return Data.Y value
 #define SetBit(data,y) data |= (1 << y)    // Set Data.Y   to 1
 
-__global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq, 
-                             int* Ftest_Results, const int NumReads, const int F_ErrorThreshold)
+void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq, 
+                             int* Ftest_Results, const int NumReads, const int F_ErrorThreshold,
+                             sycl::nd_item<3> item_ct1)
 {
-	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+ int tid = item_ct1.get_local_id(2) +
+           item_ct1.get_group(2) * item_ct1.get_local_range().get(2);
         if(tid >= NumReads) return;
 
         // const int NBytes = 8;
@@ -104,7 +108,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
           ReadCompTmp = ReadTmp1 | ReadTmp2;
           RefCompTmp = RefTmp1 | RefTmp2;
           DiagonalResult = ReadCompTmp ^ RefCompTmp;
-          localCounterMax = __clz(DiagonalResult);
+  localCounterMax = sycl::clz((int)DiagonalResult);
 
           //////////////////// Upper diagonals /////////////////////
 
@@ -129,7 +133,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
               }
 
               DiagonalResult  = DiagonalResult | CornerCase;
-              localCounter = __clz(DiagonalResult);
+    localCounter = sycl::clz((int)DiagonalResult);
 
             }
             else if ( (ShiftValue - (2*e) ) < 0 )
@@ -142,7 +146,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
 
               DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-              localCounter = __clz(DiagonalResult);
+    localCounter = sycl::clz((int)DiagonalResult);
             }
             else
             {
@@ -154,8 +158,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
 
               DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-              localCounter = __clz(DiagonalResult);
-
+    localCounter = sycl::clz((int)DiagonalResult);
             }
             if (localCounter>localCounterMax)
               localCounterMax=localCounter;
@@ -189,7 +192,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
                 RefCompTmp = RefTmp1 | RefTmp2;
 
                 DiagonalResult = ReadCompTmp ^ RefCompTmp;
-                localCounter = __clz(DiagonalResult);
+     localCounter = sycl::clz((int)DiagonalResult);
 
               }
               else
@@ -204,7 +207,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
 
                 DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-                localCounter = __clz(DiagonalResult);
+     localCounter = sycl::clz((int)DiagonalResult);
               }
             }
             else
@@ -235,7 +238,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
               }
               DiagonalResult = DiagonalResult | CornerCase;
 
-              localCounter = __clz(DiagonalResult);
+    localCounter = sycl::clz((int)DiagonalResult);
             }
 
             if (localCounter>localCounterMax)
@@ -400,15 +403,17 @@ int main(int argc, const char * const argv[])
   uint* Dev_ReadSeq;
   uint* Dev_RefSeq;
   int* Dev_Results;
-  cudaMalloc((void**)&Dev_ReadSeq, sizeof(uint) * NumReads * 8);
-  cudaMalloc((void**)&Dev_RefSeq, sizeof(uint) * NumReads * 8);
-  cudaMalloc((void**)&Dev_Results, sizeof(int) * NumReads);
+ dpct::dpct_malloc((void **)&Dev_ReadSeq, sizeof(uint) * NumReads * 8);
+ dpct::dpct_malloc((void **)&Dev_RefSeq, sizeof(uint) * NumReads * 8);
+ dpct::dpct_malloc((void **)&Dev_Results, sizeof(int) * NumReads);
 
-  dim3 grid (Number_of_blocks_inside_each_kernel);
-  dim3 block (Concurrent_threads_In_Block);
+ sycl::range<3> grid(Number_of_blocks_inside_each_kernel, 1, 1);
+ sycl::range<3> block(Concurrent_threads_In_Block, 1, 1);
 
-  cudaMemcpy(Dev_ReadSeq, ReadSeq, sizeof(uint) * NumReads * 8, cudaMemcpyHostToDevice);
-  cudaMemcpy(Dev_RefSeq, RefSeq, sizeof(uint) * NumReads * 8, cudaMemcpyHostToDevice);
+ dpct::dpct_memcpy(Dev_ReadSeq, ReadSeq, sizeof(uint) * NumReads * 8,
+                   dpct::host_to_device);
+ dpct::dpct_memcpy(Dev_RefSeq, RefSeq, sizeof(uint) * NumReads * 8,
+                   dpct::host_to_device);
 
   for (int n = 0; n < 100; n++) {
     for (int loopPar = 0; loopPar <= 25; loopPar++) {
@@ -416,9 +421,36 @@ int main(int argc, const char * const argv[])
 
       high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-      sneaky_snake<<<grid, block>>>(Dev_ReadSeq, Dev_RefSeq, Dev_Results, NumReads, F_ErrorThreshold);
+   {
+    dpct::buffer_t Dev_ReadSeq_buf_ct0 = dpct::get_buffer(Dev_ReadSeq);
+    dpct::buffer_t Dev_RefSeq_buf_ct1 = dpct::get_buffer(Dev_RefSeq);
+    dpct::buffer_t Dev_Results_buf_ct2 = dpct::get_buffer(Dev_Results);
+    dpct::get_default_queue().submit([&](sycl::handler &cgh) {
+     auto Dev_ReadSeq_acc_ct0 =
+         Dev_ReadSeq_buf_ct0.get_access<sycl::access::mode::read_write>(cgh);
+     auto Dev_RefSeq_acc_ct1 =
+         Dev_RefSeq_buf_ct1.get_access<sycl::access::mode::read_write>(cgh);
+     auto Dev_Results_acc_ct2 =
+         Dev_Results_buf_ct2.get_access<sycl::access::mode::read_write>(cgh);
 
-      cudaMemcpy(DFinal_Results, Dev_Results, sizeof(int) * NumReads, cudaMemcpyDeviceToHost);
+     auto dpct_global_range = grid * block;
+
+     cgh.parallel_for(
+         sycl::nd_range<3>(
+             sycl::range<3>(dpct_global_range.get(2), dpct_global_range.get(1),
+                            dpct_global_range.get(0)),
+             sycl::range<3>(block.get(2), block.get(1), block.get(0))),
+         [=](sycl::nd_item<3> item_ct1) {
+          sneaky_snake((const uint *)(&Dev_ReadSeq_acc_ct0[0]),
+                       (const uint *)(&Dev_RefSeq_acc_ct1[0]),
+                       (int *)(&Dev_Results_acc_ct2[0]), NumReads,
+                       F_ErrorThreshold, item_ct1);
+         });
+    });
+   }
+
+   dpct::dpct_memcpy(DFinal_Results, Dev_Results, sizeof(int) * NumReads,
+                     dpct::device_to_host);
 
       high_resolution_clock::time_point t2 = high_resolution_clock::now();
 
@@ -438,8 +470,8 @@ int main(int argc, const char * const argv[])
   free(ReadSeq);
   free(RefSeq);
   free(DFinal_Results);
-  cudaFree(Dev_ReadSeq);
-  cudaFree(Dev_RefSeq);
-  cudaFree(Dev_Results);
+ dpct::dpct_free(Dev_ReadSeq);
+ dpct::dpct_free(Dev_RefSeq);
+ dpct::dpct_free(Dev_Results);
   return 0;
 }
