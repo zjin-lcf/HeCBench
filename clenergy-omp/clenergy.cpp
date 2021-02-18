@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
     // RUN the kernel...
     wkf_timer_start(runtimer);
 
-    #pragma omp target teams distribute parallel for collapse(2) nowait
+    #pragma omp target teams distribute parallel for collapse(2) // nowait
     for (unsigned int yindex = 0; yindex < volsize.y; yindex++) { 
       for (unsigned int xindex = 0; xindex < volsize.x / UNROLLX; xindex++) { 
       unsigned int outaddr = yindex * volsize.x + xindex; 

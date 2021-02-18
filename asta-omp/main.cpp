@@ -154,9 +154,9 @@ int main(int argc, char **argv) {
       memset((void *)h_finished, 0, sizeof(int) * finished_size);
       h_head[0] = 0;
 
-#pragma omp target update to(h_in_out[0:in_size]) nowait
-#pragma omp target update to(h_finished[0:finished_size]) nowait
-#pragma omp target update to(h_head[0:1]) nowait
+#pragma omp target update to(h_in_out[0:in_size]) // nowait
+#pragma omp target update to(h_finished[0:finished_size]) // nowait
+#pragma omp target update to(h_head[0:1]) // nowait
 
 #pragma omp target teams num_teams(blocks) thread_limit(threads) 
       {
@@ -263,7 +263,7 @@ int main(int argc, char **argv) {
         }
       }
     // Copy back 
-#pragma omp target update from(h_in_out[0:in_size]) nowait
+#pragma omp target update from(h_in_out[0:in_size]) //nowait
     }
   }
 

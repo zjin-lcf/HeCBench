@@ -39,7 +39,7 @@ int main() {
     {
       start = clock();
       for (int j = 0; j < NUM_ITER; j++) {
-        #pragma omp target update to (A[0:len]) nowait
+        #pragma omp target update to (A[0:len]) //nowait
       }
       end = clock();
       uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
@@ -49,7 +49,7 @@ int main() {
 
       start = clock();
       for (int j = 0; j < NUM_ITER; j++) {
-        #pragma omp target update from (A[0:len]) nowait
+        #pragma omp target update from (A[0:len]) //nowait
       }
       end = clock();
       uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
