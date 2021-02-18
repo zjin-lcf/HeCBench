@@ -3,10 +3,16 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = syclcc
 OPTIMIZE  = yes
 DEBUG     = no
+MARCH     = gfx906
+PLATFORM  = rocm
 DEVICE    = gpu
+ROCM_DEVICE_LIB = -nogpulib \
+	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
+	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/hip.bc
+
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +29,10 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DNuints=8 -std=c++14 -Wall -I../include
+CFLAGS := -Wall -I../include \
+          --hipsycl-platform=$(PLATFORM) \
+	  --hipsycl-gpu-arch=$(MARCH) \
+	  $(ROCM_DEVICE_LIB) 
 
 # Linker Flags
 LDFLAGS = 
@@ -33,7 +42,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)

@@ -35,7 +35,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <chrono>
-#include "common.h"
 
 using namespace std::chrono;
 
@@ -49,6 +48,29 @@ using namespace std::chrono;
 #define F_ReadLength 100
 #define BitVal(data,y) ( (data>>y) & 1)    // Return Data.Y value
 #define SetBit(data,y) data |= (1 << y)    // Set Data.Y   to 1
+
+// suboptimal
+#pragma omp declare target
+uint popcnt( uint x )
+{
+    x -= ((x >> 1) & 0x55555555);
+    x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
+    x = (((x >> 4) + x) & 0x0f0f0f0f);
+    x += (x >> 8);
+    x += (x >> 16);
+    return x & 0x0000003f;
+}
+
+uint clz( uint x )
+{
+    x |= (x >> 1);
+    x |= (x >> 2);
+    x |= (x >> 4);
+    x |= (x >> 8);
+    x |= (x >> 16);
+    return 32 - popcnt(x);
+}
+#pragma omp end declare target
 
 
 int main(int argc, const char * const argv[])
@@ -77,7 +99,7 @@ int main(int argc, const char * const argv[])
 
   uint* ReadSeq = (uint * ) calloc(NumReads * 8, sizeof(uint));
   uint* RefSeq = (uint * ) calloc(NumReads * 8, sizeof(uint));
-  int* DFinal_Results = (int * ) calloc(NumReads, sizeof(int));
+  int* Results = (int * ) calloc(NumReads, sizeof(int));
 
 
   int tokenIndex=1;
@@ -148,42 +170,18 @@ int main(int argc, const char * const argv[])
   }
   fclose(fp);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
-  buffer<uint, 1> Dev_ReadSeq (NumReads * 8);
-  buffer<uint, 1> Dev_RefSeq (NumReads * 8);
-  buffer<int, 1> Dtest_Results (NumReads);
-
-  range<1> gws(Concurrent_threads_In_Block * Number_of_blocks_inside_each_kernel);
-  range<1> lws(Concurrent_threads_In_Block);
-
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_ReadSeq.get_access<sycl_write>(cgh);
-    cgh.copy(ReadSeq, acc);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_RefSeq.get_access<sycl_write>(cgh);
-    cgh.copy(RefSeq, acc);
-  });
+#pragma omp target data map(to: ReadSeq[0:NumReads*8], RefSeq[0:NumReads*8]) \
+                        map(alloc: Results[0:NumReads])
+{
 
   for (int loopPar = 0; loopPar <= 25; loopPar++) {
     F_ErrorThreshold = (loopPar*ReadLength)/100;
 
     high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto F_ReadSeq = Dev_ReadSeq.get_access<sycl_read>(cgh); 
-      auto F_RefSeq = Dev_RefSeq.get_access<sycl_read>(cgh); 
-      auto Ftest_Results = Dtest_Results.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class sneaky_snake>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        int tid = item.get_global_id(0); 
-        if(tid >= NumReads) return;
-
+#pragma omp target teams distribute parallel for num_teams(Number_of_blocks_inside_each_kernel) \
+                                                 thread_limit(Concurrent_threads_In_Block)
+    for (int tid = 0; tid < NumReads; tid++) {
         // const int NBytes = 8;
         uint ReadsPerThread[NBytes];
         uint RefsPerThread[NBytes];
@@ -191,12 +189,12 @@ int main(int argc, const char * const argv[])
         #pragma unroll
         for (int i = 0; i < NBytes; i++)
         {
-          ReadsPerThread[i] = F_ReadSeq[tid*8 + i];
-          RefsPerThread[i] = F_RefSeq[tid*8 + i];
+          ReadsPerThread[i] = ReadSeq[tid*8 + i];
+          RefsPerThread[i] = RefSeq[tid*8 + i];
         }
 
         /////////////////////////////////////////////////////////////////////////////
-        Ftest_Results[tid] = 1;
+        Results[tid] = 1;
 
         uint ReadCompTmp = 0;
         uint RefCompTmp = 0;
@@ -232,7 +230,7 @@ int main(int argc, const char * const argv[])
           ReadCompTmp = ReadTmp1 | ReadTmp2;
           RefCompTmp = RefTmp1 | RefTmp2;
           DiagonalResult = ReadCompTmp ^ RefCompTmp;
-          localCounterMax = cl::sycl::clz(DiagonalResult);
+          localCounterMax = clz(DiagonalResult);
 
           //////////////////// Upper diagonals /////////////////////
 
@@ -257,7 +255,7 @@ int main(int argc, const char * const argv[])
               }
 
               DiagonalResult  = DiagonalResult | CornerCase;
-              localCounter = cl::sycl::clz(DiagonalResult);
+              localCounter = clz(DiagonalResult);
 
             }
             else if ( (ShiftValue - (2*e) ) < 0 )
@@ -270,7 +268,7 @@ int main(int argc, const char * const argv[])
 
               DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-              localCounter = cl::sycl::clz(DiagonalResult);
+              localCounter = clz(DiagonalResult);
             }
             else
             {
@@ -282,7 +280,7 @@ int main(int argc, const char * const argv[])
 
               DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-              localCounter = cl::sycl::clz(DiagonalResult);
+              localCounter = clz(DiagonalResult);
 
             }
             if (localCounter>localCounterMax)
@@ -317,7 +315,7 @@ int main(int argc, const char * const argv[])
                 RefCompTmp = RefTmp1 | RefTmp2;
 
                 DiagonalResult = ReadCompTmp ^ RefCompTmp;
-                localCounter = cl::sycl::clz(DiagonalResult);
+                localCounter = clz(DiagonalResult);
 
               }
               else
@@ -332,7 +330,7 @@ int main(int argc, const char * const argv[])
 
                 DiagonalResult = ReadCompTmp ^ RefCompTmp;
 
-                localCounter = cl::sycl::clz(DiagonalResult);
+                localCounter = clz(DiagonalResult);
               }
             }
             else
@@ -363,7 +361,7 @@ int main(int argc, const char * const argv[])
               }
               DiagonalResult = DiagonalResult | CornerCase;
 
-              localCounter = cl::sycl::clz(DiagonalResult);
+              localCounter = clz(DiagonalResult);
             }
 
             if (localCounter>localCounterMax)
@@ -405,7 +403,7 @@ int main(int argc, const char * const argv[])
 
           if(AccumulatedErrs > F_ErrorThreshold)
           {
-            Ftest_Results[tid] = 0;
+            Results[tid] = 0;
             break;
           }
 
@@ -426,14 +424,8 @@ int main(int argc, const char * const argv[])
             globalCounter += (Max_leading_zeros + 2);
           }
         }
-     });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = Dtest_Results.get_access<sycl_read>(cgh);
-      cgh.copy(acc, DFinal_Results);
-    });
-    q.wait();
+     }
+    #pragma omp target update from (Results[0:NumReads])
 
     high_resolution_clock::time_point t2 = high_resolution_clock::now();
 
@@ -441,16 +433,17 @@ int main(int argc, const char * const argv[])
     int accepted = 0;
     for(int i = 0; i < NumReads; i++)
     {
-      if(DFinal_Results[i] == 1)
+      if(Results[i] == 1)
         accepted += 1;
     }
 
     printf("E: \t %d \t Snake-on-GPU: \t %5.4f \t Accepted: \t %10d \t Rejected: \t %10d\n", 
         F_ErrorThreshold, elapsed_time, accepted, NumReads - accepted);
   }
+}
 
   free(ReadSeq);
   free(RefSeq);
-  free(DFinal_Results);
+  free(Results);
   return 0;
 }
