@@ -35,7 +35,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <chrono>
-#include "common.h"
+#include <cuda.h>
 
 using namespace std::chrono;
 
@@ -50,10 +50,260 @@ using namespace std::chrono;
 #define BitVal(data,y) ( (data>>y) & 1)    // Return Data.Y value
 #define SetBit(data,y) data |= (1 << y)    // Set Data.Y   to 1
 
+__global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq, 
+                             int* Ftest_Results, const int NumReads, const int F_ErrorThreshold)
+{
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+        if(tid >= NumReads) return;
+
+        // const int NBytes = 8;
+        uint ReadsPerThread[NBytes];
+        uint RefsPerThread[NBytes];
+
+        #pragma unroll
+        for (int i = 0; i < NBytes; i++)
+        {
+          ReadsPerThread[i] = F_ReadSeq[tid*8 + i];
+          RefsPerThread[i] = F_RefSeq[tid*8 + i];
+        }
+
+        /////////////////////////////////////////////////////////////////////////////
+        Ftest_Results[tid] = 1;
+
+        uint ReadCompTmp = 0;
+        uint RefCompTmp = 0;
+        uint DiagonalResult = 0;
+
+        uint ReadTmp1 = 0;
+        uint ReadTmp2 = 0;
+
+        uint RefTmp1 = 0;
+        uint RefTmp2 = 0;
+
+        uint CornerCase = 0;
+
+        int localCounter= 0;
+        int localCounterMax=0;
+        int globalCounter = 0;
+        int Max_leading_zeros = 0;
+        int AccumulatedErrs = 0;
+
+        int ShiftValue = 0;
+        int Diagonal = 0;
+
+        int j = 0; //specifying the j-th uint that we are reading in each read-ref comparison (can be from 0 to 7)
+
+        while ( (j < 7) && (globalCounter < 200))
+        {
+          Diagonal = 0;
+          RefTmp1 = RefsPerThread[j] << ShiftValue;
+          RefTmp2 = RefsPerThread[j + 1] >>  32 - ShiftValue;
+          ReadTmp1 = ReadsPerThread[j] << ShiftValue;
+          ReadTmp2 = ReadsPerThread[j + 1] >>  32 - ShiftValue;
+
+          ReadCompTmp = ReadTmp1 | ReadTmp2;
+          RefCompTmp = RefTmp1 | RefTmp2;
+          DiagonalResult = ReadCompTmp ^ RefCompTmp;
+          localCounterMax = __clz(DiagonalResult);
+
+          //////////////////// Upper diagonals /////////////////////
+
+          for(int e = 1; e <= F_ErrorThreshold; e++)
+          {
+            Diagonal += 1;
+            CornerCase = 0;
+            if (  (j == 0)  &&  (  (ShiftValue - (2*e))  < 0 )  )
+            {
+              ReadTmp1 = ReadsPerThread[j] >> ( (2*e) - ShiftValue );
+              ReadTmp2 = 0;
+
+              ReadCompTmp = ReadTmp1 | ReadTmp2;
+              RefCompTmp = RefTmp1 | RefTmp2;
+
+              DiagonalResult = ReadCompTmp ^ RefCompTmp;
+
+              CornerCase = 0;
+              for(int Ci = 0; Ci < (2*e) - ShiftValue; Ci++)
+              {
+                SetBit(CornerCase, 31 - Ci);
+              }
+
+              DiagonalResult  = DiagonalResult | CornerCase;
+              localCounter = __clz(DiagonalResult);
+
+            }
+            else if ( (ShiftValue - (2*e) ) < 0 )
+            {
+              ReadTmp1 = ReadsPerThread[j-1] << 32 - ( (2*e) - ShiftValue );
+              ReadTmp2 = ReadsPerThread[j] >> (2*e) - ShiftValue;
+
+              ReadCompTmp = ReadTmp1 | ReadTmp2;
+              RefCompTmp = RefTmp1 | RefTmp2;
+
+              DiagonalResult = ReadCompTmp ^ RefCompTmp;
+
+              localCounter = __clz(DiagonalResult);
+            }
+            else
+            {
+              ReadTmp1 = ReadsPerThread[j] <<  ShiftValue - (2*e);
+              ReadTmp2 = ReadsPerThread[j+1] >> 32 - (ShiftValue - (2*e) ) ;
+
+              ReadCompTmp = ReadTmp1 | ReadTmp2;
+              RefCompTmp = RefTmp1 | RefTmp2;
+
+              DiagonalResult = ReadCompTmp ^ RefCompTmp;
+
+              localCounter = __clz(DiagonalResult);
+
+            }
+            if (localCounter>localCounterMax)
+              localCounterMax=localCounter;
+          }
+
+
+          /*
+             sh = shift
+             up = upper diagonal
+             RC = ReadCompTmp
+             FC = RefCompTmp
+             D = DiagonalResult
+             DN = diagonal
+             LC = localCounter
+           */
+
+          //////////////////// Lower diagonals /////////////////////
+
+          for(int e = 1; e <= F_ErrorThreshold; e++)
+          {
+            Diagonal += 1;
+            CornerCase = 0;
+            if ( j<5)//  ( (globalCounter + ShiftValue + (2*e) + 32) < 200) )
+            {
+              if ( (ShiftValue + (2*e) )  < 32)
+              {
+                ReadTmp1 = ReadsPerThread[j] << ShiftValue + (2*e);
+                ReadTmp2 = ReadsPerThread[j+1] >> 32 - ( ShiftValue + (2*e) );
+
+                ReadCompTmp = ReadTmp1 | ReadTmp2;
+                RefCompTmp = RefTmp1 | RefTmp2;
+
+                DiagonalResult = ReadCompTmp ^ RefCompTmp;
+                localCounter = __clz(DiagonalResult);
+
+              }
+              else
+              {
+                ReadTmp1 = ReadsPerThread[j+1] << ( ShiftValue + (2*e) ) % 32;
+                ReadTmp2 = ReadsPerThread[j+2] >>  32 - ( ( ShiftValue + (2*e) ) % 32 );
+
+                ReadCompTmp = ReadTmp1 | ReadTmp2;
+                RefCompTmp = RefTmp1 | RefTmp2;
+
+                DiagonalResult = 0xffffffff;//ReadCompTmp ^ RefCompTmp;
+
+                DiagonalResult = ReadCompTmp ^ RefCompTmp;
+
+                localCounter = __clz(DiagonalResult);
+              }
+            }
+            else
+            {
+              //printf("HI3");
+              ReadTmp1 = ReadsPerThread[j] << ShiftValue + (2*e);
+              ReadTmp2 = ReadsPerThread[j+1] >>   32 - ( ShiftValue + (2*e) );
+
+              ReadCompTmp = ReadTmp1 | ReadTmp2;
+              RefCompTmp = RefTmp1 | RefTmp2;
+              DiagonalResult = ReadCompTmp ^ RefCompTmp;
+
+              CornerCase = 0;
+              if ((globalCounter+32)>200 ) {
+
+                for(int Ci = ((globalCounter+32)-200); Ci < (((globalCounter+32)-200)+ 2*e); Ci++)
+                {
+                  SetBit(CornerCase, Ci);
+                }
+              }
+
+              else if ((globalCounter+32)>=(200- (2*e))){
+
+                for(int Ci = 0; Ci < (2*e); Ci++)
+                {
+                  SetBit(CornerCase, Ci);
+                }
+              }
+              DiagonalResult = DiagonalResult | CornerCase;
+
+              localCounter = __clz(DiagonalResult);
+            }
+
+            if (localCounter>localCounterMax)
+              localCounterMax=localCounter;
+
+          }
+
+          /*
+             CC = CornerCase
+             sh = shift
+             up = upper diagonal
+             RC = ReadCompTmp
+             FC = RefCompTmp
+             D = DiagonalResult
+             DN = diagonal
+             LC = localCounter
+           */
+
+          Max_leading_zeros = 0;
+
+          if ( (j == 6) && ( ((localCounterMax/2)*2) >= 8)  )
+          {
+            Max_leading_zeros = 8;
+            break;
+          }
+          else if( ((localCounterMax/2)*2) > Max_leading_zeros)
+          {
+            Max_leading_zeros = ((localCounterMax/2)*2);
+          }
+
+          if ( ( (Max_leading_zeros/2) < 16) && (j < 5) )
+          {
+            AccumulatedErrs += 1;
+          }
+          else if (  (j == 6) && ( (Max_leading_zeros/2) < 4) )
+          {
+            AccumulatedErrs += 1;
+          }
+
+          if(AccumulatedErrs > F_ErrorThreshold)
+          {
+            Ftest_Results[tid] = 0;
+            break;
+          }
+
+
+          if(ShiftValue + Max_leading_zeros + 2 >= 32)
+          {
+            j += 1;
+          }
+
+          // ShiftValue_2Ref = (ShiftValue_2Ref + Max_leading_zeros + 2) %32;
+          if (Max_leading_zeros == 32)
+          {
+            globalCounter += Max_leading_zeros;
+          }
+          else
+          {
+            ShiftValue = ((ShiftValue + Max_leading_zeros + 2) % 32);
+            globalCounter += (Max_leading_zeros + 2);
+          }
+        }
+     }
+
 
 int main(int argc, const char * const argv[])
 {
-  if (argc != 4){
+  if (argc != 4) {
     printf("Incorrect arguments..\nUsage: ./%s [ReadLength] [ReadandRefFile] [#reads]\n", argv[0]);
     exit(-1);
   }
@@ -78,7 +328,6 @@ int main(int argc, const char * const argv[])
   uint* ReadSeq = (uint * ) calloc(NumReads * 8, sizeof(uint));
   uint* RefSeq = (uint * ) calloc(NumReads * 8, sizeof(uint));
   int* DFinal_Results = (int * ) calloc(NumReads, sizeof(int));
-
 
   int tokenIndex=1;
   fp = fopen(argv[2], "r");
@@ -148,292 +397,27 @@ int main(int argc, const char * const argv[])
   }
   fclose(fp);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
+  uint* Dev_ReadSeq;
+  uint* Dev_RefSeq;
+  int* Dev_Results;
+  cudaMalloc((void**)&Dev_ReadSeq, sizeof(uint) * NumReads * 8);
+  cudaMalloc((void**)&Dev_RefSeq, sizeof(uint) * NumReads * 8);
+  cudaMalloc((void**)&Dev_Results, sizeof(int) * NumReads);
 
-  buffer<uint, 1> Dev_ReadSeq (NumReads * 8);
-  buffer<uint, 1> Dev_RefSeq (NumReads * 8);
-  buffer<int, 1> Dtest_Results (NumReads);
+  dim3 grid (Number_of_blocks_inside_each_kernel);
+  dim3 block (Concurrent_threads_In_Block);
 
-  range<1> gws(Concurrent_threads_In_Block * Number_of_blocks_inside_each_kernel);
-  range<1> lws(Concurrent_threads_In_Block);
-
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_ReadSeq.get_access<sycl_write>(cgh);
-    cgh.copy(ReadSeq, acc);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_RefSeq.get_access<sycl_write>(cgh);
-    cgh.copy(RefSeq, acc);
-  });
+  cudaMemcpy(Dev_ReadSeq, ReadSeq, sizeof(uint) * NumReads * 8, cudaMemcpyHostToDevice);
+  cudaMemcpy(Dev_RefSeq, RefSeq, sizeof(uint) * NumReads * 8, cudaMemcpyHostToDevice);
 
   for (int loopPar = 0; loopPar <= 25; loopPar++) {
     F_ErrorThreshold = (loopPar*ReadLength)/100;
 
     high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto F_ReadSeq = Dev_ReadSeq.get_access<sycl_read>(cgh); 
-      auto F_RefSeq = Dev_RefSeq.get_access<sycl_read>(cgh); 
-      auto Ftest_Results = Dtest_Results.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class sneaky_snake>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        int tid = item.get_global_id(0); 
-        if(tid >= NumReads) return;
+    sneaky_snake<<<grid, block>>>(Dev_ReadSeq, Dev_RefSeq, Dev_Results, NumReads, F_ErrorThreshold);
 
-        // const int NBytes = 8;
-        uint ReadsPerThread[NBytes];
-        uint RefsPerThread[NBytes];
-
-        #pragma unroll
-        for (int i = 0; i < NBytes; i++)
-        {
-          ReadsPerThread[i] = F_ReadSeq[tid*8 + i];
-          RefsPerThread[i] = F_RefSeq[tid*8 + i];
-        }
-
-        /////////////////////////////////////////////////////////////////////////////
-        Ftest_Results[tid] = 1;
-
-        uint ReadCompTmp = 0;
-        uint RefCompTmp = 0;
-        uint DiagonalResult = 0;
-
-        uint ReadTmp1 = 0;
-        uint ReadTmp2 = 0;
-
-        uint RefTmp1 = 0;
-        uint RefTmp2 = 0;
-
-        uint CornerCase = 0;
-
-        int localCounter= 0;
-        int localCounterMax=0;
-        int globalCounter = 0;
-        int Max_leading_zeros = 0;
-        int AccumulatedErrs = 0;
-
-        int ShiftValue = 0;
-        int Diagonal = 0;
-
-        int j = 0; //specifying the j-th uint that we are reading in each read-ref comparison (can be from 0 to 7)
-
-        while ( (j < 7) && (globalCounter < 200))
-        {
-          Diagonal = 0;
-          RefTmp1 = RefsPerThread[j] << ShiftValue;
-          RefTmp2 = RefsPerThread[j + 1] >>  32 - ShiftValue;
-          ReadTmp1 = ReadsPerThread[j] << ShiftValue;
-          ReadTmp2 = ReadsPerThread[j + 1] >>  32 - ShiftValue;
-
-          ReadCompTmp = ReadTmp1 | ReadTmp2;
-          RefCompTmp = RefTmp1 | RefTmp2;
-          DiagonalResult = ReadCompTmp ^ RefCompTmp;
-          localCounterMax = cl::sycl::clz(DiagonalResult);
-
-          //////////////////// Upper diagonals /////////////////////
-
-          for(int e = 1; e <= F_ErrorThreshold; e++)
-          {
-            Diagonal += 1;
-            CornerCase = 0;
-            if (  (j == 0)  &&  (  (ShiftValue - (2*e))  < 0 )  )
-            {
-              ReadTmp1 = ReadsPerThread[j] >> ( (2*e) - ShiftValue );
-              ReadTmp2 = 0;
-
-              ReadCompTmp = ReadTmp1 | ReadTmp2;
-              RefCompTmp = RefTmp1 | RefTmp2;
-
-              DiagonalResult = ReadCompTmp ^ RefCompTmp;
-
-              CornerCase = 0;
-              for(int Ci = 0; Ci < (2*e) - ShiftValue; Ci++)
-              {
-                SetBit(CornerCase, 31 - Ci);
-              }
-
-              DiagonalResult  = DiagonalResult | CornerCase;
-              localCounter = cl::sycl::clz(DiagonalResult);
-
-            }
-            else if ( (ShiftValue - (2*e) ) < 0 )
-            {
-              ReadTmp1 = ReadsPerThread[j-1] << 32 - ( (2*e) - ShiftValue );
-              ReadTmp2 = ReadsPerThread[j] >> (2*e) - ShiftValue;
-
-              ReadCompTmp = ReadTmp1 | ReadTmp2;
-              RefCompTmp = RefTmp1 | RefTmp2;
-
-              DiagonalResult = ReadCompTmp ^ RefCompTmp;
-
-              localCounter = cl::sycl::clz(DiagonalResult);
-            }
-            else
-            {
-              ReadTmp1 = ReadsPerThread[j] <<  ShiftValue - (2*e);
-              ReadTmp2 = ReadsPerThread[j+1] >> 32 - (ShiftValue - (2*e) ) ;
-
-              ReadCompTmp = ReadTmp1 | ReadTmp2;
-              RefCompTmp = RefTmp1 | RefTmp2;
-
-              DiagonalResult = ReadCompTmp ^ RefCompTmp;
-
-              localCounter = cl::sycl::clz(DiagonalResult);
-
-            }
-            if (localCounter>localCounterMax)
-              localCounterMax=localCounter;
-          }
-
-
-          /*
-             sh = shift
-             up = upper diagonal
-             RC = ReadCompTmp
-             FC = RefCompTmp
-             D = DiagonalResult
-             DN = diagonal
-             LC = localCounter
-           */
-
-          //////////////////// Lower diagonals /////////////////////
-
-          for(int e = 1; e <= F_ErrorThreshold; e++)
-          {
-            Diagonal += 1;
-            CornerCase = 0;
-            if ( j<5)//  ( (globalCounter + ShiftValue + (2*e) + 32) < 200) )
-            {
-              if ( (ShiftValue + (2*e) )  < 32)
-              {
-                ReadTmp1 = ReadsPerThread[j] << ShiftValue + (2*e);
-                ReadTmp2 = ReadsPerThread[j+1] >> 32 - ( ShiftValue + (2*e) );
-
-                ReadCompTmp = ReadTmp1 | ReadTmp2;
-                RefCompTmp = RefTmp1 | RefTmp2;
-
-                DiagonalResult = ReadCompTmp ^ RefCompTmp;
-                localCounter = cl::sycl::clz(DiagonalResult);
-
-              }
-              else
-              {
-                ReadTmp1 = ReadsPerThread[j+1] << ( ShiftValue + (2*e) ) % 32;
-                ReadTmp2 = ReadsPerThread[j+2] >>  32 - ( ( ShiftValue + (2*e) ) % 32 );
-
-                ReadCompTmp = ReadTmp1 | ReadTmp2;
-                RefCompTmp = RefTmp1 | RefTmp2;
-
-                DiagonalResult = 0xffffffff;//ReadCompTmp ^ RefCompTmp;
-
-                DiagonalResult = ReadCompTmp ^ RefCompTmp;
-
-                localCounter = cl::sycl::clz(DiagonalResult);
-              }
-            }
-            else
-            {
-              //printf("HI3");
-              ReadTmp1 = ReadsPerThread[j] << ShiftValue + (2*e);
-              ReadTmp2 = ReadsPerThread[j+1] >>   32 - ( ShiftValue + (2*e) );
-
-              ReadCompTmp = ReadTmp1 | ReadTmp2;
-              RefCompTmp = RefTmp1 | RefTmp2;
-              DiagonalResult = ReadCompTmp ^ RefCompTmp;
-
-              CornerCase = 0;
-              if ((globalCounter+32)>200 ) {
-
-                for(int Ci = ((globalCounter+32)-200); Ci < (((globalCounter+32)-200)+ 2*e); Ci++)
-                {
-                  SetBit(CornerCase, Ci);
-                }
-              }
-
-              else if ((globalCounter+32)>=(200- (2*e))){
-
-                for(int Ci = 0; Ci < (2*e); Ci++)
-                {
-                  SetBit(CornerCase, Ci);
-                }
-              }
-              DiagonalResult = DiagonalResult | CornerCase;
-
-              localCounter = cl::sycl::clz(DiagonalResult);
-            }
-
-            if (localCounter>localCounterMax)
-              localCounterMax=localCounter;
-
-          }
-
-          /*
-             CC = CornerCase
-             sh = shift
-             up = upper diagonal
-             RC = ReadCompTmp
-             FC = RefCompTmp
-             D = DiagonalResult
-             DN = diagonal
-             LC = localCounter
-           */
-
-          Max_leading_zeros = 0;
-
-          if ( (j == 6) && ( ((localCounterMax/2)*2) >= 8)  )
-          {
-            Max_leading_zeros = 8;
-            break;
-          }
-          else if( ((localCounterMax/2)*2) > Max_leading_zeros)
-          {
-            Max_leading_zeros = ((localCounterMax/2)*2);
-          }
-
-          if ( ( (Max_leading_zeros/2) < 16) && (j < 5) )
-          {
-            AccumulatedErrs += 1;
-          }
-          else if (  (j == 6) && ( (Max_leading_zeros/2) < 4) )
-          {
-            AccumulatedErrs += 1;
-          }
-
-          if(AccumulatedErrs > F_ErrorThreshold)
-          {
-            Ftest_Results[tid] = 0;
-            break;
-          }
-
-
-          if(ShiftValue + Max_leading_zeros + 2 >= 32)
-          {
-            j += 1;
-          }
-
-          // ShiftValue_2Ref = (ShiftValue_2Ref + Max_leading_zeros + 2) %32;
-          if (Max_leading_zeros == 32)
-          {
-            globalCounter += Max_leading_zeros;
-          }
-          else
-          {
-            ShiftValue = ((ShiftValue + Max_leading_zeros + 2) % 32);
-            globalCounter += (Max_leading_zeros + 2);
-          }
-        }
-     });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = Dtest_Results.get_access<sycl_read>(cgh);
-      cgh.copy(acc, DFinal_Results);
-    });
-    q.wait();
+    cudaMemcpy(DFinal_Results, Dev_Results, sizeof(int) * NumReads, cudaMemcpyDeviceToHost);
 
     high_resolution_clock::time_point t2 = high_resolution_clock::now();
 
@@ -452,5 +436,8 @@ int main(int argc, const char * const argv[])
   free(ReadSeq);
   free(RefSeq);
   free(DFinal_Results);
+  cudaFree(Dev_ReadSeq);
+  cudaFree(Dev_RefSeq);
+  cudaFree(Dev_Results);
   return 0;
 }

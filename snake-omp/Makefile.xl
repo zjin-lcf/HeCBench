@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = xlc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = sm_70
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DNuints=8 -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -41,7 +42,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS +=-qsmp -qoffload -qtgtarch=$(SM)
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
