@@ -1403,7 +1403,7 @@ int main(int argc, char *argv[])
         auto v = d_v.get_access<sycl_read>(cgh);
         auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
 
-        cgh.parallel_for<class hgc>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class hgcfe>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
             int i = item.get_global_id(0);
             if (i >= numElem) return;
 
@@ -2122,7 +2122,7 @@ int main(int argc, char *argv[])
         auto vnew = d_vnew.get_access<sycl_read>(cgh);
         auto vdov = d_vdov.get_access<sycl_discard_write>(cgh);
         auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class kintec>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class strainRate>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
             int k = item.get_global_id(0);
             if (k >= numElem) return;
 
