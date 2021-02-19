@@ -115,16 +115,6 @@ int main()
         gpuData[0] += 10;
        #pragma omp atomic update  
         gpuData[1] -= 10;
-       #pragma omp critical
-        {
-          //if (gpuData[2] < i) gpuData[2] = i;
-          gpuData[2] = max(gpuData[2], i);
-        }
-       #pragma omp critical
-        {
-          //if (gpuData[3] > i) gpuData[3] = i;
-          gpuData[3] = min(gpuData[3], i);
-        }
        #pragma omp atomic update  
         gpuData[4] &= (2*i+7);
        #pragma omp atomic update  
@@ -132,6 +122,14 @@ int main()
        #pragma omp atomic update  
         gpuData[6] ^= i;
     }
+
+    #pragma omp target teams distribute parallel for thread_limit(256) reduction(max: gpuData[2])
+    for (int i = 0; i < len; ++i)
+       gpuData[2] = max(gpuData[2], i);
+
+    #pragma omp target teams distribute parallel for thread_limit(256) reduction(min: gpuData[3])
+    for (int i = 0; i < len; ++i)
+       gpuData[3] = min(gpuData[3], i);
   }
   computeGold(gpuData, len);
   return 0;
