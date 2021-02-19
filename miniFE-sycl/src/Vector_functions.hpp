@@ -336,7 +336,7 @@ dot(const Vector& x,
     auto y = d_ycoefs.template get_access<sycl_read>(h);
     auto d = d_sop.template get_access<sycl_write>(h);
     accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    h.parallel_for<class xy_dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
       for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
@@ -452,7 +452,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
     auto x = d_xcoefs.template get_access<sycl_read>(h);
     auto d = d_sop.template get_access<sycl_write>(h);
     accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    h.parallel_for<class xx_dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
       for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
@@ -475,7 +475,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
   q.submit([&] (handler &h) {
     auto d = d_sop.template get_access<sycl_read_write>(h);
     accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class final_reduce>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
+    h.parallel_for<class final_reduce2>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
       int lid = item.get_local_id(0);
       MINIFE_SCALAR sum = d[lid];
       red[lid]=sum;
