@@ -497,6 +497,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 1.06 | 1.06 | 1.06 | 1.72 |
 
 
+| multimaterial | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 100 | 429 | 429 | 689 |
+| host timing(s) | 3.2 | 3.5 | 3.5 | 6.8 |
+| device timing(s) | 0.88 | 1.6 | 1.6 | 2.95 |
+
+
 | murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 104 | 104 | 409 |
@@ -1303,6 +1310,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 1.06 | 1.02 | 1.05 | 7.6 |
 
 
+| multimaterial | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 100 | 429 | 429 | 689 |
+| host timing(s) | 3.3 | 3.4 | 4.5 | 7.8 |
+| device timing(s) | 1.6 | 1.8 | 2.6 | 4.2 |
+
+
 | murmurhash3 | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 101 | 104 | 104 | 409 |
@@ -1790,6 +1804,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### mt
   Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### multimaterial
+  Multi-material simulations (https://github.com/reguly/multimaterial)
 
 ### murmurhash3
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
