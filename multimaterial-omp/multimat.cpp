@@ -281,7 +281,7 @@ void initialise_field_file(full_data cc) {
 
   int status;
   FILE *fp;
-  fp = fopen("../multimaterial-cuda/volfrac.dat", "r");
+  fp = fopen("volfrac.dat", "r");
   if (!fp) {
     fprintf(stderr, "unable to read volume fractions from file \"%s\"\n",
         "volfrac.dat");
