@@ -4,9 +4,7 @@
 //Constants for the error function
 
 #ifndef ERROR_FUNCT_CONSTS_CUH
-#define ERROR_FUNCT_CONSTS_CUH	
-
-#define DBL_MIN (1e-999)
+#define ERROR_FUNCT_CONSTS_CUH
 
 #ifndef M_1_PI
     #define M_1_PI      0.318309886183790671538
