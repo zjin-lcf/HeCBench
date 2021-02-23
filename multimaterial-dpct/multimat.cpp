@@ -96,15 +96,12 @@ extern void full_matrix_material_centric(full_data cc, full_data mc);
 
 extern bool full_matrix_check_results(full_data cc, full_data mc);
 
-extern void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv);
+extern void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv);
 
 extern bool compact_check_results(full_data cc, compact_data ccc);
 
 void initialise_field_rand(full_data cc, double prob2, double prob3, double prob4) {
 
-  int sizex = cc.sizex;
-  int sizey = cc.sizey;
-  int Nmats = cc.Nmats;
   //let's use a morton space filling curve here
   srand(0);
   double prob1 = 1.0-prob2-prob3-prob4;
@@ -112,36 +109,36 @@ void initialise_field_rand(full_data cc, double prob2, double prob3, double prob
   printf("Random layout %g %g %g %g\n", prob1, prob2, prob3, prob4);
 #endif
 
-  for (int n = 0; n < cc.sizex*sizey; n++) {
+  for (int n = 0; n < cc.sizex*cc.sizey; n++) {
     int i = n%cc.sizex;//n & 0xAAAA;
     int j = n/cc.sizex;//n & 0x5555;
 
     double r = (double)rand()/(double)RAND_MAX;
-    int m = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+    int m = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
     int m2, m3, m4;
     cc.rho[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     cc.t[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     cc.p[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     if (r >= prob1) {
-      m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+      m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       while (m2 == m)
-        m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+        m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
     }
     if (r >= 1.0-prob4-prob3) {
-      m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+      m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       while (m3 == m && m3 == m2)
-        m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+        m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
     }
     if (r >= 1.0-prob4) {
-      m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+      m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       while (m4 == m && m4 == m2 && m4 == m3)
-        m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
+        m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*cc.sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
@@ -277,7 +274,6 @@ void initialise_field_file(full_data cc) {
   int sizex = cc.sizex;
   int sizey = cc.sizey;
   int Nmats = cc.Nmats;
-  int width = sizex/Nmats;
 
   int status;
   FILE *fp;
@@ -617,11 +613,26 @@ int main(int argc, char** argv) {
   ccc.mm_len = imaterial_multi_cell;
 
   full_matrix_cell_centric(cc);
-
+  /*  full_matrix_material_centric(cc, mc);
+  // Check results
+  if (!full_matrix_check_results(cc, mc)) {
+  goto end;
+  }*/
 #define MIN(a,b) (a)<(b)?(a):(b)
+  double a1,a2,a3;
+  compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
+  double t1=100, t2=100, t3=100;
   for (int i = 0; i < 10; i++) {
-    compact_cell_centric(cc, ccc, argc, argv);
+    a1=a2=a3=0.0;
+    compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
+    /*    t1+=a1;
+          t2+=a2;
+          t3+=a3;*/
+    t1 = MIN(t1,a1*10.0);
+    t2 = MIN(t2,a2*10.0);
+    t3 = MIN(t3,a3*10.0);
   }
+  //printf("%g %g %g\n", t1/10.0,t2/10.0,t3/10.0);
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];
   //Alg 1:
@@ -717,6 +728,7 @@ int main(int argc, char** argv) {
 #endif
 
 
+  //printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t2/1e9, alg3*10.0/t3/1e9);
 
   // Check results
   if (!compact_check_results(cc, ccc))
