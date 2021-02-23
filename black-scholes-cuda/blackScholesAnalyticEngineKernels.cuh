@@ -6,9 +6,8 @@
 #define BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
 
 #include <stdio.h>
-
 #include <stdlib.h>
-
+#include <float.h>
 #include <vector>
 #include <algorithm>
 #include <cuda.h>
