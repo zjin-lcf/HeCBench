@@ -302,8 +302,6 @@ int main(int argc, char** argv)
    buffer<uint, 1> d_isWordInProfileHash(h_isWordInProfileHash, 1L << BLOOM_SIZE);
    buffer<ulong, 1> d_docInfo(h_docInfo, total_num_docs);
    buffer<ulong, 1> d_profileScore(h_profileScore, total_num_docs);
-   d_partialSums_dimm1.set_final_data(nullptr);
-   d_partialSums_dimm2.set_final_data(nullptr);
 
    const double start_time = getCurrentTimestamp();
    for (int i=0; i<100; i++) {
@@ -374,7 +372,7 @@ int main(int argc, char** argv)
        auto docInfo = d_docInfo.get_access<sycl_read>(h);
        auto partial_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_read>(h);
        auto partial_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_read>(h);
-       auto result = d_profileScore.get_access<sycl_write>(h);
+       auto result = d_profileScore.get_access<sycl_discard_write>(h);
        h.parallel_for<class reduction>(nd_range<1>(global_size_reduction, local_size_reduction), [=] (nd_item<1> item) {
         ulong info = docInfo[item.get_global_id(0)]; 
         uint start = info >> 32;
