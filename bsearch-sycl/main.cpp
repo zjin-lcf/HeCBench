@@ -30,7 +30,7 @@ void bs ( queue &q,
   q.submit([&](handler& cgh) {
     auto acc_a = buf_x.template get_access<sycl_read>(cgh);
     auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_write>(cgh);
+    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
 
     cgh.parallel_for<class BS<T>>(ndr, [=](nd_item<1> item) {
       size_t i = item.get_global_id(0);
@@ -45,7 +45,7 @@ void bs ( queue &q,
             low = mid;
         }
         acc_r[i] = low;
-        });
+    });
   });
   q.wait();
 }
@@ -70,7 +70,7 @@ void bs2 (queue &q,
   q.submit([&](handler& cgh) {
     auto acc_a = buf_x.template get_access<sycl_read>(cgh);
     auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_write>(cgh);
+    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
 
     cgh.parallel_for<class BS2<T>>(ndr, [=](nd_item<1> item) {
       size_t i = item.get_global_id(0);
@@ -86,7 +86,7 @@ void bs2 (queue &q,
         }
       }
       acc_r[i] = idx;
-       });
+    });
   });
   q.wait();
 }
@@ -111,7 +111,7 @@ void bs3 ( queue &q,
   q.submit([&](handler& cgh) {
     auto acc_a = buf_x.template get_access<sycl_read>(cgh);
     auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_write>(cgh);
+    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
 
     cgh.parallel_for<class BS3<T>>(ndr, [=] (nd_item<1> item) {
       size_t i = item.get_global_id(0);
@@ -128,7 +128,7 @@ void bs3 ( queue &q,
          }
        }
        acc_r[i] = idx;
-        });
+    });
   });
   q.wait();
 }
@@ -155,7 +155,7 @@ void bs4 (queue &q,
   q.submit([&](handler& cgh) {
     auto acc_a = buf_x.template get_access<sycl_read>(cgh);
     auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_write>(cgh);
+    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
 
     accessor<size_t, 1, sycl_read_write, access::target::local> k(range<1>(1), cgh);
 
@@ -181,7 +181,7 @@ void bs4 (queue &q,
          }
        }
        acc_r[gid] = idx;
-        });
+    });
   });
   q.wait();
 }
