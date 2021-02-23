@@ -5,8 +5,6 @@
 #ifndef BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CPU_CUH
 #define BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CPU_CUH
 
-#include <math.h>
-
 //needed for the constants in the error function
 #include "errorFunctConsts.cuh"
 

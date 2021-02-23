@@ -62,7 +62,7 @@ float errorFunctCpu(normalDistStruct normDist, float x)
 	{      
         if(ax < 3.7252902984e-09) 
 		{ 
-                if (ax < DBL_MIN*16)
+                if (ax < FLT_MIN*16)
                     return 0.125*(8.0*x+ (ERROR_FUNCT_efx8)*x);  /*avoid underflow */
 	            return x + (ERROR_FUNCT_efx)*x;
         }
