@@ -121,7 +121,7 @@ void  lstm_n5( queue &q,
     auto d_intB_acc = d_intB.get_access<sycl_read>(cgh);
     auto d_outW_acc = d_outW.get_access<sycl_read>(cgh);
     auto d_outB_acc = d_outB.get_access<sycl_read>(cgh);
-    auto d_y_acc = d_y.get_access<sycl_write>(cgh);
+    auto d_y_acc = d_y.get_access<sycl_discard_read_write>(cgh);
     
     cgh.parallel_for<class lstm>(nd_range<1>(range<>(N), range<1>(WGS)), [=] (nd_item<1> item) {
       int t,i,j;
