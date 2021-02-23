@@ -1643,8 +1643,6 @@ uint64_t crc64_parallel(const void *input, size_t nbytes) {
     d_crc64_table = sycl::malloc_device<uint64_t>(4 * 256, q_ct1);
     d_crc64_interleaved_table = sycl::malloc_device<uint64_t>(4 * 256, q_ct1);
 
-    q_ct1.memcpy(d_thread_sz, thread_sz, nthreads * sizeof(size_t)).wait();
-    q_ct1.memcpy(d_thread_cs, thread_cs, nthreads * sizeof(uint64_t)).wait();
     q_ct1.memcpy(d_data, data, nbytes).wait();
     q_ct1.memcpy(d_crc64_table, crc64_table, 4 * 256 * sizeof(uint64_t)).wait();
     q_ct1

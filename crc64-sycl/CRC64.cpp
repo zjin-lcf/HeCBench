@@ -560,8 +560,8 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
 
     const unsigned char *data = (const unsigned char*) input;
 
-    buffer<size_t, 1> d_thread_sz(thread_sz, nthreads);
-    buffer<uint64_t, 1> d_thread_cs(thread_cs, nthreads);
+    buffer<size_t, 1> d_thread_sz(nthreads);
+    buffer<uint64_t, 1> d_thread_cs(nthreads);
     buffer<unsigned char, 1> d_data(data, nbytes);
     buffer<uint64_t, 1> d_crc64_table(crc64_table_1D, 4*256);
     buffer<uint64_t, 1> d_crc64_interleaved_table(crc64_interleaved_table_1D, 4*256);
