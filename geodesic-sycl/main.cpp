@@ -92,7 +92,7 @@ void distance_device(const cl::sycl::float4* VA, float* VC, const size_t N, cons
   for (int n = 0; n < iteration; n++) {
     q.submit([&](handler& cgh) {
         auto accessorA = bufferA.get_access<sycl_read>(cgh);
-        auto accessorC = bufferC.get_access<sycl_write>(cgh);
+        auto accessorC = bufferC.get_access<sycl_discard_write>(cgh);
         cgh.parallel_for<class distance>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
 
             const int wiID = item.get_global_id(0);
