@@ -1640,8 +1640,6 @@ uint64_t crc64_parallel(const void *input, size_t nbytes) {
     hipMalloc((void**)&d_crc64_table, 4*256*sizeof(uint64_t));
     hipMalloc((void**)&d_crc64_interleaved_table, 4*256*sizeof(uint64_t));
 
-    hipMemcpy(d_thread_sz, thread_sz, nthreads * sizeof(size_t), hipMemcpyHostToDevice);
-    hipMemcpy(d_thread_cs, thread_cs, nthreads * sizeof(uint64_t), hipMemcpyHostToDevice);
     hipMemcpy(d_data, data, nbytes , hipMemcpyHostToDevice);
     hipMemcpy(d_crc64_table, crc64_table, 4*256*sizeof(uint64_t) , hipMemcpyHostToDevice);
     hipMemcpy(d_crc64_interleaved_table, crc64_interleaved_table, 

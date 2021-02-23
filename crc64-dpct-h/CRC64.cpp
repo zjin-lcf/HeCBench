@@ -1643,10 +1643,6 @@ uint64_t crc64_parallel(const void *input, size_t nbytes) {
     d_crc64_interleaved_table =
         (uint64_t *)dpct::dpct_malloc(4 * 256 * sizeof(uint64_t));
 
-    dpct::dpct_memcpy(d_thread_sz, thread_sz, nthreads * sizeof(size_t),
-                      dpct::host_to_device);
-    dpct::dpct_memcpy(d_thread_cs, thread_cs, nthreads * sizeof(uint64_t),
-                      dpct::host_to_device);
     dpct::dpct_memcpy(d_data, data, nbytes, dpct::host_to_device);
     dpct::dpct_memcpy(d_crc64_table, crc64_table, 4 * 256 * sizeof(uint64_t),
                       dpct::host_to_device);
