@@ -41,9 +41,9 @@
 #define LINE "--------------------" // A line for fancy output
 
 // Function definitions
-void initial_value(cl::sycl::queue &queue, const unsigned int n, const double dx, const double length, cl::sycl::buffer<double,1>& u);
-void zero(cl::sycl::queue &queue, const unsigned int n, cl::sycl::buffer<double,1>& u);
-void solve(cl::sycl::queue &queue, const unsigned int n, const double alpha, const double dx, const double dt, cl::sycl::buffer<double,1>& u, cl::sycl::buffer<double,1>& u_tmp);
+void initial_value(cl::sycl::queue &q, const unsigned int n, const double dx, const double length, cl::sycl::buffer<double,1>& u);
+void zero(cl::sycl::queue &q, const unsigned int n, cl::sycl::buffer<double,1>& u);
+void solve(cl::sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, cl::sycl::buffer<double,1>& u, cl::sycl::buffer<double,1>& u_tmp);
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const unsigned int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
@@ -92,8 +92,12 @@ int main(int argc, char *argv[]) {
   // Stability requires that dt/(dx^2) <= 0.5,
   double r = alpha * dt / (dx * dx);
 
-  // Initalise SYCL queue on a GPU device
-  cl::sycl::queue queue {cl::sycl::gpu_selector{}};
+#ifdef USE_GPU
+  cl::sycl::gpu_selector dev_sel;
+#else
+  cl::sycl::cpu_selector dev_sel;
+#endif
+  cl::sycl::queue q(dev_sel);
 
   // Print message detailing runtime configuration
   std::cout
@@ -110,7 +114,7 @@ int main(int argc, char *argv[]) {
     << " Steps: " <<  nsteps << std::endl
     << " Total time: " << dt*(double)nsteps << std::endl
     << " Time step: " << dt << std::endl
-    << " SYCL device: " << queue.get_device().get_info<cl::sycl::info::device::name>() << std::endl
+    << " SYCL device: " << q.get_device().get_info<cl::sycl::info::device::name>() << std::endl
     << LINE << std::endl;
 
   // Stability check
@@ -129,7 +133,7 @@ int main(int argc, char *argv[]) {
   const int n_ceil = (n*n+block_size-1) / block_size * block_size;
 
   // Set the initial value of the grid under the MMS scheme
-  queue.submit([&](cl::sycl::handler& cgh) {
+  q.submit([&](cl::sycl::handler& cgh) {
     auto ua = u.get_access<cl::sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class initial_value_kernel>(
 		    cl::sycl::nd_range<1>(
@@ -146,7 +150,7 @@ int main(int argc, char *argv[]) {
     });
   });
 
-  queue.submit([&](cl::sycl::handler& cgh) {
+  q.submit([&](cl::sycl::handler& cgh) {
     auto ua = u_tmp.get_access<cl::sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class zero_kernel>(
 		    cl::sycl::nd_range<1>(
@@ -158,7 +162,7 @@ int main(int argc, char *argv[]) {
   });
 
   // Ensure everything is initalised on the device
-  queue.wait();
+  q.wait();
 
   //
   // Run through timesteps under the explicit scheme
@@ -173,7 +177,7 @@ int main(int argc, char *argv[]) {
     // Call the solve kernel
     // Computes u_tmp at the next timestep
     // given the value of u at the current timestep
-    queue.submit([&](cl::sycl::handler& cgh) {
+    q.submit([&](cl::sycl::handler& cgh) {
       auto u_tmp_acc = u_tmp.get_access<cl::sycl::access::mode::discard_write>(cgh);
       auto u_acc = u.get_access<cl::sycl::access::mode::read>(cgh);
 
@@ -202,15 +206,15 @@ int main(int argc, char *argv[]) {
     u = std::move(u_tmp);
     u_tmp = std::move(tmp);
   }
-  queue.wait();
+  q.wait();
   auto toc = std::chrono::high_resolution_clock::now();
 
   double *u_host = new double[n*n];
-  queue.submit([&](cl::sycl::handler& cgh) {
+  q.submit([&](cl::sycl::handler& cgh) {
       auto u_acc = u.get_access<cl::sycl::access::mode::read>(cgh);
       cgh.copy(u_acc, u_host);
   });
-  queue.wait();
+  q.wait();
 
 
   //
