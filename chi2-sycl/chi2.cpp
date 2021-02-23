@@ -160,7 +160,7 @@ int main(int argc ,char* argv[]) {
 
 	q.submit([&](handler& cgh) {
           auto snpdata = dev_dataT.get_access<sycl_read>(cgh);
-          auto chi_result = results.get_access<sycl_write>(cgh);
+          auto chi_result = results.get_access<sycl_discard_write>(cgh);
           cgh.parallel_for<class chi2>(
             nd_range<1>(range<1>(global_work_size), range<1>(THREADS)), [=] (nd_item<1> item) {
               unsigned char y;
