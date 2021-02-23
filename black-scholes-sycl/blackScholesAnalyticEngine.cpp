@@ -249,7 +249,7 @@ void runBlackScholesAnalyticEngine()
 
                 q.submit([&](handler& cgh) {
                   auto options = optionsGpu.get_access<sycl_read>(cgh);
-                  auto outputVals = outputValsGpu.get_access<sycl_write>(cgh);
+                  auto outputVals = outputValsGpu.get_access<sycl_discard_write>(cgh);
                   cgh.parallel_for<class blackScholesKernel>(
                     nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
                     int optionNum = item.get_global_id(0);

@@ -2,8 +2,8 @@
 //Scott Grauer-Gray
 //Kernels for running black scholes using the analytic engine
 
-#ifndef BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
-#define BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
+#ifndef BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CPP
+#define BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CPP
 
 //declarations for the kernels
 #include "blackScholesAnalyticEngineKernels.h"
@@ -60,7 +60,7 @@ float errorFunct(normalDistStruct normDist, float x)
 	{      
 		if(ax < 3.7252902984e-09) 
 		{ 
-			if (ax < DBL_MIN*16)
+			if (ax < FLT_MIN*16)
 				return 0.125*(8.0*x+ (ERROR_FUNCT_efx8)*x);  /*avoid underflow */
 			return x + (ERROR_FUNCT_efx)*x;
 		}
@@ -210,5 +210,5 @@ float getResultVal(blackCalcStruct blackCalculator)
 }
 
 
-#endif //BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
+#endif //BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CPP
 
