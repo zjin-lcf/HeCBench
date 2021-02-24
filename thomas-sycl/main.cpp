@@ -142,6 +142,7 @@ int main(int argc, char const *argv[])
   buffer<double, 1> l_device (l_Thomas_host, N * M);
   buffer<double, 1> rhs_device (rhs_Thomas_host, N * M);
   d_device.set_final_data(nullptr);
+  u_device.set_final_data(nullptr);
 
   range<1> gws = (N + BlockSize - 1) / BlockSize * BlockSize; 
   range<1> lws = BlockSize;
