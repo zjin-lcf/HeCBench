@@ -69,7 +69,7 @@ int main() {
     }
     q.wait();
     end = clock();
-    double uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
+    uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
     std::cout << "Copy " << size[i] << " btyes from device to host takes " 
       << uS <<  " us" << std::endl;
 
