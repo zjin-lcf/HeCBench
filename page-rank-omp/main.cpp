@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
        #pragma omp target data map(to: pages[0:n*n]) \
 	                       map(to: page_ranks[0:n]) \
                                map(to:noutlinks[0:n]) \
-	                       map(to: diffs[0:n]) \
+	                       map(alloc: diffs[0:n]) \
 	                       map(to: nzeros[0:n]) \
                                map(alloc: maps[0:n*n]) 
 
@@ -182,7 +182,6 @@ int main(int argc, char *argv[]) {
           	for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
           }
           
-           //#pragma omp target map(tofrom: diffs[0:n]) map( 
            #pragma omp target teams distribute parallel for thread_limit(block_size) 
            for (int j = 0; j < n; j++) {
              float new_rank;
@@ -198,7 +197,6 @@ int main(int argc, char *argv[]) {
           max_diff = maximum_dif(diffs, n);
 
 
-          //#pragma omp target map(to: diffs[0:n]) map(from: nzeros[0:n])
           #pragma omp target teams distribute parallel for thread_limit(block_size) 
 		  for (int i = 0; i < n; i++)
 		    diffs[i] = nzeros[i];

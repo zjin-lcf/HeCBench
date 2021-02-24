@@ -216,9 +216,7 @@ int main(int argc, char *argv[]) {
 
   hipMemcpy(d_pages, pages, sizeof(int)*n*n, hipMemcpyHostToDevice);
   hipMemcpy(d_page_ranks, page_ranks, sizeof(float)*n, hipMemcpyHostToDevice);
-  hipMemcpy(d_maps, maps, sizeof(float)*n*n, hipMemcpyHostToDevice);
   hipMemcpy(d_noutlinks, noutlinks, sizeof(unsigned int)*n, hipMemcpyHostToDevice);
-  hipMemcpy(d_diffs, diffs, sizeof(float)*n, hipMemcpyHostToDevice);
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t num_blocks = (n+block_size-1) / block_size;

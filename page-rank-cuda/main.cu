@@ -216,9 +216,7 @@ int main(int argc, char *argv[]) {
 
 	cudaMemcpy(d_pages, pages, sizeof(int)*n*n, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_page_ranks, page_ranks, sizeof(float)*n, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_maps, maps, sizeof(float)*n*n, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_noutlinks, noutlinks, sizeof(unsigned int)*n, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_diffs, diffs, sizeof(float)*n, cudaMemcpyHostToDevice);
 
 	size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
 	size_t num_blocks = (n+block_size-1) / block_size;

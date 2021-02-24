@@ -227,10 +227,8 @@ int main(int argc, char *argv[]) {
  dpct::dpct_memcpy(d_pages, pages, sizeof(int) * n * n, dpct::host_to_device);
  dpct::dpct_memcpy(d_page_ranks, page_ranks, sizeof(float) * n,
                    dpct::host_to_device);
- dpct::dpct_memcpy(d_maps, maps, sizeof(float) * n * n, dpct::host_to_device);
  dpct::dpct_memcpy(d_noutlinks, noutlinks, sizeof(unsigned int) * n,
                    dpct::host_to_device);
- dpct::dpct_memcpy(d_diffs, diffs, sizeof(float) * n, dpct::host_to_device);
 
         size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
 	size_t num_blocks = (n+block_size-1) / block_size;
