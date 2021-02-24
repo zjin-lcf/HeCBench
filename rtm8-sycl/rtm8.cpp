@@ -122,12 +122,13 @@ int main() {
   buffer<float, 1> vsq_d (vsq, ArraySize, props);
   buffer<float, 1> next_s_d (next_s, ArraySize, props);
   buffer<float, 1> next_r_d (next_r, ArraySize, props);
-  next_s_d.set_final_data( nullptr );
-  next_r_d.set_final_data( nullptr );
   buffer<float, 1> current_s_d (current_s, ArraySize, props);
   buffer<float, 1> current_r_d (current_r, ArraySize, props);
   buffer<float, 1> image_d (image_gpu, ArraySize, props);
   buffer<float, 1> a_d (a, 5, props);
+  next_s_d.set_final_data( nullptr );
+  next_r_d.set_final_data( nullptr );
+  image_d.set_final_data( nullptr );
 
   int groupSize = 16;
   int nx_pad = (nx + groupSize - 1) / groupSize * groupSize;
