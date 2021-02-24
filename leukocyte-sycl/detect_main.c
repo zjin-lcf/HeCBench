@@ -135,8 +135,7 @@ int main(int argc, char ** argv) {
 
   buffer<float,1> d_grad_x(host_grad_x, grad_m * grad_n, props);
   buffer<float,1> d_grad_y(host_grad_y, grad_m * grad_n, props);
-  buffer<float,1> d_gicov(host_gicov, grad_m * grad_n);
-  d_gicov.set_final_data(nullptr);
+  buffer<float,1> d_gicov(grad_m * grad_n);
 
 
 #ifdef DEBUG
