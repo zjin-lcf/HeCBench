@@ -89,7 +89,7 @@ void SyclFindNearestNeighbors(
 
     q.submit([&](handler& cgh) {
       auto d_locations_acc = d_locations.get_access<sycl_read>(cgh);
-      auto d_distances_acc = d_distances.get_access<sycl_write>(cgh);
+      auto d_distances_acc = d_distances.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class nn>(nd_range<1>(
         range<1>(globalWorkSize), range<1>(localWorkSize)), [=] (nd_item<1> item) {
         int globalId = item.get_global_id(0);
