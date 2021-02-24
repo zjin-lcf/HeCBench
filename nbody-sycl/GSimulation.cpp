@@ -112,8 +112,9 @@ void GSimulation::Start() {
 #endif
   queue q(dev_sel);
 
-  buffer<Particle, 1> pbuf(particles_.data(), r, {property::buffer::use_host_ptr()});
-  buffer<RealType, 1> ebuf(energy.data(), r, {property::buffer::use_host_ptr()});
+  buffer<Particle, 1> pbuf(particles_.data(), r);
+  buffer<RealType, 1> ebuf(r);
+  pbuf.set_final_data(nullptr);
 
   TimeInterval t0;
   int nsteps = get_nsteps();
@@ -156,7 +157,7 @@ void GSimulation::Start() {
     // Second kernel updates the velocity and position for all particles
     q.submit([&](handler& h) {
        auto p = pbuf.get_access<sycl_read_write>(h);
-       auto e = ebuf.get_access<sycl_read_write>(h);
+       auto e = ebuf.get_access<sycl_discard_read_write>(h);
        h.parallel_for<class update_velocity_position>(r, [=](id<1> i) {
          p[i].vel[0] += p[i].acc[0] * dt;  // 2flops
          p[i].vel[1] += p[i].acc[1] * dt;  // 2flops
@@ -183,7 +184,7 @@ void GSimulation::Start() {
        h.single_task<class accumulate_energy>([=]() {
          for (int i = 1; i < n; i++) e[0] += e[i];
        });
-     });
+    });
 
     q.submit([&](handler& h) {
       auto e = ebuf.get_access<sycl_read>(h, range<1>(1));
@@ -208,7 +209,6 @@ void GSimulation::Start() {
                (elapsed_seconds * elapsed_seconds);
       }
     }
-
   }  // end of the time step loop
   total_time_ = t0.Elapsed();
   total_flops_ = gflops * get_nsteps();
