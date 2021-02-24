@@ -227,9 +227,7 @@ int main(int argc, char *argv[]) {
 
  q_ct1.memcpy(d_pages, pages, sizeof(int) * n * n).wait();
  q_ct1.memcpy(d_page_ranks, page_ranks, sizeof(float) * n).wait();
- q_ct1.memcpy(d_maps, maps, sizeof(float) * n * n).wait();
  q_ct1.memcpy(d_noutlinks, noutlinks, sizeof(unsigned int) * n).wait();
- q_ct1.memcpy(d_diffs, diffs, sizeof(float) * n).wait();
 
         size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
 	size_t num_blocks = (n+block_size-1) / block_size;
