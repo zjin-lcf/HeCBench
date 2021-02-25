@@ -8,7 +8,6 @@
 #include "defs.h"
 
 #include "io.c"
-#include "lapl_ss.c"
 
 double
 stop_watch(double t0) 
@@ -53,40 +52,41 @@ int main(int argc, char *argv[]) {
   printf(" Ly,Lx = %d,%d\n", Ly, Lx);
   printf(" niter = %d\n", niter);
   printf(" input file = %s\n", argv[4]);
+
+  float xdelta = sigma / (1.0+4.0*sigma);
+  float xnorm = 1.0/(1.0+4.0*sigma);
+
   /* Allocate the buffer for the data */
-  float *cpu_arr = (float*) malloc(sizeof(float)*Lx*Ly);
+  float *cpu_in = (float*) malloc(sizeof(float)*Lx*Ly);
+  float *cpu_out = (float*) malloc(sizeof(float)*Lx*Ly);
   /* read file to buffer */
-  read_from_file(cpu_arr, argv[4]);
-  /* allocate super-site buffers */
-  supersite *ssarr[2];
-  posix_memalign((void**)&ssarr[0], 16, sizeof(supersite)*Lx*Ly/4);
-  posix_memalign((void**)&ssarr[1], 16, sizeof(supersite)*Lx*Ly/4);
-  /* convert input array to super-site packed */
-  to_supersite(ssarr[0], cpu_arr);
+  read_from_file(cpu_in, argv[4]);
+
   /* do iterations, record time */
   double t0 = stop_watch(0);
   for(int i=0; i<niter; i++) {
-    lapl_iter_supersite(ssarr[(i+1)%2], sigma, ssarr[i%2]);
+    #pragma omp parallel for collapse(2) 
+    for (int y = 0; y < Ly; y++)
+      for (int x = 0; x < Lx; x++) {
+        int v00 = y*Lx + x;
+        int v0p = y*Lx + (x + 1)%Lx;
+        int v0m = y*Lx + (Lx + x - 1)%Lx;
+        int vp0 = ((y+1)%Ly)*Lx + x;
+        int vm0 = ((Ly+y-1)%Ly)*Lx + x;
+        cpu_out[v00] = xnorm*cpu_in[v00] + xdelta*(cpu_in[v0p] + cpu_in[v0m] + cpu_in[vp0] + cpu_in[vm0]);
+      }
+    float* tmp = cpu_out;
+    cpu_out = cpu_in;
+    cpu_in = tmp;
   }
   t0 = stop_watch(t0)/(double)niter;
   /* write the result after niter iteraions */
-  //char fname[256];
-  /* construct filename */
-  //sprintf(fname, "%s.ss%08d", argv[5], niter);
-  /* convert from super-site packed */
-  from_supersite(cpu_arr, ssarr[niter%2]);
 
-  /* write to file */
-  //write_to_file(fname, arr);
   /* write timing info */
-  printf(" iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
+  printf("Host: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
 	 niter, Lx, Ly, t0*1e6, 
 	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9), 
 	 (Lx*Ly*6.0)/(t0*1.0e9));
-  /* free super-site buffers */
-  for(int i=0; i<2; i++) {
-    free(ssarr[i]);
-  }
   /*
    * GPU part
    */
@@ -96,15 +96,9 @@ int main(int argc, char *argv[]) {
   float *out = (float*) malloc(sizeof(float)*Lx*Ly);
   read_from_file(in, argv[4]);
 
-  int idx = 0;			/* holds the current iteration index */
-  float xdelta = sigma / (1.0+4.0*sigma);
-  float xnorm = 1.0/(1.0+4.0*sigma);
-
-
-
   /* Fixed number of threads per block (in x- and y-direction), number
      of blocks per direction determined by dimensions Lx, Ly */
-#pragma omp target enter data map (to: in[0:Lx*Ly]) map(alloc: out[0:Lx*Ly])
+#pragma omp target data map (tofrom: in[0:Lx*Ly]) map(alloc: out[0:Lx*Ly])
   {
     t0 = stop_watch(0);
     for(int i=0; i<niter; i++) {
@@ -124,7 +118,6 @@ int main(int argc, char *argv[]) {
     }
     t0 = stop_watch(t0)/(double)niter;
   }
-#pragma omp target exit data map (from: in[0:Lx*Ly]) map(delete: out[0:Lx*Ly])
 
 
   printf("Device: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
@@ -133,6 +126,7 @@ int main(int argc, char *argv[]) {
   	 (Lx*Ly*6.0)/(t0*1.0e9));
 
   float *gpu_arr = in;
+  float *cpu_arr = cpu_in;
   // verification
   for (int i = 0; i < Lx*Ly; i++) {
     // choose 1e-2 because the error rate increases with the iteration from 1 to 100000
@@ -145,11 +139,9 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  /* write to file */
-  //write_to_file(fname, arr);
-  /* write timing info */
-  free(cpu_arr);
-  free(gpu_arr);
+  free(cpu_in);
+  free(cpu_out);
+  free(in);
   free(out);
   return 0;
 }
