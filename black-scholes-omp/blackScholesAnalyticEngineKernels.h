@@ -15,8 +15,8 @@
 #include "blackScholesAnalyticEngineStructs.h"
 
 //constants used in this code
-#define M_1_SQRTPI  0.564189583547756286948
-#define M_SQRT_2    0.7071067811865475244008443621048490392848359376887
+#define M_1_SQRTPI  0.564189583547756286948f
+#define M_SQRT_2    0.7071067811865475244008443621048490392848359376887f
 
 
 //device kernel to retrieve the compound factor in interestRate

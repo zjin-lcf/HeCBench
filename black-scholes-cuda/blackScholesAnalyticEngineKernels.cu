@@ -54,14 +54,14 @@ __device__ float errorFunct(normalDistStruct normDist, float x)
 {
   float R,S,P,Q,s,y,z,r, ax;
 
-  ax = fabs(x);
+  ax = fabsf(x);
 
-  if(ax < 0.84375) 
+  if(ax < 0.84375f) 
   {      
-    if(ax < 3.7252902984e-09) 
+    if(ax < 3.7252902984e-09f) 
     { 
-      if (ax < FLT_MIN*16)
-        return 0.125*(8.0*x+ (ERROR_FUNCT_efx8)*x);  /*avoid underflow */
+      if (ax < FLT_MIN*16.0f)
+        return 0.125f*(8.0f*x+ (ERROR_FUNCT_efx8)*x);  /*avoid underflow */
       return x + (ERROR_FUNCT_efx)*x;
     }
     z = x*x;
@@ -70,16 +70,16 @@ __device__ float errorFunct(normalDistStruct normDist, float x)
     y = r/s;
     return x + x*y;
   }
-  if(ax <1.25) 
+  if(ax <1.25f) 
   {      
     s = ax-ERROR_FUNCT_one;
     P = ERROR_FUNCT_pa0+s*(ERROR_FUNCT_pa1+s*(ERROR_FUNCT_pa2+s*(ERROR_FUNCT_pa3+s*(ERROR_FUNCT_pa4+s*(ERROR_FUNCT_pa5+s*ERROR_FUNCT_pa6)))));
     Q = ERROR_FUNCT_one+s*(ERROR_FUNCT_qa1+s*(ERROR_FUNCT_qa2+s*(ERROR_FUNCT_qa3+s*(ERROR_FUNCT_qa4+s*(ERROR_FUNCT_qa5+s*ERROR_FUNCT_qa6)))));
-    if(x>=0) return ERROR_FUNCT_erx + P/Q; else return -1*ERROR_FUNCT_erx - P/Q;
+    if(x>=0.0f) return ERROR_FUNCT_erx + P/Q; else return -1.0f*ERROR_FUNCT_erx - P/Q;
   }
-  if (ax >= 6) 
+  if (ax >= 6.0f) 
   {      
-    if(x>=0) 
+    if(x>=0.0f) 
       return ERROR_FUNCT_one-ERROR_FUNCT_tiny; 
     else 
       return ERROR_FUNCT_tiny-ERROR_FUNCT_one;
@@ -88,7 +88,7 @@ __device__ float errorFunct(normalDistStruct normDist, float x)
   /* Starts to lose accuracy when ax~5 */
   s = ERROR_FUNCT_one/(ax*ax);
 
-  if(ax < 2.85714285714285) { /* |x| < 1/0.35 */
+  if(ax < 2.85714285714285f) { /* |x| < 1/0.35 */
     R = ERROR_FUNCT_ra0+s*(ERROR_FUNCT_ra1+s*(ERROR_FUNCT_ra2+s*(ERROR_FUNCT_ra3+s*(ERROR_FUNCT_ra4+s*(ERROR_FUNCT_ra5+s*(ERROR_FUNCT_ra6+s*ERROR_FUNCT_ra7))))));
     S = ERROR_FUNCT_one+s*(ERROR_FUNCT_sa1+s*(ERROR_FUNCT_sa2+s*(ERROR_FUNCT_sa3+s*(ERROR_FUNCT_sa4+s*(ERROR_FUNCT_sa5+s*(ERROR_FUNCT_sa6+s*(ERROR_FUNCT_sa7+s*ERROR_FUNCT_sa8)))))));
   } else {    /* |x| >= 1/0.35 */
@@ -96,8 +96,8 @@ __device__ float errorFunct(normalDistStruct normDist, float x)
     S=ERROR_FUNCT_one+s*(ERROR_FUNCT_sb1+s*(ERROR_FUNCT_sb2+s*(ERROR_FUNCT_sb3+s*(ERROR_FUNCT_sb4+s*(ERROR_FUNCT_sb5+s*(ERROR_FUNCT_sb6+s*ERROR_FUNCT_sb7))))));
   }
 
-  r = exp( -ax*ax-0.5625 +R/S);
-  if(x>=0) 
+  r = expf( -ax*ax-0.5625f +R/S);
+  if(x>=0.0f) 
     return ERROR_FUNCT_one-r/ax; 
   else 
     return r/ax-ERROR_FUNCT_one;
@@ -109,7 +109,7 @@ __device__ float errorFunct(normalDistStruct normDist, float x)
 __device__ float cumNormDistOp(normalDistStruct normDist, float z)
 {
   z = (z - normDist.average) / normDist.sigma;
-  float result = 0.5 * ( 1.0 + errorFunct(normDist, z*M_SQRT_2 ) );
+  float result = 0.5f * ( 1.0f + errorFunct(normDist, z*M_SQRT_2 ) );
   return result;
 }
 
@@ -121,8 +121,8 @@ __device__ float gaussianFunctNormDist(normalDistStruct normDist, float x)
   float exponent = -(deltax*deltax)/normDist.denominator;
 
   // debian alpha had some strange problem in the very-low range
-  return exponent <= -690.0 ? 0.0 :  // exp(x) < 1.0e-300 anyway
-    normDist.normalizationFactor * exp(exponent);
+  return exponent <= -690.0f ? 0.0f :  // exp(x) < 1.0e-300 anyway
+    normDist.normalizationFactor * expf(exponent);
 }
 
 
@@ -141,14 +141,14 @@ __device__ void initCumNormDist(normalDistStruct& currCumNormDist)
   currCumNormDist.sigma = 1.0f;
   currCumNormDist.normalizationFactor = M_SQRT_2*M_1_SQRTPI/currCumNormDist.sigma;
   currCumNormDist.derNormalizationFactor = currCumNormDist.sigma*currCumNormDist.sigma;
-  currCumNormDist.denominator = 2.0*currCumNormDist.derNormalizationFactor;
+  currCumNormDist.denominator = 2.0f*currCumNormDist.derNormalizationFactor;
 }
 
 
 //device function to initialize variable in the black calculator
 __device__ void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct payoff)
 {
-  blackCalculator.d1 = log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5*blackCalculator.stdDev;
+  blackCalculator.d1 = log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 0.5f*blackCalculator.stdDev;
   blackCalculator.d2 = blackCalculator.d1 - blackCalculator.stdDev;
 
   //initialize the cumulative normal distribution structure
@@ -161,11 +161,11 @@ __device__ void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct
   blackCalculator.n_d2 = cumNormDistDeriv(currCumNormDist, blackCalculator.d2);
 
   blackCalculator.x = payoff.strike;
-  blackCalculator.DxDstrike = 1.0;
+  blackCalculator.DxDstrike = 1.0f;
 
   // the following one will probably disappear as soon as
   // super-share will be properly handled
-  blackCalculator.DxDs = 0.0;
+  blackCalculator.DxDs = 0.0f;
 
   // this part is always executed.
   // in case of plain-vanilla payoffs, it is also the only part
@@ -173,16 +173,16 @@ __device__ void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct
   switch (payoff.type) 
   {
     case CALL:
-      blackCalculator.alpha     =  blackCalculator.cum_d1;//  N(d1)
-      blackCalculator.DalphaDd1 =    blackCalculator.n_d1;//  n(d1)
+      blackCalculator.alpha     = blackCalculator.cum_d1;//  N(d1)
+      blackCalculator.DalphaDd1 = blackCalculator.n_d1;//  n(d1)
       blackCalculator.beta      = -1.0f*blackCalculator.cum_d2;// -N(d2)
       blackCalculator.DbetaDd2  = -1.0f*blackCalculator.n_d2;// -n(d2)
       break;
     case PUT:
-      blackCalculator.alpha     = -1.0+blackCalculator.cum_d1;// -N(-d1)
-      blackCalculator.DalphaDd1 =        blackCalculator.n_d1;//  n( d1)
-      blackCalculator.beta      =  1.0-blackCalculator.cum_d2;//  N(-d2)
-      blackCalculator.DbetaDd2  =     -1.0f* blackCalculator.n_d2;// -n( d2)
+      blackCalculator.alpha     = -1.0f+blackCalculator.cum_d1;// -N(-d1)
+      blackCalculator.DalphaDd1 = blackCalculator.n_d1;//  n( d1)
+      blackCalculator.beta      = 1.0f-blackCalculator.cum_d2;//  N(-d2)
+      blackCalculator.DbetaDd2  = -1.0f* blackCalculator.n_d2;// -n( d2)
       break;
   }
 }
