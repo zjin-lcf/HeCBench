@@ -12,7 +12,7 @@ top_scan (T* isums, const size_t num_work_groups)
   // Decide if this is the last thread that needs to
   // propagate the seed value
   int last_thread = (lid < num_work_groups &&
-      (lid+1) == num_work_groups) ? 1 : 0;
+                    (lid+1) == num_work_groups) ? 1 : 0;
 
   for (int d = 0; d < 16; d++)
   {
@@ -23,7 +23,7 @@ top_scan (T* isums, const size_t num_work_groups)
       val = isums[(num_work_groups * d) + lid];
     }
     // Exclusive scan the counts in local memory
-    //FPTYPE res = scanLocalMem(val, lmem, 1);
+    // T res = scanLocalMem(val, lmem, 1);
     int idx = lid;
     lmem[idx] = 0;
     idx += local_range;
