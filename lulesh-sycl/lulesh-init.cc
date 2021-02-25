@@ -174,7 +174,7 @@ Domain::Domain(Int_t numRanks, Index_t colLoc,
       e(0) = einit;
    }
    //set initial deltatime base on analytic CFL calculation
-   deltatime() = (Real_t(.5)*cbrt(volo(0)))/sqrt(Real_t(2.0)*einit);
+   deltatime() = (Real_t(.5)*CBRT(volo(0)))/SQRT(Real_t(2.0)*einit);
 
 } // End constructor
 
@@ -604,7 +604,7 @@ void InitMeshDecomp(Int_t numRanks, Int_t myRank,
    Int_t myDom;
    
    // Assume cube processor layout for now 
-   testProcs = Int_t(cbrt(Real_t(numRanks))+0.5) ;
+   testProcs = Int_t(CBRT(Real_t(numRanks))+0.5) ;
    if (testProcs*testProcs*testProcs != numRanks) {
       printf("Num processors must be a cube of an integer (1, 8, 27, ...)\n") ;
       exit(-1);
