@@ -13,7 +13,7 @@ DEBUG     = no
 
 program = BlackScholesEngine
 
-source = blackScholesAnalyticEngine.cpp
+source = blackScholesAnalyticEngine.dp.cpp
 
 obj = $(source:.cpp=.o)
 
