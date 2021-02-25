@@ -1,6 +1,7 @@
 VENDOR      = intel
 OPTIMIZE    = yes
 DEBUG       = no
+DUMP      = yes
 DEVICE      = gpu
 
 
@@ -29,6 +30,9 @@ endif
 ifeq ($(DEBUG),yes)
 	CFLAGS += -g  
 	TEST_ON = -DTEST_CHECKSUM 
+endif
+
+ifeq ($(DUMP),yes)
 	OUTPUT  = -DOUTPUT
 endif
 
