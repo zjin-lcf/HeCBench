@@ -8,9 +8,10 @@
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
 #include <math.h>
+#include <float.h>
 
 //needed for the constants in the error function
-#include "errorFunctConsts.h"
+#include "errorFunctConsts.dp.hpp"
 
 //device kernel to retrieve the compound factor in interestRate
 float interestRateCompoundFactorCpu(float t, yieldTermStruct currYieldTermStruct);

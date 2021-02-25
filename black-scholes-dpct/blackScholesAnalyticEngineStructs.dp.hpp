@@ -1,4 +1,3 @@
-#define DPCT_USM_LEVEL_NONE
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
 // blackScholesAnalyticEngineStructs.cuh
@@ -15,33 +14,33 @@
 //define the thread block size
 #define THREAD_BLOCK_SIZE 256
 
-typedef struct dpct_type_c76b16
+typedef struct dpct_type_e73885
 {
 	int day;
 	int month;
 	int year;
 } dateStruct;
 
-typedef struct dpct_type_93b64d
+typedef struct dpct_type_e2fde4
 {
 	int type;
 	float strike;
 } payoffStruct;
 
-typedef struct dpct_type_7ef445
+typedef struct dpct_type_ba4476
 {
 	float typeExercise;
 	float yearFractionTime;
 } exerciseStruct;
 
-typedef struct dpct_type_da6de8
+typedef struct dpct_type_c72968
 {
 	float rate;
 	float freq;
 	int comp;
 } interestRateStruct;
 
-typedef struct dpct_type_3c58a9
+typedef struct dpct_type_29be7b
 {
 	float timeYearFraction;
 	float forward;
@@ -50,14 +49,14 @@ typedef struct dpct_type_3c58a9
 	float intRate;
 } yieldTermStruct;
 
-typedef struct dpct_type_ba1b81
+typedef struct dpct_type_ea05b5
 {
 	float timeYearFraction;
 	float following;
 	float volatility;
 } blackVolStruct;
 
-typedef struct dpct_type_3cbc33
+typedef struct dpct_type_33ad77
 {
 	float x0;
 	yieldTermStruct dividendTS;
@@ -65,7 +64,7 @@ typedef struct dpct_type_3cbc33
 	blackVolStruct blackVolTS;
 } blackScholesMertStruct;
 
-typedef struct dpct_type_7dbaef
+typedef struct dpct_type_b27f46
 {
 	blackScholesMertStruct process;
 	float tGrid;
@@ -75,14 +74,14 @@ typedef struct dpct_type_7dbaef
 	float localVol;
 } engineStruct;
 
-typedef struct dpct_type_1fc019
+typedef struct dpct_type_d86f3c
 {
 	payoffStruct payoff;
 	float yearFractionTime;
 	blackScholesMertStruct pricingEngine;
 } optionStruct;
 
-typedef struct dpct_type_f4d8be
+typedef struct dpct_type_dee375
 {
 	float strike;
 	float forward;
@@ -104,7 +103,7 @@ typedef struct dpct_type_f4d8be
 	float DxDstrike;
 } blackCalcStruct;
 
-typedef struct dpct_type_59b54c
+typedef struct dpct_type_392099
 {
 	float average;
 	float sigma;
@@ -117,7 +116,7 @@ typedef struct dpct_type_59b54c
 #define CALL 0
 #define PUT 1
 
-typedef struct dpct_type_ea93ce
+typedef struct dpct_type_cfbb26
 { 
 	int type;
 	float strike;

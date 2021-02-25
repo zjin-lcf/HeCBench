@@ -5,6 +5,9 @@
 #ifndef BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
 #define BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
 
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
@@ -12,11 +15,11 @@
 #include <algorithm>
 
 //needed for the structs used on the code
-#include "blackScholesAnalyticEngineStructs.h"
+#include "blackScholesAnalyticEngineStructs.dp.hpp"
 
 //constants used in this code
-#define M_1_SQRTPI  0.564189583547756286948
-#define M_SQRT_2    0.7071067811865475244008443621048490392848359376887
+#define M_1_SQRTPI  0.564189583547756286948f
+#define M_SQRT_2    0.7071067811865475244008443621048490392848359376887f
 
 
 //device kernel to retrieve the compound factor in interestRate
@@ -68,6 +71,8 @@ float getResultVal(blackCalcStruct* blackCalculator);
 
 
 //global function to retrieve the output value for an option
-void getOutValOption(optionInputStruct* options, float* outputVals, int numVals);
+SYCL_EXTERNAL void getOutValOption(optionInputStruct *options,
+                                   float *outputVals, int numVals,
+                                   sycl::nd_item<3> item_ct1);
 
 #endif //BLACK_SCHOLES_ANALYTIC_ENGINE_KERNELS_CUH
