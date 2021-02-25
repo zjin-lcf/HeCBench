@@ -43,7 +43,11 @@ while (window < block_stop)
 
   if (i < block_stop) // Make sure we don't read out of bounds
   {
-    val_4 = ((vec4<T>*)in)[i];
+    //val_4 = ((vec4<T>*)in)[i];
+    val_4.x = in[4*i];
+    val_4.y = in[4*i+1];
+    val_4.z = in[4*i+2];
+    val_4.w = in[4*i+3];
 
     // Mask the keys to get the appropriate digit
     key_4.x = (val_4.x >> shift) & 0xFU;
