@@ -26,7 +26,6 @@ typedef int    Int_t ;   // integer representation
 
 enum { VolumeError = -1, QStopError = -2 } ;
 
-#pragma omp declare target
 inline real4  SQRT(real4  arg) { return sqrtf(arg) ; }
 inline real8  SQRT(real8  arg) { return sqrt(arg) ; }
 inline real10 SQRT(real10 arg) { return sqrtl(arg) ; }
@@ -38,7 +37,6 @@ inline real10 CBRT(real10 arg) { return cbrtl(arg) ; }
 inline real4  FABS(real4  arg) { return fabsf(arg) ; }
 inline real8  FABS(real8  arg) { return fabs(arg) ; }
 inline real10 FABS(real10 arg) { return fabsl(arg) ; }
-#pragma omp end declare target
 
 
 // Stuff needed for boundary conditions
