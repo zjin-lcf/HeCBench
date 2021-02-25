@@ -75,8 +75,8 @@ cpp_src = \
   $(DMND_PATH)/src/dp/banded_sw.cpp \
   $(DMND_PATH)/src/data/sorted_list.cpp \
   $(DMND_PATH)/src/data/seed_set.cpp \
-  $(DMND_PATH)/src/util/binary_file.cpp \
   $(DMND_PATH)/src/util/simd.cpp \
+  $(DMND_PATH)/src/util/binary_file.cpp \
   $(DMND_PATH)/src/output/taxon_format.cpp \
   $(DMND_PATH)/src/output/view.cpp \
   $(DMND_PATH)/src/output/output_sink.cpp \
@@ -84,7 +84,7 @@ cpp_src = \
 
 cuda_src = ./masking.cu
 
-obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(cuda_src: .cu=.o) 
+obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(cuda_src:.cu=.o) 
 
 #===============================================================================
 # Sets Flags
