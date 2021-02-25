@@ -9,7 +9,7 @@ for (int gid = 0; gid < global[0]; gid++) {
 
     int Bstart = Astart + nrElems/2;
     //global float4 *resStart;
-    auto resStart= &(d_resultList[Astart]);
+    float4* resStart= &(d_resultList[Astart]);
 
     if(Astart < startaddr[division + 1]) {
       if(Bstart >= startaddr[division + 1]){
@@ -26,7 +26,7 @@ for (int gid = 0; gid < global[0]; gid++) {
         a = d_origList[Astart + aidx];
         b = d_origList[Bstart + bidx];
 
-        while(true)
+        while(1)
         {
           /**
            * For some reason, it's faster to do the texture fetches here than
