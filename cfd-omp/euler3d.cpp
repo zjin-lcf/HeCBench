@@ -142,7 +142,7 @@ void dump(float* h_variables, int nel, int nelr){
 }
 
 #pragma omp declare target
-void initialize_buffer(float* d, float val, int number_words)throw(std::string){
+void initialize_buffer(float* d, float val, int number_words) { //throw(std::string){
 #pragma omp target teams distribute parallel for thread_limit(256)
   for (int i = 0; i < number_words; i++) { 
     d[i] = val;
@@ -152,7 +152,7 @@ void initialize_buffer(float* d, float val, int number_words)throw(std::string){
 
 
 #pragma omp declare target
-void initialize_variables(int nelr, float* variables, float* ff_variable) throw(std::string){
+void initialize_variables(int nelr, float* variables, float* ff_variable)  { //throw(std::string){
 
 #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE_1)
   for (int i = 0; i < nelr; i++)
