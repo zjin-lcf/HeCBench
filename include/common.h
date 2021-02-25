@@ -11,4 +11,7 @@ constexpr access::mode sycl_discard_read_write = access::mode::discard_read_writ
 constexpr access::mode sycl_discard_write = access::mode::discard_write;
 constexpr access::mode sycl_atomic     = access::mode::atomic;
 
+constexpr access::target sycl_cmem     = access::target::constant_buffer;
+constexpr access::target sycl_gmem     = access::target::global_buffer;
+
 #endif
