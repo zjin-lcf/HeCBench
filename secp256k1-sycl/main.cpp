@@ -1215,12 +1215,12 @@ int main(int argc, char **argv) {
           secp256k1_ge ge[512];
           secp256k1_gej sum;
 
-          secp256k1_ge_from_storage(&ge[0], &prec[0]);
+          secp256k1_ge_from_storage(&ge[0], prec.get_pointer());
           secp256k1_gej_set_ge(&sum, &ge[0]);
           secp256k1_fe z_all = sum.z;
 
           for (uint i=1; i<512; ++i) {
-            secp256k1_ge_from_storage(&ge[i], &prec[i]);
+            secp256k1_ge_from_storage(&ge[i], prec.get_pointer()+i);
             secp256k1_gej_add_ge_var(&sum, &sum, &ge[i], 0);
             secp256k1_fe_mul(&z_all, &z_all, &sum.z);
           }
