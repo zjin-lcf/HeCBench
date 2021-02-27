@@ -679,6 +679,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.69 | 1.22 | 0.9 | 1.39 |
 
 
+| secp256k1 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 |  102 | 102 | 307 |
+| host timing(s) | 11.2 | 11.5 | 11.4 | 16.3 |
+| device timing(s) | 5.43 | 5.43 | 5.24 | 12.3 |
+
+
 | shuffle | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 909 | 910 | 910 | NA |
@@ -1457,6 +1464,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.79 | 1.28 | 0.93 | 2.6 |
 
 
+| secp256k1 | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 101 |  102 | 102 | 307 |
+| host timing(s) | 5.7 | 5.82 | 5.83 | 21.7 |
+| device timing(s) | 3.56 | 3.58 | 3.46 | 17.9 |
+
+
 | shuffle | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 909 | 910 | 910 | NA |
@@ -1872,6 +1886,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+
+### secp256k1
+  Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
 ### shuffle
   shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
