@@ -1562,6 +1562,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 3.8 | 3.3 | 3.8 | 96 |
 
 
+| vmc | SYCL | DPCT usm | DPCT header | OpenMP |
+| --- | --- | --- | --- | --- |
+| total enqueue | 1104 | 1104 | 1104 | NA | 
+| host timing(s) | 235.9 | 238.1 | 236.8 | NA |
+| device timing(s) | 234.3 | 236.5 | 234.9 | NA |
+
+
 | xsbench | SYCL | DPCT usm | DPCT header | OpenMP |
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 9 | 9 | 26 |
@@ -1910,6 +1917,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### triad
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+
+### vmc
+  Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
