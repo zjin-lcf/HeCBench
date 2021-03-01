@@ -1,0 +1,63 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = nvcc
+OPTIMIZE  = yes
+DEBUG     = no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+VPATH = ../boxfilter-sycl
+
+program = main
+
+source = main.cu shrUtils.cpp cmd_arg_reader.cpp reference.cpp
+
+obj = main.o shrUtils.o cmd_arg_reader.o reference.o
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Xcompiler -Wall -I../boxfilter-sycl
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp shrUtils.h cmd_arg_reader.h exception.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o: main.cu shrUtils.h helper_math.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) ../boxfilter-sycl/data/lenaRGB.ppm
+
