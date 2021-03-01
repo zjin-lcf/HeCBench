@@ -130,8 +130,8 @@ void BoxFilterGPU ( queue &q,
     auto uiDest = cmBufOut.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class col_kernel>(nd_range<1>(col_gws, col_lws), [=] (nd_item<1> item) {
       size_t globalPosX = item.get_global_id(0);
-      auto uiInputImage = &uiSource[globalPosX];
-      auto uiOutputImage = &uiDest[globalPosX];
+      auto uiInputImage = uiSource.get_pointer() + globalPosX;
+      auto uiOutputImage = uiDest.get_pointer() + globalPosX;
 
       // do left edge
       float4 f4Sum;
