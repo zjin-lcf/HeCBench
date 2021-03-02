@@ -518,6 +518,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 2.4 | 2.4 | 2.4 | 2.7 |
 
 
+| nms | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 203 | 205 | 205 | NA |
+| host timing(s) | 1.87 | 1.63 | 1.74 | NA | 
+| device timing(s) | 1.51 | 1.05 | 1.12 | NA |
+
+
 | nn | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 2 | 3 | 3 | 13 |
@@ -1844,6 +1851,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### nbody
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
+
+### nms
+  Work-efficient Parallel Non-Maximum Suppression Kernels (https://github.com/hertasecurity/gpu-nms)
 
 ### nn
   Nearest neighbor in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
