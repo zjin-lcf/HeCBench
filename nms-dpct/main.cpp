@@ -146,7 +146,6 @@ int get_upper_limit(int val, int mul)
 int main(int argc, char *argv[]) try {
   dpct::device_ext &dev_ct1 = dpct::get_current_device();
   sycl::queue &q_ct1 = dev_ct1.default_queue();
-  int res;
   int x, y, w;
   float score;
 

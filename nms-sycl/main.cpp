@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
 
   /* Dump detections after having performed the NMS */
   q.submit([&] (handler &cgh) {
-    auto pointsbitmap = d_pointsbitmap.get_access<sycl_write>(cgh);
+    auto pointsbitmap = d_pointsbitmap.get_access<sycl_read>(cgh);
     cgh.copy(pointsbitmap, cpu_pointsbitmap);
   });
   q.wait();
