@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -12,13 +12,11 @@ DEVICE    = gpu
 # Program name & source code list
 #===============================================================================
 
-VPATH = ../boxfilter-sycl
+SPATH = ../boxfilter-sycl
 
 program = main
 
-source = main.cpp shrUtils.cpp cmd_arg_reader.cpp reference.cpp
-
-obj = $(source:.cpp=.o)
+obj = main.o shrUtils.o cmd_arg_reader.o reference.o
 
 #===============================================================================
 # Sets Flags
@@ -43,7 +41,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -55,7 +53,16 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp shrUtils.h cmd_arg_reader.h exception.h
+main.o: main.cpp $(SPATH)/shrUtils.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h $(SPATH)/cmd_arg_reader.h $(SPATH)/exception.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+cmd_arg_reader.o : $(SPATH)/cmd_arg_reader.cpp $(SPATH)/cmd_arg_reader.h $(SPATH)/exception.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+reference.o : $(SPATH)/reference.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

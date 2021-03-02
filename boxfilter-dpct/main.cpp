@@ -9,10 +9,12 @@
  *
  */
 
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <memory>
 #include <iostream>
-#include <hip/hip_runtime.h>
 #include "shrUtils.h"
+#include "helper_math.h"
 
 extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
                           unsigned int uiWidth, unsigned int uiHeight, int r, float fScale );
@@ -28,46 +30,42 @@ inline uint DivUp(const uint a, const uint b){
 
 // Helper function to convert float[4] rgba color to 32-bit unsigned integer
 //*****************************************************************
-__device__
-float4 rgbaUintToFloat4(const unsigned int c)
+
+sycl::float4 rgbaUintToFloat4(const unsigned int c)
 {
-  float4 rgba;
-  rgba.x = c & 0xff;
-  rgba.y = (c >> 8) & 0xff;
-  rgba.z = (c >> 16) & 0xff;
-  rgba.w = (c >> 24) & 0xff;
+  sycl::float4 rgba;
+  rgba.x() = c & 0xff;
+  rgba.y() = (c >> 8) & 0xff;
+  rgba.z() = (c >> 16) & 0xff;
+  rgba.w() = (c >> 24) & 0xff;
   return rgba;
 }
 
 // Inline device function to convert floating point rgba color to 32-bit unsigned integer
 //*****************************************************************
-__device__
-unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
+
+unsigned int rgbaFloat4ToUint(const sycl::float4 rgba, const float fScale)
 {
   unsigned int uiPackedPix = 0U;
-  uiPackedPix |= 0x000000FF & (unsigned int)(rgba.x * fScale);
-  uiPackedPix |= 0x0000FF00 & (((unsigned int)(rgba.y * fScale)) << 8);
-  uiPackedPix |= 0x00FF0000 & (((unsigned int)(rgba.z * fScale)) << 16);
-  uiPackedPix |= 0xFF000000 & (((unsigned int)(rgba.w * fScale)) << 24);
+  uiPackedPix |= 0x000000FF & (unsigned int)(rgba.x() * fScale);
+  uiPackedPix |= 0x0000FF00 & (((unsigned int)(rgba.y() * fScale)) << 8);
+  uiPackedPix |= 0x00FF0000 & (((unsigned int)(rgba.z() * fScale)) << 16);
+  uiPackedPix |= 0xFF000000 & (((unsigned int)(rgba.w() * fScale)) << 24);
   return uiPackedPix;
 }
 
-__global__ void row_kernel (
-    const uchar4* ucSource, 
-    uint* uiDest,
-    const unsigned int uiWidth, 
-    const unsigned int uiHeight,
-    const int iRadius,
-    const int iRadiusAligned, 
-    const float fScale, 
-    const unsigned int uiNumOutputPix)
+void row_kernel(const sycl::uchar4 *ucSource, uint *uiDest,
+                const unsigned int uiWidth, const unsigned int uiHeight,
+                const int iRadius, const int iRadiusAligned, const float fScale,
+                const unsigned int uiNumOutputPix, sycl::nd_item<3> item_ct1,
+                uint8_t *dpct_local)
 {
 
-  HIP_DYNAMIC_SHARED( uchar4, uc4LocalData)
+  auto uc4LocalData = (sycl::uchar4 *)dpct_local;
 
-  int lid = threadIdx.x;
-  int gidx = blockIdx.x;
-  int gidy = blockIdx.y; 
+  int lid = item_ct1.get_local_id(2);
+  int gidx = item_ct1.get_group(2);
+  int gidy = item_ct1.get_group(1);
 
   int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
   int globalPosY = gidy;
@@ -79,25 +77,25 @@ __global__ void row_kernel (
     uc4LocalData[lid] = ucSource[iGlobalOffset];
   }
   else
-    uc4LocalData[lid] = {0, 0, 0, 0}; 
+    uc4LocalData[lid] = {0, 0, 0, 0};
 
-  __syncthreads();
+  item_ct1.barrier();
 
   if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
       (lid < (iRadiusAligned + (int)uiNumOutputPix)))
   {
     // Init summation registers to zero
-    float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
+    sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
 
     // Do summation, using inline function to break up uint value from LMEM into independent RGBA values
     int iOffsetX = lid - iRadius;
     int iLimit = iOffsetX + (2 * iRadius) + 1;
     for(; iOffsetX < iLimit; iOffsetX++)
     {
-      f4Sum.x += uc4LocalData[iOffsetX].x;
-      f4Sum.y += uc4LocalData[iOffsetX].y;
-      f4Sum.z += uc4LocalData[iOffsetX].z;
-      f4Sum.w += uc4LocalData[iOffsetX].w; 
+      f4Sum.x() += uc4LocalData[iOffsetX].x();
+      f4Sum.y() += uc4LocalData[iOffsetX].y();
+      f4Sum.z() += uc4LocalData[iOffsetX].z();
+      f4Sum.w() += uc4LocalData[iOffsetX].w();
     }
 
     // Use inline function to scale and convert registers to packed RGBA values in a uchar4, 
@@ -106,20 +104,24 @@ __global__ void row_kernel (
   }
 }
 
-__global__ void col_kernel (
+void col_kernel (
     const uint* uiSource, 
     uint* uiDest, 
     const unsigned int uiWidth, 
     const unsigned int uiHeight, 
     const int iRadius, 
-    const float fScale)
+    const float fScale,
+    sycl::nd_item<3> item_ct1)
 {
-  size_t globalPosX = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t globalPosX =
+      item_ct1.get_group(2) * item_ct1.get_local_range().get(2) +
+      item_ct1.get_local_id(2);
   const uint* uiInputImage = &uiSource[globalPosX];
   uint* uiOutputImage = &uiDest[globalPosX];
   // do left edge
-  float4 f4Sum;
-  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * float4(iRadius); 
+  sycl::float4 f4Sum;
+  // convert from "const int" to "float4"
+  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * sycl::float4((float)iRadius);
   for (int y = 0; y < iRadius + 1; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
@@ -149,14 +151,12 @@ __global__ void col_kernel (
   }
 }
 
-void BoxFilterGPU (uchar4* cmBufIn,
-    unsigned int* cmBufTmp,
-    unsigned int* cmBufOut,
-    const unsigned int uiWidth, 
-    const unsigned int uiHeight, 
-    const int r, 
-    const float fScale )
+void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
+                  unsigned int *cmBufOut, const unsigned int uiWidth,
+                  const unsigned int uiHeight, const int r, const float fScale)
 {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
   int szMaxWorkgroupSize = 256;
   int iRadiusAligned = ((r + 15)/16) * 16;  // 16
   unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
@@ -164,24 +164,60 @@ void BoxFilterGPU (uchar4* cmBufIn,
     uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
 
   // Set global and local work sizes for row kernel // Workgroup padded left and right
-  dim3 row_grid(DivUp((size_t)uiWidth, (size_t)uiNumOutputPix), uiHeight); 
-  dim3 row_block((size_t)(iRadiusAligned + uiNumOutputPix + r), 1);
+  sycl::range<3> row_grid(1, uiHeight,
+                          DivUp((size_t)uiWidth, (size_t)uiNumOutputPix));
+  sycl::range<3> row_block(1, 1, (size_t)(iRadiusAligned + uiNumOutputPix + r));
 
   // Launch row kernel
-  hipLaunchKernelGGL(row_kernel, dim3(row_grid), dim3(row_block), sizeof(uchar4)*(iRadiusAligned+uiNumOutputPix+r), 0, 
-      cmBufIn, cmBufTmp, uiWidth, uiHeight, iRadius, iRadiusAligned, fScale, uiNumOutputPix);
+  /*
+  DPCT1049:155: The workgroup size passed to the SYCL kernel may exceed the
+  limit. To get the device limit, query info::device::max_work_group_size.
+  Adjust the workgroup size if needed.
+  */
+  q_ct1.submit([&](sycl::handler &cgh) {
+    sycl::accessor<uint8_t, 1, sycl::access::mode::read_write,
+                   sycl::access::target::local>
+        dpct_local_acc_ct1(
+            sycl::range<1>(sizeof(sycl::uchar4) *
+                           (iRadiusAligned + uiNumOutputPix + r)),
+            cgh);
+
+    auto iRadius_ct4 = iRadius;
+
+    cgh.parallel_for(sycl::nd_range<3>(row_grid * row_block, row_block),
+                     [=](sycl::nd_item<3> item_ct1) {
+                       row_kernel(cmBufIn, cmBufTmp, uiWidth, uiHeight,
+                                  iRadius_ct4, iRadiusAligned, fScale,
+                                  uiNumOutputPix, item_ct1,
+                                  dpct_local_acc_ct1.get_pointer());
+                     });
+  });
 
   // Set global and local work sizes for column kernel
-  dim3 col_grid(DivUp((size_t)uiWidth, 64));
-  dim3 col_block(64);
+  sycl::range<3> col_grid(1, 1, DivUp((size_t)uiWidth, 64));
+  sycl::range<3> col_block(1, 1, 64);
 
   // Launch column kernel
-  hipLaunchKernelGGL(col_kernel, dim3(col_grid), dim3(col_block), 0, 0, cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
+  /*
+  DPCT1049:156: The workgroup size passed to the SYCL kernel may exceed the
+  limit. To get the device limit, query info::device::max_work_group_size.
+  Adjust the workgroup size if needed.
+  */
+  q_ct1.submit([&](sycl::handler &cgh) {
+    auto iRadius_ct4 = iRadius;
 
+    cgh.parallel_for(sycl::nd_range<3>(col_grid * col_block, col_block),
+                     [=](sycl::nd_item<3> item_ct1) {
+                       col_kernel(cmBufTmp, cmBufOut, uiWidth, uiHeight,
+                                  iRadius_ct4, fScale, item_ct1);
+                     });
+  });
 }
 
 int main(int argc, char** argv)
 {
+    dpct::device_ext &dev_ct1 = dpct::get_current_device();
+    sycl::queue &q_ct1 = dev_ct1.default_queue();
   unsigned int uiImageWidth = 0;      // Image width
   unsigned int uiImageHeight = 0;     // Image height
   unsigned int* uiInput = NULL;       // Host buffer to hold input image data
@@ -202,22 +238,22 @@ int main(int argc, char** argv)
   uiDevOutput = (unsigned int*)malloc(szBuffBytes);
   uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
-  uchar4* cmDevBufIn;
+  sycl::uchar4 *cmDevBufIn;
   unsigned int* cmDevBufTmp;
   unsigned int* cmDevBufOut;
 
-  hipMalloc((void**)&cmDevBufIn, szBuffBytes);
-  hipMalloc((void**)&cmDevBufTmp, szBuffBytes);
-  hipMalloc((void**)&cmDevBufOut, szBuffBytes);
+  cmDevBufIn = (sycl::uchar4 *)sycl::malloc_device(szBuffBytes, q_ct1);
+  cmDevBufTmp = (unsigned int *)sycl::malloc_device(szBuffBytes, q_ct1);
+  cmDevBufOut = (unsigned int *)sycl::malloc_device(szBuffBytes, q_ct1);
 
-  // Copy input data from host to device 
-  hipMemcpy(cmDevBufIn, uiInput, szBuffBytes, hipMemcpyHostToDevice);
+  // Copy input data from host to device
+  q_ct1.memcpy(cmDevBufIn, uiInput, szBuffBytes).wait();
 
   // Warmup
   BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
       uiImageWidth, uiImageHeight, iRadius, fScale);
 
-  hipDeviceSynchronize();
+  dev_ct1.queues_wait_and_throw();
 
   const int iCycles = 1000;
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
@@ -228,11 +264,11 @@ int main(int argc, char** argv)
   }
 
   // Copy output from device to host
-  hipMemcpy(uiDevOutput, cmDevBufOut, szBuffBytes, hipMemcpyDeviceToHost);
+  q_ct1.memcpy(uiDevOutput, cmDevBufOut, szBuffBytes).wait();
 
-  hipFree(cmDevBufIn);
-  hipFree(cmDevBufTmp);
-  hipFree(cmDevBufOut);
+  sycl::free(cmDevBufIn, q_ct1);
+  sycl::free(cmDevBufTmp, q_ct1);
+  sycl::free(cmDevBufOut, q_ct1);
 
   // Do filtering on the host
   BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, iRadius, fScale);

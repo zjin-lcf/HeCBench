@@ -11,10 +11,9 @@ DEBUG     = no
 # Program name & source code list
 #===============================================================================
 
-VPATH = ../boxfilter-sycl
-program = main
+SPATH = ../boxfilter-sycl
 
-source = main.cu shrUtils.cpp cmd_arg_reader.cpp reference.cpp
+program = main
 
 obj = main.o shrUtils.o cmd_arg_reader.o reference.o
 
@@ -49,10 +48,17 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp shrUtils.h cmd_arg_reader.h exception.h 
+
+main.o: main.cu $(SPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.cu shrUtils.h
+shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h $(SPATH)/cmd_arg_reader.h $(SPATH)/exception.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+cmd_arg_reader.o : $(SPATH)/cmd_arg_reader.cpp $(SPATH)/cmd_arg_reader.h $(SPATH)/exception.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+reference.o : $(SPATH)/reference.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
