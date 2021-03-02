@@ -875,6 +875,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 0.27 | 0.42 | 0.37 | 0.96 |  
 
 
+| boxfilter | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 2004 | 2004 | 2004 | 2016 |
+| host timing(s) | 3.4 | 2.5 | 3.5 | 5.1 | 
+| device timing(s) | 2.5 | 2.22 | 2.3 | 4.6 |  
+
+
 | bsearch | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 80 |  160 |  160 | 308 | 
@@ -1635,6 +1642,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### black-scholes
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+
+### boxfilter
+  Box filtering (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### bsearch
   Classic and vectorizable binary search algorithms (https://www.sciencedirect.com/science/article/abs/pii/S0743731517302836)
