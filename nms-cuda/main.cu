@@ -128,7 +128,6 @@ int get_upper_limit(int val, int mul)
 
 int main(int argc, char *argv[])
 {
-  int res;
   int x, y, w;
   float score;
 
