@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -22,7 +22,7 @@ obj = main.o shrUtils.o cmd_arg_reader.o reference.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I../boxfilter-sycl
+CFLAGS := -std=c++14 -Wall -I../boxfilter-sycl
 
 # Linker Flags
 LDFLAGS = 
@@ -39,7 +39,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -47,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cu $(SPATH)/shrUtils.h 
+main.o: main.cpp $(SPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h $(SPATH)/cmd_arg_reader.h $(SPATH)/exception.h

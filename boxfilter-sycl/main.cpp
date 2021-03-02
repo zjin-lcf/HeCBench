@@ -212,7 +212,7 @@ int main(int argc, char** argv)
                   uiImageWidth, uiImageHeight, iRadius, fScale);
     q.wait();
 
-    const int iCycles = 150;
+    const int iCycles = 1000;
     printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
     for (int i = 0; i < iCycles; i++)
     {
