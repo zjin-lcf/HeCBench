@@ -157,8 +157,8 @@ void BoxFilterGPU (uchar4* cmBufIn,
     const int r, 
     const float fScale )
 {
-  int szMaxWorkgroupSize = 256;
-  int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+  const int szMaxWorkgroupSize = 256;
+  const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
   unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
   if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
     uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
@@ -177,7 +177,6 @@ void BoxFilterGPU (uchar4* cmBufIn,
 
   // Launch column kernel
   hipLaunchKernelGGL(col_kernel, dim3(col_grid), dim3(col_block), 0, 0, cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
-
 }
 
 int main(int argc, char** argv)
