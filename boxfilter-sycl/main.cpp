@@ -60,8 +60,8 @@ void BoxFilterGPU ( queue &q,
                     const unsigned int uiHeight, 
                     const int r, const float fScale )
 {
-    int szMaxWorkgroupSize = 256;
-    int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+    const int szMaxWorkgroupSize = 256;
+    const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
     unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
     if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
       uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
@@ -165,7 +165,6 @@ void BoxFilterGPU ( queue &q,
       }
     });
    });
-
 }
 
 int main(int argc, char** argv)
