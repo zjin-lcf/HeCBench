@@ -157,8 +157,8 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
 {
     dpct::device_ext &dev_ct1 = dpct::get_current_device();
     sycl::queue &q_ct1 = dev_ct1.default_queue();
-  int szMaxWorkgroupSize = 256;
-  int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+  const int szMaxWorkgroupSize = 256;
+  const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
   unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
   if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
     uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
