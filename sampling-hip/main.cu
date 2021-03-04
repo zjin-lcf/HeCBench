@@ -1,7 +1,9 @@
 #include <vector>
 #include <iostream>
+#include <cmath>
 #include <hip/hip_runtime.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "kernels.cu"
 
 struct Dataset {
@@ -30,7 +32,7 @@ int main() {
     {1000, 1000, 2000, 10, 11, 1234ULL}, 
     {2000, 2000, 4000, 10, 11, 1234ULL},
     {4000, 4000, 8000, 10, 11, 1234ULL},
-    {8000, 8000, 16000, 10, 11, 1234ULL},
+    //{8000, 8000, 16000, 10, 11, 1234ULL},
   };
 
   for (auto params : inputs) {

@@ -151,7 +151,7 @@ void kernel_dataset(float* X,
   IdxT nblks;
   IdxT nthreads;
 
-  nthreads = min(256, ncols);
+  nthreads = std::min(256, ncols);
   nblks = nrows_X - len_samples;
   printf("nblks = %d len_samples = %d\n", nblks, len_samples );
 
