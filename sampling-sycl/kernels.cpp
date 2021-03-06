@@ -26,7 +26,7 @@ void kernel_dataset(queue &q,
   IdxT nblks;
   IdxT nthreads;
 
-  nthreads = min(256, ncols);
+  nthreads = std::min(256, ncols);
   nblks = nrows_X - len_samples;
 
   range<1> exact_gws (nblks * nthreads);
