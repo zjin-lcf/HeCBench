@@ -31,7 +31,8 @@ void convolutionRows(
     const unsigned int imageW,
     const unsigned int imageH,
     const unsigned int pitch
-){
+)
+{
     assert ( ROWS_BLOCKDIM_X * ROWS_HALO_STEPS >= KERNEL_RADIUS );
     assert ( imageW % (ROWS_RESULT_STEPS * ROWS_BLOCKDIM_X) == 0 );
     assert ( imageH % ROWS_BLOCKDIM_Y == 0 );
@@ -55,20 +56,20 @@ void convolutionRows(
         const int baseX = (gidX * ROWS_RESULT_STEPS - ROWS_HALO_STEPS) * ROWS_BLOCKDIM_X + lidX;
         const int baseY = gidY * ROWS_BLOCKDIM_Y + lidY;
 
-        src.get_pointer() += baseY * pitch + baseX;
-        dst.get_pointer() += baseY * pitch + baseX;
+        const float* src_new = src.get_pointer() + baseY * pitch + baseX;
+        float* dst_new = dst.get_pointer() + baseY * pitch + baseX;
 
         //Load main data
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src[i * ROWS_BLOCKDIM_X];
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src_new[i * ROWS_BLOCKDIM_X];
 
         //Load left halo
         for(int i = 0; i < ROWS_HALO_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src[i * ROWS_BLOCKDIM_X] : 0;
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
 
         //Load right halo
         for(int i = ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS + ROWS_HALO_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src[i * ROWS_BLOCKDIM_X] : 0;
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
 
         //Compute and store results
         item.barrier(access::fence_space::local_space);
@@ -78,7 +79,7 @@ void convolutionRows(
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
                 sum += kernel[KERNEL_RADIUS - j] * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
 
-            dst[i * ROWS_BLOCKDIM_X] = sum;
+            dst_new[i * ROWS_BLOCKDIM_X] = sum;
         }
       });
     });
@@ -92,7 +93,8 @@ void convolutionColumns(
     const unsigned int imageW,
     const unsigned int imageH,
     const unsigned int pitch
-){
+)
+{
     assert ( COLUMNS_BLOCKDIM_Y * COLUMNS_HALO_STEPS >= KERNEL_RADIUS );
     assert ( imageW % COLUMNS_BLOCKDIM_X == 0 );
     assert ( imageH % (COLUMNS_RESULT_STEPS * COLUMNS_BLOCKDIM_Y) == 0 );
@@ -114,34 +116,35 @@ void convolutionColumns(
         int lidX = item.get_local_id(1); 
         int lidY = item.get_local_id(0); 
 
-      //Offset to the upper halo edge
-      const int baseX = gidX * COLUMNS_BLOCKDIM_X + lidX;
-      const int baseY = (gidY * COLUMNS_RESULT_STEPS - COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + lidY;
-      src.get_pointer() += baseY * pitch + baseX;
-      dst.get_pointer() += baseY * pitch + baseX;
+        //Offset to the upper halo edge
+        const int baseX = gidX * COLUMNS_BLOCKDIM_X + lidX;
+        const int baseY = (gidY * COLUMNS_RESULT_STEPS - COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + lidY;
 
-      //Load main data
-      for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
-          l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src[i * COLUMNS_BLOCKDIM_Y * pitch];
+        const float* src_new = src.get_pointer() + baseY * pitch + baseX;
+        float* dst_new = dst.get_pointer() + baseY * pitch + baseX;
 
-      //Load upper halo
-      for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
-          l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+        //Load main data
+        for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src_new[i * COLUMNS_BLOCKDIM_Y * pitch];
 
-      //Load lower halo
-      for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
-          l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y]  = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+        //Load upper halo
+        for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
 
-      //Compute and store results
-      item.barrier(access::fence_space::local_space);
-      for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++){
-          float sum = 0;
+        //Load lower halo
+        for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y]  = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
 
-          for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
-              sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
+        //Compute and store results
+        item.barrier(access::fence_space::local_space);
+        for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++){
+            float sum = 0;
 
-          dst[i * COLUMNS_BLOCKDIM_Y * pitch] = sum;
-      }
+            for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
+                sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
+
+            dst_new[i * COLUMNS_BLOCKDIM_Y * pitch] = sum;
+        }
       });
     });
 }

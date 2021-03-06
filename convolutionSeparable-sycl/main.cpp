@@ -53,8 +53,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-             );
+        imageW);
 
     convolutionColumns(
         q,
@@ -63,8 +62,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-        );
+        imageW);
 
     const int numIterations = 100;
 
@@ -76,8 +74,7 @@ int main(int argc, char **argv)
           d_Kernel,
           imageW,
           imageH,
-          imageW
-               );
+          imageW);
 
       convolutionColumns(
           q,
@@ -86,8 +83,7 @@ int main(int argc, char **argv)
           d_Kernel,
           imageW,
           imageH,
-          imageW
-          );
+          imageW);
     }
     q.wait();
   }
@@ -99,7 +95,6 @@ int main(int argc, char **argv)
   double sum = 0, delta = 0;
   double L2norm;
   for(unsigned int i = 0; i < imageW * imageH; i++){
-    //printf("%f %f\n", h_OutputCPU[i] , h_OutputGPU[i]);
     delta += (h_OutputCPU[i] - h_OutputGPU[i]) * (h_OutputCPU[i] - h_OutputGPU[i]);
     sum += h_OutputCPU[i] * h_OutputCPU[i];
   }
