@@ -1,10 +1,27 @@
+/*
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <vector>
 #include <iostream>
 #include <cmath>
-#include <hip/hip_runtime.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "kernels.cu"
+#include "kernels.dp.cpp"
 
 struct Dataset {
   int nrows_exact;
@@ -19,6 +36,8 @@ struct Dataset {
 typedef float T;
 
 int main() {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   int i, j, k;
 
   // each row represents a set of parameters for a testcase
@@ -77,30 +96,38 @@ int main() {
     }
 
     T *d_b;
-    hipMalloc((void**)&d_b, sizeof(T) * params.nrows_background * params.ncols);
-    hipMemcpy(d_b, b, sizeof(T) * params.nrows_background * params.ncols, hipMemcpyHostToDevice );
+    d_b = (T *)sycl::malloc_device(
+        sizeof(T) * params.nrows_background * params.ncols, q_ct1);
+    q_ct1.memcpy(d_b, b, sizeof(T) * params.nrows_background * params.ncols)
+        .wait();
 
     T *d_o;
-    hipMalloc((void**)&d_o, sizeof(T) * params.ncols);
-    hipMemcpy(d_o, o, sizeof(T) * params.ncols, hipMemcpyHostToDevice );
+    d_o = sycl::malloc_device<T>(params.ncols, q_ct1);
+    q_ct1.memcpy(d_o, o, sizeof(T) * params.ncols).wait();
 
     int *d_n;
-    hipMalloc((void**)&d_n, sizeof(int) * params.nrows_sampled/2);
-    hipMemcpy(d_n, n, sizeof(int) * params.nrows_sampled/2, hipMemcpyHostToDevice);
+    d_n = (int *)sycl::malloc_device(sizeof(int) * params.nrows_sampled / 2,
+                                     q_ct1);
+    q_ct1.memcpy(d_n, n, sizeof(int) * params.nrows_sampled / 2).wait();
 
     float *d_X;
-    hipMalloc((void**)&d_X, sizeof(float) * nrows_X * params.ncols);
-    hipMemcpy(d_X, X, sizeof(float) * nrows_X * params.ncols, hipMemcpyHostToDevice);
+    d_X = (float *)sycl::malloc_device(sizeof(float) * nrows_X * params.ncols,
+                                       q_ct1);
+    q_ct1.memcpy(d_X, X, sizeof(float) * nrows_X * params.ncols).wait();
 
     T *d_d;
-    hipMalloc((void**)&d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols);
+    d_d = (T *)sycl::malloc_device(
+        sizeof(T) * nrows_X * params.nrows_background * params.ncols, q_ct1);
 
     kernel_dataset(d_X, nrows_X, params.ncols, d_b,
         params.nrows_background, d_d, d_o, d_n,
         params.nrows_sampled, params.max_samples, params.seed);
 
-    hipMemcpy(X, d_X, sizeof(float) * nrows_X * params.ncols, hipMemcpyDeviceToHost);
-    hipMemcpy(d, d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols, hipMemcpyDeviceToHost);
+    q_ct1.memcpy(X, d_X, sizeof(float) * nrows_X * params.ncols).wait();
+    q_ct1
+        .memcpy(d, d_d,
+                sizeof(T) * nrows_X * params.nrows_background * params.ncols)
+        .wait();
 
     // Check the generated part of X by sampling. The first nrows_exact
     // correspond to the exact part generated before, so we just test after that.
@@ -199,11 +226,11 @@ int main() {
     free(X);
     free(n);
     free(d);
-    hipFree(d_o);
-    hipFree(d_b);
-    hipFree(d_X);
-    hipFree(d_n);
-    hipFree(d_d);
+    sycl::free(d_o, q_ct1);
+    sycl::free(d_b, q_ct1);
+    sycl::free(d_X, q_ct1);
+    sycl::free(d_n, q_ct1);
+    sycl::free(d_d, q_ct1);
   }
 
   return 0;

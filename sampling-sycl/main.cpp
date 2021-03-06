@@ -1,6 +1,8 @@
 #include <vector>
 #include <iostream>
+#include <cmath>
 #include <stdlib.h>
+#include <stdio.h>
 #include "common.h"
 #include "kernels.cpp"
 
@@ -21,16 +23,16 @@ int main() {
 
   // each row represents a set of parameters for a testcase
   const std::vector<Dataset> inputs = {
-    //{10, 10, 12, 2, 3, 1234ULL},
-    //{10, 0, 12, 2, 3, 1234ULL},
-    //{100, 50, 200, 10, 10, 1234ULL},
-    //{100, 0, 200, 10, 10, 1234ULL},
-    //{0, 10, 12, 2, 3, 1234ULL},
-    //{0, 50, 200, 10, 10, 1234ULL},
-    //{1000, 1000, 2000, 10, 11, 1234ULL}, 
+    {10, 10, 12, 2, 3, 1234ULL},
+    {10, 0, 12, 2, 3, 1234ULL},
+    {100, 50, 200, 10, 10, 1234ULL},
+    {100, 0, 200, 10, 10, 1234ULL},
+    {0, 10, 12, 2, 3, 1234ULL},
+    {0, 50, 200, 10, 10, 1234ULL},
+    {1000, 1000, 2000, 10, 11, 1234ULL}, 
     {2000, 2000, 4000, 10, 11, 1234ULL},
-    //{4000, 4000, 8000, 10, 11, 1234ULL},
-    //{8000, 8000, 16000, 10, 11, 1234ULL},
+    {4000, 4000, 8000, 10, 11, 1234ULL},
+    //{8000, 8000, 16000, 10, 11, 1234ULL},  
   };
 
 #ifdef USE_GPU

@@ -1,10 +1,28 @@
+/*
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#define DPCT_USM_LEVEL_NONE
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <vector>
 #include <iostream>
 #include <cmath>
-#include <hip/hip_runtime.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "kernels.cu"
+#include "kernels.dp.cpp"
 
 struct Dataset {
   int nrows_exact;
@@ -77,30 +95,39 @@ int main() {
     }
 
     T *d_b;
-    hipMalloc((void**)&d_b, sizeof(T) * params.nrows_background * params.ncols);
-    hipMemcpy(d_b, b, sizeof(T) * params.nrows_background * params.ncols, hipMemcpyHostToDevice );
+    d_b = (T *)dpct::dpct_malloc(sizeof(T) * params.nrows_background *
+                                 params.ncols);
+    dpct::dpct_memcpy(d_b, b,
+                      sizeof(T) * params.nrows_background * params.ncols,
+                      dpct::host_to_device);
 
     T *d_o;
-    hipMalloc((void**)&d_o, sizeof(T) * params.ncols);
-    hipMemcpy(d_o, o, sizeof(T) * params.ncols, hipMemcpyHostToDevice );
+    d_o = (T *)dpct::dpct_malloc(sizeof(T) * params.ncols);
+    dpct::dpct_memcpy(d_o, o, sizeof(T) * params.ncols, dpct::host_to_device);
 
     int *d_n;
-    hipMalloc((void**)&d_n, sizeof(int) * params.nrows_sampled/2);
-    hipMemcpy(d_n, n, sizeof(int) * params.nrows_sampled/2, hipMemcpyHostToDevice);
+    d_n = (int *)dpct::dpct_malloc(sizeof(int) * params.nrows_sampled / 2);
+    dpct::dpct_memcpy(d_n, n, sizeof(int) * params.nrows_sampled / 2,
+                      dpct::host_to_device);
 
     float *d_X;
-    hipMalloc((void**)&d_X, sizeof(float) * nrows_X * params.ncols);
-    hipMemcpy(d_X, X, sizeof(float) * nrows_X * params.ncols, hipMemcpyHostToDevice);
+    d_X = (float *)dpct::dpct_malloc(sizeof(float) * nrows_X * params.ncols);
+    dpct::dpct_memcpy(d_X, X, sizeof(float) * nrows_X * params.ncols,
+                      dpct::host_to_device);
 
     T *d_d;
-    hipMalloc((void**)&d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols);
+    d_d = (T *)dpct::dpct_malloc(sizeof(T) * nrows_X * params.nrows_background *
+                                 params.ncols);
 
     kernel_dataset(d_X, nrows_X, params.ncols, d_b,
         params.nrows_background, d_d, d_o, d_n,
         params.nrows_sampled, params.max_samples, params.seed);
 
-    hipMemcpy(X, d_X, sizeof(float) * nrows_X * params.ncols, hipMemcpyDeviceToHost);
-    hipMemcpy(d, d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols, hipMemcpyDeviceToHost);
+    dpct::dpct_memcpy(X, d_X, sizeof(float) * nrows_X * params.ncols,
+                      dpct::device_to_host);
+    dpct::dpct_memcpy(
+        d, d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols,
+        dpct::device_to_host);
 
     // Check the generated part of X by sampling. The first nrows_exact
     // correspond to the exact part generated before, so we just test after that.
@@ -199,11 +226,11 @@ int main() {
     free(X);
     free(n);
     free(d);
-    hipFree(d_o);
-    hipFree(d_b);
-    hipFree(d_X);
-    hipFree(d_n);
-    hipFree(d_d);
+    dpct::dpct_free(d_o);
+    dpct::dpct_free(d_b);
+    dpct::dpct_free(d_X);
+    dpct::dpct_free(d_n);
+    dpct::dpct_free(d_d);
   }
 
   return 0;
