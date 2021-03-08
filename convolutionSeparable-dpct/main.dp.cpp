@@ -8,13 +8,16 @@
  * is strictly prohibited.
  *
  */
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <stdio.h>
 #include <math.h>
-#include "common.h"
 #include "conv.h"
 
 int main(int argc, char **argv)
 {
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   const unsigned int imageW = 3072;
   const unsigned int imageH = 3072;
 
@@ -31,63 +34,66 @@ int main(int argc, char **argv)
   for(unsigned int i = 0; i < imageW * imageH; i++)
     h_Input[i] = (float)(rand() % 16);
 
-  {
 
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
+  float* d_Kernel;
+  d_Kernel = sycl::malloc_device<float>(KERNEL_LENGTH, q_ct1);
+  q_ct1.memcpy(d_Kernel, h_Kernel, sizeof(float) * KERNEL_LENGTH).wait();
 
-    buffer<float,1> d_Kernel(h_Kernel, KERNEL_LENGTH);
-    buffer<float,1> d_Input(h_Input, imageW * imageH);
-    buffer<float,1> d_Buffer(imageW * imageH);
-    buffer<float,1> d_Output(h_OutputGPU, imageW * imageH);
+  float* d_Input;
+  d_Input =
+      (float *)sycl::malloc_device(sizeof(float) * imageW * imageH, q_ct1);
+  q_ct1.memcpy(d_Input, h_Input, sizeof(float) * imageW * imageH).wait();
 
-    //Just a single run or a warmup iteration
+  float* d_Buffer;
+  d_Buffer =
+      (float *)sycl::malloc_device(sizeof(float) * imageW * imageH, q_ct1);
+
+  float* d_Output;
+  d_Output =
+      (float *)sycl::malloc_device(sizeof(float) * imageW * imageH, q_ct1);
+
+  //Just a single run or a warmup iteration
+  convolutionRows(
+      d_Buffer,
+      d_Input,
+      d_Kernel,
+      imageW,
+      imageH,
+      imageW
+           );
+
+  convolutionColumns(
+      d_Output,
+      d_Buffer,
+      d_Kernel,
+      imageW,
+      imageH,
+      imageW
+      );
+
+  const int numIterations = 100;
+
+  for(int iter = 0; iter < numIterations; iter++){
     convolutionRows(
-        q,
         d_Buffer,
         d_Input,
         d_Kernel,
         imageW,
         imageH,
-        imageW);
+        imageW
+             );
 
     convolutionColumns(
-        q,
         d_Output,
         d_Buffer,
         d_Kernel,
         imageW,
         imageH,
-        imageW);
-
-    const int numIterations = 100;
-
-    for(int iter = 0; iter < numIterations; iter++){
-      convolutionRows(
-          q,
-          d_Buffer,
-          d_Input,
-          d_Kernel,
-          imageW,
-          imageH,
-          imageW);
-
-      convolutionColumns(
-          q,
-          d_Output,
-          d_Buffer,
-          d_Kernel,
-          imageW,
-          imageH,
-          imageW);
-    }
-    q.wait();
+        imageW
+        );
   }
 
+  q_ct1.memcpy(h_OutputGPU, d_Output, sizeof(float) * imageW * imageH).wait();
 
   printf("Comparing against Host/C++ computation...\n"); 
   convolutionRowHost(h_Buffer, h_Input, h_Kernel, imageW, imageH, KERNEL_RADIUS);
@@ -106,6 +112,10 @@ int main(int argc, char **argv)
   free(h_Buffer);
   free(h_Input);
   free(h_Kernel);
+  sycl::free(d_Kernel, q_ct1);
+  sycl::free(d_Input, q_ct1);
+  sycl::free(d_Buffer, q_ct1);
+  sycl::free(d_Output, q_ct1);
 
   if (L2norm < 1e-6)
     printf("PASS\n"); 
