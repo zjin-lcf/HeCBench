@@ -52,7 +52,7 @@ int main(int argc, char **argv)
         imageH,
         imageW);
 
-    const int numIterations = 100;
+    const int numIterations = 0;
 
     for(int iter = 0; iter < numIterations; iter++){
       convolutionRows(
