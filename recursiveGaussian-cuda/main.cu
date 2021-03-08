@@ -98,7 +98,7 @@ __global__ void SimpleRecursiveRGBA(
   for (int Y = 0; Y < iHeight; Y++) 
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
-    float4 yc = xc + (yp - xc) * make_float4(a);   
+    float4 yc = xc + (yp - xc) * make_float4(a, a, a, a);   
     *uiDataOut = rgbaFloat4ToUint(yc);
     yp = yc;
     uiDataIn += iWidth;     // move to next row
@@ -114,7 +114,7 @@ __global__ void SimpleRecursiveRGBA(
   for (int Y = iHeight - 1; Y > -1; Y--) 
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
-    float4 yc = xc + (yp - xc) * make_float4(a);
+    float4 yc = xc + (yp - xc) * make_float4(a, a, a, a);
     *uiDataOut = rgbaFloat4ToUint((rgbaUintToFloat4(*uiDataOut) + yc) * 0.5f);
     yp = yc;
     uiDataIn -= iWidth;   // move to previous row
@@ -152,13 +152,13 @@ __global__ void RecursiveRGBA(
     uiDataOut += X;
 
     // start forward filter pass
-    float4 xp = make_float4(0.0f);  // previous input
-    float4 yp = make_float4(0.0f);  // previous output
-    float4 yb = make_float4(0.0f);  // previous output by 2
+    float4 xp = make_float4(0.0f, 0.0f, 0.0f, 0.0f);  // previous input
+    float4 yp = make_float4(0.0f, 0.0f, 0.0f, 0.0f);  // previous output
+    float4 yb = make_float4(0.0f, 0.0f, 0.0f, 0.0f);  // previous output by 2
 
 #ifdef CLAMP_TO_EDGE
     xp = rgbaUintToFloat4(*uiDataIn); 
-    yb = xp * make_float4(coefp); 
+    yb = xp * make_float4(coefp,coefp,coefp,coefp); 
     yp = yb;
 #endif
 
@@ -179,15 +179,15 @@ __global__ void RecursiveRGBA(
     uiDataOut -= iWidth;
 
     // start reverse filter pass: ensures response is symmetrical
-    float4 xn = make_float4(0.0f);
-    float4 xa = make_float4(0.0f);
-    float4 yn = make_float4(0.0f);
-    float4 ya = make_float4(0.0f);
+    float4 xn = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 xa = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 yn = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 ya = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 
 #ifdef CLAMP_TO_EDGE
     xn = rgbaUintToFloat4(*uiDataIn);
     xa = xn; 
-    yn = xn * make_float4(coefn); 
+    yn = xn * make_float4(coefn,coefn,coefn,coefn); 
     ya = yn;
 #endif
 
