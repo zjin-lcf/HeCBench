@@ -9,9 +9,9 @@
  *
  */
 
-#include "conv.h"
-#include <omp.h>
 #include <cassert>
+#include <omp.h>
+#include "conv.h"
 
 #define ROWS_BLOCKDIM_X       16
 #define COLUMNS_BLOCKDIM_X    16
@@ -52,21 +52,37 @@ void convolutionRows(
         //Offset to the left halo edge
         const int baseX = (gidX * ROWS_RESULT_STEPS - ROWS_HALO_STEPS) * ROWS_BLOCKDIM_X + lidX;
         const int baseY = gidY * ROWS_BLOCKDIM_Y + lidY;
-
+#if 0
         const float* src_new = src + baseY * pitch + baseX;
         float* dst_new = dst + baseY * pitch + baseX;
+#else
+        src += baseY * pitch + baseX;
+        dst += baseY * pitch + baseX;
+#endif
 
         //Load main data
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++)
+#if 0
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src_new[i * ROWS_BLOCKDIM_X];
+#else
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src[i * ROWS_BLOCKDIM_X];
+#endif
 
         //Load left halo
         for(int i = 0; i < ROWS_HALO_STEPS; i++)
+#if 0
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
+#else
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src[i * ROWS_BLOCKDIM_X] : 0;
+#endif
 
         //Load right halo
         for(int i = ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS + ROWS_HALO_STEPS; i++)
+#if 0
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
+#else
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X]  = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src[i * ROWS_BLOCKDIM_X] : 0;
+#endif
 
         //Compute and store results
         #pragma omp barrier
@@ -76,7 +92,11 @@ void convolutionRows(
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
                 sum += kernel[KERNEL_RADIUS - j] * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
 
+#if 0
             dst_new[i * ROWS_BLOCKDIM_X] = sum;
+#else
+            dst[i * ROWS_BLOCKDIM_X] = sum;
+#endif
         }
       }
     }
@@ -112,20 +132,37 @@ void convolutionColumns(
         const int baseX = gidX * COLUMNS_BLOCKDIM_X + lidX;
         const int baseY = (gidY * COLUMNS_RESULT_STEPS - COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + lidY;
 
+#if 0
         const float* src_new = src + baseY * pitch + baseX;
         float* dst_new = dst + baseY * pitch + baseX;
+#else
+        src += baseY * pitch + baseX;
+        dst += baseY * pitch + baseX;
+#endif
 
         //Load main data
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
+#if 0
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src_new[i * COLUMNS_BLOCKDIM_Y * pitch];
+#else
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src[i * COLUMNS_BLOCKDIM_Y * pitch];
+#endif
 
         //Load upper halo
         for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
+#if 0
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+#else
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+#endif
 
         //Load lower halo
         for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
+#if 0
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y]  = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+#else
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y]  = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+#endif
 
         //Compute and store results
         #pragma omp barrier
@@ -135,7 +172,11 @@ void convolutionColumns(
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
                 sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
 
+#if 0
             dst_new[i * COLUMNS_BLOCKDIM_Y * pitch] = sum;
+#else
+            dst[i * COLUMNS_BLOCKDIM_Y * pitch] = sum;
+#endif
         }
       }
     }
