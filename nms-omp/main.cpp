@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,14 +128,14 @@ int main(int argc, char *argv[])
 
   while(!feof(fp))
   {
-     int cnt = fscanf(fp, "%d,%d,%d,%f\n", &x, &y, &w, &score);
+    int cnt = fscanf(fp, "%d,%d,%d,%f\n", &x, &y, &w, &score);
 
-     if (cnt !=4)
-     {
-	printf("Error: Invalid file format in line %d when reading %s\n", ndetections, argv[1]);
-        return -1;
-     }
- 
+    if (cnt !=4)
+    {
+      printf("Error: Invalid file format in line %d when reading %s\n", ndetections, argv[1]);
+      return -1;
+    }
+
     points[ndetections].x = (float) x;       // x coordinate
     points[ndetections].y = (float) y;       // y coordinate
     points[ndetections].z = (float) w;       // window dimensions
@@ -156,60 +156,70 @@ int main(int argc, char *argv[])
   memset(nmsbitmap, 1, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
 
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
-  // generate_nms_bitmap<<<pkgrid, pkthreads>>>(points, nmsbitmap, 0.3f);
   const int limit = get_upper_limit(ndetections, 16);
   const int threads = get_optimal_dim(limit) * get_optimal_dim(limit);
 
 #pragma omp target data map(to: points[0:MAX_DETECTIONS], \
-                                nmsbitmap[0:MAX_DETECTIONS * MAX_DETECTIONS]) \
-                        map(tofrom: pointsbitmap[0:MAX_DETECTIONS])
-{
-  for (int n = 0; n < ITER; n++) {
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(threads)
-    {
-      for (int i = 0; i < limit; i++) {
-        for (int j = 0; j < limit; j++) {
-          if(points[i].w < points[j].w)
-          {
-            float area = (points[j].z + 1.0f) * (points[j].z + 1.0f);
-            float w = fmaxf(0.0f, fminf(points[i].x + points[i].z, points[j].x + points[j].z) - 
-                      fmaxf(points[i].x, points[j].x) + 1.0f);
-            float h = fmaxf(0.0f, fminf(points[i].y + points[i].z, points[j].y + points[j].z) - 
-                      fmaxf(points[i].y, points[j].y) + 1.0f);
-            nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (points[j].z != 0);
+    nmsbitmap[0:MAX_DETECTIONS * MAX_DETECTIONS]) \
+  map(tofrom: pointsbitmap[0:MAX_DETECTIONS])
+  {
+    for (int n = 0; n < ITER; n++) {
+#pragma omp target teams distribute parallel for collapse(2) thread_limit(threads)
+      {
+        for (int i = 0; i < limit; i++) {
+          for (int j = 0; j < limit; j++) {
+            if(points[i].w < points[j].w)
+            {
+              float area = (points[j].z + 1.0f) * (points[j].z + 1.0f);
+              float w = fmaxf(0.0f, fminf(points[i].x + points[i].z, points[j].x + points[j].z) - 
+                  fmaxf(points[i].x, points[j].x) + 1.0f);
+              float h = fmaxf(0.0f, fminf(points[i].y + points[i].z, points[j].y + points[j].z) - 
+                  fmaxf(points[i].y, points[j].y) + 1.0f);
+              nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (points[j].z != 0);
+            }
           }
         }
       }
     }
-  }
 
-  /* Then we perform a reduction for generating a point bitmap vector */
-  // reduce_nms_bitmap<<<pkgrid, pkthreads>>>(nmsbitmap, pointsbitmap, ndetections);
-
-  for (int n = 0; n < ITER; n++) {
-      #pragma omp target teams num_teams(ndetections) thread_limit(MAX_DETECTIONS / N_PARTITIONS)
+    /* Then we perform a reduction for generating a point bitmap vector */
+    for (int n = 0; n < ITER; n++) {
+#pragma omp target teams num_teams(ndetections) thread_limit(MAX_DETECTIONS / N_PARTITIONS)
       {
-        #pragma omp parallel 
-	{
-        int bid = omp_get_team_num();
-        int lid = omp_get_thread_num();
-        int idx = bid * MAX_DETECTIONS + lid;
-
-       #pragma omp atomic update  
-        pointsbitmap[bid] &= nmsbitmap[idx];
-       #pragma omp barrier
-
-        for(int i=0; i<(N_PARTITIONS-1); i++)
+#ifdef BYTE_ATOMIC
+        unsigned char s;
+#else
+        unsigned s;
+#endif
+#pragma omp parallel 
         {
-          idx += MAX_DETECTIONS / N_PARTITIONS;
-          #pragma omp atomic update  
-          pointsbitmap[bid] &= pointsbitmap[bid] && nmsbitmap[idx];
-          #pragma omp barrier
+          int bid = omp_get_team_num();
+          int lid = omp_get_thread_num();
+          int idx = bid * MAX_DETECTIONS + lid;
+
+          if (lid == 0) s = 1;
+#pragma omp barrier
+
+#pragma omp atomic update  
+          s &= 
+#ifndef BYTE_ATOMIC
+            (unsigned int)
+#endif
+            nmsbitmap[idx];
+#pragma omp barrier
+
+          for(int i=0; i<(N_PARTITIONS-1); i++)
+          {
+            idx += MAX_DETECTIONS / N_PARTITIONS;
+#pragma omp atomic update  
+            s &= nmsbitmap[idx];
+#pragma omp barrier
+          }
+          pointsbitmap[bid] = s;
         }
       }
     }
   }
-}
 
 
   fp = fopen(argv[2], "w");
