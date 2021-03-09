@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
-OPTIMIZE  = yes
-DEBUG     = no
-DEVICE    = gpu
+CC          = icpx
+OPTIMIZE    = yes
+DEBUG       = no
+DEVICE      = gpu
+BYTE_ATOMIC = no
 
 #===============================================================================
 # Program name & source code list
@@ -40,8 +41,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(BYTE_ATOMIC),yes)
+  CFLAGS += -DBYTE_ATOMIC
+endif
+
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__ 
 else
   CFLAGS +=-qopenmp
 endif
