@@ -27,7 +27,7 @@ typedef struct { float x; float y; float z; float w; } float4 ;
 
 #define MAX_DETECTIONS  4096
 #define N_PARTITIONS    32
-#define ITER            1
+#define ITER            100
 
 void print_help()
 {
