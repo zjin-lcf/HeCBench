@@ -41,8 +41,8 @@ __global__ void generate_nms_bitmap(const float4* rects, unsigned char* nmsbitma
   if(rects[i].w < rects[j].w)
   {
     float area = (rects[j].z + 1.0f) * (rects[j].z + 1.0f);
-    float w = max(0.0f, min(rects[i].x + rects[i].z, rects[j].x + rects[j].z) - max(rects[i].x, rects[j].x) + 1.0f);
-    float h = max(0.0f, min(rects[i].y + rects[i].z, rects[j].y + rects[j].z) - max(rects[i].y, rects[j].y) + 1.0f);
+    float w = fmaxf(0.0f, fminf(rects[i].x + rects[i].z, rects[j].x + rects[j].z) - fmaxf(rects[i].x, rects[j].x) + 1.0f);
+    float h = fmaxf(0.0f, fminf(rects[i].y + rects[i].z, rects[j].y + rects[j].z) - fmaxf(rects[i].y, rects[j].y) + 1.0f);
     nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < othreshold) && (rects[j].z != 0);
   } 
 }
