@@ -45,14 +45,14 @@ void generate_nms_bitmap(const sycl::float4 *rects, unsigned char *nmsbitmap,
   if (rects[i].w() < rects[j].w())
   {
     float area = (rects[j].z() + 1.0f) * (rects[j].z() + 1.0f);
-    float w = sycl::max(
-        0.0f, (float)(sycl::min((float)(rects[i].x() + rects[i].z()),
+    float w = sycl::fmax(
+        0.0f, (float)(sycl::fmin((float)(rects[i].x() + rects[i].z()),
                                 (float)(rects[j].x() + rects[j].z())) -
-                      sycl::max(rects[i].x(), rects[j].x()) + 1.0f));
-    float h = sycl::max(
-        0.0f, (float)(sycl::min((float)(rects[i].y() + rects[i].z()),
+                      sycl::fmax(rects[i].x(), rects[j].x()) + 1.0f));
+    float h = sycl::fmax(
+        0.0f, (float)(sycl::fmin((float)(rects[i].y() + rects[i].z()),
                                 (float)(rects[j].y() + rects[j].z())) -
-                      sycl::max(rects[i].y(), rects[j].y()) + 1.0f));
+                      sycl::fmax(rects[i].y(), rects[j].y()) + 1.0f));
     nmsbitmap[i * MAX_DETECTIONS + j] =
         (((w * h) / area) < othreshold) && (rects[j].z() != 0);
   } 
