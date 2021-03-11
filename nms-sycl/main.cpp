@@ -193,10 +193,10 @@ int main(int argc, char *argv[])
         if(rects[i].w() < rects[j].w())
         {
           float area = (rects[j].z() + 1.0f) * (rects[j].z() + 1.0f);
-          float w = cl::sycl::max(0.0f, cl::sycl::min(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) - 
-                    cl::sycl::max(rects[i].x(), rects[j].x()) + 1.0f);
-          float h = cl::sycl::max(0.0f, cl::sycl::min(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) - 
-                    cl::sycl::max(rects[i].y(), rects[j].y()) + 1.0f);
+          float w = cl::sycl::fmax(0.0f, cl::sycl::fmin(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) - 
+                    cl::sycl::fmax(rects[i].x(), rects[j].x()) + 1.0f);
+          float h = cl::sycl::fmax(0.0f, cl::sycl::fmin(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) - 
+                    cl::sycl::fmax(rects[i].y(), rects[j].y()) + 1.0f);
           nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (rects[j].z() != 0);
         } 
       });
