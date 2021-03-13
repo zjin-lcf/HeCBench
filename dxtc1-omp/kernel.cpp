@@ -183,9 +183,9 @@ void loadColorBlock( const uint * image,  float4 * colors,  float4 * sums,  int 
 // ////////////////////////////////////////////////////////////////////////////////
 float4 roundAndExpand(float4 v, ushort * w)
 {
-    ushort x = rint(clamp(v.x, 0.0f, 1.0f) * 31.0f);
-    ushort y = rint(clamp(v.y, 0.0f, 1.0f) * 63.0f);
-    ushort z = rint(clamp(v.z, 0.0f, 1.0f) * 31.0f);
+    ushort x = rint(clamp(v.x, 1.0f, 0.0f) * 31.0f);
+    ushort y = rint(clamp(v.y, 1.0f, 0.0f) * 63.0f);
+    ushort z = rint(clamp(v.z, 1.0f, 0.0f) * 31.0f);
 
     *w = ((x << 11) | (y << 5) | z);
     v.x = x * 0.03227752766457f; // approximate integer bit expansion.
