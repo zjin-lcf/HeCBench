@@ -130,8 +130,8 @@ void loadColorBlock(nd_item<1> &item, global_ptr<const unsigned int> image, loca
         // No need to synchronize, 16 < warp size.	
 
         // Sort colors along the best fit line.
-	    colorSums(item, colors, sums);
-	    float4 axis = bestFitLine(item, colors, sums[idx], temp);
+        colorSums(item, colors, sums);
+        float4 axis = bestFitLine(item, colors, sums[idx], temp);
             
         temp[idx] = colors[idx].x() * axis.x() + colors[idx].y() * axis.y() + colors[idx].z() * axis.z();
         
