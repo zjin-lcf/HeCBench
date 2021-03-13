@@ -148,9 +148,9 @@ void loadColorBlock(nd_item<1> &item, global_ptr<const unsigned int> image, loca
 // ////////////////////////////////////////////////////////////////////////////////
 float4 roundAndExpand(float4 v, unsigned short * w)
 {
-    unsigned short x = rint(clamp(v.x(), 0.0f, 1.0f) * 31.0f);
-    unsigned short y = rint(clamp(v.y(), 0.0f, 1.0f) * 63.0f);
-    unsigned short z = rint(clamp(v.z(), 0.0f, 1.0f) * 31.0f);
+    unsigned short x = cl::sycl::rint(cl::sycl::clamp(v.x(), 0.0f, 1.0f) * 31.0f);
+    unsigned short y = cl::sycl::rint(cl::sycl::clamp(v.y(), 0.0f, 1.0f) * 63.0f);
+    unsigned short z = cl::sycl::rint(cl::sycl::clamp(v.z(), 0.0f, 1.0f) * 31.0f);
 
     *w = ((x << 11) | (y << 5) | z);
     v.x() = x * 0.03227752766457f; // approximate integer bit expansion.
