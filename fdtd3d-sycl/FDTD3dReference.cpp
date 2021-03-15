@@ -9,7 +9,6 @@
  *
  */
 
-
 #include "shrUtils.h"
 #include "FDTD3dReference.h"
 

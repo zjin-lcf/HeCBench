@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -14,9 +13,9 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp FDTD3dReference.cpp FDTD3dGPU.cpp shrUtils.cpp cmd_arg_reader.cpp
+source = main.cu FDTD3dReference.cu FDTD3dGPU.cu shrUtils.cu cmd_arg_reader.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
@@ -40,12 +39,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
-endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -53,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp shrUtils.h cmd_arg_reader.h exception.h FDTD3dGPU.h
+%.o: %.cu shrUtils.h cmd_arg_reader.h exception.h FDTD3dGPU.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

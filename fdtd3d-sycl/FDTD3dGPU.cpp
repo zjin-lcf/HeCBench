@@ -11,13 +11,11 @@
 
 #include <iostream>
 #include <algorithm>
-#include <cstring>
-#include <cmath>
-#include <omp.h>
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
+#include "common.h"
 
-bool fdtdGPU(float *output, float *input, const float *coeff, 
+bool fdtdGPU(float *output, const float *input, const float *coeff, 
              const int dimx, const int dimy, const int dimz, const int radius, 
              const int timesteps, const int argc, const char **argv)
 {
@@ -26,57 +24,71 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
     const int         outerDimy  = dimy + 2 * radius;
     const int         outerDimz  = dimz + 2 * radius;
     const size_t      volumeSize = outerDimx * outerDimy * outerDimz;
-    size_t            teamSize[2];
-    size_t            threadSize[2];
+    size_t            globalWorkSize[2];
+    size_t            localWorkSize[2];
 
     // Ensure that the inner data starts on a 128B boundary
     const int padding = (128 / sizeof(float)) - radius;
     const size_t paddedVolumeSize = volumeSize + padding;
 
-    float* bufferOut = (float*) malloc (paddedVolumeSize * sizeof(float));
-    float* bufferIn = (float*) malloc (paddedVolumeSize * sizeof(float));
+#ifdef USE_GPU
+    gpu_selector dev_sel;
+#else
+    cpu_selector dev_sel;
+#endif
+    queue q(dev_sel);
 
-    memcpy(bufferIn + padding, input, volumeSize * sizeof(float));
-    memcpy(bufferOut + padding, input, volumeSize * sizeof(float)); 
+    // Create memory buffer objects
+    buffer<float, 1> bufferOut (paddedVolumeSize);
+    buffer<float, 1> bufferIn (paddedVolumeSize);
+    buffer<float, 1> bufferCoef (coeff, radius+1);
+
 
     // Get the maximum work group size
     size_t userWorkSize = 256;
 
     // Set the work group size
-    threadSize[0] = k_localWorkX;
-    threadSize[1] = userWorkSize / k_localWorkX;
-    teamSize[0] = (unsigned int)ceil((float)dimx / threadSize[0]);
-    teamSize[1] = (unsigned int)ceil((float)dimy / threadSize[1]);
+    localWorkSize[0] = k_localWorkX;
+    localWorkSize[1] = userWorkSize / k_localWorkX;
+    globalWorkSize[0] = localWorkSize[0] * (unsigned int)ceil((float)dimx / localWorkSize[0]);
+    globalWorkSize[1] = localWorkSize[1] * (unsigned int)ceil((float)dimy / localWorkSize[1]);
+    shrLog(" set local work group size to %dx%d\n", localWorkSize[0], localWorkSize[1]);
+    shrLog(" set total work size to %dx%d\n", globalWorkSize[0], globalWorkSize[1]);
+    range<2> gws (globalWorkSize[1], globalWorkSize[0]);
+    range<2> lws (localWorkSize[1], localWorkSize[0]);
 
-    int teamX = teamSize[0];
-    int teamY = teamSize[1];
-    int numTeam = teamX * teamY;
+    // Copy the input to the device input buffer 
+    // offset = padding * 4, bytes = volumeSize * 4
+    q.submit([&] (handler &cgh) {
+      auto in = bufferIn.get_access<sycl_write>(cgh, volumeSize, padding);
+      cgh.copy(input, in);
+    });
 
-    shrLog(" set thread size to %dx%d\n", threadSize[0], threadSize[1]);
-    shrLog(" set team size to %dx%d\n", teamSize[0], teamSize[1]);
-
+    // Copy the input to the device output buffer (actually only need the halo)
+    q.submit([&] (handler &cgh) {
+      auto in = bufferOut.get_access<sycl_write>(cgh, volumeSize, padding);
+      cgh.copy(input, in);
+    });
+      
     // Execute the FDTD
     shrLog(" GPU FDTD loop\n");
-
-#pragma omp target data map(to: bufferIn[0:paddedVolumeSize], \
-                                bufferOut[0:paddedVolumeSize], \
-                                coeff[0:radius+1]) 
-{
-
     for (int it = 0 ; it < timesteps ; it++)
     {
-      #pragma omp target teams num_teams(numTeam) thread_limit(userWorkSize)
-      {
-        float tile [localWorkMaxY + 2*k_radius_default][localWorkMaxX + 2*k_radius_default];
-        #pragma omp parallel 
-	{
+        // Launch the kernel
+      q.submit([&] (handler &cgh) {
+        auto output = bufferOut.get_access<sycl_write>(cgh);
+        auto input = bufferIn.get_access<sycl_read>(cgh);
+        auto coef = bufferCoef.get_access<sycl_read>(cgh);
+        accessor<float, 2, sycl_read_write, access::target::local> tile(
+          {localWorkMaxY + 2*k_radius_default, localWorkMaxX + 2*k_radius_default} , cgh);
+        cgh.parallel_for<class finite_difference>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
           bool valid = true;
-          const int ltidx = omp_get_thread_num() % k_localWorkX;
-          const int ltidy = omp_get_thread_num() / k_localWorkX;
-          const int workx = k_localWorkX;
-          const int worky = userWorkSize / k_localWorkX;
-          const int gtidx = (omp_get_team_num() % teamX) * workx + ltidx;
-          const int gtidy = (omp_get_team_num() / teamX) * worky + ltidy;
+          const int gtidx = item.get_global_id(1);
+          const int gtidy = item.get_global_id(0);
+          const int ltidx = item.get_local_id(1);
+          const int ltidy = item.get_local_id(0);
+          const int workx = item.get_local_range(1);
+          const int worky = item.get_local_range(0);
           
           const int stride_y = dimx + 2 * k_radius_default;
           const int stride_z = stride_y * (dimy + 2 * k_radius_default);
@@ -107,17 +119,17 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
           // Preload the "infront" and "behind" data
           for (int i = k_radius_default - 2 ; i >= 0 ; i--)
           {
-              behind[i] = bufferIn[inputIndex];
+              behind[i] = input[inputIndex];
               inputIndex += stride_z;
           }
 
-          current = bufferIn[inputIndex];
+          current = input[inputIndex];
           outputIndex = inputIndex;
           inputIndex += stride_z;
 
           for (int i = 0 ; i < k_radius_default ; i++)
           {
-              infront[i] = bufferIn[inputIndex];
+              infront[i] = input[inputIndex];
               inputIndex += stride_z;
           }
 
@@ -131,11 +143,11 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
               current = infront[0];
               for (int i = 0 ; i < k_radius_default - 1 ; i++)
                   infront[i] = infront[i + 1];
-              infront[k_radius_default - 1] = bufferIn[inputIndex];
+              infront[k_radius_default - 1] = input[inputIndex];
 
               inputIndex  += stride_z;
               outputIndex += stride_z;
-              #pragma omp barrier
+              item.barrier(access::fence_space::local_space);
 
               // Note that for the work items on the boundary of the problem, the
               // supplied index when reading the halo (below) may wrap to the
@@ -148,41 +160,44 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
               // Halo above & below
               if (ltidy < k_radius_default)
               {
-                  tile[ltidy][tx]                  = bufferIn[outputIndex - k_radius_default * stride_y];
-                  tile[ltidy + worky + k_radius_default][tx] = bufferIn[outputIndex + worky * stride_y];
+                  tile[ltidy][tx]                  = input[outputIndex - k_radius_default * stride_y];
+                  tile[ltidy + worky + k_radius_default][tx] = input[outputIndex + worky * stride_y];
               }
               // Halo left & right
               if (ltidx < k_radius_default)
               {
-                  tile[ty][ltidx]                  = bufferIn[outputIndex - k_radius_default];
-                  tile[ty][ltidx + workx + k_radius_default] = bufferIn[outputIndex + workx];
+                  tile[ty][ltidx]                  = input[outputIndex - k_radius_default];
+                  tile[ty][ltidx + workx + k_radius_default] = input[outputIndex + workx];
               }
               tile[ty][tx] = current;
-              #pragma omp barrier
+              item.barrier(access::fence_space::local_space);
 
               // Compute the output value
-              float value = coeff[0] * current;
+              float value = coef[0] * current;
               for (int i = 1 ; i <= k_radius_default ; i++)
               {
-                  value += coeff[i] * (infront[i-1] + behind[i-1] + tile[ty - i][tx] + 
+                  value += coef[i] * (infront[i-1] + behind[i-1] + tile[ty - i][tx] + 
                            tile[ty + i][tx] + tile[ty][tx - i] + tile[ty][tx + i]);
               }
 
               // Store the output value
-              if (valid) bufferOut[outputIndex] = value;
+              if (valid) output[outputIndex] = value;
           }
-        }
-      }
+        });
+      });
 
       // Toggle the buffers
-      float* tmp = bufferIn;
-      bufferIn = bufferOut;
-      bufferOut = tmp;
+      auto tmp = std::move(bufferIn);
+      bufferIn = std::move(bufferOut);
+      bufferOut = std::move(tmp);
     }
-    #pragma omp target update from (bufferIn[0:paddedVolumeSize])
-}
-    memcpy(output, bufferIn+padding, volumeSize*sizeof(float));
-    free(bufferIn);
-    free(bufferOut);
+
+    // Read the result back, result is in bufferSrc (after final toggle)
+    q.submit([&] (handler &cgh) {
+      auto src = bufferIn.get_access<sycl_read>(cgh, volumeSize, padding);
+      cgh.copy(src, output);
+    });
+    q.wait();
+
     return ok;
 }

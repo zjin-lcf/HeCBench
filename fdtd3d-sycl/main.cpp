@@ -52,6 +52,8 @@ void showHelp(const int argc, const char **argv)
   std::cout << "    " << std::setw(20) << "--dimz=<N>" << "Specify number of elements in z direction (excluding halo)" << std::endl;
   std::cout << "    " << std::setw(20) << "--radius=<N>" << "Specify radius of stencil" << std::endl;
   std::cout << "    " << std::setw(20) << "--timesteps=<N>" << "Specify number of timesteps" << std::endl;
+  std::cout << "    " << std::setw(20) << "--work-group-size=<N>" << "Specify work group size" << std::endl;
+  std::cout << std::endl;
   std::cout << "    " << std::setw(20) << "--noprompt" << "Skip prompt before exit" << std::endl;
   std::cout << std::endl;
 }
@@ -294,5 +296,6 @@ bool runTest(int argc, const char **argv)
     if (host_output) free(host_output);
     if (device_output) free(device_output);
   }
+
   return ok;
 }
