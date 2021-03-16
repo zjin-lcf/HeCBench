@@ -102,10 +102,10 @@ unsigned int N = 1048576;
 // Wrapper for Niederreiter quasirandom number generator kernel
 ///////////////////////////////////////////////////////////////////////////////
 void QuasirandomGeneratorGPU(float* output,
-    const unsigned int* table,
-    const unsigned int seed,
-    const unsigned int N,
-    size_t szWgXDim)
+                             const unsigned int* table,
+                             const unsigned int seed,
+                             const unsigned int N,
+                             const size_t szWgXDim)
 {
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(szWgXDim)
   {
@@ -125,8 +125,8 @@ void QuasirandomGeneratorGPU(float* output,
 // Wrapper for Inverse Cumulative Normal Distribution generator kernel
 ///////////////////////////////////////////////////////////////////////////////
 void InverseCNDGPU(float* output, 
-    const unsigned int pathN,
-    const size_t szWgXDim)
+                   const unsigned int pathN,
+                   const size_t szWgXDim)
 {
   const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
 
