@@ -117,11 +117,6 @@ int main(int argc, char** argv)
     unsigned int* hCellStart = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
     unsigned int* hCellEnd   = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
 
-    memset(hPos, 0, numParticles * 4 * sizeof(float));
-    memset(hVel, 0, numParticles * 4 * sizeof(float));
-    memset(hCellStart, 0, numGridCells * sizeof(unsigned int));
-    memset(hCellEnd,   0, numGridCells * sizeof(unsigned int));
-
     // configure grid
     float jitter = params.particleRadius * 0.01f;
     initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, jitter, numParticles);
@@ -139,12 +134,12 @@ int main(int argc, char** argv)
     buffer<float4, 1> dReorderedVel (numParticles);
     buffer<unsigned int, 1> dHash (numParticles);
     buffer<unsigned int, 1> dIndex (numParticles);
-    buffer<unsigned int, 1> dCellStart (hCellStart, numGridCells);
-    buffer<unsigned int, 1> dCellEnd (hCellEnd, numGridCells);
+    buffer<unsigned int, 1> dCellStart (numGridCells);
+    buffer<unsigned int, 1> dCellEnd (numGridCells);
     dPos.set_final_data(nullptr);
     dVel.set_final_data(nullptr);
     
-    const int iCycles = 1;
+    const int iCycles = 2;
     for (int i = 0; i < iCycles; i++)
     {
       integrateSystem(
@@ -201,13 +196,13 @@ int main(int argc, char** argv)
 
 #ifdef DEBUG
     q.submit([&] (handler &cgh) {
-      auto v = dVel.get_access<sycl_read>(cgh);
-      cgh.copy(v, (float4*)hVel);
+      auto v = dPos.get_access<sycl_read>(cgh);
+      cgh.copy(v, (float4*)hPos);
     });
     q.wait();
     for (unsigned int i = 0; i < numParticles; i++)
       printf("%d %.3f %.3f %3.f %3.f\n", i, 
-        hVel[4*i], hVel[4*i+1], hVel[4*i+2], hVel[4*i+3]);
+        hPos[4*i], hPos[4*i+1], hPos[4*i+2], hPos[4*i+3]);
 #endif
 
 
