@@ -32,6 +32,7 @@
 */
 
 #include <iostream>
+#include <cuda.h>
 #include <stdexcept>
 #include <math.h>
 #include "sobol.h"
@@ -61,8 +62,8 @@ void printHelp(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     // We will generate n_vectors vectors of n_dimensions numbers
-    int n_vectors = atoi(argv[1]);
-    int n_dimensions = atoi(argv[2]);
+    int n_vectors = atoi(argv[1]); //100000;
+    int n_dimensions = atoi(argv[2]); //100;
 
     // Allocate memory for the arrays
     std::cout << "Allocating CPU memory..." << std::endl;
@@ -83,17 +84,26 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "Allocating GPU memory..." << std::endl;
+    unsigned int *d_directions;
+    float        *d_output;
+
+    cudaMalloc((void **)&d_directions, n_dimensions * n_directions * sizeof(unsigned int));
+    cudaMalloc((void **)&d_output, n_vectors * n_dimensions * sizeof(float));
+
     // Initialize the direction numbers (done on the host)
     std::cout << "Initializing direction numbers..." << std::endl;
     initSobolDirectionVectors(n_dimensions, h_directions);
 
     std::cout << "Executing QRNG on GPU..." << std::endl;
 
-#pragma omp target data map(to: h_directions[0:n_dimensions * n_directions]) \
-                        map(from: h_outputGPU[0:n_dimensions * n_vectors])
-{
-    sobolGPU(n_vectors, n_dimensions, h_directions, h_outputGPU);
-}
+    cudaMemcpy(d_directions, h_directions, 
+               n_dimensions * n_directions * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    cudaDeviceSynchronize();
+
+    sobolGPU(n_vectors, n_dimensions, d_directions, d_output);
+
+    cudaMemcpy(h_outputGPU, d_output, n_vectors * n_dimensions * sizeof(float), cudaMemcpyDeviceToHost);
 
     std::cout << std::endl;
     // Execute the QRNG on the host
@@ -158,6 +168,8 @@ int main(int argc, char *argv[])
     delete h_directions;
     delete h_outputCPU;
     delete h_outputGPU;
+    cudaFree(d_directions);
+    cudaFree(d_output);
 
     // Check pass/fail using L1 error
     if (l1error < L1ERROR_TOLERANCE)
