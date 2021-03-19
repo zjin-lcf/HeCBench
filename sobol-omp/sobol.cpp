@@ -61,8 +61,8 @@ void printHelp(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     // We will generate n_vectors vectors of n_dimensions numbers
-    int n_vectors = atoi(argv[1]); //100000;
-    int n_dimensions = atoi(argv[2]); //100;
+    int n_vectors = atoi(argv[1]);
+    int n_dimensions = atoi(argv[2]);
 
     // Allocate memory for the arrays
     std::cout << "Allocating CPU memory..." << std::endl;

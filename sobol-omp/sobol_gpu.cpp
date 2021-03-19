@@ -91,7 +91,7 @@ void sobolGPU(int n_vectors, int n_dimensions,
     size_t numTeam =  dimGrid_x * dimGrid_y;
 
     // Execute GPU kernel
-    for (int i = 0; i < 1; i++) { 
+    for (int i = 0; i < 100; i++) { 
       #pragma omp target teams num_teams(numTeam) thread_limit(threadsperblock)
       {
 	unsigned int v[n_directions];
@@ -99,9 +99,8 @@ void sobolGPU(int n_vectors, int n_dimensions,
 	{
 	  unsigned int teamX = omp_get_team_num() % dimGrid_x;
 	  unsigned int teamY = omp_get_team_num() / dimGrid_x; 
-	  unsigned int tid = omp_get_thread_num();
-	  unsigned int threadSize = omp_get_num_threads();
-	  unsigned int teamSize = omp_get_num_teams();
+	  unsigned int tidX = omp_get_thread_num();
+	  unsigned int threadSizeX = omp_get_num_threads();
 
           dir += n_directions * teamY;
           out += n_vectors * teamY;
@@ -109,9 +108,9 @@ void sobolGPU(int n_vectors, int n_dimensions,
           // Copy the direction numbers for this dimension into shared
           // memory - there are only 32 direction numbers so only the
           // first 32 (n_directions) threads need participate.
-          if (tid < n_directions)
+          if (tidX < n_directions)
           {
-            v[tid] = dir[tid];
+            v[tidX] = dir[tidX];
           }
 
           #pragma omp barrier
@@ -119,8 +118,8 @@ void sobolGPU(int n_vectors, int n_dimensions,
           // Set initial index (i.e. which vector this thread is
           // computing first) and stride (i.e. step to the next vector
           // for this thread)
-          int i0     = teamX * threadSize + tid;
-          int stride = threadSize * teamSize;
+          int i0     = teamX * threadSizeX + tidX;
+          int stride = dimGrid_x * threadSizeX;
 
           // Get the gray code of the index
           // c.f. Numerical Recipes in C, chapter 20
