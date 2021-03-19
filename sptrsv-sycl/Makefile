@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp
+source = main.cpp sptrsv_syncfree.cpp
 
 obj = $(source:.cpp=.o)
 

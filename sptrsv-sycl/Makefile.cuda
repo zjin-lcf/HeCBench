@@ -15,7 +15,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = main.cpp sptrsv_syncfree.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp mmio.h read_mtx.h sptrsv.h sptrsv_syncfree.h tranpose.h
+%.o: %.cpp mmio.h read_mtx.h sptrsv.h tranpose.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
