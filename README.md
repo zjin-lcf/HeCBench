@@ -1968,7 +1968,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Istvan Reguly, Jiya su, John Tramm, Mohammed Alser, Pedro Valero Lara, Piotr Różański, Robert Harrison
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Pedro Valero Lara, Piotr Różański, Robert Harrison, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also uses resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
