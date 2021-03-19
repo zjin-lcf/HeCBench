@@ -1,0 +1,72 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = dpcpp
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = SobolQRNG
+
+source = sobol.cpp sobol_gold.cpp sobol_gpu.cpp sobol_primitives.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -I../include
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) 
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+sobol.o:sobol.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+sobol_gold.o:sobol_gold.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+sobol_gpu.o:sobol_gpu.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+sobol_primitives.o:sobol_primitives.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+run: $(program)
+	./$(program) 1000000 1000
+
+clean:
+	rm -rf $(program) $(obj)
+
