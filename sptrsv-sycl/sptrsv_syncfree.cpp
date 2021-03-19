@@ -1,6 +1,29 @@
 #ifndef _SPTRSV_SYNCFREE_
 #define _SPTRSV_SYNCFREE_
 
+#include "common.h"
+#include "sptrsv.h"
+
+int atomicLoad(nd_item<1> item, const int *addr)
+{
+  const volatile int *vaddr = addr; // volatile to bypass cache
+  //__threadfence(); // for seq_cst loads. Remove for acquire semantics.
+  const int value = *vaddr;
+  // fence to ensure that dependent reads are correctly ordered
+  item.mem_fence(access::fence_space::global_space);
+  return value; 
+}
+
+// addr must be aligned properly.
+void atomicStore(nd_item<1> item, int *addr, int value)
+{
+  volatile int *vaddr = addr; // volatile to bypass cache
+  // fence to ensure that previous non-atomic stores are visible to other threads
+  item.mem_fence(access::fence_space::global_space);
+  *vaddr = value;
+}
+
+
 int sptrsv_syncfree (
     const int           *csrRowPtr,
     const int           *csrColIdx,
@@ -75,14 +98,17 @@ int sptrsv_syncfree (
       cgh.copy(x, acc);
     });
 
-
     q.submit([&] (handler &cgh) {
       auto csrRowPtr = d_csrRowPtr.get_access<sycl_read>(cgh);
       auto csrColIdx = d_csrColIdx.get_access<sycl_read>(cgh);
       auto csrVal = d_csrVal.get_access<sycl_read>(cgh);
       auto b = d_b.get_access<sycl_read>(cgh);
       auto warp_num = d_warp_num.get_access<sycl_read>(cgh);
+#ifdef FROM_OPENCL
       auto get_value = d_get_value.get_access<sycl_atomic>(cgh);
+#else
+      auto get_value = d_get_value.get_access<sycl_read_write>(cgh);
+#endif
       auto x = d_x.get_access<sycl_read_write>(cgh);
 
       accessor<VALUE_TYPE, 1, sycl_read_write, access::target::local> 
@@ -115,7 +141,11 @@ int sptrsv_syncfree (
           while(j<csrRowPtr[i+1])
           {
             col=csrColIdx[j];
+#ifdef FROM_OPENCL
             if(atomic_load(get_value[col])==1)
+#else
+            if(atomicLoad(item, &get_value[col])==1)
+#endif
             {
               left_sum+=csrVal[j]*x[col];
               j++;
@@ -125,8 +155,12 @@ int sptrsv_syncfree (
             {
               xi = (b[i] - left_sum) / csrVal[csrRowPtr[i+1]-1];
               x[i] = xi;
+#ifdef FROM_OPENCL
               item.mem_fence(access::fence_space::global_space);
               get_value[i].store(1);
+#else
+              atomicStore(item, &get_value[i], 1);
+#endif
               j++;
             }
           }
@@ -142,8 +176,11 @@ int sptrsv_syncfree (
           while(j < (csrRowPtr[row+1]-1))
           {
             col=csrColIdx[j];
-            //if(get_value[col]==1)
+#ifdef FROM_OPENCL
             if(atomic_load(get_value[col])==1)
+#else
+            if(atomicLoad(item, &get_value[col])==1)
+#endif
             {
               sum += x[col] * csrVal[j];
               j += WARP_SIZE;
@@ -164,8 +201,12 @@ int sptrsv_syncfree (
           {
             xi = (b[row] - s_left_sum[local_id]) / csrVal[csrRowPtr[row+1]-1];
             x[row]=xi;
+#ifdef FROM_OPENCL
             item.mem_fence(access::fence_space::global_space);
             get_value[row].store(1);
+#else
+            atomicStore(item, &get_value[i], 1);
+#endif
           }
         }
 

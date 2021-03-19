@@ -1,9 +1,7 @@
 #include "sptrsv.h"
-#include "common.h"
 #include "mmio.h"
 #include "tranpose.h"
 #include "read_mtx.h"
-#include "sptrsv_syncfree.h"
 
 int main(int argc, char ** argv)
 {
