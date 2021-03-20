@@ -967,6 +967,13 @@ We may build the [software from source with support for AMD HIP](https://github.
 | device timing(s) | 6.5 | 6.3 | 6.5 | 14.6  |
 
 
+| convolutionSeperable | SYCL | DPCT usm | DPCT header | OpenMP | 
+| --- | --- | --- | --- | --- |
+| total enqueue | 203 | 205  | 205 | 218 |
+| host timing(s) | 9.4 | 9.5 | 9.5 | 10.7 |
+| device timing(s) | 1.8 | 1.77 | 1.76 | 1.44  |
+
+
 | d2q9_bgk | SYCL | DPCT usm | DPCT header | OpenMP | 
 | --- | --- | --- | --- | --- |
 | total enqueue | 80011 | 80021  | 80021 | 640027 |
@@ -1686,14 +1693,26 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
+### convolutionSeperable 
+  Convolution filter of a 2D image with separable kernels (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
 ### d2q9_bgk
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
+
+### dct8x8
+  Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### diamond
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
 ### divergence
   CPU and GPU divergence test (https://github.com/E3SM-Project/divergence_cmdvse)
+
+### dp
+  Dot product (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### dxtc1
+  DXT1 compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### easyWave
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
@@ -1703,6 +1722,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### extrema
   Find local maxima (https://github.com/rapidsai/cusignal/)
+
+### fdtd3d
+  FDTD-3D (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
@@ -1882,6 +1904,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### quicksort
   Quicksort (https://software.intel.com/content/www/us/en/develop/download/code-for-the-parallel-universe-article-gpu-quicksort-from-opencl-to-data-parallel-c.html)
 
+### qrg
+  Quasirandom generator implements Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
 
@@ -1918,6 +1943,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 
 ### snake
   Genome pre-alignment filtering (https://github.com/CMU-SAFARI/SneakySnake)
+
+### sobol
+  Sobol quasi-random generator (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### softmax
   The softmax function (https://github.com/pytorch/glow/tree/master/lib/Backends/OpenCL)
