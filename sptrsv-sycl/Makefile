@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -DVALUE_TYPE=double
+CFLAGS := -std=c++14 -Wall -I../include -DVALUE_TYPE=double -DFROM_OPENCL
 
 # Linker Flags
 LDFLAGS = 
@@ -50,7 +50,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp mmio.h read_mtx.h sptrsv.h sptrsv_syncfree.h tranpose.h
+%.o: %.cpp mmio.h read_mtx.h sptrsv.h tranpose.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
