@@ -145,7 +145,7 @@ void dump(const float *h_variables, const int nel, const int nelr){
 
 void initialize_buffer(queue &q, buffer<float,1> &mem_d, const float val, const int number_words) noexcept(false) {
   q.submit([&] (handler& cgh) {
-      accessor<float,1,sycl_write,sycl_global_buffer>  \
+      accessor<float,1,sycl_discard_write,sycl_global_buffer>  \
       mem_d_acc (mem_d, cgh, range<1>(number_words), id<1>(0)); // add workgroup size
       cgh.fill(mem_d_acc, val);
       });
@@ -157,7 +157,7 @@ void initialize_variables(queue &q, const int nelr, buffer<float,1> &variables, 
   int work_group_size = BLOCK_SIZE_1;
 
   q.submit([&](handler& cgh) {
-      auto variables_acc = variables.get_access<sycl_write>(cgh);
+      auto variables_acc = variables.get_access<sycl_discard_write>(cgh);
       auto ff_variable_acc = ff_variable.get_access<sycl_read>(cgh);
 
       cgh.parallel_for<class init_vars>(
