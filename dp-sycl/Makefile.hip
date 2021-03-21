@@ -17,7 +17,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp
+source = main.cpp shrUtils.cpp    
 
 obj = $(source:.cpp=.o)
 
@@ -54,12 +54,12 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp support/common.h support/timer.h support/verify.h
+%.o: %.cpp shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 67108864
 
