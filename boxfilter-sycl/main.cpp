@@ -19,8 +19,8 @@ void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsig
                     unsigned int uiWidth, unsigned int uiHeight, int r, float fScale );
 
 
-const unsigned int iRadius = 10;                    // initial radius of 2D box filter mask
-const float fScale = 1.0f/(2.0f * iRadius + 1.0f);  // precalculated GV rescaling value
+const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
+const float SCALE = 1.0f/(2.0f * RADIUS + 1.0f);  // precalculated GV rescaling value
 
 inline uint DivUp(const uint a, const uint b){
     return (a % b != 0) ? (a / b + 1) : (a / b);
@@ -58,25 +58,25 @@ void BoxFilterGPU ( queue &q,
                     buffer<unsigned int, 1> &cmBufOut,
                     const unsigned int uiWidth, 
                     const unsigned int uiHeight, 
-                    const int r, const float fScale )
+                    const int iRadius, const float fScale )
 {
     const int szMaxWorkgroupSize = 256;
-    const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+    const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
     unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
-    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
-      uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
+    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
+      uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
     // Set global and local work sizes for row kernel // Workgroup padded left and right
-    range<2> row_gws(uiHeight, (size_t)(iRadiusAligned + uiNumOutputPix + r) * 
+    range<2> row_gws(uiHeight, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius) * 
                                       DivUp((size_t)uiWidth, (size_t)uiNumOutputPix));
-    range<2> row_lws(1, (size_t)(iRadiusAligned + uiNumOutputPix + r));
+    range<2> row_lws(1, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius));
 
     // Launch row kernel
     q.submit([&] (handler &cgh) {
     auto ucSource = cmBufIn.get_access<sycl_read>(cgh);
     auto uiDest = cmBufTmp.get_access<sycl_discard_write>(cgh);
     accessor<cl::sycl::uchar4, 1, sycl_read_write, access::target::local> 
-      uc4LocalData(iRadiusAligned + uiNumOutputPix + r, cgh);
+      uc4LocalData(iRadiusAligned + uiNumOutputPix + iRadius, cgh);
     cgh.parallel_for<class row_kernel>(nd_range<2>(row_gws, row_lws), [=] (nd_item<2> item) {
         int lid = item.get_local_id(1);
         int gidx = item.get_group(1);
@@ -178,7 +178,7 @@ int main(int argc, char** argv)
 
     shrLoadPPM4ub(argv[1], (uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
     printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, iRadius);
+           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
     printf("Using Local Memory for Row Processing\n\n");
 
     size_t szBuff= uiImageWidth * uiImageHeight;
@@ -208,7 +208,7 @@ int main(int argc, char** argv)
 
     // Warmup
     BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-                  uiImageWidth, uiImageHeight, iRadius, fScale);
+                  uiImageWidth, uiImageHeight, RADIUS, SCALE);
     q.wait();
 
     const int iCycles = 1000;
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < iCycles; i++)
     {
         BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-                      uiImageWidth, uiImageHeight, iRadius, fScale);
+                      uiImageWidth, uiImageHeight, RADIUS, SCALE);
     }
 
     // Copy output from device to host
@@ -227,12 +227,12 @@ int main(int argc, char** argv)
     q.wait();
 
     // Do filtering on the host
-    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, iRadius, fScale);
+    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
     // Verification 
     // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
     int error = 0;
-    for (int i = iRadius * uiImageWidth; i < (uiImageHeight-iRadius)*uiImageWidth; i++)
+    for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
     {
       if (uiDevOutput[i] != uiHostOutput[i]) {
         printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
