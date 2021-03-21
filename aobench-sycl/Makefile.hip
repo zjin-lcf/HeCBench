@@ -9,13 +9,6 @@ DEBUG     = no
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
-ROCM_DEVICE_LIB = -nogpulib \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ocml.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_daz_opt_on.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_finite_only_on.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_isa_version_906.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_correctly_rounded_sqrt_on.bc
 
 #===============================================================================
 # Program name & source code list
@@ -34,8 +27,7 @@ obj = $(source:.cpp=.o)
 # Standard Flags
 CFLAGS := -Wall -I../include \
           --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
 LDFLAGS = 

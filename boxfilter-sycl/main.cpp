@@ -29,9 +29,9 @@ inline uint DivUp(const uint a, const uint b){
 
 // Helper function to convert float[4] rgba color to 32-bit unsigned integer
 //*****************************************************************
-float4 rgbaUintToFloat4(const unsigned int c)
+cl::sycl::float4 rgbaUintToFloat4(const unsigned int c)
 {
-    float4 rgba;
+    cl::sycl::float4 rgba;
     rgba.x() = c & 0xff;
     rgba.y() = (c >> 8) & 0xff;
     rgba.z() = (c >> 16) & 0xff;
@@ -41,7 +41,7 @@ float4 rgbaUintToFloat4(const unsigned int c)
 
 // Inline device function to convert floating point rgba color to 32-bit unsigned integer
 //*****************************************************************
-unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
+unsigned int rgbaFloat4ToUint(const cl::sycl::float4 rgba, const float fScale)
 {
     unsigned int uiPackedPix = 0U;
     uiPackedPix |= 0x000000FF & (unsigned int)(rgba.x() * fScale);
@@ -53,7 +53,7 @@ unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
 
 
 void BoxFilterGPU ( queue &q, 
-                    buffer<uchar4, 1> &cmBufIn,
+                    buffer<cl::sycl::uchar4, 1> &cmBufIn,
                     buffer<unsigned int, 1> &cmBufTmp,
                     buffer<unsigned int, 1> &cmBufOut,
                     const unsigned int uiWidth, 
@@ -75,7 +75,7 @@ void BoxFilterGPU ( queue &q,
     q.submit([&] (handler &cgh) {
     auto ucSource = cmBufIn.get_access<sycl_read>(cgh);
     auto uiDest = cmBufTmp.get_access<sycl_discard_write>(cgh);
-    accessor<uchar4, 1, sycl_read_write, access::target::local> 
+    accessor<cl::sycl::uchar4, 1, sycl_read_write, access::target::local> 
       uc4LocalData(iRadiusAligned + uiNumOutputPix + r, cgh);
     cgh.parallel_for<class row_kernel>(nd_range<2>(row_gws, row_lws), [=] (nd_item<2> item) {
         int lid = item.get_local_id(1);
@@ -100,7 +100,7 @@ void BoxFilterGPU ( queue &q,
            (lid < (iRadiusAligned + (int)uiNumOutputPix)))
         {
             // Init summation registers to zero
-            float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
+            cl::sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
 
             // Do summation, using inline function to break up uint value from LMEM into independent RGBA values
             int iOffsetX = lid - iRadius;
@@ -113,7 +113,7 @@ void BoxFilterGPU ( queue &q,
                 f4Sum.w() += uc4LocalData[iOffsetX].w(); 
             }
 
-            // Use inline function to scale and convert registers to packed RGBA values in a uchar4, 
+            // Use inline function to scale and convert registers to packed RGBA values in a cl::sycl::uchar4, 
             // and write back out to GMEM
             uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
         }
@@ -134,8 +134,8 @@ void BoxFilterGPU ( queue &q,
       auto uiOutputImage = uiDest.get_pointer() + globalPosX;
 
       // do left edge
-      float4 f4Sum;
-      f4Sum = rgbaUintToFloat4(uiInputImage[0]) * (float4)(iRadius);
+      cl::sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
+      cl::sycl::float4 f4Sum = rgbaUintToFloat4(uiInputImage[0]) * radius ;
       for (int y = 0; y < iRadius + 1; y++) 
       {
           f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
@@ -196,14 +196,14 @@ int main(int argc, char** argv)
 #endif
     queue q(dev_sel);
 
-    buffer<uchar4, 1> cmDevBufIn(szBuff);
+    buffer<cl::sycl::uchar4, 1> cmDevBufIn(szBuff);
     buffer<unsigned int, 1> cmDevBufTmp(szBuff);
     buffer<unsigned int, 1> cmDevBufOut(szBuff);
 
     // Copy input data from host to device 
     q.submit([&] (handler &cgh) {
       auto input = cmDevBufIn.get_access<sycl_write>(cgh);
-      cgh.copy(uiInput, input);
+      cgh.copy((cl::sycl::uchar4*)uiInput, input);
     });
 
     // Warmup

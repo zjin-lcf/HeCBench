@@ -10,14 +10,13 @@ MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
 
-
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
 program = main
 
-source = main.cpp
+source = main.cpp kernels.cpp DCT8x8_gold.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -28,7 +27,7 @@ obj = $(source:.cpp=.o)
 # Standard Flags
 CFLAGS := -Wall -I../include \
           --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH)
+	  --hipsycl-gpu-arch=$(MARCH) 
 
 # Linker Flags
 LDFLAGS = 
@@ -38,6 +37,7 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -54,7 +54,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp support/common.h support/timer.h support/verify.h
+%.o: %.cpp DCT8x8.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

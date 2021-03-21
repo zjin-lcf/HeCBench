@@ -43,7 +43,7 @@ using namespace std;
 
 #define BLOCK_SIZE 256
 
-void ParallelBitonicSort(int data_gpu[], int n, queue &q) {
+void ParallelBitonicSort(int data_gpu[], int n, cl::sycl::queue &q) {
 
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  cl::sycl::queue q(dev_sel);
 
 
   // Memory allocated for host access only.
