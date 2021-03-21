@@ -43,7 +43,7 @@ void Verify(const float* h_OutputGPU,
       delta += (h_OutputGPU[i * stride + j] - h_OutputCPU[i * stride + j]) * 
                (h_OutputGPU[i * stride + j] - h_OutputCPU[i * stride + j]);
     }
-  L2norm = sqrt(delta / sum);
+  L2norm = std::sqrt(delta / sum);
   printf("Relative L2 norm: %.3e\n\n", L2norm);
   if (L2norm < 1E-6) 
     printf("PASS\n"); 

@@ -9,8 +9,6 @@ DEBUG     = no
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
-ROCM_DEVICE_LIB = -nogpulib \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
 
 #===============================================================================
 # Program name & source code list
@@ -29,8 +27,7 @@ obj = $(source:.cpp=.o)
 # Standard Flags
 CFLAGS := -Wall -I../include \
           --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
 LDFLAGS = 

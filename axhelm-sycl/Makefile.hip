@@ -9,9 +9,6 @@ DEBUG     = no
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
-ROCM_DEVICE_LIB = -nogpulib \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/hip.bc \
 
 #===============================================================================
 # Program name & source code list
@@ -27,8 +24,7 @@ program = axhelm
 CFLAGS := -Wall -I../include \
           -Ddfloat=double -Ddlong=int \
           --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
 LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
