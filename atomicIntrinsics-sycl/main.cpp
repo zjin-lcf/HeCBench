@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 
   for (int i = 0; i < 1; i++) {
     q.submit([&](handler &h) {
-      auto d = dOData.get_access<sycl_write>(h);
+      auto d = dOData.get_access<sycl_discard_write>(h);
       h.copy(gpuData, d);
     });
     q.submit([&](handler &h) {
