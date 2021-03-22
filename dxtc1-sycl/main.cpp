@@ -22,10 +22,11 @@
 #include "block.h"
 #include "shrUtils.h"
 #include "common.h"
-#include "kernel.cpp"
 
 #define ERROR_THRESHOLD 0.02f
 #define NUM_THREADS     64      // Number of threads per work group.
+
+#include "kernel.cpp"
 
 int main(int argc, char** argv) 
 {

@@ -570,8 +570,8 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
     range<1> global_size(nthreads);
 
     q.submit([&](handler &h) {
-      auto d_thread_sz_acc = d_thread_sz.get_access<sycl_write>(h);
-      auto d_thread_cs_acc = d_thread_cs.get_access<sycl_write>(h);
+      auto d_thread_sz_acc = d_thread_sz.get_access<sycl_discard_write>(h);
+      auto d_thread_cs_acc = d_thread_cs.get_access<sycl_discard_write>(h);
       auto d_data_acc = d_data.get_access<sycl_read>(h);
       auto d_crc64_table_acc = d_crc64_table.get_access<sycl_read>(h);
       auto d_crc64_interleaved_table_acc = d_crc64_interleaved_table.get_access<sycl_read>(h);
