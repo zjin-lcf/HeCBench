@@ -17,11 +17,11 @@
 #include "shrUtils.h"
 
 extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                          unsigned int uiWidth, unsigned int uiHeight, int r, float fScale );
+                          unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale );
 
 
-const unsigned int iRadius = 10;                    // initial radius of 2D box filter mask
-const float fScale = 1.0f/(2.0f * iRadius + 1.0f);  // precalculated GV rescaling value
+const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
+const float SCALE = 1.0f/(2.0f * RADIUS + 1.0f);  // precalculated GV rescaling value
 
 inline uint DivUp(const uint a, const uint b){
   return (a % b != 0) ? (a / b + 1) : (a / b);
@@ -120,8 +120,8 @@ void col_kernel (
   uint* uiOutputImage = &uiDest[globalPosX];
   // do left edge
   sycl::float4 f4Sum;
-  // convert from "const int" to "float4"
-  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * sycl::float4((float)iRadius);
+  // convert from "const int" to "float4" 
+  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * (sycl::float4)(iRadius); 
   for (int y = 0; y < iRadius + 1; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
@@ -153,26 +153,28 @@ void col_kernel (
 
 void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
                   unsigned int *cmBufOut, const unsigned int uiWidth,
-                  const unsigned int uiHeight, const int r, const float fScale)
+                  const unsigned int uiHeight, const int iRadius,
+                  const float fScale)
 {
-    dpct::device_ext &dev_ct1 = dpct::get_current_device();
-    sycl::queue &q_ct1 = dev_ct1.default_queue();
+  dpct::device_ext &dev_ct1 = dpct::get_current_device();
+  sycl::queue &q_ct1 = dev_ct1.default_queue();
   const int szMaxWorkgroupSize = 256;
-  const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+  const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
   unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
-  if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
-    uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
+  if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
+    uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
   // Set global and local work sizes for row kernel // Workgroup padded left and right
   sycl::range<3> row_grid(1, uiHeight,
                           DivUp((size_t)uiWidth, (size_t)uiNumOutputPix));
-  sycl::range<3> row_block(1, 1, (size_t)(iRadiusAligned + uiNumOutputPix + r));
+  sycl::range<3> row_block(1, 1,
+                           (size_t)(iRadiusAligned + uiNumOutputPix + iRadius));
 
   // Launch row kernel
   /*
-  DPCT1049:155: The workgroup size passed to the SYCL kernel may exceed the
-  limit. To get the device limit, query info::device::max_work_group_size.
-  Adjust the workgroup size if needed.
+  DPCT1049:0: The workgroup size passed to the SYCL kernel may exceed the limit.
+  To get the device limit, query info::device::max_work_group_size. Adjust the
+  workgroup size if needed.
   */
   {
     std::pair<dpct::buffer_t, size_t> cmBufIn_buf_ct0 =
@@ -186,15 +188,13 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
                      sycl::access::target::local>
           dpct_local_acc_ct1(
               sycl::range<1>(sizeof(sycl::uchar4) *
-                             (iRadiusAligned + uiNumOutputPix + r)),
+                             (iRadiusAligned + uiNumOutputPix + iRadius)),
               cgh);
       auto cmBufIn_acc_ct0 =
           cmBufIn_buf_ct0.first.get_access<sycl::access::mode::read_write>(cgh);
       auto cmBufTmp_acc_ct1 =
           cmBufTmp_buf_ct1.first.get_access<sycl::access::mode::read_write>(
               cgh);
-
-      auto iRadius_ct4 = iRadius;
 
       cgh.parallel_for(
           sycl::nd_range<3>(row_grid * row_block, row_block),
@@ -204,9 +204,9 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
                                        cmBufIn_offset_ct0);
             unsigned int *cmBufTmp_ct1 =
                 (unsigned int *)(&cmBufTmp_acc_ct1[0] + cmBufTmp_offset_ct1);
-            row_kernel(cmBufIn_ct0, cmBufTmp_ct1, uiWidth, uiHeight,
-                       iRadius_ct4, iRadiusAligned, fScale, uiNumOutputPix,
-                       item_ct1, dpct_local_acc_ct1.get_pointer());
+            row_kernel(cmBufIn_ct0, cmBufTmp_ct1, uiWidth, uiHeight, iRadius,
+                       iRadiusAligned, fScale, uiNumOutputPix, item_ct1,
+                       dpct_local_acc_ct1.get_pointer());
           });
     });
   }
@@ -217,9 +217,9 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
 
   // Launch column kernel
   /*
-  DPCT1049:156: The workgroup size passed to the SYCL kernel may exceed the
-  limit. To get the device limit, query info::device::max_work_group_size.
-  Adjust the workgroup size if needed.
+  DPCT1049:1: The workgroup size passed to the SYCL kernel may exceed the limit.
+  To get the device limit, query info::device::max_work_group_size. Adjust the
+  workgroup size if needed.
   */
   {
     std::pair<dpct::buffer_t, size_t> cmBufTmp_buf_ct0 =
@@ -236,8 +236,6 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
           cmBufOut_buf_ct1.first.get_access<sycl::access::mode::read_write>(
               cgh);
 
-      auto iRadius_ct4 = iRadius;
-
       cgh.parallel_for(
           sycl::nd_range<3>(col_grid * col_block, col_block),
           [=](sycl::nd_item<3> item_ct1) {
@@ -245,8 +243,8 @@ void BoxFilterGPU(sycl::uchar4 *cmBufIn, unsigned int *cmBufTmp,
                 (const uint *)(&cmBufTmp_acc_ct0[0] + cmBufTmp_offset_ct0);
             unsigned int *cmBufOut_ct1 =
                 (unsigned int *)(&cmBufOut_acc_ct1[0] + cmBufOut_offset_ct1);
-            col_kernel(cmBufTmp_ct0, cmBufOut_ct1, uiWidth, uiHeight,
-                       iRadius_ct4, fScale, item_ct1);
+            col_kernel(cmBufTmp_ct0, cmBufOut_ct1, uiWidth, uiHeight, iRadius,
+                       fScale, item_ct1);
           });
     });
   }
@@ -263,7 +261,7 @@ int main(int argc, char** argv)
 
   shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
   printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-      uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, iRadius);
+      uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
   printf("Using Local Memory for Row Processing\n\n");
 
   size_t szBuff= uiImageWidth * uiImageHeight;
@@ -287,7 +285,7 @@ int main(int argc, char** argv)
 
   // Warmup
   BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-      uiImageWidth, uiImageHeight, iRadius, fScale);
+      uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
   dpct::get_current_device().queues_wait_and_throw();
 
@@ -296,7 +294,7 @@ int main(int argc, char** argv)
   for (int i = 0; i < iCycles; i++)
   {
     BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-        uiImageWidth, uiImageHeight, iRadius, fScale);
+        uiImageWidth, uiImageHeight, RADIUS, SCALE);
   }
 
   // Copy output from device to host
@@ -308,12 +306,12 @@ int main(int argc, char** argv)
   dpct::dpct_free(cmDevBufOut);
 
   // Do filtering on the host
-  BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, iRadius, fScale);
+  BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
   // Verification 
   // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
   int error = 0;
-  for (int i = iRadius * uiImageWidth; i < (uiImageHeight-iRadius)*uiImageWidth; i++)
+  for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
   {
     if (uiDevOutput[i] != uiHostOutput[i]) {
       printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
