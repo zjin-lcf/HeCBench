@@ -9,10 +9,6 @@
  *
  */
  
-
-#define NUM_THREADS   64      // Number of threads per work group.
-
-
 //MATH functions
 
 // Use power method to find the first eigenvector.
