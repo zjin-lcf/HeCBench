@@ -19,11 +19,11 @@ typedef struct { unsigned char x; unsigned char y; unsigned char z; unsigned cha
 
 extern
 void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int r, float fScale );
+                    unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale );
 
 
-const unsigned int iRadius = 10;                    // initial radius of 2D box filter mask
-const float fScale = 1.0f/(2.0f * iRadius + 1.0f);  // precalculated GV rescaling value
+const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
+const float SCALE = 1.0f/(2.0f * RADIUS + 1.0f);  // precalculated GV rescaling value
 
 inline uint DivUp(uint a, uint b){
     return (a % b != 0) ? (a / b + 1) : (a / b);
@@ -92,19 +92,19 @@ void BoxFilterGPU ( unsigned int *uiInput,
                     unsigned int *uiDevOutput,
                     const unsigned int uiWidth, 
                     const unsigned int uiHeight, 
-                    const int r, const float fScale )
+                    const int iRadius, const float fScale )
 {
     const int szMaxWorkgroupSize = 256;
-    const int iRadiusAligned = ((r + 15)/16) * 16;  // 16
+    const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
     unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
 
-    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + r))
-      uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - r;
+    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
+      uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
     // Set team and thread sizes for row kernel // Workgroup padded left and right
     const int uiBlockWidth = DivUp((size_t)uiWidth, (size_t)uiNumOutputPix);
     const int numTeams = uiHeight * uiBlockWidth;
-    const int blockSize = iRadiusAligned + uiNumOutputPix + r;
+    const int blockSize = iRadiusAligned + uiNumOutputPix + iRadius;
 
     // Launch row kernel
     #pragma omp target teams num_teams(numTeams) thread_limit(blockSize)
@@ -161,7 +161,7 @@ void BoxFilterGPU ( unsigned int *uiInput,
 
       // do left edge
       float4 f4Sum;
-      float4 f4iRadius = {iRadius, iRadius, iRadius, iRadius};
+      float4 f4iRadius = {(float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius};
       f4Sum = rgbaUintToFloat4(uiInputImage[0]) * f4iRadius;
       for (int y = 0; y < iRadius + 1; y++) 
       {
@@ -204,7 +204,7 @@ int main(int argc, char** argv)
 
     shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
     printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, iRadius);
+           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
     printf("Using Local Memory for Row Processing\n\n");
 
     size_t szBuff= uiImageWidth * uiImageHeight;
@@ -222,24 +222,24 @@ int main(int argc, char** argv)
 
     // Warmup
     BoxFilterGPU (uiInput, uiTmp, uiDevOutput, 
-                  uiImageWidth, uiImageHeight, iRadius, fScale);
+                  uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
     const int iCycles = 1000;
     printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
     for (int i = 0; i < iCycles; i++)
     {
         BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
-                      uiImageWidth, uiImageHeight, iRadius, fScale);
+                      uiImageWidth, uiImageHeight, RADIUS, SCALE);
     }
 }
 
     // Do filtering on the host
-    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, iRadius, fScale);
+    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
     // Verification 
     // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
     int error = 0;
-    for (int i = iRadius * uiImageWidth; i < (uiImageHeight-iRadius)*uiImageWidth; i++)
+    for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
     {
       if (uiDevOutput[i] != uiHostOutput[i]) {
         printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
