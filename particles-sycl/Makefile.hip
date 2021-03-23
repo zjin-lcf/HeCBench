@@ -3,10 +3,13 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = syclcc
 OPTIMIZE  = yes
 DEBUG     = no
+MARCH     = gfx906
+PLATFORM  = rocm
 DEVICE    = gpu
+
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +26,9 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -Wall -I../include \
+          --hipsycl-platform=$(PLATFORM) \
+	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
 LDFLAGS = 
@@ -33,7 +38,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -58,6 +62,7 @@ bitonicSort.o : bitonicSort.cpp bitonicSort_kernels.cpp particles.h
 
 particles.o : particles.cpp particles_kernels.cpp particles.h
 	$(CC) $(CFLAGS) -c $< -o $@
+
 
 clean:
 	rm -rf $(program) $(obj)
