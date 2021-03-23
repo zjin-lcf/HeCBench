@@ -18,20 +18,23 @@
 #define GRID_SIZE         64
 #define NUM_PARTICLES     16384
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include "common.h"
 #include "particles.h"
 
 // Simulation parameters
-float timestep = 0.5f;              // time slice for re-computation iteration
-float gravity = 0.0005f;            // Strength of gravity
-float damping = 1.0f;
-float fParticleRadius = 0.023f;     // Radius of individual particles
-float fColliderRadius = 0.17f;      // Radius of collider for interacting with particles in 'm' mode
-float collideSpring = 0.4f;         // Elastic spring constant for impact between particles
-float collideDamping = 0.025f;      // Inelastic loss component for impact between particles
-float collideShear = 0.12f;         // Friction constant for particles in contact
-float collideAttraction = 0.0012f;  // Attraction between particles (~static or Van der Waals) 
-
+const int iterations = 100;               // Number of iterations
+const float timestep = 0.5f;              // Time slice for re-computation iteration
+//const float gravity = 0.0005f;            // Strength of gravity
+//const float damping = 1.0f;
+const float fParticleRadius = 0.023f;     // Radius of individual particles
+const float fColliderRadius = 0.17f;      // Radius of collider for interacting with particles in 'm' mode
+//const float collideSpring = 0.4f;         // Elastic spring constant for impact between particles
+//const float collideDamping = 0.025f;      // Inelastic loss component for impact between particles
+//const float collideShear = 0.12f;         // Friction constant for particles in contact
+//const float collideAttraction = 0.0012f;  // Attraction between particles (~static or Van der Waals) 
 
 // Forward Function declarations
 //*****************************************************************************
@@ -40,16 +43,21 @@ inline float frand(void){
 }
 
 void initGrid(float *hPos, float *hVel, float particleRadius, float spacing, 
-              float jitter, unsigned int numParticles)
+    unsigned int numParticles)
 {
+  float jitter = particleRadius * 0.01f;
+  unsigned int s = (int) ceilf(powf((float) numParticles, 1.0f / 3.0f));
+  unsigned int gridSize[3];
+  gridSize[0] = gridSize[1] = gridSize[2] = s;
+
   srand(1973);
-  for(unsigned int z=0; z<GRID_SIZE; z++) 
+  for(unsigned int z=0; z<gridSize[2]; z++) 
   {
-    for(unsigned int y=0; y<GRID_SIZE; y++) 
+    for(unsigned int y=0; y<gridSize[1]; y++) 
     {
-      for(unsigned int x=0; x<GRID_SIZE; x++) 
+      for(unsigned int x=0; x<gridSize[0]; x++) 
       {
-        unsigned int i = (z * GRID_SIZE * GRID_SIZE) + (y * GRID_SIZE) + x;
+        unsigned int i = (z * gridSize[0] * gridSize[1]) + (y * gridSize[1]) + x;
         if (i < numParticles) 
         {
           hPos[i * 4] = (spacing * x) + particleRadius - 1.0f + (frand() * 2.0f - 1.0f) * jitter;
@@ -80,7 +88,7 @@ int main(int argc, char** argv)
     gridSize.x() = gridSize.y() = gridSize.z() = gridDim;
 
     unsigned int numGridCells = gridSize.x() * gridSize.y() * gridSize.z();
-    float3 worldSize = {2.0f, 2.0f, 2.0f};
+    //float3 worldSize = {2.0f, 2.0f, 2.0f};
 
     simParams_t params;
 
@@ -118,8 +126,7 @@ int main(int argc, char** argv)
     unsigned int* hCellEnd   = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
 
     // configure grid
-    float jitter = params.particleRadius * 0.01f;
-    initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, jitter, numParticles);
+    initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, numParticles);
 
 #ifdef USE_GPU
     gpu_selector dev_sel;
@@ -139,8 +146,7 @@ int main(int argc, char** argv)
     dPos.set_final_data(nullptr);
     dVel.set_final_data(nullptr);
     
-    const int iCycles = 2;
-    for (int i = 0; i < iCycles; i++)
+    for (int i = 0; i < iterations; i++)
     {
       integrateSystem(
           q,
@@ -196,13 +202,21 @@ int main(int argc, char** argv)
 
 #ifdef DEBUG
     q.submit([&] (handler &cgh) {
-      auto v = dPos.get_access<sycl_read>(cgh);
-      cgh.copy(v, (float4*)hPos);
+      auto acc dPos.get_access<sycl_read>(cgh);
+      cgh.copy(acc (float4*)hPos);
+    });
+    q.submit([&] (handler &cgh) {
+      auto acc dVel.get_access<sycl_read>(cgh);
+      cgh.copy(acc (float4*)hVel);
     });
     q.wait();
-    for (unsigned int i = 0; i < numParticles; i++)
-      printf("%d %.3f %.3f %3.f %3.f\n", i, 
-        hPos[4*i], hPos[4*i+1], hPos[4*i+2], hPos[4*i+3]);
+    for (unsigned int i = 0; i < numParticles; i++) {
+      printf("%d: ", i);
+      printf("pos: (%.4f, %.4f, %.4f, %.4f)\n",
+          hPos[4*i], hPos[4*i+1], hPos[4*i+2], hPos[4*i+3]);
+      printf("vel: (%.4f, %.4f, %.4f, %.4f)\n",
+          hVel[4*i], hVel[4*i+1], hVel[4*i+2], hVel[4*i+3]);
+    }
 #endif
 
 
