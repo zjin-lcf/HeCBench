@@ -25,11 +25,11 @@ static size_t uSnap(size_t a, size_t b){
 
 void integrateSystem(
     queue &q,
-    buffer<float4,1> &d_Pos,
-    buffer<float4,1> &d_Vel,
+    buffer<cl::sycl::float4,1> &d_Pos,
+    buffer<cl::sycl::float4,1> &d_Vel,
     const simParams_t &params,
     const float deltaTime,
-    const uint numParticles
+    const unsigned int numParticles
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
     range<1> gws (globalWorkSize);
@@ -49,7 +49,7 @@ void calcHash(
     queue &q,
     buffer<unsigned int, 1> &d_Hash,
     buffer<unsigned int, 1> &d_Index,
-    buffer<float4, 1> &d_Pos,
+    buffer<cl::sycl::float4, 1> &d_Pos,
     const simParams_t &params,
     const int numParticles
 ){
@@ -59,8 +59,8 @@ void calcHash(
 
     q.submit([&] (handler &cgh) {
       auto pos = d_Pos.get_access<sycl_read>(cgh);
-      auto hash = d_Hash.get_access<sycl_write>(cgh);
-      auto index = d_Index.get_access<sycl_write>(cgh);
+      auto hash = d_Hash.get_access<sycl_discard_write>(cgh);
+      auto index = d_Index.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class CalcHash>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         calcHashK(item, hash.get_pointer(), index.get_pointer(), 
                   pos.get_pointer(), params, numParticles);
@@ -71,8 +71,8 @@ void calcHash(
 void memSet(
     queue &q,
     buffer<unsigned int, 1> &d_Data,
-    uint val,
-    uint N
+    unsigned int val,
+    unsigned int N
 ){
     size_t globalWorkSize = uSnap(N, wgSize);
 
@@ -80,7 +80,7 @@ void memSet(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto data = d_Data.get_access<sycl_write>(cgh);
+      auto data = d_Data.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class Memset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         memSetK(item, data.get_pointer(), val, N);
       });
@@ -91,14 +91,14 @@ void findCellBoundsAndReorder(
     queue &q,
     buffer<unsigned int, 1> &d_CellStart,
     buffer<unsigned int, 1> &d_CellEnd,
-    buffer<float4, 1> &d_ReorderedPos,
-    buffer<float4, 1> &d_ReorderedVel,
+    buffer<cl::sycl::float4, 1> &d_ReorderedPos,
+    buffer<cl::sycl::float4, 1> &d_ReorderedVel,
     buffer<unsigned int, 1> &d_Hash,
     buffer<unsigned int, 1> &d_Index,
-    buffer<float4, 1> &d_Pos,
-    buffer<float4, 1> &d_Vel,
-    const uint numParticles,
-    const uint numCells
+    buffer<cl::sycl::float4, 1> &d_Pos,
+    buffer<cl::sycl::float4, 1> &d_Vel,
+    const unsigned int numParticles,
+    const unsigned int numCells
 ){
     memSet(q, d_CellStart, 0xFFFFFFFFU, numCells);
     
@@ -108,10 +108,10 @@ void findCellBoundsAndReorder(
 
     q.submit([&] (handler &cgh) {
       auto pos = d_Pos.get_access<sycl_read>(cgh);
-      auto rpos = d_ReorderedPos.get_access<sycl_write>(cgh);
-      auto rvel = d_ReorderedVel.get_access<sycl_write>(cgh);
-      auto cellstart = d_CellStart.get_access<sycl_read_write>(cgh);
-      auto cellend = d_CellEnd.get_access<sycl_write>(cgh);
+      auto rpos = d_ReorderedPos.get_access<sycl_discard_write>(cgh);
+      auto rvel = d_ReorderedVel.get_access<sycl_discard_write>(cgh);
+      auto cellstart = d_CellStart.get_access<sycl_discard_write>(cgh);
+      auto cellend = d_CellEnd.get_access<sycl_discard_write>(cgh);
       auto index = d_Index.get_access<sycl_read>(cgh);
       auto hash = d_Hash.get_access<sycl_read>(cgh);
       auto vel = d_Vel.get_access<sycl_read>(cgh);
@@ -134,15 +134,15 @@ void findCellBoundsAndReorder(
 
 void collide(
     queue &q,
-    buffer<float4, 1> &d_Vel,
-    buffer<float4, 1> &d_ReorderedPos,
-    buffer<float4, 1> &d_ReorderedVel,
+    buffer<cl::sycl::float4, 1> &d_Vel,
+    buffer<cl::sycl::float4, 1> &d_ReorderedPos,
+    buffer<cl::sycl::float4, 1> &d_ReorderedVel,
     buffer<unsigned int, 1> &d_Index,
     buffer<unsigned int, 1> &d_CellStart,
     buffer<unsigned int, 1> &d_CellEnd,
     const simParams_t &params,
-    const uint   numParticles,
-    const uint   numCells
+    const unsigned int   numParticles,
+    const unsigned int   numCells
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
 
@@ -150,7 +150,7 @@ void collide(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto vel = d_Vel.get_access<sycl_write>(cgh);
+      auto vel = d_Vel.get_access<sycl_discard_write>(cgh);
       auto rpos = d_ReorderedPos.get_access<sycl_read>(cgh);
       auto rvel = d_ReorderedVel.get_access<sycl_read>(cgh);
       auto cellstart = d_CellStart.get_access<sycl_read>(cgh);

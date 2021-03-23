@@ -14,8 +14,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 void integrateSystemK(
     nd_item<1> &item,
-    global_ptr<float4> d_Pos,  //input/output
-    global_ptr<float4> d_Vel,  //input/output
+    global_ptr<cl::sycl::float4> d_Pos,  //input/output
+    global_ptr<cl::sycl::float4> d_Vel,  //input/output
     const simParams_t &params,
     float deltaTime,
     unsigned int numParticles
@@ -24,14 +24,14 @@ void integrateSystemK(
   const unsigned int index = item.get_global_id(0);
   if(index >= numParticles) return;
 
-  float4 pos = d_Pos[index];
-  float4 vel = d_Vel[index];
+  cl::sycl::float4 pos = d_Pos[index];
+  cl::sycl::float4 vel = d_Vel[index];
 
   pos.w() = 1.0f;
   vel.w() = 0.0f;
 
   //Gravity
-  float4 g = {params.gravity.x(), params.gravity.y(), params.gravity.z(), 0};
+  cl::sycl::float4 g = {params.gravity.x(), params.gravity.y(), params.gravity.z(), 0};
   vel += g * deltaTime;
   vel *= params.globalDamping;
 
@@ -78,8 +78,8 @@ void integrateSystemK(
 ////////////////////////////////////////////////////////////////////////////////
 // Save particle grid cell hashes and indices
 ////////////////////////////////////////////////////////////////////////////////
-int4 getGridPos(float4 p, const simParams_t &params){
-  int4 gridPos;
+cl::sycl::int4 getGridPos(cl::sycl::float4 p, const simParams_t &params){
+  cl::sycl::int4 gridPos;
   gridPos.x() = (int)floor((p.x() - params.worldOrigin.x()) / params.cellSize.x());
   gridPos.y() = (int)floor((p.y() - params.worldOrigin.y()) / params.cellSize.y());
   gridPos.z() = (int)floor((p.z() - params.worldOrigin.z()) / params.cellSize.z());
@@ -88,7 +88,7 @@ int4 getGridPos(float4 p, const simParams_t &params){
 }
 
 //Calculate address in grid from position (clamping to edges)
-unsigned int getGridHash(int4 gridPos, const simParams_t &params){
+unsigned int getGridHash(cl::sycl::int4 gridPos, const simParams_t &params){
   //Wrap addressing, assume power-of-two grid dimensions
   gridPos.x() = gridPos.x() & (params.gridSize.x() - 1);
   gridPos.y() = gridPos.y() & (params.gridSize.y() - 1);
@@ -102,17 +102,17 @@ void calcHashK(
     nd_item<1> item,
     global_ptr<unsigned int> d_Hash, //output
     global_ptr<unsigned int> d_Index, //output
-    global_ptr<const float4> d_Pos, //input: positions
+    const global_ptr<cl::sycl::float4> d_Pos, //input: positions
     const simParams_t &params,
     unsigned int numParticles)
 {
   const unsigned int index = item.get_global_id(0);
   if(index >= numParticles) return;
 
-  float4 p = d_Pos[index];
+  cl::sycl::float4 p = d_Pos[index];
 
   //Get address in grid
-  int4  gridPos = getGridPos(p, params);
+  cl::sycl::int4  gridPos = getGridPos(p, params);
   unsigned int gridHash = getGridHash(gridPos, params);
 
   //Store grid hash and particle index
@@ -139,13 +139,13 @@ void findCellBoundsAndReorderK(
     nd_item<1> &item,
     global_ptr<unsigned int> d_CellStart,     //output: cell start index
     global_ptr<unsigned int> d_CellEnd,       //output: cell end index
-    global_ptr<float4> d_ReorderedPos,  //output: reordered by cell hash positions
-    global_ptr<float4> d_ReorderedVel,  //output: reordered by cell hash velocities
+    global_ptr<cl::sycl::float4> d_ReorderedPos,  //output: reordered by cell hash positions
+    global_ptr<cl::sycl::float4> d_ReorderedVel,  //output: reordered by cell hash velocities
 
-    global_ptr<const unsigned int> d_Hash,    //input: sorted grid hashes
-    global_ptr<const unsigned int> d_Index,   //input: particle indices sorted by hash
-    global_ptr<const float4> d_Pos,     //input: positions array sorted by hash
-    global_ptr<const float4> d_Vel,     //input: velocity array sorted by hash
+    const global_ptr<unsigned int> d_Hash,    //input: sorted grid hashes
+    const global_ptr<unsigned int> d_Index,   //input: particle indices sorted by hash
+    const global_ptr<cl::sycl::float4> d_Pos,     //input: positions array sorted by hash
+    const global_ptr<cl::sycl::float4> d_Vel,     //input: velocity array sorted by hash
     local_ptr<unsigned int> localHash,          //get_group_size(0) + 1 elements
     const unsigned int    numParticles
     )
@@ -188,8 +188,8 @@ void findCellBoundsAndReorderK(
 
     //Now use the sorted index to reorder the pos and vel arrays
     unsigned int sortedIndex = d_Index[index];
-    float4 pos = d_Pos[sortedIndex];
-    float4 vel = d_Vel[sortedIndex];
+    cl::sycl::float4 pos = d_Pos[sortedIndex];
+    cl::sycl::float4 vel = d_Vel[sortedIndex];
 
     d_ReorderedPos[index] = pos;
     d_ReorderedVel[index] = vel;
@@ -201,11 +201,11 @@ void findCellBoundsAndReorderK(
 ////////////////////////////////////////////////////////////////////////////////
 // Process collisions (calculate accelerations)
 ////////////////////////////////////////////////////////////////////////////////
-float4 collideSpheres(
-    float4 posA,
-    float4 posB,
-    float4 velA,
-    float4 velB,
+cl::sycl::float4 collideSpheres(
+    cl::sycl::float4 posA,
+    cl::sycl::float4 posB,
+    cl::sycl::float4 velA,
+    cl::sycl::float4 velB,
     float radiusA,
     float radiusB,
     float spring,
@@ -214,20 +214,20 @@ float4 collideSpheres(
     float attraction
     ){
   //Calculate relative position
-  float4     relPos = {posB.x() - posA.x(), posB.y() - posA.y(), posB.z() - posA.z(), 0};
+  cl::sycl::float4     relPos = {posB.x() - posA.x(), posB.y() - posA.y(), posB.z() - posA.z(), 0};
   float        dist = sqrt(relPos.x() * relPos.x() + relPos.y() * relPos.y() + relPos.z() * relPos.z());
   float collideDist = radiusA + radiusB;
 
-  float4 force = {0, 0, 0, 0};
+  cl::sycl::float4 force = {0, 0, 0, 0};
   if(dist < collideDist){
-    float4 norm = {relPos.x() / dist, relPos.y() / dist, relPos.z() / dist, 0};
+    cl::sycl::float4 norm = {relPos.x() / dist, relPos.y() / dist, relPos.z() / dist, 0};
 
     //Relative velocity
-    float4 relVel = {velB.x() - velA.x(), velB.y() - velA.y(), velB.z() - velA.z(), 0};
+    cl::sycl::float4 relVel = {velB.x() - velA.x(), velB.y() - velA.y(), velB.z() - velA.z(), 0};
 
     //Relative tangential velocity
     float relVelDotNorm = relVel.x() * norm.x() + relVel.y() * norm.y() + relVel.z() * norm.z();
-    float4 tanVel = {relVel.x() - relVelDotNorm * norm.x(), relVel.y() - relVelDotNorm * norm.y(), 
+    cl::sycl::float4 tanVel = {relVel.x() - relVelDotNorm * norm.x(), relVel.y() - relVelDotNorm * norm.y(), 
       relVel.z() - relVelDotNorm * norm.z(), 0};
 
     //Spring force (potential)
@@ -247,12 +247,12 @@ float4 collideSpheres(
 
 void collideK(
     nd_item<1> &item,
-    global_ptr<float4> d_Vel,          //output: new velocity
-    global_ptr<const float4> d_ReorderedPos, //input: reordered positions
-    global_ptr<const float4> d_ReorderedVel, //input: reordered velocities
-    global_ptr<const unsigned int> d_Index,        //input: reordered particle indices
-    global_ptr<const unsigned int> d_CellStart,    //input: cell boundaries
-    global_ptr<const unsigned int> d_CellEnd,
+    global_ptr<cl::sycl::float4> d_Vel,          //output: new velocity
+    const global_ptr<cl::sycl::float4> d_ReorderedPos, //input: reordered positions
+    const global_ptr<cl::sycl::float4> d_ReorderedVel, //input: reordered velocities
+    const global_ptr<unsigned int> d_Index,        //input: reordered particle indices
+    const global_ptr<unsigned int> d_CellStart,    //input: cell boundaries
+    const global_ptr<unsigned int> d_CellEnd,
     const simParams_t &params,
     const unsigned int numParticles)
 {
@@ -260,19 +260,19 @@ void collideK(
   if(index >= numParticles)
     return;
 
-  float4   pos = d_ReorderedPos[index];
-  float4   vel = d_ReorderedVel[index];
-  float4 force = {0, 0, 0, 0};
+  cl::sycl::float4   pos = d_ReorderedPos[index];
+  cl::sycl::float4   vel = d_ReorderedVel[index];
+  cl::sycl::float4 force = {0, 0, 0, 0};
 
   //Get address in grid
-  int4 gridPos = getGridPos(pos, params);
+  cl::sycl::int4 gridPos = getGridPos(pos, params);
 
   //Accumulate surrounding cells
   for(int z = -1; z <= 1; z++)
     for(int y = -1; y <= 1; y++)
       for(int x = -1; x <= 1; x++){
         //Get start particle index for this cell
-        int4 t = {x, y, z, 0};
+        cl::sycl::int4 t = {x, y, z, 0};
         unsigned int   hash = getGridHash(gridPos + t, params);
         unsigned int startI = d_CellStart[hash];
 
@@ -284,8 +284,8 @@ void collideK(
         for(unsigned int j = startI; j < endI; j++){
           if(j == index) continue;
 
-          float4 pos2 = d_ReorderedPos[j];
-          float4 vel2 = d_ReorderedVel[j];
+          cl::sycl::float4 pos2 = d_ReorderedPos[j];
+          cl::sycl::float4 vel2 = d_ReorderedVel[j];
 
           //Collide two spheres
           force += collideSpheres(

@@ -9,10 +9,6 @@
  *
  */
 
-#ifndef min
-#define min(a,b) (a < b ? a : b)
-#endif
-
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
 #define GRID_SIZE         64
@@ -25,7 +21,6 @@
 #include "particles.h"
 
 // Simulation parameters
-const int iterations = 100;               // Number of iterations
 const float timestep = 0.5f;              // Time slice for re-computation iteration
 //const float gravity = 0.0005f;            // Strength of gravity
 //const float damping = 1.0f;
@@ -80,11 +75,12 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
 //*****************************************************************************
 int main(int argc, char** argv) 
 {
+    const int iterations = atoi(argv[1]);               // Number of iterations
     unsigned int numParticles = NUM_PARTICLES;
     unsigned int gridDim = GRID_SIZE;
 
     // Set and log grid size and particle count, after checking optional command-line inputs
-    uint3 gridSize;
+    cl::sycl::uint3 gridSize;
     gridSize.x() = gridSize.y() = gridSize.z() = gridDim;
 
     unsigned int numGridCells = gridSize.x() * gridSize.y() * gridSize.z();
@@ -135,10 +131,10 @@ int main(int argc, char** argv)
 #endif
     queue q(dev_sel);
 
-    buffer<float4, 1> dPos ((float4*)hPos, numParticles);
-    buffer<float4, 1> dVel ((float4*)hVel, numParticles);
-    buffer<float4, 1> dReorderedPos (numParticles);
-    buffer<float4, 1> dReorderedVel (numParticles);
+    buffer<cl::sycl::float4, 1> dPos ((cl::sycl::float4*)hPos, numParticles);
+    buffer<cl::sycl::float4, 1> dVel ((cl::sycl::float4*)hVel, numParticles);
+    buffer<cl::sycl::float4, 1> dReorderedPos (numParticles);
+    buffer<cl::sycl::float4, 1> dReorderedVel (numParticles);
     buffer<unsigned int, 1> dHash (numParticles);
     buffer<unsigned int, 1> dIndex (numParticles);
     buffer<unsigned int, 1> dCellStart (numGridCells);
@@ -202,12 +198,12 @@ int main(int argc, char** argv)
 
 #ifdef DEBUG
     q.submit([&] (handler &cgh) {
-      auto acc dPos.get_access<sycl_read>(cgh);
-      cgh.copy(acc (float4*)hPos);
+      auto acc = dPos.get_access<sycl_read>(cgh);
+      cgh.copy(acc, (cl::sycl::float4*)hPos);
     });
     q.submit([&] (handler &cgh) {
-      auto acc dVel.get_access<sycl_read>(cgh);
-      cgh.copy(acc (float4*)hVel);
+      auto acc = dVel.get_access<sycl_read>(cgh);
+      cgh.copy(acc, (cl::sycl::float4*)hVel);
     });
     q.wait();
     for (unsigned int i = 0; i < numParticles; i++) {
