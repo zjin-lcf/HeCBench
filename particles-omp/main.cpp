@@ -136,7 +136,6 @@ int main(int argc, char** argv)
                                 dIndex[0:numParticles], \
                                 dCellStart[0:numGridCells], \
                                 dCellEnd[0:numGridCells])
-
 {
   for (int i = 0; i < iterations; i++)
   {
@@ -191,9 +190,9 @@ int main(int argc, char** argv)
   for (unsigned int i = 0; i < numParticles; i++) {
     printf("%d: ", i);
     printf("pos: (%.4f, %.4f, %.4f, %.4f)\n",
-        dPos[4*i], dPos[4*i+1], dPos[4*i+2], dPos[4*i+3]);
+        dPos[i].x, dPos[i].y, dPos[i].z, dPos[i].w);
     printf("vel: (%.4f, %.4f, %.4f, %.4f)\n",
-        dVel[4*i], dVel[4*i+1], dVel[4*i+2], dVel[4*i+3]);
+        dVel[i].x, dVel[i].y, dVel[i].z, dVel[i].w);
   }
 #endif
 
