@@ -9,7 +9,7 @@
  *
  */
 
-#include <cassert>
+#include <assert.h>
 #include "common.h"
 
 #define LOCAL_SIZE_LIMIT 512U
