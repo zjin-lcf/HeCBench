@@ -64,9 +64,9 @@ inline void operator*=(float4 &a, const float b)
 int4 getGridPos(const float4 p, const simParams_t &params)
 {
   int4 gridPos;
-  gridPos.x = (int)floor((p.x - params.worldOrigin.x) / params.cellSize.x);
-  gridPos.y = (int)floor((p.y - params.worldOrigin.y) / params.cellSize.y);
-  gridPos.z = (int)floor((p.z - params.worldOrigin.z) / params.cellSize.z);
+  gridPos.x = (int)floorf((p.x - params.worldOrigin.x) / params.cellSize.x);
+  gridPos.y = (int)floorf((p.y - params.worldOrigin.y) / params.cellSize.y);
+  gridPos.z = (int)floorf((p.z - params.worldOrigin.z) / params.cellSize.z);
   gridPos.w = 0;
   return gridPos;
 }
