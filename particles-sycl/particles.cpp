@@ -16,7 +16,7 @@
 
 //Simulation parameters
 
-static size_t wgSize = 64;
+static const size_t wgSize = 64;
 
 
 static size_t uSnap(size_t a, size_t b){

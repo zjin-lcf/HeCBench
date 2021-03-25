@@ -80,9 +80,9 @@ void integrateSystemK(
 ////////////////////////////////////////////////////////////////////////////////
 cl::sycl::int4 getGridPos(cl::sycl::float4 p, const simParams_t &params){
   cl::sycl::int4 gridPos;
-  gridPos.x() = (int)floor((p.x() - params.worldOrigin.x()) / params.cellSize.x());
-  gridPos.y() = (int)floor((p.y() - params.worldOrigin.y()) / params.cellSize.y());
-  gridPos.z() = (int)floor((p.z() - params.worldOrigin.z()) / params.cellSize.z());
+  gridPos.x() = (int)cl::sycl::floor((p.x() - params.worldOrigin.x()) / params.cellSize.x());
+  gridPos.y() = (int)cl::sycl::floor((p.y() - params.worldOrigin.y()) / params.cellSize.y());
+  gridPos.z() = (int)cl::sycl::floor((p.z() - params.worldOrigin.z()) / params.cellSize.z());
   gridPos.w() = 0;
   return gridPos;
 }
@@ -215,7 +215,7 @@ cl::sycl::float4 collideSpheres(
     ){
   //Calculate relative position
   cl::sycl::float4     relPos = {posB.x() - posA.x(), posB.y() - posA.y(), posB.z() - posA.z(), 0};
-  float        dist = sqrt(relPos.x() * relPos.x() + relPos.y() * relPos.y() + relPos.z() * relPos.z());
+  float        dist = cl::sycl::sqrt(relPos.x() * relPos.x() + relPos.y() * relPos.y() + relPos.z() * relPos.z());
   float collideDist = radiusA + radiusB;
 
   cl::sycl::float4 force = {0, 0, 0, 0};
