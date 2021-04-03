@@ -157,4 +157,4 @@ inline uint4 scan4Exclusive(uint4 data4,
   return scan4Inclusive(data4, l_Data, size) - data4;
 }
 
-#pragma omp declare target
+#pragma omp end declare target
