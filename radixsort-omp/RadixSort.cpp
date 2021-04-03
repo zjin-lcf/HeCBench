@@ -237,14 +237,14 @@ void radixSortStepKeysOnly(unsigned int* d_keys,
   //for (int i = 0; i < numElements; i++) printf("temp key %d: %x\n", i, h_tempKeys[i]);
   //free(h_tempKeys);
 
-  #pragma omp target update from(d_tempKeys[0:numElements]);
+  #pragma omp target update from(d_tempKeys[0:numElements])
   for (int i = 0; i < numElements; i++) printf("temp key %d: %x\n", i, d_tempKeys[i]);
 #endif
 
   findRadixOffsets(d_tempKeys, d_counters, d_blockOffsets, startbit, numElements);
 
 #ifdef DEBUG
-  //unsigned int numBlocks = (numElements / (CTA_SIZE * 4));
+  unsigned int numBlocks = (numElements / (CTA_SIZE * 4));
   //unsigned int *h_counters = (unsigned int*) malloc (WARP_SIZE*numBlocks*sizeof(unsigned int));
   //cudaMemcpy(h_counters, d_counters, WARP_SIZE*numBlocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
   //for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("counters %d: %x\n", i, h_counters[i]);
