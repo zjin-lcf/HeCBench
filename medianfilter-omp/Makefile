@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -13,9 +14,9 @@ DEBUG     = no
 
 program = main
 
-source = main.cu shrUtils.cu MedianFilterHost.cu
+source = main.cpp shrUtils.cpp MedianFilterHost.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
@@ -33,10 +34,15 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
 endif
 
 #===============================================================================
@@ -46,13 +52,13 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cu MedianFilter.cu shrUtils.h
+main.o: main.cpp MedianFilter.cpp shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cu 
+MedianFilterHost.o : MedianFilterHost.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cu shrUtils.h 
+shrUtils.o : shrUtils.cpp shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
