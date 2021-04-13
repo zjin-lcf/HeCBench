@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include "common.h"
+#include "verify.cpp"
 
 //----------------------------------------------------------------------------
 // Scans each warp in parallel ("warp-scan"), one element per thread.
@@ -111,15 +112,13 @@ void radixSortBlocksKeysK(
     local_ptr<uint> numtrue)
 {
   int globalId = item.get_global_id(0);
+  int localId = item.get_local_id(0);
+  int localSize = item.get_local_range(0);
 
   vec<uint, 4> key;
   key.load(globalId, keysIn);
 
   item.barrier(access::fence_space::local_space);
-
-  // radixSortBlockKeysOnly(&key, nbits, startbit, sMem, numtrue);
-  int localId = item.get_local_id(0);
-  int localSize = item.get_local_range(0);
 
   for(uint shift = startbit; shift < (startbit + nbits); ++shift)
   {
@@ -153,18 +152,17 @@ void radixSortBlocksKeysK(
   key.store(globalId, keysOut);
 }
 
-int main() {
-
-  srand(2);
-  const int N = 512;
+int main(int argc, char** argv) {
+  srand(512);
+  const int N = atoi(argv[1]);  // assume a multiple of 512
   unsigned int *keys = (unsigned int*) malloc (N * sizeof(unsigned int));
   unsigned int *out = (unsigned int*) malloc (N * sizeof(unsigned int));
   for (int i = 0; i < N; i++)  keys[i] = rand() % 16;
 
   const unsigned int startbit = 0;
   const unsigned int nbits = 4;
-  const unsigned threads = 128; // 1
-  const unsigned teams = N/4/threads; // 1
+  const unsigned threads = 128;
+  const unsigned teams = N/4/threads;
 
   {
 #ifdef USE_GPU
@@ -180,23 +178,29 @@ int main() {
   range<1> gws (teams * threads);
   range<1> lws (threads);
 
-  q.submit([&] (handler &cgh) {
-    auto keysIn = d_keys.get_access<sycl_read>(cgh);
-    auto keysOut = d_tempKeys.get_access<sycl_discard_write>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> sMem(4*threads, cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> numtrue(1, cgh);
-    cgh.parallel_for<class radixSort_blocksKeys>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      radixSortBlocksKeysK(item, keysIn.get_pointer(), keysOut.get_pointer(), 
-                           nbits, startbit, sMem.get_pointer(), numtrue.get_pointer());
+  for (int i = 0; i < 1; i++)
+    q.submit([&] (handler &cgh) {
+      auto keysIn = d_keys.get_access<sycl_read>(cgh);
+      auto keysOut = d_tempKeys.get_access<sycl_discard_write>(cgh);
+      accessor<unsigned int, 1, sycl_read_write, access::target::local> sMem(4*threads, cgh);
+      accessor<unsigned int, 1, sycl_read_write, access::target::local> numtrue(1, cgh);
+      cgh.parallel_for<class radixSort_blocksKeys>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        radixSortBlocksKeysK(item, keysIn.get_pointer(), keysOut.get_pointer(), 
+                             nbits, startbit, sMem.get_pointer(), numtrue.get_pointer());
 
+      });
     });
-  });
+  q.wait();
+
   }
  
-  for (int i = 0; i < N; i++)  printf("%u ", out[i]);
-  printf("\n");
+  bool check = verify(out, keys, threads, N);
+  if (check)
+    printf("PASS\n");
+  else 
+    printf("FAIL\n");
+
   free(keys);
   free(out);
-
   return 0;
 }
