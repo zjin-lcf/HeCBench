@@ -6,7 +6,7 @@ bool verify(const unsigned int* sorted_keys, const unsigned int* keys,
 
   unsigned int m1[16], m2[16];
 
-  unsigned n = threads * 4;   // n elements are expected to be sorted
+  int n = threads * 4;   // n elements are expected to be sorted
   for (int i = 0; i < N; i = i+n) {
     for (int j = 0; j < n-1; j++)
       if (sorted_keys[i+j] > sorted_keys[i+j+1]) return false;
