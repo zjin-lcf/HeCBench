@@ -80,7 +80,6 @@ int main(int argc, const char **argv)
 
   // Check results
   bool passed = true;
-  //passed &= verifySortUint(h_keysSorted, NULL, h_keys, numElements);
   passed &= verifySortUint(h_keys, NULL, h_tempKeys, numElements);
 
   free(h_keys);
@@ -90,7 +89,6 @@ int main(int argc, const char **argv)
   free(h_blockOffsets);
   free(h_buffer);
 
-  // finish
   if (passed)
     printf("PASS\n");
   else 

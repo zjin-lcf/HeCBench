@@ -232,11 +232,6 @@ void radixSortStepKeysOnly(unsigned int* d_keys,
   radixSortBlocksKeysOnly(d_keys, d_tempKeys, nbits, startbit, numElements);
 
 #ifdef DEBUG
-  //unsigned int *h_tempKeys = (unsigned int*) malloc (numElements*sizeof(unsigned int));
-  //cudaMemcpy(h_tempKeys, d_tempKeys, numElements*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-  //for (int i = 0; i < numElements; i++) printf("temp key %d: %x\n", i, h_tempKeys[i]);
-  //free(h_tempKeys);
-
   #pragma omp target update from(d_tempKeys[0:numElements])
   for (int i = 0; i < numElements; i++) printf("temp key %d: %x\n", i, d_tempKeys[i]);
 #endif
@@ -257,10 +252,6 @@ void radixSortStepKeysOnly(unsigned int* d_keys,
                      batchSize, numElements/2/CTA_SIZE*16, numElements);
 
 #ifdef DEBUG
-  //unsigned int *h_countersSum = (unsigned int*) malloc (WARP_SIZE*numBlocks*sizeof(unsigned int));
-  //cudaMemcpy(h_countersSum, d_countersSum, WARP_SIZE*numBlocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-  //for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("countersSum %d: %x\n", i, h_countersSum[i]);
-  //free(h_countersSum);
   #pragma omp target update from(d_countersSum[0:WARP_SIZE*numBlocks])
   for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("countersSum %d: %x\n", i, d_countersSum[i]);
 #endif

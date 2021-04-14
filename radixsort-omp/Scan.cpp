@@ -40,7 +40,6 @@ void scanExclusiveLocal1(
       reinterpret_cast<uint4*>(d_Dst)[i] = odata4;
     }
   }
-
 }
 
 void scanExclusiveLocal2(
@@ -101,7 +100,6 @@ void uniformUpdate(
       reinterpret_cast<uint4*>(d_Dst)[i] = data4;
     }
   }
-
 }
 
 // main exclusive scan routine
@@ -130,9 +128,6 @@ void scanExclusiveLarge(
       );
 
 #ifdef DEBUG
-  //unsigned int *h_countersSum = (unsigned int*) malloc (WARP_SIZE*numBlocks*sizeof(unsigned int));
-  //cudaMemcpy(h_countersSum, d_Dst, WARP_SIZE*numBlocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-  //for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("local1 %d: %x\n", i, h_countersSum[i]);
   #pragma omp target update from(d_Dst[0:WARP_SIZE*numBlocks])
   for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("local1 %d: %x\n", i, d_Dst[i]);
 #endif
@@ -146,13 +141,10 @@ void scanExclusiveLarge(
       );
 
 #ifdef DEBUG
-  //unsigned int *h_buffer = (unsigned int*) malloc (sizeof(unsigned int) * (arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE));
-  //cudaMemcpy(h_buffer, d_Buf, (arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE)*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-  //for (int i = 0; i < arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE; i++) printf("local2 %d: %x\n", i, h_buffer[i]);
   #pragma omp target update from(d_Buf[0:arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE])
   for (int i = 0; i < arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE; i++) printf("local2 %d: %x\n", i, d_Buf[i]);
 #endif
-
+ 
   uniformUpdate(
       d_Dst,
       d_Buf,
@@ -160,8 +152,6 @@ void scanExclusiveLarge(
          );
 
 #ifdef DEBUG
-  //cudaMemcpy(h_countersSum, d_Dst, WARP_SIZE*numBlocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-  //for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("uniform %d: %x\n", i, h_countersSum[i]);
   #pragma omp target update from(d_Dst[0:WARP_SIZE*numBlocks])
   for (int i = 0; i < WARP_SIZE*numBlocks; i++) printf("uniform %d: %x\n", i, d_Dst[i]);
 #endif
