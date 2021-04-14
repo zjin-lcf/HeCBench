@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -14,36 +13,32 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp ../split-sycl/verify.cpp
+source = main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../split-sycl
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g 
+  CFLAGS += -g
+  LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -51,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../split-sycl/verify.cpp
+%.o: %.cu verify.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -59,5 +54,4 @@ clean:
 
 run: $(program)
 	./$(program) 33554432
-
 

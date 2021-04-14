@@ -9,27 +9,22 @@
  *
  */
 
-#include <omp.h>
+#include <hip/hip_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include "verify.cpp"
-
-typedef struct { unsigned int x; unsigned int y; unsigned int z; unsigned int w;} uint4 ;
+#include "verify.cu"
 
 //----------------------------------------------------------------------------
 // Scans each warp in parallel ("warp-scan"), one element per thread.
 // uses 2 numElements of shared memory per thread (64 = elements per warp)
 //----------------------------------------------------------------------------
 #define WARP_SIZE 32
-
-#pragma omp declare target 
-
+__device__
 unsigned int scanwarp(unsigned int val, volatile unsigned int* sData, const int maxlevel)
 {
   // The following is the same as 2 * RadixSort::WARP_SIZE * warpId + threadInWarp = 
-  // 64*(omp_get_thread_num() >> 5) + (omp_get_thread_num() & (RadixSort::WARP_SIZE - 1))
-  int localId = omp_get_thread_num();
+  // 64*(threadIdx.x >> 5) + (threadIdx.x & (RadixSort::WARP_SIZE - 1))
+  int localId = threadIdx.x;
   int idx = 2 * localId - (localId & (WARP_SIZE - 1));
   sData[idx] = 0;
   idx += WARP_SIZE;
@@ -48,11 +43,11 @@ unsigned int scanwarp(unsigned int val, volatile unsigned int* sData, const int 
 // scan4 scans 4*RadixSort::CTA_SIZE numElements in a block (4 per thread), using 
 // a warp-scan algorithm
 //----------------------------------------------------------------------------
-
+__device__
 uint4 scan4(const uint4 idata, unsigned int* ptr)
 {    
 
-  unsigned int idx = omp_get_thread_num();
+  unsigned int idx = threadIdx.x;
 
   uint4 val4 = idata;
   unsigned int sum[3];
@@ -63,18 +58,18 @@ uint4 scan4(const uint4 idata, unsigned int* ptr)
   unsigned int val = val4.w + sum[2];
 
   val = scanwarp(val, ptr, 4);
-  #pragma omp barrier
+  __syncthreads();
 
   if ((idx & (WARP_SIZE - 1)) == WARP_SIZE - 1)
   {
     ptr[idx >> 5] = val + val4.w + sum[2];
   }
-  #pragma omp barrier
+  __syncthreads();
 
   if (idx < WARP_SIZE)
     ptr[idx] = scanwarp(ptr[idx], ptr, 2);
 
-  #pragma omp barrier
+  __syncthreads();
 
   val += ptr[idx >> 5];
 
@@ -86,10 +81,11 @@ uint4 scan4(const uint4 idata, unsigned int* ptr)
   return val4;
 }
 
+__device__
 uint4 rank4(const uint4 preds, unsigned int* sMem, unsigned int* numtrue)
 {
-  int localId = omp_get_thread_num();
-  int localSize = omp_get_num_threads();
+  int localId = threadIdx.x;
+  int localSize = blockDim.x;
 
   uint4 address = scan4(preds, sMem);
 
@@ -97,7 +93,7 @@ uint4 rank4(const uint4 preds, unsigned int* sMem, unsigned int* numtrue)
   {
     numtrue[0] = address.w + preds.w;
   }
-  #pragma omp barrier
+  __syncthreads();
 
   uint4 rank;
   int idx = localId*4;
@@ -109,77 +105,91 @@ uint4 rank4(const uint4 preds, unsigned int* sMem, unsigned int* numtrue)
   return rank;
 }
 
+__global__ void radixSortBlocksKeysK(
+   unsigned int* keysIn, 
+   unsigned int* keysOut,
+   const unsigned int nbits,
+   const unsigned int startbit)
+{
+  int globalId = blockIdx.x * blockDim.x + threadIdx.x;
+  __shared__ unsigned int numtrue[1];
+  __shared__ unsigned int sMem[4*128];
 
-#pragma omp end declare target 
+  uint4 key = reinterpret_cast<uint4*>(keysIn)[globalId];
 
+  __syncthreads();
 
+  // radixSortBlockKeysOnly(&key, nbits, startbit, sMem, numtrue);
+  int localId = threadIdx.x;
+  int localSize = blockDim.x;
+
+  for(unsigned int shift = startbit; shift < (startbit + nbits); ++shift)
+  {
+    uint4 lsb;
+    lsb.x = !((key.x >> shift) & 0x1);
+    lsb.y = !((key.y >> shift) & 0x1);
+    lsb.z = !((key.z >> shift) & 0x1);
+    lsb.w = !((key.w >> shift) & 0x1);
+
+    uint4 r;
+
+    r = rank4(lsb, sMem, numtrue);
+
+    // This arithmetic strides the ranks across 4 CTA_SIZE regions
+    sMem[(r.x & 3) * localSize + (r.x >> 2)] = key.x;
+    sMem[(r.y & 3) * localSize + (r.y >> 2)] = key.y;
+    sMem[(r.z & 3) * localSize + (r.z >> 2)] = key.z;
+    sMem[(r.w & 3) * localSize + (r.w >> 2)] = key.w;
+    __syncthreads();
+
+    // The above allows us to read without 4-way bank conflicts:
+    key.x = sMem[localId];
+    key.y = sMem[localId +     localSize];
+    key.z = sMem[localId + 2 * localSize];
+    key.w = sMem[localId + 3 * localSize];
+
+    __syncthreads();
+  }
+
+  //keysOut[globalId] = key;
+  reinterpret_cast<uint4*>(keysOut)[globalId] = key;  
+  
+}
+
+  
 int main(int argc, char** argv) {
   srand(512);
   const int N = atoi(argv[1]);  // assume a multiple of 512
   unsigned int *keys = (unsigned int*) malloc (N * sizeof(unsigned int));
   unsigned int *out = (unsigned int*) malloc (N * sizeof(unsigned int));
-
   for (int i = 0; i < N; i++)  keys[i] = rand() % 16;
-  memcpy(out, keys, N*sizeof(unsigned int));
 
-  unsigned int startbit = 0;
-  unsigned int nbits = 4;
-  unsigned threads = 128;
-  unsigned teams = N/4/threads;
+  const unsigned int startbit = 0;
+  const unsigned int nbits = 4;
+  const unsigned threads = 128; // 1
+  const unsigned teams = N/4/threads; // 1
 
-#pragma omp target data map(tofrom: out[0:N]) 
-{
-  for (int i = 0; i < 100; i++) {
-    #pragma omp target teams num_teams(teams) thread_limit(threads)
-    {
-      unsigned int numtrue[1];
-      unsigned int sMem[512];
-      #pragma omp parallel 
-      {
-        int localId = omp_get_thread_num();
-        int localSize = omp_get_num_threads();
-        int globalId = omp_get_team_num() * localSize + localId;
-        uint4 key = reinterpret_cast<uint4*>(out)[globalId];
+  unsigned int* d_keys;
+  hipMalloc((void**)&d_keys, N*sizeof(unsigned int));
+  hipMemcpy(d_keys, keys, N*sizeof(unsigned int), hipMemcpyHostToDevice);
+  
+  unsigned int* d_tempKeys;
+  hipMalloc((void**)&d_tempKeys, N*sizeof(unsigned int));
 
-        for(unsigned int shift = startbit; shift < (startbit + nbits); ++shift)
-        {
-          uint4 lsb;
-          lsb.x = !((key.x >> shift) & 0x1);
-          lsb.y = !((key.y >> shift) & 0x1);
-          lsb.z = !((key.z >> shift) & 0x1);
-          lsb.w = !((key.w >> shift) & 0x1);
-
-          uint4 r;
-
-          r = rank4(lsb, sMem, numtrue);
-
-          // This arithmetic strides the ranks across 4 CTA_SIZE regions
-          sMem[(r.x & 3) * localSize + (r.x >> 2)] = key.x;
-          sMem[(r.y & 3) * localSize + (r.y >> 2)] = key.y;
-          sMem[(r.z & 3) * localSize + (r.z >> 2)] = key.z;
-          sMem[(r.w & 3) * localSize + (r.w >> 2)] = key.w;
-          #pragma omp barrier
-
-             // The above allows us to read without 4-way bank conflicts:
-          key.x = sMem[localId];
-          key.y = sMem[localId +     localSize];
-          key.z = sMem[localId + 2 * localSize];
-          key.w = sMem[localId + 3 * localSize];
-
-          #pragma omp barrier
-        }
-        reinterpret_cast<uint4*>(out)[globalId] = key;
-      }
-    }
-  }
-}
+  for (int i = 0; i < 100; i++)
+    hipLaunchKernelGGL(radixSortBlocksKeysK, dim3(teams), dim3(threads), 
+                       0, 0, d_keys, d_tempKeys, nbits, startbit);
  
+  hipMemcpy(out, d_tempKeys, N*sizeof(unsigned int), hipMemcpyDeviceToHost);
+
   bool check = verify(out, keys, threads, N);
   if (check)
     printf("PASS\n");
   else 
     printf("FAIL\n");
 
+  hipFree(d_keys);
+  hipFree(d_tempKeys);
   free(keys);
   free(out);
 

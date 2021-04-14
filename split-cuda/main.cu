@@ -176,7 +176,8 @@ int main(int argc, char** argv) {
   unsigned int* d_tempKeys;
   cudaMalloc((void**)&d_tempKeys, N*sizeof(unsigned int));
 
-  radixSortBlocksKeysK<<<teams, threads>>>(d_keys, d_tempKeys, nbits, startbit);
+  for (int i = 0; i < 100; i++)
+    radixSortBlocksKeysK<<<teams, threads>>>(d_keys, d_tempKeys, nbits, startbit);
  
   cudaMemcpy(out, d_tempKeys, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
