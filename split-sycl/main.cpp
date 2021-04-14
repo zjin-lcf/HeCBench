@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
   range<1> gws (teams * threads);
   range<1> lws (threads);
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 100; i++)
     q.submit([&] (handler &cgh) {
       auto keysIn = d_keys.get_access<sycl_read>(cgh);
       auto keysOut = d_tempKeys.get_access<sycl_discard_write>(cgh);

@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = xlc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = sm_70
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../split-sycl
+CFLAGS := -std=c++14 -Wall -I../split-sycl 
 
 # Linker Flags
 LDFLAGS = 
@@ -40,7 +41,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-qsmp -qoffload -qtgtarch=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
