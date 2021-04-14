@@ -33,14 +33,15 @@ unsigned int factorRadix2(unsigned int& log2L, unsigned int L)
 ////////////////////////////////////////////////////////////////////////////////
 #pragma omp declare target
 
-#if(1)
+#if(0)
 //Naive inclusive scan: O(N * log2(N)) operations
 //Allocate 2 * 'size' local memory, initialize the first half
 //with 'size' zeros avoiding if(pos >= offset) condition evaluation
 //and saving instructions
 
 inline unsigned int scan1Inclusive(const unsigned int idata, 
-                           unsigned int* l_Data, const unsigned int size)
+                                   unsigned int* l_Data, 
+                                   const unsigned int size)
 {
   int lid = omp_get_thread_num();
   unsigned int pos = 2 * lid - (lid & (size - 1));
@@ -58,21 +59,16 @@ inline unsigned int scan1Inclusive(const unsigned int idata,
   return l_Data[pos];
 }
 
-
-inline unsigned int scan1Exclusive(const unsigned int idata, 
-                                   unsigned int* l_Data, const unsigned int size)
-{
-  return scan1Inclusive(idata, l_Data, size) - idata;
-}
-
 #else
-#define LOG2_WARP_SIZE 5U
-#define      WARP_SIZE (1U << LOG2_WARP_SIZE)
+
+static const unsigned int WARP_SIZE = 32;
+static const unsigned int LOG2_WARP_SIZE = 5;
 
 //Almost the same as naiveScan1 but doesn't need barriers
 //assuming size <= WARP_SIZE
 inline unsigned int warpScanInclusive(const unsigned int idata, 
-                                      unsigned int* l_Data, const unsigned int size)
+                                      volatile unsigned int* l_Data, 
+                                      const unsigned int size)
 {
   int lid = omp_get_thread_num();
   unsigned int pos = 2 * lid - (lid & (size - 1));
@@ -104,7 +100,7 @@ inline unsigned int scan1Inclusive(const unsigned int idata,
     //sync to wait for warp scans to complete (because l_Data is being overwritten)
     #pragma omp barrier
 
-    int lid = threadIdx.x;
+    int lid = omp_get_thread_num();
     if( (lid & (WARP_SIZE - 1)) == (WARP_SIZE - 1) )
       l_Data[lid >> LOG2_WARP_SIZE] = warpResult;
 
@@ -124,13 +120,14 @@ inline unsigned int scan1Inclusive(const unsigned int idata,
     return warpScanInclusive(idata, l_Data, size);
   }
 }
-
+#endif
 
 inline unsigned int scan1Exclusive(const unsigned int idata, 
-                                   unsigned int* l_Data, const unsigned int size){
+                                   unsigned int* l_Data, const unsigned int size)
+{
   return scan1Inclusive(idata, l_Data, size) - idata;
 }
-#endif
+
 
 
 //Vector scan: the array to be scanned is stored
