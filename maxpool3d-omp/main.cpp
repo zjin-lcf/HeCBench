@@ -49,9 +49,8 @@ int main(int argc, char** argv)
 {
   for (int n = 0; n < 100; n++) {
     #pragma omp target teams distribute parallel for collapse(3) thread_limit(256) 
-    {
-    for (int z = 0; z < i_img_count; z++)
-      for (int y = 0; y < o_img_height; y++)
+    for (int z = 0; z < i_img_count; z++) {
+      for (int y = 0; y < o_img_height; y++) {
         for (int x = 0; x < o_img_width; x++) {
           const int xidx = Hstride*x;
           const int yidx = Vstride*y;
@@ -67,6 +66,7 @@ int main(int argc, char** argv)
           }
           d_output[(((z*o_img_height)+y)*o_img_width)+x] = maxval;
         }
+      }
     }
   }
 } 
