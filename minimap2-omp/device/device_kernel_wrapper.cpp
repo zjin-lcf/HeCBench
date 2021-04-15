@@ -2,6 +2,7 @@
 #include <cstring>
 #include <ctime>
 #include <cstdio>
+#include <cstdlib>
 #include <omp.h>
 #include "datatypes.h"
 #include "kernel_common.h"
