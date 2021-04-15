@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include <omp.h>
 
@@ -19,7 +20,7 @@ const size_t SSIZE = (size_t)NSIZE_round*48*48*48;  //Coefs size
 
 
 #pragma omp declare target
-#pragma omp declare simd simdlen(32)
+#pragma omp declare simd // simdlen(32)
 static inline void eval_UBspline_3d_s_vgh (
     const float * restrict coefs_init,
     const intptr_t xs,
@@ -213,7 +214,7 @@ void  eval_abc(const float * restrict Af, float tx, float * restrict a){
 
 #pragma omp declare target
 
-#pragma omp declare simd simdlen(32)
+#pragma omp declare simd // simdlen(32)
 static inline void eval_UBspline_3d_s_vgh (
     const float * restrict coefs_init,
     const intptr_t xs,
