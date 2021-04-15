@@ -107,16 +107,14 @@ void QuasirandomGeneratorGPU(float* output,
                              const unsigned int N,
                              const size_t szWgXDim)
 {
-#pragma omp target teams distribute parallel for collapse(2) thread_limit(szWgXDim)
-  {
-    for (unsigned int pos = 0; pos < N; pos++) {
-      for (unsigned int y = 0; y < QRNG_DIMENSIONS; y++) {
-        unsigned int result = 0;
-        unsigned int data = seed + pos;
-        for(int bit = 0; bit < QRNG_RESOLUTION; bit++, data >>= 1)
-          if(data & 1) result ^= table[bit + y * QRNG_RESOLUTION];
-        output[y * N + pos] = (float)(result + 1) * INT_SCALE;
-      }
+  #pragma omp target teams distribute parallel for collapse(2) thread_limit(szWgXDim)
+  for (unsigned int pos = 0; pos < N; pos++) {
+    for (unsigned int y = 0; y < QRNG_DIMENSIONS; y++) {
+      unsigned int result = 0;
+      unsigned int data = seed + pos;
+      for(int bit = 0; bit < QRNG_RESOLUTION; bit++, data >>= 1)
+        if(data & 1) result ^= table[bit + y * QRNG_RESOLUTION];
+      output[y * N + pos] = (float)(result + 1) * INT_SCALE;
     }
   }
 }
@@ -130,12 +128,10 @@ void InverseCNDGPU(float* output,
 {
   const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
 
-#pragma omp target teams distribute parallel for thread_limit(szWgXDim)
-  {
-    for(unsigned int pos = 0; pos < pathN; pos++){
-      unsigned int d = (pos + 1) * distance;
-      output[pos] = MoroInvCNDgpu(d);
-    }
+  #pragma omp target teams distribute parallel for thread_limit(szWgXDim)
+  for(unsigned int pos = 0; pos < pathN; pos++){
+    unsigned int d = (pos + 1) * distance;
+    output[pos] = MoroInvCNDgpu(d);
   }
 }
 
