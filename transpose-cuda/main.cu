@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cuda.h>
 
 #define TILE_SIZE 5900

@@ -1,6 +1,7 @@
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
 #include <cstdio>
+#include <cstdlib>
 
 #define TILE_SIZE 5900
 #define NTHREADS 256
