@@ -1,5 +1,5 @@
 #include <cstdio>
-#include <cstdio>
+#include <cstdlib>
 #include "common.h"
 
 #define TILE_SIZE 5900
