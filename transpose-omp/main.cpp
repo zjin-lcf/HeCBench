@@ -1,5 +1,5 @@
 #include <cstdio>
-#include <cstdio>
+#include <cstdlib>
 #include <omp.h>
 
 #define TILE_SIZE 5900
