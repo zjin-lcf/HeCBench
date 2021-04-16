@@ -3,18 +3,19 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = blackScholes
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
+source = blackScholesAnalyticEngine.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -34,13 +35,14 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
@@ -49,21 +51,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-MedianFilterHost.o : MedianFilterHost.cpp 
-	$(CC) $(CFLAGS) -c $< -o $@
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+%.o: %.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
+	./$(program) 
 

@@ -3,10 +3,18 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
+
+CheckSize ?= 256x256
+FINAL_STATE_FILE = ./final_state.dat
+AV_VELS_FILE = ./av_vels.dat
+REF_FINAL_STATE_FILE = ./check/$(CheckSize).final_state.dat
+REF_AV_VELS_FILE = ./check/$(CheckSize).av_vels.dat
+
 
 #===============================================================================
 # Program name & source code list
@@ -14,7 +22,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -23,7 +31,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -34,17 +42,17 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,18 +60,17 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-MedianFilterHost.o : MedianFilterHost.cpp 
-	$(CC) $(CFLAGS) -c $< -o $@
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.dat
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
+	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
 
+check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
+	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \
+        --ref-final-state-file=$(REF_FINAL_STATE_FILE) \
+        --av-vels-file=$(AV_VELS_FILE) \
+        --final-state-file=$(FINAL_STATE_FILE)

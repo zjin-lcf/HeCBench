@@ -3,27 +3,25 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = divergence
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
-
-obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -40,30 +38,26 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): divergence.o timer.o 
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
+divergence.o: divergence.cpp divergence.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cpp 
+timer.o: timer/timer.cpp timer/timer.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
-	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) *.o
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
-
+	./$(program) input.txt 10000

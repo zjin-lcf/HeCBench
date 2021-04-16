@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -14,16 +13,16 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
+source = main.cu shrUtils.cu cmd_arg_reader.cu 
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -DUNIX -std=c++14 -Xcompiler -Wall \
 
 # Linker Flags
 LDFLAGS = 
@@ -34,15 +33,10 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
-endif
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
 endif
 
 #===============================================================================
@@ -52,18 +46,31 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
+main.o : main.cu \
+         tridiagonal.h\
+         shrUtils.h\
+         file_read_write.h\
+         test_gen_result_check.h\
+         cpu_solvers.h\
+         pcr_small_systems.h\
+         cyclic_small_systems.h\
+         sweep_small_systems.h\
+         pcr_kernels.cu\
+         cyclic_kernels.cu\
+         sweep_kernels.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cpp 
+shrUtils.o: shrUtils.cu shrUtils.h cmd_arg_reader.h exception.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
+cmd_arg_reader.o: cmd_arg_reader.cu cmd_arg_reader.h exception.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.dat *.timing *.txt *.csv
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
+	./$(program)  
+	./$(program) --lmem  
+	./$(program) --vec4  
 

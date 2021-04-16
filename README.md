@@ -10,7 +10,7 @@ Software: Intel<sup>®</sup> oneAPI Beta08* Toolkit, Ubuntu 18.04
 Platform 1: Intel<sup>®</sup> Xeon E3-1284L with a Gen8 P6300 integrated GPU  
 Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 
-*newer versions are only used when they can produce results correctly
+*newer versions may be used when they can produce results correctly
 
 ## Run
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
@@ -1844,6 +1844,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### md5hash
   MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
+### medianfilter
+  2-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### memcpy
   A benchmark for memory copy from a host to a device
 
@@ -1910,9 +1913,12 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### qrg
   Quasirandom generator implements Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### radixsort
+  A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
-
+  
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
 
@@ -1962,6 +1968,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
+### sptrsv
+  A Thread-Level Synchronization-Free Sparse Triangular Solve (https://github.com/JiyaSu/CapelliniSpTRSV)
+
 ### srad
   SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -1986,6 +1995,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### triad
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### tridiagonal
+  Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### vmc
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
@@ -1999,7 +2011,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Pedro Valero Lara, Piotr Różański, Robert Harrison, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
-Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also uses resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
+Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	

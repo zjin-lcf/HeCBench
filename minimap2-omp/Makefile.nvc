@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
@@ -14,7 +15,11 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
+source = device/device_kernel_wrapper.cpp \
+src/host_data_io.cpp   \
+src/host_kernel.cpp   \
+src/main.cpp   \
+src/memory_scheduler.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -23,7 +28,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../include -I./include \
 
 # Linker Flags
 LDFLAGS = 
@@ -34,36 +39,33 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) 
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-MedianFilterHost.o : MedianFilterHost.cpp 
-	$(CC) $(CFLAGS) -c $< -o $@
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+%.o: %.cpp include/datatypes.h include/device_kernel_wrapper.h \
+	   include/host_data_io.h include/host_kernel.h \
+	   include/kernel_common.h include/memory_scheduler.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
+	./$(program) ../minimap2-sycl/in-1k.txt kernel-out.txt
 
