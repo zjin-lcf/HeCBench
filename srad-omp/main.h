@@ -6,7 +6,7 @@
 //	DEFINE
 //====================================================================================================100
 
-#define fp float
+#define FP float
 
 #ifdef RD_WG_SIZE_0_0
         #define NUMBER_THREADS RD_WG_SIZE_0_0
