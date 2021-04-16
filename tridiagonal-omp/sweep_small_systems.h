@@ -127,8 +127,8 @@ double sweep_small_systems(float *a, float *b, float *c, float *d, float *x,
                                   b[0:mem_size], \
                                   c[0:mem_size], \
                                   d[0:mem_size]) \
-                          map(from: t[0:mem_size]), \
                           map(alloc: x[0:mem_size], \
+                                     t[0:mem_size], \
                                      w[0:mem_size])
 {
   if (reorder)
@@ -154,12 +154,12 @@ double sweep_small_systems(float *a, float *b, float *c, float *d, float *x,
   {
     // transpose result back
     reorder_time += runReorderKernel(x, t, workSize, system_size);
-    //std::swap(x, t);
-  }
+    std::swap(x, t);
+  } 
+  #pragma omp target update from (x[0:mem_size])
 }
-  memcpy(x, t, mem_size * sizeof(float));
   
-  //free(t);
+  if (!reorder) free(t);
   free(w);
   return solver_time + reorder_time;
 }
