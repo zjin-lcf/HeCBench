@@ -1,0 +1,8 @@
+nvcc -DUNIX -std=c++14 -Xcompiler -Wall  -O3 -c main.cu -o main.o
+nvcc warning : The -std=c++14 flag is not supported with the configured host compiler. Flag will be ignored.
+sweep_small_systems.h(49): error: a host function call cannot be configured
+
+sweep_small_systems.h(58): error: a host function call cannot be configured
+
+2 errors detected in the compilation of "main.cu".
+make: *** [main.o] Error 1
