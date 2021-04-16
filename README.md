@@ -10,7 +10,7 @@ Software: Intel<sup>®</sup> oneAPI Beta08* Toolkit, Ubuntu 18.04
 Platform 1: Intel<sup>®</sup> Xeon E3-1284L with a Gen8 P6300 integrated GPU  
 Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 
-*newer versions are only used when they can produce results correctly
+*newer versions may be used when they can produce results correctly
 
 ## Run
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
@@ -1907,9 +1907,12 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### qrg
   Quasirandom generator implements Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### radixsort
+  A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
-
+  
 ### reduction
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
 
@@ -1983,6 +1986,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### triad
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### tridiagonal
+  Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### vmc
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
