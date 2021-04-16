@@ -1959,6 +1959,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
+### sptrsv
+  A Thread-Level Synchronization-Free Sparse Triangular Solve (https://github.com/JiyaSu/CapelliniSpTRSV)
+
 ### srad
   SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
