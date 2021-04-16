@@ -7,11 +7,6 @@
  * this software and related documentation outside the terms of the EULA
  * is strictly prohibited.
  *
- */
-
-/*
- * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
- * 
  * Tridiagonal solvers.
  * Host code for sweep solver (one-system-per-thread).
  *
@@ -38,7 +33,7 @@ double runReorderKernel(float* d_a, float* d_t, int width, int height)
 {
   // set transpose kernel execution parameters
   size_t szTeamX = shrRoundUp(TRANSPOSE_BLOCK_DIM, width) / TRANSPOSE_BLOCK_DIM;
-  size_t szTeamY = shrRoundUp(TRANSPOSE_BLOCK_DIM, width) / TRANSPOSE_BLOCK_DIM;
+  size_t szTeamY = shrRoundUp(TRANSPOSE_BLOCK_DIM, height) / TRANSPOSE_BLOCK_DIM;
   size_t szTeam = szTeamX * szTeamY;
 
   transpose(d_t, d_a, width, height, szTeamX, szTeam);
@@ -132,8 +127,8 @@ double sweep_small_systems(float *a, float *b, float *c, float *d, float *x,
                                   b[0:mem_size], \
                                   c[0:mem_size], \
                                   d[0:mem_size]) \
-                          map(from: x[0:mem_size]), \
-                          map(alloc: t[0:mem_size], \
+                          map(from: t[0:mem_size]), \
+                          map(alloc: x[0:mem_size], \
                                      w[0:mem_size])
 {
   if (reorder)
@@ -159,11 +154,12 @@ double sweep_small_systems(float *a, float *b, float *c, float *d, float *x,
   {
     // transpose result back
     reorder_time += runReorderKernel(x, t, workSize, system_size);
-    std::swap(x, t);
+    //std::swap(x, t);
   }
 }
+  memcpy(x, t, mem_size * sizeof(float));
   
-  free(t);
+  //free(t);
   free(w);
   return solver_time + reorder_time;
 }

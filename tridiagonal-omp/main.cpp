@@ -26,8 +26,6 @@
  * NVIDIA, Nikolai Sakharnykh, 2009
  */
 
-//#define OUTPUT_RESULTS
-#define BENCH_ITERATIONS  100
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,6 +36,7 @@
 #include "file_read_write.h"
 #include "test_gen_result_check.h"
 #include "cpu_solvers.h"
+#include "tridiagonal.h"
 
 bool             useLmem = false;  // select sweep_small_systems_local_kernel
 bool             useVec4 = false;  // select sweep_small_systems_global_vec4_kernel
