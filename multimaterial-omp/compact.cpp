@@ -112,7 +112,6 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
   //ccc_loop1 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
 
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
-{
     for (int j = 0; j < sizey; j++) {
       for (int i = 0; i < sizex; i++) {
     #ifdef FUSED
@@ -144,13 +143,11 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
      
     }
   }
-}
 
 #ifndef FUSED
 
   // ccc_loop1_2 <<< dim3((mmc_cells-1)/(thx*thy)+1), dim3((thx*thy)) >>> (d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, d_mmc_index, mmc_cells, d_mmc_i, d_mmc_j, sizex, sizey);
 #pragma omp target teams distribute parallel for thread_limit(thx*thy)
-{
     for (int c = 0; c < mmc_cells; c++) {
       double ave = 0.0;
       for (int m = mmc_index[c]; m < mmc_index[c+1]; m++) {
@@ -158,7 +155,6 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
       }
       rho_ave_compact[mmc_i[c]+sizex*mmc_j[c]] = ave/V[mmc_i[c]+sizex*mmc_j[c]];
     }
-}
 #endif
 
 #ifdef DEBUG
@@ -170,7 +166,6 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
   // ccc_loop2 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
   
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
-{
     for (int j = 0; j < sizey; j++) {
       for (int i = 0; i < sizex; i++) {
       int ix = imaterial[i+sizex*j];
@@ -202,16 +197,13 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
      }
     }
   }
-}
 #ifndef FUSED
   //ccc_loop2_2 <<< dim3((mm_len-1)/(thx*thy)+1), dim3((thx*thy)) >>> (d_matids, d_rho_compact_list, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact_list, d_mmc_index, mm_len);
 #pragma omp target teams distribute parallel for thread_limit(thx*thy)
-{
     for (int idx = 0; idx < mm_len; idx++) {
       double nm = n[matids[idx]];
       p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
     }
-}
 #endif
 
 #ifdef DEBUG
@@ -223,7 +215,6 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
 #endif
   //ccc_loop3 <<< dim3(blocks), dim3(threads) >>> (d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
-{
     // if (i >= sizex-1 || j >= sizey-1 || i < 1 || j < 1) return;
     for (int j = 1; j < sizey-1; j++) {
       for (int i = 1; i < sizex-1; i++) {
@@ -353,7 +344,6 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
     rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
   } // end else
  }
-}
 }
 }
 #ifdef DEBUG
