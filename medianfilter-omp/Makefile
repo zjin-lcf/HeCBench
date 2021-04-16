@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp MedianFilter.cpp shrUtils.h
+main.o: main.cpp shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 MedianFilterHost.o : MedianFilterHost.cpp 
