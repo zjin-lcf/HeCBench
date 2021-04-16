@@ -21,6 +21,9 @@
 #define REORDER
 #define SYSTEM_SIZE  128
 
+//#define OUTPUT_RESULTS
+#define BENCH_ITERATIONS  1
+
 typedef struct { float x; float y; float z; float w; } float4 ;
 
 #endif
