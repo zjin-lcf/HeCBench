@@ -3,18 +3,20 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
+
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = qtc
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
+source = main.cpp Option.cpp OptionParser.cpp QTC.cpp comm.cpp libdata.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -30,9 +32,10 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -40,30 +43,40 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-qopenmp
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
+main.o: main.cpp OptionParser.h Utility.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cpp 
+comm.o: comm.cpp comm.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
+libdata.o: libdata.cpp libdata.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Option.o: Option.cpp Option.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+OptionParser.o: OptionParser.cpp OptionParser.h Utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+QTC.o: QTC.cpp QTC.h OptionParser.h libdata.h \
+       tuningParameters.h comm.h kernels_compact_storage.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
+	./$(program) --Verbose
+	#./$(program) --SaveOutput
 
