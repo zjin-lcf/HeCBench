@@ -47,13 +47,8 @@ void sweep_small_systems_local_kernel(
     c2 = b_d[base_idx];
     f_i = d_d[base_idx];
 
-#ifndef NATIVE_DIVIDE
     a[1] = - c1 / c2;
     x_prev = f_i / c2;
-#else
-    a[1] = - __fdiv_rn(c1, c2);
-    x_prev = __fdiv_rn(f_i, c2);
-#endif
 
     // forward trace
     int idx = base_idx;
@@ -68,11 +63,7 @@ void sweep_small_systems_local_kernel(
       f_i = d_d[idx];
 
       float q = (c3 * a[k] + c2);
-#ifndef NATIVE_DIVIDE
       float t = 1 / q; 
-#else
-      float t = __frcp_rn(q);
-#endif
       x_next = (f_i - c3 * x_prev) * t;
       x_d[idx] = x_prev = x_next;
 
@@ -86,11 +77,7 @@ void sweep_small_systems_local_kernel(
     f_i = d_d[idx];
 
     float q = (c3 * a[system_size-1] + c2);
-#ifndef NATIVE_DIVIDE
     float t = 1 / q; 
-#else
-    float t = __frcp_rn(q);
-#endif 
     x_next = (f_i - c3 * x_prev) * t;
     x_d[idx] = x_prev = x_next;
 
@@ -270,13 +257,8 @@ void sweep_small_systems_global_vec4_kernel(
       c2 = load(b_d, base_idx);
       f_i = load(d_d, base_idx);
 
-#ifndef NATIVE_DIVIDE
       store(w_d, getLocalIdx(i, 1, num_systems), - c1 / c2);
       x_prev = f_i / c2;
-#else
-      store(w_d, getLocalIdx(i, 1, num_systems), native_divide(-c1, c2));
-      x_prev = native_divide(f_i, c2);
-#endif
 
       // forward trace
       int idx = base_idx;
@@ -291,11 +273,7 @@ void sweep_small_systems_global_vec4_kernel(
         f_i = load(d_d, idx);
 
         float4 q = (c3 * load(w_d, getLocalIdx(i, k, num_systems)) + c2);
-#ifndef NATIVE_DIVIDE
         float4 t = {1.0f/q.x, 1.0f/q.y, 1.0f/q.z, 1.0f/q.w};
-#else
-        float4 t = native_recip(q);
-#endif
         x_next = (f_i - c3 * x_prev) * t;
         x_prev = x_next;
         store(x_d, idx, x_prev);
@@ -310,11 +288,7 @@ void sweep_small_systems_global_vec4_kernel(
       f_i = load(d_d, idx);
 
       float4 q = (c3 * load(w_d, getLocalIdx(i, system_size-1, num_systems)) + c2);
-#ifndef NATIVE_DIVIDE
       float4 t = {1.0f/q.x, 1.0f/q.y, 1.0f/q.z, 1.0f/q.w};
-#else
-      float4 t = native_recip(q);
-#endif 
       x_next = (f_i - c3 * x_prev) * t;
       x_prev = x_next;
       store(x_d, idx, x_prev);
