@@ -1844,6 +1844,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### md5hash
   MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
+### medianfilter
+  2-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
 ### memcpy
   A benchmark for memory copy from a host to a device
 
@@ -2002,7 +2005,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Pedro Valero Lara, Piotr Różański, Robert Harrison, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
-Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also uses resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
+Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
