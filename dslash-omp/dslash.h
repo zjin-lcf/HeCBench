@@ -80,6 +80,7 @@ typedef struct { dcomplex c[3]; } dsu3_vector;
 /*   b = a*   */
 #define CONJG(a,b)     { (b).real = (a).real; (b).imag = -(a).imag; }
 
+#pragma omp declare target
 //--------------------------------------------------------------------------------
 inline void su3_adjoint( const su3_matrix *a, su3_matrix *b ){
   int i,j;
@@ -112,15 +113,7 @@ inline void mult_su3_mat_vec_sum( const su3_matrix *a, const su3_vector *b,
     c->c[i].imag += x.imag;
   }
 }
-//--------------------------------------------------------------------------------
-inline void mult_su3_mat_vec_sum_4dir( su3_matrix *a, su3_vector *b0,
-       su3_vector *b1, su3_vector *b2, su3_vector *b3, 
-       su3_vector *c  ){
-    mult_su3_mat_vec(       a,b0,c );
-    mult_su3_mat_vec_sum( ++a,b1,c );
-    mult_su3_mat_vec_sum( ++a,b2,c );
-    mult_su3_mat_vec_sum( ++a,b3,c );
-}
+
 //--------------------------------------------------------------------------------
 inline void add_su3_vector( const su3_vector *a, const su3_vector *b, su3_vector *c ){
   int i;
@@ -134,6 +127,18 @@ inline void sub_su3_vector( const su3_vector *a, const su3_vector *b, su3_vector
   for(i=0;i<3;i++){
     CSUB( a->c[i], b->c[i], c->c[i] );
   }
+}
+
+#pragma omp end declare target
+
+//--------------------------------------------------------------------------------
+inline void mult_su3_mat_vec_sum_4dir( su3_matrix *a, su3_vector *b0,
+       su3_vector *b1, su3_vector *b2, su3_vector *b3, 
+       su3_vector *c  ){
+    mult_su3_mat_vec(       a,b0,c );
+    mult_su3_mat_vec_sum( ++a,b1,c );
+    mult_su3_mat_vec_sum( ++a,b2,c );
+    mult_su3_mat_vec_sum( ++a,b3,c );
 }
 //--------------------------------------------------------------------------------
 #include <stdio.h>
