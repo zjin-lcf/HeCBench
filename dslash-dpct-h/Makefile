@@ -6,7 +6,6 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -28,7 +27,7 @@ CFLAGS := -std=c++14 \
           -DMILC_COMPLEX \
           -DLDIM=32 \
           -DPRECISION=2 \
-          -Wall -I../include
+          -Wall 
 
 # Linker Flags
 LDFLAGS = 
