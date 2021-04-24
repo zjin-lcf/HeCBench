@@ -7,15 +7,15 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
+
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = qtc
 
-source = euler3d.cpp
+source = main.cpp Option.cpp OptionParser.cpp QTC.cpp comm.cpp libdata.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -24,14 +24,14 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
@@ -49,10 +49,6 @@ ifeq ($(DEVICE),gpu)
 else
   CFLAGS +=-fopenmp
 endif
-
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -60,14 +56,29 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+main.o: main.cpp OptionParser.h Utility.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+comm.o: comm.cpp comm.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+libdata.o: libdata.cpp libdata.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Option.o: Option.cpp Option.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+OptionParser.o: OptionParser.cpp OptionParser.h Utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+QTC.o: QTC.cpp QTC.h OptionParser.h libdata.h \
+       tuningParameters.h comm.h kernels_compact_storage.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
+	./$(program) --Verbose
+	#./$(program) --SaveOutput
 

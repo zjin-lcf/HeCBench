@@ -42,7 +42,7 @@ double cyclic_small_systems(float *a, float *b, float *c, float *d, float *x,
 
   size_t szTeams;
   size_t szThreads;
-  int iterations = log2(system_size/2);
+  int iterations = my_log2 (system_size/2);
 
   // set execution parameters
   szThreads = system_size / 2;

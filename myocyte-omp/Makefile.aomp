@@ -13,7 +13,6 @@ CFLAGS :=  -Wall
 LDFLAGS = -lm
 
 ifeq ($(DEVICE),gpu)
-  #CFLAGS +=-qsmp -qoffload 
   CFLAGS += -target x86_64-pc-linux-gnu \
           -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
           -Xopenmp-target=amdgcn-amd-amdhsa \
@@ -57,7 +56,7 @@ endif
 ./main.o:	./common.h \
 	./main.h \
 	./main.c
-	$(CC) ./main.c \
+	$(CC) $(CFLAGS) ./main.c \
 		-c \
 		-o ./main.o \
 		-O3

@@ -7,7 +7,13 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
+
+CheckSize ?= 256x256
+FINAL_STATE_FILE = ./final_state.dat
+AV_VELS_FILE = ./av_vels.dat
+REF_FINAL_STATE_FILE = ./check/$(CheckSize).final_state.dat
+REF_AV_VELS_FILE = ./check/$(CheckSize).av_vels.dat
+
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +21,7 @@ DUMP      = yes
 
 program = main
 
-source = euler3d.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -24,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -49,25 +55,24 @@ ifeq ($(DEVICE),gpu)
 else
   CFLAGS +=-fopenmp
 endif
-
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.dat
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
+	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
 
+check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
+	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \
+        --ref-final-state-file=$(REF_FINAL_STATE_FILE) \
+        --av-vels-file=$(AV_VELS_FILE) \
+        --final-state-file=$(FINAL_STATE_FILE)
