@@ -3,31 +3,28 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
+SM        = cc70
+
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
-
-source = euler3d.cpp
-
-obj = $(source:.cpp=.o)
+program = axhelm
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -41,33 +38,36 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906
-else
-  CFLAGS +=-fopenmp
-endif
 
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
+all: build
 
-$(program): $(obj) Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+build: $(program)
 
-%.o: %.cpp Makefile
+main.o : main.cpp axhelmReference.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
+BlasLapack/libBlasLapack.a: 
+	cd BlasLapack && make -j8 && cd ..
+
+$(program): main.o meshBasis.o BlasLapack/libBlasLapack.a 
+	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
+
 clean:
-	rm -rf $(program) $(obj)
+	cd BlasLapack && make clean && cd ..
+	rm -rf $(program) main.o meshBasis.o 
 
+# run one- and three-dimensional kernels
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
-
+	./$(program) 1 8000 100
+	./$(program) 3 8000 100
