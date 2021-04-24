@@ -7,7 +7,6 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +14,7 @@ DUMP      = yes
 
 program = main
 
-source = euler3d.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -49,10 +48,6 @@ ifeq ($(DEVICE),gpu)
 else
   CFLAGS +=-fopenmp
 endif
-
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -67,7 +62,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
+	./$(program) ../nms-cuda/detections.txt output.txt
 

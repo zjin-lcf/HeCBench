@@ -113,7 +113,7 @@ int main() {
                         map(to: vsq[0:ArraySize]) \
                         map(alloc: next_r[0:ArraySize]) \
                         map(alloc: next_s[0:ArraySize]) \
-                        map(from: image_gpu[0:ArraySize]) 
+                        map(tofrom: image_gpu[0:ArraySize]) 
 {
   for (int t = 0; t < nt; t++) {
     #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
