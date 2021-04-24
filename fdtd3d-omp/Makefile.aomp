@@ -7,7 +7,6 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +14,7 @@ DUMP      = yes
 
 program = main
 
-source = euler3d.cpp
+source = main.cpp FDTD3dReference.cpp FDTD3dGPU.cpp shrUtils.cpp cmd_arg_reader.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -24,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -50,24 +49,19 @@ else
   CFLAGS +=-fopenmp
 endif
 
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp shrUtils.h cmd_arg_reader.h exception.h FDTD3dGPU.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
+	./$(program) --dimx=192 --dimy=184 --timesteps=90
 

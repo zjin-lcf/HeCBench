@@ -7,7 +7,6 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +14,7 @@ DUMP      = yes
 
 program = main
 
-source = euler3d.cpp
+source = 3D.cpp 3D_helper.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -49,10 +48,6 @@ ifeq ($(DEVICE),gpu)
 else
   CFLAGS +=-fopenmp
 endif
-
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -64,10 +59,8 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) output.out
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
-	#./$(program) ../data/cfd/fvcorr.domn.193K   
-	#./$(program) ../data/cfd/missile.domn.0.2M  
+	./$(program) 512 8 5000 ../data/hotspot3D/power_512x8 ../data/hotspot3D/temp_512x8 output.out
 

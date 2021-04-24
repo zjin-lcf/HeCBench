@@ -21,7 +21,7 @@
 #ifndef _TEST_GEN_RESULT_CHECK_
 #define _TEST_GEN_RESULT_CHECK_ 
 
-int log2(int n)
+int my_log2 (int n)
 {
   int res = 0;
   while (n > 1) { n >>= 1; res++; }
