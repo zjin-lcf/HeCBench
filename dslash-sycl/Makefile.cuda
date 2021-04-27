@@ -26,7 +26,6 @@ obj = $(source:.cpp=.o)
 # Standard Flags
 # Double precision and the grid size is 32^4 
 CFLAGS := -DUSE_GPU -std=c++14 \
-          -Xcompiler -Wall \
           -DMILC_COMPLEX \
           -DLDIM=32 \
           -DPRECISION=2 \
