@@ -1820,6 +1820,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### leukocyte 
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### libor
+  a LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
+
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
 
@@ -1989,6 +1992,9 @@ We may build the [software from source with support for AMD HIP](https://github.
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
+### testSNAP
+  A proxy for the SNAP force calculation in the LAMMPS molecular dynamics package (https://github.com/FitSNAP/TestSNAP)
+
 ### thomas
   solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
 
@@ -2014,7 +2020,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mike Giles, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
