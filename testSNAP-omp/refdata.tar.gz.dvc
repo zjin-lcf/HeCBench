@@ -1,0 +1,5 @@
+outs:
+- md5: a1658855b569a2ba8ae42d1b677c182e
+  size: 2873476
+  hash: md5
+  path: refdata.tar.gz
