@@ -1,3 +1,22 @@
+//////////////////////////////////////////////////////////////////
+//                                                              //
+// This software was written by Mike Giles in 2007 based on     //
+// C code written by Zhao and Glasserman at Columbia University //
+//                                                              //
+// It is copyright University of Oxford, and provided under     //
+// the terms of the BSD3 license:                               //
+// https://opensource.org/licenses/BSD-3-Clause                 //
+//                                                              //
+// It is provided along with an informal report on              //
+// https://people.maths.ox.ac.uk/~gilesm/cuda_old.html          //
+//                                                              //
+// Note: this was written for CUDA 1.0 and optimised for        //
+// execution on an NVIDIA 8800 GTX GPU                          //
+//                                                              //
+// Mike Giles, 29 April 2021                                    //
+//                                                              //
+//////////////////////////////////////////////////////////////////
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
