@@ -48,10 +48,6 @@ int main(int argc, char **argv) {
     });
   });
 
-  printf("baseToNum:\n");
-  auto reads_acc = reads.get_access<sycl_read>();
-  for (int i = 0; i < total_length; i++) printf("%d\n", reads_acc[i]);
-
   buffer<unsigned int> d_compressed(total_length / 16);
   buffer<int> d_gaps(readsCount);
   range<1> compress_gws((readsCount+127)/128*128);
@@ -74,13 +70,6 @@ int main(int argc, char **argv) {
     });
   });
 
-  printf("gaps:\n");
-  auto gaps_acc = d_gaps.get_access<sycl_read>();
-  for (int i = 0; i < readsCount; i++) printf("%d\n", gaps_acc[i]);
-
-  printf("compressed:\n");
-  auto compressed_acc = d_compressed.get_access<sycl_read>();
-  for (int i = 0; i < total_length/16; i++) printf("%d\n", compressed_acc[i]);
   //createIndex(data, option);
 
   unsigned short* h_indexs = (unsigned short*) malloc (sizeof(unsigned short) * total_length);
