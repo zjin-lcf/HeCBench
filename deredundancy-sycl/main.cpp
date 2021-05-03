@@ -95,16 +95,16 @@ int main(int argc, char **argv) {
         auto words = d_words.get_access<sycl_discard_write>(cgh);
         auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
         cgh.parallel_for<class index4> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-            kernel_createIndex4(
-                reads.get_pointer(), 
-                lengths.get_pointer(),
-                offsets.get_pointer(), 
-                indexs.get_pointer(),
-                orders.get_pointer(),
-                words.get_pointer(), 
-                magicBase.get_pointer(), 
-                readsCount,
-                item);
+          kernel_createIndex4(
+            reads.get_pointer(), 
+            lengths.get_pointer(),
+            offsets.get_pointer(), 
+            indexs.get_pointer(),
+            orders.get_pointer(),
+            words.get_pointer(), 
+            magicBase.get_pointer(), 
+            readsCount,
+            item);
         });
       });
       break;
@@ -118,16 +118,16 @@ int main(int argc, char **argv) {
         auto words = d_words.get_access<sycl_discard_write>(cgh);
         auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
         cgh.parallel_for<class index5> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-            kernel_createIndex5(
-                reads.get_pointer(), 
-                lengths.get_pointer(),
-                offsets.get_pointer(), 
-                indexs.get_pointer(),
-                orders.get_pointer(),
-                words.get_pointer(), 
-                magicBase.get_pointer(), 
-                readsCount,
-                item);
+          kernel_createIndex5(
+            reads.get_pointer(), 
+            lengths.get_pointer(),
+            offsets.get_pointer(), 
+            indexs.get_pointer(),
+            orders.get_pointer(),
+            words.get_pointer(), 
+            magicBase.get_pointer(), 
+            readsCount,
+            item);
         });
       });
       break;
@@ -141,16 +141,16 @@ int main(int argc, char **argv) {
         auto words = d_words.get_access<sycl_discard_write>(cgh);
         auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
         cgh.parallel_for<class index6> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-            kernel_createIndex6(
-                reads.get_pointer(), 
-                lengths.get_pointer(),
-                offsets.get_pointer(), 
-                indexs.get_pointer(),
-                orders.get_pointer(),
-                words.get_pointer(), 
-                magicBase.get_pointer(), 
-                readsCount,
-                item);
+          kernel_createIndex6(
+            reads.get_pointer(), 
+            lengths.get_pointer(),
+            offsets.get_pointer(), 
+            indexs.get_pointer(),
+            orders.get_pointer(),
+            words.get_pointer(), 
+            magicBase.get_pointer(), 
+            readsCount,
+            item);
         });
       });
       break;
@@ -164,41 +164,42 @@ int main(int argc, char **argv) {
         auto words = d_words.get_access<sycl_discard_write>(cgh);
         auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
         cgh.parallel_for<class index7> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-            kernel_createIndex7(
-                reads.get_pointer(), 
-                lengths.get_pointer(),
-                offsets.get_pointer(), 
-                indexs.get_pointer(),
-                orders.get_pointer(),
-                words.get_pointer(), 
-                magicBase.get_pointer(), 
-                readsCount,
-                item);
+          kernel_createIndex7(
+            reads.get_pointer(), 
+            lengths.get_pointer(),
+            offsets.get_pointer(), 
+            indexs.get_pointer(),
+            orders.get_pointer(),
+            words.get_pointer(), 
+            magicBase.get_pointer(), 
+            readsCount,
+            item);
         });
       });
       break;
   }
 
-  // createCutoff(data, option);  // create threshold ok
+  // createCutoff(data, option);
   float threshold = option.threshold;
   buffer<int, 1> d_wordCutoff (readsCount);
   q.submit([&](handler &cgh) {
-    auto reads = d_reads.get_access<sycl_read>(cgh);
+    //auto reads = d_reads.get_access<sycl_read>(cgh);
     auto lengths = d_lengths.get_access<sycl_read>(cgh);
     auto words = d_words.get_access<sycl_read>(cgh);
     auto wordCutoff = d_wordCutoff.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class index7> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-        kernel_createCutoff(threshold, 
-            wordLength, 
-            lengths.get_pointer(),
-            words.get_pointer(),
-            wordCutoff.get_pointer(),
-            readsCount, 
-            item);
+      kernel_createCutoff(
+        threshold, 
+        wordLength, 
+        lengths.get_pointer(),
+        words.get_pointer(),
+        wordCutoff.get_pointer(),
+        readsCount, 
+        item);
     });
   });
 
-  // sortIndex(data);  // sort index ok
+  // sortIndex(data);
   q.submit([&](handler &cgh) {
     auto indexs = d_indexs.get_access<sycl_read>(cgh);
     cgh.copy(indexs, h_indexs);
@@ -219,7 +220,7 @@ int main(int argc, char **argv) {
     std::sort(&h_indexs[start], &h_indexs[start]+length);
   }
 
-  // mergeIndex(data);  // merge index ok
+  // mergeIndex(data);
   q.submit([&](handler &cgh) {
     auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
     cgh.copy(h_indexs, indexs);
@@ -231,28 +232,30 @@ int main(int argc, char **argv) {
     auto words = d_words.get_access<sycl_read>(cgh);
     auto orders = d_orders.get_access<sycl_write>(cgh);
     cgh.parallel_for<class mergeIndex> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
-        kernel_mergeIndex(offsets.get_pointer(), 
-            indexs.get_pointer(), 
-            orders.get_pointer(),
-            words.get_pointer(), 
-            readsCount, 
-            item);
+      kernel_mergeIndex(
+        offsets.get_pointer(), 
+        indexs.get_pointer(), 
+        orders.get_pointer(),
+        words.get_pointer(), 
+        readsCount, 
+        item);
     });
   });
 
-  // clustering(option, data, bench);  // clustering ok
   int* h_cluster = (int*) malloc (sizeof(int) * readsCount);
   for (int i = 0; i < readsCount; i++) {
     h_cluster[i] = -1;
   }
 
   buffer<int, 1> d_cluster(h_cluster, readsCount);
+  d_cluster.set_final_data(nullptr);
 
   unsigned short* table = (unsigned short*) malloc (sizeof(unsigned short) * 65536);
   memset(table, 0, 65536*sizeof(unsigned short));  // fill zero
   buffer<unsigned short, 1> d_table(table, 65536);
+  d_table.set_final_data(nullptr);
 
-  int r = -1; // 
+  int r = -1; // a shorthand for representative
 
   range<1> makeTable_gws(128*128);
   range<1> makeTable_lws(128);
@@ -260,7 +263,7 @@ int main(int argc, char **argv) {
   range<1> cleanTable_lws(128);
   range<1> magic_gws((readsCount+127)/128*128);
   range<1> magic_lws(128);
-  range<1> filter_gws((readsCount+127)/128*128);
+  range<1> filter_gws(readsCount*128);
   range<1> filter_lws(128);
   range<1> align_gws((readsCount+127)/128*128);
   range<1> align_lws(128);
@@ -271,7 +274,7 @@ int main(int argc, char **argv) {
     if (r >= readsCount-1) {  // complete
       break;
     }
-    std::cout << r << "/" << readsCount << std::endl;
+    //std::cout << r << "/" << readsCount << std::endl;
 
     q.submit([&](sycl::handler &cgh) {
       auto offsets = d_offsets.get_access<sycl_read>(cgh);
@@ -280,8 +283,14 @@ int main(int argc, char **argv) {
       auto words = d_words.get_access<sycl_read>(cgh);
       auto table = d_table.get_access<sycl_write>(cgh);
       cgh.parallel_for<class makeTable>(nd_range<1>(makeTable_gws, makeTable_lws), [=] (nd_item<1> item) {
-            kernel_makeTable(offsets.get_pointer(), indexs.get_pointer(), orders.get_pointer(),
-                words.get_pointer(), table.get_pointer(), r, item);
+        kernel_makeTable(
+          offsets.get_pointer(), 
+          indexs.get_pointer(),
+          orders.get_pointer(),
+          words.get_pointer(),
+          table.get_pointer(),
+          r,
+          item);
       });
     }); // create table
 
@@ -290,10 +299,17 @@ int main(int argc, char **argv) {
       auto magicBase = d_magicBase.get_access<sycl_read>(cgh);
       auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class magic>(nd_range<1>(magic_gws, magic_lws), [=] (nd_item<1> item) {
-            kernel_magic(threshold, lengths.get_pointer(), magicBase.get_pointer(),
-                cluster.get_pointer(), r, readsCount, item);
+        kernel_magic(
+          threshold,
+          lengths.get_pointer(),
+          magicBase.get_pointer(),
+          cluster.get_pointer(),
+          r,
+          readsCount,
+          item);
       });
     }); // magic filter
+
 
     q.submit([&](sycl::handler &cgh) {
       auto lengths = d_lengths.get_access<sycl_read>(cgh);
@@ -301,21 +317,22 @@ int main(int argc, char **argv) {
       auto indexs = d_indexs.get_access<sycl_read>(cgh);
       auto orders = d_orders.get_access<sycl_read>(cgh);
       auto words = d_words.get_access<sycl_read>(cgh);
-      auto magicBase = d_magicBase.get_access<sycl_read>(cgh);
+      //auto magicBase = d_magicBase.get_access<sycl_read>(cgh);
       auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
       auto wordCutoff = d_wordCutoff.get_access<sycl_read>(cgh);
       auto table = d_table.get_access<sycl_read>(cgh);
       accessor<int, 1, sycl_read_write, access::target::local> result (128, cgh);
       cgh.parallel_for<class filter>(nd_range<1>(filter_gws, filter_lws), [=] (nd_item<1> item) {
-          kernel_filter(threshold, wordLength, 
-              lengths.get_pointer(),
-              offsets.get_pointer(), indexs.get_pointer(), orders.get_pointer(), words.get_pointer(),
-              wordCutoff.get_pointer(), cluster.get_pointer(), table.get_pointer(),
-              readsCount,
-              item, 
-              result.get_pointer());
+        kernel_filter(threshold, wordLength, 
+          lengths.get_pointer(),
+          offsets.get_pointer(), indexs.get_pointer(), orders.get_pointer(), words.get_pointer(),
+          wordCutoff.get_pointer(), cluster.get_pointer(), table.get_pointer(),
+          readsCount,
+          item, 
+          result.get_pointer());
       });
     }); // word filter
+
     q.submit([&](sycl::handler &cgh) {
       auto lengths = d_lengths.get_access<sycl_read>(cgh);
       auto offsets = d_offsets.get_access<sycl_read>(cgh);
@@ -323,15 +340,14 @@ int main(int argc, char **argv) {
       auto gaps = d_gaps.get_access<sycl_read>(cgh);
       auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class align>(nd_range<1>(align_gws, align_lws), [=] (nd_item<1> item) {
-
-          kernel_align(threshold, 
-              lengths.get_pointer(), 
-              offsets.get_pointer(),
-              compressed.get_pointer(), 
-              gaps.get_pointer(), 
-              r,
-              cluster.get_pointer(), 
-              readsCount, item);
+        kernel_align(threshold, 
+          lengths.get_pointer(), 
+          offsets.get_pointer(),
+          compressed.get_pointer(), 
+          gaps.get_pointer(), 
+          r,
+          cluster.get_pointer(), 
+          readsCount, item);
       });
     }); // dynamic programming
 
@@ -342,8 +358,14 @@ int main(int argc, char **argv) {
       auto words = d_words.get_access<sycl_read>(cgh);
       auto table = d_table.get_access<sycl_write>(cgh);
       cgh.parallel_for<class cleanTable>(nd_range<1>(cleanTable_gws, cleanTable_lws), [=] (nd_item<1> item) {
-        kernel_cleanTable(offsets.get_pointer(), indexs.get_pointer(), orders.get_pointer(),
-                words.get_pointer(), table.get_pointer(), r, item);
+        kernel_cleanTable(
+          offsets.get_pointer(), 
+          indexs.get_pointer(),
+          orders.get_pointer(),
+          words.get_pointer(),
+          table.get_pointer(),
+          r,
+          item);
       }); // table fill zero
     });
   }
@@ -363,7 +385,8 @@ int main(int argc, char **argv) {
     }
   }
   file.close();
-  std::cout << "cluster count：" << sum << std::endl;
+
+  std::cout << "cluster count: " << sum << std::endl;
   free(h_lengths);
   free(h_offsets);
   free(h_reads);

@@ -1,5 +1,6 @@
 // kernel_baseToNumber
-void kernel_baseToNumber(char *reads, long length, nd_item<1> &item) {
+void kernel_baseToNumber(char *reads, long length, nd_item<1> &item) 
+{
   long index = item.get_global_id(0); 
   while (index < length) {
     switch (reads[index]) {
@@ -41,7 +42,7 @@ void kernel_baseToNumber(char *reads, long length, nd_item<1> &item) {
   }
 }
 
-// 1 base use 2 bit，drop gap
+// 1 base use 2 bit, drop gap
 // kernel_compressedData
 void kernel_compressData(
     const int *lengths, 
@@ -327,7 +328,8 @@ void kernel_mergeIndex(
     unsigned short *orders, 
     const long *words, 
     int readsCount, 
-    nd_item<1> &item) {
+    nd_item<1> &item) 
+{
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
   int start = offsets[index];
@@ -335,7 +337,7 @@ void kernel_mergeIndex(
   unsigned short basePrevious = indexs[start];
   unsigned short baseNow;
   int count = 1;
-  for (int i=start+1; i<end; i++) {  // merge same index，orders is count
+  for (int i=start+1; i<end; i++) {  // merge same index orders is count
     baseNow = indexs[i];
     if (baseNow == basePrevious) {
       count++;
@@ -350,7 +352,12 @@ void kernel_mergeIndex(
 }
 
 // updateRepresentative
-void updateRepresentative(queue &q, buffer<int, 1> &d_cluster, int *representative, int readsCount) {
+void updateRepresentative(
+    queue &q,
+    buffer<int, 1> &d_cluster, 
+    int *representative, 
+    int readsCount) 
+{
   buffer<int, 1> d_r(representative, 1);
   q.submit([&](handler &cgh) {
     auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
@@ -396,7 +403,7 @@ void kernel_cleanTable(
     const long *words,
     unsigned short *table, 
     const int representative, 
-    nd_item<1> item) 
+    nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   int start = offsets[representative];
@@ -413,7 +420,7 @@ void kernel_magic(float threshold,
     int *cluster, 
     const int representative, 
     const int readsCount,
-    cl::sycl::nd_item<1> item) 
+    cl::sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
@@ -464,13 +471,11 @@ void kernel_filter(
     for (int i=1; i<128; i++) {
       result[0] += result[i];
     }
-  } else {
-    return;
-  }
-  if (result[0] > wordCutoff[gid]) { // pass filter
-    cluster[gid] = -3;
-  } else {
-    cluster[gid] = -1; // not pass filter
+    if (result[0] > wordCutoff[gid]) { // pass filter
+      cluster[gid] = -3;
+    } else {
+      cluster[gid] = -1; // not pass filter
+    }
   }
 }
 

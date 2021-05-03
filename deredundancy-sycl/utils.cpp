@@ -79,7 +79,5 @@ void readFile(std::vector<Read> &reads, Option &option) {
   reads.push_back(read);
   file.close();
   std::sort(reads.begin(), reads.end(), compare);
-  std::cout << "reads count：\t" << reads.size() << std::endl;
+  std::cout << "reads count:\t" << reads.size() << std::endl;
 }
-
-
