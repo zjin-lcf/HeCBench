@@ -50,7 +50,10 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernels.cpp utils.h
+main.o: main.cpp kernels.cpp utils.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+utils.o: utils.cpp utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
