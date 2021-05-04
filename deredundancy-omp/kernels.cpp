@@ -421,17 +421,18 @@ void kernel_magic(float threshold,
 {
   #pragma omp target teams distribute parallel for num_threads(128)
   for (int index = 0; index < readsCount; index++)  {
-    if (cluster[index] >= 0) return;  // is clustered
-    int offsetOne = representative*4;  // representative magic offset
-    int offsetTwo = index*4;  // query magic offset
-    int magic = min(magicBase[offsetOne + 0], magicBase[offsetTwo + 0]) +
-      min(magicBase[offsetOne + 1], magicBase[offsetTwo + 1]) +
-      min(magicBase[offsetOne + 2], magicBase[offsetTwo + 2]) +
-      min(magicBase[offsetOne + 3], magicBase[offsetTwo + 3]);
-    int length = lengths[index];
-    int minLength = ceilf((float)length*threshold);
-    if (magic > minLength) {  // pass filter
-      cluster[index] = -2;
+    if (cluster[index] < 0) {
+      int offsetOne = representative*4;  // representative magic offset
+      int offsetTwo = index*4;  // query magic offset
+      int magic = min(magicBase[offsetOne + 0], magicBase[offsetTwo + 0]) +
+        min(magicBase[offsetOne + 1], magicBase[offsetTwo + 1]) +
+        min(magicBase[offsetOne + 2], magicBase[offsetTwo + 2]) +
+        min(magicBase[offsetOne + 3], magicBase[offsetTwo + 3]);
+      int length = lengths[index];
+      int minLength = ceilf((float)length*threshold);
+      if (magic > minLength) {  // pass filter
+        cluster[index] = -2;
+      }
     }
   }
 }
@@ -495,169 +496,182 @@ void kernel_align(
 {
   #pragma omp target teams distribute parallel for num_threads(128)
   for (int index = 0; index < readsCount; index++) {
-    if (cluster[index] != -3) return;  // not pass filter
-    int target = representative;  // representative read
-    int query = index;  // query read
-    int minLength = ceilf((float)lengths[index] * threshold);
-    int targetLength = lengths[target] - gaps[target];  // representative base count
-    int queryLength = lengths[query] - gaps[query];  // query base count
-    int target32Length = targetLength/16+1;  // compressed target length
-    int query32Length  = queryLength/16+1;  // compressed query length
-    int targetOffset = offsets[target]/16;  // representative offset
-    int queryOffset = offsets[query]/16;  // query offset
-    short rowNow[3000] = {0};  // dynamic matrix row
-    short rowPrevious[3000] = {0};  // dynamic matrix row
-    int columnPrevious[17] = {0};  // dynamic matrix column
-    int columnNow[17] = {0};  // dynamic matrix column
-    int shift = ceilf((float)targetLength - (float)queryLength*threshold);
-    shift = ceilf((float)shift / 16.f); // shift form diagonal
-    // compute
-    for (int i = 0; i < query32Length; i++) {  // query is column
-      // first big loop
-      for (int j=0; j<17; j++) {
-        columnPrevious[j] = 0;
-        columnNow[j] = 0;
-      }
-      int targetIndex = 0;  // target position
-      unsigned int queryPack = compressed[queryOffset+i];  // get 16 query bases
-      int jstart = i-shift;
-      jstart = max(jstart, 0);
-      int jend = i+shift;
-      jend = min(jend, target32Length);
-      for (int j=0; j<target32Length; j++) {  // target is row
-        columnPrevious[0] = rowPrevious[targetIndex];
-        unsigned int targetPack = compressed[targetOffset+j];  // get 16 target bases
-        //---16*16core----//
-        for (int k=30; k>=0; k-=2) {  // 16 loops get target bases
-          // first small loop
-          int targetBase = (targetPack>>k)&3;  // get base from target
-          int m=0;
-          columnNow[m] = rowPrevious[targetIndex+1];
-          for (int l=30; l>=0; l-=2) {  // 16 loops get query bases
-            m++;
-            int queryBase = (queryPack>>l)&3;  // get base from query
-            int diffScore = queryBase == targetBase;
-            columnNow[m] = columnPrevious[m-1] + diffScore;
-            columnNow[m] = max(columnNow[m], columnNow[m - 1]);
-            columnNow[m] = max(columnNow[m], columnPrevious[m]);
-          }
-          targetIndex++;
-          rowNow[targetIndex] = columnNow[16];
-          if (targetIndex == targetLength) {  // last column of dynamic matirx
-            if(i == query32Length-1) {  // complete
-              int score = columnNow[queryLength%16];
-              if (score >= minLength) {
-                cluster[index] = target;
-              } else {
-                cluster[index] = -1;
-              }
-              return;
-            }
-            break;
-          }
-          // secode small loop exchange columnPrevious and columnNow
-          k-=2;
-          targetBase = (targetPack>>k)&3;
-          m=0;
-          columnPrevious[m] = rowPrevious[targetIndex+1];
-          for (int l=30; l>=0; l-=2) {
-            m++;
-            int queryBase = (queryPack>>l)&3;
-            int diffScore = queryBase == targetBase;
-            columnPrevious[m] = columnNow[m-1] + diffScore;
-            columnPrevious[m] =
-              max(columnPrevious[m], columnPrevious[m - 1]);
-            columnPrevious[m] =
-              max(columnPrevious[m], columnNow[m]);
-          }
-          targetIndex++;
-          rowNow[targetIndex] = columnPrevious[16];
-          if (targetIndex == targetLength) {
-            if(i == query32Length-1) {
-              int score = columnPrevious[queryLength%16];
-              if (score >= minLength) {
-                cluster[index] = target;
-              } else {
-                cluster[index] = -1;
-              }
-              return;
-            }
-            break;
-          }
+    if (cluster[index] == -3) {
+      int target = representative;  // representative read
+      int query = index;  // query read
+      int minLength = ceilf((float)lengths[index] * threshold);
+      int targetLength = lengths[target] - gaps[target];  // representative base count
+      int queryLength = lengths[query] - gaps[query];  // query base count
+      int target32Length = targetLength/16+1;  // compressed target length
+      int query32Length  = queryLength/16+1;  // compressed query length
+      int targetOffset = offsets[target]/16;  // representative offset
+      int queryOffset = offsets[query]/16;  // query offset
+      short rowNow[3000] = {0};  // dynamic matrix row
+      short rowPrevious[3000] = {0};  // dynamic matrix row
+      int columnPrevious[17] = {0};  // dynamic matrix column
+      int columnNow[17] = {0};  // dynamic matrix column
+      int shift = ceilf((float)targetLength - (float)queryLength*threshold);
+      int complete = 0;
+      shift = ceilf((float)shift / 16.f); // shift form diagonal
+      // compute
+      for (int i = 0; i < query32Length; i++) {  // query is column
+        // first big loop
+        for (int j=0; j<17; j++) {
+          columnPrevious[j] = 0;
+          columnNow[j] = 0;
         }
-      }
-      // secode big loop exchage rowPrevious and rowNow
-      i++;
-      for (int j=0; j<17; j++) {
-        columnPrevious[j] = 0;
-        columnNow[j] = 0;
-      }
-      targetIndex = 0;
-      queryPack = compressed[queryOffset+i];
-      jstart = i-shift;
-      jstart = max(jstart, 0);
-      jend = i+shift;
-      jend = min(jend, target32Length);
-      for (int j=0; j<target32Length; j++) {
-        unsigned int targetPack = compressed[targetOffset+j];
-        //---16*16 core----//
-        for (int k=30; k>=0; k-=2) {
-          // first small loop
-          int targetBase = (targetPack>>k)&3;
-          int m=0;
-          columnNow[m] = rowNow[targetIndex+1];
-          for (int l=30; l>=0; l-=2) {
-            m++;
-            int queryBase = (queryPack>>l)&3;
-            int diffScore = queryBase == targetBase;
-            columnNow[m] = columnPrevious[m-1] + diffScore;
-            columnNow[m] = max(columnNow[m], columnNow[m - 1]);
-            columnNow[m] = max(columnNow[m], columnPrevious[m]);
-          }
-          targetIndex++;
-          rowPrevious[targetIndex] = columnNow[16];
-          if (targetIndex == targetLength) {
-            if(i == query32Length-1) {
-              int score = columnNow[queryLength%16];
-              if (score >= minLength) {
-                cluster[index] = target;
-              } else {
-                cluster[index] = -1;
-              }
-              return;
+        int targetIndex = 0;  // target position
+        unsigned int queryPack = compressed[queryOffset+i];  // get 16 query bases
+        int jstart = i-shift;
+        jstart = max(jstart, 0);
+        int jend = i+shift;
+        jend = min(jend, target32Length);
+        for (int j=0; j<target32Length; j++) {  // target is row
+          columnPrevious[0] = rowPrevious[targetIndex];
+          unsigned int targetPack = compressed[targetOffset+j];  // get 16 target bases
+          //---16*16core----//
+          for (int k=30; k>=0; k-=2) {  // 16 loops get target bases
+            // first small loop
+            int targetBase = (targetPack>>k)&3;  // get base from target
+            int m=0;
+            columnNow[m] = rowPrevious[targetIndex+1];
+            for (int l=30; l>=0; l-=2) {  // 16 loops get query bases
+              m++;
+              int queryBase = (queryPack>>l)&3;  // get base from query
+              int diffScore = queryBase == targetBase;
+              columnNow[m] = columnPrevious[m-1] + diffScore;
+              columnNow[m] = max(columnNow[m], columnNow[m - 1]);
+              columnNow[m] = max(columnNow[m], columnPrevious[m]);
             }
-            break;
-          }
-          // second small loop
-          k-=2;
-          targetBase = (targetPack>>k)&3;
-          m=0;
-          columnPrevious[m] = rowNow[targetIndex+1];
-          for (int l=30; l>=0; l-=2) {
-            m++;
-            int queryBase = (queryPack>>l)&3;
-            int diffScore = queryBase == targetBase;
-            columnPrevious[m] = columnNow[m-1] + diffScore;
-            columnPrevious[m] =
-              max(columnPrevious[m], columnPrevious[m - 1]);
-            columnPrevious[m] =
-              max(columnPrevious[m], columnNow[m]);
-          }
-          targetIndex++;
-          rowPrevious[targetIndex] = columnPrevious[16];
-          if (targetIndex == targetLength) {
-            if(i == query32Length-1) {
-              int score = columnPrevious[queryLength%16];
-              if (score >= minLength) {
-                cluster[index] = target;
-              } else {
-                cluster[index] = -1;
+            targetIndex++;
+            rowNow[targetIndex] = columnNow[16];
+            if (targetIndex == targetLength) {  // last column of dynamic matirx
+              if(i == query32Length-1) {  // complete
+                int score = columnNow[queryLength%16];
+                if (score >= minLength) {
+                  cluster[index] = target;
+                } else {
+                  cluster[index] = -1;
+                }
+                // return;
+                complete = 1;
               }
-              return;
+              break;
             }
-            break;
+            // secode small loop exchange columnPrevious and columnNow
+            k-=2;
+            targetBase = (targetPack>>k)&3;
+            m=0;
+            columnPrevious[m] = rowPrevious[targetIndex+1];
+            for (int l=30; l>=0; l-=2) {
+              m++;
+              int queryBase = (queryPack>>l)&3;
+              int diffScore = queryBase == targetBase;
+              columnPrevious[m] = columnNow[m-1] + diffScore;
+              columnPrevious[m] =
+                max(columnPrevious[m], columnPrevious[m - 1]);
+              columnPrevious[m] =
+                max(columnPrevious[m], columnNow[m]);
+            }
+            targetIndex++;
+            rowNow[targetIndex] = columnPrevious[16];
+            if (targetIndex == targetLength) {
+              if(i == query32Length-1) {
+                int score = columnPrevious[queryLength%16];
+                if (score >= minLength) {
+                  cluster[index] = target;
+                } else {
+                  cluster[index] = -1;
+                }
+                // return;
+                complete = 1;
+              }
+              break;
+            }
           }
+          if (complete) break;
         }
+
+        if (complete) break;
+        // secode big loop exchage rowPrevious and rowNow
+        i++;
+        for (int j=0; j<17; j++) {
+          columnPrevious[j] = 0;
+          columnNow[j] = 0;
+        }
+        targetIndex = 0;
+        queryPack = compressed[queryOffset+i];
+        jstart = i-shift;
+        jstart = max(jstart, 0);
+        jend = i+shift;
+        jend = min(jend, target32Length);
+        for (int j=0; j<target32Length; j++) {
+          unsigned int targetPack = compressed[targetOffset+j];
+          //---16*16 core----//
+          for (int k=30; k>=0; k-=2) {
+            // first small loop
+            int targetBase = (targetPack>>k)&3;
+            int m=0;
+            columnNow[m] = rowNow[targetIndex+1];
+            for (int l=30; l>=0; l-=2) {
+              m++;
+              int queryBase = (queryPack>>l)&3;
+              int diffScore = queryBase == targetBase;
+              columnNow[m] = columnPrevious[m-1] + diffScore;
+              columnNow[m] = max(columnNow[m], columnNow[m - 1]);
+              columnNow[m] = max(columnNow[m], columnPrevious[m]);
+            }
+            targetIndex++;
+            rowPrevious[targetIndex] = columnNow[16];
+            if (targetIndex == targetLength) {
+              if(i == query32Length-1) {
+                int score = columnNow[queryLength%16];
+                if (score >= minLength) {
+                  cluster[index] = target;
+                } else {
+                  cluster[index] = -1;
+                }
+                // return;
+                complete = 1;
+              }
+              break;
+            }
+            if (complete) break;
+            // second small loop
+            k-=2;
+            targetBase = (targetPack>>k)&3;
+            m=0;
+            columnPrevious[m] = rowNow[targetIndex+1];
+            for (int l=30; l>=0; l-=2) {
+              m++;
+              int queryBase = (queryPack>>l)&3;
+              int diffScore = queryBase == targetBase;
+              columnPrevious[m] = columnNow[m-1] + diffScore;
+              columnPrevious[m] =
+                max(columnPrevious[m], columnPrevious[m - 1]);
+              columnPrevious[m] =
+                max(columnPrevious[m], columnNow[m]);
+            }
+            targetIndex++;
+            rowPrevious[targetIndex] = columnPrevious[16];
+            if (targetIndex == targetLength) {
+              if(i == query32Length-1) {
+                int score = columnPrevious[queryLength%16];
+                if (score >= minLength) {
+                  cluster[index] = target;
+                } else {
+                  cluster[index] = -1;
+                }
+                // return;
+                complete = 1;
+              }
+              break;
+            }
+            if (complete) break;
+          }
+          if (complete) break;
+        }  
+        if (complete) break;
       }
     }
   }
