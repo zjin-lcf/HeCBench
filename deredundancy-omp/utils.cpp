@@ -56,7 +56,7 @@ void checkOption(int argc, char **argv, Option &option) {
 }
 
 // compare
-bool compare(Read &a, Read &b) {
+bool compare(const Read &a, const Read &b) {
   return a.data.size() > b.data.size();
 }
 
