@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
     auto lengths = d_lengths.get_access<sycl_read>(cgh);
     auto words = d_words.get_access<sycl_read>(cgh);
     auto wordCutoff = d_wordCutoff.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class index7> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class createCutoff> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
       kernel_createCutoff(
         threshold, 
         wordLength, 
