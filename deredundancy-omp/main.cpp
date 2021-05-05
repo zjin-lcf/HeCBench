@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   int *h_gaps = (int*) malloc(readsCount * sizeof(int));
 
   unsigned short* h_indexs = (unsigned short*) malloc (total_length * sizeof(unsigned short));
-  long* h_words = (long*) malloc (sizeof(long) * (readsCount + 1));
+  long* h_words = (long*) malloc (sizeof(long) * readsCount);
 
   unsigned short *h_orders = (unsigned short*) malloc (total_length * sizeof(unsigned short)); 
 
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
                         map(alloc: h_compressed[0:total_length/16], \
                                    h_gaps[0:readsCount], \
                                    h_indexs[0:total_length], \
-                                   h_words[0:readsCount+1], \
+                                   h_words[0:readsCount], \
                                    h_magicBase[0:readsCount*4], \
                                    h_orders[0:total_length], \
                                    h_wordCutoff[0:readsCount]), \
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
   // sortIndex(data);
   #pragma omp target update from (h_indexs[0:total_length])
   #pragma omp target update from (h_offsets[0:1+readsCount])
-  #pragma omp target update from (h_words[0:1+readsCount])
+  #pragma omp target update from (h_words[0:readsCount])
 
   for (int i = 0; i< readsCount; i++) {
     int start = h_offsets[i];

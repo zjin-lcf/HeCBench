@@ -356,9 +356,10 @@ void kernel_mergeIndex(
 void updateRepresentative(
     int *cluster, 
     int *r, // representative, 
-    int readsCount) 
+    const int readsCount) 
 {
-  #pragma omp target map (tofrom: r[0:1]) 
+
+  #pragma omp target map (tofrom: r[0:1]) map(tofrom: cluster[0:readsCount])
   {
     r[0]++;
     while (r[0] < readsCount) {
