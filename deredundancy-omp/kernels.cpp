@@ -452,6 +452,27 @@ void kernel_filter(
     const unsigned short *table, 
     const int readsCount)
 {  
+#ifdef OMP_REDUCE
+  #pragma omp target teams distribute num_teams(readsCount) thread_limit(128)
+  for (int gid = 0; gid < readsCount; gid++) {
+    if (cluster[gid] == -2) {
+      int result = 0;
+      #pragma omp parallel for reduction(+:result) 
+      for (int lid = 0; lid < 128; lid++) {
+        int start = offsets[gid];
+        int end = start + words[gid];
+        for (int i = lid + start; i < end; i += 128) {
+          result += min(table[indexs[i]], orders[i]);
+        }
+      }
+      if (result > wordCutoff[gid]) { // pass filter
+        cluster[gid] = -3;
+      } else {
+        cluster[gid] = -1; // not pass filter
+      }
+    }
+  }
+#else
   #pragma omp target teams num_teams(readsCount) thread_limit(128)
   {
     int result[128];
@@ -460,7 +481,7 @@ void kernel_filter(
       int gid = omp_get_team_num();
       int lid = omp_get_thread_num(); 
 
-      if ((gid < readsCount) && (cluster[gid] == -2)) {
+      if (cluster[gid] == -2) {
         result[lid] = 0;             // result in thread
         int start = offsets[gid];
         int end = start + words[gid];
@@ -470,7 +491,7 @@ void kernel_filter(
       }
       #pragma omp barrier
 
-      if ((gid < readsCount) && (cluster[gid] == -2) && (lid == 0)) {
+      if ((cluster[gid] == -2) && (lid == 0)) {
         for (int i=1; i<128; i++) {
           result[0] += result[i];
         }
@@ -482,6 +503,7 @@ void kernel_filter(
       }
     }
   }
+#endif
 }
 
 // kernel_align
