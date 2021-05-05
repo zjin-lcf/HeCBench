@@ -7,8 +7,8 @@
 #include <cmath>  // math functions
 #include <omp.h>
 
-#define max(a,b) (a) < (b) ? (b) : (a)
-#define min(a,b) (a) < (b) ? (a) : (b)
+#define max(a,b) ((a) < (b) ? (b) : (a))
+#define min(a,b) ((a) < (b) ? (a) : (b))
 
 //--------------------data--------------------//
 struct Option {
