@@ -73,11 +73,11 @@ int main(int argc, char **argv) {
   //createIndex(data, option);
 
   unsigned short* h_indexs = (unsigned short*) malloc (sizeof(unsigned short) * total_length);
-  long* h_words = (long*) malloc (sizeof(long) * (readsCount + 1));
+  long* h_words = (long*) malloc (sizeof(long) * readsCount);
 
   buffer<unsigned short, 1> d_indexs (total_length);
   buffer<unsigned short, 1> d_orders (total_length);
-  buffer<long, 1> d_words (readsCount + 1);
+  buffer<long, 1> d_words (readsCount);
   buffer<int, 1> d_magicBase (readsCount * 4);
 
   int wordLength = option.wordLength;
