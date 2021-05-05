@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
     if (r >= readsCount-1) {  // complete
       break;
     }
-    std::cout << r << "/" << readsCount << std::endl;
+    //std::cout << r << "/" << readsCount << std::endl;
 
     kernel_makeTable(
         h_offsets, 
