@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = xlc++
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-SM        = sm_70
 
 #===============================================================================
 # Program name & source code list
@@ -42,7 +41,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qsmp -qoffload -qtgtarch=$(SM)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -58,6 +57,7 @@ main.o: main.cpp kernels.cpp utils.h
 
 utils.o: utils.cpp utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
+
 
 clean:
 	rm -rf $(program) $(obj)
