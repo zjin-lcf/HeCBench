@@ -634,12 +634,6 @@ void cuhd::CUHDGPUDecoder::decode(
       initial_state,
       initial_bit);
 
-#ifdef DEBUG
-  #pragma omp target update from (d_sync_info[0:num_subseq])
-  for (int i = 0; i < num_subseq; i++) 
-    printf("%u %u %u %u\n", d_sync_info[i].x, d_sync_info[i].y, d_sync_info[i].z, d_sync_info[i].w);
-#endif
-
   // launch phase 2 (inter-sequence synchronisation)
   bool blocks_synchronised = true;
 
