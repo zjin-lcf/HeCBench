@@ -1,6 +1,6 @@
 ARCH = gfx906
 NVCC = clang++
-NVCC_FLAGS = --std=c++14 -g -target x86_64-pc-linux-gnu \
+NVCC_FLAGS = --std=c++14 -O3 -target x86_64-pc-linux-gnu \
           -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
           -Xopenmp-target=amdgcn-amd-amdhsa \
           -march=$(ARCH) \

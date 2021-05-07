@@ -37,8 +37,7 @@ void run(long int input_size) {
   std::cout << "\u03BB | compressed size (bytes) | ";
   std::cout << std::endl << std::endl;
 
-  //for(float lambda = 0.1f; lambda < 2.5f; lambda += 0.16) {
-  for(float lambda = 0.1f; lambda < 0.2f; lambda += 0.16) {
+  for(float lambda = 0.1f; lambda < 2.5f; lambda += 0.16) {
 
     // vectors to record timings
     std::cout << std::left << std::setw(5) << lambda << std::setfill(' ');
@@ -132,9 +131,6 @@ void run(long int input_size) {
       << input_buffer->get_compressed_size() * sizeof(UNIT_TYPE)
       << std::setfill(' ') << std::endl;
 
-    free(d_input_buffer);
-    free(d_output_buffer);
-    free(d_decoder_table);
     free(d_sync_info);
     free(d_output_sizes);
     free(d_sequence_synced);
