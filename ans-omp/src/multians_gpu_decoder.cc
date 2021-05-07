@@ -391,7 +391,7 @@ void phase2_synchronise_blocks(
   {
   #pragma omp parallel
   {
-  std::uint32_t gid = omp_get_team_num() * threads_per_block + omp_get_thread_num();
+  std::uint32_t gid = omp_get_team_num();
   if (gid < num_of_seams) {
 
     // mask
