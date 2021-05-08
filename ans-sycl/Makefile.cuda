@@ -1,0 +1,41 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+CC = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+CUDA_ARCH = "--cuda-gpu-arch=sm_60"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+CC_FLAGS = -DUSE_GPU -std=c++14 -Wall -I../include -pthread \
+           -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+           -fsycl-unnamed-lambda \
+           -Xsycl-target-backend $(CUDA_ARCH) \
+           -Xcuda-ptxas -v \
+           --gcc-toolchain=$(GCC_TOOLCHAIN) -v --save-temps
+
+BIN = -o bin
+
+INC_DIR = include
+SRC_DIR = src
+OBJ_DIR = bin
+EXEC_NAME = demo
+
+SRC_FILES := $(wildcard $(SRC_DIR)/*.cc)
+OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
+
+
+$(OBJ_DIR)/$(EXEC_NAME): $(OBJ_FILES)
+	$(CC) $(CC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
+	$(CC) $(CC_FLAGS) -I $(INC_DIR) -c -o $@ $<
+
+.PHONY: clean
+clean:
+	rm -f $(RM_FLAGS) $(OBJ_DIR)/*.o
+	rm -f $(RM_FLAGS) $(OBJ_DIR)/*.obj
+	rm -f $(RM_FLAGS) $(OBJ_DIR)/$(EXEC_NAME)
+
+run: $(OBJ_DIR)/$(EXEC_NAME)
+	./$(OBJ_DIR)/$(EXEC_NAME) 10
