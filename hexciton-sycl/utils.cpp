@@ -195,3 +195,34 @@ real_t compare_matrices(complex_t* a, complex_t* b, size_t dim, size_t num)
   return deviation;
 }
 
+std::string look_up (const int kid) 
+{
+  switch (kid) {
+    case 0: return "comm_empty";
+    case 1: return "comm_init";
+    case 2: return "comm_refactor";
+    case 3: return "comm_refactor_direct_store";
+    case 4: return "comm_aosoa_naive";
+    case 5: return "comm_aosoa_naive_constants";
+    case 6: return "comm_aosoa_naive_constants_perm";
+    case 7: return "comm_aosoa_naive_direct";
+    case 8: return "comm_aosoa_naive_constants_direct";
+    case 9: return "comm_aosoa_naive_constants_direct_perm";
+    case 10: return "comm_aosoa";
+    case 11: return "comm_aosoa_constants";
+    case 12: return "comm_aosoa_constants_perm";
+    case 13: return "comm_aosoa_direct";
+    case 14: return "comm_aosoa_constants_direct";
+    case 15: return "comm_aosoa_constants_direct_perm";
+    case 16: return "comm_manual_aosoa";
+    case 17: return "comm_manual_aosoa_constants";
+    case 18: return "comm_manual_aosoa_constants_perm";
+    case 19: return "comm_manual_aosoa_constants_prefetch";
+    case 20: return "comm_manual_aosoa_direct";
+    case 21: return "comm_manual_aosoa_constants_direct";
+    case 22: return "comm_manual_aosoa_constants_direct_prefetch";
+    case 23: return "comm_manual_aosoa_constants_direct_perm";
+    case 24: return "final_gpu_kernel";
+    default: return "unknown";
+  }
+}

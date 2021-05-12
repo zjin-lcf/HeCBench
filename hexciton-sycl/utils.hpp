@@ -3,8 +3,8 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef utils_hpp
-#define utils_hpp
+#ifndef UTILS_HPP
+#define UTILS_HPP
 
 #include <complex>
 #include <cstdint> // fixed width integers
@@ -12,6 +12,7 @@
 #include <iostream>
 #include "common.h"
 
+#define SINGLE_PRECISION
 
 #ifdef SINGLE_PRECISION
 using real_t = float;
@@ -169,6 +170,9 @@ void transform_matrices_aos_to_aosoa_gpu(complex_t* matrices, size_t dim, size_t
 // measure of deviation
 real_t compare_matrices(complex_t* a, complex_t* b, size_t dim, size_t num);
 
+// look up the name corresponding to the kernel id
+std::string look_up(const int kid);
 
-#endif // utils_hpp
+
+#endif // UTILS_HPP
 

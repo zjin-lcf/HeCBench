@@ -1153,8 +1153,8 @@ void benchmark(
         size_t block_dim_x = (dim * dim + WARP_SIZE - 1) / WARP_SIZE * WARP_SIZE;
         size_t block_dim_y = NUM_SUB_GROUPS;
 
-        range<2> k19_gws (block_dim_y, num / (block_dim_y * CHUNK_SIZE) * block_dim_x);
-        range<2> k19_lws (block_dim_y, block_dim_x);
+        range<2> k24_gws (block_dim_y, num / (block_dim_y * CHUNK_SIZE) * block_dim_x);
+        range<2> k24_lws (block_dim_y, block_dim_x);
         q.submit([&] (handler &cgh) {
           auto sigma_in = d_sigma_in.get_access<sycl_read>(cgh);
           auto sigma_out = d_sigma_out.get_access<sycl_read_write>(cgh);
@@ -1169,7 +1169,7 @@ void benchmark(
           accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_real({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
           accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_imag({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
 
-          cgh.parallel_for<class final_gpu_kernel>(nd_range<2>(k19_gws, k19_lws), [=] (nd_item<2> item) {
+          cgh.parallel_for<class final_gpu_kernel>(nd_range<2>(k24_gws, k24_lws), [=] (nd_item<2> item) {
             #define id_2d_to_1d(i,j) ((i) * DIM + (j))
             #define sigma_id(i,j,m) ((m) * DIM * DIM + ((i) * DIM + (j)))
             #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -1245,22 +1245,21 @@ void benchmark(
                 }
 
                 // Write output sigma matrices 'm' and 'm+1', element (i,j)
-                sigma_out[sigma_id(i, j, m)] = (double2)(snew1_ij.x(), snew2_ij.x());
-                sigma_out[sigma_id(i, j, m + 1)] = (double2)(snew1_ij.y(), snew2_ij.y());
+                sigma_out[sigma_id(i, j, m)] = (real_2_t)(snew1_ij.x(), snew2_ij.x());
+                sigma_out[sigma_id(i, j, m + 1)] = (real_2_t)(snew1_ij.y(), snew2_ij.y());
               }
             }
           });
         });
         break;
       }
-
       default: std::cerr << "ERROR: **** benchmark kernel unavailable **** \n";
     }
   }
 
-  // ignore the deviation of an empty kernel
   real_t deviation = 0;
 
+  // the deviation of an empty kernel does not make sense
   if (kernel_id > 0)  {
     q.submit([&] (handler &cgh) {
       auto acc = d_sigma_out.get_access<sycl_read>(cgh);
@@ -1274,7 +1273,7 @@ void benchmark(
     // measure the differences between the CPU and GPU results 
     deviation = compare_matrices(sigma_out, sigma_reference_transformed, dim, num);
 
-    std::cout << "Deviation: " << deviation << std::endl;
+    std::cout << "Deviation of kernel " << look_up(kernel_id) << ": " << deviation << std::endl;
   }
 
   free(sin);
