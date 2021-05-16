@@ -210,7 +210,7 @@ void kernel_driver_aa(std::string filename,
       accessor<short, 1, sycl_read_write, access::target::local> locInds(32, cgh);
       accessor<short, 1, sycl_read_write, access::target::local> locInds2(32, cgh);
 
-      cgh.parallel_for<class aa>(nd_range<1>(gws_aa, lws_aa), [=] (nd_item<1> item) {
+      cgh.parallel_for<class aa>(nd_range<1>(gws_aa, lws_aa), [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
         sequence_aa_kernel(
            strA.get_pointer(),
            strB.get_pointer(),
@@ -290,7 +290,7 @@ void kernel_driver_aa(std::string filename,
       accessor<short, 1, sycl_read_write, access::target::local> locTots(32, cgh);
       accessor<short, 1, sycl_read_write, access::target::local> locInds(32, cgh);
       accessor<short, 1, sycl_read_write, access::target::local> locInds2(32, cgh);
-      cgh.parallel_for<class aa_r>(nd_range<1>(gws_aa_r, lws_aa_r), [=] (nd_item<1> item) {
+      cgh.parallel_for<class aa_r>(nd_range<1>(gws_aa_r, lws_aa_r), [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
         sequence_aa_reverse_kernel(
            strA.get_pointer(),
            strB.get_pointer(),
