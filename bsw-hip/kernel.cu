@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include "kernel.hpp"
 
   __inline__ __device__ short
