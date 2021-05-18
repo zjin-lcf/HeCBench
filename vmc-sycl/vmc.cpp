@@ -12,8 +12,8 @@ const int NTHR_PER_BLK = 256;           // Number of threads per block
 const int NBLOCK  = 56*4;               // Number of blocks
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
 const int Neq = 100000;                 // No. of generations to equilibrate 
-const int Ngen_per_block = 5000; // No. of generations per block
-const int Nsample = 100;         // No. of blocks to sample
+const int Ngen_per_block = 5000;        // No. of generations per block
+const int Nsample = 100;                // No. of blocks to sample
 
 
 // Explicitly typed constants so can easily work with both floats and floats
@@ -36,7 +36,8 @@ FLOAT SQRT(FLOAT x) {return cl::sycl::sqrt(x);}
 
 
 void SumWithinBlocks(const int n, global_ptr<FLOAT> data, 
-                     global_ptr<FLOAT> blocksums, local_ptr<FLOAT> sdata, nd_item<1> &item) {
+                     global_ptr<FLOAT> blocksums, local_ptr<FLOAT> sdata, nd_item<1> &item) 
+{
   int blockDim = item.get_local_range(0);
   int tid = item.get_local_id(0);
   int gid = item.get_group(0);
@@ -69,7 +70,8 @@ void SumWithinBlocks(const int n, global_ptr<FLOAT> data,
 
 void compute_distances(const FLOAT x1, const FLOAT y1, const FLOAT z1, 
                        const FLOAT x2, const FLOAT y2, const FLOAT z2,
-		       FLOAT& r1, FLOAT& r2, FLOAT& r12) {
+		       FLOAT& r1, FLOAT& r2, FLOAT& r12) 
+{
     r1 = SQRT(x1*x1 + y1*y1 + z1*z1);
     r2 = SQRT(x2*x2 + y2*y2 + z2*z2);
     FLOAT xx = x1-x2;
@@ -78,14 +80,16 @@ void compute_distances(const FLOAT x1, const FLOAT y1, const FLOAT z1,
     r12 = SQRT(xx*xx + yy*yy + zz*zz);
 }
 
-FLOAT psi(const FLOAT x1, const FLOAT y1, const FLOAT z1, const FLOAT x2, const FLOAT y2, const FLOAT z2) {
+FLOAT psi(const FLOAT x1, const FLOAT y1, const FLOAT z1, const FLOAT x2, const FLOAT y2, const FLOAT z2) 
+{
     FLOAT r1, r2, r12;
     compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
     return (ONE + HALF*r12)*EXP(-TWO*(r1 + r2));
 }
 
 // reset stats counters on the GPU
-void zero_stats(global_ptr<FLOAT> stats, nd_item<1> &item) {
+void zero_stats(global_ptr<FLOAT> stats, nd_item<1> &item)
+{
   int i = item.get_global_id(0);
   stats[0*Npoint+i] = ZERO; // r1
   stats[1*Npoint+i] = ZERO; // r2
@@ -96,7 +100,8 @@ void zero_stats(global_ptr<FLOAT> stats, nd_item<1> &item) {
 void propagate(const int nstep, global_ptr<FLOAT> X1, global_ptr<FLOAT> Y1, 
                global_ptr<FLOAT> Z1, global_ptr<FLOAT> X2, global_ptr<FLOAT> Y2, 
                global_ptr<FLOAT> Z2, global_ptr<FLOAT> P, global_ptr<FLOAT> stats, 
-               global_ptr<oneapi::mkl::rng::device::philox4x32x10<1>> states, nd_item<1> &item) {
+               global_ptr<oneapi::mkl::rng::device::philox4x32x10<1>> states, nd_item<1> &item)
+{
   int i = item.get_global_id(0);
   FLOAT x1 = X1[i];
   FLOAT y1 = Y1[i];
@@ -142,7 +147,8 @@ void propagate(const int nstep, global_ptr<FLOAT> X1, global_ptr<FLOAT> Y1,
   P[i] = p;
 }
   
-int main() {
+int main()
+{
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -207,22 +213,22 @@ int main() {
     
   // Equilibrate
   //propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
-    q.submit([&](handler &cgh) {
-      auto x1 = d_x1.get_access<sycl_read_write>(cgh);
-      auto y1 = d_y1.get_access<sycl_read_write>(cgh);
-      auto z1 = d_z1.get_access<sycl_read_write>(cgh);
-      auto x2 = d_x2.get_access<sycl_read_write>(cgh);
-      auto y2 = d_y2.get_access<sycl_read_write>(cgh);
-      auto z2 = d_z2.get_access<sycl_read_write>(cgh);
-      auto psir = d_psir.get_access<sycl_read_write>(cgh);
-      auto stats = d_stats.get_access<sycl_read_write>(cgh);
-      auto ranstates = d_ranstates.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class prop2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        propagate(Neq, x1.get_pointer(), y1.get_pointer(), z1.get_pointer(),
-             x2.get_pointer(), y2.get_pointer(), z2.get_pointer(),
-             psir.get_pointer(), stats.get_pointer(), ranstates.get_pointer(), item);
-      });
+  q.submit([&](handler &cgh) {
+    auto x1 = d_x1.get_access<sycl_read_write>(cgh);
+    auto y1 = d_y1.get_access<sycl_read_write>(cgh);
+    auto z1 = d_z1.get_access<sycl_read_write>(cgh);
+    auto x2 = d_x2.get_access<sycl_read_write>(cgh);
+    auto y2 = d_y2.get_access<sycl_read_write>(cgh);
+    auto z2 = d_z2.get_access<sycl_read_write>(cgh);
+    auto psir = d_psir.get_access<sycl_read_write>(cgh);
+    auto stats = d_stats.get_access<sycl_read_write>(cgh);
+    auto ranstates = d_ranstates.get_access<sycl_read>(cgh);
+    cgh.parallel_for<class prop2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      propagate(Neq, x1.get_pointer(), y1.get_pointer(), z1.get_pointer(),
+           x2.get_pointer(), y2.get_pointer(), z2.get_pointer(),
+           psir.get_pointer(), stats.get_pointer(), ranstates.get_pointer(), item);
     });
+  });
 
   // Accumulators for averages over blocks --- use doubles
   double r1_tot = ZERO,  r1_sq_tot = ZERO;
