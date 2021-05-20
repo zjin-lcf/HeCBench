@@ -12,9 +12,11 @@ Platform 2: Intel<sup>®</sup> Xeon E-2176G with a Gen9.5 UHD630 integrated GPU
 A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To run a single test, go to a test directory and type the command "make run".  
 
 ## Note
-We may build the [software from source with support for Nvidia CUDA](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md). To run a single test on an Nvidia GPU, go to a test directory (e.g. affine-sycl) and type the command " make -f Makefile.cuda run". "Makefile.cuda" may be modified for different versions of Nvidia GPUs and toolchains.
+We may execute SYCL programs on an Nvidia GPU by building the [software from source with support for Nvidia CUDA](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md). Then, go to a directory (e.g., affine-sycl) and type the command " make -f Makefile.cuda run". "Makefile.cuda" may be modified for different versions of Nvidia GPUs and toolchains.
 
-We may build the [software from source with support for AMD HIP](https://github.com/illuhad/hipSYCL/blob/develop/doc/installing.md). To run a single test on an AMD GPU, go to a test directory (e.g. affine-sycl) and type the command " make -f Makefile.hip run". "Makefile.hip" may be modified for different versions of AMD GPUs and toolchains.
+We may execute SYCL programs on an AMD GPU by building  the [software from source with support for AMD HIP](https://github.com/illuhad/hipSYCL/blob/develop/doc/installing.md). Then, go to a directory (e.g., affine-sycl) and type the command " make -f Makefile.hip run". "Makefile.hip" may be modified for different versions of AMD GPUs and toolchains.
+
+We may also evaluate OpenMP Offload to GPU feature with [AOMP](https://github.com/ROCm-Developer-Tools/aomp) on an AMD GPU or [the Nvidia HPC SDK](https://developer.nvidia.com/nvidia-hpc-sdk-downloads) on an Nvidia GPU. Then, go to a directory (e.g., affine-omp) and type "make -f Makefile.aomp run" or "make -f Makefile.nvc run".
 
 ## Results on Platform 1
 | affine | SYCL | DPCT usm | DPCT header | OpenMP |     
