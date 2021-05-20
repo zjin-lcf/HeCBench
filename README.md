@@ -51,6 +51,9 @@ Early results are shown [here](results/README.md)
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
 
+### bsw
+  GPU accelerated Smith-Waterman for performing batch alignments (https://github.com/mgawan/GPU-BSW)
+
 ### b+tree
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -87,6 +90,9 @@ Early results are shown [here](results/README.md)
 ### dct8x8
   Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### deredundancy
+  Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
+  
 ### diamond
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
@@ -105,6 +111,9 @@ Early results are shown [here](results/README.md)
 ### easyWave
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
+### epistatis
+   Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
+   
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
 
@@ -149,8 +158,11 @@ Early results are shown [here](results/README.md)
   The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
 
 ### heat2d
-  Discreet 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
-
+  Discrete 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
+  
+### hexicton
+  A Portable and Scalable Solver-Framework for the Hierarchical Equations of Motion (https://github.com/noma/hexciton_benchmark)
+  
 ### histogram
   Histogram (http://github.com/NVlabs/cub/tree/master/experimental)
 
@@ -232,6 +244,9 @@ Early results are shown [here](results/README.md)
 ### md
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### mdh
+  Simple Multiple Debye-Huckel kernel in Fast Molecular Electrostatics Algorithms on GPUs (http://gpugems.hwu-server2.crhc.illinois.edu/)
+  
 ### md5hash
   MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
@@ -360,7 +375,7 @@ Early results are shown [here](results/README.md)
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
 ### sptrsv
-  A Thread-Level Synchronization-Free Sparse Triangular Solve (https://github.com/JiyaSu/CapelliniSpTRSV)
+  A thread-Level synchronization-free sparse triangular solver (https://github.com/JiyaSu/CapelliniSpTRSV)
 
 ### srad
   SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -405,7 +420,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mike Giles, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
