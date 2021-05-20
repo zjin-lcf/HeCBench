@@ -1,5 +1,5 @@
 # oneAPI Direct Programming
-This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
+This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
 
 # Experimental Results
 Early results are shown [here](results/README.md)
@@ -112,7 +112,7 @@ Early results are shown [here](results/README.md)
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
 ### epistatis
-   Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
+  Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
    
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
@@ -218,13 +218,13 @@ Early results are shown [here](results/README.md)
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### libor
-  a LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
+  A LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
 
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
 
 ### lombscargle
-   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
+  Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
 ### lud
   LU decomposition in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -251,7 +251,7 @@ Early results are shown [here](results/README.md)
   MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
 ### medianfilter
-  2-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  Two-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
 ### memcpy
   A benchmark for memory copy from a host to a device
@@ -317,7 +317,7 @@ Early results are shown [here](results/README.md)
   Quicksort (https://software.intel.com/content/www/us/en/develop/download/code-for-the-parallel-universe-article-gpu-quicksort-from-opencl-to-data-parallel-c.html)
 
 ### qrg
-  Quasirandom generator implements Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### radixsort
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
@@ -342,7 +342,7 @@ Early results are shown [here](results/README.md)
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
 ### s3d
-  S3D in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+  Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
