@@ -1,5 +1,5 @@
 # oneAPI Direct Programming
-This repository contains a collection of data-parallel programs for evaluating oneAPI direct programming. Each program is written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
+This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
 
 # Experimental Results
 Early results are shown [here](results/README.md)
@@ -51,6 +51,9 @@ Early results are shown [here](results/README.md)
 ### bspline-vgh
   Bspline value gradient hessian (https://github.com/QMCPACK/miniqmc/blob/OMP_offload/src/OpenMP/main.cpp)
 
+### bsw
+  GPU accelerated Smith-Waterman for performing batch alignments (https://github.com/mgawan/GPU-BSW)
+
 ### b+tree
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -87,6 +90,9 @@ Early results are shown [here](results/README.md)
 ### dct8x8
   Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### deredundancy
+  Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
+  
 ### diamond
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
@@ -105,6 +111,9 @@ Early results are shown [here](results/README.md)
 ### easyWave
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
+### epistatis
+  Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
+   
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
 
@@ -149,8 +158,11 @@ Early results are shown [here](results/README.md)
   The heat equation solver (https://github.com/UoB-HPC/heat_sycl)
 
 ### heat2d
-  Discreet 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
-
+  Discrete 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
+  
+### hexicton
+  A Portable and Scalable Solver-Framework for the Hierarchical Equations of Motion (https://github.com/noma/hexciton_benchmark)
+  
 ### histogram
   Histogram (http://github.com/NVlabs/cub/tree/master/experimental)
 
@@ -206,13 +218,13 @@ Early results are shown [here](results/README.md)
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### libor
-  a LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
+  A LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
 
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
 
 ### lombscargle
-   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
+  Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
 ### lud
   LU decomposition in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -232,11 +244,14 @@ Early results are shown [here](results/README.md)
 ### md
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### mdh
+  Simple Multiple Debye-Huckel kernel in Fast Molecular Electrostatics Algorithms on GPUs (http://gpugems.hwu-server2.crhc.illinois.edu/)
+  
 ### md5hash
   MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
 ### medianfilter
-  2-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  Two-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
 ### memcpy
   A benchmark for memory copy from a host to a device
@@ -302,7 +317,7 @@ Early results are shown [here](results/README.md)
   Quicksort (https://software.intel.com/content/www/us/en/develop/download/code-for-the-parallel-universe-article-gpu-quicksort-from-opencl-to-data-parallel-c.html)
 
 ### qrg
-  Quasirandom generator implements Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### radixsort
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
@@ -327,7 +342,7 @@ Early results are shown [here](results/README.md)
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
 ### s3d
-  S3D in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+  Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
 ### scan
   A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
@@ -360,7 +375,7 @@ Early results are shown [here](results/README.md)
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
 ### sptrsv
-  A Thread-Level Synchronization-Free Sparse Triangular Solve (https://github.com/JiyaSu/CapelliniSpTRSV)
+  A thread-Level synchronization-free sparse triangular solver (https://github.com/JiyaSu/CapelliniSpTRSV)
 
 ### srad
   SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -405,7 +420,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya su, John Tramm, Mike Giles, Mohammed Alser, Nevin Liber, Pedro Valero Lara, Piotr Różański, Robert Harrison, Thomas Applencourt, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	

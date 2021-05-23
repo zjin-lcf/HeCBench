@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -11,18 +11,18 @@ DEBUG     = no
 # Program name & source code list
 #===============================================================================
 
-program = lud
+program = main
 
-source = lud.cpp ./common/common.cpp
+source = main.cu utils.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I./common
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -46,12 +46,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp lud_kernels.cpp Makefile
+%.o: %.cu kernels.cu iteration.cu flame.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s 8192
+	./$(program)
 
