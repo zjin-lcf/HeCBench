@@ -14,9 +14,11 @@ using namespace std;
 #ifdef SINGLE_PRECISION
 #define T float 
 #define T2 float2
+#define EPISON 1e-4
 #else
 #define T double
 #define T2 double2
+#define EPISON 1e-6
 #endif
 
 
@@ -177,12 +179,12 @@ int main(int argc, char** argv)
   // Verification
   bool error = false;
   for (int i = 0; i < N; i++) {
-    if ( fabs((T)source[i].x - (T)reference[i].x) > 1e-6) {
+    if ( fabs((T)source[i].x - (T)reference[i].x) > EPISON) {
       //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
       error = true;
       break;
     }
-    if ( fabs((T)source[i].y - (T)reference[i].y) > 1e-6) {
+    if ( fabs((T)source[i].y - (T)reference[i].y) > EPISON) {
       //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
       error = true;
       break;
