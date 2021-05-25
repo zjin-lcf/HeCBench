@@ -23,181 +23,181 @@ ratx_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
         CTOT += C(k);
     }
 
-    real CTB_10 = CTOT + C(1) + 5.e0*C(6) + C(10) + 5.e-1*C(11) + C(12)
-                + 2.e0*C(16) + 2.e0*C(14) + 2.e0*C(15);
-    real CTB_114= CTOT + C(1) + 5.e0*C(6) + C(10) + 5.e-1*C(11) + C(12)
-                + 2.e0*C(16) + 1.5e0*C(14) + 1.5e0*C(15) ;
-    real CTB_16 = CTOT + C(1) + 5.e0*C(6) + C(10) + 5.e-1*C(11) + C(12)
-                + 2.e0*C(16) + 2.e0*C(14) + 2.e0*C(15) ;
+    real CTB_10 = CTOT + C(1) + (real)5.e0*C(6) + C(10) + (real)5.e-1*C(11) + C(12)
+                + (real)2.e0*C(16) + (real)2.e0*C(14) + (real)2.e0*C(15);
+    real CTB_114= CTOT + C(1) + (real)5.e0*C(6) + C(10) + (real)5.e-1*C(11) + C(12)
+                + (real)2.e0*C(16) + (real)1.5e0*C(14) + (real)1.5e0*C(15) ;
+    real CTB_16 = CTOT + C(1) + (real)5.e0*C(6) + C(10) + (real)5.e-1*C(11) + C(12)
+                + (real)2.e0*C(16) + (real)2.e0*C(14) + (real)2.e0*C(15) ;
 
     //     If fall-off (pressure correction):
 
     PR = RKLOW(1) * DIV(CTB_16, RF(16));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.654e-1*EXP(DIV(-TEMP,9.4e1)) + 7.346e-1*EXP(DIV(-TEMP,1.756e3))
-    + EXP(DIV(-5.182e3,TEMP));
+    FCENT = (real)2.654e-1*EXP(DIV(-TEMP,(real)9.4e1)) + (real)7.346e-1*EXP(DIV(-TEMP,(real)1.756e3))
+    + EXP(DIV((real)-5.182e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(16) = RF(16) * PCOR;
     RB(16) = RB(16) * PCOR;
 
     PR = RKLOW(2) * DIV(CTB_10, RF(31));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 6.8e-2*EXP(DIV(-TEMP,1.97e2)) + 9.32e-1*EXP(DIV(-TEMP,1.54e3))
-    + EXP(DIV(-1.03e4,TEMP));
+    FCENT = (real)6.8e-2*EXP(DIV(-TEMP,(real)1.97e2)) + (real)9.32e-1*EXP(DIV(-TEMP,(real)1.54e3))
+    + EXP(DIV((real)-1.03e4,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV (CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV (FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV (CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV (FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(31) = RF(31) * PCOR;
     RB(31) = RB(31) * PCOR;
 
     PR = RKLOW(3) * DIV(CTB_10, RF(39));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 4.243e-1*EXP(DIV(-TEMP,2.37e2)) + 5.757e-1*EXP(DIV(-TEMP,1.652e3))
-    + EXP(DIV(-5.069e3,TEMP));
+    FCENT = (real)4.243e-1*EXP(DIV(-TEMP,(real)2.37e2)) + (real)5.757e-1*EXP(DIV(-TEMP,(real)1.652e3))
+    + EXP(DIV((real)-5.069e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(39) = RF(39) * PCOR;
     RB(39) = RB(39) * PCOR;
 
     PR = RKLOW(4) * DIV(CTB_10, RF(41));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.176e-1*EXP(DIV(-TEMP,2.71e2)) + 7.824e-1*EXP(DIV(-TEMP,2.755e3))
-    + EXP(DIV(-6.57e3,TEMP));
+    FCENT = (real)2.176e-1*EXP(DIV(-TEMP,(real)2.71e2)) + (real)7.824e-1*EXP(DIV(-TEMP,(real)2.755e3))
+    + EXP(DIV((real)-6.57e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(41) = RF(41) * PCOR;
     RB(41) = RB(41) * PCOR;
 
     PR = RKLOW(5) * DIV(CTB_10, RF(48));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 3.2e-1*EXP(DIV(-TEMP,7.8e1)) + 6.8e-1*EXP(DIV(-TEMP,1.995e3))
-    + EXP(DIV(-5.59e3,TEMP));
+    FCENT = (real)3.2e-1*EXP(DIV(-TEMP,(real)7.8e1)) + (real)6.8e-1*EXP(DIV(-TEMP,(real)1.995e3))
+    + EXP(DIV((real)-5.59e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(48) = RF(48) * PCOR;
     RB(48) = RB(48) * PCOR;
 
     PR = RKLOW(6) * DIV(CTB_10, RF(56));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 4.093e-1*EXP(DIV(-TEMP,2.75e2)) + 5.907e-1*EXP(DIV(-TEMP,1.226e3))
-    + EXP(DIV(-5.185e3, TEMP));
+    FCENT = (real)4.093e-1*EXP(DIV(-TEMP,(real)2.75e2)) + (real)5.907e-1*EXP(DIV(-TEMP,(real)1.226e3))
+    + EXP(DIV((real)-5.185e3, TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(56) = RF(56) * PCOR;
     RB(56) = RB(56) * PCOR;
 
     PR = RKLOW(7) * DIV(CTB_10, RF(71));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.42e-1*EXP(DIV(-TEMP,9.4e1)) + 7.58e-1*EXP(DIV(-TEMP,1.555e3))
-    + EXP(DIV(-4.2e3,TEMP));
+    FCENT = (real)2.42e-1*EXP(DIV(-TEMP,(real)9.4e1)) + (real)7.58e-1*EXP(DIV(-TEMP,(real)1.555e3))
+    + EXP(DIV((real)-4.2e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(71) = RF(71) * PCOR;
     RB(71) = RB(71) * PCOR;
 
     PR = RKLOW(8) * DIV(CTB_10, RF(78));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.17e-1*EXP(DIV(-TEMP,7.4e1)) + 7.83e-1*EXP(DIV(-TEMP,2.941e3))
-    + EXP(DIV(-6.964e3,TEMP));
+    FCENT = (real)2.17e-1*EXP(DIV(-TEMP,(real)7.4e1)) + (real)7.83e-1*EXP(DIV(-TEMP,(real)2.941e3))
+    + EXP(DIV((real)-6.964e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(78) = RF(78) * PCOR;
     RB(78) = RB(78) * PCOR;
 
     PR = RKLOW(9) * DIV(CTB_10, RF(89));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 3.827e-1*EXP(DIV(-TEMP,1.3076e1)) + 6.173e-1*EXP(DIV(-TEMP,2.078e3))
-    + EXP(DIV(-5.093e3,TEMP));
+    FCENT = (real)3.827e-1*EXP(DIV(-TEMP,(real)1.3076e1)) + (real)6.173e-1*EXP(DIV(-TEMP,(real)2.078e3))
+    + EXP(DIV((real)-5.093e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(89) = RF(89) * PCOR;
     RB(89) = RB(89) * PCOR;
 
     PR = RKLOW(10) * DIV(CTB_10, RF(93));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 4.675e-1*EXP(DIV(-TEMP,1.51e2)) + 5.325e-1*EXP(DIV(-TEMP,1.038e3))
-    + EXP(DIV(-4.97e3,TEMP));
+    FCENT = (real)4.675e-1*EXP(DIV(-TEMP,(real)1.51e2)) + (real)5.325e-1*EXP(DIV(-TEMP,(real)1.038e3))
+    + EXP(DIV((real)-4.97e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(93) = RF(93) * PCOR;
     RB(93) = RB(93) * PCOR;
 
     PR = RKLOW(11) * DIV(CTB_114, RF(114));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     RF(114) = RF(114) * PCOR;
     RB(114) = RB(114) * PCOR;
 
     PR = RKLOW(12) * DIV(CTB_10, RF(115));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = -9.816e-1*EXP(DIV(-TEMP,5.3837e3)) +
-            1.9816e0*EXP(DIV(-TEMP,4.2932e0))  +
-            EXP(DIV(7.95e-2,TEMP));
+    FCENT = (real)-9.816e-1*EXP(DIV(-TEMP,(real)5.3837e3)) +
+            (real)1.9816e0*EXP(DIV(-TEMP,(real)4.2932e0))  +
+            EXP(DIV((real)7.95e-2,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(115) = RF(115) * PCOR;
@@ -212,7 +212,7 @@ ratxb_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
 {
     const real TEMP = T[threadIdx.x + (blockIdx.x * blockDim.x)]*TCONV;
     //const real ALOGT = LOG((TEMP));
-    real CTOT = 0.0;
+    real CTOT = (real)0.0;
     register real PR, PCOR, PRLOG, FCENT, FCLOG, XN;
     register real CPRLOG, FLOG, FC, SQR;
     const real SMALL = FLT_MIN;
@@ -223,22 +223,22 @@ ratxb_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
         CTOT += C(k);
     }
 
-    real CTB_5  = CTOT - C(1) - C(6) + C(10) - C(12) + 2.e0*C(16)
-                + 2.e0*C(14) + 2.e0*C(15) ;
-    real CTB_9  = CTOT - 2.7e-1*C(1) + 2.65e0*C(6) + C(10) + 2.e0*C(16)
-                + 2.e0*C(14) + 2.e0*C(15) ;
-    real CTB_10 = CTOT + C(1) + 5.e0*C(6) + C(10) + 5.e-1*C(11) + C(12)
-                + 2.e0*C(16) + 2.e0*C(14) + 2.e0*C(15);
-    real CTB_11 = CTOT + 1.4e0*C(1) + 1.44e1*C(6) + C(10) + 7.5e-1*C(11)
-                + 2.6e0*C(12) + 2.e0*C(16) + 2.e0*C(14)
-                + 2.e0*C(15) ;
-    real CTB_12 = CTOT - C(4) - C(6) - 2.5e-1*C(11) + 5.e-1*C(12)
-                + 5.e-1*C(16) - C(22) + 2.e0*C(14) + 2.e0*C(15) ;
-    real CTB_29 = CTOT + C(1) + 5.e0*C(4) + 5.e0*C(6) + C(10)
-                + 5.e-1*C(11) + 2.5e0*C(12) + 2.e0*C(16)
-                + 2.e0*C(14) + 2.e0*C(15) ;
-    real CTB_190= CTOT + C(1) + 5.e0*C(6) + C(10) + 5.e-1*C(11)
-                + C(12) + 2.e0*C(16) ;
+    real CTB_5  = CTOT - C(1) - C(6) + C(10) - C(12) + (real)2.e0*C(16)
+                + (real)2.e0*C(14) + (real)2.e0*C(15) ;
+    real CTB_9  = CTOT - (real)2.7e-1*C(1) + (real)2.65e0*C(6) + C(10) + (real)2.e0*C(16)
+                + (real)2.e0*C(14) + (real)2.e0*C(15) ;
+    real CTB_10 = CTOT + C(1) + (real)5.e0*C(6) + C(10) + (real)5.e-1*C(11) + C(12)
+                + (real)2.e0*C(16) + (real)2.e0*C(14) + (real)2.e0*C(15);
+    real CTB_11 = CTOT + (real)1.4e0*C(1) + (real)1.44e1*C(6) + C(10) + (real)7.5e-1*C(11)
+                + (real)2.6e0*C(12) + (real)2.e0*C(16) + (real)2.e0*C(14)
+                + (real)2.e0*C(15) ;
+    real CTB_12 = CTOT - C(4) - C(6) - (real)2.5e-1*C(11) + (real)5.e-1*C(12)
+                + (real)5.e-1*C(16) - C(22) + (real)2.e0*C(14) + (real)2.e0*C(15) ;
+    real CTB_29 = CTOT + C(1) + (real)5.e0*C(4) + (real)5.e0*C(6) + C(10)
+                + (real)5.e-1*C(11) + (real)2.5e0*C(12) + (real)2.e0*C(16)
+                + (real)2.e0*C(14) + (real)2.e0*C(15) ;
+    real CTB_190= CTOT + C(1) + (real)5.e0*C(6) + C(10) + (real)5.e-1*C(11)
+                + C(12) + (real)2.e0*C(16) ;
 
     RF(5) = RF(5)*CTB_5*C(2)*C(2);
     RB(5) = RB(5)*CTB_5*C(1);
@@ -259,135 +259,135 @@ ratxb_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
 
 
     PR = RKLOW(13) * DIV(CTB_10, RF(126));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 6.63e-1*EXP(DIV(-TEMP,1.707e3)) + 3.37e-1*EXP(DIV(-TEMP,3.2e3))
-    + EXP(DIV(-4.131e3,TEMP));
+    FCENT = (real)6.63e-1*EXP(DIV(-TEMP,(real)1.707e3)) + (real)3.37e-1*EXP(DIV(-TEMP,(real)3.2e3))
+    + EXP(DIV((real)-4.131e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(126) = RF(126) * PCOR;
     RB(126) = RB(126) * PCOR;
 
     PR = RKLOW(14) * DIV(CTB_10, RF(132));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.18e-1*EXP(DIV(-TEMP,2.075e2)) + 7.82e-1*EXP(DIV(-TEMP,2.663e3))
-    + EXP(DIV(-6.095e3,TEMP));
+    FCENT = (real)2.18e-1*EXP(DIV(-TEMP,(real)2.075e2)) + (real)7.82e-1*EXP(DIV(-TEMP,(real)2.663e3))
+    + EXP(DIV((real)-6.095e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(132) = RF(132) * PCOR;
     RB(132) = RB(132) * PCOR;
 
     PR = RKLOW(15) * DIV(CTB_10, RF(145));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 8.25e-1*EXP(DIV(-TEMP,1.3406e3)) + 1.75e-1*EXP(DIV(-TEMP,6.e4))
-    + EXP(DIV(-1.01398e4,TEMP));
+    FCENT = (real)8.25e-1*EXP(DIV(-TEMP,(real)1.3406e3)) + (real)1.75e-1*EXP(DIV(-TEMP,(real)6.e4))
+    + EXP(DIV((real)-1.01398e4,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(145) = RF(145) * PCOR;
     RB(145) = RB(145) * PCOR;
 
     PR = RKLOW(16) * DIV(CTB_10, RF(148));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 4.5e-1*EXP(DIV(-TEMP,8.9e3)) + 5.5e-1*EXP(DIV(-TEMP,4.35e3))
-    + EXP(DIV(-7.244e3,TEMP));
+    FCENT = (real)4.5e-1*EXP(DIV(-TEMP,(real)8.9e3)) + (real)5.5e-1*EXP(DIV(-TEMP,(real)4.35e3))
+    + EXP(DIV((real)-7.244e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(148) = RF(148) * PCOR;
     RB(148) = RB(148) * PCOR;
 
     PR = RKLOW(17) * DIV(CTB_10, RF(155));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.655e-1*EXP(DIV(-TEMP,1.8e2)) + 7.345e-1*EXP(DIV(-TEMP,1.035e3))
-    + EXP(DIV(-5.417e3,TEMP));
+    FCENT = (real)2.655e-1*EXP(DIV(-TEMP,(real)1.8e2)) + (real)7.345e-1*EXP(DIV(-TEMP,(real)1.035e3))
+    + EXP(DIV((real)-5.417e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(155) = RF(155) * PCOR;
     RB(155) = RB(155) * PCOR;
 
     PR = RKLOW(18) * DIV(CTB_10, RF(156));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 2.47e-2*EXP(DIV(-TEMP,2.1e2)) + 9.753e-1*EXP(DIV(-TEMP,9.84e2))
-    + EXP(DIV(-4.374e3,TEMP));
+    FCENT = (real)2.47e-2*EXP(DIV(-TEMP,(real)2.1e2)) + (real)9.753e-1*EXP(DIV(-TEMP,(real)9.84e2))
+    + EXP(DIV((real)-4.374e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(156) = RF(156) * PCOR;
     RB(156) = RB(156) * PCOR;
 
     PR = RKLOW(19) * DIV(CTB_10, RF(170));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 1.578e-1*EXP(DIV(-TEMP,1.25e2)) + 8.422e-1*EXP(DIV(-TEMP,2.219e3))
-    + EXP(DIV(-6.882e3,TEMP));
+    FCENT = (real)1.578e-1*EXP(DIV(-TEMP,(real)1.25e2)) + (real)8.422e-1*EXP(DIV(-TEMP,(real)2.219e3))
+    + EXP(DIV((real)-6.882e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(170) = RF(170) * PCOR;
     RB(170) = RB(170) * PCOR;
 
     PR = RKLOW(20) * DIV(CTB_10, RF(185));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 9.8e-1*EXP(DIV(-TEMP,1.0966e3)) + 2.e-2*EXP(DIV(-TEMP,1.0966e3))
-    + EXP(DIV(-6.8595e3,TEMP));
+    FCENT = (real)9.8e-1*EXP(DIV(-TEMP,(real)1.0966e3)) + (real)2.e-2*EXP(DIV(-TEMP,(real)1.0966e3))
+    + EXP(DIV((real)-6.8595e3,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(185) = RF(185) * PCOR;
     RB(185) = RB(185) * PCOR;
 
     PR = RKLOW(21) * DIV(CTB_190, RF(190));
-    PCOR = DIV(PR, (1.0 + PR));
+    PCOR = DIV(PR, ((real)1.0 + PR));
     PRLOG = LOG10(MAX(PR,SMALL));
-    FCENT = 0.e0*EXP(DIV(-TEMP,1.e3)) + 1.e0*EXP(DIV(-TEMP,1.31e3))
-    + EXP(DIV(-4.8097e4,TEMP));
+    FCENT = (real)0.e0*EXP(DIV(-TEMP,(real)1.e3)) + (real)1.e0*EXP(DIV(-TEMP,(real)1.31e3))
+    + EXP(DIV((real)-4.8097e4,TEMP));
     FCLOG = LOG10(MAX(FCENT,SMALL));
-    XN    = 0.75 - 1.27*FCLOG;
-    CPRLOG= PRLOG - (0.4 + 0.67*FCLOG);
-    SQR = DIV(CPRLOG, (XN-0.14*CPRLOG));
-    FLOG = DIV(FCLOG, (1.0 + SQR*SQR));
+    XN    = (real)0.75 - (real)1.27*FCLOG;
+    CPRLOG= PRLOG - ((real)0.4 + (real)0.67*FCLOG);
+    SQR = DIV(CPRLOG, (XN-(real)0.14*CPRLOG));
+    FLOG = DIV(FCLOG, ((real)1.0 + SQR*SQR));
     FC = EXP10(FLOG);
     PCOR = FC * PCOR;
     RF(190) = RF(190) * PCOR;
