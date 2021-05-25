@@ -10,12 +10,12 @@ qssa_kernel(real* RESTRICT RF, real* RESTRICT RB, real* RESTRICT A) {
 
     register real DEN;
 
-    RF(57) = 0.e0;
-    RF(58) = 0.e0;
-    RF(143) = 0.e0;
-    RF(179) = 0.e0;
-    RB(194) = 0.e0;
-    RF(206) = 0.e0;
+    RF(57)  = (real)0.0;
+    RF(58)  = (real)0.0;
+    RF(143) = (real)0.0;
+    RF(179) = (real)0.0;
+    RB(194) = (real)0.0;
+    RF(206) = (real)0.0;
 
     //   CH
     DEN = +RF(34) +RF(35) +RF(36) +RF(37) +RF(38)
