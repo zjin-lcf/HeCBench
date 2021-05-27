@@ -118,8 +118,8 @@ int main(int argc, char **argv)
       std::cout << i << " " << k << " " << dst[i].c[k].real << " " << chkdst[i].c[k].real << " " <<
         dst[i].c[k].imag << " " << chkdst[i].c[k].imag << std::endl;
 #endif
-      assert(almost_equal<Real>(dst[i].c[k].real, chkdst[i].c[k].real, 2E-6));
-      assert(almost_equal<Real>(dst[i].c[k].imag, chkdst[i].c[k].imag, 2E-6));
+      assert(almost_equal<Real>(dst[i].c[k].real, chkdst[i].c[k].real, EPISON));
+      assert(almost_equal<Real>(dst[i].c[k].imag, chkdst[i].c[k].imag, EPISON));
     }
   }
 
