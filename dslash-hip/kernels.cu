@@ -1,4 +1,3 @@
-#include <hip/hip_runtime.h>
 #include "dslash.h"
 
 #define THREADS_PER_SITE 1
