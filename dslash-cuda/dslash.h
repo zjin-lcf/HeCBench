@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 #include <math.h>
 #include <chrono>
+#include <cuda.h>
 
 extern size_t sites_on_node;
 extern size_t even_sites_on_node;
