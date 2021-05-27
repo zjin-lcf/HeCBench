@@ -1,4 +1,3 @@
-#include <cuda.h>
 #include "dslash.h"
 
 __global__ void make_back(
