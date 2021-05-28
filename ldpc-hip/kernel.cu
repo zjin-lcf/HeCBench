@@ -127,8 +127,9 @@ __global__ void ldpc_cnp_kernel(
 #endif
 
   // Define cache for R: Rcache[NON_EMPTY_ELMENT][nThreadPerBlock]
-  // extern means that the memory is allocated dynamically at run-time
-  extern __shared__ float RCache[];
+  // the memory is allocated dynamically at run-time
+  HIP_DYNAMIC_SHARED(float, RCache);
+
   int iRCacheLine = threadIdx.y * blockDim.x + threadIdx.x;
 
   int iCW = threadIdx.y; // index of CW in a MCW
