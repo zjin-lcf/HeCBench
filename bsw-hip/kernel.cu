@@ -1,5 +1,9 @@
 #include "kernel.hpp"
 
+#ifdef USE_HIPCL
+#define __shfl(array, lane, warpsize)  __shfl(array, lane)
+#endif
+
   __inline__ __device__ short
 warpReduceMax_with_index_reverse(short val, short& myIndex, short& myIndex2, unsigned lengthSeqB)
 {
@@ -16,7 +20,7 @@ warpReduceMax_with_index_reverse(short val, short& myIndex, short& myIndex2, uns
   {
 
     short tempVal = __shfl_down(val, offset);
-    val     = max(val,tempVal);
+    val     = (val > tempVal) ? val : tempVal;
     newInd  = __shfl_down(ind, offset);
     newInd2 = __shfl_down(ind2, offset);
 
@@ -59,7 +63,7 @@ warpReduceMax_with_index(short val, short& myIndex, short& myIndex2, unsigned le
   {
 
     short tempVal = __shfl_down(val, offset);
-    val     = max(val,tempVal);
+    val     = (val > tempVal) ? val : tempVal;
     newInd  = __shfl_down(ind, offset);
     newInd2 = __shfl_down(ind2, offset);
     if(val != myMax)
@@ -180,14 +184,14 @@ blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2, unsi
 
 
 
-  __device__ __host__ short
+  __device__ short
 findMaxFour(short first, short second, short third, short fourth)
 {
   short maxScore = 0;
 
-  maxScore = max(first,second);
-  maxScore = max(maxScore, third);
-  maxScore = max(maxScore, fourth);
+  maxScore = (first > second) ? first : second; 
+  maxScore = (maxScore > third) ? maxScore : third;
+  maxScore = (maxScore > fourth) ? maxScore : fourth;
 
   return maxScore;
 }
@@ -220,7 +224,7 @@ sequence_aa_kernel(
   const char* seqB;
   const char* longer_seq;
 
-  extern __shared__ char is_valid_array[]; 
+  HIP_DYNAMIC_SHARED(char, is_valid_array); 
   char*                  is_valid = &is_valid_array[0];
 
   // setting up block local sequences and their lengths.
@@ -244,9 +248,15 @@ sequence_aa_kernel(
 
   // shared memory space for storing longer of the two strings
   if (thread_Id == 0) {
+#ifdef USE_HIPCL
+    for (int i = 0; i < minSize; i++) is_valid[i] = 0;
+    for (int i = minSize; i < 2*minSize; i++) is_valid[i] = 1;
+    for (int i = 2*minSize; i < 3*minSize; i++) is_valid[i] = 0;
+#else
     memset(is_valid, 0, minSize);
     memset(is_valid + minSize, 1, minSize);
     memset(is_valid + 2*minSize, 0, minSize);
+#endif
   }
   is_valid += 2*minSize;
 
@@ -450,7 +460,7 @@ sequence_aa_reverse_kernel(
   const char* seqB;
   const char* longer_seq;
 
-  extern __shared__ char is_valid_array[]; 
+  HIP_DYNAMIC_SHARED(char, is_valid_array); 
   char*                  is_valid = &is_valid_array[0];
 
   // setting up block local sequences and their lengths.
@@ -471,9 +481,15 @@ sequence_aa_reverse_kernel(
   char myColumnChar;
 
   if (thread_Id == 0) {
+#ifdef USE_HIPCL
+    for (int i = 0; i < minSize; i++) is_valid[i] = 0;
+    for (int i = minSize; i < 2*minSize; i++) is_valid[i] = 1;
+    for (int i = 2*minSize; i < 3*minSize; i++) is_valid[i] = 0;
+#else
     memset(is_valid, 0, minSize);
     memset(is_valid + minSize, 1, minSize);
     memset(is_valid + 2*minSize, 0, minSize);
+#endif
   }
   is_valid += 2*minSize;
 
