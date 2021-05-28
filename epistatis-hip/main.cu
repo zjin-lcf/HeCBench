@@ -288,9 +288,6 @@ int main(int argc, char **argv)
       bin_data_zeros_trans[(j * num_snp + i) * 2 + 1] = bin_data_zeros[(i * PP_zeros + j) * 2 + 1];
     }
 
-  for (int i = 0; i < num_snp*PP_zeros*2; i++) std::cout << bin_data_zeros_trans[i] << "\n";
-  for (int i = 0; i < num_snp*PP_ones*2; i++) std::cout << bin_data_ones_trans[i] << "\n";
-
   float *scores = mem_alloc<float>(64, num_snp * num_snp);
   for(x = 0; x < num_snp * num_snp; x++) scores[x] = FLT_MAX;
 
