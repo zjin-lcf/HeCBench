@@ -90,10 +90,10 @@ void ray_sphere_intersect(Isect *isect, const Ray *ray, const Sphere *sphere)
   float C = vdot(rs, rs) - sphere->radius * sphere->radius;
   float D = B * B - C;
 
-  if (D > 0.0) {
-    float t = -B - sqrt(D);
+  if (D > 0.f) {
+    float t = -B - sqrtf(D);
 
-    if ((t > 0.0) && (t < isect->t)) {
+    if ((t > 0.f) && (t < isect->t)) {
       isect->t = t;
       isect->hit = 1;
 
@@ -116,11 +116,11 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
   float d = -vdot(plane->p, plane->n);
   float v = vdot(ray->dir, plane->n);
 
-  if (fabs(v) < 1.0e-17f) return;
+  if (fabsf(v) < 1.0e-17f) return;
 
   float t = -(vdot(ray->org, plane->n) + d) / v;
 
-  if ((t > 0.0) && (t < isect->t)) {
+  if ((t > 0.f) && (t < isect->t)) {
     isect->t = t;
     isect->hit = 1;
 
@@ -136,7 +136,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
 void orthoBasis(vec *basis, vec n)
 {
   basis[2] = n;
-  basis[1].x = 0.0; basis[1].y = 0.0; basis[1].z = 0.0;
+  basis[1].x = 0.f; basis[1].y = 0.f; basis[1].z = 0.f;
 
   if ((n.x < 0.6f) && (n.x > -0.6f)) {
     basis[1].x = 1.0f;
@@ -198,12 +198,12 @@ void ambient_occlusion(vec *col, const Isect *isect, const Sphere *spheres, cons
   orthoBasis(basis, isect->n);
 
 
-  float occlusion = 0.0;
+  float occlusion = 0.f;
 
   for (j = 0; j < ntheta; j++) {
     for (i = 0; i < nphi; i++) {
       float theta = sqrtf(rng());
-      float phi = 2.0f * M_PI * rng();
+      float phi = 2.0f * (float)M_PI * rng();
       float x = cosf(phi) * theta;
       float y = sinf(phi) * theta;
       float z = sqrtf(1.0f - theta * theta);
@@ -229,7 +229,7 @@ void ambient_occlusion(vec *col, const Isect *isect, const Sphere *spheres, cons
       ray_sphere_intersect(&occIsect, &ray, spheres+2); 
       ray_plane_intersect (&occIsect, &ray, plane); 
 
-      if (occIsect.hit) occlusion += 1.0;
+      if (occIsect.hit) occlusion += 1.f;
 
     }
   }
@@ -313,12 +313,12 @@ render_kernel (unsigned char *fimg, const Sphere *spheres, const Plane plane,
         float py = -( y + ( v / ( float )nsubsamples ) - ( h / 2.0f ) ) / ( h / 2.0f );
 
         Ray ray;
-        ray.org.x = 0.0;
-        ray.org.y = 0.0;
-        ray.org.z = 0.0;
+        ray.org.x = 0.f;
+        ray.org.y = 0.f;
+        ray.org.z = 0.f;
         ray.dir.x = px;
         ray.dir.y = py;
-        ray.dir.z = -1.0;
+        ray.dir.z = -1.f;
         vnormalize( &( ray.dir ) );
 
         Isect isect;

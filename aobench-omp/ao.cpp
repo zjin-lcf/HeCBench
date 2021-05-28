@@ -88,10 +88,10 @@ void ray_sphere_intersect(Isect *isect, const Ray *ray, const Sphere *sphere)
   float C = vdot(rs, rs) - sphere->radius * sphere->radius;
   float D = B * B - C;
 
-  if (D > 0.0) {
+  if (D > 0.f) {
     float t = -B - sqrtf(D);
 
-    if ((t > 0.0) && (t < isect->t)) {
+    if ((t > 0.f) && (t < isect->t)) {
       isect->t = t;
       isect->hit = 1;
 
@@ -120,7 +120,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
 
   float t = -(vdot(ray->org, plane->n) + d) / v;
 
-  if ((t > 0.0) && (t < isect->t)) {
+  if ((t > 0.f) && (t < isect->t)) {
     isect->t = t;
     isect->hit = 1;
 
@@ -136,7 +136,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
 void orthoBasis(Vec *basis, Vec n)
 {
   basis[2] = n;
-  basis[1].x = 0.0; basis[1].y = 0.0; basis[1].z = 0.0;
+  basis[1].x = 0.f; basis[1].y = 0.f; basis[1].z = 0.f;
 
   if ((n.x < 0.6f) && (n.x > -0.6f)) {
     basis[1].x = 1.0f;
@@ -203,7 +203,7 @@ void ambient_occlusion(Vec *col, const Isect *isect,
   for (j = 0; j < ntheta; j++) {
     for (i = 0; i < nphi; i++) {
       float theta = sqrtf(rng());
-      float phi = 2.0f * M_PI * rng();
+      float phi = 2.0f * (float)M_PI * rng();
       float x = cosf(phi) * theta;
       float y = sinf(phi) * theta;
       float z = sqrtf(1.0f - theta * theta);
@@ -229,7 +229,7 @@ void ambient_occlusion(Vec *col, const Isect *isect,
       ray_sphere_intersect(&occIsect, &ray, spheres+2); 
       ray_plane_intersect (&occIsect, &ray, plane); 
 
-      if (occIsect.hit) occlusion += 1.0;
+      if (occIsect.hit) occlusion += 1.f;
 
     }
   }

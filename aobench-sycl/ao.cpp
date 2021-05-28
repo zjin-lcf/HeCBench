@@ -116,7 +116,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
 
   float t = -(vdot(ray->org, plane->n) + d) / v;
 
-  if ((t > 0.0) && (t < isect->t)) {
+  if ((t > 0.f) && (t < isect->t)) {
     isect->t = t;
     isect->hit = 1;
 
@@ -131,7 +131,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
 void orthoBasis(Vec *basis, Vec n)
 {
   basis[2] = n;
-  basis[1].x = 0.0; basis[1].y = 0.0; basis[1].z = 0.0;
+  basis[1].x = 0.f; basis[1].y = 0.f; basis[1].z = 0.f;
 
   if ((n.x < 0.6f) && (n.x > -0.6f)) {
     basis[1].x = 1.0f;
@@ -190,12 +190,12 @@ void ambient_occlusion(Vec *col, const Isect *isect,
   orthoBasis(basis, isect->n);
 
 
-  float occlusion = 0.0;
+  float occlusion = 0.f;
 
   for (j = 0; j < ntheta; j++) {
     for (i = 0; i < nphi; i++) {
       float theta = cl::sycl::sqrt(rng());
-      float phi = 2.0f * M_PI * rng();
+      float phi = 2.0f * (float)M_PI * rng();
       float x = cl::sycl::cos(phi) * theta;
       float y = cl::sycl::sin(phi) * theta;
       float z = cl::sycl::sqrt(1.0f - theta * theta);
@@ -221,7 +221,7 @@ void ambient_occlusion(Vec *col, const Isect *isect,
       ray_sphere_intersect(&occIsect, &ray, spheres+2); 
       ray_plane_intersect (&occIsect, &ray, plane); 
 
-      if (occIsect.hit) occlusion += 1.0;
+      if (occIsect.hit) occlusion += 1.f;
 
     }
   }
@@ -311,9 +311,9 @@ void render(queue &q, unsigned char *img, int w, int h, int nsubsamples,
         if (y < h && x < w) {
 
           RNG rng(y * w + x);
-          float s0 = 0;
-          float s1 = 0;
-          float s2 = 0;
+          float s0 = 0.f;
+          float s1 = 0.f;
+          float s2 = 0.f;
 
           for(int  v = 0; v < nsubsamples; v++ ) {
             for(int  u = 0; u < nsubsamples; u++ ) {
@@ -321,12 +321,12 @@ void render(queue &q, unsigned char *img, int w, int h, int nsubsamples,
               float py = -( y + ( v / ( float )nsubsamples ) - ( h / 2.0f ) ) / ( h / 2.0f );
 
               Ray ray;
-              ray.org.x = 0.0;
-              ray.org.y = 0.0;
-              ray.org.z = 0.0;
+              ray.org.x = 0.f;
+              ray.org.y = 0.f;
+              ray.org.z = 0.f;
               ray.dir.x = px;
               ray.dir.y = py;
-              ray.dir.z = -1.0;
+              ray.dir.z = -1.f;
               vnormalize( &( ray.dir ) );
 
               Isect isect;
