@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -19,7 +19,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int
+CFLAGS := -std=c++14 -Wall -Ddfloat=float -Ddlong=int
 
 # Linker Flags
 LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
@@ -38,7 +38,7 @@ endif
 
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif

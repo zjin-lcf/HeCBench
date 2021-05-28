@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC    = nvcc
+CC        = $(HIPCL_LLVM)/bin/clang++
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -18,10 +18,10 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++11 -Xcompiler -Wall -Ddfloat=float -Ddlong=int 
+CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` -Ddfloat=float -Ddlong=int 
 
 # Linker Flags
-LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -42,7 +42,7 @@ all: build
 
 build: $(program)
 
-main.o : main.cu axhelmKernel.cpp axhelmReference.cpp
+main.o : main.cpp axhelmKernel.cpp axhelmReference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 	
 meshBasis.o : meshBasis.cpp meshBasis.hpp
@@ -52,7 +52,7 @@ BlasLapack/libBlasLapack.a:
 	cd BlasLapack && make -j8 && cd ..
 
 $(program): main.o meshBasis.o BlasLapack/libBlasLapack.a 
-	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
+	$(CC) $+ -o $@ $(LDFLAGS)
 
 clean:
 	cd BlasLapack && make clean && cd ..

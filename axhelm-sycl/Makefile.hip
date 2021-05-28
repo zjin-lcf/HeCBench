@@ -22,12 +22,12 @@ program = axhelm
 
 # Standard Flags
 CFLAGS := -Wall -I../include \
-          -Ddfloat=double -Ddlong=int \
+          -Ddfloat=float -Ddlong=int \
           --hipsycl-platform=$(PLATFORM) \
 	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = ./BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

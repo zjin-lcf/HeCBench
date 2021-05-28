@@ -6,7 +6,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -19,10 +19,10 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=double -Ddlong=int  -I../include
+CFLAGS := -std=c++14 -Wall -Ddfloat=float -Ddlong=int  -I../include
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = ./BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
