@@ -84,7 +84,7 @@ cpp_src = \
 
 hip_src = ./masking.cu
 
-obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(hip_src: .cu=.o) 
+obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(hip_src:.cu=.o) 
 
 #===============================================================================
 # Sets Flags
