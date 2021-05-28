@@ -79,7 +79,7 @@ __global__ void mdh (
     const float pre1, 
     float *val)
 {
-  extern __shared__ float shared[];
+  HIP_DYNAMIC_SHARED(float, shared);
 
   int lid = threadIdx.x;
   int lsize = blockDim.x;
@@ -132,7 +132,7 @@ __global__ void mdh2 (
     const float pre1, 
     float *val)
 {
-  extern __shared__ float shared[];
+  HIP_DYNAMIC_SHARED(float, shared);
 
   int lid = threadIdx.x;
   int lsize = blockDim.x;
