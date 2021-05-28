@@ -20,6 +20,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -88,10 +89,10 @@ kernel_extend2(
   k = m * m;
   for (i = 0, max = 0; i < k; ++i) // get the max score
     max = max > mat[i]? max : mat[i];
-  max_ins = (int)((double)(qlen * max + end_bonus - o_ins) / e_ins + 1.);
+  max_ins = (int)((float)(qlen * max + end_bonus - o_ins) / e_ins + 1.f);
   max_ins = max_ins > 1? max_ins : 1;
   w = w < max_ins? w : max_ins;
-  max_del = (int)((double)(qlen * max + end_bonus - o_del) / e_del + 1.);
+  max_del = (int)((float)(qlen * max + end_bonus - o_del) / e_del + 1.f);
   max_del = max_del > 1? max_del : 1;
   w = w < max_del? w : max_del; // TODO: is this necessary?
   // DP loop
