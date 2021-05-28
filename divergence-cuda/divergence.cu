@@ -108,7 +108,6 @@ void compareDivergences(const real v[np][np][DIMS],
 }
 
 int main(int argc, char **argv) {
-  using real = double;
   constexpr const int NP = 4;
   real v[NP][NP][DIMS];
   element<NP, real> elem;
