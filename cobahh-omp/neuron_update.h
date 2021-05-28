@@ -76,7 +76,7 @@ void neurongroup_stateupdater (
         float n = _ptr_array_neurongroup_n[_idx];
         float ge = _ptr_array_neurongroup_ge[_idx];
         float v = _ptr_array_neurongroup_v[_idx];
-        const double lastspike = _ptr_array_neurongroup_lastspike[_idx];
+        const float lastspike = _ptr_array_neurongroup_lastspike[_idx];
         float gi = _ptr_array_neurongroup_gi[_idx];
         char not_refractory;
         not_refractory = _timestep(t - lastspike, dt) >= _lio_1;

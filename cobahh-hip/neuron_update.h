@@ -55,7 +55,7 @@ __global__ void cobahh (
   float n = d_n[_idx];
   float ge = d_ge[_idx];
   float v = d_v[_idx];
-  const double lastspike = d_lastspike[_idx];
+  const float lastspike = d_lastspike[_idx];
   float gi = d_gi[_idx];
   char not_refractory;
   not_refractory = _timestep(t - lastspike, dt) >= _lio_1;
