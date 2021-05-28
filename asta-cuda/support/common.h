@@ -37,11 +37,7 @@
 #define _COMMON_H_
 
 
-#ifndef DOUBLE_PRECISION
-#define DOUBLE_PRECISION 1
-#endif
-
-#if DOUBLE_PRECISION
+#ifdef DOUBLE_PRECISION
 #define T double
 #else
 #define T float
