@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
  * Copyright (c) 2009, Shanghai Jiao Tong University
  * All rights reserved.
