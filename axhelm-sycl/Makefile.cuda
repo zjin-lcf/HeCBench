@@ -21,14 +21,14 @@ program = axhelm
 
 # Standard Flags
 CFLAGS :=-DUSE_GPU -std=c++14 -Wall \
-         -Ddfloat=double -Ddlong=int  -I../include \
+         -Ddfloat=float -Ddlong=int  -I../include \
          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
          -fsycl-unnamed-lambda \
          -Xsycl-target-backend $(CUDA_ARCH) \
          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
-LDFLAGS = ../axhelm-cuda/BlasLapack/libBlasLapack.a -lgfortran
+LDFLAGS = ./BlasLapack/libBlasLapack.a -lgfortran
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

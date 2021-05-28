@@ -91,23 +91,23 @@ int main(int argc, char **argv){
       if (Ndim > 1) {
 #pragma omp target teams num_teams(Nelements) thread_limit(64) 
         {
-          double s_D[64];
-          double s_U[64];
-          double s_V[64];
-          double s_W[64];
-          double s_GUr[64];
-          double s_GUs[64];
-          double s_GVr[64];
-          double s_GVs[64];
-          double s_GWr[64];
-          double s_GWs[64];
+          dfloat s_D[64];
+          dfloat s_U[64];
+          dfloat s_V[64];
+          dfloat s_W[64];
+          dfloat s_GUr[64];
+          dfloat s_GUs[64];
+          dfloat s_GVr[64];
+          dfloat s_GVs[64];
+          dfloat s_GWr[64];
+          dfloat s_GWs[64];
 #pragma omp parallel 
           {
-            double r_Ut, r_Vt, r_Wt;
-            double r_U[8], r_V[8], r_W[8];
-            double r_AU[8], r_AV[8], r_AW[8];
-            double r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
-            double r_lam0, r_lam1;
+            dfloat r_Ut, r_Vt, r_Wt;
+            dfloat r_U[8], r_V[8], r_W[8];
+            dfloat r_AU[8], r_AV[8], r_AW[8];
+            dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
+            dfloat r_lam0, r_lam1;
 
             int e = omp_get_team_num();
             int j = omp_get_thread_num() / 8; 
@@ -145,19 +145,19 @@ int main(int argc, char **argv){
               r_Wt = 0;
 #pragma unroll 8
               for (int m = 0; m < 8; m++) {
-                double Dkm = s_D[k*8+m];
+                dfloat Dkm = s_D[k*8+m];
                 r_Ut += Dkm * r_U[m];
                 r_Vt += Dkm * r_V[m];
                 r_Wt += Dkm * r_W[m];
               }
 #pragma omp barrier
-              double Ur = 0, Us = 0;
-              double Vr = 0, Vs = 0;
-              double Wr = 0, Ws = 0;
+              dfloat Ur = 0, Us = 0;
+              dfloat Vr = 0, Vs = 0;
+              dfloat Wr = 0, Ws = 0;
 #pragma unroll 8
               for (int m = 0; m < 8; m++) {
-                double Dim = s_D[i*8+m];
-                double Djm = s_D[j*8+m];
+                dfloat Dim = s_D[i*8+m];
+                dfloat Djm = s_D[j*8+m];
                 Ur += Dim * s_U[j*8+m];
                 Us += Djm * s_U[m*8+i];
                 Vr += Dim * s_V[j*8+m];
@@ -178,12 +178,12 @@ int main(int argc, char **argv){
               r_AV[k] += r_GwJ * r_lam1 * r_V[k];
               r_AW[k] += r_GwJ * r_lam1 * r_W[k];
 #pragma omp barrier
-              double AUtmp = 0, AVtmp = 0, AWtmp = 0;
+              dfloat AUtmp = 0, AVtmp = 0, AWtmp = 0;
 #pragma unroll 8
               for (int m = 0; m < 8; m++) {
-                double Dmi = s_D[m*8+i];
-                double Dmj = s_D[m*8+j];
-                double Dkm = s_D[k*8+m];
+                dfloat Dmi = s_D[m*8+i];
+                dfloat Dmj = s_D[m*8+j];
+                dfloat Dkm = s_D[k*8+m];
                 AUtmp += Dmi * s_GUr[j*8+m];
                 AUtmp += Dmj * s_GUs[m*8+i];
                 AVtmp += Dmi * s_GVr[j*8+m];
@@ -211,18 +211,18 @@ int main(int argc, char **argv){
 #pragma omp target teams num_teams(Nelements) thread_limit(64) 
         {
 
-          double s_D[64];
-          double s_q[64];
-          double s_Gqr[64];
-          double s_Gqs[64];
+          dfloat s_D[64];
+          dfloat s_q[64];
+          dfloat s_Gqr[64];
+          dfloat s_Gqs[64];
 #pragma omp parallel
           {
 
-            double r_qt, r_Gqt, r_Auk;
-            double r_q[8];
-            double r_Aq[8];
-            double r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
-            double r_lam0, r_lam1;
+            dfloat r_qt, r_Gqt, r_Auk;
+            dfloat r_q[8];
+            dfloat r_Aq[8];
+            dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
+            dfloat r_lam0, r_lam1;
 
             int e = omp_get_team_num();
             int j = omp_get_thread_num() / 8; 
@@ -255,8 +255,8 @@ int main(int argc, char **argv){
                 r_qt += s_D[k*8+m] * r_q[m];
               }
 #pragma omp barrier
-              double qr = 0;
-              double qs = 0;
+              dfloat qr = 0;
+              dfloat qs = 0;
 #pragma unroll 8
               for (int m = 0; m < 8; ++m) {
                 qr += s_D[i*8+m] * s_q[j*8+m];
