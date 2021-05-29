@@ -35,6 +35,9 @@
 #define NOPT 15
 #define NPATH 96000
 
+#define __fdividef fdividef
+#define __expf expf
+
 /* Monte Carlo LIBOR path calculation */
 
 __device__ void path_calc(float *L, 
@@ -151,7 +154,7 @@ __device__ float portfolio_b(float *L,
 
   v = 0.f;
 
-  for (m=0; m<N-Nmat; m++) {
+  for (m=0; m<NMAT; m++) {
     B_b[m] = 0.f;
     S_b[m] = 0.f;
   }
