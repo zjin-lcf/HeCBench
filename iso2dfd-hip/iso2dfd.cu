@@ -167,7 +167,7 @@ __global__ void iso_2dfd_kernel(float* next, const float* prev, const float* vel
       // New time step for grid point is computed based on the values of the
       //    the immediate neighbors in both the horizontal and vertical
       //    directions, as well as the value of grid point at a previous time step
-      float value = 0.0;
+      float value = 0.f;
       value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
       value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
       value *= dtDIVdxy * vel[gid];
