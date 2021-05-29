@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <iostream>
 #include <string>
+#include <cstring>
 
 #ifdef CURAND
 #include <curand.h>
