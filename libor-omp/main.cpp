@@ -151,7 +151,7 @@ float portfolio_b(float *L,
 
   v = 0.f;
 
-  for (m=0; m<N-Nmat; m++) {
+  for (m=0; m<NMAT; m++) {
     B_b[m] = 0.f;
     S_b[m] = 0.f;
   }
