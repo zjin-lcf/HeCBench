@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC    = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -11,9 +11,9 @@ DEBUG     = no
 # Program name & source code list
 #===============================================================================
 
-program = iso2dfd
+program = main
 
-source = iso2dfd.cu
+source = main.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -43,15 +43,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) iso2dfd.h Makefile
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu iso2dfd.h Makefile
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.bin *.txt
+	rm -rf $(program) $(obj)
 
-run:
-	./$(program) 2048 2048 1000
+run: $(program)
+	./$(program)
 
