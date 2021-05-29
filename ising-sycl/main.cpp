@@ -298,7 +298,6 @@ int main(int argc, char **argv) {
         distr, 
 #endif
         inv_temp, nx, ny);
-    if (i % 1000 == 0) printf("Completed %d/%d iterations...\n", i+1, niters);
   }
 
   q.wait();

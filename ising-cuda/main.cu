@@ -261,7 +261,6 @@ int main(int argc, char **argv) {
         rng, 
 #endif
         inv_temp, nx, ny);
-    if (i % 1000 == 0) printf("Completed %d/%d iterations...\n", i+1, niters);
   }
 
   CHECK_CUDA(cudaDeviceSynchronize());
