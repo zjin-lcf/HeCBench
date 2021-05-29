@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = hipcc
+CC        = $(HIPCL_LLVM)/bin/clang++
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -22,10 +22,10 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -43,10 +43,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) iso2dfd.h Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): $(obj) iso2dfd.h
+	$(CC) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu iso2dfd.h Makefile
+%.o: %.cu iso2dfd.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

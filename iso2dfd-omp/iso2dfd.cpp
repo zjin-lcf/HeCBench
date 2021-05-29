@@ -117,26 +117,21 @@ bool within_epsilon(float* output, float* reference, const size_t dimx,
 void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
                             const float dtDIVdxy, int nRows, int nCols,
                             int nIterations) {
-  float* swap;
-  float value = 0.0;
-  int gid = 0;
   for (unsigned int k = 0; k < nIterations; k += 1) {
     for (unsigned int i = 1; i < nRows - HALF_LENGTH; i += 1) {
       for (unsigned int j = 1; j < nCols - HALF_LENGTH; j += 1) {
-        value = 0.0;
-
         // Stencil code to update grid
-        gid = j + (i * nCols);
-        value = 0.0;
-        value += prev[gid + 1] - 2.0 * prev[gid] + prev[gid - 1];
-        value += prev[gid + nCols] - 2.0 * prev[gid] + prev[gid - nCols];
+        int gid = j + (i * nCols);
+        float value = 0.f;
+        value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
+        value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
         value *= dtDIVdxy * vel[gid];
-        next[gid] = 2.0f * prev[gid] - next[gid] + value;
+        next[gid] = 2.f * prev[gid] - next[gid] + value;
       }
     }
 
     // Swap arrays
-    swap = next;
+    float* swap = next;
     next = prev;
     prev = swap;
   }
@@ -163,11 +158,11 @@ void iso_2dfd_kernel(float* next, const float* prev, const float* vel,
         // New time step for grid point is computed based on the values of the
         //    the immediate neighbors in both the horizontal and vertical
         //    directions, as well as the value of grid point at a previous time step
-        float value = 0.0;
-        value += prev[gid + 1] - 2.0 * prev[gid] + prev[gid - 1];
-        value += prev[gid + nCols] - 2.0 * prev[gid] + prev[gid - nCols];
+        float value = 0.f;
+        value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
+        value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
         value *= dtDIVdxy * vel[gid];
-        next[gid] = 2.0f * prev[gid] - next[gid] + value;
+        next[gid] = 2.f * prev[gid] - next[gid] + value;
       }
   }
 }
