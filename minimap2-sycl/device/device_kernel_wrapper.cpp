@@ -41,7 +41,7 @@ score_dt chain_dp_score(const anchor_dt *active, const anchor_dt curr,
     score_dt log_dd = device_ilog2(dd);
 
     score_dt sc = min_d > act.w ? act.w : min_d;
-    sc -= (score_dt)(dd * (0.01 * avg_qspan)) + (log_dd >> 1);
+    sc -= (score_dt)(dd * (0.01f * avg_qspan)) + (log_dd >> 1);
 
     return sc;
 }
