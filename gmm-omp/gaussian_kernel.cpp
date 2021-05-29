@@ -22,7 +22,7 @@ void invert(float* data, int actualsize, float* log_determinant)  {
   // sanity check        
   if (actualsize == 1) {
     *log_determinant = logf(data[0]);
-    data[0] = 1.0 / data[0];
+    data[0] = 1.f / data[0];
   } else {
 
     for (int i=1; i < actualsize; i++) data[i] /= data[0]; // normalize row 0
@@ -49,7 +49,7 @@ void invert(float* data, int actualsize, float* log_determinant)  {
 
     for ( int i = 0; i < actualsize; i++ )  // invert L
       for ( int j = i; j < actualsize; j++ )  {
-        float x = 1.0;
+        float x = 1.f;
         if ( i != j ) {
           x = 0.0;
           for ( int k = i; k < j; k++ ) 
@@ -62,14 +62,14 @@ void invert(float* data, int actualsize, float* log_determinant)  {
         if ( i == j ) continue;
         float sum = 0.0;
         for ( int k = i; k < j; k++ )
-          sum += data[k*maxsize+j]*( (i==k) ? 1.0 : data[i*maxsize+k] );
+          sum += data[k*maxsize+j]*( (i==k) ? 1.f : data[i*maxsize+k] );
         data[i*maxsize+j] = -sum;
       }
     for ( int i = 0; i < actualsize; i++ )   // final inversion
       for ( int j = 0; j < actualsize; j++ )  {
         float sum = 0.0;
         for ( int k = ((i>j)?i:j); k < actualsize; k++ )  
-          sum += ((j==k)?1.0:data[j*maxsize+k])*data[k*maxsize+i];
+          sum += ((j==k)?1.f:data[j*maxsize+k])*data[k*maxsize+i];
         data[j*maxsize+i] = sum;
       }
   }
