@@ -25,6 +25,8 @@
 #include <getopt.h>
 #include <iostream>
 #include <string>
+#include <cstring>
+
 #ifdef MKLRAND
 #include <mkl_rng_sycl.hpp>
 #endif
