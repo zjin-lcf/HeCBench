@@ -14,7 +14,7 @@
 #ifndef GAUSSIAN_H
 #define GAUSSIAN_H
 
-#define PI  3.1415926535897931
+#define PI  3.1415926535897931f
 #define COVARIANCE_DYNAMIC_RANGE 1E6
 
 // if 0, uses random, else picks events uniformly distributed in data set
