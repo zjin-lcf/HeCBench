@@ -94,8 +94,8 @@ __global__ void Simulation(float* a_particleX, float* a_particleY,
 	    randnumY = a_randomY[iter * n_particles + ii];
 
 	    // Transform the scaled random numbers into small displacements
-	    displacementX = (float)randnumX / 1000.0f - 0.0495;
-	    displacementY = (float)randnumY / 1000.0f - 0.0495;
+	    displacementX = (float)randnumX / 1000.0f - 0.0495f;
+	    displacementY = (float)randnumY / 1000.0f - 0.0495f;
 
 	    // Move particles using random displacements
 	    a_particleX[ii] += displacementX;
