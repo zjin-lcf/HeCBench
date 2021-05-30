@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = ${HOME}/llvm-install/bin/clang++
+CC        = $(HIPCL_LLVM)/bin/clang++
 OPTIMIZE    = yes
 DEBUG       = no
 
@@ -25,7 +25,7 @@ obj = $(source:.cu=.o)
 CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
 
 # Linker flags
-LDFLAGS = -Wl,-rpath,${HOME}/hipcl-install/lib -L${HOME}/hipcl-install/lib -lhipcl -lm
+LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
 
 
 # Debug Flags
@@ -43,7 +43,7 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cu graphics.c resize.c timer.c \

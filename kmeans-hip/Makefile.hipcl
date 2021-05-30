@@ -1,11 +1,11 @@
-CC        = ${HOME}/llvm-install/bin/clang++
+CC        = $(HIPCL_LLVM)/bin/clang++
 OPTIMIZE  = yes
 DEBUG     = no
 
 # Standard flags
 CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
 
-LDFLAGS = -Wl,-rpath,${HOME}/hipcl-install/lib -L${HOME}/hipcl-install/lib -lhipcl
+LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
