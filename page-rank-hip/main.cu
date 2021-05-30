@@ -32,7 +32,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 
-#define D_FACTOR (0.85)
+#define D_FACTOR (0.85f)
 #ifndef BLOCK_SIZE
 #define BLOCK_SIZE 256
 #endif
@@ -72,8 +72,8 @@ void reduce( float *page_ranks, float *maps, int n, float *dif)
       new_rank += maps[i*n + j];
     }
 
-    new_rank = ((1-D_FACTOR)/n)+(D_FACTOR*new_rank);
-    dif[j] = fabs(new_rank - old_rank) > dif[j] ? fabs(new_rank - old_rank) : dif[j];
+    new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
+    dif[j] = fabsf(new_rank - old_rank) > dif[j] ? fabsf(new_rank - old_rank) : dif[j];
     page_ranks[j] = new_rank;
   }
 }
