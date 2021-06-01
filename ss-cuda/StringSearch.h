@@ -21,7 +21,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define LOCAL_SIZE      256
 #define COMPARE(x,y)    ((toupper(x) == toupper(y)))
 #define SEARCH_BYTES_PER_WORKITEM   512
-#define TOLOWER(x) (('A' <= (x) && (x) <= 'Z') ? ((x - 'A') + 'a') : (x))
+#define TOLOWER(x) (('A' <= (x) && (x) <= 'Z') ? ((x) - 'A' + 'a') : (x))
 
 
 // Enable filtering when the search pattern has more than 16 characters
