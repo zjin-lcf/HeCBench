@@ -53,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../ss-sycl/StringSearch_Input.txt OpenCL 100
+	./$(program) ../ss-sycl/StringSearch_Input.txt clEnqueueNDRangeKernel 100
 
