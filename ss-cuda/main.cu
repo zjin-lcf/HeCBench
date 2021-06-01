@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
   }
   textFile.close();
 
-  int subStrLength = (int)subStr.length();
+  uint subStrLength = subStr.length();
   if(subStrLength == 0)
   {
     std::cout << "\nError: Sub-String not specified..." << std::endl;
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
   }
 
 #ifdef ENABLE_2ND_LEVEL_FILTER
-  if(subStrLength <= 16)
+  if(subStrLength != 1 && subStrLength <= 16)
   {
     std::cout << "\nText size should be longer than 16" << std::endl;
     return -1;
@@ -127,14 +127,14 @@ int main(int argc, char* argv[])
   // Rreference implementation on host device
   std::vector<uint> cpuResults;
 
-  uint last = (uint)subStrLength - 1;
+  uint last = subStrLength - 1;
   uint badCharSkip[UCHAR_MAX + 1];
 
   // Initialize the table with default values
   uint scan = 0;
   for(scan = 0; scan <= UCHAR_MAX; ++scan)
   {
-    badCharSkip[scan] = (uint)subStrLength;
+    badCharSkip[scan] = subStrLength;
   }
 
   // populate the table with analysis on pattern
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
   cudaMalloc((void**)&subStrBuf, subStrLength);
   cudaMemcpy(subStrBuf, ss, subStrLength, cudaMemcpyHostToDevice);
 
-  uint totalSearchPos = textLength - (uint)subStrLength + 1;
+  uint totalSearchPos = textLength - subStrLength + 1;
   uint searchLenPerWG = SEARCH_BYTES_PER_WORKITEM * LOCAL_SIZE;
   uint workGroupCount = (totalSearchPos + searchLenPerWG - 1) / searchLenPerWG;
 
@@ -206,8 +206,8 @@ int main(int argc, char* argv[])
           searchLenPerWG);
 
     // Read Results Count per workGroup
-    cudaMemcpy(resultCount, resultCountBuf, workGroupCount, cudaMemcpyDeviceToHost);
-    cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) , cudaMemcpyDeviceToHost);
+    cudaMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), cudaMemcpyDeviceToHost);
+    cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), cudaMemcpyDeviceToHost);
 
     verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
   }
@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
     std::cout << "\nExecuting String search with load balance for " <<
       iterations << " iterations" << std::endl;
     for(int i = 0; i < iterations; i++)
-      StringSearchLoadBalance<<<grid, block, subStrLength>>>(
+      StringSearchLoadBalance<<<grid, block, 32/*subStrLength*/>>>(
           textBuf,
           textLength,
           subStrBuf, 
@@ -227,8 +227,8 @@ int main(int argc, char* argv[])
           searchLenPerWG);
 
     // Read Results Count per workGroup
-    cudaMemcpy(resultCount, resultCountBuf, workGroupCount, cudaMemcpyDeviceToHost);
-    cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) , cudaMemcpyDeviceToHost);
+    cudaMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), cudaMemcpyDeviceToHost);
+    cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), cudaMemcpyDeviceToHost);
 
     verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
   }
