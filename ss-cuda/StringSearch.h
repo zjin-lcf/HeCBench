@@ -25,7 +25,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 // Enable filtering when the search pattern has more than 16 characters
-// #define ENABLE_2ND_LEVEL_FILTER
+#define ENABLE_2ND_LEVEL_FILTER
 
 typedef unsigned char uchar;
 

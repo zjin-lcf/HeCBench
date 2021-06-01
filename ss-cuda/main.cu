@@ -43,8 +43,6 @@ int verify(uint* resultCount, uint workGroupCount,
   }
   std::sort(result, result+count);
 
-  for (int i = 0; i < count; i++)
-    std::cout << "@" << result[i] << std::endl; 
   std::cout << "Device: found " << count << " times\n"; 
 
   // compare the results and see if they match
@@ -156,14 +154,13 @@ int main(int argc, char* argv[])
       if (scan == curPos)
       {
         cpuResults.push_back(curPos);
-        std::cout << "@" << curPos << std::endl; 
         break;
       }
     }
     curPos += (scan == curPos) ? 1 : badCharSkip[text[last+curPos]];
   }
 
-  std::cout << "CPU: found " << subStr << " " << cpuResults.size() << " times\n"; 
+  std::cout << "CPU: found " << cpuResults.size() << " times\n"; 
 
   uchar *textBuf;
   cudaMalloc((void**)&textBuf, textLength);
@@ -175,9 +172,6 @@ int main(int argc, char* argv[])
   cudaMalloc((void**)&subStrBuf, subStrLength);
   cudaMemcpy(subStrBuf, ss, subStrLength, cudaMemcpyHostToDevice);
 
-  //devResults.reserve(textLength - subStrLength + 1);
-  //memset(devResults.data(), 0, devResults.capacity() * sizeof(uint));
-
   uint totalSearchPos = textLength - (uint)subStrLength + 1;
   uint searchLenPerWG = SEARCH_BYTES_PER_WORKITEM * LOCAL_SIZE;
   uint workGroupCount = (totalSearchPos + searchLenPerWG - 1) / searchLenPerWG;
@@ -186,8 +180,9 @@ int main(int argc, char* argv[])
   uint* result = (uint*) malloc((textLength - subStrLength + 1) * sizeof(uint));
 
   uint *resultCountBuf;
-  uint *resultBuf;
   cudaMalloc((void**)&resultCountBuf, workGroupCount * sizeof(uint));
+
+  uint *resultBuf;
   cudaMalloc((void**)&resultBuf, (textLength - subStrLength + 1) * sizeof(uint));
 
   dim3 block (LOCAL_SIZE);
@@ -217,7 +212,8 @@ int main(int argc, char* argv[])
     verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
   }
 
-  if(subStrLength > 1) {
+  if(subStrLength > 1) 
+  {
     std::cout << "\nExecuting String search with load balance for " <<
       iterations << " iterations" << std::endl;
     for(int i = 0; i < iterations; i++)
