@@ -129,6 +129,9 @@ Early results are shown [here](results/README.md)
 ### fft
   FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### flame
+  Fractal flame (http://gpugems.hwu-server2.crhc.illinois.edu/)
+
 ### floydwarshall
   Floyd-Warshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
 
@@ -213,6 +216,9 @@ Early results are shown [here](results/README.md)
 
 ### lavaMD
   LavaMD in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### ldpc
+  QC-LDPC decoding (https://github.com/robertwgh/cuLDPC)
 
 ### leukocyte 
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -380,6 +386,9 @@ Early results are shown [here](results/README.md)
 ### srad
   SRAD (version 1) in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### ss
+  String search (https://github.com/OpenCL/AMD_APP_samples)
+
 ### sssp
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
 
@@ -406,6 +415,9 @@ Early results are shown [here](results/README.md)
 
 ### tridiagonal
   Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### urng
+  Uniform random noise generator (https://github.com/OpenCL/AMD_APP_samples)
   
 ### vmc
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)

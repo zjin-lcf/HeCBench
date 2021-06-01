@@ -14,9 +14,11 @@ A script "run.sh" attempts to run all tests with the OpenCL plugin interface. To
 ## Note
 We may execute SYCL programs on an Nvidia GPU by building the [software from source with support for Nvidia CUDA](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md). Then, go to a directory (e.g., affine-sycl) and type the command " make -f Makefile.cuda run". "Makefile.cuda" may be modified for different versions of Nvidia GPUs and toolchains.
 
-We may execute SYCL programs on an AMD GPU by building  the [software from source with support for AMD HIP](https://github.com/illuhad/hipSYCL/blob/develop/doc/installing.md). Then, go to a directory (e.g., affine-sycl) and type the command " make -f Makefile.hip run". "Makefile.hip" may be modified for different versions of AMD GPUs and toolchains.
+We may execute SYCL programs on an AMD GPU by building the [software from source with support for AMD HIP](https://github.com/illuhad/hipSYCL/blob/develop/doc/installing.md). Then, go to a directory (e.g., affine-sycl) and type the command " make -f Makefile.hip run". "Makefile.hip" may be modified for different versions of AMD GPUs and toolchains.
 
-We may also evaluate OpenMP Offload to GPU feature with [AOMP](https://github.com/ROCm-Developer-Tools/aomp) on an AMD GPU or [the Nvidia HPC SDK](https://developer.nvidia.com/nvidia-hpc-sdk-downloads) on an Nvidia GPU. Then, go to a directory (e.g., affine-omp) and type "make -f Makefile.aomp run" or "make -f Makefile.nvc run".
+We may execute HIP programs on an Intel GPU by building the [software from source with support for OpenCL](https://https://github.com/cpc/hipcl). Then, go to a directory (e.g., affine-hip) and type the command " make -f Makefile.hipcl run". "Makefile.hipcl" may be modified for different versions of AMD GPUs and toolchains.
+
+We may also evaluate OpenMP Offload to GPU feature with [AOMP](https://github.com/ROCm-Developer-Tools/aomp) on an AMD GPU or [the Nvidia HPC SDK](https://developer.nvidia.com/nvidia-hpc-sdk-downloads) on an Nvidia GPU. Then, go to a directory (e.g., affine-omp) and type "make -f Makefile.aomp run" or "make -f Makefile.nvc run". Both files may be modified for different versions of GPUs and toolchains.
 
 ## Results on Platform 1
 | affine | SYCL | DPCT usm | DPCT header | OpenMP |     
