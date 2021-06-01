@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 #ifdef ENABLE_2ND_LEVEL_FILTER
   if(subStrLength != 1 && subStrLength <= 16)
   {
-    std::cout << "\nText size should be longer than 16" << std::endl;
+    std::cout << "\nSearch pattern size should be longer than 16" << std::endl;
     return -1;
   }
 #endif

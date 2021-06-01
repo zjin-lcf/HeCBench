@@ -4,8 +4,8 @@
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
-OPTIMIZE  = no
-DEBUG     = yes
+OPTIMIZE  = yes
+DEBUG     = no
 
 #===============================================================================
 # Program name & source code list
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -ggdb
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 

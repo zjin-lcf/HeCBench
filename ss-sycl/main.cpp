@@ -42,10 +42,6 @@ int verify(uint* resultCount, uint workGroupCount,
   }
   std::sort(result, result+count);
 
-#ifdef DEBUG
-  for (int i = 0; i < count; i++)
-     std::cout << "@" << result[i] << std::endl; 
-#endif
   std::cout << "Device: found " << count << " times\n"; 
 
   // compare the results and see if they match
@@ -119,7 +115,7 @@ int main(int argc, char* argv[])
   }
   textFile.close();
 
-  int subStrLength = (int)subStr.length();
+  uint subStrLength = subStr.length();
   if(subStrLength == 0)
   {
     std::cout << "\nError: Sub-String not specified..." << std::endl;
@@ -134,9 +130,9 @@ int main(int argc, char* argv[])
   }
 
 #ifdef ENABLE_2ND_LEVEL_FILTER
-  if(subStrLength <= 16)
+  if(subStrLength != 1 && subStrLength <= 16)
   {
-    std::cout << "\nText size should be longer than 16" << std::endl;
+    std::cout << "\nSearch pattern size should be longer than 16" << std::endl;
     return -1;
   }
 #endif
@@ -146,14 +142,14 @@ int main(int argc, char* argv[])
   // Rreference implementation on host device
   std::vector<uint> cpuResults;
 
-  uint last = (uint)subStrLength - 1;
+  uint last = subStrLength - 1;
   uint badCharSkip[UCHAR_MAX + 1];
 
   // Initialize the table with default values
   uint scan = 0;
   for(scan = 0; scan <= UCHAR_MAX; ++scan)
   {
-    badCharSkip[scan] = (uint)subStrLength;
+    badCharSkip[scan] = subStrLength;
   }
 
   // populate the table with analysis on pattern
@@ -173,9 +169,6 @@ int main(int argc, char* argv[])
       if (scan == curPos)
       {
         cpuResults.push_back(curPos);
-#ifdef DEBUG
-        std::cout << "@" << curPos << std::endl; 
-#endif
         break;
       }
     }
@@ -197,7 +190,7 @@ int main(int argc, char* argv[])
   const uchar* ss = (const uchar*) subStr.c_str();
   buffer<uchar, 1> subStrBuf (ss, subStrLength);
 
-  uint totalSearchPos = textLength - (uint)subStrLength + 1;
+  uint totalSearchPos = textLength - subStrLength + 1;
   uint searchLenPerWG = SEARCH_BYTES_PER_WORKITEM * LOCAL_SIZE;
   uint workGroupCount = (totalSearchPos + searchLenPerWG - 1) / searchLenPerWG;
 

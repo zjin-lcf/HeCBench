@@ -54,7 +54,7 @@ StringSearchNaive (
     uint* resultCountPerWG,
     const uint maxSearchLength)
 {
-  extern __shared__ uchar localPattern[];
+  HIP_DYNAMIC_SHARED(uchar, localPattern)
   __shared__ uint groupSuccessCounter;
 
   int localIdx = threadIdx.x;
@@ -117,7 +117,7 @@ StringSearchLoadBalance (
     uint* resultCountPerWG,
     const uint maxSearchLength)
 {
-  extern __shared__ uchar localPattern[];
+  HIP_DYNAMIC_SHARED(uchar, localPattern)
   __shared__ uint stack1[LOCAL_SIZE*2];
   __shared__ uint stack2[LOCAL_SIZE*2];
   __shared__ uint stack1Counter;
@@ -190,7 +190,7 @@ StringSearchLoadBalance (
     // another 8-bytes from the positions in stack1 and store the match positions in stack2.
     if(localIdx < stackSize)
     {
-      revStackPos = atomicAdd(&stack1Counter, (uint)1);
+      revStackPos = atomicSub(&stack1Counter, (uint)1);
       int pos = stack1[--revStackPos];
       bool status = (localPattern[2] == TOLOWER(text[beginSearchIdx+pos+2]));
       status = status && (localPattern[3] == TOLOWER(text[beginSearchIdx+pos+3]));

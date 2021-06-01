@@ -42,10 +42,6 @@ int verify(uint* resultCount, uint workGroupCount,
   }
   std::sort(result, result+count);
 
-#ifdef DEBUG
-  for (int i = 0; i < count; i++)
-     std::cout << "@" << result[i] << std::endl; 
-#endif
   std::cout << "Device: found " << count << " times\n"; 
 
   // compare the results and see if they match
@@ -119,7 +115,7 @@ int main(int argc, char* argv[])
   }
   textFile.close();
 
-  int subStrLength = (int)subStr.length();
+  uint subStrLength = subStr.length();
   if(subStrLength == 0)
   {
     std::cout << "\nError: Sub-String not specified..." << std::endl;
@@ -134,9 +130,9 @@ int main(int argc, char* argv[])
   }
 
 #ifdef ENABLE_2ND_LEVEL_FILTER
-  if(subStrLength <= 16)
+  if(subStrLength != 1 && subStrLength <= 16)
   {
-    std::cout << "\nText size should be longer than 16" << std::endl;
+    std::cout << "\nSearch pattern size should be longer than 16" << std::endl;
     return -1;
   }
 #endif
@@ -146,14 +142,14 @@ int main(int argc, char* argv[])
   // Rreference implementation on host device
   std::vector<uint> cpuResults;
 
-  uint last = (uint)subStrLength - 1;
+  uint last = subStrLength - 1;
   uint badCharSkip[UCHAR_MAX + 1];
 
   // Initialize the table with default values
   uint scan = 0;
   for(scan = 0; scan <= UCHAR_MAX; ++scan)
   {
-    badCharSkip[scan] = (uint)subStrLength;
+    badCharSkip[scan] = subStrLength;
   }
 
   // populate the table with analysis on pattern
@@ -173,9 +169,6 @@ int main(int argc, char* argv[])
       if (scan == curPos)
       {
         cpuResults.push_back(curPos);
-#ifdef DEBUG
-        std::cout << "@" << curPos << std::endl; 
-#endif
         break;
       }
     }
@@ -187,7 +180,7 @@ int main(int argc, char* argv[])
   // Move subStr data host to device
   const uchar* pattern = (const uchar*) subStr.c_str();
 
-  uint totalSearchPos = textLength - (uint)subStrLength + 1;
+  uint totalSearchPos = textLength - subStrLength + 1;
   uint searchLenPerWG = SEARCH_BYTES_PER_WORKITEM * LOCAL_SIZE;
   uint workGroupCount = (totalSearchPos + searchLenPerWG - 1) / searchLenPerWG;
 
@@ -226,8 +219,7 @@ int main(int argc, char* argv[])
     {
       #pragma omp target teams num_teams(workGroupCount) thread_limit(LOCAL_SIZE) 
       {
-        //uchar localPattern[subStrLength];
-        uchar localPattern[32];
+        uchar localPattern[1];
         uint groupSuccessCounter;
         #pragma omp parallel 
 	{
@@ -251,7 +243,6 @@ int main(int argc, char* argv[])
               localPattern[idx] = TOLOWER(pattern[idx]);
             }
 
-            //if(localIdx == 0) atomic_store(groupSuccessCounter[0], (uint)0);
             if(localIdx == 0) groupSuccessCounter = 0;
             #pragma omp barrier
 
@@ -260,7 +251,6 @@ int main(int argc, char* argv[])
             {
               if (compare(text+stringPos, localPattern, patternLength) == 1)
               {
-                //int count = atomic_fetch_add(groupSuccessCounter[0], (uint)1);
                 int count;
                 #pragma omp atomic capture 
                 count = groupSuccessCounter++;
@@ -269,7 +259,6 @@ int main(int argc, char* argv[])
             }
 
             #pragma omp barrier
-            //if(localIdx == 0) resultCount[groupIdx] = atomic_load(groupSuccessCounter[0]);
             if(localIdx == 0) resultCount[groupIdx] = groupSuccessCounter;
           }
         }
@@ -301,7 +290,11 @@ int main(int argc, char* argv[])
     for(int i = 0; i < iterations; i++) {
       #pragma omp target teams num_teams(workGroupCount) thread_limit(LOCAL_SIZE) 
       {  //uchar localPattern[subStrLength];
+        #ifdef ENABLE_2ND_LEVEL_FILTER
         uchar localPattern[32];
+        #else
+        uchar localPattern[16];
+        #endif
         uint stack1[LOCAL_SIZE*2];
         uint stack2[LOCAL_SIZE*2];
         uint stack1Counter;
@@ -316,9 +309,6 @@ int main(int argc, char* argv[])
             // Initialize the local variaables
             if(localIdx == 0)
             {
-                //atomic_store(groupSuccessCounter[0],(uint)0);
-                //atomic_store(stack1Counter[0],(uint)0);
-                //atomic_store(stack2Counter[0],(uint)0);
                 groupSuccessCounter = 0;
                 stack1Counter = 0;
                 stack2Counter = 0;
@@ -358,7 +348,6 @@ int main(int argc, char* argv[])
                   // Queue the initial match positions. Make sure queue has sufficient positions for each work-item.
                   if ((first == TOLOWER(text[beginSearchIdx+stringPos])) && (second == TOLOWER(text[beginSearchIdx+stringPos+1])))
                   {
-                    //stackPos = atomic_fetch_add(stack1Counter[0], (uint)1);
                     #pragma omp atomic capture 
                     stackPos = stack1Counter++;
                     stack1[stackPos] = stringPos;
@@ -368,7 +357,6 @@ int main(int argc, char* argv[])
                 stringPos += localSize;     // next search idx
         
                 #pragma omp barrier
-                //stackSize = atomic_load(stack1Counter[0]);
                 stackSize = stack1Counter;
                 #pragma omp barrier
                 
@@ -380,7 +368,6 @@ int main(int argc, char* argv[])
                // another 8-bytes from the positions in stack1 and store the match positions in stack2.
                 if(localIdx < stackSize)
                 {
-                    //revStackPos = atomic_fetch_sub(stack1Counter[0], (uint)1);
                     #pragma omp atomic capture 
                     revStackPos = stack1Counter--;
                     int pos = stack1[--revStackPos];
@@ -395,7 +382,6 @@ int main(int argc, char* argv[])
         
                     if (status)
                     {
-                        //stackPos = atomic_fetch_add(stack2Counter[0], (uint)1);
                         #pragma omp atomic capture 
                         stackPos = stack2Counter++;
                         stack2[stackPos] = pos;
@@ -403,7 +389,6 @@ int main(int argc, char* argv[])
                 }
         
                 #pragma omp barrier
-                //stackSize = atomic_load(stack2Counter[0]);
                 stackSize = stack2Counter;
                 #pragma omp barrier
         
@@ -416,13 +401,11 @@ int main(int argc, char* argv[])
                 if(localIdx < stackSize)
                 {
                     #ifdef ENABLE_2ND_LEVEL_FILTER
-                    //revStackPos = atomic_fetch_sub(stack2Counter[0], (uint)1);
                     #pragma omp atomic capture 
                     revStackPos = stack2Counter--;
                     int pos = stack2[--revStackPos];
                     if (compare(text+beginSearchIdx+pos+10, localPattern+10, patternLength-10) == 1)
                     #else
-                    //revStackPos = atomic_fetch_sub(stack1Counter[0], (uint)1);
                     #pragma omp atomic capture 
                     revStackPos = stack1Counter--;
                     int pos = stack1[--revStackPos];
@@ -430,7 +413,6 @@ int main(int argc, char* argv[])
                     #endif
                     {
                         // Full match found
-                        // int count = atomic_fetch_add(groupSuccessCounter[0], (uint)1);
 			int count;
                         #pragma omp atomic capture 
                         count = groupSuccessCounter++;
@@ -441,10 +423,8 @@ int main(int argc, char* argv[])
                 #pragma omp barrier
                 if((((stringPos/localSize)*localSize) >= searchLength) && 
                    (stack1Counter <= 0) && (stack2Counter <= 0)) break;
-                   //(atomic_load(stack1Counter[0]) <= 0) && (atomic_load(stack2Counter[0]) <= 0)) break;
               }
         
-              //if(localIdx == 0) resultCount[groupIdx] = atomic_load(groupSuccessCounter[0]);
               if(localIdx == 0) resultCount[groupIdx] = groupSuccessCounter;
             }
           }

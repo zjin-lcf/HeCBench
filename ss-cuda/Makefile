@@ -46,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.cu
+%.o: %.cu kernels.cu StringSearch.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
