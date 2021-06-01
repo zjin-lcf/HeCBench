@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 #ifdef ENABLE_2ND_LEVEL_FILTER
   if(subStrLength != 1 && subStrLength <= 16)
   {
-    std::cout << "\nText size should be longer than 16" << std::endl;
+    std::cout << "\nSearch pattern size should be longer than 16" << std::endl;
     return -1;
   }
 #endif
@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
     std::cout << "\nExecuting String search with load balance for " <<
       iterations << " iterations" << std::endl;
     for(int i = 0; i < iterations; i++)
-      StringSearchLoadBalance<<<grid, block, 32/*subStrLength*/>>>(
+      StringSearchLoadBalance<<<grid, block, subStrLength>>>(
           textBuf,
           textLength,
           subStrBuf, 

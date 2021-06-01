@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp StringSearch.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

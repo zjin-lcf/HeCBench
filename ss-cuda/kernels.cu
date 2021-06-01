@@ -117,8 +117,8 @@ StringSearchLoadBalance (
     const uint maxSearchLength)
 {
   extern __shared__ uchar localPattern[];
-  __shared__ uint stack1[LOCAL_SIZE*4];
-  __shared__ uint stack2[LOCAL_SIZE*4];
+  __shared__ uint stack1[LOCAL_SIZE*2];
+  __shared__ uint stack2[LOCAL_SIZE*2];
   __shared__ uint stack1Counter;
   __shared__ uint stack2Counter;
   __shared__ uint groupSuccessCounter;
@@ -189,7 +189,7 @@ StringSearchLoadBalance (
     // another 8-bytes from the positions in stack1 and store the match positions in stack2.
     if(localIdx < stackSize)
     {
-      revStackPos = atomicAdd(&stack1Counter, (uint)1);
+      revStackPos = atomicSub(&stack1Counter, (uint)1);
       uint pos = stack1[--revStackPos];
       bool status = (localPattern[2] == TOLOWER(text[beginSearchIdx+pos+2]));
       status = status && (localPattern[3] == TOLOWER(text[beginSearchIdx+pos+3]));
@@ -199,8 +199,6 @@ StringSearchLoadBalance (
       status = status && (localPattern[7] == TOLOWER(text[beginSearchIdx+pos+7]));
       status = status && (localPattern[8] == TOLOWER(text[beginSearchIdx+pos+8]));
       status = status && (localPattern[9] == TOLOWER(text[beginSearchIdx+pos+9]));
-      //printf("lid=%d gpid=%d strPos=%d stackSz=%d stackPos=%d textPos=%d\n", 
-       //  localIdx, groupIdx, stringPos, stackSize, revStackPos, beginSearchIdx+pos+9);
 
       if (status)
       {
