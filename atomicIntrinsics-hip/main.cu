@@ -35,7 +35,7 @@
 //! @param idata      input data as provided to device
 //! @param len        number of elements in reference / idata
 ////////////////////////////////////////////////////////////////////////////////
-int
+void
 computeGold(int *gpuData, const int len)
 {
     int val = 0;
@@ -120,10 +120,9 @@ computeGold(int *gpuData, const int len)
     if (val != gpuData[6])
     {
         printf("Xor failed %d %d\n", val, gpuData[6]);
-        return false;
     }
 
-    return true;
+    printf("PASS\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
