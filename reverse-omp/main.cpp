@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <omp.h>
 #include <assert.h>
 
@@ -26,5 +27,7 @@ int main() {
   }
 
   for (int i = 0; i < len; i++) assert(d[i] == len-i-1);
+  printf("PASS\n");
+
   return 0;
 }
