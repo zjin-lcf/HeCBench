@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <assert.h>
 #include "common.h"
 
@@ -32,5 +33,7 @@ int main() {
   q.wait();
   }
   for (int i = 0; i < len; i++) assert(d[i] == len-i-1);
+  printf("PASS\n");
+
   return 0;
 }

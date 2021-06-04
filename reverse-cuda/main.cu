@@ -1,5 +1,6 @@
-#include <cuda.h>
+#include <stdio.h>
 #include <assert.h>
+#include <cuda.h>
 
 __global__ void reverse (int* d, const int len)
 {
@@ -26,5 +27,7 @@ int main() {
   cudaFree(dd);
 
   for (int i = 0; i < len; i++) assert(d[i] == len-i-1);
+  printf("PASS\n");
+
   return 0;
 }
