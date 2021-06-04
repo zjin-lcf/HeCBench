@@ -9,6 +9,7 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <hip/hip_runtime.h>
 #include <math.h>
 #include "conv.h"

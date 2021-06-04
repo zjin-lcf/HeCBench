@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "common.h"
 #include "conv.h"
 
 int main(int argc, char **argv)
@@ -32,35 +31,24 @@ int main(int argc, char **argv)
   for(unsigned int i = 0; i < imageW * imageH; i++)
     h_Input[i] = (float)(rand() % 16);
 
+#pragma omp target data map(to:h_Kernel[0:KERNEL_LENGTH], h_Input[0:imageW*imageH]) \
+                        map(alloc: h_Buffer[0:imageW*imageH]) \
+                        map(from: h_OutputGPU[0:imageW*imageH]) 
   {
-
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
-
-    buffer<float,1> d_Kernel(h_Kernel, KERNEL_LENGTH);
-    buffer<float,1> d_Input(h_Input, imageW * imageH);
-    buffer<float,1> d_Buffer(imageW * imageH);
-    buffer<float,1> d_Output(h_OutputGPU, imageW * imageH);
 
     //Just a single run or a warmup iteration
     convolutionRows(
-        q,
-        d_Buffer,
-        d_Input,
-        d_Kernel,
+        h_Buffer,
+        h_Input,
+        h_Kernel,
         imageW,
         imageH,
         imageW);
 
     convolutionColumns(
-        q,
-        d_Output,
-        d_Buffer,
-        d_Kernel,
+        h_OutputGPU,
+        h_Buffer,
+        h_Kernel,
         imageW,
         imageH,
         imageW);
@@ -69,24 +57,21 @@ int main(int argc, char **argv)
 
     for(int iter = 0; iter < numIterations; iter++){
       convolutionRows(
-          q,
-          d_Buffer,
-          d_Input,
-          d_Kernel,
+          h_Buffer,
+          h_Input,
+          h_Kernel,
           imageW,
           imageH,
           imageW);
 
       convolutionColumns(
-          q,
-          d_Output,
-          d_Buffer,
-          d_Kernel,
+          h_OutputGPU,
+          h_Buffer,
+          h_Kernel,
           imageW,
           imageH,
           imageW);
     }
-    q.wait();
   }
 
 
@@ -99,7 +84,7 @@ int main(int argc, char **argv)
     delta += (h_OutputCPU[i] - h_OutputGPU[i]) * (h_OutputCPU[i] - h_OutputGPU[i]);
     sum += h_OutputCPU[i] * h_OutputCPU[i];
   }
-  L2norm = std::sqrt(delta / sum);
+  L2norm = sqrt(delta / sum);
   printf("Relative L2 norm: %.3e\n\n", L2norm);
 
   free(h_OutputGPU);
