@@ -251,13 +251,13 @@ Early results are shown [here](results/README.md)
   Molecular dynamics function in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### mdh
-  Simple Multiple Debye-Huckel kernel in Fast Molecular Electrostatics Algorithms on GPUs (http://gpugems.hwu-server2.crhc.illinois.edu/)
+  Simple multiple Debye-Huckel kernel in fast molecular electrostatics algorithms on GPUs (http://gpugems.hwu-server2.crhc.illinois.edu/)
   
 ### md5hash
-  MD5 Hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
+  MD5 hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
 ### medianfilter
-  Two-dimensional 3x3 Median Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  Two-dimensional 3x3 median filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
 ### memcpy
   A benchmark for memory copy from a host to a device
@@ -266,7 +266,7 @@ Early results are shown [here](results/README.md)
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
 
 ### minimap2
-  Hardware Acceleration of Long Read Pairwise Overlapping in Genome Sequencing (https://github.com/UCLA-VAST/minimap2-acceleration)
+  Hardware acceleration of long read pairwise overlapping in genome sequencing (https://github.com/UCLA-VAST/minimap2-acceleration)
 
 ### minimod
   A finite difference solver for seismic modeling (https://github.com/rsrice/gpa-minimod-artifacts)
@@ -290,7 +290,7 @@ Early results are shown [here](results/README.md)
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
 ### nms
-  Work-efficient Parallel Non-Maximum Suppression Kernels (https://github.com/hertasecurity/gpu-nms)
+  Work-efficient parallel non-maximum suppression kernels (https://github.com/hertasecurity/gpu-nms)
 
 ### nn
   Nearest neighbor in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -335,7 +335,7 @@ Early results are shown [here](results/README.md)
   Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
 
 ### reverse
-   Reverse an input array of size 256 using shared memory
+  Reverse an input array of size 256 using shared memory
 
 ### rng-wallace
    Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
@@ -351,13 +351,16 @@ Early results are shown [here](results/README.md)
   Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
 ### scan
-  A block-level scan using shared memory (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+  A block-level scan (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
+
+### scan2
+  Scan a large array (https://github.com/OpenCL/AMD_APP_samples)
 
 ### secp256k1
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
 ### shuffle
-  shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
+  Shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
 
 ### simplemoc
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
@@ -405,7 +408,7 @@ Early results are shown [here](results/README.md)
   A proxy for the SNAP force calculation in the LAMMPS molecular dynamics package (https://github.com/FitSNAP/TestSNAP)
 
 ### thomas
-  solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
+  Solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
 
 ### transpose
   Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
