@@ -17,7 +17,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef URNG_H_
 #define URNG_H_
 
-#include "SDKBitMap.hpp"
+#include "SDKBitMap.h"
 
 #define INPUT_IMAGE "URNG_Input.bmp"
 #define OUTPUT_IMAGE "URNG_Output.bmp"
