@@ -87,6 +87,9 @@ int main(int argc, char** argv) {
 
   genScoreKernel(sizepernode, localscore, data, LG);
 
+  for (int i = 0; i < NODE_N * sizepernode; i=i+sizepernode)
+    printf("%f\n", localscore[i]);
+    
   printf("Begin to generate orders.\n");
   pre2 = clock();
 
@@ -241,7 +244,7 @@ float findBestGraph(float *D_localscore,
       const int sizePerNode = sizepernode;
 
       #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int t = 0; t < (sizePerNode/(256*WORKLOAD)+1) * 4; t++) D_resP[t] = 0.f;
+      for (int t = 0; t < blocknum * 4; t++) D_resP[t] = 0;
 
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int t = 0; t < blocknum; t++) D_Score[t] = -999999.f;
@@ -255,7 +258,10 @@ float findBestGraph(float *D_localscore,
       #pragma omp target update from (D_resP[0:blocknum*4])
       memcpy(parents, D_resP, blocknum*4*sizeof(int));
  
-      #pragma omp target update from (D_Score[0:sizePerNode / (256 * WORKLOAD) + 1])
+      #pragma omp target update from (D_Score[0:blocknum])
+
+      for (i = 0; i < blocknum * 4; i++) printf("resP: %d\n", parents[i]);
+      for (i = 0; i < blocknum; i++) printf("score: %f\n", D_Score[i]);
 
       for (i = 0; i < blocknum; i++) {
 
