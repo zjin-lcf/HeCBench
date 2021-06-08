@@ -260,8 +260,10 @@ float findBestGraph(float *D_localscore,
  
       #pragma omp target update from (D_Score[0:blocknum])
 
+#ifdef DEBUG
       for (i = 0; i < blocknum * 4; i++) printf("resP: %d\n", parents[i]);
       for (i = 0; i < blocknum; i++) printf("score: %f\n", D_Score[i]);
+#endif
 
       for (i = 0; i < blocknum; i++) {
 
