@@ -79,18 +79,18 @@ int main(int argc, char** argv) {
   Pre_logGamma();
 
   buffer<int, 1> D_data(data, NODE_N * DATA_N);
-  buffer<float, 1> D_LG(LG, (DATA_N+2));
+  buffer<float, 1> D_LG(LG, (DATA_N + 2));
   buffer<float, 1> D_localscore(NODE_N * sizepernode);
   buffer<float, 1> D_Score(sizepernode / (256 * WORKLOAD) + 1);
   buffer<bool, 1> D_parent(NODE_N);
-  buffer<int, 1> D_resP((sizepernode / (256 * WORKLOAD) + 1)*4);
+  buffer<int, 1> D_resP((sizepernode / (256 * WORKLOAD) + 1) * 4);
 
   pre1 = clock();
 
   range<1> gws((sizepernode+255)/256*256);
   range<1> lws(256);
 
-  const int sizePerNode = sizepernode;
+  const int sizePerNode = sizepernode;  // global variable not allowed by lambda
 
   q.submit([&] (handler &cgh) {
     auto ls = D_localscore.get_access<sycl_discard_write>(cgh);
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
   });
 
   q.submit([&] (handler &cgh) {
-    auto ls = D_localscore.get_access<sycl_write>(cgh);
+    auto ls = D_localscore.get_access<sycl_read_write>(cgh);
     auto data = D_data.get_access<sycl_read>(cgh);
     auto lg = D_LG.get_access<sycl_read>(cgh);
     cgh.parallel_for<class genScore>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
