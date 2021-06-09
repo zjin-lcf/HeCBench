@@ -18,23 +18,21 @@ void genScoreKernel(const int sizepernode,
                     const int *D_data,
                     const float *D_LG)
 {
-  int node,index;
-  bool flag;
-  int parent[5]={0};
-  int pre[NODE_N]={0};
-  int state[5]={0};
-  int i,j,parN=0,tmp,t;
-  int t1=0,t2=0;
-  float ls=0;
-  int Nij[STATE_N]={0};
-
   #pragma omp target teams distribute parallel for thread_limit(256)
   for (int id = 0; id<sizepernode * NODE_N; id++) 
     D_localscore[id] = 0.f;
 
-  #pragma omp target teams distribute parallel for thread_limit(256) \
-     private(node, index, flag, parent, pre, state, i, j, parN, tmp, t, t1, t2, ls, Nij)
+  #pragma omp target teams distribute parallel for thread_limit(256) 
   for (int id = 0; id<sizepernode; id++) {
+    int node,index;
+    bool flag;
+    int parent[5]={0};
+    int pre[NODE_N]={0};
+    int state[5]={0};
+    int i,j,parN=0,tmp,t;
+    int t1=0,t2=0;
+    float ls=0;
+    int Nij[STATE_N]={0};
 
     D_findComb(parent,id,NODE_N-1);
 

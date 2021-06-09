@@ -42,6 +42,9 @@ Early results are shown [here](results/README.md)
 ### black-scholes
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
 
+### bn
+  Bayesian network learning (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
+
 ### boxfilter
   Box filtering (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
@@ -203,7 +206,7 @@ Early results are shown [here](results/README.md)
   K-means in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
 ### knn
-  K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks/knn/)
+  K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
 
 ### lanczos
   Lanczos tridiagonalization (https://github.com/linhr/15618)
