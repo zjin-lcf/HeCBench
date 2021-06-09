@@ -57,7 +57,7 @@ typedef struct { dcomplex c[3]; } dsu3_vector;
   #define su3_vector    fsu3_vector
   #define Real          float
   #define Complx        fcomplex
-  #define EPISON        2E-3
+  #define EPISON        2E-5
 #else
   #define su3_matrix    dsu3_matrix
   #define su3_vector    dsu3_vector
