@@ -148,6 +148,9 @@ Early results are shown [here](results/README.md)
 ### gaussian
   Gaussian elimination in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### gd
+  Gradient descent (https://github.com/CGudapati/BinaryClassification)
+
 ### geodesic
   Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
 
