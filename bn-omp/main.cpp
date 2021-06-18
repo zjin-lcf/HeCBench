@@ -87,8 +87,10 @@ int main(int argc, char** argv) {
 
   genScoreKernel(sizepernode, localscore, data, LG);
 
+#ifdef DEBUG
   for (int i = 0; i < NODE_N * sizepernode; i=i+sizepernode)
     printf("%f\n", localscore[i]);
+#endif
     
   printf("Begin to generate orders.\n");
   pre2 = clock();
@@ -189,14 +191,14 @@ int main(int argc, char** argv) {
     fprintf(fpout,"--------------------------------------------------------------------\n");
   }
 
-  fprintf(fpout, "Duration per interation is %f seconds.\n",
+  fprintf(fpout, "Duration per iteration is %f seconds.\n",
       ((float)total / ITER) / CLOCKS_PER_SEC);
   fprintf(fpout, "Total duration is %f seconds.\n",
       (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
   fprintf(fpout, "Preprocessing duration is %f seconds.\n",
       (float)(pre2 - pre1) / CLOCKS_PER_SEC);
 
-  printf("Duration per interation is %f seconds.\n",
+  printf("Duration per iteration is %f seconds.\n",
       ((float)total / ITER) / CLOCKS_PER_SEC);
   printf("Total duration is %f seconds.\n",
       (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);

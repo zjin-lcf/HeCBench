@@ -99,20 +99,21 @@ void device_chain_kernel_wrapper(
 
     for (auto batch = 0; batch < batch_count; batch++) {
       q.submit([&] (handler &cgh) {
-        accessor<anchor_dt, 1, sycl_read_write, access::target::local> active_sm(BACK_SEARCH_COUNT_GPU, cgh);
-        accessor<score_dt, 1, sycl_read_write, access::target::local> max_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
-        accessor<parent_dt, 1, sycl_read_write, access::target::local> j_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
+        //accessor<anchor_dt, 1, sycl_read_write, access::target::local> active_sm(BACK_SEARCH_COUNT_GPU, cgh);
+        //accessor<score_dt, 1, sycl_read_write, access::target::local> max_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
+        //accessor<parent_dt, 1, sycl_read_write, access::target::local> j_tracker_sm(BACK_SEARCH_COUNT_GPU, cgh);
 
-        auto ret = d_ret.get_access<sycl_write>(cgh, range<1>(PE_NUM * TILE_SIZE), id<1>(batch * PE_NUM * TILE_SIZE));
-        auto a = d_arg.get_access<sycl_read>(cgh, range<1>(PE_NUM * TILE_SIZE_ACTUAL), id<1>(batch * PE_NUM * TILE_SIZE_ACTUAL));
-        auto cont = d_control.get_access<sycl_read>(cgh,  range<1>(PE_NUM), id<1>(batch * PE_NUM));
-        auto max_tracker_g = d_max_tracker.get_access<sycl_read_write>(cgh);
-        auto j_tracker_g = d_j_tracker.get_access<sycl_read_write>(cgh);
+        //auto ret = d_ret.get_access<sycl_write>(cgh, range<1>(PE_NUM * TILE_SIZE), id<1>(batch * PE_NUM * TILE_SIZE));
+        //auto a = d_arg.get_access<sycl_read>(cgh, range<1>(PE_NUM * TILE_SIZE_ACTUAL), id<1>(batch * PE_NUM * TILE_SIZE_ACTUAL));
+        //auto cont = d_control.get_access<sycl_read>(cgh,  range<1>(PE_NUM), id<1>(batch * PE_NUM));
+        //auto max_tracker_g = d_max_tracker.get_access<sycl_read_write>(cgh);
+        //auto j_tracker_g = d_j_tracker.get_access<sycl_read_write>(cgh);
 
-        cgh.parallel_for<class scan_block>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class tiled_chain>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
           int block = item.get_group(0); 
           int id = item.get_local_id(0);
           int ofs = block;
+	  /*
           auto control = cont[ofs];
 
           update_anchor(a.get_pointer(), active_sm.get_pointer(), ofs*TILE_SIZE_ACTUAL+id, id);
@@ -163,10 +164,11 @@ void device_chain_kernel_wrapper(
               update_return(&tmp, ret.get_pointer(), 0, ofs*TILE_SIZE+curr_idx);
             }
           }
+	  */
 
           item.barrier(access::fence_space::local_space);
-          max_tracker_g[ofs][id] = max_tracker_sm[id];
-          j_tracker_g[ofs][id] = j_tracker_sm[id];
+          //max_tracker_g[ofs][id] = max_tracker_sm[id];
+          //j_tracker_g[ofs][id] = j_tracker_sm[id];
         });
       });
     }
