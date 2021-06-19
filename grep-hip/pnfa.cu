@@ -205,12 +205,12 @@ __device__ inline int panypmatch(State *start, char *s, List *dl1, List *dl2) {
 
 
 __global__ void parallelMatch(
-  char *bigLine,
-  const u32 *tableOfLineStarts, 
+  char * bigLine,
+  const u32 * tableOfLineStarts, 
   int numLines,
   char *regexLines,
   const u32 *regexTable, 
-  unsigned char *devResult,
+  unsigned char * devResult,
   State *pmatchstate) 
 {
 
@@ -230,6 +230,7 @@ __global__ void parallelMatch(
 
   List d1;
   List d2;  
+
 
   int i;
   for (i = blockIdx.x * blockDim.x + threadIdx.x; i < numLines; i += gridDim.x * blockDim.x) { 

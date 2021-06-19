@@ -96,10 +96,10 @@ int checkCmdLine(int argc, char **argv, char **fileName, char **regexFile, int *
 
 
 int main(int argc, char **argv)
-{  
+{
   int timerOn;
-  char *fileName = NULL, *regexFile = NULL, **lines = NULL, **regexs = NULL; 
-  int num_lines, num_regexs;
+  char *fileName = NULL, *regexFile = NULL, **lines = NULL;
+  int num_lines;
 
   SimpleReBuilder builder;
   double startTime, endReadFile, 
@@ -181,30 +181,28 @@ int main(int argc, char **argv)
     accessor<State*, 1, sycl_read_write, access::target::local> st(1, cgh);
 
     cgh.parallel_for<class regExpMatch>(nd_range<1>(range<1>(512*160), range<1>(160)), [=] (nd_item<1> item) {
-      for (int j = 0; j < 1; j++) {
-        if (item.get_local_id(0) == 0) {
-          pre2post(regexLines.get_pointer() + regexTable[j], buf.get_pointer());
+      if (item.get_local_id(0) == 0) {
+        pre2post(regexLines.get_pointer() + regexTable[0], buf.get_pointer());
 
-          pnstate[0] = 0;
-          st[0] = ppost2nfa(buf.get_pointer(), s.get_pointer(), 
-                            pnstate.get_pointer(), pmatchstate.get_pointer());
-        }
+        pnstate[0] = 0;
+        st[0] = ppost2nfa(buf.get_pointer(), s.get_pointer(), 
+                          pnstate.get_pointer(), pmatchstate.get_pointer());
+      }
 
-        item.barrier(access::fence_space::local_space);
+      item.barrier(access::fence_space::local_space);
 
-        List d1;
-        List d2;  
+      List d1;
+      List d2;  
 
-        int i;
-        for (i = item.get_global_id(0); i < num_lines;
-             i += item.get_local_range(0) * item.get_group_range(0)) { 
+      int i;
+      for (i = item.get_global_id(0); i < num_lines;
+           i += item.get_local_range(0) * item.get_group_range(0)) { 
 
-          char * lineSegment = bigLine.get_pointer() + tableOfLineStarts[i];
-          if (panypmatch(st[0], lineSegment, &d1, &d2)) 
-            devResult[i] = 1;
-          else
-            devResult[i] = 0;
-        }
+        char * lineSegment = bigLine.get_pointer() + tableOfLineStarts[i];
+        if (panypmatch(st[0], lineSegment, &d1, &d2)) 
+          devResult[i] = 1;
+        else
+          devResult[i] = 0;
       }
     });  
   });  

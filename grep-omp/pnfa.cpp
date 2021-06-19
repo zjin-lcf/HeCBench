@@ -1,11 +1,11 @@
-#include "putil.cu" 
+#include "putil.cpp" 
 
-__device__ inline void paddstate(List*, State*, List*);
-__device__ inline void pstep(List*, int, List *);
+inline void paddstate(List*, State*, List*);
+inline void pstep(List*, int, List *);
 
 
 
-__device__ inline int pstrlen(char *str) {
+inline int pstrlen(char *str) {
   int len = 0; 
   while(*str != 0) {
     len ++;
@@ -19,7 +19,7 @@ __device__ inline int pstrlen(char *str) {
  * Insert ESC (or 0x1b) as explicit concatenation operator.
  * Cheesy parser, return static buffer.
  */
-__device__ inline char * pre2post(char *re, char *dst)
+inline char * pre2post(char *re, char *dst)
 {
   int nalt, natom;
   struct {
@@ -101,7 +101,7 @@ __device__ inline char * pre2post(char *re, char *dst)
 
 
 /* Compute initial state list */
-  __device__ inline List*
+  inline List*
 pstartlist(State *start, List *l)
 {
   l->n = 0;
@@ -112,7 +112,7 @@ pstartlist(State *start, List *l)
 }
 
 /* Check whether state list contains a match. */
-  __device__ inline int
+  inline int
 ispmatch(List *l)
 {
   int i;
@@ -125,7 +125,7 @@ ispmatch(List *l)
 }
 
 /* Add s to l, following unlabeled arrows. */
-  __device__ inline void
+  inline void
 paddstate(List *l, State *s, List *addStateList)
 {  
   addStateList->n = 0;
@@ -154,7 +154,7 @@ paddstate(List *l, State *s, List *addStateList)
  * past the character c,
  * to create next NFA state set nlist.
  */
-  __device__ inline void
+  inline void
 pstep(List *clist, int c, List *nlist)
 {
   int i;
@@ -171,7 +171,7 @@ pstep(List *clist, int c, List *nlist)
 }
 
 /* Run NFA to determine whether it matches s. */
-  __device__ inline int
+inline int
 pmatch(State *start, char *s, List *dl1, List *dl2)
 {
   int c;
@@ -188,7 +188,7 @@ pmatch(State *start, char *s, List *dl1, List *dl2)
 }
 
 /* Check for a string match at all possible start positions */
-__device__ inline int panypmatch(State *start, char *s, List *dl1, List *dl2) { 
+inline int panypmatch(State* start, char *s, List *dl1, List *dl2) { 
   int c;
   List *clist, *nlist, *t;
 
@@ -204,41 +204,3 @@ __device__ inline int panypmatch(State *start, char *s, List *dl1, List *dl2) {
 
 
 
-__global__ void parallelMatch(
-  char *bigLine,
-  const u32 *tableOfLineStarts, 
-  int numLines,
-  char *regexLines,
-  const u32 *regexTable, 
-  unsigned char *devResult,
-  State *pmatchstate) 
-{
-
-  __shared__ char buf[BUFFER_SIZE];
-  __shared__  int pnstate;
-  __shared__ State s[100];
-  __shared__ State *st;
-
-  if (threadIdx.x == 0) {
-    pre2post(regexLines + regexTable[0], buf);
-
-    pnstate = 0;
-    st = ppost2nfa(buf, s, &pnstate, pmatchstate);
-  }
-
-  __syncthreads();
-
-  List d1;
-  List d2;  
-
-  int i;
-  for (i = blockIdx.x * blockDim.x + threadIdx.x; i < numLines; i += gridDim.x * blockDim.x) { 
-
-    char * lineSegment = bigLine + tableOfLineStarts[i];
-    if (panypmatch(st, lineSegment, &d1, &d2)) 
-      devResult[i] = 1;
-    else
-      devResult[i] = 0;
-
-  }
-}
