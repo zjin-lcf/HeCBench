@@ -33,7 +33,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "pnfa.h"
 #include "cycleTimer.h"
 #include "pnfa.cu"
@@ -128,8 +128,8 @@ int main(int argc, char **argv)
   int postsize = (strlen(builder.re) + 1) * sizeof (char);
 
   char *device_regex;
-  cudaMalloc((void **) &device_regex, postsize); 
-  cudaMemcpy(device_regex, builder.re, postsize, cudaMemcpyHostToDevice);  
+  hipMalloc((void **) &device_regex, postsize); 
+  hipMemcpy(device_regex, builder.re, postsize, hipMemcpyHostToDevice);  
 
   char * device_line;
   u32 * device_line_table;
@@ -149,38 +149,38 @@ int main(int argc, char **argv)
   if((lines[0])[len-1] == '\n')/*if at the end file not '\n', then we not forgot last offset */
     --num_lines;
 
-  cudaMalloc((void**)&device_line_table, sizeof (u32) * (len));    
-  cudaMalloc((void**)&device_line, sizeof (char) * (len + 1));    
+  hipMalloc((void**)&device_line_table, sizeof (u32) * (len ));    
+  hipMalloc((void**)&device_line, sizeof (char) * (len + 1));    
 
-  cudaMemcpy(device_line_table, table, sizeof(u32) * (len), cudaMemcpyHostToDevice);
-  cudaMemcpy(device_line, *lines, sizeof(char) * (len + 1), cudaMemcpyHostToDevice);
+  hipMemcpy(device_line_table, table, sizeof(u32) * (len), hipMemcpyHostToDevice);
+  hipMemcpy(device_line, *lines, sizeof(char) * (len + 1), hipMemcpyHostToDevice);
 
   u32 host_regex_table[1]; /*offsets to regexes on host*/
   u32 *device_regex_table; /*this array will contain host_regex_table*/
   host_regex_table[0]=0;   /*in case of one regex offset must be 0*/
-  cudaMalloc((void**)&device_regex_table, sizeof (u32) );
-  cudaMemcpy(device_regex_table, host_regex_table, sizeof(u32), cudaMemcpyHostToDevice);
+  hipMalloc((void**)&device_regex_table, sizeof (u32) );
+  hipMemcpy(device_regex_table, host_regex_table, sizeof(u32), hipMemcpyHostToDevice);
 
   unsigned char *device_result;
-  cudaMalloc(&device_result, num_lines * sizeof(unsigned char) );
+  hipMalloc(&device_result, num_lines * sizeof(unsigned char) );
 
   State pmatchstate = { Match };  /* matching state */
   State *device_match_state;
-  cudaMalloc((void**)&device_match_state, sizeof(State) );
-  cudaMemcpy(device_match_state, &pmatchstate, sizeof(State), cudaMemcpyHostToDevice);
+  hipMalloc((void**)&device_match_state, sizeof(State) );
+  hipMemcpy(device_match_state, &pmatchstate, sizeof(State), hipMemcpyHostToDevice);
 
   endSetup = CycleTimer::currentSeconds();
 
   // measure kernel execution time
-  parallelMatch<<<512, 160>>>(device_line, device_line_table, 
+  hipLaunchKernelGGL(parallelMatch, dim3(512), dim3(160), 0, 0, device_line, device_line_table, 
       num_lines, device_regex, device_regex_table, device_result, device_match_state);
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
 
   endKernel = CycleTimer::currentSeconds();
 
   unsigned char *host_result = (unsigned char *) malloc (num_lines * sizeof(unsigned char));
-  cudaMemcpy(host_result, device_result, num_lines * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+  hipMemcpy(host_result, device_result, num_lines * sizeof(unsigned char), hipMemcpyDeviceToHost);
 
   // print the "grep" results for verification
   if (!timerOn) {  
@@ -190,12 +190,12 @@ int main(int argc, char **argv)
     }
   }
 
-  cudaFree(device_result);
-  cudaFree(device_match_state);
-  cudaFree(device_line);
-  cudaFree(device_line_table);
-  cudaFree(device_regex);
-  cudaFree(device_regex_table);
+  hipFree(device_result);
+  hipFree(device_match_state);
+  hipFree(device_line);
+  hipFree(device_line_table);
+  hipFree(device_regex);
+  hipFree(device_regex_table);
 
   free(table);
   free(host_result);
