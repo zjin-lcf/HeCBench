@@ -1,7 +1,7 @@
     const real TEMP = T[item.get_global_id(0)]*tconv;
 
     const real ALOGT = LOG(TEMP);
-    const real TI = 1.0e0/(TEMP);
+    const real TI = (real)1.0e0/(TEMP);
     const real TI2 = TI*TI;
     real TMP;
 
