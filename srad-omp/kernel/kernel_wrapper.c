@@ -66,7 +66,7 @@ kernel_wrapper(  fp* image,                      // input image
 
 #pragma omp target teams distribute parallel for num_teams(blocks_work_size) thread_limit(NUMBER_THREADS)
     for (int ei = 0; ei < Ne; ei++)
-      image[ei] = expf(image[ei]/(FP)255); // exponentiate input IMAGE and copy to output image
+      image[ei] = expf(image[ei]/(fp)255); // exponentiate input IMAGE and copy to output image
 
     int blocks2_work_size;
     long no;
@@ -265,13 +265,13 @@ kernel_wrapper(  fp* image,                      // input image
         fp d_L = (N_loc + S_loc + W_loc + E_loc) / d_Jc;      // laplacian (based on derivatives)
 
         // ICOV (equ 31/35)
-        fp d_num  = ((FP)0.5*d_G2) - (((FP)1.0/(FP)16.0)*(d_L*d_L)) ;            // num (based on gradient and laplacian)
-        fp d_den  = (FP)1 + ((FP)0.25*d_L);                        // den (based on laplacian)
+        fp d_num  = ((fp)0.5*d_G2) - (((fp)1.0/(fp)16.0)*(d_L*d_L)) ;            // num (based on gradient and laplacian)
+        fp d_den  = (fp)1 + ((fp)0.25*d_L);                        // den (based on laplacian)
         fp d_qsqr = d_num/(d_den*d_den);                    // qsqr (based on num and den)
 
         // diffusion coefficent (equ 33) (every element of IMAGE)
         d_den = (d_qsqr-q0sqr) / (q0sqr * (1+q0sqr)) ;        // den (based on qsqr and q0sqr)
-        fp d_c_loc = (FP)1.0 / ((FP)1.0+d_den) ;                    // diffusion coefficient (based on den)
+        fp d_c_loc = (fp)1.0 / ((fp)1.0+d_den) ;                    // diffusion coefficient (based on den)
 
         // saturate diffusion coefficent to 0-1 range
         if (d_c_loc < 0){                          // if diffusion coefficient < 0
@@ -315,7 +315,7 @@ kernel_wrapper(  fp* image,                      // input image
         fp d_D = d_cN*dN[ei] + d_cS*dS[ei] + d_cW*dW[ei] + d_cE*dE[ei];
 
         // image update (equ 61) (every element of IMAGE)
-        image[ei] += (FP)0.25*lambda*d_D; // updates image (based on input time step and divergence)
+        image[ei] += (fp)0.25*lambda*d_D; // updates image (based on input time step and divergence)
 
       }
 
@@ -331,7 +331,7 @@ kernel_wrapper(  fp* image,                      // input image
 
 #pragma omp target teams distribute parallel for num_teams(blocks_work_size ) thread_limit(NUMBER_THREADS)
     for (int ei = 0; ei < Ne; ei++)
-      image[ei] = logf(image[ei])*(FP)255; // exponentiate input IMAGE and copy to output image
+      image[ei] = logf(image[ei])*(fp)255; // exponentiate input IMAGE and copy to output image
   }
     //
 #ifdef DEBUG
