@@ -23,6 +23,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
