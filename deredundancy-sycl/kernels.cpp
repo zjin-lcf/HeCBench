@@ -1,5 +1,5 @@
 // kernel_baseToNumber
-void kernel_baseToNumber(char *reads, long length, nd_item<1> &item) 
+void kernel_baseToNumber(char *reads, const long length, nd_item<1> &item) 
 {
   long index = item.get_global_id(0); 
   while (index < length) {
@@ -50,7 +50,7 @@ void kernel_compressData(
     const char *reads,
     unsigned int *compressed, 
     int *gaps, 
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -88,7 +88,7 @@ void kernel_createIndex4(
     unsigned short *orders, 
     long *words, 
     int *magicBase,
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -144,7 +144,7 @@ void kernel_createIndex5(
     unsigned short *orders, 
     long *words, 
     int *magicBase,
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -200,7 +200,7 @@ void kernel_createIndex6(
     unsigned short *orders, 
     long *words, 
     int *magicBase,
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -256,7 +256,7 @@ void kernel_createIndex7(
     unsigned short *orders, 
     long *words, 
     int *magicBase,
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -310,7 +310,7 @@ void kernel_createCutoff(
     const int *lengths, 
     long *words, 
     int *wordCutoff, 
-    int readsCount,
+    const int readsCount,
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -327,7 +327,7 @@ void kernel_mergeIndex(
     const unsigned short *indexs,
     unsigned short *orders, 
     const long *words, 
-    int readsCount, 
+    const int readsCount, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
@@ -356,7 +356,7 @@ void updateRepresentative(
     queue &q,
     buffer<int, 1> &d_cluster, 
     int *representative, 
-    int readsCount) 
+    const int readsCount) 
 {
   buffer<int, 1> d_r(representative, 1);
   q.submit([&](handler &cgh) {
@@ -382,7 +382,7 @@ void kernel_makeTable(
     const unsigned short *orders,
     const long *words,
     unsigned short *table,
-    int representative, 
+    const int representative, 
     nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
