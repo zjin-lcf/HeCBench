@@ -277,6 +277,9 @@ Early results are shown [here](results/README.md)
 ### minimod
   A finite difference solver for seismic modeling (https://github.com/rsrice/gpa-minimod-artifacts)
 
+### minisweep
+  A deterministic Sn radiation transport miniapp (https://github.com/wdj/minisweep)
+
 ### mixbench
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
 
@@ -431,6 +434,9 @@ Early results are shown [here](results/README.md)
 ### vmc
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
+### winograd
+  Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
+
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
   (https://github.com/ANL-CESAR/XSBench/)
@@ -441,7 +447,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project used resources at [JLSE](https://www.jlse.anl.gov/) and [ExCL](https://excl.ornl.gov/). 	
