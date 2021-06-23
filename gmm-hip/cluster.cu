@@ -471,7 +471,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     // Calculates a cluster membership probability
     // for each event and each cluster.
     DEBUG("Invoking E-step kernels.");
-    hipLaunchKernelGGL(estep1, dim3(dim3(num_clusters), dim3(NUM_BLOCKS)), NUM_THREADS_ESTEP, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
+    hipLaunchKernelGGL(estep1, dim3(num_clusters), dim3(NUM_BLOCKS), NUM_THREADS_ESTEP, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
     hipLaunchKernelGGL(estep2, dim3(NUM_BLOCKS), dim3(NUM_THREADS_ESTEP), 0, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_clusters,num_events,d_likelihoods);
     regroup_iterations++;
 
@@ -575,7 +575,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
       DEBUG("Invoking regroup (E-step) kernel with %d blocks.\n",NUM_BLOCKS);
       // Compute new cluster membership probabilities for all the events
-      hipLaunchKernelGGL(estep1, dim3(dim3(num_clusters), dim3(NUM_BLOCKS)), NUM_THREADS_ESTEP, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
+      hipLaunchKernelGGL(estep1, dim3(num_clusters), dim3(NUM_BLOCKS), NUM_THREADS_ESTEP, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
       hipLaunchKernelGGL(estep2, dim3(NUM_BLOCKS), dim3(NUM_THREADS_ESTEP), 0, 0, d_fcs_data_by_dimension,d_clusters,num_dimensions,num_clusters,num_events,d_likelihoods);
       regroup_iterations++;
 
