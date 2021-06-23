@@ -1,4 +1,5 @@
-#include <stdio.h>      /* defines printf for tests */
+#include <stdio.h>
+#include <stdlib.h> 
 #include <omp.h>
 
 typedef unsigned long ulong;
