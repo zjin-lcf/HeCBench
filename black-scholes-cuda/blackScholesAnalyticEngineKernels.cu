@@ -15,7 +15,7 @@
 //device kernel to retrieve the compound factor in interestRate
 __device__ float interestRateCompoundFactor(float t, yieldTermStruct currYieldTermStruct)
 {
-  return (exp((currYieldTermStruct.forward)*t));
+  return (expf((currYieldTermStruct.forward)*t));
 }
 
 
