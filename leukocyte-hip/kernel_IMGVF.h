@@ -122,7 +122,7 @@ __global__ void kernel_IMGVF(float* IMGVF_array,
         // 2) Compute IMGVF -= (1 / lambda)(I .* (IMGVF - I))
         //FP_TYPE vI = I[(i * n) + j];
         FP_TYPE vI = I_array[I_offset+ (i * n) + j];
-        new_val -= ((1.0 / LAMBDA) * vI * (new_val - vI));
+        new_val -= ((FP_CONST(1.0) / LAMBDA) * vI * (new_val - vI));
 
       }
       // Save the previous virtual thread block's value (if it exists)
