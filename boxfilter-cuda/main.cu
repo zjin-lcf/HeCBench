@@ -121,7 +121,8 @@ __global__ void col_kernel (
   // do left edge
   float4 f4Sum;
   // convert from "const int" to "float4" 
-  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * make_float4((float)iRadius); 
+  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * 
+          make_float4((float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius); 
   for (int y = 0; y < iRadius + 1; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
