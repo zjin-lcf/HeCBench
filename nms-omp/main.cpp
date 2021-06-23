@@ -159,24 +159,22 @@ int main(int argc, char *argv[])
   const int limit = get_upper_limit(ndetections, 16);
   const int threads = get_optimal_dim(limit) * get_optimal_dim(limit);
 
-#pragma omp target data map(to: points[0:MAX_DETECTIONS], \
-    nmsbitmap[0:MAX_DETECTIONS * MAX_DETECTIONS]) \
-  map(tofrom: pointsbitmap[0:MAX_DETECTIONS])
+  #pragma omp target data map(to: points[0:MAX_DETECTIONS], \
+                                  nmsbitmap[0:MAX_DETECTIONS * MAX_DETECTIONS]) \
+                          map(tofrom: pointsbitmap[0:MAX_DETECTIONS])
   {
     for (int n = 0; n < ITER; n++) {
-#pragma omp target teams distribute parallel for collapse(2) thread_limit(threads)
-      {
-        for (int i = 0; i < limit; i++) {
-          for (int j = 0; j < limit; j++) {
-            if(points[i].w < points[j].w)
-            {
-              float area = (points[j].z + 1.0f) * (points[j].z + 1.0f);
-              float w = fmaxf(0.0f, fminf(points[i].x + points[i].z, points[j].x + points[j].z) - 
-                  fmaxf(points[i].x, points[j].x) + 1.0f);
-              float h = fmaxf(0.0f, fminf(points[i].y + points[i].z, points[j].y + points[j].z) - 
-                  fmaxf(points[i].y, points[j].y) + 1.0f);
-              nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (points[j].z != 0);
-            }
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(threads)
+      for (int i = 0; i < limit; i++) {
+        for (int j = 0; j < limit; j++) {
+          if(points[i].w < points[j].w)
+          {
+            float area = (points[j].z + 1.0f) * (points[j].z + 1.0f);
+            float w = fmaxf(0.0f, fminf(points[i].x + points[i].z, points[j].x + points[j].z) - 
+                fmaxf(points[i].x, points[j].x) + 1.0f);
+            float h = fmaxf(0.0f, fminf(points[i].y + points[i].z, points[j].y + points[j].z) - 
+                fmaxf(points[i].y, points[j].y) + 1.0f);
+            nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (points[j].z != 0);
           }
         }
       }
