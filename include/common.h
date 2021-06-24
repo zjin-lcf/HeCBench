@@ -13,5 +13,6 @@ constexpr access::mode sycl_atomic     = access::mode::atomic;
 
 constexpr access::target sycl_cmem     = access::target::constant_buffer;
 constexpr access::target sycl_gmem     = access::target::global_buffer;
+constexpr access::target sycl_lmem     = access::target::local;
 
 #endif
