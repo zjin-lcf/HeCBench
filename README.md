@@ -157,6 +157,9 @@ Early results are shown [here](results/README.md)
 ### gmm
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
 
+### grep
+  Regular expression matching (https://github.com/bkase/CUDA-grep)
+
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
@@ -270,6 +273,9 @@ Early results are shown [here](results/README.md)
 
 ### miniFE
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
+
+### minibude
+  The core computation of the Bristol University Docking Engine (BUDE) (https://github.com/UoB-HPC/miniBUDE)
 
 ### minimap2
   Hardware acceleration of long read pairwise overlapping in genome sequencing (https://github.com/UCLA-VAST/minimap2-acceleration)
