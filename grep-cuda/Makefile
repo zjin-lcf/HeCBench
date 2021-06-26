@@ -21,7 +21,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60
+CFLAGS := -std=c++14 -Xcompiler -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -45,7 +45,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu cycleTimer.h nfautil.h pnfa.h regex.h
+%.o: %.cu pnfa.cu cycleTimer.h nfautil.h pnfa.h regex.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
