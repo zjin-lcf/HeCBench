@@ -3,28 +3,25 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvc++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-SM        = cc70
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-
 program = nfa
 
-source = main.cpp nfautil.cpp regex.cpp
+source = main.cu nfautil.cu regex.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall 
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -32,19 +29,15 @@ LDFLAGS =
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
-  LDFLAGS  += -g 
+  LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
-else
-  CFLAGS +=-qopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,13 +45,12 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp pnfa.cpp cycleTimer.h nfautil.h pnfa.h regex.h
+%.o: %.cu pnfa.cu cycleTimer.h nfautil.h pnfa.h regex.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) RESULTS
 
 run: $(program)
 	./runtests.sh
-
 

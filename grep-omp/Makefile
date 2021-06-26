@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp cycleTimer.h nfautil.h pnfa.h regex.h
+%.o: %.cpp pnfa.cpp cycleTimer.h nfautil.h pnfa.h regex.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

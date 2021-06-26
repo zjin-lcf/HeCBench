@@ -35,8 +35,7 @@ __global__ void fasten_main(
     const FFParams *__restrict forcefield,
     float *__restrict etotals) 
 {
-
-  extern __shared__ FFParams local_forcefield[];
+  HIP_DYNAMIC_SHARED(FFParams, local_forcefield); 
   const size_t lid = threadIdx.x;
   const size_t gid = blockIdx.x;
   const size_t lrange = blockDim.x;

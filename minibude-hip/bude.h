@@ -30,7 +30,7 @@
 #define FILE_REF_ENERGIES "/ref_energies.out"
 
 struct __attribute__((__packed__)) Atom {
-  float x, y, ;
+  float x, y, z;
   int32_t type;
 };
 
