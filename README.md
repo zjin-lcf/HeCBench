@@ -69,6 +69,9 @@ Early results are shown [here](results/README.md)
 ### cfd
   The CFD solver in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### che
+  Phase-field simulation of spinodal decomposition using the Cahn-Hilliard equation (https://github.com/myousefi2016/Cahn-Hilliard-CUDA)
+
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
 
