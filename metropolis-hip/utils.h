@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,16 +13,16 @@
 
 #define cudaCheckErrors(msg) \
   do { \
-    cudaError_t __err = cudaGetLastError(); \
-    if (__err != cudaSuccess) { \
+    hipError_t __err = hipGetLastError(); \
+    if (__err != hipSuccess) { \
       fprintf(stderr, "Fatal error: %s (%s at %s:%d)\n", \
-          msg, cudaGetErrorString(__err), __FILE__, __LINE__); \
+          msg, hipGetErrorString(__err), __FILE__, __LINE__); \
       fprintf(stderr, "*** FAILED - ABORTING\n"); \
       exit(1); \
     } \
   } while(0)
 
-
+// same result when warp size is 64
 #define WARPSIZE 32
 
 #ifndef BX

@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_60"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -22,11 +21,7 @@ obj = main.o utils.o heap.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -34,15 +29,19 @@ LDFLAGS =
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g
+  LDFLAGS  += -g 
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -67,4 +66,5 @@ dbg: $(program)
 
 run: $(program)
 	./$(program) -l 32 11 -t 4.7 0.1 -a 10 2 2000 10 -h 1.0 -z 7919
+
 

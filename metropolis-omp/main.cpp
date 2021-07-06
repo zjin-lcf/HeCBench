@@ -94,63 +94,47 @@ int main(int argc, char **argv){
   gpu_pcg32_srandom_r(&hpcgs, &hpcgi, seed, 1);
   seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
-  /* build the space of computation for the lattices */
-  dim3 mcblock (BX, BY / 2, BZ);
-  dim3 mcgrid ((L + BX - 1) / BX, (L + BY - 1) / (2 * BY), (L + BZ - 1) / BZ);
-  dim3 lblock (BLOCKSIZE1D, 1, 1);
-  dim3 lgrid  ((N + BLOCKSIZE1D - 1) / BLOCKSIZE1D, 1, 1);
-
-  /* build the space of computation for random numbers and lattice simulation */
-  dim3 prng_block (BLOCKSIZE1D, 1, 1);
-  dim3 prng_grid (((N / 4) + BLOCKSIZE1D - 1) / BLOCKSIZE1D, 1, 1);
-
   /* T is a sorted temp array */
   float* T = (float*)malloc(sizeof(float) * Ra);
 
-#ifdef DEBUG
-  // memory for H array
-  int* hH = (int*)malloc(sizeof(int) * N);
-  int* hr = (int*)malloc(sizeof(int) * N);
-  uint64_t* pcga = (uint64_t*)malloc(sizeof(uint64_t) * N/4);
-  uint64_t* pcgb = (uint64_t*)malloc(sizeof(uint64_t) * N/4);
-#endif
-
-  /* allocate the replica pool */
-  int** mdlat = (int**) malloc(sizeof(int *) * rpool);
   /* per temperature counter array */
   float* aex = (float*) malloc(sizeof(float) * rpool);
   /* per temperature counter array */
   float* aavex = (float*)malloc(sizeof(float) * rpool);
-  /* exchange energies */
-  float* aexE = (float*)malloc(sizeof(float) * rpool);
 
-  /* PRNG states volume, one state per thread */
-  uint64_t** apcga = (uint64_t**)malloc(sizeof(uint64_t*) * rpool);
-  uint64_t** apcgb = (uint64_t**)malloc(sizeof(uint64_t*) * rpool);
+  /* malloc energy reductions */
+  float* aexE = (float*)malloc(sizeof(float) * rpool);
 
   /* fragmented indices for replicas temperature sorted */
   findex_t* arts = (findex_t*)malloc(sizeof(findex_t) * rpool);
+
   /* fragmented indices for temperatures replica sorted */
   findex_t* atrs = (findex_t*)malloc(sizeof(findex_t) * rpool);
+
   /* fragmented temperatures sorted */
   float* aT = (float*)malloc(sizeof(float) * rpool);
 
-  /* malloc device magnetic field */
-  int* dH;
-  cudaMalloc((void**)&dH, sizeof(int)*N);
+  /* malloc magnetic field */
+  int* dH = (int*) malloc (sizeof(int)*N);
 
-  /* malloc device energy reductions */
-  float* dE;
-  cudaMalloc((void**)&dE, sizeof(float)*rpool);
+  /* allocate the replica pool */
+  int *mdlat = (int*) malloc (sizeof(int) * N * rpool);
+
+  /* PRNG states volume, one state per thread */
+  uint64_t *pcga = (uint64_t*) malloc (sizeof(uint64_t) * N/4 * rpool);
+  uint64_t *pcgb = (uint64_t*) malloc (sizeof(uint64_t) * N/4 * rpool);
+
+#pragma omp target data map (alloc: dH[0:N], \
+                                    mdlat[0:N*rpool], \
+                                    pcga[0:N/4*rpool], \
+                                    pcgb[0:N/4*rpool])
+{
 
   /* malloc the data for 'r' replicas on each GPU */
   for (int k = 0; k < rpool; ++k) {
-    cudaMalloc(&mdlat[k], sizeof(int) * N);
-    cudaMalloc(&apcga[k], (N/4) * sizeof(uint64_t));
-    cudaMalloc(&apcgb[k], (N/4) * sizeof(uint64_t));
     // offset and sequence approach
-    kernel_gpupcg_setup<<<prng_grid, prng_block>>>(apcga[k], apcgb[k], N/4, 
-        seed + N/4 * k, k);
+    kernel_gpupcg_setup(pcga + k * N/4, pcgb + k * N/4, N/4, seed + N/4 * k, k);
+
 #ifdef DEBUG
     printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
             0, N, N/4, R, seed + (N/4 * k), k);
@@ -203,11 +187,11 @@ int main(int argc, char **argv){
     printf("[trial %i of %i]\n", trial+1, atrials); fflush(stdout);
 
     /* distribution for H */
-    kernel_reset_random_gpupcg<<<lgrid, lblock>>>(dH, N, apcga[0], apcgb[0]);  
+    kernel_reset_random_gpupcg(dH, N, pcga, pcgb);  
     
 #ifdef DEBUG
-    cudaMemcpy(hH, dH, N*sizeof(int), cudaMemcpyDeviceToHost);
-    for (int n = 0; n < N; n++) printf("dH %d %d\n", n, hH[n]);
+    #pragma omp target update from(dH[0:N])
+    for (int n = 0; n < N; n++) printf("dH %d %d\n", n, dH[n]);
 #endif
 
     /* reset ex counters */
@@ -225,76 +209,78 @@ int main(int argc, char **argv){
 
 
     for (int k = 0; k < ar; ++k) {
-      kernel_reset<int><<< lgrid, lblock >>>(mdlat[k], N, 1);
-      cudaCheckErrors("kernel: reset spins up");
-
-      kernel_gpupcg_setup<<<prng_grid, prng_block>>>(apcga[k], apcgb[k], N/4, 
-          seed + (uint64_t)(N/4 * k), k);
-      cudaCheckErrors("kernel: prng reset");
-#ifdef DEBUG
-      cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-      for (int i = 0; i < N/4; i++) printf("pcga: %d %d %lu\n", k, i, pcga[i]);
-      cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-      for (int i = 0; i < N/4; i++) printf("pcgb: %d %d %lu\n", k, i, pcgb[i]);
-#endif
+      kernel_reset<int>(mdlat + k * N, N, 1);
+      kernel_gpupcg_setup(pcga + k * N/4, pcgb + k * N/4, N/4, seed + (uint64_t)(N/4 * k), k);
     }
+#ifdef DEBUG
+      #pragma omp target update from (pcga[0:ar*N/4])
+      #pragma omp target update from (pcgb[0:ar*N/4])
+
+      for (int k = 0; k < ar; ++k) {
+        uint64_t *t = pcga + k * N/4;
+        for (int i = 0; i < N/4; i++)
+          printf("pcga: %d %d %lu\n", k, i, t[i]);
+
+        t = pcgb + k * N/4;
+        for (int i = 0; i < N/4; i++)
+          printf("pcgb: %d %d %lu\n", k, i, t[i]);
+      }
+#endif
 
     /* parallel tempering */
     for(int p = 0; p < apts; ++p) {
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
-          kernel_metropolis<<< mcgrid, mcblock >>>(N, L, mdlat[k], dH, h, 
-              -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
-#ifdef DEBUG
-          cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(hr, mdlat[k], N*sizeof(int), cudaMemcpyDeviceToHost);
-          for (int i = 0; i < N/4; i++) printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("black replica: %d %d %d\n", k, i, hr[i]); 
-#endif
+          kernel_metropolis(N, L, mdlat + k*N, dH, h, -2.0f/aT[atrs[k].i], 
+                            pcga + k * N/4, pcgb + k * N/4, 0);
         }
+#ifdef DEBUG
+        #pragma omp target update from (pcga[0:ar*N/4])
+        #pragma omp target update from (pcgb[0:ar*N/4])
+        #pragma omp target update from (mdlat[0:ar*N])
 
-        cudaDeviceSynchronize();
-        cudaCheckErrors("mcmc: kernel metropolis white launch");
+        for (int k = 0; k < ar; ++k) {
+          uint64_t *m = pcga + k * N/4;
+          uint64_t *n = pcgb + k * N/4;
+          int *p = mdlat + k * N;
+          for (int i = 0; i < N/4; i++)
+            printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, m[i], n[i]);
+          for (int i = 0; i < N; i++) 
+            printf("black replica: %d %d %d\n", k, i, p[i]); 
+        }
+#endif
 
         for(int k = 0; k < ar; ++k) {
-          kernel_metropolis<<< mcgrid, mcblock >>>(N, L, mdlat[k], dH, h, 
-              -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
-#ifdef DEBUG
-          cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(hr, mdlat[k], N*sizeof(int), cudaMemcpyDeviceToHost);
-          for (int i = 0; i < N/4; i++) printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("white replica: %d %d %d\n", k, i, hr[i]); 
-#endif
+          kernel_metropolis(N, L, mdlat + k*N, dH, h, -2.0f/aT[atrs[k].i],
+                            pcga + k * N/4, pcgb + k * N/4, 1);
         }
 
-        cudaDeviceSynchronize();
-        cudaCheckErrors("mcmc: kernel metropolis black launch");
-      }
-
 #ifdef DEBUG
-      for(int k = 0; k < ar; ++k) {
-      }
+        #pragma omp target update from (pcga[0:ar*N/4])
+        #pragma omp target update from (pcgb[0:ar*N/4])
+        #pragma omp target update from (mdlat[0:ar*N])
+
+        for (int k = 0; k < ar; ++k) {
+          uint64_t *m = pcga + k * N/4;
+          uint64_t *n = pcgb + k * N/4;
+          int *p = mdlat + k * N;
+          for (int i = 0; i < N/4; i++)
+            printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, m[i], n[i]);
+          for (int i = 0; i < N; i++) 
+            printf("white replica: %d %d %d\n", k, i, p[i]); 
+        }
 #endif
+      }
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
-      kernel_reset<float><<< (ar + BLOCKSIZE1D - 1)/BLOCKSIZE1D, BLOCKSIZE1D >>> (dE, ar, 0.0f);
-      cudaDeviceSynchronize();
 
       /* compute one energy reduction for each replica */
-      dim3 block(BX, BY, BZ);
-      dim3 grid((L + BX - 1)/BX, (L + BY - 1)/BY,  (L + BZ - 1)/BZ);
-
-      for(int k = 0; k < ar; ++k){
+      for(int k = 0; k < ar; ++k) {
         /* launch reduction kernel for k-th replica */
-        kernel_redenergy<float><<<grid, block>>>(mdlat[k], L, dE + k, dH, h);
-        cudaDeviceSynchronize();
-        cudaCheckErrors("kernel_redenergy");
+        kernel_redenergy<float>(mdlat + k * N , L, aexE + k, dH, h);
       }
-      cudaMemcpy(aexE, dE, ar*sizeof(float), cudaMemcpyDeviceToHost);
 
       /* exchange phase */
       double delta = 0.0;
@@ -379,30 +365,16 @@ int main(int argc, char **argv){
   double end = rtclock();
   printf("Total trial time %.2f secs\n", end-start);
 
-
   fclose(fw);
-  for(int i = 0; i < rpool; ++i) {
-    cudaFree(mdlat[i]);
-    cudaFree(apcga[i]);
-    cudaFree(apcgb[i]);
-  }
+}
 
-  cudaFree(dH);
-  cudaFree(dE);
-  
   free(T);
-#ifdef DEBUG
-  free(hH);
-  free(hr);
   free(pcga);
   free(pcgb);
-#endif
   free(aex);
   free(aavex);
   free(aexE);
   free(mdlat);
-  free(apcga);
-  free(apcgb);
   free(arts);
   free(atrs);
   free(aT);
