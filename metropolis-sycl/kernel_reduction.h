@@ -72,7 +72,7 @@ void redenergy(queue &q,
   
   q.submit([&] (handler &cgh) {
     auto s = mdlat.get_access<sycl_read>(cgh);
-    auto out = dE.template get_access<sycl_read_write>(cgh, range<1>(k));
+    auto out = dE.template get_access<sycl_read_write>(cgh);
     auto H = dH.get_access<sycl_read>(cgh);
     accessor<T, 1, sycl_read_write, access::target::local> lmem (WARPSIZE, cgh);
     cgh.parallel_for<class setup_pcg>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
@@ -97,7 +97,7 @@ void redenergy(queue &q,
         auto atomic_obj_ref = ONEAPI::atomic_ref<float,
                      ONEAPI::memory_order::relaxed, 
                      ONEAPI::memory_scope::device, 
-                     access::address_space::global_space> (out[0]);
+                     access::address_space::global_space> (out[k]);
         atomic_obj_ref.fetch_add(sum);
       }
     });

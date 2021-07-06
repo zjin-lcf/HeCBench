@@ -1,29 +1,16 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <cuda.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 #include <sys/time.h>
 #include <iostream>
 
 #include "heap.h"
-
-#define cudaCheckErrors(msg) \
-  do { \
-    cudaError_t __err = cudaGetLastError(); \
-    if (__err != cudaSuccess) { \
-      fprintf(stderr, "Fatal error: %s (%s at %s:%d)\n", \
-          msg, cudaGetErrorString(__err), __FILE__, __LINE__); \
-      fprintf(stderr, "*** FAILED - ABORTING\n"); \
-      exit(1); \
-    } \
-  } while(0)
-
-
-#define WARPSIZE 32
 
 #ifndef BX
 #define BX  16

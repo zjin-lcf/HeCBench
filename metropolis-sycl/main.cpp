@@ -241,25 +241,34 @@ int main(int argc, char **argv){
     for(int p = 0; p < apts; ++p) {
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
-        for(int k = 0; k < ar; ++k)
+        for(int k = 0; k < ar; ++k)  {
           metropolis(q, mc_gws, mc_lws, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
+#ifdef DEBUG
+          auto pcga = apcga[k].get_access<sycl_read>();
+          auto pcgb = apcgb[k].get_access<sycl_read>();
+          auto lat = mdlat[k].get_access<sycl_read>();
+          for (int i = 0; i < N/4; i++) printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
+          for (int i = 0; i < N; i++) printf("black replica: %d %d %d\n", k, i, lat[i]); 
+#endif
+        }
 
         q.wait();
 
-        for(int k = 0; k < ar; ++k)
+        for(int k = 0; k < ar; ++k) {
           metropolis(q, mc_gws, mc_lws, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
+#ifdef DEBUG
+          auto pcga = apcga[k].get_access<sycl_read>();
+          auto pcgb = apcgb[k].get_access<sycl_read>();
+          auto lat = mdlat[k].get_access<sycl_read>();
+          for (int i = 0; i < N/4; i++) printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
+          for (int i = 0; i < N; i++) printf("white replica: %d %d %d\n", k, i, lat[i]); 
+#endif
+        }
 
         q.wait();
       }
-
-#ifdef DEBUG
-        for(int k = 0; k < ar; ++k) {
-          auto acc = mdlat[k].get_access<sycl_read>();
-          for (int i = 0; i < N; i++) printf("replica: %d %d %d\n", k, i, acc[i]); 
-        }
-#endif
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);

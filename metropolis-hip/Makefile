@@ -3,11 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_60"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -22,11 +20,7 @@ obj = main.o utils.o heap.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -50,13 +44,13 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-heap.o: heap.cpp heap.h
+heap.o: heap.cu heap.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-utils.o: utils.cpp heap.h utils.h
+utils.o: utils.cu heap.h utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.cpp utils.h kernel_metropolis.h kernel_prng.h kernel_reduction.h  
+main.o: main.cu utils.h kernel_metropolis.h kernel_prng.h kernel_reduction.h  
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -67,4 +61,3 @@ dbg: $(program)
 
 run: $(program)
 	./$(program) -l 32 11 -t 4.7 0.1 -a 10 2 2000 10 -h 1.0 -z 7919
-

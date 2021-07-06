@@ -137,19 +137,19 @@ int main(int argc, char **argv){
 
   /* malloc device magnetic field */
   int* dH;
-  cudaMalloc((void**)&dH, sizeof(int)*N);
+  hipMalloc((void**)&dH, sizeof(int)*N);
 
   /* malloc device energy reductions */
   float* dE;
-  cudaMalloc((void**)&dE, sizeof(float)*rpool);
+  hipMalloc((void**)&dE, sizeof(float)*rpool);
 
   /* malloc the data for 'r' replicas on each GPU */
   for (int k = 0; k < rpool; ++k) {
-    cudaMalloc(&mdlat[k], sizeof(int) * N);
-    cudaMalloc(&apcga[k], (N/4) * sizeof(uint64_t));
-    cudaMalloc(&apcgb[k], (N/4) * sizeof(uint64_t));
+    hipMalloc(&mdlat[k], sizeof(int) * N);
+    hipMalloc(&apcga[k], (N/4) * sizeof(uint64_t));
+    hipMalloc(&apcgb[k], (N/4) * sizeof(uint64_t));
     // offset and sequence approach
-    kernel_gpupcg_setup<<<prng_grid, prng_block>>>(apcga[k], apcgb[k], N/4, 
+    hipLaunchKernelGGL(kernel_gpupcg_setup, dim3(prng_grid), dim3(prng_block), 0, 0, apcga[k], apcgb[k], N/4, 
         seed + N/4 * k, k);
 #ifdef DEBUG
     printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
@@ -203,10 +203,10 @@ int main(int argc, char **argv){
     printf("[trial %i of %i]\n", trial+1, atrials); fflush(stdout);
 
     /* distribution for H */
-    kernel_reset_random_gpupcg<<<lgrid, lblock>>>(dH, N, apcga[0], apcgb[0]);  
+    hipLaunchKernelGGL(kernel_reset_random_gpupcg, dim3(lgrid), dim3(lblock), 0, 0, dH, N, apcga[0], apcgb[0]);  
     
 #ifdef DEBUG
-    cudaMemcpy(hH, dH, N*sizeof(int), cudaMemcpyDeviceToHost);
+    hipMemcpy(hH, dH, N*sizeof(int), hipMemcpyDeviceToHost);
     for (int n = 0; n < N; n++) printf("dH %d %d\n", n, hH[n]);
 #endif
 
@@ -225,16 +225,16 @@ int main(int argc, char **argv){
 
 
     for (int k = 0; k < ar; ++k) {
-      kernel_reset<int><<< lgrid, lblock >>>(mdlat[k], N, 1);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<int>), dim3(lgrid), dim3(lblock ), 0, 0, mdlat[k], N, 1);
       cudaCheckErrors("kernel: reset spins up");
 
-      kernel_gpupcg_setup<<<prng_grid, prng_block>>>(apcga[k], apcgb[k], N/4, 
+      hipLaunchKernelGGL(kernel_gpupcg_setup, dim3(prng_grid), dim3(prng_block), 0, 0, apcga[k], apcgb[k], N/4, 
           seed + (uint64_t)(N/4 * k), k);
       cudaCheckErrors("kernel: prng reset");
 #ifdef DEBUG
-      cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
+      hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
       for (int i = 0; i < N/4; i++) printf("pcga: %d %d %lu\n", k, i, pcga[i]);
-      cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
+      hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
       for (int i = 0; i < N/4; i++) printf("pcgb: %d %d %lu\n", k, i, pcgb[i]);
 #endif
     }
@@ -244,33 +244,33 @@ int main(int argc, char **argv){
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
-          kernel_metropolis<<< mcgrid, mcblock >>>(N, L, mdlat[k], dH, h, 
+          hipLaunchKernelGGL(kernel_metropolis, dim3(mcgrid), dim3(mcblock ), 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
 #ifdef DEBUG
-          cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(hr, mdlat[k], N*sizeof(int), cudaMemcpyDeviceToHost);
+          hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
+          hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
+          hipMemcpy(hr, mdlat[k], N*sizeof(int), hipMemcpyDeviceToHost);
           for (int i = 0; i < N/4; i++) printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
           for (int i = 0; i < N; i++) printf("black replica: %d %d %d\n", k, i, hr[i]); 
 #endif
         }
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
         cudaCheckErrors("mcmc: kernel metropolis white launch");
 
         for(int k = 0; k < ar; ++k) {
-          kernel_metropolis<<< mcgrid, mcblock >>>(N, L, mdlat[k], dH, h, 
+          hipLaunchKernelGGL(kernel_metropolis, dim3(mcgrid), dim3(mcblock ), 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
 #ifdef DEBUG
-          cudaMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, cudaMemcpyDeviceToHost);
-          cudaMemcpy(hr, mdlat[k], N*sizeof(int), cudaMemcpyDeviceToHost);
+          hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
+          hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
+          hipMemcpy(hr, mdlat[k], N*sizeof(int), hipMemcpyDeviceToHost);
           for (int i = 0; i < N/4; i++) printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
           for (int i = 0; i < N; i++) printf("white replica: %d %d %d\n", k, i, hr[i]); 
 #endif
         }
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
         cudaCheckErrors("mcmc: kernel metropolis black launch");
       }
 
@@ -281,8 +281,8 @@ int main(int argc, char **argv){
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
-      kernel_reset<float><<< (ar + BLOCKSIZE1D - 1)/BLOCKSIZE1D, BLOCKSIZE1D >>> (dE, ar, 0.0f);
-      cudaDeviceSynchronize();
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<float>), dim3((ar + BLOCKSIZE1D - 1)/BLOCKSIZE1D), dim3(BLOCKSIZE1D ), 0, 0, dE, ar, 0.0f);
+      hipDeviceSynchronize();
 
       /* compute one energy reduction for each replica */
       dim3 block(BX, BY, BZ);
@@ -290,11 +290,11 @@ int main(int argc, char **argv){
 
       for(int k = 0; k < ar; ++k){
         /* launch reduction kernel for k-th replica */
-        kernel_redenergy<float><<<grid, block>>>(mdlat[k], L, dE + k, dH, h);
-        cudaDeviceSynchronize();
+        hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_redenergy<float>), dim3(grid), dim3(block), 0, 0, mdlat[k], L, dE + k, dH, h);
+        hipDeviceSynchronize();
         cudaCheckErrors("kernel_redenergy");
       }
-      cudaMemcpy(aexE, dE, ar*sizeof(float), cudaMemcpyDeviceToHost);
+      hipMemcpy(aexE, dE, ar*sizeof(float), hipMemcpyDeviceToHost);
 
       /* exchange phase */
       double delta = 0.0;
@@ -382,13 +382,13 @@ int main(int argc, char **argv){
 
   fclose(fw);
   for(int i = 0; i < rpool; ++i) {
-    cudaFree(mdlat[i]);
-    cudaFree(apcga[i]);
-    cudaFree(apcgb[i]);
+    hipFree(mdlat[i]);
+    hipFree(apcga[i]);
+    hipFree(apcgb[i]);
   }
 
-  cudaFree(dH);
-  cudaFree(dE);
+  hipFree(dH);
+  hipFree(dE);
   
   free(T);
 #ifdef DEBUG
