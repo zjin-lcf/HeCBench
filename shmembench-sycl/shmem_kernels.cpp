@@ -78,7 +78,7 @@ void benchmark_shmem(float4 *g_data, float4* shm_buffer, nd_item<1> &item){
                                     shm_buffer[tid+5*blk]);
 }
 
-void shmembenchGPU(double *c, const long size, const n) {
+void shmembenchGPU(double *c, const long size, const int n) {
   const int TOTAL_BLOCKS = size/(BLOCK_SIZE);
 
 #ifdef USE_GPU
