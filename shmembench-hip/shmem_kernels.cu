@@ -88,10 +88,10 @@ void shmembenchGPU(double *c, const long size, const int n) {
 
   auto start = high_resolution_clock::now();
   for (int i = 0; i < n; i++)
-    hipLaunchKernelGGL(benchmark_shmem, dim3(dimGrid_f4), dim3(dimBlock ), 0, 0, (float4*)cd);
+    hipLaunchKernelGGL(benchmark_shmem, dim3(dimGrid_f4), dim3(dimBlock), 0, 0, (float4*)cd);
   hipDeviceSynchronize();
   auto end = high_resolution_clock::now();
-  auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / 1000.0;
+  auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
   printf("Average execution time : %8.2f (ns)\n", time_shmem_128b);
 
   // Copy results back to host memory

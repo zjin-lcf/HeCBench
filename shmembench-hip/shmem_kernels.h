@@ -6,5 +6,5 @@
 
 #pragma once
 
-void shmembenchGPU(double*, long, int);
+void shmembenchGPU(double*, const long, const int);
 
