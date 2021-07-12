@@ -389,6 +389,9 @@ Early results are shown [here](results/README.md)
 ### secp256k1
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
+### shmembench
+  The shared local memory microbenchmark (https://github.com/ekondis/gpumembench)
+
 ### shuffle
   Shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
 
