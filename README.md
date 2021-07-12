@@ -27,6 +27,9 @@ Early results are shown [here](results/README.md)
 ### axhelm
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
 
+### babelstream
+  Measure memory transfer rates for copy, add, mul, triad, dot, and nstream (https://github.com/UoB-HPC/BabelStream)
+
 ### backprop
   Backpropagation in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -111,11 +114,17 @@ Early results are shown [here](results/README.md)
 ### dslash
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
+### dtw
+  Dynamic time warping for time series (https://github.com/alexkyllo/cuTimeWarp)
+
 ### dxtc1
   DXT1 compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### easyWave
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
+
+### eigenvalue
+  Calculate the eigenvalues of a tridiagonal symmetric matrix (https://github.com/OpenCL/AMD_APP_samples)
 
 ### epistatis
   Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
@@ -273,6 +282,9 @@ Early results are shown [here](results/README.md)
   
 ### memcpy
   A benchmark for memory copy from a host to a device
+
+### metropolis
+   Simulation of an ensemble of replicas with Metropolis–Hastings computation in the trial run (https://github.com/crinavar/trueke) 
 
 ### miniFE
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
