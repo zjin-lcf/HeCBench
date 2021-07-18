@@ -1,0 +1,31 @@
+CC        = dpcpp
+DEVICE    = gpu
+
+CFLAGS := -std=c++17 -Wall -I../include -DDEBUG -O3 -ffast-math
+
+
+SOURCES = main.cpp lsqt.cpp sigma.cpp vector.cpp hamiltonian.cpp model.\
+	cpp model_general.cpp model_lattice.cpp anderson.cpp charge.cpp
+	
+_OBJ = main.o lsqt.o sigma.o vector.o hamiltonian.o model.o model_general.o \
+	model_lattice.o anderson.o charge.o
+
+HEADERS = sigma.h vector.h lsqt.h hamiltonian.h model.h anderson.h charge.h
+
+
+ODIR = obj_gpu
+OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+
+all: lsqt_gpu
+
+$(ODIR)/%.o: %.cpp $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+lsqt_gpu: $(OBJ)
+	$(CC) $(CFLAGS) $^ -o $@
+
+clean:
+	rm -f $(ODIR)/*.o lsqt_gpu *.out
+
+run: lsqt_gpu
+	./$(program) ../lsqt-cuda/examples/input.txt

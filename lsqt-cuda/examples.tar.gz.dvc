@@ -1,0 +1,5 @@
+outs:
+- md5: c7d1af7bc30a4faf929c8b399c071024
+  size: 35364096
+  hash: md5
+  path: examples.tar.gz
