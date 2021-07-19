@@ -21,6 +21,9 @@ Early results are shown [here](results/README.md)
 ### asta
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
+### attention
+  Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
+
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
@@ -253,6 +256,9 @@ Early results are shown [here](results/README.md)
 ### lombscargle
   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
+### lsqt
+  Linear scaling quantum transport (https://github.com/brucefan1983/gpuqt)
+
 ### lud
   LU decomposition in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
@@ -442,6 +448,9 @@ Early results are shown [here](results/README.md)
 
 ### thomas
   Solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
+
+### tonemapping
+  Tone mapping (https://github.com/OpenCL/AMD_APP_samples)
 
 ### transpose
   Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
