@@ -383,6 +383,9 @@ Early results are shown [here](results/README.md)
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
+### rushlarsen
+  An ODE solver using the Rush-Larsen scheme (https://bitbucket.org/finsberg/gotran/src/master)
+
 ### s3d
   Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
