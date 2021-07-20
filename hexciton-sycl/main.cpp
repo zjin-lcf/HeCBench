@@ -3,13 +3,6 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <iostream>
-#include <cstring> // memcpy
-#include <cmath>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <sstream>
 #include "utils.hpp"
 
 
@@ -56,17 +49,17 @@ void benchmark(
   real_2_t* sin = allocate_aligned<real_2_t>(size_sigma);
   real_2_t* sout = allocate_aligned<real_2_t>(size_sigma);
   
-  for (int i = 0; i < size_hamiltonian; i++) {
+  for (size_t i = 0; i < size_hamiltonian; i++) {
     ham[i].x() = hamiltonian[i].real(); 
     ham[i].y() = hamiltonian[i].imag(); 
   }
 
-  for (int i = 0; i < size_sigma; i++) {
+  for (size_t i = 0; i < size_sigma; i++) {
     sin[i].x() = sigma_in[i].real(); 
     sin[i].y() = sigma_in[i].imag(); 
   }
 
-  for (int i = 0; i < size_sigma; i++) {
+  for (size_t i = 0; i < size_sigma; i++) {
     sout[i].x() = sigma_out[i].real(); 
     sout[i].y() = sigma_out[i].imag(); 
   }
@@ -1166,7 +1159,6 @@ void benchmark(
           accessor<real_t, 1, sycl_read_write, access::target::local> ham_local_imag(DIM*DIM, cgh);
           accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_real({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
           accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_imag({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
-
           cgh.parallel_for<class final_gpu_kernel>(nd_range<2>(k24_gws, k24_lws), [=] (nd_item<2> item) {
             #define id_2d_to_1d(i,j) ((i) * DIM + (j))
             #define sigma_id(i,j,m) ((m) * DIM * DIM + ((i) * DIM + (j)))
@@ -1264,7 +1256,7 @@ void benchmark(
       cgh.copy(acc, sout); 
     }).wait();
 
-    for (int i = 0; i < size_sigma; i++) {
+    for (size_t i = 0; i < size_sigma; i++) {
       sigma_out[i] = {sout[i].x(), sout[i].y()};
     }
 

@@ -4,8 +4,8 @@
 
 # Compiler can be set below, or via environment variable
 CC        = clang++
-OPTIMIZE  = no
-DEBUG     = yes
+OPTIMIZE  = yes
+DEBUG     = no
 CUDA_ARCH = "--cuda-gpu-arch=sm_60"
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 

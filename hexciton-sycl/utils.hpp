@@ -7,9 +7,9 @@
 #define UTILS_HPP
 
 #include <complex>
-#include <cstdint> // fixed width integers
-#include <functional>
 #include <iostream>
+#include <cstring> // memcpy
+#include <cstdlib>
 #include "common.h"
 
 #define SINGLE_PRECISION
@@ -18,8 +18,8 @@
 using real_t = float;
 using real_2_t = float2;
 // == 1 / Pi
-#define hbar  (1.0f / cl::sycl::acos(-1.f)) 
-#define dt  1.0e-3f
+#define hbar  (1.f / cl::sycl::acos(-1.f)) 
+#define dt  1e-3f
 #define hdt  (dt / hbar)
 
 
@@ -27,7 +27,7 @@ using real_2_t = float2;
 using real_t = double;
 using real_2_t = double2;
 #define hbar  (1.0 / cl::sycl::acos(-1.0))
-#define dt  1.0e-3
+#define dt  1e-3
 #define hdt  (dt / hbar)
 
 #endif
@@ -40,21 +40,22 @@ using complex_t = std::complex<real_t>;
 #define VEC_LENGTH VEC_LENGTH_AUTO  
 #endif
 
+// consistent with CUDA/HIP though simd8 and sim16 are supported by SYCL
 #ifdef SINGLE_PRECISION
 #if  VEC_LENGTH == 2
   #define real_vec_t float2
 #elif VEC_LENGTH == 4
   #define real_vec_t float4
 #else
-  #define real_vec_t float8
+  #define real_vec_t float4
 #endif
 #else
 #if  VEC_LENGTH == 2
   #define real_vec_t double2
 #elif VEC_LENGTH == 4
   #define real_vec_t double4
-#else
-  #define real_vec_t double8
+#else 
+  #define real_vec_t double4
 #endif
 #endif
 
