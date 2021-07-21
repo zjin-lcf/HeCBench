@@ -9,12 +9,6 @@ DEBUG     = no
 MARCH     = gfx906
 PLATFORM  = rocm
 DEVICE    = gpu
-ROCM_DEVICE_LIB = -nogpulib \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ocml.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_daz_opt_on.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_unsafe_math_on.bc \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/oclc_isa_version_906.bc \
 
 #===============================================================================
 # Program name & source code list
@@ -31,10 +25,9 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../include \
+CFLAGS := -Wall -I../include -I../cobahh-cuda \
           --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+	  --hipsycl-gpu-arch=$(MARCH)
 
 # Linker Flags
 LDFLAGS = 
@@ -58,15 +51,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp neuron_update.h Makefile
+%.o: %.cpp neuron_update.h ../cobahh-cuda/neuron_update_host.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100000000 10
+	./$(program) 1000000 10
 

@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
+CFLAGS := -std=c++14 -Wall -I../cobahh-cuda/ -pthread -fPIE `hipcl_config -C` 
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
@@ -46,12 +46,12 @@ endif
 $(program): $(obj)
 	$(CC) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu neuron_update.h
+%.o: %.cu neuron_update.h ../cobahh-cuda/neuron_update_host.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100000000 10
+	./$(program) 1000000 10
 
