@@ -54,7 +54,7 @@ endif
 #===============================================================================
 
 $(program): $(obj)
-	$(LD) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -63,6 +63,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	mpirun -n 1 ./$(program) --num_vector 16 --num_field 32 --num_iterations 1
-	#mpirun -n 1 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 1
+	mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10
 
