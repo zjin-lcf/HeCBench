@@ -45,7 +45,7 @@
 
 // mkl/sycl includes
 #include <CL/sycl.hpp>
-#include "mkl_blas_sycl.hpp"
+#include "oneapi/mkl/blas.hpp"
 #include "mkl.h"
 
 template <typename T>
@@ -94,8 +94,8 @@ void run_gemm_example() {
     // C = alpha * op(A) * op(B)  + beta * C 
     //
 
-    mkl::transpose transA = mkl::transpose::trans;
-    mkl::transpose transB = mkl::transpose::nontrans;
+    oneapi::mkl::transpose transA = oneapi::mkl::transpose::trans;
+    oneapi::mkl::transpose transB = oneapi::mkl::transpose::nontrans;
 
     // matrix data sizes
     MKL_INT m = 79;
@@ -127,7 +127,7 @@ void run_gemm_example() {
     {
     // create execution queue and buffers of matrix data
     cl::sycl::gpu_selector dev;
-    cl::sycl::queue main_queue(dev);
+    cl::sycl::queue q(dev);
 
     cl::sycl::buffer<fp, 1> A_buffer(a, m*k);
     cl::sycl::buffer<fp, 1> B_buffer(b, k*n);
@@ -135,8 +135,11 @@ void run_gemm_example() {
 
     for (int i = 0; i < 20000; i++) 
       // add mkl::blas::gemm to execution queue
-      mkl::blas::gemm(main_queue, transA, transB, m, n, k, alpha, A_buffer, ldA, B_buffer, ldB, beta, C_buffer, ldC);
-
+      oneapi::mkl::blas::gemm(q, transA, transB, 
+        m, n, k, alpha, 
+        A_buffer, ldA, 
+        B_buffer, ldB, 
+        beta, C_buffer, ldC);
     }
     //
     // Post Processing
@@ -150,7 +153,6 @@ void run_gemm_example() {
     mkl_free(a);
     mkl_free(b);
     mkl_free(c);
-
 }
 
 
