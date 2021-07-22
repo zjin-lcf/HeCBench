@@ -9,6 +9,8 @@
 #include <mpi.h>
 
 #include "common.h"
+#include "oneapi/mkl/blas.hpp"
+#include "mkl.h"
 
 //=============================================================================
 
@@ -85,23 +87,23 @@ class Matrix {
   public:
 
     typedef P_ P;
+    buffer<P_, 1> db;  // a public member for easy access to the buffer 
 
     //----------
 
     Matrix(size_t num_row, size_t num_col)
+      // compiler may reorder the initialization order
       : num_row_(num_row)
       , num_col_(num_col)
       , num_row_up_(((num_row+ROUNDUP-1)/ROUNDUP)*ROUNDUP)
       , num_col_up_(((num_col+ROUNDUP-1)/ROUNDUP)*ROUNDUP)
       , num_elt_up_(num_row_up_ * num_col_up_)
-      , sizeP(sizeof(P)) {
+      , sizeP(sizeof(P)) 
+      , db{((num_row+ROUNDUP-1)/ROUNDUP*ROUNDUP)*((num_col+ROUNDUP-1)/ROUNDUP*ROUNDUP)} {
 
-      P* h_ = (P *)mkl_malloc(num_elt_up * sizeP, 64);
+      h_ = (P *) mkl_malloc(num_elt_up_ * sizeP, 64);
       ASSERT(h_ && "Failure in host memory allocation");
       memset((void*)h_, 0, num_elt_up_ * sizeP);
-
-      //SAFE_CALL_CUDA(cudaMemset((void*)d_, 0, num_elt_up_ * sizeP));
-      buffer<P, 1> d_ (num_elt_up);
     }
 
     //----------
@@ -111,9 +113,6 @@ class Matrix {
     }
 
     //----------
-
-    P* h() const {return h_;}
-    P* d() const {return d_;}
 
     size_t nr() const {return num_row_;}
     size_t nc() const {return num_col_;}
@@ -129,12 +128,6 @@ class Matrix {
 
     //----------
 
-    P& eltd(size_t i, size_t j) {
-      return d_[i + num_row_up_ * j];
-    }
-
-    //----------
-
     static P& eltd(size_t i, size_t j, P* d, size_t num_row_up) {
       return d[i + num_row_up * j];
     }
@@ -143,7 +136,7 @@ class Matrix {
 
     void to_device(queue &q) {
       q.submit([&] (handler &cgh) {
-        auto acc = d_.template get_access<sycl_discard_write>(cgh);
+        auto acc = db.template get_access<sycl_discard_write>(cgh);
         cgh.copy(h_, acc);
       });
     }
@@ -152,9 +145,9 @@ class Matrix {
 
     void from_device(queue &q) {
       q.submit([&] (handler &cgh) {
-        auto acc = d_.template get_access<sycl_read>(cgh);
+        auto acc = db.template get_access<sycl_read>(cgh);
         cgh.copy(acc, h_);
-      });
+      }).wait();
     }
 
     //----------
@@ -169,7 +162,6 @@ class Matrix {
     size_t sizeP;
 
     P* h_;
-    buffer<P, 1> d_;
 
     // Disallowed methods.
     Matrix(const Matrix&);
@@ -210,7 +202,6 @@ size_t nonzero_stride(const size_t& i) {
 template<class Matrix_t>
 void set_input_matrix_kernel(
   nd_item<1> &item, 
-  Matrix_t& a,
   size_t nr, size_t nc, size_t nru, 
   typename Matrix_t::P* d,
   size_t base_vector_num, 
@@ -247,16 +238,19 @@ void set_input_matrix(
   typename Matrix_t::P value) {
 
   const int threadblocksize = 256;
-  const int num_threadblocks = (a.nr() * a.nc() + threadblocksize - 1);
+  const int num_threadblocks = (a.nr() * a.nc() + threadblocksize - 1) / 
+	                       threadblocksize * threadblocksize;
 
   range<1> gws (num_threadblocks);
   range<1> lws (threadblocksize);
-
+  const size_t nr = a.nr(); 
+  const size_t nc = a.nc(); 
+  const size_t nru = a.nru(); 
   q.submit([&] (handler &cgh) {
-    auto d = a.d().template get_access<sycl_discard_write>(cgh);
+    auto d_acc = a.db.template get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      set_input_matrix_kernel<Matrix_t> (a, a.nr(), a.nc(), a.nru(), 
-         d.get_pointer(), base_vector_num, value);
+      set_input_matrix_kernel<Matrix_t> (item, nr, nc, nru,
+                                         d_acc.get_pointer(), base_vector_num, value);
     });
   });
 }
@@ -279,18 +273,18 @@ void perform_gemm(queue &q, size_t m, size_t n, size_t k,
   const GemmOut_t alpha = TCBufTypes<GemmOut_t>::one();
   const GemmOut_t beta = TCBufTypes<GemmOut_t>::zero();
 
-  mkl::transpose transA = mkl::transpose::nontrans;
-  mkl::transpose transB = mkl::transpose::trans;
+  oneapi::mkl::transpose transA = oneapi::mkl::transpose::nontrans;
+  oneapi::mkl::transpose transB = oneapi::mkl::transpose::trans;
 
-  mkl::blas::gemm(
+  oneapi::mkl::blas::gemm(
     q, 
     transA, transB, 
     m, n, k, 
     alpha, 
-    tc_buf_left.d(), tc_buf_left.nru(),
-    tc_buf_right.d(), tc_buf_right.nru(),
+    tc_buf_left.db, tc_buf_left.nru(),
+    tc_buf_right.db, tc_buf_right.nru(),
     beta,
-    c_buf.d(), c_buf.nru()
+    c_buf.db, c_buf.nru()
   );
 
 /*  cblas as a reference
@@ -375,8 +369,6 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
 
     for (int step = 1; step <= num_steps; ++step) {
 
-      //SAFE_CALL_CUDA(cudaStreamSynchronize(stream));
-      q.wait();
       SAFE_CALL_MPI(MPI_Barrier(MPI_COMM_WORLD));
       const double timetotal2 = get_time();
       const double timetotal= timetotal2 - timetotal1;
@@ -412,7 +404,6 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
         fflush(stdout);
       }
 
-      q.wait();
       SAFE_CALL_MPI(MPI_Barrier(MPI_COMM_WORLD));
       const double timegemm1 = get_time();
 
@@ -422,7 +413,6 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
         flops_local += 2. * m * n * k;
       } // if is_step_active
 
-      q.wait();
       SAFE_CALL_MPI(MPI_Barrier(MPI_COMM_WORLD));
       const double timegemm2 = get_time();
 
@@ -437,7 +427,6 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
 
       if (is_step_active) {
         c_buf.from_device(q);
-        q.wait();
 
         const int check_freq1 = 89; // spot check, for speed.
         const int check_freq2 = 113;
@@ -488,8 +477,6 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
   SAFE_CALL_MPI(MPI_Allreduce(&hash_local, &hash, 1,
                            MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD));
 
-  //SAFE_CALL_CUDA(cudaStreamSynchronize(stream));
-  q.wait();
   SAFE_CALL_MPI(MPI_Barrier(MPI_COMM_WORLD));
   const double timetotal2 = get_time();
   const double timetotal= timetotal2 - timetotal1;
