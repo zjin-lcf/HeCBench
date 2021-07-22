@@ -422,6 +422,9 @@ Early results are shown [here](results/README.md)
 ### sosfil
   Second-order IIR digital filtering (https://github.com/rapidsai/cusignal/)
 
+### sparkler
+  A miniapp for the CoMet comparative genomics application (https://github.com/wdj/sparkler)
+
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
