@@ -1,3 +1,10 @@
+/*
+Copyright 1998–2018 Bernhard Esslinger and the CrypTool Team. Permission
+is granted to copy, distribute and/or modify this document under the terms of the
+GNU Free Documentation License, Version 1.3 or any later version published by the
+Free Software Foundation (FSF). A copy of the license is included in the section
+entitled "GNU Free Documentation License".
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
