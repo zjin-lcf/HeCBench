@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall -I../include -I../cobahh-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -50,12 +50,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp neuron_update.h Makefile
+%.o: %.cpp neuron_update.h ../cobahh-cuda/neuron_update_host.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100000000 10
+	./$(program) 1000000 10
 

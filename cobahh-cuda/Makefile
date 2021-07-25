@@ -46,12 +46,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu neuron_update.h Makefile
+%.o: %.cu neuron_update.h neuron_update_host.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100000000 10
+	./$(program) 1000000 10
 

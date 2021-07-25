@@ -7,9 +7,15 @@ inline int _timestep(float t, float dt)
 }
 
 __global__ void cobahh (
-    float* d_h, float* d_m, float* d_n, float* d_ge,
-    float* d_v, float* d_gi, const float* d_lastspike, 
-    char* d_not_refractory, const int _N ,
+    float* __restrict d_h, 
+    float* __restrict d_m,
+    float* __restrict d_n,
+    float* __restrict d_ge,
+    float* __restrict d_v,
+    float* __restrict d_gi,
+    const float* __restrict d_lastspike, 
+    char* __restrict d_not_refractory, 
+    const int _N ,
     const float dt,
     const float t,
     const int    _lio_1,

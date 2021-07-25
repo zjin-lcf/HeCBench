@@ -90,6 +90,9 @@ Early results are shown [here](results/README.md)
 ### cobahh
   Simulation of Random Network of Hodgkin and Huxley Neurons with Exponential Synaptic Conductances (https://dl.acm.org/doi/10.1145/3307339.3343460)
 
+### columnarSolver
+  Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
+
 ### compute-score
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
@@ -383,6 +386,9 @@ Early results are shown [here](results/README.md)
 ### rtm8
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
 
+### rushlarsen
+  An ODE solver using the Rush-Larsen scheme (https://bitbucket.org/finsberg/gotran/src/master)
+
 ### s3d
   Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
@@ -418,6 +424,9 @@ Early results are shown [here](results/README.md)
 
 ### sosfil
   Second-order IIR digital filtering (https://github.com/rapidsai/cusignal/)
+
+### sparkler
+  A miniapp for the CoMet comparative genomics application (https://github.com/wdj/sparkler)
 
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
