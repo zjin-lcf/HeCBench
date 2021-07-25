@@ -2,6 +2,9 @@
 # User Options
 #===============================================================================
 
+HIPBLAS_ROOT=/opt/rocm/hipblas
+HIPRT_ROOT=/opt/rocm/hip
+
 # Compiler can be set below, or via environment variable
 CC        = hipcc
 OPTIMIZE  = yes
@@ -25,7 +28,8 @@ obj = $(source:.cu=.o)
 CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
-LDFLAGS = -lhipblas
+LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas
+
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
