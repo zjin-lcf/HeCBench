@@ -15,7 +15,7 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
    THE SOFTWARE.
-   */
+*/
 #include <iostream>
 #include "common.h"
 
@@ -83,67 +83,61 @@ int main() {
   int *out = (int *)malloc(sizeof(int) * BUF_SIZE);
   buffer<int,  1> d_out (BUF_SIZE);
 
+  range<1> gws (BUF_SIZE);
+  range<1> lws (BUF_SIZE);
+
   for (int n = 0; n < 100; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bcast_shfl_xor_sg8>(
-        nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
-          int value = item.get_local_id(0) & 0x7;
-          for (int mask = 1; mask < 0x7; mask *= 2)
+      cgh.parallel_for<class bc_shflxor_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int value = item.get_local_id(0) & 0x7;
+        for (int mask = 1; mask < 0x7; mask *= 2)
           value += item.get_sub_group().shuffle_xor(value, mask);
-          size_t oi = item.get_global_id(0);
-          out_acc[oi] = value;
+        out_acc[item.get_global_id(0)] = value;
       });
     });
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
-  });
-  q.wait();
+  }).wait();
 
   verifyBroadcast(out, 8);
 
   //=====================================================================================================
   for (int n = 0; n < 100; n++)
     q.submit([&] (handler &cgh) {
-        auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class bcast_shfl_xor_sg16>(
-          nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
-            int value = item.get_local_id(0) & 0xf;
-            for (int mask = 1; mask < 0xf; mask *= 2)
-            value += item.get_sub_group().shuffle_xor(value, mask);
-            size_t oi = item.get_global_id(0);
-            out_acc[oi] = value;
-            });
-        });
-
-  q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_read>(cgh);
-      cgh.copy(out_acc, out);
-      });
-  q.wait();
-
-  verifyBroadcast(out, 16);
-
-  for (int n = 0; n < 100; n++)
-    q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bcast_shfl_xor_sg32>(
-        nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
-          int value = item.get_local_id(0) & 0x1f;
-          for (int mask = 1; mask < 0x1f; mask *= 2)
+      cgh.parallel_for<class bc_shflxor_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int value = item.get_local_id(0) & 0xf;
+        for (int mask = 1; mask < 0xf; mask *= 2)
           value += item.get_sub_group().shuffle_xor(value, mask);
-          size_t oi = item.get_global_id(0);
-          out_acc[oi] = value;
+        out_acc[item.get_global_id(0)] = value;
       });
     });
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
-  });
-  q.wait();
+  }).wait();
+
+  verifyBroadcast(out, 16);
+
+  for (int n = 0; n < 100; n++)
+    q.submit([&] (handler &cgh) {
+      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class bc_shflxor_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int value = item.get_local_id(0) & 0x1f;
+        for (int mask = 1; mask < 0x1f; mask *= 2)
+          value += item.get_sub_group().shuffle_xor(value, mask);
+        out_acc[item.get_global_id(0)] = value;
+      });
+    });
+
+  q.submit([&] (handler &cgh) {
+    auto out_acc = d_out.get_access<sycl_read>(cgh);
+    cgh.copy(out_acc, out);
+  }).wait();
 
   verifyBroadcast(out, 32);
   //=====================================================================================================
@@ -152,19 +146,17 @@ int main() {
   for (int n = 0; n < 100; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bcast_shfl_sg8>(nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
+      cgh.parallel_for<class bc_shfl_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x7) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        size_t oi = item.get_global_id(0);
-        out_acc[oi] = out_v;
+        out_acc[item.get_global_id(0)] = out_v;
       });
     });
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
-  });
-  q.wait();
+  }).wait();
 
   verifyBroadcast(out, 8, PATTERN);
 
@@ -172,19 +164,17 @@ int main() {
   for (int n = 0; n < 100; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bcast_shfl_sg16>(nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
+      cgh.parallel_for<class bc_shfl_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = (item.get_local_id(0) & 0xf) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        size_t oi = item.get_global_id(0);
-        out_acc[oi] = out_v;
+        out_acc[item.get_global_id(0)] = out_v;
       });
     });
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
-  });
-  q.wait();
+  }).wait();
 
   verifyBroadcast(out, 16, PATTERN);
 
@@ -192,11 +182,10 @@ int main() {
   for (int n = 0; n < 100; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bcast_shfl_sg32>(nd_range<1>(range<1>(BUF_SIZE), range<1>(BUF_SIZE)), [=] (nd_item<1> item) {
+      cgh.parallel_for<class bc_shfl_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x1f) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        size_t oi = item.get_global_id(0);
-        out_acc[oi] = out_v;
+        out_acc[item.get_global_id(0)] = out_v;
       });
     });
 
@@ -233,19 +222,19 @@ int main() {
       auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class transpose_shfl_sg8>(nd_range<1>(
             range<1>(total), range<1>(8)), [=] (nd_item<1> item) {
-          unsigned b_start = item.get_local_range(0) * item.get_group(0);
-          unsigned b_offs = b_start + item.get_local_id(0);
-          unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
-          float val = in[b_offs];
-          out[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        unsigned b_start = item.get_local_range(0) * item.get_group(0);
+        unsigned b_offs = b_start + item.get_local_id(0);
+        unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
+        float val = in[b_offs];
+        out[b_offs] = item.get_sub_group().shuffle(val, s_offs);
       });
     });
 
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
-  });
-  q.wait();
+  }).wait();
+
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/8, 8);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 8);
 
@@ -266,8 +255,8 @@ int main() {
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
-  });
-  q.wait();
+  }).wait();
+
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/16, 16);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 16);
 
@@ -288,8 +277,8 @@ int main() {
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
-  });
-  q.wait();
+  }).wait();
+
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/32, 32);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 32);
 
