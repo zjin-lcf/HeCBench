@@ -72,7 +72,7 @@ void dwtHaar1D( nd_item<1> &item,
     unsigned int activeThreads = (1 << levels) / 2;
     unsigned int midOutPos = signalLength / 2;
     
-    float rsqrt_two = sycl::rsqrt(2.0f);
+    const float rsqrt_two = 0.7071f;
     for(unsigned int i = 0; i < levels; ++i)
     {
 
