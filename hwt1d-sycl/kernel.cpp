@@ -195,6 +195,7 @@ int runKernel(
       cgh.copy(acc, dPartialOutData);
     });
 
+    q.wait();
 
     if(levels <= maxLevelsOnDevice)
     {
