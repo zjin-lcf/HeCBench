@@ -147,7 +147,7 @@ int main(int argc, char * argv[])
           unsigned int activeThreads = (1 << levels) / 2;
           unsigned int midOutPos = curSignalLength / 2;
           
-          float rsqrt_two = 0.7071f;
+          const float rsqrt_two = 0.7071f;
           for(unsigned int i = 0; i < levels; ++i)
           {
 
