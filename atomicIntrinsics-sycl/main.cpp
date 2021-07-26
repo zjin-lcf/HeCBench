@@ -130,8 +130,9 @@ computeGold(int *gpuData, const int len)
 int main(int argc, char **argv)
 {
   unsigned int len = 1 << 27;
-  unsigned int numThreads = 256;
-  unsigned int numBlocks = (len + numThreads - 1) / numThreads * numThreads;
+  unsigned int localWorkSize = 256;
+  unsigned int globalWorkSize = (len + localWorkSize - 1) /
+                                localWorkSize * localWorkSize;
   unsigned int numData = 7;
   int gpuData[] = {0, 0, -(1<<8), 1<<8, 0xff, 0, 0xff};
 
@@ -145,17 +146,18 @@ int main(int argc, char **argv)
   // allocate device memory for result
   buffer<int, 1> dOData(numData);
 
-  range<1> global_work_size (numBlocks);
-  range<1> local_work_size (numThreads);
+  range<1> gws (globalWorkSize);
+  range<1> lws (localWorkSize);
 
   for (int i = 0; i < 1; i++) {
     q.submit([&](handler &h) {
       auto d = dOData.get_access<sycl_discard_write>(h);
       h.copy(gpuData, d);
     });
+
     q.submit([&](handler &h) {
       auto gpuData = dOData.get_access<sycl_atomic>(h);
-      h.parallel_for<class test_atomics>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class test_atomics>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0);
         atomic_fetch_add(gpuData[0], 10);
         atomic_fetch_sub(gpuData[1], 10);
@@ -164,15 +166,15 @@ int main(int argc, char **argv)
         atomic_fetch_and(gpuData[4], 2*i+7);
         atomic_fetch_or (gpuData[5], 1<<i);
         atomic_fetch_xor(gpuData[6], i);
-        });
       });
+    });
   }
+
   q.submit([&](handler &h) {
     auto d = dOData.get_access<sycl_read>(h);
     h.copy(d, gpuData);
-  });
-  q.wait();
+  }).wait();
 
-  computeGold(gpuData, numBlocks);
+  computeGold(gpuData, globalWorkSize);
   return 0;
 }
