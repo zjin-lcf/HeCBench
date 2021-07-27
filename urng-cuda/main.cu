@@ -41,23 +41,23 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  uint pixelSize = sizeof(uchar4_t);
+  uint pixelSize = sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
   std::cout << " width: " << width << std::endl;
 
   // allocate memory for input & output image data
-  uchar4_t* inputImageData  = (uchar4_t*)malloc(width * height * sizeof(uchar4_t));
+  uchar4* inputImageData  = (uchar4*)malloc(width * height * sizeof(uchar4));
 
   // allocate memory for output image data
-  uchar4_t* outputImageData = (uchar4_t*)malloc(width * height * sizeof(uchar4_t));
+  uchar4* outputImageData = (uchar4*)malloc(width * height * sizeof(uchar4));
 
   // initializa the Image data to NULL
   memset(outputImageData, 0, width * height * pixelSize);
 
   // get the pointer to pixel data
-  uchar4_t *pixelData = inputBitmap.getPixels();
+  uchar4 *pixelData = inputBitmap.getPixels();
   if(pixelData == NULL)
   {
     std::cout << "Failed to read pixel Data!";
@@ -70,18 +70,18 @@ int main(int argc, char** argv)
   memcpy(inputImageData, pixelData, width * height * pixelSize);
 
   // allocate memory for verification output
-  uchar4_t *verificationOutput = (uchar4_t*)malloc(width * height * pixelSize);
+  uchar4 *verificationOutput = (uchar4*)malloc(width * height * pixelSize);
 
   // initialize the data to NULL
   memset(verificationOutput, 0, width * height * pixelSize);
 
   const int factor = FACTOR;
 
-  uchar4_t *inputImageBuffer;
-  cudaMalloc((void**)&inputImageBuffer, width * height * sizeof(uchar4_t)); 
+  uchar4 *inputImageBuffer;
+  cudaMalloc((void**)&inputImageBuffer, width * height * sizeof(uchar4)); 
 
-  uchar4_t *outputImageBuffer;
-  cudaMalloc((void**)&outputImageBuffer, width * height * sizeof(uchar4_t)); 
+  uchar4 *outputImageBuffer;
+  cudaMalloc((void**)&outputImageBuffer, width * height * sizeof(uchar4)); 
 
   dim3 grid (height * width / (blockSizeY * blockSizeX));
   dim3 block (blockSizeY * blockSizeX);  // maximum work-group size is 256
@@ -89,12 +89,12 @@ int main(int argc, char** argv)
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
-  cudaMemcpy(inputImageBuffer, inputImageData, width * height * sizeof(uchar4_t), cudaMemcpyHostToDevice);
+  cudaMemcpy(inputImageBuffer, inputImageData, width * height * sizeof(uchar4), cudaMemcpyHostToDevice);
   for(int i = 0; i < iterations; i++)
   {
     noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, factor);
   }
-  cudaMemcpy(outputImageData, outputImageBuffer, width * height * sizeof(uchar4_t), cudaMemcpyDeviceToHost);
+  cudaMemcpy(outputImageData, outputImageBuffer, width * height * sizeof(uchar4), cudaMemcpyDeviceToHost);
   cudaFree(inputImageBuffer);
   cudaFree(outputImageBuffer);
 
