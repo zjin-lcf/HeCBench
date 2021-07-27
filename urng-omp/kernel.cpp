@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-inline float4 convert_float4(uchar4_t v) {
+inline float4 convert_float4(uchar4 v) {
   float4 res;
   res.x = (float) v.x;
   res.y = (float) v.y;
@@ -23,8 +23,8 @@ inline float4 convert_float4(uchar4_t v) {
   return res;
 }
 
-inline uchar4_t convert_uchar4_sat(float4 v) {
-  uchar4_t res;
+inline uchar4 convert_uchar4_sat(float4 v) {
+  uchar4 res;
   res.x = (unsigned char) ((v.x > 255.f) ? 255.f : (v.x < 0.f ? 0.f : v.x));
   res.y = (unsigned char) ((v.y > 255.f) ? 255.f : (v.y < 0.f ? 0.f : v.y));
   res.z = (unsigned char) ((v.z > 255.f) ? 255.f : (v.z < 0.f ? 0.f : v.z));
