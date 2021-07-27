@@ -15,7 +15,7 @@
  ********************************************************************/
 
 __device__ __forceinline__ 
-float4 convert_float4(uchar4_t v) {
+float4 convert_float4(uchar4 v) {
   float4 res;
   res.x = (float) v.x;
   res.y = (float) v.y;
@@ -25,8 +25,8 @@ float4 convert_float4(uchar4_t v) {
 }
 
 __device__ __forceinline__ 
-uchar4_t convert_uchar4_sat(float4 v) {
-  uchar4_t res;
+uchar4 convert_uchar4_sat(float4 v) {
+  uchar4 res;
   res.x = (unsigned char) ((v.x > 255.f) ? 255.f : (v.x < 0.f ? 0.f : v.x));
   res.y = (unsigned char) ((v.y > 255.f) ? 255.f : (v.y < 0.f ? 0.f : v.y));
   res.z = (unsigned char) ((v.z > 255.f) ? 255.f : (v.z < 0.f ? 0.f : v.z));
@@ -78,8 +78,8 @@ float4 operator+(float4 a, float b)
 
 __global__
 void noise_uniform(
-  const uchar4_t* inputImage, 
-  uchar4_t* outputImage, 
+  const uchar4* inputImage, 
+  uchar4* outputImage, 
   const int factor)
 {
   int pos = blockIdx.x * blockDim.x + threadIdx.x;
