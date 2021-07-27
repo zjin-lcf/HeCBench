@@ -46,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernel.cu urng.h SDKBitMap.h  
+%.o: %.cu kernel.cu urng.h ../include/SDKBitMap.h  
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
