@@ -41,23 +41,23 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  uint pixelSize = sizeof(uchar4_t);
+  uint pixelSize = sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
   std::cout << " width: " << width << std::endl;
 
   // allocate memory for input & output image data
-  uchar4_t* inputImageData  = (uchar4_t*)malloc(width * height * sizeof(uchar4_t));
+  uchar4* inputImageData  = (uchar4*)malloc(width * height * sizeof(uchar4));
 
   // allocate memory for output image data
-  uchar4_t* outputImageData = (uchar4_t*)malloc(width * height * sizeof(uchar4_t));
+  uchar4* outputImageData = (uchar4*)malloc(width * height * sizeof(uchar4));
 
   // initializa the Image data to NULL
   memset(outputImageData, 0, width * height * pixelSize);
 
   // get the pointer to pixel data
-  uchar4_t *pixelData = inputBitmap.getPixels();
+  uchar4 *pixelData = inputBitmap.getPixels();
   if(pixelData == NULL)
   {
     std::cout << "Failed to read pixel Data!";
@@ -70,7 +70,7 @@ int main(int argc, char** argv)
   memcpy(inputImageData, pixelData, width * height * pixelSize);
 
   // allocate memory for verification output
-  uchar4_t *verificationOutput = (uchar4_t*)malloc(width * height * pixelSize);
+  uchar4 *verificationOutput = (uchar4*)malloc(width * height * pixelSize);
 
   // initialize the data to NULL
   memset(verificationOutput, 0, width * height * pixelSize);
@@ -85,8 +85,8 @@ int main(int argc, char** argv)
 #endif
     queue q(dev_sel);
 
-    buffer<uchar4_t, 1> inputImageBuffer (inputImageData, width * height);
-    buffer<uchar4_t, 1> outputImageBuffer (outputImageData, width * height);
+    buffer<uchar4, 1> inputImageBuffer (inputImageData, width * height);
+    buffer<uchar4, 1> outputImageBuffer (outputImageData, width * height);
     range<1> gws (height * width);
     range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
 
@@ -115,10 +115,10 @@ int main(int argc, char** argv)
   float mean = 0;
   for(int i = 0; i < (int)(width * height); i++)
   {
-    mean += outputImageData[i].x - inputImageData[i].x;
-    mean += outputImageData[i].y - inputImageData[i].y;
-    mean += outputImageData[i].z - inputImageData[i].z;
-    mean += outputImageData[i].w - inputImageData[i].w;
+    mean += outputImageData[i].x() - inputImageData[i].x();
+    mean += outputImageData[i].y() - inputImageData[i].y();
+    mean += outputImageData[i].z() - inputImageData[i].z();
+    mean += outputImageData[i].w() - inputImageData[i].w();
   }
   mean /= (4 * width * height * factor);
   std::cout << "The averaged mean: " << mean << std::endl;

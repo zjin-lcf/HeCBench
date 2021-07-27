@@ -14,21 +14,21 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-inline float4 convert_float4(uchar4_t v) {
+inline float4 convert_float4(uchar4 v) {
   float4 res;
-  res.x() = (float) v.x;
-  res.y() = (float) v.y;
-  res.z() = (float) v.z;
-  res.w() = (float) v.w;
+  res.x() = (float) v.x();
+  res.y() = (float) v.y();
+  res.z() = (float) v.z();
+  res.w() = (float) v.w();
   return res;
 }
 
-inline uchar4_t convert_uchar4_sat(float4 v) {
-  uchar4_t res;
-  res.x = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
-  res.y = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
-  res.z = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
-  res.w = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
+inline uchar4 convert_uchar4_sat(float4 v) {
+  uchar4 res;
+  res.x() = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
+  res.y() = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
+  res.z() = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
+  res.w() = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
   return res;
 }
 
@@ -69,8 +69,8 @@ float ran1(int idum, int *iv, nd_item<1> &item)
 
 
 void kernel_noise_uniform(
-  const uchar4_t* inputImage, 
-  uchar4_t* outputImage, 
+  const uchar4* inputImage, 
+  uchar4* outputImage, 
   const int factor, 
   int* iv, 
   nd_item<1> &item)

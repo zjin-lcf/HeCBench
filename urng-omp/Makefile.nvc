@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
@@ -41,7 +42,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -57,5 +60,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) URNG_Input.bmp 16 16 100
+	./$(program) ../urng-sycl/URNG_Input.bmp 16 16 100
 
