@@ -37,7 +37,7 @@ static const short bitMapID = 19778;
 
 #ifdef _OPENMP
 /**
- * uchar4_t
+ * uchar4
  * struct implements a vector of chars
  */
 typedef struct
@@ -46,7 +46,7 @@ typedef struct
   unsigned char y;
   unsigned char z;
   unsigned char w;
-} uchar4_t;
+} uchar4;
 
 typedef struct
 {
@@ -58,9 +58,9 @@ typedef struct
 #endif
 
 /**
- * ColorPelette of type uchar4_t
+ * ColorPelette of type uchar4
  */
-typedef uchar4_t ColorPalette;
+typedef uchar4 ColorPalette;
 
 /**
  * struct Bitmap header
@@ -99,7 +99,7 @@ typedef struct
 class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
 {
   private:
-    uchar4_t * pixels_;               /**< Pixel Data */
+    uchar4 * pixels_;               /**< Pixel Data */
     int numColors_;                 /**< Number of colors */
     ColorPalette * colors_;         /**< Color Data */
     bool isLoaded_;                 /**< If Bitmap loaded */
@@ -117,14 +117,17 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
       colors_    = NULL;
       isLoaded_  = false;
     }
-    int colorIndex(uchar4_t color)    /**< get a color index */
+    int colorIndex(uchar4 color)    /**< get a color index */
     {
       for (int i = 0; i < numColors_; i++)
       {
-        if (colors_[i].x == color.x &&
-            colors_[i].y == color.y &&
-            colors_[i].z == color.z &&
-            colors_[i].w == color.w)
+#if defined(SYCL_LANGUAGE_VERSION)
+        if (colors_[i].x() == color.x() && colors_[i].y() == color.y() &&
+            colors_[i].z() == color.z() && colors_[i].w() == color.w())
+#else
+        if (colors_[i].x == color.x && colors_[i].y == color.y &&
+            colors_[i].z == color.z && colors_[i].w == color.w)
+#endif
         {
           return i;
         }
@@ -190,13 +193,13 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
       {
         return *this;
       }
-      // Copy header
-      id         = rhs.id;
-      size       = rhs.size;
-      reserved1  = rhs.reserved1;
-      reserved2  = rhs.reserved2;
-      offset     = rhs.offset;
-      // Copy header info
+      // header
+      id             = rhs.id;
+      size           = rhs.size;
+      reserved1      = rhs.reserved1;
+      reserved2      = rhs.reserved2;
+      offset         = rhs.offset;
+      // header info
       sizeInfo       = rhs.sizeInfo;
       width          = rhs.width;
       height         = rhs.height;
@@ -208,10 +211,10 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
       yPelsPerMeter  = rhs.yPelsPerMeter;
       clrUsed        = rhs.clrUsed;
       clrImportant   = rhs.clrImportant;
-      numColors_ = rhs.numColors_;
-      isLoaded_  = rhs.isLoaded_;
-      pixels_    = NULL;
-      colors_    = NULL;
+      numColors_     = rhs.numColors_;
+      isLoaded_      = rhs.isLoaded_;
+      pixels_        = NULL;
+      colors_        = NULL;
       if (isLoaded_)
       {
         if (rhs.colors_ != NULL)
@@ -224,7 +227,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           }
           memcpy(colors_, rhs.colors_, numColors_ * sizeof(ColorPalette));
         }
-        pixels_ = new uchar4_t[width * height];
+        pixels_ = new uchar4[width * height];
         if (pixels_ == NULL)
         {
           delete[] colors_;
@@ -232,7 +235,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           isLoaded_ = false;
           return *this;
         }
-        memcpy(pixels_, rhs.pixels_, width * height * sizeof(uchar4_t));
+        memcpy(pixels_, rhs.pixels_, width * height * sizeof(uchar4));
       }
       return *this;
     }
@@ -338,7 +341,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
             return;
           }
           // Allocate image
-          pixels_ = new uchar4_t[width * height];
+          pixels_ = new uchar4[width * height];
           if (pixels_ == NULL)
           {
             delete colors_;
@@ -348,7 +351,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
             return;
           }
           // Set image, including w component (white)
-          memset(pixels_, 0xff, width * height * sizeof(uchar4_t));
+          memset(pixels_, 0xff, width * height * sizeof(uchar4));
           unsigned int index = 0;
           for(int y = 0; y < height; y++)
           {
@@ -361,9 +364,15 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
               }
               else   // 24 bit
               {
+#if defined(SYCL_LANGUAGE_VERSION)
+                pixels_[(y * width + x)].z() = tmpPixels[index++];
+                pixels_[(y * width + x)].y() = tmpPixels[index++];
+                pixels_[(y * width + x)].x() = tmpPixels[index++];
+#else
                 pixels_[(y * width + x)].z = tmpPixels[index++];
                 pixels_[(y * width + x)].y = tmpPixels[index++];
                 pixels_[(y * width + x)].x = tmpPixels[index++];
+#endif
               }
             }
             // Handle padding
@@ -449,9 +458,15 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
               }
               else   // 24 bit
               {
+#if defined(SYCL_LANGUAGE_VERSION)
+                fputc(pixels_[(y * width + x)].z(), fd);
+                fputc(pixels_[(y * width + x)].y(), fd);
+                fputc(pixels_[(y * width + x)].x(), fd);
+#else
                 fputc(pixels_[(y * width + x)].z, fd);
                 fputc(pixels_[(y * width + x)].y, fd);
                 fputc(pixels_[(y * width + x)].x, fd);
+#endif
                 if (ferror(fd))
                 {
                   fclose(fd);
@@ -601,7 +616,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
      * @return If a bitmap image has been successfully loaded, then returns
      * a pointer to image's pixels, otherwise NULL.
      */
-    uchar4_t * getPixels(void) const
+    uchar4 * getPixels(void) const
     {
       return pixels_;
     }
