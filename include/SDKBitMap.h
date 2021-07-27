@@ -35,6 +35,7 @@ static const short bitMapID = 19778;
  */
 #pragma pack(push,1)
 
+#ifdef _OPENMP
 /**
  * uchar4_t
  * struct implements a vector of chars
@@ -54,6 +55,7 @@ typedef struct
   float z;
   float w;
 } float4;
+#endif
 
 /**
  * ColorPelette of type uchar4_t
