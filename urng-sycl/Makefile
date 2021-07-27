@@ -6,7 +6,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE      = gpu
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -50,7 +50,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernel.cpp urng.h SDKBitMap.h
+%.o: %.cpp kernel.cpp urng.h ../include/SDKBitMap.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
