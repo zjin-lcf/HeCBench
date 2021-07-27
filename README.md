@@ -202,6 +202,9 @@ Early results are shown [here](results/README.md)
 ### hotspot3D
   Hotspot3D in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### hwt1d
+  1D Haar wavelet transformation (https://github.com/OpenCL/AMD_APP_samples)
+
 ### hybridsort
   Hybridsort in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
