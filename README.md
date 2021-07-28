@@ -6,6 +6,9 @@ Early results are shown [here](results/README.md)
 
 
 # Reference
+### aes
+  AES encrypt and decrypt (https://github.com/Multi2Sim/m2s-bench-amdsdk-2.5-src)
+
 ### affine
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
 
