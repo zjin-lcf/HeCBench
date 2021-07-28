@@ -265,7 +265,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           // Read header
           val = fread((BitMapHeader *)this, sizeof(BitMapHeader), 1, fd);
           // Failed to read header
-          if (ferror(fd))
+          if (val != 1) 
           {
             fclose(fd);
             return;
@@ -279,11 +279,12 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           // Read map info header
           val = fread((BitMapInfoHeader *)this, sizeof(BitMapInfoHeader), 1, fd);
           // Failed to read map info header
-          if (ferror(fd))
+          if (val != 1) 
           {
             fclose(fd);
             return;
           }
+
           // No support for compressed images
           if (compression)
           {
@@ -312,12 +313,14 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
                 numColors_ * sizeof(ColorPalette),
                 1,
                 fd);
+
             // Failed to read colors
-            if (ferror(fd))
+            if (val != 1) 
             {
               fclose(fd);
               return;
             }
+
           }
           // Allocate buffer to hold all pixels
           unsigned int sizeBuffer = size - offset;
@@ -332,7 +335,7 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           // Read pixels from file, including any padding
           val = fread(tmpPixels, sizeBuffer * sizeof(unsigned char), 1, fd);
           // Failed to read pixel data
-          if (ferror(fd))
+          if (val != 1) 
           {
             delete colors_;
             colors_ = NULL;
