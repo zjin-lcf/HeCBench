@@ -6,6 +6,9 @@ Early results are shown [here](results/README.md)
 
 
 # Reference
+### ace
+  Phase-field simulation of dendritic solidification (https://github.com/myousefi2016/Allen-Cahn-CUDA)
+
 ### aes
   AES encrypt and decrypt (https://github.com/Multi2Sim/m2s-bench-amdsdk-2.5-src)
 
