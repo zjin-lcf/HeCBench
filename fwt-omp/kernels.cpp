@@ -62,7 +62,7 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
 
     #pragma omp target teams num_teams(M) thread_limit(N/4)
     {
-      float s_data[1024];
+      float s_data[2048];
       #pragma omp parallel 
       {
         int lid = omp_get_thread_num();
