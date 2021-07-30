@@ -147,6 +147,9 @@ Early results are shown [here](results/README.md)
 ### extrema
   Find local maxima (https://github.com/rapidsai/cusignal/)
 
+### f16sp
+  Half-precision scalar product (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### fdtd3d
   FDTD-3D (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
