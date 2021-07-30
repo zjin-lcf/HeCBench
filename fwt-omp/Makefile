@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp reference.cpp
+source = main2.cpp reference.cpp
 
 obj = $(source:.cpp=.o)
 
