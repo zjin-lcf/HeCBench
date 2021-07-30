@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 
 #pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
 {
-    for (i = 0; i < 1; i++)
+    for (i = 0; i < 100; i++)
     {
       memset(d_Kernel, 0, DATA_SIZE);
       memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
@@ -345,7 +345,7 @@ int main(int argc, char *argv[])
 
     float     rcpN = 1.0f / (float)dataN;
     #pragma omp target teams distribute parallel for num_teams(128) thread_limit(256)
-    for (int pos = 0; pos < N; pos++)
+    for (int pos = 0; pos < dataN; pos++)
     {
         d_Data[pos] *= d_Kernel[pos] * rcpN;
     }
