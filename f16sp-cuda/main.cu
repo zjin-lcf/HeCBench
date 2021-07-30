@@ -67,10 +67,9 @@ void scalarProductKernel_intrinsics(
     const int stride = gridDim.x*blockDim.x;
     __shared__ half2 shArray[NUM_OF_THREADS];
 
-    shArray[threadIdx.x] = __float2half2_rn(0.f);
     half2 value = __float2half2_rn(0.f);
 
-    for (int i = threadIdx.x + blockDim.x + blockIdx.x; i < size; i+=stride)
+    for (int i = threadIdx.x + blockDim.x * blockIdx.x; i < size; i+=stride)
     {
         value = __hfma2(a[i], b[i], value);
     }
@@ -101,7 +100,7 @@ void scalarProductKernel_native(
     half2 value(0.f, 0.f);
     shArray[threadIdx.x] = value;
 
-    for (int i = threadIdx.x + blockDim.x + blockIdx.x; i < size; i+=stride)
+    for (int i = threadIdx.x + blockDim.x * blockIdx.x; i < size; i+=stride)
     {
         value = a[i] * b[i] + value;
     }
@@ -131,7 +130,6 @@ void generateInput(half2 * a, size_t size)
 
 int main(int argc, char *argv[])
 {
-    srand(time(NULL));
     size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
     half2 * a, *b;
