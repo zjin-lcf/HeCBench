@@ -169,6 +169,9 @@ Early results are shown [here](results/README.md)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
 
+### fwt
+  Fast Walsh transformation (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### gamma-correction
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
 
