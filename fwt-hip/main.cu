@@ -27,8 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,14 +96,14 @@ int main(int argc, char *argv[])
     printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
 
     float *d_Data, *d_Kernel;
-    cudaMalloc((void **)&d_Kernel, DATA_SIZE);
-    cudaMalloc((void **)&d_Data, DATA_SIZE);
+    hipMalloc((void **)&d_Kernel, DATA_SIZE);
+    hipMalloc((void **)&d_Data, DATA_SIZE);
 
     for (i = 0; i < repeat; i++)
     {
-      cudaMemset(d_Kernel, 0, DATA_SIZE);
-      cudaMemcpy(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice);
-      cudaMemcpy(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice);
+      hipMemset(d_Kernel, 0, DATA_SIZE);
+      hipMemcpy(d_Kernel, h_Kernel, KERNEL_SIZE, hipMemcpyHostToDevice);
+      hipMemcpy(d_Data, h_Data, DATA_SIZE, hipMemcpyHostToDevice);
 
       fwtBatchGPU(d_Data, 1, log2Data);
       fwtBatchGPU(d_Kernel, 1, log2Data);
@@ -113,10 +112,10 @@ int main(int argc, char *argv[])
     }
 
     printf("Reading back GPU results...\n");
-    cudaMemcpy(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost);
+    hipMemcpy(h_ResultGPU, d_Data, DATA_SIZE, hipMemcpyDeviceToHost);
 
-    cudaFree(d_Data);
-    cudaFree(d_Kernel);
+    hipFree(d_Data);
+    hipFree(d_Kernel);
 
     printf("Running straightforward CPU dyadic convolution...\n");
     dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
