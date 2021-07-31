@@ -53,9 +53,9 @@ extern "C" void dyadicConvolutionCPU(
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
 ////////////////////////////////////////////////////////////////////////////////
-const int log2Data = 23;
+const int log2Data = 10;
 const int   dataN = 1 << log2Data;
-const int   DATA_SIZE = dataN   * sizeof(float);
+const int   DATA_SIZE = dataN * sizeof(float);
 
 const int log2Kernel = 7;
 const int kernelN = 1 << log2Kernel;
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 
 #pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
 {
-    for (i = 0; i < 100; i++)
+    for (i = 0; i < 1; i++)
     {
       memset(d_Kernel, 0, DATA_SIZE);
       memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
@@ -113,18 +113,19 @@ int main(int argc, char *argv[])
     int N = 1 << log2N;
     int M = 1;
     
+    const float *d_Src = d_Data;
+    float *d_Dst = d_Data;
     for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
     {
       #pragma omp target teams distribute parallel for thread_limit(256)
         for (int pos = 0; pos < N; pos++) {
-          const float *d_Src = d_Data;
-          float *d_Dst = d_Data;
           const int stride = N/4;
           int lo = pos & (stride - 1);
           int i0 = ((pos - lo) << 2) + lo;
           int i1 = i0 + stride;
           int i2 = i1 + stride;
           int i3 = i2 + stride;
+          //printf("%d %d %d %d %d\n", N, i0, i1, i2, i3);
 
           float D0 = d_Src[i0];
           float D1 = d_Src[i1];
@@ -147,6 +148,10 @@ int main(int argc, char *argv[])
         }
       }
 
+    #pragma omp target update from (d_Data[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k1 %f\n", d_Data[i]);
+
+
     #pragma omp target teams num_teams(M) thread_limit(N/4)
     {
       float s_data[2048];
@@ -157,21 +162,23 @@ int main(int argc, char *argv[])
         int gsz = omp_get_num_threads(); 
 
         // Handle to thread block group
-        const int    N = 1 << log2N;
+        const int    N2 = 1 << log2N;
         const int base = gid << log2N;
 
         const float *d_Src = d_Data  + base;
         float *d_Dst = d_Data + base;
 
-        for (int pos = lid; pos < N; pos += gsz)
+        for (int pos = lid; pos < N2; pos += gsz)
         {
             s_data[pos] = d_Src[pos];
         }
 
+        #pragma omp barrier
+
         //Main radix-4 stages
         const int pos = lid;
 
-        for (int stride = N >> 2; stride > 0; stride >>= 2)
+        for (int stride = N2 >> 2; stride > 0; stride >>= 2)
         {
             int lo = pos & (stride - 1);
             int i0 = ((pos - lo) << 2) + lo;
@@ -179,7 +186,6 @@ int main(int argc, char *argv[])
             int i2 = i1 + stride;
             int i3 = i2 + stride;
 
-            #pragma omp barrier
             float D0 = s_data[i0];
             float D1 = s_data[i1];
             float D2 = s_data[i2];
@@ -198,6 +204,7 @@ int main(int argc, char *argv[])
             T = D2;
             s_data[i2] = D2 + D3;
             s_data[i3] = T - D3;
+            #pragma omp barrier
         }
 
         //Do single radix-2 stage for odd power of two
@@ -205,7 +212,7 @@ int main(int argc, char *argv[])
         {
             #pragma omp barrier
 
-            for (int pos = lid; pos < N / 2; pos += gsz)
+            for (int pos = lid; pos < N2 / 2; pos += gsz)
             {
                 int i0 = pos << 1;
                 int i1 = i0 + 1;
@@ -219,12 +226,16 @@ int main(int argc, char *argv[])
 
         #pragma omp barrier
 
-        for (int pos = lid; pos < N; pos += gsz)
+        for (int pos = lid; pos < N2; pos += gsz)
         {
             d_Dst[pos] = s_data[pos];
         }
       }
     }
+    #pragma omp target update from (d_Data[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k2 %f\n", d_Data[i]);
+
+/*    
       //fwtBatchGPU(d_Kernel, 1, log2N);
     log2N = log2Data;
     N = 1 << log2N;
@@ -467,6 +478,7 @@ int main(int argc, char *argv[])
         }
       }
     }
+    */
     }
 
     printf("Reading back GPU results...\n");
