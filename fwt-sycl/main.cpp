@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <cuda.h>
+#include "common.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +47,7 @@ extern "C" void dyadicConvolutionCPU(
 ////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
 ////////////////////////////////////////////////////////////////////////////////
-#include "kernels.cu"
+#include "kernels.cpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
@@ -96,27 +96,44 @@ int main(int argc, char *argv[])
 
     printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
 
-    float *d_Data, *d_Kernel;
-    cudaMalloc((void **)&d_Kernel, DATA_SIZE);
-    cudaMalloc((void **)&d_Data, DATA_SIZE);
+#ifdef USE_GPU
+    gpu_selector dev_sel;
+#else
+    cpu_selector dev_sel;
+#endif
+    queue q(dev_sel);
+
+    buffer<float, 1> d_Data (dataN);
+    buffer<float, 1> d_Kernel (dataN);
 
     for (i = 0; i < repeat; i++)
     {
-      cudaMemset(d_Kernel, 0, DATA_SIZE);
-      cudaMemcpy(d_Kernel, h_Kernel, KERNEL_SIZE, cudaMemcpyHostToDevice);
-      cudaMemcpy(d_Data, h_Data, DATA_SIZE, cudaMemcpyHostToDevice);
+      q.submit([&] (handler &cgh) {
+        auto acc = d_Kernel.get_access<sycl_discard_write>(cgh);
+        cgh.fill(acc, 0.f);	
+      });
 
-      fwtBatchGPU(d_Data, 1, log2Data);
-      fwtBatchGPU(d_Kernel, 1, log2Data);
-      modulateGPU(d_Data, d_Kernel, dataN);
-      fwtBatchGPU(d_Data, 1, log2Data);
+      q.submit([&] (handler &cgh) {
+        auto acc = d_Kernel.get_access<sycl_write>(cgh, range<1>(kernelN));
+        cgh.copy(h_Kernel, acc);
+      });
+
+      q.submit([&] (handler &cgh) {
+        auto acc = d_Data.get_access<sycl_discard_write>(cgh);
+        cgh.copy(h_Data, acc);
+      });
+
+      fwtBatchGPU(q, d_Data, 1, log2Data);
+      fwtBatchGPU(q, d_Kernel, 1, log2Data);
+      modulateGPU(q, d_Data, d_Kernel, dataN);
+      fwtBatchGPU(q, d_Data, 1, log2Data);
     }
 
     printf("Reading back GPU results...\n");
-    cudaMemcpy(h_ResultGPU, d_Data, DATA_SIZE, cudaMemcpyDeviceToHost);
-
-    cudaFree(d_Data);
-    cudaFree(d_Kernel);
+    q.submit([&] (handler &cgh) {
+      auto acc = d_Data.get_access<sycl_read>(cgh);
+      cgh.copy(acc, h_ResultGPU);
+    }).wait();
 
     printf("Running straightforward CPU dyadic convolution...\n");
     dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
