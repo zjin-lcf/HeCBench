@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cmath>
-#include <hip/hip_runtime.h>
+#include <hiprand.h>
+#include <hiprand_kernel.h>
 
 using namespace std;
 
@@ -23,29 +24,22 @@ static const FLOAT ONE  = 1.0;
 static const FLOAT HALF = 0.5;
 static const FLOAT ZERO = 0.0;
 
+// Specialized/overloaded functions to support both double and float
+template <typename T> __device__ __forceinline__ T rand(hiprandState_t* state);
+
+template<> __device__ __forceinline__ float rand<float>(hiprandState_t* state) {
+  return hiprand_uniform(state);
+}
+
+template<> __device__ __forceinline__ double rand<double>(hiprandState_t* state) {
+  return hiprand_uniform_double(state);
+}
+
 __device__ __forceinline__ float EXP(float x) {return expf(x);}
 __device__ __forceinline__ double EXP(double x) {return exp(x);}
 __device__ __forceinline__ float SQRT(float x) {return sqrtf(x);}
 __device__ __forceinline__ double SQRT(double x) {return sqrt(x);}
 
-
-__device__
-float LCG_random(unsigned int * seed) {
-  const unsigned int m = 2147483648;
-  const unsigned int a = 26757677;
-  const unsigned int c = 1;
-  *seed = (a * (*seed) + c) % m;
-  return (float) (*seed) / (float) m;
-}
-
-__device__
-void LCG_random_init(unsigned int * seed) {
-  const unsigned int m = 2147483648;
-  const unsigned int a = 26757677;
-  const unsigned int c = 1;
-  *seed = (a * (*seed) + c) % m;
-}
-  
 
 __global__ void SumWithinBlocks(const int n, const FLOAT* data, FLOAT* blocksums) {
   int nthread = blockDim.x*gridDim.x;
@@ -62,6 +56,7 @@ __global__ void SumWithinBlocks(const int n, const FLOAT* data, FLOAT* blocksums
   __syncthreads();
 
   // Now do binary tree sum within a block
+
   int tid = threadIdx.x;
   for (unsigned int s=128; s>0; s>>=1) {
     if (tid<s && (tid+s)<blockDim.x) {
@@ -92,15 +87,13 @@ __device__ __forceinline__ void compute_distances(FLOAT x1, FLOAT y1, FLOAT z1, 
 __device__  __forceinline__ FLOAT wave_function(FLOAT x1, FLOAT y1, FLOAT z1, FLOAT x2, FLOAT y2, FLOAT z2) {
   FLOAT r1, r2, r12;
   compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
-
   return (ONE + HALF*r12)*EXP(-TWO*(r1 + r2));
 }
 
 // Initialize random number generator
-__global__ void initran(unsigned int seed, unsigned int* states) {
+__global__ void initran(unsigned int seed, hiprandState_t* states) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
-  states[i] = seed ^ i;
-  LCG_random_init(&states[i]);
+  hiprand_init(seed, i, 0, &states[i]);
 }
 
 // ZERO stats counters on the GPU
@@ -113,19 +106,19 @@ __global__ void zero_stats(int Npoint, FLOAT* stats) {
 }
 
 // initializes samples
-__global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, unsigned int* states) {
+__global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, hiprandState_t* states) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
-  x1[i] = (LCG_random(states+i) - HALF)*FOUR;
-  y1[i] = (LCG_random(states+i) - HALF)*FOUR;
-  z1[i] = (LCG_random(states+i) - HALF)*FOUR;
-  x2[i] = (LCG_random(states+i) - HALF)*FOUR;
-  y2[i] = (LCG_random(states+i) - HALF)*FOUR;
-  z2[i] = (LCG_random(states+i) - HALF)*FOUR;
+  x1[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
+  y1[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
+  z1[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
+  x2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
+  y2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
+  z2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
   psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
 }
 
 __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
-                          FLOAT* X2, FLOAT* Y2, FLOAT* Z2, FLOAT* P, FLOAT* stats, unsigned int* states) {
+                          FLOAT* X2, FLOAT* Y2, FLOAT* Z2, FLOAT* P, FLOAT* stats, hiprandState_t* states) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   FLOAT x1 = X1[i];
   FLOAT y1 = Y1[i];
@@ -136,15 +129,15 @@ __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y
   FLOAT p = P[i];
 
   for (int step=0; step<nstep; step++) {
-    FLOAT x1new = x1 + (LCG_random(states+i)-HALF)*DELTA;
-    FLOAT y1new = y1 + (LCG_random(states+i)-HALF)*DELTA;
-    FLOAT z1new = z1 + (LCG_random(states+i)-HALF)*DELTA;
-    FLOAT x2new = x2 + (LCG_random(states+i)-HALF)*DELTA;
-    FLOAT y2new = y2 + (LCG_random(states+i)-HALF)*DELTA;
-    FLOAT z2new = z2 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT x1new = x1 + (rand<FLOAT>(states+i)-HALF)*DELTA;
+    FLOAT y1new = y1 + (rand<FLOAT>(states+i)-HALF)*DELTA;
+    FLOAT z1new = z1 + (rand<FLOAT>(states+i)-HALF)*DELTA;
+    FLOAT x2new = x2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
+    FLOAT y2new = y2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
+    FLOAT z2new = z2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
     FLOAT pnew = wave_function(x1new, y1new, z1new, x2new, y2new, z2new);
 
-    if (pnew*pnew > p*p*LCG_random(states+i)) {
+    if (pnew*pnew > p*p*rand<FLOAT>(states+i)) {
       stats[3*Npoint+i]++; //naccept ++;
       p = pnew;
       x1 = x1new;
@@ -173,7 +166,7 @@ __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y
 
 int main() {
   FLOAT *x1, *y1, *z1, *x2, *y2, *z2, *psi, *stats, *statsum, *blocksums;
-  unsigned int *ranstates;  
+  hiprandState_t *ranstates;  
 
   CHECK(hipMalloc((void **)&x1, Npoint * sizeof(FLOAT)));
   CHECK(hipMalloc((void **)&y1, Npoint * sizeof(FLOAT)));
@@ -185,7 +178,7 @@ int main() {
   CHECK(hipMalloc((void **)&stats, 4 * Npoint * sizeof(FLOAT)));
   CHECK(hipMalloc((void **)&blocksums, NBLOCK * sizeof(FLOAT))); // workspace for summation
   CHECK(hipMalloc((void **)&statsum, 4 * sizeof(FLOAT))); // workspace for summation
-  CHECK(hipMalloc((void **)&ranstates, Npoint*sizeof(unsigned int)));
+  CHECK(hipMalloc((void **)&ranstates, Npoint*sizeof(hiprandState_t)));
 
   hipLaunchKernelGGL(initran, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, 5551212, ranstates);
   hipLaunchKernelGGL(initialize, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, x1, y1, z1, x2, y2, z2, psi, ranstates);
