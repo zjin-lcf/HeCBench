@@ -12,7 +12,7 @@ const int NBLOCK  = 56*4;               // Number of blocks
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
 const int Neq = 100000;                 // No. of generations to equilibrate 
 const int Ngen_per_block = 5000;        // No. of generations per block
-const int Nsample = 2;                // No. of blocks to sample
+const int Nsample = 100;                // No. of blocks to sample
 
 #pragma omp declare target
 
@@ -235,7 +235,7 @@ int main()
       SumWithinBlocks(Npoint, NTHR_PER_BLK, stats+what*Npoint, blocksums);
       SumWithinBlocks(NBLOCK, NBLOCK, blocksums, statsum+what);
     }
-    #pragma omp target update from (statsum[0:3])
+    #pragma omp target update from (statsum[0:4])
     memcpy(&s, statsum, 4 * sizeof(FLOAT));
 
     naccept += s.accept;
