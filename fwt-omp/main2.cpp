@@ -53,9 +53,9 @@ extern "C" void dyadicConvolutionCPU(
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
 ////////////////////////////////////////////////////////////////////////////////
-const int log2Data = 10;
-const int   dataN = 1 << log2Data;
-const int   DATA_SIZE = dataN * sizeof(float);
+const int log2Data = 12;
+const int dataN = 1 << log2Data;
+const int DATA_SIZE = dataN * sizeof(float);
 
 const int log2Kernel = 7;
 const int kernelN = 1 << log2Kernel;
@@ -113,8 +113,6 @@ int main(int argc, char *argv[])
     int N = 1 << log2N;
     int M = 1;
     
-    const float *d_Src = d_Data;
-    float *d_Dst = d_Data;
     for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
     {
       #pragma omp target teams distribute parallel for thread_limit(256)
@@ -125,12 +123,11 @@ int main(int argc, char *argv[])
           int i1 = i0 + stride;
           int i2 = i1 + stride;
           int i3 = i2 + stride;
-          //printf("%d %d %d %d %d\n", N, i0, i1, i2, i3);
 
-          float D0 = d_Src[i0];
-          float D1 = d_Src[i1];
-          float D2 = d_Src[i2];
-          float D3 = d_Src[i3];
+          float D0 = d_Data[i0];
+          float D1 = d_Data[i1];
+          float D2 = d_Data[i2];
+          float D3 = d_Data[i3];
 
           float T;
           T = D0;
@@ -140,16 +137,18 @@ int main(int argc, char *argv[])
           D1        = D1 + D3;
           D3        = T - D3;
           T = D0;
-          d_Dst[i0] = D0 + D1;
-          d_Dst[i1] = T - D1;
+          d_Data[i0] = D0 + D1;
+          d_Data[i1] = T - D1;
           T = D2;
-          d_Dst[i2] = D2 + D3;
-          d_Dst[i3] = T - D3;
+          d_Data[i2] = D2 + D3;
+          d_Data[i3] = T - D3;
         }
       }
 
+#ifdef DEBUG
     #pragma omp target update from (d_Data[0:dataN])
     for (int i = 0; i < dataN; i++) printf("k1 %f\n", d_Data[i]);
+#endif
 
 
     #pragma omp target teams num_teams(M) thread_limit(N/4)
@@ -162,13 +161,13 @@ int main(int argc, char *argv[])
         int gsz = omp_get_num_threads(); 
 
         // Handle to thread block group
-        const int    N2 = 1 << log2N;
+        const int    N = 1 << log2N;
         const int base = gid << log2N;
 
         const float *d_Src = d_Data  + base;
         float *d_Dst = d_Data + base;
 
-        for (int pos = lid; pos < N2; pos += gsz)
+        for (int pos = lid; pos < N; pos += gsz)
         {
             s_data[pos] = d_Src[pos];
         }
@@ -178,7 +177,7 @@ int main(int argc, char *argv[])
         //Main radix-4 stages
         const int pos = lid;
 
-        for (int stride = N2 >> 2; stride > 0; stride >>= 2)
+        for (int stride = N >> 2; stride > 0; stride >>= 2)
         {
             int lo = pos & (stride - 1);
             int i0 = ((pos - lo) << 2) + lo;
@@ -212,7 +211,7 @@ int main(int argc, char *argv[])
         {
             #pragma omp barrier
 
-            for (int pos = lid; pos < N2 / 2; pos += gsz)
+            for (int pos = lid; pos < N / 2; pos += gsz)
             {
                 int i0 = pos << 1;
                 int i1 = i0 + 1;
@@ -226,16 +225,17 @@ int main(int argc, char *argv[])
 
         #pragma omp barrier
 
-        for (int pos = lid; pos < N2; pos += gsz)
+        for (int pos = lid; pos < N; pos += gsz)
         {
             d_Dst[pos] = s_data[pos];
         }
       }
     }
+#ifdef DEBUG
     #pragma omp target update from (d_Data[0:dataN])
     for (int i = 0; i < dataN; i++) printf("k2 %f\n", d_Data[i]);
+#endif
 
-/*    
       //fwtBatchGPU(d_Kernel, 1, log2N);
     log2N = log2Data;
     N = 1 << log2N;
@@ -245,8 +245,6 @@ int main(int argc, char *argv[])
     {
       #pragma omp target teams distribute parallel for thread_limit(256)
         for (int pos = 0; pos < N; pos++) {
-          const float *d_Src = d_Kernel;
-          float *d_Dst = d_Kernel;
           const int stride = N/4;
           int lo = pos & (stride - 1);
           int i0 = ((pos - lo) << 2) + lo;
@@ -254,10 +252,10 @@ int main(int argc, char *argv[])
           int i2 = i1 + stride;
           int i3 = i2 + stride;
 
-          float D0 = d_Src[i0];
-          float D1 = d_Src[i1];
-          float D2 = d_Src[i2];
-          float D3 = d_Src[i3];
+          float D0 = d_Kernel[i0];
+          float D1 = d_Kernel[i1];
+          float D2 = d_Kernel[i2];
+          float D3 = d_Kernel[i3];
 
           float T;
           T = D0;
@@ -267,13 +265,17 @@ int main(int argc, char *argv[])
           D1        = D1 + D3;
           D3        = T - D3;
           T = D0;
-          d_Dst[i0] = D0 + D1;
-          d_Dst[i1] = T - D1;
+          d_Kernel[i0] = D0 + D1;
+          d_Kernel[i1] = T - D1;
           T = D2;
-          d_Dst[i2] = D2 + D3;
-          d_Dst[i3] = T - D3;
+          d_Kernel[i2] = D2 + D3;
+          d_Kernel[i3] = T - D3;
         }
       }
+#ifdef DEBUG
+    #pragma omp target update from (d_Kernel[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k3 %f\n", d_Kernel[i]);
+#endif
 
     #pragma omp target teams num_teams(M) thread_limit(N/4)
     {
@@ -353,6 +355,11 @@ int main(int argc, char *argv[])
         }
       }
     }
+#ifdef DEBUG
+    #pragma omp target update from (d_Kernel[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k4 %f\n", d_Kernel[i]);
+#endif
+
 
     float     rcpN = 1.0f / (float)dataN;
     #pragma omp target teams distribute parallel for num_teams(128) thread_limit(256)
@@ -370,8 +377,6 @@ int main(int argc, char *argv[])
     {
       #pragma omp target teams distribute parallel for thread_limit(256)
         for (int pos = 0; pos < N; pos++) {
-          const float *d_Src = d_Data;
-          float *d_Dst = d_Data;
           const int stride = N/4;
           int lo = pos & (stride - 1);
           int i0 = ((pos - lo) << 2) + lo;
@@ -379,10 +384,10 @@ int main(int argc, char *argv[])
           int i2 = i1 + stride;
           int i3 = i2 + stride;
 
-          float D0 = d_Src[i0];
-          float D1 = d_Src[i1];
-          float D2 = d_Src[i2];
-          float D3 = d_Src[i3];
+          float D0 = d_Data[i0];
+          float D1 = d_Data[i1];
+          float D2 = d_Data[i2];
+          float D3 = d_Data[i3];
 
           float T;
           T = D0;
@@ -392,13 +397,18 @@ int main(int argc, char *argv[])
           D1        = D1 + D3;
           D3        = T - D3;
           T = D0;
-          d_Dst[i0] = D0 + D1;
-          d_Dst[i1] = T - D1;
+          d_Data[i0] = D0 + D1;
+          d_Data[i1] = T - D1;
           T = D2;
-          d_Dst[i2] = D2 + D3;
-          d_Dst[i3] = T - D3;
+          d_Data[i2] = D2 + D3;
+          d_Data[i3] = T - D3;
         }
       }
+#ifdef DEBUG
+    #pragma omp target update from (d_Data[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k5 %f\n", d_Data[i]);
+#endif
+
 
     #pragma omp target teams num_teams(M) thread_limit(N/4)
     {
@@ -478,7 +488,11 @@ int main(int argc, char *argv[])
         }
       }
     }
-    */
+#ifdef DEBUG
+    #pragma omp target update from (d_Data[0:dataN])
+    for (int i = 0; i < dataN; i++) printf("k6 %f\n", d_Data[i]);
+#endif
+
     }
 
     printf("Reading back GPU results...\n");
