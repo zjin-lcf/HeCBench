@@ -1,7 +1,5 @@
 #include <cstdio>
 #include <cmath>
-#include <oneapi/mkl.hpp>
-#include <oneapi/mkl/rng/device.hpp>
 #include "common.h"
 
 using namespace std;
@@ -24,16 +22,26 @@ static const FLOAT ONE  = 1.0;
 static const FLOAT HALF = 0.5;
 static const FLOAT ZERO = 0.0;
 
-FLOAT rand (oneapi::mkl::rng::device::philox4x32x10<1> *state)
-{
-  oneapi::mkl::rng::device::uniform<FLOAT> distr_ct1;
-  return oneapi::mkl::rng::device::generate(distr_ct1, *state);
-}
 
 FLOAT EXP(FLOAT x) {return cl::sycl::exp(x);}
 
 FLOAT SQRT(FLOAT x) {return cl::sycl::sqrt(x);}
 
+float LCG_random(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+  return (float) (*seed) / (float) m;
+}
+
+void LCG_random_init(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+}
+  
 
 void SumWithinBlocks(const int n, global_ptr<FLOAT> data, 
                      global_ptr<FLOAT> blocksums, local_ptr<FLOAT> sdata, nd_item<1> &item) 
@@ -55,10 +63,7 @@ void SumWithinBlocks(const int n, global_ptr<FLOAT> data,
 
   // Now do binary tree sum within a block
   
-  // Round up to closest power of 2
-  int pow2 = 1 << (32 - cl::sycl::clz(blockDim-1));
-  
-  for (unsigned int s=pow2>>1; s>0; s>>=1) {
+  for (unsigned int s=128; s>0; s>>=1) {
     if (tid<s && (tid+s)<blockDim) {
       //printf("%4d : %4d %4d\n", tid, s, tid+s);
       sdata[tid] += sdata[tid + s];
@@ -100,7 +105,7 @@ void zero_stats(global_ptr<FLOAT> stats, nd_item<1> &item)
 void propagate(const int nstep, global_ptr<FLOAT> X1, global_ptr<FLOAT> Y1, 
                global_ptr<FLOAT> Z1, global_ptr<FLOAT> X2, global_ptr<FLOAT> Y2, 
                global_ptr<FLOAT> Z2, global_ptr<FLOAT> P, global_ptr<FLOAT> stats, 
-               global_ptr<oneapi::mkl::rng::device::philox4x32x10<1>> states, nd_item<1> &item)
+               global_ptr<unsigned int> states, nd_item<1> &item)
 {
   int i = item.get_global_id(0);
   FLOAT x1 = X1[i];
@@ -112,15 +117,15 @@ void propagate(const int nstep, global_ptr<FLOAT> X1, global_ptr<FLOAT> Y1,
   FLOAT p = P[i];
   
   for (int step=0; step<nstep; step++) {
-    FLOAT x1new = x1 + (rand(states+i)-HALF)*DELTA;
-    FLOAT y1new = y1 + (rand(states+i)-HALF)*DELTA;
-    FLOAT z1new = z1 + (rand(states+i)-HALF)*DELTA;
-    FLOAT x2new = x2 + (rand(states+i)-HALF)*DELTA;
-    FLOAT y2new = y2 + (rand(states+i)-HALF)*DELTA;
-    FLOAT z2new = z2 + (rand(states+i)-HALF)*DELTA;
+    FLOAT x1new = x1 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT y1new = y1 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT z1new = z1 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT x2new = x2 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT y2new = y2 + (LCG_random(states+i)-HALF)*DELTA;
+    FLOAT z2new = z2 + (LCG_random(states+i)-HALF)*DELTA;
     FLOAT pnew = wave_function(x1new, y1new, z1new, x2new, y2new, z2new);
 
-    if (pnew*pnew > p*p*rand(states+i)) {
+    if (pnew*pnew > p*p*LCG_random(states+i)) {
     	stats[3*Npoint+i]++; //naccept ++;
     	p = pnew;
     	x1 = x1new;
@@ -167,7 +172,7 @@ int main()
   buffer<FLOAT, 1> d_stats(4*Npoint);
   buffer<FLOAT, 1> d_statsum(4);
   buffer<FLOAT, 1> d_blocksums(NBLOCK);
-  buffer<oneapi::mkl::rng::device::philox4x32x10<1>, 1> d_ranstates(Npoint);
+  buffer<unsigned int, 1> d_ranstates(Npoint);
 
   //initran<<<NBLOCK,NTHR_PER_BLK>>>(5551212, ranstates);
   range<1> gws (Npoint);
@@ -177,7 +182,8 @@ int main()
     auto states = d_ranstates.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class init_random_states>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int i = item.get_global_id(0);
-      states[i] = oneapi::mkl::rng::device::philox4x32x10<1>(5551212, {0, static_cast<std::uint64_t>(i * 8)});
+      states[i] = 5551212 ^ i;      
+      LCG_random_init(&states[i]);
     });
   });
 
@@ -193,12 +199,12 @@ int main()
     auto psi = d_psi.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int i = item.get_global_id(0);
-      x1[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
-      y1[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
-      z1[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
-      x2[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
-      y2[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
-      z2[i] = (rand(states.get_pointer()+i) - HALF)*FOUR;
+      x1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
+      y1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
+      z1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
+      x2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
+      y2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
+      z2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
       psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
     });
   });
