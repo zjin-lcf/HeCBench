@@ -12,7 +12,7 @@ const int NBLOCK  = 56*4;               // Number of blocks
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
 const int Neq = 100000;                 // No. of generations to equilibrate 
 const int Ngen_per_block = 5000;        // No. of generations per block
-const int Nsample = 100;                // No. of blocks to sample
+const int Nsample = 2;                // No. of blocks to sample
 
 #pragma omp declare target
 
@@ -65,11 +65,11 @@ FLOAT wave_function(const FLOAT x1, const FLOAT y1, const FLOAT z1, const FLOAT 
 #pragma omp end declare target
 
 
-void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
+void propagate(const int npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
                FLOAT* X2, FLOAT* Y2, FLOAT* Z2, FLOAT* P, FLOAT* stats, unsigned int* states)
 {
   #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
-  for (int i = 0; i < Npoint; i++) {
+  for (int i = 0; i < npoint; i++) {
     FLOAT x1 = X1[i];
     FLOAT y1 = Y1[i];
     FLOAT z1 = Z1[i];
@@ -88,7 +88,7 @@ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z
       FLOAT pnew = wave_function(x1new, y1new, z1new, x2new, y2new, z2new);
 
       if (pnew*pnew > p*p*LCG_random(states+i)) {
-        stats[3*Npoint+i]++; //naccept ++;
+        stats[3*npoint+i]++; //naccept ++;
         p = pnew;
         x1 = x1new;
         y1 = y1new;
@@ -101,9 +101,9 @@ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z
       FLOAT r1, r2, r12;
       compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
       
-      stats[0*Npoint+i] += r1;
-      stats[1*Npoint+i] += r2;
-      stats[2*Npoint+i] += r12;
+      stats[0*npoint+i] += r1;
+      stats[1*npoint+i] += r2;
+      stats[2*npoint+i] += r12;
     }
     X1[i] = x1;  
     Y1[i] = y1;  
@@ -112,6 +112,38 @@ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z
     Y2[i] = y2;  
     Z2[i] = z2;  
     P[i] = p;
+  }
+}
+
+// Initialize random number generator
+void initran(const int npoint, unsigned int seed, unsigned int* states) {
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < npoint; i++) {
+    states[i] = seed ^ i;
+    LCG_random_init(&states[i]);
+  }
+}
+
+void initialize(const int npoint, FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, unsigned int* states) {
+  for (int i = 0; i < npoint; i++) {
+    x1[i] = (LCG_random(states+i) - HALF)*FOUR;
+    y1[i] = (LCG_random(states+i) - HALF)*FOUR;
+    z1[i] = (LCG_random(states+i) - HALF)*FOUR;
+    x2[i] = (LCG_random(states+i) - HALF)*FOUR;
+    y2[i] = (LCG_random(states+i) - HALF)*FOUR;
+    z2[i] = (LCG_random(states+i) - HALF)*FOUR;
+    psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
+  }
+}
+
+// ZERO stats counters on the GPU
+void zero_stats(const int npoint, FLOAT* stats) {
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < npoint; i++) {
+    stats[0*npoint+i] = ZERO; // r1
+    stats[1*npoint+i] = ZERO; // r2
+    stats[2*npoint+i] = ZERO; // r12
+    stats[3*npoint+i] = ZERO; // accept count
   }
 }
 
@@ -177,29 +209,11 @@ int main()
                                   blocksums[0:NBLOCK],\
                                   ranstates[0:Npoint])
 {
-  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
-  for (int i = 0; i < Npoint; i++) {
-    LCG_random_init(&ranstates[i]);
-  }
+  initran(Npoint, 5551212, ranstates);
 
-  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
-  for (int i = 0; i < Npoint; i++) {
-    x1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    y1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    z1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    x2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    y2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    z2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
-    psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
-  }
+  initialize(Npoint, x1, y1, z1, x2, y2, z2, psi, ranstates);
 
-  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
-  for (int i = 0; i < Npoint; i++) {
-    stats[0*Npoint+i] = ZERO; // r1
-    stats[1*Npoint+i] = ZERO; // r2
-    stats[2*Npoint+i] = ZERO; // r12
-    stats[3*Npoint+i] = ZERO; // accept count
-  }
+  zero_stats(Npoint, stats);
     
   // Equilibrate
   propagate(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
@@ -211,13 +225,7 @@ int main()
   double naccept = ZERO;  // Keeps track of propagation efficiency
 
   for (int sample=0; sample<Nsample; sample++) {
-    #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
-    for (int i = 0; i < Npoint; i++) {
-      stats[0*Npoint+i] = ZERO; // r1
-      stats[1*Npoint+i] = ZERO; // r2
-      stats[2*Npoint+i] = ZERO; // r12
-      stats[3*Npoint+i] = ZERO; // accept count
-    }
+    zero_stats(Npoint, stats);
 
     propagate(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
 
