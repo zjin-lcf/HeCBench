@@ -7,18 +7,15 @@ using namespace std;
 
 using FLOAT = float;
 
-const int NTHR_PER_BLK = 256; // Number of CUDA threads per block
-const int NBLOCK  = 56*4;  // Number of CUDA blocks (SMs on P100)
-
 #define CHECK(test) if (test != cudaSuccess) throw "error";
 
+const int NTHR_PER_BLK = 256;           // Number of CUDA threads per block
+const int NBLOCK  = 56*4;               // Number of CUDA blocks (SMs on P100)
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
-const int Neq = 100000;          // No. of generations to equilibrate 
-
-const int Ngen_per_block = 5000; // No. of generations per block
-const int Nsample = 100;         // No. of blocks to sample
-
-const float DELTA = 2.0;        // Random step size
+const int Neq = 100000;                 // No. of generations to equilibrate 
+const int Ngen_per_block = 5000;        // No. of generations per block
+const int Nsample = 100;                // No. of blocks to sample
+const float DELTA = 2.0;                // Random step size
 
 // Explicitly typed constants so can easily work with both floats and floats
 static const FLOAT FOUR = 4.0; 
@@ -91,7 +88,7 @@ __device__ __forceinline__ void compute_distances(FLOAT x1, FLOAT y1, FLOAT z1, 
   r12 = SQRT(xx*xx + yy*yy + zz*zz);
 }
 
-__device__  __forceinline__ FLOAT psi(FLOAT x1, FLOAT y1, FLOAT z1, FLOAT x2, FLOAT y2, FLOAT z2) {
+__device__  __forceinline__ FLOAT wave_function(FLOAT x1, FLOAT y1, FLOAT z1, FLOAT x2, FLOAT y2, FLOAT z2) {
   FLOAT r1, r2, r12;
   compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
 
@@ -114,7 +111,7 @@ __global__ void zero_stats(int Npoint, FLOAT* stats) {
 }
 
 // initializes samples
-__global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psir, curandState_t* states) {
+__global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, curandState_t* states) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   x1[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
   y1[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
@@ -122,7 +119,7 @@ __global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2
   x2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
   y2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
   z2[i] = (rand<FLOAT>(states+i) - HALF)*FOUR;
-  psir[i] = psi(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
+  psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
 }
 
 __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
@@ -143,7 +140,7 @@ __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y
     FLOAT x2new = x2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
     FLOAT y2new = y2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
     FLOAT z2new = z2 + (rand<FLOAT>(states+i)-HALF)*DELTA;
-    FLOAT pnew = psi(x1new, y1new, z1new, x2new, y2new, z2new);
+    FLOAT pnew = wave_function(x1new, y1new, z1new, x2new, y2new, z2new);
 
     if (pnew*pnew > p*p*rand<FLOAT>(states+i)) {
       stats[3*Npoint+i]++; //naccept ++;
