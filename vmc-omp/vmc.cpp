@@ -1,0 +1,274 @@
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <omp.h>
+
+using namespace std;
+
+using FLOAT = float;
+
+const int NTHR_PER_BLK = 256;           // Number of threads per block
+const int NBLOCK  = 56*4;               // Number of blocks
+const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
+const int Neq = 100000;                 // No. of generations to equilibrate 
+const int Ngen_per_block = 5000;        // No. of generations per block
+const int Nsample = 100;                // No. of blocks to sample
+
+#pragma omp declare target
+
+// Explicitly typed constants so can easily work with both floats and floats
+static const FLOAT DELTA = 2.0;         // Random step size
+static const FLOAT FOUR = 4.0; 
+static const FLOAT TWO  = 2.0;
+static const FLOAT ONE  = 1.0;
+static const FLOAT HALF = 0.5;
+static const FLOAT ZERO = 0.0;
+
+inline float EXP(float x) {return expf(x);}
+inline double EXP(double x) {return exp(x);}
+inline float SQRT(float x) {return sqrtf(x);}
+inline double SQRT(double x) {return sqrt(x);}
+
+float LCG_random(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+  return (float) (*seed) / (float) m;
+}
+
+void LCG_random_init(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+}
+
+void compute_distances(const FLOAT x1, const FLOAT y1, const FLOAT z1, 
+                       const FLOAT x2, const FLOAT y2, const FLOAT z2,
+                       FLOAT& r1, FLOAT& r2, FLOAT& r12) 
+{
+    r1 = SQRT(x1*x1 + y1*y1 + z1*z1);
+    r2 = SQRT(x2*x2 + y2*y2 + z2*z2);
+    FLOAT xx = x1-x2;
+    FLOAT yy = y1-y2;
+    FLOAT zz = z1-z2;
+    r12 = SQRT(xx*xx + yy*yy + zz*zz);
+}
+
+FLOAT wave_function(const FLOAT x1, const FLOAT y1, const FLOAT z1, const FLOAT x2, const FLOAT y2, const FLOAT z2) 
+{
+    FLOAT r1, r2, r12;
+    compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
+    return (ONE + HALF*r12)*EXP(-TWO*(r1 + r2));
+}
+#pragma omp end declare target
+
+
+void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
+               FLOAT* X2, FLOAT* Y2, FLOAT* Z2, FLOAT* P, FLOAT* stats, unsigned int* states)
+{
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < Npoint; i++) {
+    FLOAT x1 = X1[i];
+    FLOAT y1 = Y1[i];
+    FLOAT z1 = Z1[i];
+    FLOAT x2 = X2[i];
+    FLOAT y2 = Y2[i];
+    FLOAT z2 = Z2[i];
+    FLOAT p = P[i];
+    
+    for (int step=0; step<nstep; step++) {
+      FLOAT x1new = x1 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT y1new = y1 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT z1new = z1 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT x2new = x2 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT y2new = y2 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT z2new = z2 + (LCG_random(states+i)-HALF)*DELTA;
+      FLOAT pnew = wave_function(x1new, y1new, z1new, x2new, y2new, z2new);
+
+      if (pnew*pnew > p*p*LCG_random(states+i)) {
+        stats[3*Npoint+i]++; //naccept ++;
+        p = pnew;
+        x1 = x1new;
+        y1 = y1new;
+        z1 = z1new;
+        x2 = x2new;
+        y2 = y2new;
+        z2 = z2new;
+      }
+      
+      FLOAT r1, r2, r12;
+      compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
+      
+      stats[0*Npoint+i] += r1;
+      stats[1*Npoint+i] += r2;
+      stats[2*Npoint+i] += r12;
+    }
+    X1[i] = x1;  
+    Y1[i] = y1;  
+    Z1[i] = z1;  
+    X2[i] = x2;  
+    Y2[i] = y2;  
+    Z2[i] = z2;  
+    P[i] = p;
+  }
+}
+
+void SumWithinBlocks(const int n, const int threads, FLOAT *data, FLOAT* blocksums)
+{
+  const int teams = n / threads;
+  #pragma omp target teams num_teams(teams) thread_limit(threads)
+  { 
+     FLOAT sdata[512];
+     #pragma omp parallel 
+     {
+       int blockDim = omp_get_num_threads();
+       int tid = omp_get_thread_num();
+       int gid = omp_get_team_num();
+       int nthread =  blockDim * omp_get_num_teams(); // blockDim.x*gridDim.x;
+       int i = gid * blockDim + tid;  // global id
+
+       // Every thread in every block computes partial sum over rest of vector
+       FLOAT st = ZERO;
+       while (i < n) {
+         st += data[i];
+         i += nthread;
+       }
+       sdata[tid] = st;
+       #pragma omp barrier
+
+       // Now do binary tree sum within a block
+       
+       for (unsigned int s=128; s>0; s>>=1) {
+         if (tid<s && (tid+s)<blockDim) {
+           sdata[tid] += sdata[tid + s];
+         }
+         #pragma omp barrier
+       }
+       if (tid==0) blocksums[gid] = sdata[0];
+     }
+   }
+}
+  
+int main()
+{
+  FLOAT *x1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *y1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *z1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *x2 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *y2 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *z2 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *psi = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
+  FLOAT *stats = (FLOAT*) malloc(4 * Npoint * sizeof(FLOAT));
+  FLOAT *statsum = (FLOAT*) malloc(4 * sizeof(FLOAT));
+  FLOAT *blocksums = (FLOAT*) malloc(NBLOCK * sizeof(FLOAT));
+  unsigned int *ranstates = (unsigned int*) malloc(Npoint * sizeof(unsigned int));
+
+#pragma omp target data map(alloc:x1[0:Npoint],\
+                                  y1[0:Npoint],\
+                                  z1[0:Npoint],\
+                                  x2[0:Npoint],\
+                                  y2[0:Npoint],\
+                                  z2[0:Npoint],\
+                                  psi[0:Npoint],\
+                                  stats[0:4*Npoint],\
+                                  statsum[0:4],\
+                                  blocksums[0:NBLOCK],\
+                                  ranstates[0:Npoint])
+{
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < Npoint; i++) {
+    LCG_random_init(&ranstates[i]);
+  }
+
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < Npoint; i++) {
+    x1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    y1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    z1[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    x2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    y2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    z2[i] = (LCG_random(ranstates+i) - HALF)*FOUR;
+    psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
+  }
+
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+  for (int i = 0; i < Npoint; i++) {
+    stats[0*Npoint+i] = ZERO; // r1
+    stats[1*Npoint+i] = ZERO; // r2
+    stats[2*Npoint+i] = ZERO; // r12
+    stats[3*Npoint+i] = ZERO; // accept count
+  }
+    
+  // Equilibrate
+  propagate(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+
+  // Accumulators for averages over blocks --- use doubles
+  double r1_tot = ZERO,  r1_sq_tot = ZERO;
+  double r2_tot = ZERO,  r2_sq_tot = ZERO;
+  double r12_tot = ZERO, r12_sq_tot = ZERO;
+  double naccept = ZERO;  // Keeps track of propagation efficiency
+
+  for (int sample=0; sample<Nsample; sample++) {
+    #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
+    for (int i = 0; i < Npoint; i++) {
+      stats[0*Npoint+i] = ZERO; // r1
+      stats[1*Npoint+i] = ZERO; // r2
+      stats[2*Npoint+i] = ZERO; // r12
+      stats[3*Npoint+i] = ZERO; // accept count
+    }
+
+    propagate(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+
+    struct {FLOAT r1, r2, r12, accept;} s;
+    //sum_stats(Npoint, stats, statsum, blocksums);
+    for (int what=0; what<4; what++) {
+      SumWithinBlocks(Npoint, NTHR_PER_BLK, stats+what*Npoint, blocksums);
+      SumWithinBlocks(NBLOCK, NBLOCK, blocksums, statsum+what);
+    }
+    #pragma omp target update from (statsum[0:3])
+    memcpy(&s, statsum, 4 * sizeof(FLOAT));
+
+    naccept += s.accept;
+    s.r1 /= Ngen_per_block*Npoint;  
+    s.r2 /= Ngen_per_block*Npoint;  
+    s.r12 /= Ngen_per_block*Npoint;
+
+    printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
+
+    r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
+    r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
+    r12_tot += s.r12; r12_sq_tot += s.r12*s.r12;
+  }
+
+  r1_tot /= Nsample; r1_sq_tot /= Nsample; 
+  r2_tot /= Nsample; r2_sq_tot /= Nsample; 
+  r12_tot /= Nsample; r12_sq_tot /= Nsample; 
+  
+  double r1s = sqrt((r1_sq_tot - r1_tot*r1_tot) / Nsample);
+  double r2s = sqrt((r2_sq_tot - r2_tot*r2_tot) / Nsample);
+  double r12s = sqrt((r12_sq_tot - r12_tot*r12_tot) / Nsample);
+  
+  printf(" <r1>  = %.6f +- %.6f\n", r1_tot, r1s);
+  printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
+  printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
+  
+  printf(" acceptance ratio=%.1f%%\n",
+     100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+
+}
+
+  free(x1);
+  free(y1);
+  free(z1);
+  free(x2);
+  free(y2);
+  free(z2);
+  free(psi);
+  free(stats);
+  free(blocksums);
+  free(statsum);
+  free(ranstates);
+  return 0;
+}
