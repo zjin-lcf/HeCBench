@@ -57,13 +57,9 @@ __global__ void SumWithinBlocks(const int n, const FLOAT* data, FLOAT* blocksums
 
   // Now do binary tree sum within a block
 
-  // Round up to closest power of 2
-  int pow2 = 1 << (32 - __clz(blockDim.x-1));
-
   int tid = threadIdx.x;
-  for (unsigned int s=pow2>>1; s>0; s>>=1) {
+  for (unsigned int s=128; s>0; s>>=1) {
     if (tid<s && (tid+s)<blockDim.x) {
-      //printf("%4d : %4d %4d\n", tid, s, tid+s);
       sdata[tid] += sdata[tid + s];
     }
     __syncthreads();
@@ -91,7 +87,6 @@ __device__ __forceinline__ void compute_distances(FLOAT x1, FLOAT y1, FLOAT z1, 
 __device__  __forceinline__ FLOAT wave_function(FLOAT x1, FLOAT y1, FLOAT z1, FLOAT x2, FLOAT y2, FLOAT z2) {
   FLOAT r1, r2, r12;
   compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
-
   return (ONE + HALF*r12)*EXP(-TWO*(r1 + r2));
 }
 
