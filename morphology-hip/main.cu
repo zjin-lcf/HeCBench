@@ -22,7 +22,6 @@ int main(int argc, char* argv[])
   unsigned int memSize = width * height * sizeof(unsigned char);
 
   unsigned char* srcImg = (unsigned char*) malloc (memSize);
-  unsigned char* dstImg = (unsigned char*) malloc (memSize);
 
   for (int i = 0; i < height; i++) 
     for (int j = 0; j < width; j++)
@@ -41,15 +40,14 @@ int main(int argc, char* argv[])
     erode(img_d, tmp_d, width, height, hsize, vsize);
   }
 
-  hipMemcpy(dstImg, img_d, memSize, hipMemcpyDeviceToHost);
+  hipMemcpy(srcImg, img_d, memSize, hipMemcpyDeviceToHost);
 
   int s = 0;
-  for (unsigned int i = 0; i < memSize; i++) s += dstImg[i];
+  for (unsigned int i = 0; i < memSize; i++) s += srcImg[i];
   printf("%s\n", s == WHITE ? "PASS" : "FAIL");
 
   hipFree(img_d);
   hipFree(tmp_d);
   free(srcImg);
-  free(dstImg);
   return 0;
 }

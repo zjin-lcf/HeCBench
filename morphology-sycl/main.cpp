@@ -20,9 +20,7 @@ int main(int argc, char* argv[])
   int height = atoi(argv[4]); // image height
 
   unsigned int memSize = width * height * sizeof(unsigned char);
-
   unsigned char* srcImg = (unsigned char*) malloc (memSize);
-  unsigned char* dstImg = (unsigned char*) malloc (memSize);
 
   for (int i = 0; i < height; i++) 
     for (int j = 0; j < width; j++)
@@ -36,9 +34,9 @@ int main(int argc, char* argv[])
 #endif
   queue q(dev_sel);
 
+  
   buffer<unsigned char, 1> img_d (srcImg, memSize);
   buffer<unsigned char, 1> tmp_d (memSize);
-  img_d.set_final_data(dstImg);
 
   for (int n = 0; n < 100; n++) {
     dilate(q, img_d, tmp_d, width, height, hsize, vsize);
@@ -47,10 +45,9 @@ int main(int argc, char* argv[])
   }
 
   int s = 0;
-  for (unsigned int i = 0; i < memSize; i++) s += dstImg[i];
+  for (unsigned int i = 0; i < memSize; i++) s += srcImg[i];
   printf("%s\n", s == WHITE ? "PASS" : "FAIL");
 
   free(srcImg);
-  free(dstImg);
   return 0;
 }

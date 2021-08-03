@@ -70,7 +70,7 @@ void twoWayScan(unsigned char* __restrict__ buffer,
 
 template <MorphOpType opType>
 void morphology(
-        const unsigned char* img_d,
+        unsigned char* img_d,
         unsigned char* tmp_d,
         const int width,
         const int height,
@@ -137,21 +137,21 @@ void morphology(
         const int tidy = ty + by * blockSize_y;
         if (tidx < width && tidy < height) {
 
-          buffer[ty] = img_d[tidy * width + tidx];
+          buffer[ty] = tmp_d[tidy * width + tidx];
           if (tidy + vsize < height) {
-              buffer[ty + vsize] = img_d[(tidy + vsize) * width + tidx];
+              buffer[ty + vsize] = tmp_d[(tidy + vsize) * width + tidx];
           }
           #pragma omp barrier
 
           twoWayScan<opType>(buffer, opArray, vsize, ty);
 
           if (tidy + vsize/2 < height - vsize/2) {
-              tmp_d[(tidy + vsize/2) * width + tidx] = 
+              img_d[(tidy + vsize/2) * width + tidx] = 
                   elementOp<opType>(opArray[ty], opArray[ty + vsize - 1]);
           }
 
           if (tidy < vsize/2 || tidy >= height - vsize/2) {
-              tmp_d[tidy * width + tidx] = borderValue<opType>();
+              img_d[tidy * width + tidx] = borderValue<opType>();
           }
         }
       }

@@ -23,29 +23,26 @@ int main(int argc, char* argv[])
 
   unsigned char* srcImg = (unsigned char*) malloc (memSize);
   unsigned char* tmpImg = (unsigned char*) malloc (memSize);
-  unsigned char* dstImg = (unsigned char*) malloc (memSize);
 
   for (int i = 0; i < height; i++) 
     for (int j = 0; j < width; j++)
       srcImg[i*width+j] = (i == (height/2 - 1) && 
                            j == (width/2 - 1)) ? WHITE : BLACK;
 
-#pragma omp target data map(to: srcImg[0:memSize]) \
-                        map(alloc: tmpImg[0:memSize]) \
-                        map(from: dstImg[0:memSize])
+#pragma omp target data map(tofrom: srcImg[0:memSize]) \
+                        map(alloc: tmpImg[0:memSize])
 {
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < 1; n++) {
     dilate(srcImg, tmpImg, width, height, hsize, vsize);
-    erode(tmpImg, dstImg, width, height, hsize, vsize);
+    erode(srcImg, tmpImg, width, height, hsize, vsize);
   }
 }
 
   int s = 0;
-  for (unsigned int i = 0; i < memSize; i++) s += dstImg[i];
+  for (unsigned int i = 0; i < memSize; i++) s += srcImg[i];
   printf("%s\n", s == WHITE ? "PASS" : "FAIL");
 
   free(srcImg);
-  free(dstImg);
   free(tmpImg);
   return 0;
 }
