@@ -331,6 +331,9 @@ Early results are shown [here](results/README.md)
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
 
+### morphology
+  Morphological operators: Erosion and Dilation (https://github.com/yszheda/CUDA-Morphology)
+
 ### mt
   Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
