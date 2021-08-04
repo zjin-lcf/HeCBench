@@ -28,7 +28,8 @@ void runKernels(
     float *diagonalBuffer,
     uint *numEigenValuesIntervalBuffer,
     float *offDiagonalBuffer,
-    float **eigenIntervalBuffer,
+    float *eigenIntervalBuffer0,
+    float *eigenIntervalBuffer1,
 
     // reset the eigenvalue intervals buffer
     float **eigenIntervals,
@@ -38,22 +39,22 @@ void runKernels(
     // index of the two eigenInterval buffers
     uint &in )
 {
-  #pragma omp target update to(eigenIntervalBuffer[0][0:length*2])
-  #pragma omp target update to(eigenIntervalBuffer[1][0:length*2])
+  #pragma omp target update to (eigenIntervalBuffer0[0:length*2])
+  #pragma omp target update to (eigenIntervalBuffer1[0:length*2])
 
   in = 0;
   while (isComplete(eigenIntervals[in], length, tolerance)) {
 
     calNumEigenValueInterval(
       numEigenValuesIntervalBuffer,
-      eigenIntervalBuffer[in],
+      eigenIntervalBuffer0,
       diagonalBuffer,
       offDiagonalBuffer,
       length);
 
     recalculateEigenIntervals(
-      eigenIntervalBuffer[1-in],
-      eigenIntervalBuffer[in],
+      eigenIntervalBuffer1,
+      eigenIntervalBuffer0,
       numEigenValuesIntervalBuffer,
       diagonalBuffer,
       offDiagonalBuffer,
@@ -61,8 +62,11 @@ void runKernels(
       tolerance);
 
     in = 1 - in;
+    float *e = eigenIntervalBuffer1;
+    eigenIntervalBuffer1 = eigenIntervalBuffer0,
+    eigenIntervalBuffer0 = e;
 
-    #pragma omp target update from (eigenIntervalBuffer[in][0:length*2])
+    #pragma omp target update from (eigenIntervalBuffer0[0:length*2])
   }
 }
 
@@ -161,15 +165,14 @@ int main(int argc, char * argv[])
 
   // store the eigenvalue intervals
   //float *eigenIntervalBuffer = (float*) malloc (sizeof(float) * length * 4);
-  float *eigenIntervalBuffer[2];
-  eigenIntervalBuffer[0] = eigenIntervals[0];
-  eigenIntervalBuffer[1] = eigenIntervals[1];
+  float *eigenIntervalBuffer0 = eigenIntervals[0];
+  float *eigenIntervalBuffer1 = eigenIntervals[1];
 
 #pragma omp target data map(to: diagonalBuffer[0:length], \
                                 offDiagonalBuffer[0:length-1]) \
                         map(alloc: numEigenValuesIntervalBuffer[0:length], \
-                                   eigenIntervalBuffer[0][0:length*2], \
-                                   eigenIntervalBuffer[1][0:length*2])
+                                   eigenIntervalBuffer0[0:length*2], \
+                                   eigenIntervalBuffer1[0:length*2])
 {
   // Warm up
   for(int i = 0; i < 2 && iterations != 1; i++)
@@ -179,7 +182,8 @@ int main(int argc, char * argv[])
         diagonalBuffer,
         numEigenValuesIntervalBuffer,
         offDiagonalBuffer,
-        eigenIntervalBuffer,
+        eigenIntervalBuffer0,
+        eigenIntervalBuffer1,
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
@@ -198,7 +202,8 @@ int main(int argc, char * argv[])
         diagonalBuffer,
         numEigenValuesIntervalBuffer,
         offDiagonalBuffer,
-        eigenIntervalBuffer,
+        eigenIntervalBuffer0,
+        eigenIntervalBuffer1,
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
