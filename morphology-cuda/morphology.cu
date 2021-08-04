@@ -1,6 +1,5 @@
 #include "morphology.h"
 
-
 enum class MorphOpType {
     ERODE,
     DILATE,
@@ -180,6 +179,10 @@ void morphology(unsigned char* img_d,
         const int hsize,
         const int vsize)
 {
+
+    unsigned int memSize = width * height * sizeof(unsigned char);
+    cudaMemset(tmp_d, 0, memSize);
+
     dim3 blockSize;
     blockSize.x = hsize;
     blockSize.y = 1;

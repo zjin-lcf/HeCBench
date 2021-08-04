@@ -1,5 +1,3 @@
-#include <cstdio>
-#include <cstdlib>
 #include "morphology.h"
 
 void display(unsigned char *img, const int height, const int width)

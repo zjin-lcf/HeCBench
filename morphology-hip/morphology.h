@@ -1,6 +1,8 @@
 #ifndef MORPHOLOGY_H
 #define MORPHOLOGY_H
 
+#include <cstdio>
+#include <cstdlib>
 #include <hip/hip_runtime.h>
 
 #define BLACK 0

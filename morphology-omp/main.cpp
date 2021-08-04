@@ -1,5 +1,3 @@
-#include <cstdio>
-#include <cstdlib>
 #include "morphology.h"
 
 void display(unsigned char *img, const int height, const int width)
@@ -32,10 +30,11 @@ int main(int argc, char* argv[])
 #pragma omp target data map(tofrom: srcImg[0:memSize]) \
                         map(alloc: tmpImg[0:memSize])
 {
-  for (int n = 0; n < 1; n++) {
+  for (int n = 0; n < 100; n++) {
     dilate(srcImg, tmpImg, width, height, hsize, vsize);
     erode(srcImg, tmpImg, width, height, hsize, vsize);
   }
+
 }
 
   int s = 0;
