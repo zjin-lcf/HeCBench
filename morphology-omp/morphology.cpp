@@ -81,6 +81,11 @@ void morphology(
     int blockSize_y = 1;
     int gridSize_x = roundUp(width, blockSize_x);
     int gridSize_y = roundUp(height, blockSize_y);
+
+    // initialize the intermediate buffer may be required
+    unsigned int memSize = width * height * sizeof(unsigned char);
+    memset(tmp_d, 0, memSize);
+    #pragma omp target update to(tmp_d[0:memSize])
     
     #pragma omp target teams num_teams(gridSize_x*gridSize_y) thread_limit(blockSize_x*blockSize_y)
     {

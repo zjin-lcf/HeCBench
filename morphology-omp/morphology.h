@@ -1,6 +1,9 @@
 #ifndef MORPHOLOGY_H
 #define MORPHOLOGY_H
 
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <omp.h>
 
 #define BLACK 0

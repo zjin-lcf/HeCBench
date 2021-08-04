@@ -1,6 +1,5 @@
 #include "morphology.h"
 
-
 enum class MorphOpType {
     ERODE,
     DILATE,
@@ -148,6 +147,11 @@ void morphology(
         const int hsize,
         const int vsize)
 {
+    q.submit([&] (handler &cgh) {
+      auto acc = tmp_d.get_access<sycl_discard_write>(cgh);
+      cgh.fill(acc, (unsigned char)0);
+    });
+
     int blockSize_x = hsize;
     int blockSize_y = 1;
     int gridSize_x = roundUp(width, blockSize_x);
