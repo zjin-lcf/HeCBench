@@ -14,9 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp \
-	 find_min_max.cpp \
-	 minimig.cpp
+source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp minimig.cpp
 
 obj = $(source:.cpp=.o)
 
