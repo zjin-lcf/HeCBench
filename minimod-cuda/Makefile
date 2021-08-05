@@ -13,9 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = main.cu constants.cu grid.cu pml.cu data_setup.cu \
-	 find_min_max.cu \
-	 minimig.cu
+source = main.cu constants.cu grid.cu pml.cu data_setup.cu minimig.cu
 
 obj = $(source:.cu=.o)
 
@@ -24,14 +22,14 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_70 -Xptxas -v
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
   LDFLAGS  += -g
 endif
 
@@ -55,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --grid 100 
+	./$(program) --grid 100 --nsteps 1000
 

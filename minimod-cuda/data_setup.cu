@@ -25,10 +25,6 @@ void kernel_add_source(struct grid_t grid,
     // Nothing needed
 }
 
-extern void find_min_max_u_cuda(
-    const float *__restrict__ u, llint u_size, float *__restrict__ min_u, float *__restrict__ max_u
-);
-
 void find_min_max_u(struct grid_t grid,
                     const float *__restrict__ u, float *__restrict__ min_u, float *__restrict__ max_u)
 {
@@ -40,5 +36,18 @@ void find_min_max_u(struct grid_t grid,
     const llint lz = grid.lz;
 
     llint u_size = (nx + 2 * lx) * (ny + 2 * ly) * (nz + 2 * lz);
-    find_min_max_u_cuda(u, u_size, min_u, max_u);
+
+   float min_val = FLT_MAX;
+   #pragma omp parallel for reduction(min: min_val)
+   for (llint i = 0; i < u_size; i++) {
+     min_val = fmin(u[i], min_val);
+   }
+   *min_u = min_val;
+
+   float max_val = FLT_MIN;
+   #pragma omp parallel for reduction(max: max_val)
+   for (llint i = 0; i < u_size; i++) {
+     max_val = fmax(u[i], max_val);
+   }
+   *max_u = max_val;
 }

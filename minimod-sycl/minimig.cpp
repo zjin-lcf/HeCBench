@@ -5,8 +5,8 @@
 #include "constants.h"
 #include "common.h"
 
-#define N_RADIUS 4
-#define N_THREADS_PER_BLOCK_DIM 8
+#define R 4
+#define NDIM 8
 
 void target_inner_3d_kernel(
     llint nx, llint ny, llint nz,
@@ -28,20 +28,31 @@ void target_inner_3d_kernel(
   const llint j0 = y3 + item.get_local_range(1) * item.get_group(1);
   const llint k0 = z3 + item.get_local_range(2) * item.get_group(2); 
 
-  const llint i = i0 + item.get_local_id(0);
-  const llint j = j0 + item.get_local_id(1);
-  const llint k = k0 + item.get_local_id(2);
+  const int ti = item.get_local_id(0);
+  const int tj = item.get_local_id(1);
+  const int tk = item.get_local_id(2);
 
-  const llint sui = item.get_local_id(0) + N_RADIUS;
-  const llint suj = item.get_local_id(1) + N_RADIUS;
-  const llint suk = item.get_local_id(2) + N_RADIUS;
+  const llint i = i0 + ti;
+  const llint j = j0 + tj;
+  const llint k = k0 + tk;
 
-  const int z_side = item.get_local_id(0) / N_RADIUS;
-  s_u[item.get_local_id(0)+z_side*N_THREADS_PER_BLOCK_DIM][suj][suk] = u[IDX3_l(i0+item.get_local_id(0)+(z_side*2-1)*N_RADIUS,j,k)];
-  const int y_side = item.get_local_id(1) / N_RADIUS;
-  s_u[sui][item.get_local_id(1)+y_side*N_THREADS_PER_BLOCK_DIM][suk] = u[IDX3_l(i,j0+item.get_local_id(1)+(y_side*2-1)*N_RADIUS,k)];
-  s_u[sui][suj][item.get_local_id(2)] = u[IDX3_l(i,j,k0+item.get_local_id(2)-N_RADIUS)];
-  s_u[sui][suj][item.get_local_id(2)+N_THREADS_PER_BLOCK_DIM] = u[IDX3_l(i,j,k0+item.get_local_id(2)+N_RADIUS)];
+  const llint sui = ti + R;
+  const llint suj = tj + R;
+  const llint suk = tk + R;
+
+  s_u[ti][tj][tk] = 0.f;
+
+  if (ti < 2*R && tj < 2*R && tk < 2*R)
+    s_u[NDIM+ti][NDIM+tj][NDIM+tk] = 0.f;
+
+  item.barrier(access::fence_space::local_space);
+
+  const int z_side = ti / R;
+  s_u[ti+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
+  const int y_side = tj / R;
+  s_u[sui][tj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
+  s_u[sui][suj][tk] = u[IDX3_l(i,j,k-R)];
+  s_u[sui][suj][tk+NDIM] = u[IDX3_l(i,j,k+R)];
 
   item.barrier(access::fence_space::local_space);
 
@@ -84,20 +95,31 @@ void target_pml_3d_kernel(
   const llint j0 = y3 + item.get_local_range(1) * item.get_group(1);
   const llint k0 = z3 + item.get_local_range(2) * item.get_group(2); 
 
-  const llint i = i0 + item.get_local_id(0);
-  const llint j = j0 + item.get_local_id(1);
-  const llint k = k0 + item.get_local_id(2);
+  const int ti = item.get_local_id(0);
+  const int tj = item.get_local_id(1);
+  const int tk = item.get_local_id(2);
 
-  const llint sui = item.get_local_id(0) + N_RADIUS;
-  const llint suj = item.get_local_id(1) + N_RADIUS;
-  const llint suk = item.get_local_id(2) + N_RADIUS;
+  const llint i = i0 + ti;
+  const llint j = j0 + tj;
+  const llint k = k0 + tk;
 
-  const int z_side = item.get_local_id(0) / N_RADIUS;
-  s_u[item.get_local_id(0)+z_side*N_THREADS_PER_BLOCK_DIM][suj][suk] = u[IDX3_l(i0+item.get_local_id(0)+(z_side*2-1)*N_RADIUS,j,k)];
-  const int y_side = item.get_local_id(1) / N_RADIUS;
-  s_u[sui][item.get_local_id(1)+y_side*N_THREADS_PER_BLOCK_DIM][suk] = u[IDX3_l(i,j0+item.get_local_id(1)+(y_side*2-1)*N_RADIUS,k)];
-  s_u[sui][suj][item.get_local_id(2)] = u[IDX3_l(i,j,k0+item.get_local_id(2)-N_RADIUS)];
-  s_u[sui][suj][item.get_local_id(2)+N_THREADS_PER_BLOCK_DIM] = u[IDX3_l(i,j,k0+item.get_local_id(2)+N_RADIUS)];
+  const llint sui = ti + R;
+  const llint suj = tj + R;
+  const llint suk = tk + R;
+
+  s_u[ti][tj][tk] = 0.f;
+
+  if (ti < 2*R && tj < 2*R && tk < 2*R)
+    s_u[NDIM+ti][NDIM+tj][NDIM+tk] = 0.f;
+
+  item.barrier(access::fence_space::local_space);
+
+  const int z_side = ti / R;
+  s_u[ti+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
+  const int y_side = tj / R;
+  s_u[sui][tj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
+  s_u[sui][suj][tk] = u[IDX3_l(i,j,k-R)];
+  s_u[sui][suj][tk+NDIM] = u[IDX3_l(i,j,k+R)];
 
   item.barrier(access::fence_space::local_space);
 
@@ -155,13 +177,13 @@ void minimod( queue &q,
   const llint size_vp = size_phi;
   const llint size_eta = (nx+2)*(ny+2)*(nz+2);
 
-  const llint size_u_ext = ((((nx+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM + 1) * N_THREADS_PER_BLOCK_DIM) + 2 * lx)
-    * ((((ny+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM + 1) * N_THREADS_PER_BLOCK_DIM) + 2 * ly)
-    * ((((nz+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM + 1) * N_THREADS_PER_BLOCK_DIM) + 2 * lz);
+  const llint size_u_ext = ((((nx+NDIM-1) / NDIM + 1) * NDIM) + 2 * lx)
+    * ((((ny+NDIM-1) / NDIM + 1) * NDIM) + 2 * ly)
+    * ((((nz+NDIM-1) / NDIM + 1) * NDIM) + 2 * lz);
 
 
-  buffer<float, 1> d_u (size_u_ext);
-  buffer<float, 1> d_v (size_u_ext);
+  buffer<float, 1> d_u (size_u);
+  buffer<float, 1> d_v (size_u);
   buffer<float, 1> d_vp (vp, size_vp);
   buffer<float, 1> d_phi (phi, size_phi);
   buffer<float, 1> d_eta (eta, size_eta);
@@ -179,7 +201,7 @@ void minimod( queue &q,
   const llint xmin = 0; const llint xmax = nx;
   const llint ymin = 0; const llint ymax = ny;
 
-  range<3> threadsPerBlock(N_THREADS_PER_BLOCK_DIM, N_THREADS_PER_BLOCK_DIM, N_THREADS_PER_BLOCK_DIM);
+  range<3> threadsPerBlock(NDIM, NDIM, NDIM);
   const float coef0 = coefx[0]+coefy[0]+coefz[0];
   const float coefx_1 = coefx[1];
   const float coefx_2 = coefx[2];
@@ -199,9 +221,9 @@ void minimod( queue &q,
     clock_gettime(CLOCK_REALTIME, &start);
 
     range<3> n_block_front(
-        (nx+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (ny+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z2-z1+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (nx+NDIM-1) / NDIM * NDIM,
+        (ny+NDIM-1) / NDIM * NDIM,
+        (z2-z1+NDIM-1) / NDIM * NDIM
 	);
 
     q.submit([&] (handler &h) {
@@ -211,9 +233,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class front>(nd_range<3>(n_block_front,threadsPerBlock), [=] (nd_item<3> item) {
 
             target_pml_3d_kernel(nx,ny,nz,
@@ -229,9 +251,9 @@ void minimod( queue &q,
     });
 
     range<3> n_block_top(
-        (nx+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (y2-y1+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z4-z3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (nx+NDIM-1) / NDIM * NDIM,
+        (y2-y1+NDIM-1) / NDIM * NDIM,
+        (z4-z3+NDIM-1) / NDIM * NDIM
 	);
 
     q.submit([&] (handler &h) {
@@ -241,9 +263,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class top>(nd_range<3>(n_block_top,threadsPerBlock), [=] (nd_item<3> item) {
 
             target_pml_3d_kernel(nx,ny,nz,
@@ -259,9 +281,9 @@ void minimod( queue &q,
     });
 
     range<3> n_block_left(
-        (x2-x1+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (y4-y3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z4-z3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (x2-x1+NDIM-1) / NDIM * NDIM,
+        (y4-y3+NDIM-1) / NDIM * NDIM,
+        (z4-z3+NDIM-1) / NDIM * NDIM
 	);
     q.submit([&] (handler &h) {
         auto u = d_u.get_access<sycl_read>(h);
@@ -270,9 +292,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class left>(nd_range<3>(n_block_left,threadsPerBlock), [=] (nd_item<3> item) {
             target_pml_3d_kernel(nx,ny,nz,
                 x1,x2,y3,y4,z3,z4,
@@ -289,9 +311,9 @@ void minimod( queue &q,
 
 
     range<3> n_block_center (
-        (x4-x3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM ,
-        (y4-y3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM ,
-        (z4-z3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM 
+        (x4-x3+NDIM-1) / NDIM * NDIM ,
+        (y4-y3+NDIM-1) / NDIM * NDIM ,
+        (z4-z3+NDIM-1) / NDIM * NDIM 
 	);
     q.submit([&] (handler &h) {
         auto u = d_u.get_access<sycl_read>(h);
@@ -299,9 +321,9 @@ void minimod( queue &q,
         auto eta = d_eta.get_access<sycl_read>(h);
         auto v = d_v.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class center>(nd_range<3>(n_block_center,threadsPerBlock), [=] (nd_item<3> item) {
             target_inner_3d_kernel(nx,ny,nz,
                 x3,x4,y3,y4,z3,z4,
@@ -316,9 +338,9 @@ void minimod( queue &q,
     });
 
     range<3> n_block_right(
-        (x6-x5+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (y4-y3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z4-z3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (x6-x5+NDIM-1) / NDIM * NDIM,
+        (y4-y3+NDIM-1) / NDIM * NDIM,
+        (z4-z3+NDIM-1) / NDIM * NDIM
 	);
     q.submit([&] (handler &h) {
         auto u = d_u.get_access<sycl_read>(h);
@@ -327,9 +349,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class right>(nd_range<3>(n_block_right,threadsPerBlock), [=] (nd_item<3> item) {
             target_pml_3d_kernel(nx,ny,nz,
                 x5,x6,y3,y4,z3,z4,
@@ -344,9 +366,9 @@ void minimod( queue &q,
     });
 
     range<3> n_block_bottom(
-        (nx+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (y6-y5+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z4-z3+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (nx+NDIM-1) / NDIM * NDIM,
+        (y6-y5+NDIM-1) / NDIM * NDIM,
+        (z4-z3+NDIM-1) / NDIM * NDIM
 	);
     q.submit([&] (handler &h) {
         auto u = d_u.get_access<sycl_read>(h);
@@ -355,9 +377,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class bottom>(nd_range<3>(n_block_bottom,threadsPerBlock), [=] (nd_item<3> item) {
             target_pml_3d_kernel(nx,ny,nz,
                 xmin,xmax,y5,y6,z3,z4,
@@ -372,9 +394,9 @@ void minimod( queue &q,
     });
 
     range<3> n_block_back(
-        (nx+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (ny+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM,
-        (z6-z5+N_THREADS_PER_BLOCK_DIM-1) / N_THREADS_PER_BLOCK_DIM * N_THREADS_PER_BLOCK_DIM
+        (nx+NDIM-1) / NDIM * NDIM,
+        (ny+NDIM-1) / NDIM * NDIM,
+        (z6-z5+NDIM-1) / NDIM * NDIM
 	);
     q.submit([&] (handler &h) {
         auto u = d_u.get_access<sycl_read>(h);
@@ -383,9 +405,9 @@ void minimod( queue &q,
         auto v = d_v.get_access<sycl_read_write>(h);
         auto phi = d_phi.get_access<sycl_read_write>(h);
         accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS,
-            N_THREADS_PER_BLOCK_DIM+2*N_RADIUS}, h);
+            NDIM+2*R,
+            NDIM+2*R,
+            NDIM+2*R}, h);
         h.parallel_for<class back>(nd_range<3>(n_block_back,threadsPerBlock), [=] (nd_item<3> item) {
             target_pml_3d_kernel(nx,ny,nz,
                 xmin,xmax,ymin,ymax,z5,z6,

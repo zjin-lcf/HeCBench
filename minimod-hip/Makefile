@@ -13,9 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = main.cu constants.cu grid.cu pml.cu data_setup.cu \
-	 find_min_max.cu \
-	 minimig.cu
+source = main.cu constants.cu grid.cu pml.cu data_setup.cu minimig.cu
 
 obj = $(source:.cu=.o)
 
@@ -31,7 +29,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
   LDFLAGS  += -g
 endif
 
@@ -48,15 +46,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c constants.h grid.h pml.h data_setup.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-%.o: %.cu constants.h Makefile
+%.o: %.cu constants.h grid.h pml.h data_setup.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --grid 100 
+	./$(program) --grid 100 --nsteps 1000
 

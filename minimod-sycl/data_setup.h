@@ -31,7 +31,7 @@ void kernel_add_source(struct grid_t grid,
                        float *__restrict__ u, const float *__restrict__ source, llint istep,
                        llint sx, llint sy, llint sz);
 
-void find_min_max_u(queue &q, struct grid_t grid,
+void find_min_max_u(struct grid_t grid,
                     const float *__restrict__ u, float *__restrict__ min_u, float *__restrict__ max_u);
 
 #endif
