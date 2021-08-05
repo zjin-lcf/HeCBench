@@ -40,7 +40,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-DOMP_TARGET -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
