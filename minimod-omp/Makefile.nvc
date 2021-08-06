@@ -15,7 +15,14 @@ SM        = cc70
 
 program = main
 
-source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp minimig.cpp
+source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp
+
+ifeq ($(DEVICE),gpu)
+  source +=minimig_omptarget.cpp
+else
+  source +=minimig.cpp
+endif
+
 
 obj = $(source:.cpp=.o)
 
@@ -42,7 +49,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DOMP_TARGET -Minfo -mp=gpu -gpu=$(SM),autocollapse,maxregcount:50
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
 else
   CFLAGS +=-fopenmp
 endif
