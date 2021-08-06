@@ -15,7 +15,6 @@
  ********************************************************************/
 
 
-#include <cuda.h>
 #include "sobel.h"
 #include "SDKBitMap.h"
 #include "kernels.cu"

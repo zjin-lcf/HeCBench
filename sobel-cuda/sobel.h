@@ -2,6 +2,7 @@
 #define SOBEL_H
 
 #include <cmath>
+#include <cuda.h>
 
 typedef unsigned char uchar;
 
