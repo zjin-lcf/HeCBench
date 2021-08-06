@@ -61,7 +61,7 @@ void sobel_filter(const uchar4*__restrict inputImage,
     float4 i02 = convert_float4(inputImage[c + 1 - width]);
 
     float4 i10 = convert_float4(inputImage[c - 1]);
-    float4 i11 = convert_float4(inputImage[c]);
+    //float4 i11 = convert_float4(inputImage[c]);
     float4 i12 = convert_float4(inputImage[c + 1]);
 
     float4 i20 = convert_float4(inputImage[c - 1 + width]);
