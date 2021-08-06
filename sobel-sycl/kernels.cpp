@@ -44,8 +44,8 @@ inline uchar4 convert_uchar4(float4 v) {
 
 void sobel_filter(const uchar4*__restrict inputImage, 
                         uchar4*__restrict outputImage, 
-                  const int width,
-                  const int height,
+                  const uint width,
+                  const uint height,
                   nd_item<2> &item)
 {
   uint x = item.get_global_id(1);
