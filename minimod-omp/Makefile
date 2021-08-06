@@ -14,7 +14,13 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp minimig.cpp
+source = main.cpp constants.cpp grid.cpp pml.cpp data_setup.cpp
+
+ifeq ($(DEVICE),gpu)
+  source +=minimig_omptarget.cpp
+else
+  source +=minimig.cpp
+endif
 
 obj = $(source:.cpp=.o)
 
@@ -40,7 +46,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DOMP_TARGET -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
