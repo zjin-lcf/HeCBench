@@ -25,52 +25,55 @@
 
 inline float4 convert_float4(uchar4 data) 
 {
-   float4 r = (float4)(data.x(), data.y(), data.z(), data.w());
+   float4 r;
+   r.x() = (float)data.x();
+   r.y() = (float)data.y();
+   r.z() = (float)data.z();
+   r.w() = (float)data.w();
    return r;
 }
 
 inline uchar4 convert_uchar4(float4 v) {
-  uchar4 res;
-  res.x() = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
-  res.y() = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
-  res.z() = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
-  res.w() = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
-  return res;
+  uchar4 r;
+  r.x() = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
+  r.y() = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
+  r.z() = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
+  r.w() = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
+  return r;
 }
 
 void sobel_filter(const uchar4*__restrict inputImage, 
-                        uchar4*__restrict outputImage, nd_item<2> &item)
+                        uchar4*__restrict outputImage, 
+                  const int width,
+                  const int height,
+                  nd_item<2> &item)
 {
   uint x = item.get_global_id(1);
   uint y = item.get_global_id(0);
 
-  uint width  = item.get_global_range(1);
-  uint height = item.get_global_range(0);
-
-  float4 Gx = (float4)(0);
-  float4 Gy = Gx;
-
-  int c = x + y * width;
-
   /* Read each texel component and calculate the filtered value using neighbouring texel components */
   if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
   {
+    int c = x + y * width;
+
     float4 i00 = convert_float4(inputImage[c - 1 - width]);
-    float4 i10 = convert_float4(inputImage[c - width]);
-    float4 i20 = convert_float4(inputImage[c + 1 - width]);
-    float4 i01 = convert_float4(inputImage[c - 1]);
+    float4 i01 = convert_float4(inputImage[c - width]);
+    float4 i02 = convert_float4(inputImage[c + 1 - width]);
+
+    float4 i10 = convert_float4(inputImage[c - 1]);
     float4 i11 = convert_float4(inputImage[c]);
-    float4 i21 = convert_float4(inputImage[c + 1]);
-    float4 i02 = convert_float4(inputImage[c - 1 + width]);
-    float4 i12 = convert_float4(inputImage[c + width]);
+    float4 i12 = convert_float4(inputImage[c + 1]);
+
+    float4 i20 = convert_float4(inputImage[c - 1 + width]);
+    float4 i21 = convert_float4(inputImage[c + width]);
     float4 i22 = convert_float4(inputImage[c + 1 + width]);
 
-    Gx =   i00 + (float4)(2) * i10 + i20 - i02  - (float4)(2) * i12 - i22;
-
-    Gy =   i00 - i20  + (float4)(2)*i01 - (float4)(2)*i21 + i02  -  i22;
+    float4 Gx = i00 + (float4)(2) * i10 + i20 - i02  - (float4)(2) * i12 - i22;
+    float4 Gy = i00 - i20  + (float4)(2)*i01 - (float4)(2)*i21 + i02  -  i22;
 
     /* taking root of sums of squares of Gx and Gy */
-    outputImage[c] = convert_uchar4(sycl::hypot(Gx, Gy)/(float4)(2));
+    //outputImage[c] = convert_uchar4(sycl::hypot(Gx, Gy)/(float4)(2));
+    outputImage[c] = convert_uchar4(sycl::sqrt(Gx*Gx + Gy*Gy)/(float4)(2));
   }
 }
 
