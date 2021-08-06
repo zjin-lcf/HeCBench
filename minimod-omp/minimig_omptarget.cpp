@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h> 
+#include <omp.h>
 #include "constants.h"
 #include "data_setup.h"
 
@@ -20,45 +21,52 @@ void target_inner_3d_kernel(
     const float *__restrict__ phi, const float *__restrict__ eta
     ) {
 
-  for (llint x = x3; x <= x4 - 1; x += NDIM)
-    for (llint y = y3; y <= y4 - 1; y += NDIM)
-      for (llint z = z3; z <= z4 - 1; z += NDIM) {
-        float s_u[NDIM+2*R][NDIM+2*R][NDIM+2*R];
-        for (int i = 0; i < NDIM+2*R; i++)
-          for (int j = 0; j < NDIM+2*R; j++)
-            for (int k = 0; k < NDIM+2*R; k++)
-              s_u[i][j][k] = 0;
-        for(llint ui = 0; ui < NDIM; ui++)
-          for(llint uj = 0; uj < NDIM; uj++)
-            for(llint uk = 0; uk < NDIM; uk++) {
+  const int numTeamX =  (z4-z3+NDIM-1) / NDIM; 
+  const int numTeamY =  (y4-y3+NDIM-1) / NDIM; 
+  const int numTeamZ =  (x4-x3+NDIM-1) / NDIM; 
+  const int numTeams = numTeamX*numTeamY*numTeamZ;
+  const int numThreads = NDIM*NDIM*NDIM;
 
-              const int z_side = ui / R;
-              const int y_side = uj / R;
+  #pragma omp target teams num_teams(numTeams)  thread_limit(numThreads)
+  {
+    float s_u[NDIM+2*R][NDIM+2*R][NDIM+2*R];
+    #pragma omp parallel 
+    {
+      const int tk = omp_get_thread_num() % NDIM;
+      const int tj = omp_get_thread_num() / NDIM % NDIM;
+      const int ti = omp_get_thread_num() / (NDIM*NDIM);
 
-              const llint sui = ui+R;
-              const llint suj = uj+R;
-              const llint suk = uk+R;
+      const int gk = omp_get_team_num() % numTeamX;
+      const int gj = omp_get_team_num() / numTeamX % numTeamY;
+      const int gi = omp_get_team_num() / (numTeamX * numTeamY);
 
-              const llint i = x + ui;
-              const llint j = y + uj;
-              const llint k = z + uk;
-              s_u[ui+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
-              s_u[sui][uj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
-              s_u[sui][suj][uk] = u[IDX3_l(i,j,k-R)];
-              s_u[sui][suj][uk+NDIM] = u[IDX3_l(i,j,k+R)];
-            }
+      const llint k = gk * NDIM + tk;
+      const llint j = gj * NDIM + tj;
+      const llint i = gi * NDIM + ti;
 
-        for(llint ui = 0; ui < NDIM; ui++)
-          for(llint uj = 0; uj < NDIM; uj++)
-            for(llint uk = 0; uk < NDIM; uk++) {
-              const llint sui = ui+R;
-              const llint suj = uj+R;
-              const llint suk = uk+R;
-              const llint i = x + ui;
-              const llint j = y + uj;
-              const llint k = z + uk;
-              if  (i <= x4-1 && j <= y4-1 && k <= z4-1) {
-                float lap = coef0 *  s_u[sui][suj][suk] + 
+      s_u[ti][tj][tk] = 0.f;
+
+      if (ti < 2*R && tj < 2*R && tk< 2*R)
+        s_u[NDIM+ti][NDIM+tj][NDIM+tk] = 0.f;
+
+      #pragma omp barrier
+
+      const llint sui = ti + R;
+      const llint suj = tj + R;
+      const llint suk = tk + R;
+
+      const int z_side = ti / R;
+      s_u[ti+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
+      const int y_side = tj / R;
+      s_u[sui][tj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
+      s_u[sui][suj][tk] = u[IDX3_l(i,j,k-R)];
+      s_u[sui][suj][tk+NDIM] = u[IDX3_l(i,j,k+R)];
+
+      #pragma omp barrier
+
+      if (i <= x4-1 && j <= y4-1 && k <= z4-1) {
+
+        float lap = coef0 * s_u[sui][suj][suk] + 
                   coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
                   coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
                   coefz_1 * (s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1]) +
@@ -71,10 +79,10 @@ void target_inner_3d_kernel(
                   coefx_4 * (s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk]) +
                   coefy_4 * (s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk]) +
                   coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
-                v[IDX3_l(i,j,k)] = 2.f * s_u[sui][suj][suk] + vp[IDX3(i,j,k)] * lap - v[IDX3_l(i,j,k)];
-              }
-            }
+        v[IDX3_l(i,j,k)] = 2.f * s_u[sui][suj][suk] + vp[IDX3(i,j,k)] * lap - v[IDX3_l(i,j,k)];
       }
+    }
+  }
 }
 
 void target_pml_3d_kernel(
@@ -89,79 +97,85 @@ void target_pml_3d_kernel(
     const float *__restrict__ u, float *__restrict__ v, const float *__restrict__ vp,
     float *__restrict__ phi, const float *__restrict__ eta
     ) {
-  for (llint x = x3; x <= x4 - 1; x += NDIM)
-    for (llint y = y3; y <= y4 - 1; y += NDIM)
-      for (llint z = z3; z <= z4 - 1; z += NDIM) {
-        float s_u[NDIM+2*R][NDIM+2*R][NDIM+2*R];
-        for (int i = 0; i < NDIM+2*R; i++)
-          for (int j = 0; j < NDIM+2*R; j++)
-            for (int k = 0; k < NDIM+2*R; k++)
-              s_u[i][j][k] = 0;
-        for(llint ui = 0; ui < NDIM; ui++)
-          for(llint uj = 0; uj < NDIM; uj++)
-            for(llint uk = 0; uk < NDIM; uk++) {
+  const int numTeamX =  (z4-z3+NDIM-1) / NDIM; 
+  const int numTeamY =  (y4-y3+NDIM-1) / NDIM; 
+  const int numTeamZ =  (x4-x3+NDIM-1) / NDIM; 
+  const int numTeams = numTeamX*numTeamY*numTeamZ;
+  const int numThreads = NDIM*NDIM*NDIM;
 
-              const int z_side = ui / R;
-              const int y_side = uj / R;
+  #pragma omp target teams num_teams(numTeams)  thread_limit(numThreads)
+  {
+    float s_u[NDIM+2*R][NDIM+2*R][NDIM+2*R];
+    #pragma omp parallel 
+    {
+      const int tk = omp_get_thread_num() % NDIM;
+      const int tj = omp_get_thread_num() / NDIM % NDIM;
+      const int ti = omp_get_thread_num() / (NDIM*NDIM);
 
-              const llint sui = ui+R;
-              const llint suj = uj+R;
-              const llint suk = uk+R;
-              const llint i = x + ui;
-              const llint j = y + uj;
-              const llint k = z + uk;
+      const int gk = omp_get_team_num() % numTeamX;
+      const int gj = omp_get_team_num() / numTeamX % numTeamY;
+      const int gi = omp_get_team_num() / (numTeamX * numTeamY);
 
-              s_u[ui+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
-              s_u[sui][uj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
-              s_u[sui][suj][uk] = u[IDX3_l(i,j,k-R)];
-              s_u[sui][suj][uk+NDIM] = u[IDX3_l(i,j,k+R)];
-            }
+      const llint i = gi * NDIM + ti;
+      const llint j = gj * NDIM + tj;
+      const llint k = gk * NDIM + tk;
 
-        for(llint ui = 0; ui < NDIM; ui++)
-          for(llint uj = 0; uj < NDIM; uj++)
-            for(llint uk = 0; uk < NDIM; uk++) {
-              const llint sui = ui+R;
-              const llint suj = uj+R;
-              const llint suk = uk+R;
-              const llint i = x + ui;
-              const llint j = y + uj;
-              const llint k = z + uk;
+      s_u[ti][tj][tk] = 0.f;
 
-              if  (i <= x4-1 && j <= y4-1 && k <= z4-1) {
-                float lap = coef0 * s_u[sui][suj][suk] + 
-                  coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
-                  coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
-                  coefz_1 * (s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1]) +
-                  coefx_2 * (s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk]) +
-                  coefy_2 * (s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk]) +
-                  coefz_2 * (s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2]) +
-                  coefx_3 * (s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk]) +
-                  coefy_3 * (s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk]) +
-                  coefz_3 * (s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3]) +
-                  coefx_4 * (s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk]) +
-                  coefy_4 * (s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk]) +
-                  coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
+      if (ti < 2*R && tj < 2*R && tk< 2*R)
+        s_u[NDIM+ti][NDIM+tj][NDIM+tk] = 0.f;
 
-                const float s_eta_c = eta[IDX3_eta1(i,j,k)];
+      #pragma omp barrier
 
-                v[IDX3_l(i,j,k)] = ((2.f*s_eta_c + 2.f - s_eta_c*s_eta_c)*s_u[sui][suj][suk] + 
-                    (vp[IDX3(i,j,k)] * (lap + phi[IDX3(i,j,k)]) - v[IDX3_l(i,j,k)])) / 
-                  (2.f*s_eta_c+1.f);
+      const llint sui = ti + R;
+      const llint suj = tj + R;
+      const llint suk = tk + R;
 
-                phi[IDX3(i,j,k)] = 
-                  (phi[IDX3(i,j,k)] - 
-                   ((eta[IDX3_eta1(i+1,j,k)]-eta[IDX3_eta1(i-1,j,k)]) * 
-                    (s_u[sui+1][suj][suk]-s_u[sui-1][suj][suk]) * hdx_2 + 
-                    (eta[IDX3_eta1(i,j+1,k)]-eta[IDX3_eta1(i,j-1,k)]) *
-                    (s_u[sui][suj+1][suk]-s_u[sui][suj-1][suk]) * hdy_2 +
-                    (eta[IDX3_eta1(i,j,k+1)]-eta[IDX3_eta1(i,j,k-1)]) *
-                    (s_u[sui][suj][suk+1]-s_u[sui][suj][suk-1]) * hdz_2)) / (1.f + s_eta_c);
-              }
-            }
+      const int z_side = ti / R;
+      s_u[ti+z_side*NDIM][suj][suk] = u[IDX3_l(i+(z_side*2-1)*R,j,k)];
+      const int y_side = tj / R;
+      s_u[sui][tj+y_side*NDIM][suk] = u[IDX3_l(i,j+(y_side*2-1)*R,k)];
+      s_u[sui][suj][tk] = u[IDX3_l(i,j,k-R)];
+      s_u[sui][suj][tk+NDIM] = u[IDX3_l(i,j,k+R)];
+
+      #pragma omp barrier
+
+      if (i <= x4-1 && j <= y4-1 && k <= z4-1) {
+        float lap = coef0 * s_u[sui][suj][suk] + 
+           coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
+           coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
+           coefz_1 * (s_u[sui][suj][suk+1] + s_u[sui][suj][suk-1]) +
+           coefx_2 * (s_u[sui+2][suj][suk] + s_u[sui-2][suj][suk]) +
+           coefy_2 * (s_u[sui][suj+2][suk] + s_u[sui][suj-2][suk]) +
+           coefz_2 * (s_u[sui][suj][suk+2] + s_u[sui][suj][suk-2]) +
+           coefx_3 * (s_u[sui+3][suj][suk] + s_u[sui-3][suj][suk]) +
+           coefy_3 * (s_u[sui][suj+3][suk] + s_u[sui][suj-3][suk]) +
+           coefz_3 * (s_u[sui][suj][suk+3] + s_u[sui][suj][suk-3]) +
+           coefx_4 * (s_u[sui+4][suj][suk] + s_u[sui-4][suj][suk]) +
+           coefy_4 * (s_u[sui][suj+4][suk] + s_u[sui][suj-4][suk]) +
+           coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
+
+        const float s_eta_c = eta[IDX3_eta1(i,j,k)];
+
+        v[IDX3_l(i,j,k)] = ((2.f*s_eta_c + 2.f - s_eta_c*s_eta_c)*s_u[sui][suj][suk] + 
+             (vp[IDX3(i,j,k)] * (lap + phi[IDX3(i,j,k)]) - v[IDX3_l(i,j,k)])) / 
+           (2.f*s_eta_c+1.f);
+
+        phi[IDX3(i,j,k)] = 
+           (phi[IDX3(i,j,k)] - 
+            ((eta[IDX3_eta1(i+1,j,k)]-eta[IDX3_eta1(i-1,j,k)]) * 
+             (s_u[sui+1][suj][suk]-s_u[sui-1][suj][suk]) * hdx_2 + 
+             (eta[IDX3_eta1(i,j+1,k)]-eta[IDX3_eta1(i,j-1,k)]) *
+             (s_u[sui][suj+1][suk]-s_u[sui][suj-1][suk]) * hdy_2 +
+             (eta[IDX3_eta1(i,j,k+1)]-eta[IDX3_eta1(i,j,k-1)]) *
+             (s_u[sui][suj][suk+1]-s_u[sui][suj][suk-1]) * hdz_2)) / (1.f + s_eta_c);
       }
+    }
+  }
 }
 
 void kernel_add_source_kernel(float *__restrict__ g_u, llint idx, float source) {
+  #pragma omp target
   g_u[idx] += source;
 }
 
@@ -195,6 +209,13 @@ void target(
 
   llint xmax = nx;
   llint ymax = ny;
+
+#pragma omp target data map(tofrom: u[0:size_u]) \
+                        map(to:  v[0:size_u],\
+                                vp[0:size_vp],\
+                               phi[0:size_phi],\
+                               eta[0:size_eta])
+{
 
   const uint npo = 100;
   for (uint istep = 1; istep <= nsteps; ++istep) {
@@ -292,6 +313,7 @@ void target(
       printf("time step %u / %u\n", istep, nsteps);
     }
   }
+}
 
   if (nsteps % 2 == 1) memcpy(v, u, size_u * sizeof(float));
 
