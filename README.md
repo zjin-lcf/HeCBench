@@ -431,6 +431,9 @@ Early results are shown [here](results/README.md)
 ### snake
   Genome pre-alignment filtering (https://github.com/CMU-SAFARI/SneakySnake)
 
+### sobel
+  Sobel filter (https://github.com/OpenCL/AMD_APP_samples)
+
 ### sobol
   Sobol quasi-random generator (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
