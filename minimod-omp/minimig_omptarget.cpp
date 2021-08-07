@@ -40,9 +40,9 @@ void target_inner_3d_kernel(
       const int gj = omp_get_team_num() / numTeamX % numTeamY;
       const int gi = omp_get_team_num() / (numTeamX * numTeamY);
 
-      const llint k = gk * NDIM + tk;
-      const llint j = gj * NDIM + tj;
-      const llint i = gi * NDIM + ti;
+      const llint k = z3 + gk * NDIM + tk;
+      const llint j = y3 + gj * NDIM + tj;
+      const llint i = x3 + gi * NDIM + ti;
 
       s_u[ti][tj][tk] = 0.f;
 
@@ -116,9 +116,9 @@ void target_pml_3d_kernel(
       const int gj = omp_get_team_num() / numTeamX % numTeamY;
       const int gi = omp_get_team_num() / (numTeamX * numTeamY);
 
-      const llint i = gi * NDIM + ti;
-      const llint j = gj * NDIM + tj;
-      const llint k = gk * NDIM + tk;
+      const llint k = z3 + gk * NDIM + tk;
+      const llint j = y3 + gj * NDIM + tj;
+      const llint i = x3 + gi * NDIM + ti;
 
       s_u[ti][tj][tk] = 0.f;
 
