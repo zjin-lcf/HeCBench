@@ -259,6 +259,9 @@ Early results are shown [here](results/README.md)
 ### lavaMD
   LavaMD in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### layout
+  AoS and SoA comparison (https://github.com/OpenCL/AMD_APP_samples)
+
 ### ldpc
   QC-LDPC decoding (https://github.com/robertwgh/cuLDPC)
 
