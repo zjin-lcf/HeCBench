@@ -199,12 +199,12 @@ int main(int argc, char **argv)
   printf("Total frame time is %.1f us\n", frametime);
 
   // dump vertices
-  float3 *pixels = (float3*) malloc (NUM_POINTS_PER_THREAD * NUM_THREADS * sizeof(float3));
+  float3 *pixels = new float3[NUM_POINTS_PER_THREAD * NUM_THREADS];
   cudaMemcpy(pixels, vertices, NUM_POINTS_PER_THREAD * NUM_THREADS * sizeof(float3), cudaMemcpyDeviceToHost);
   for (int i = 0; i < NUM_POINTS_PER_THREAD * NUM_THREADS; i++)
     printf("%d x=%.1f y=%.1f color=%.1f\n", i, pixels[i].x, pixels[i].y, pixels[i].z);
 
-  free(pixels);
+  delete[] pixels;
 
   cudaFree(start_points);
   cudaFree(short_points);
