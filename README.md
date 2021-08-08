@@ -84,6 +84,9 @@ Early results are shown [here](results/README.md)
 ### che
   Phase-field simulation of spinodal decomposition using the Cahn-Hilliard equation (https://github.com/myousefi2016/Cahn-Hilliard-CUDA)
 
+### chemv
+  Complex hermitian matrix-vector multiplication (https://repo.or.cz/ppcg.git)
+
 ### chi2
   The Chi-square 2-df test. The input data must be downloaded before running the test. Please see README for the link.
 
