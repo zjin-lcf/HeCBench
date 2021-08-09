@@ -22,8 +22,8 @@
 
 void reference (uchar4 *verificationOutput,
                 const uchar4 *inputImageData, 
-                const int width,
-                const int height,
+                const uint width,
+                const uint height,
                 const int pixelSize);
 
 static bool compare(const float *refData, const float *data,
