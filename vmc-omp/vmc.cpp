@@ -124,7 +124,9 @@ void initran(const int npoint, unsigned int seed, unsigned int* states) {
   }
 }
 
-void initialize(const int npoint, FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, unsigned int* states) {
+void initialize(const int npoint, FLOAT* x1, FLOAT* y1, FLOAT* z1, 
+                FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, unsigned int* states) {
+  #pragma omp target teams distribute parallel for thread_limit(NTHR_PER_BLK)
   for (int i = 0; i < npoint; i++) {
     x1[i] = (LCG_random(states+i) - HALF)*FOUR;
     y1[i] = (LCG_random(states+i) - HALF)*FOUR;
