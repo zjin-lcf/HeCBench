@@ -6,9 +6,9 @@ inline uchar clamp (float f) {
   return (uchar)f;
 }
 
-// convolution at the achor point (c) using a 3x3 kernel(k) 
+// convolution at the anchor point (c) using a 3x3 kernel(k) 
 // on an image pointed by ptr. The image width is "width"
-void convoluation(float4 &g, const int k[][3], const uchar4 *ptr, const int c, const int width) {
+void conv(float4 &g, const int k[][3], const uchar4 *ptr, const int c, const int width) {
   g.x() =  
     k[0][0] * ptr[c-1-width].x() + k[0][1] * ptr[c-width].x() + k[0][2] * ptr[c+1-width].x() +
     k[1][0] * ptr[c-1].x()       + k[1][1] * ptr[c].x()       + k[1][2] * ptr[c+1].x() +
@@ -37,8 +37,8 @@ void magnitude(uchar4 &result, float4 &gx, float4 &gy) {
 
 void reference (uchar4 *verificationOutput,
                 const uchar4 *inputImageData, 
-                const int width,
-                const int height,
+                const uint width,
+                const uint height,
                 const int pixelSize)
 {
     // x-axis gradient mask
@@ -63,8 +63,8 @@ void reference (uchar4 *verificationOutput,
         if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1) {
           int c = x + y * width;
             float4 gx, gy;
-            convoluation(gx, kx, inputImageData, c, width);
-            convoluation(gy, ky, inputImageData, c, width);
+            conv(gx, kx, inputImageData, c, width);
+            conv(gy, ky, inputImageData, c, width);
 
             uchar4 result;
 	    magnitude(result, gx, gy);
