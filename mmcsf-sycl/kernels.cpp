@@ -397,14 +397,13 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   buffer<ITYPE, 1> dFbrIdx1 (totFbrIdx);
   buffer<ITYPE, 1> dFbrLikeSlcInds (totFbrIdx);
 
-  //if(TiledX[0].ndims == 3)
-    buffer<ITYPE, 1> dInds2 (totNnz);
-
-  //if(TiledX[0].ndims == 4){
-    buffer<ITYPE, 1> dFbrIdx2 (totFbrPtr2);
-    buffer<ITYPE, 1> dFbrPtr2 (totFbrPtr2);
-    buffer<ITYPE, 1> dInds3 (totNnz);
-  //}
+  // conditional buffer allocation will produce undefined variables
+  // ndim = 3
+  buffer<ITYPE, 1> dInds2 (totNnz);
+  // ndim = 4
+  buffer<ITYPE, 1> dFbrIdx2 (totFbrPtr2);
+  buffer<ITYPE, 1> dFbrPtr2 (totFbrPtr2);
+  buffer<ITYPE, 1> dInds3 (totNnz);
 
   // device memory copy for tiled parts
   for (int m = 0; m < TiledX[0].ndims; ++m){  
@@ -478,6 +477,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
         });
     }
   }
+  q.wait();
   std::cout << "Host to device memory copy time (ms): " << (seconds() - t0) * 1000 << std::endl;
 
   //Matrices
@@ -499,7 +499,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   });
 
   q.submit([&] (handler &cgh) {
-    auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode0].nRows * U[mode0].nCols), id<1>(szDU[0]));
+    auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode1].nRows * U[mode1].nCols), id<1>(szDU[0]));
     cgh.copy(&(U[mode1].vals[0]), acc);
   });
 
@@ -755,6 +755,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
         }
         int logOfWarpPerFbr = log2(warpPerFbr);
 
+        printf("%d %d\n", tile_nFibers, TiledX[m].nFibers);
         int grid = ( warpPerFbr * 32 * tile_nFibers + BLOCKSIZE - 1) / BLOCKSIZE;
         range<1> gws (grid * BLOCKSIZE);
         range<1> lws (BLOCKSIZE);
