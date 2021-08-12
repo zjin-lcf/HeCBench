@@ -104,7 +104,9 @@ int main(int argc, const char * argv[]) {
       mValueSum += mValue[i];
     }
 
-#pragma omp target data map(alloc: data[0:bufSize*k], code[0:bufSize*m]) \
+// TODO
+//#pragma omp target data map(alloc: data[0:bufSize*k], code[0:bufSize*m])
+#pragma omp target data map(to: data[0:bufSize*k]) map(from: code[0:bufSize*m]) \
                         map(to: all_columns_bitmatrix[0:k*w*taskSize])
 {
     int warpThreadNum = 32;
@@ -125,7 +127,8 @@ int main(int argc, const char * argv[]) {
     for (int i = 0; i < taskNum; ++i) {
       int count = (i == taskNum-1) ? bufSizeForLastTask : bufSizePerTask;
 
-      #pragma omp target update to (data[i*k*bufSizePerTask : i*k*bufSizePerTask + k*count])
+      // TODO
+      //#pragma omp target update to (data[i*k*bufSizePerTask : i*k*bufSizePerTask + k*count])
 
       int workSizePerGrid = count / sizeof(long);
       int size = workSizePerGrid * sizeof(long);
@@ -139,19 +142,19 @@ int main(int argc, const char * argv[]) {
 
         mValueSum += mValue[j];
       }
-
-      #pragma omp target update from (code[i*m*bufSizePerTask : i*m*bufSizePerTask + m*count])
+      // TODO
+      //#pragma omp target update from (code[i*m*bufSizePerTask : i*m*bufSizePerTask + m*count])
     }
     gettimeofday(&endEncodeTime, NULL);
     printf("Total elapsed time %lf (ms)\n",
       elapsed_time_in_ms(startEncodeTime, endEncodeTime));
+}
 
 #ifdef DUMP
     for (int i = 0; i < bufSize*m; i++) printf("%d\n", code[i]);
     printf("\n");
 #endif
 
-}
     free(mValue);
     free(index);
     free(coding_function_ptrs);
