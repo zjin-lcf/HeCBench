@@ -58,7 +58,7 @@ endif
 #===============================================================================
 
 $(program): jerasure.o galois.o GCRSMatrix.o main.o utils.o
-	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 main.o: main.cpp kernels.cpp utils.h ../crs-sycl/GCRSMatrix.h 
 	$(CC) $(CFLAGS) -c $< -o $@
