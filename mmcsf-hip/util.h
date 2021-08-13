@@ -17,7 +17,6 @@
 #include <sys/time.h>
 #include <iomanip> 
 #include <iostream>
-#include <omp.h>
 
 using namespace std;
 
@@ -420,16 +419,12 @@ inline void sort_MI_CSF(const Tensor &X, TiledTensor *MTX, int m){
     // sort(items.begin(), items.end(), sort_pred);
     boost::sort::sample_sort(items.begin(), items.end(), sort_pred_3D);
 
-#pragma omp parallel 
-    {
-#pragma omp for 
-      for (long idx = 0; idx < MTX[m].totNnz; ++idx) {
+    for (long idx = 0; idx < MTX[m].totNnz; ++idx) {
 
-        MTX[m].inds[mode0][idx] = get<0>(items[idx]);
-        MTX[m].inds[mode1][idx] = get<1>(items[idx]);
-        MTX[m].inds[mode2][idx] = get<2>(items[idx]);
-        MTX[m].vals[idx] = get<3>(items[idx]);
-      }
+      MTX[m].inds[mode0][idx] = get<0>(items[idx]);
+      MTX[m].inds[mode1][idx] = get<1>(items[idx]);
+      MTX[m].inds[mode2][idx] = get<2>(items[idx]);
+      MTX[m].vals[idx] = get<3>(items[idx]);
     }
   }
 
@@ -445,17 +440,13 @@ inline void sort_MI_CSF(const Tensor &X, TiledTensor *MTX, int m){
     }
     boost::sort::sample_sort(items.begin(), items.end(), sort_pred_4D);
 
-    // #pragma omp parallel 
-    {
-      // #pragma omp for 
-      for (long idx = 0; idx < MTX[m].totNnz; ++idx) {
+    for (long idx = 0; idx < MTX[m].totNnz; ++idx) {
 
-        MTX[m].inds[mode0][idx] = get<0>(items[idx]);
-        MTX[m].inds[mode1][idx] = get<1>(items[idx]);
-        MTX[m].inds[mode2][idx] = get<2>(items[idx]);           
-        MTX[m].inds[mode3][idx] = get<3>(items[idx]);
-        MTX[m].vals[idx] = get<4>(items[idx]);
-      }
+      MTX[m].inds[mode0][idx] = get<0>(items[idx]);
+      MTX[m].inds[mode1][idx] = get<1>(items[idx]);
+      MTX[m].inds[mode2][idx] = get<2>(items[idx]);           
+      MTX[m].inds[mode3][idx] = get<3>(items[idx]);
+      MTX[m].vals[idx] = get<4>(items[idx]);
     }
   } 
 
@@ -810,15 +801,11 @@ inline void create_fbrLikeSlcInds(TiledTensor *TiledX, int mode){
 
   TiledX[mode].fbrLikeSlcInds = (ITYPE *)malloc( TiledX[mode].nFibers * sizeof(ITYPE));
 
-#pragma omp parallel 
-  {
-#pragma omp for    
-    for(ITYPE slc = 0; slc < TiledX[mode].fbrIdx[0].size(); ++slc) {
+  for(ITYPE slc = 0; slc < TiledX[mode].fbrIdx[0].size(); ++slc) {
 
-      for (int fbr = TiledX[mode].fbrPtr[0][slc]; fbr < TiledX[mode].fbrPtr[0][slc+1]; ++fbr){  
+    for (int fbr = TiledX[mode].fbrPtr[0][slc]; fbr < TiledX[mode].fbrPtr[0][slc+1]; ++fbr){  
 
-        TiledX[mode].fbrLikeSlcInds[fbr] =   TiledX[mode].fbrIdx[0][slc] ;     
-      }
+      TiledX[mode].fbrLikeSlcInds[fbr] =   TiledX[mode].fbrIdx[0][slc] ;     
     }
   }
 }
@@ -848,8 +835,6 @@ inline int populate_paritions(Tensor &X, TiledTensor *MTX){
     MTX[i].vals = new DTYPE[X.totnnzPerPart[i]];
   }
 
-  // do parallel
-  // #pragma omp parallel for reduction(+:nnzCntr[mode])
   for (int idx = 0; idx < X.totNnz; ++idx){
 
     int mode = X.partPerNnz[idx];
