@@ -61,6 +61,9 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj)
 
+test:
+	./$(program) -i 1 -s 32 -r 11 -b 1 -c 1
+
 run: $(program)
 	./$(program) -i 100 -s 128 -r 11 -b 1 -c 1
 
