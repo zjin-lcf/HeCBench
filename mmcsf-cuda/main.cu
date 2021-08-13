@@ -4,7 +4,6 @@
 #include <iterator>
 #include <utility>  
 #include <cmath> 
-#include <omp.h>
 #include <bits/stdc++.h> 
 #include "mttkrp_cpu.h"
 #include "mttkrp_gpu.h" 
