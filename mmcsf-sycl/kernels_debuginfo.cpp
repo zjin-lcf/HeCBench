@@ -512,6 +512,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
       cgh.copy(&(U[mode3].vals[0]), acc);
     });
 
+  //q.wait();
 
   dLoc = 0, dSlcLoc = 0, dSlcIdxLoc = 0; dFbrLoc =0, dFbrIdxLoc = 0, dFbrLoc2= 0;
 
@@ -566,6 +567,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
           cgh.fill(acc, (DTYPE)0);
         });
       }
+      //q.wait();
     }
 
     for (int m = 0; m < TiledX[0].ndims; ++m){
@@ -682,6 +684,10 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
             });
           });
 	  q.wait();
+#ifdef DEBUG
+	  auto hU = dU.get_access<sycl_read>();
+	  for (int i = 0; i < mtxSize; i++) printf("slc: %d %f\n", i, hU[i]);
+#endif
         }
       }
 
@@ -733,6 +739,10 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
           });
         });
 	q.wait();
+#ifdef DEBUG
+	  auto hU = dU.get_access<sycl_read>();
+	  for (int i = 0; i < mtxSize; i++) printf("fbrs: %d %f\n", i, hU[i]);
+#endif
       }
 
       else if(TiledX[m].modeOrder[TiledX[0].ndims-2] == MTTKRPmode && TiledX[m].totNnz){
@@ -811,6 +821,10 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
             });
           });
 	  q.wait();
+#ifdef DEBUG
+	  auto hU = dU.get_access<sycl_read>();
+	  for (int i = 0; i < mtxSize; i++) printf("fbr: %d %f\n", i, hU[i]);
+#endif
         }
       }
 
@@ -890,6 +904,10 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
             });
           });
 	  q.wait();
+#ifdef DEBUG
+	  auto hU = dU.get_access<sycl_read>();
+	  for (int i = 0; i < mtxSize; i++) printf("nnz: %d %f\n", i, hU[i]);
+#endif
 	}
       }
     }
