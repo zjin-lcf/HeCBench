@@ -17,7 +17,6 @@
 #include <sys/time.h>
 #include <iomanip> 
 #include <iostream>
-#include <omp.h>
 
 using namespace std;
 
