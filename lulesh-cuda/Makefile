@@ -27,7 +27,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_70
 
 # Linker Flags
 LDFLAGS = 
@@ -60,6 +60,9 @@ $(program): $(obj)
 
 clean:
 	rm -rf $(program) $(obj)
+
+test: $(program)
+	./$(program) -i 1 -s 32 -r 11 -b 1 -c 1
 
 run: $(program)
 	./$(program) -i 100 -s 128 -r 11 -b 1 -c 1
