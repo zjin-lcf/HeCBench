@@ -89,10 +89,11 @@ int main(int argc, char* argv[]){
   }
   printf("Sort,createCSF,createFbrIND - time: %.3f sec \n", seconds() - t0);
 
-  t0 = seconds();
   printf("Starting MM-CSF on a GPU\n");
 
+  t0 = seconds();
   MTTKRP_MIHCSR_GPU(ModeWiseTiledX, U, Opt);
+  printf("Total GPU time: %.3f sec \n", seconds() - t0);
 
   if(!Opt.outFileName.empty()){
     printf("Save results to a file\n");
