@@ -108,6 +108,9 @@ Early results are shown [here](results/README.md)
 ### convolutionSeperable 
   Convolution filter of a 2D image with separable kernels (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### crs 
+  Cauchy Reed-Solomon encoding (https://www.comp.hkbu.edu.hk/~chxw/gcrs.html)
+
 ### d2q9_bgk
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
@@ -337,6 +340,9 @@ Early results are shown [here](results/README.md)
 ### mkl-sgemm
   Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
 
+### mmcsf
+  MTTKRP kernel using mixed-mode CSF (https://github.com/isratnisa/MM-CSF)
+
 ### morphology
   Morphological operators: Erosion and Dilation (https://github.com/yszheda/CUDA-Morphology)
 
@@ -516,7 +522,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bernhard Esslinger, Bert de Jong, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bernhard Esslinger, Bert de Jong, Chengjian Liu, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also used resources at the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
