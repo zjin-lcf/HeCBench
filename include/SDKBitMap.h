@@ -40,7 +40,7 @@ static const short bitMapID = 19778;
  * uchar4
  * struct implements a vector of chars
  */
-typedef struct
+typedef struct __attribute__((__aligned__(4)))
 {
   unsigned char x;
   unsigned char y;
@@ -48,7 +48,7 @@ typedef struct
   unsigned char w;
 } uchar4;
 
-typedef struct
+typedef struct __attribute__((__aligned__(16)))
 {
   float x;
   float y;
