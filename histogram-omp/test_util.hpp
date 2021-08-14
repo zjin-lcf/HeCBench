@@ -42,43 +42,50 @@
 #include <chrono>
 #include "mersenne.h"
 
-typedef struct {
+typedef struct __attribute__((__aligned__(16)))
+{
     float x;
     float y;
     float z;
     float w;
 } float4;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(16)))
+{
     float x;
     float y;
     float z;
 } float3;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(8)))
+{
     float x;
     float y;
 } float2;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(32)))
+{
     double x;
     double y;
     double z;
     double w;
 } double4;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(32)))
+{
     double x;
     double y;
     double z;
 } double3;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(16)))
+{
     double x;
     double y;
 } double2;
 
-typedef struct {
+typedef struct __attribute__((__aligned__(4)))
+{
     unsigned char x;
     unsigned char y;
     unsigned char z;
