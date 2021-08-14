@@ -12,6 +12,9 @@ Early results are shown [here](results/README.md)
 ### aes
   AES encrypt and decrypt (https://github.com/Multi2Sim/m2s-bench-amdsdk-2.5-src)
 
+### align-types
+  Alignment specification for variables of structured types (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### affine
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
 
