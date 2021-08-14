@@ -14,8 +14,21 @@
 #include <omp.h>
 #include "shrUtils.h"
 
-typedef struct { float x; float y; float z; float w; } float4 ;
-typedef struct { unsigned char x; unsigned char y; unsigned char z; unsigned char w; } uchar4 ;
+typedef struct __attribute__((__aligned__(4)))
+{
+  unsigned char x;
+  unsigned char y;
+  unsigned char z;
+  unsigned char w;
+} uchar4;
+
+typedef struct __attribute__((__aligned__(16)))
+{
+  float x;
+  float y;
+  float z;
+  float w;
+} float4;
 
 extern
 void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
