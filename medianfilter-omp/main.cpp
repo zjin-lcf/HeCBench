@@ -12,7 +12,14 @@
 #include <omp.h>
 #include "shrUtils.h"
 
-typedef struct { unsigned char x; unsigned char y; unsigned char z; unsigned char w; } uchar4 ;
+typedef struct __attribute__((__aligned__(4)))
+{
+  unsigned char x;
+  unsigned char y;
+  unsigned char z;
+  unsigned char w;
+} uchar4;
+
 
 #ifndef min
 #define min(a,b) (a < b ? a : b)
