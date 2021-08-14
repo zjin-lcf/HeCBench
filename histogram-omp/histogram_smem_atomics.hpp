@@ -25,9 +25,9 @@
  *
  ******************************************************************************/
 template <
-int         ACTIVE_CHANNELS,
-      int         NUM_BINS,
-  typename    PixelType>
+  int ACTIVE_CHANNELS,
+  int NUM_BINS,
+  typename PixelType>
 double run_smem_atomics(
     PixelType* image,
     int width,
