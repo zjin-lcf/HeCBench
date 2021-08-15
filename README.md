@@ -51,6 +51,9 @@ Early results are shown [here](results/README.md)
 ### bfs
   The breadth-first search in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### binomial
+  Evaluate fair call price for a given set of European options under binomial model (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
 
