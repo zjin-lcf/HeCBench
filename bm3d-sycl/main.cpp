@@ -5,6 +5,13 @@
 #define cimg_display 0
 #include "CImg.h"
 
+// adjust the size of the total shared local memory for different GPUs
+#define TOTAL_SLM     48*1024
+
+// adjust the thread block size of the block matching kernel
+// for different GPUs. The maximum thread block size is 32 * MAX_NUM_WARPS
+#define MAX_NUM_WARPS 16u
+
 using namespace cimg_library;
 
 int main(int argc, char** argv)
@@ -136,8 +143,7 @@ int main(int argc, char** argv)
   const uint s_image_p_size = p_block_width * k * sizeof(uchar);
 
   // e.g. 48KB on P100
-  //const uint shared_mem_available = 16384 - s_image_p_size;
-  const uint shared_mem_available = 48*1024 - s_image_p_size;
+  const uint shared_mem_available = TOTAL_SLM - s_image_p_size;
 
   //Block-matching shared memory sizes per warp
   const uint s_diff_size = p_block_width * sizeof(uint);
@@ -145,7 +151,7 @@ int main(int argc, char** argv)
   const uint s_patch_stacks_size = N * warpSize * sizeof(uint);
 
   const uint num_warps = std::min(shared_mem_available / 
-    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), 16u);
+    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), MAX_NUM_WARPS);
   uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) + 
     s_image_p_size;    
 
