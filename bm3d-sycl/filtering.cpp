@@ -322,7 +322,7 @@ void aggregate_final(
   if (idx >= image_dim.x() || idy >= image_dim.y()) return;
 
   int value = sycl::rint(numerator[ idx2(idx,idy,image_dim.x()) ] /
-                         denominator[ idx2(idx,idy,image_dim.x()) ] );
+                         denominator[ idx2(idx,idy,image_dim.x()) ]);
   if (value < 0) value = 0;
   if (value > 255) value = 255;
   result[ idx2(idx,idy,image_dim.x()) ] = (uchar)value;

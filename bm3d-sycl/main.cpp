@@ -1,9 +1,12 @@
 #include <iostream>
 #include <string>
+#include <chrono>
 
 #include "bm3d.hpp"
 #define cimg_display 0
 #include "CImg.h"
+
+#define REPEAT 100
 
 using namespace cimg_library;
 
@@ -85,7 +88,6 @@ int main(int argc, char** argv)
   const int height = image.height();
   size_t image_size = width * height;
 
-{
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -95,7 +97,7 @@ int main(int argc, char** argv)
 
   for(uint i = 0; i < channels; ++i) {
     d_noisy_image.emplace_back(buffer<uchar, 1> (image.data()+i*image_size, image_size));
-    d_denoised_image.emplace_back(buffer<uchar, 1> (dst_image.data()+i*image_size, image_size));
+    d_denoised_image.emplace_back(buffer<uchar, 1> (image_size));
     d_numerator.emplace_back(buffer<float, 1> (image_size));
     d_denominator.emplace_back(buffer<float, 1> (image_size));
   }
@@ -112,17 +114,6 @@ int main(int argc, char** argv)
   //Weights for aggregation
   buffer<float, 1> d_w_P (h_batch_size.x() * h_batch_size.y());
 
-  for(uint i = 0; i < channels; ++i) {
-    q.submit([&](handler &cgh) {
-      auto acc = d_numerator[i].get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&](handler &cgh) {
-      auto acc = d_denominator[i].get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-  }
 
   //image dimensions
   const uint2 image_dim (width, height);
@@ -205,6 +196,24 @@ int main(int argc, char** argv)
   //Kaiser window used for aggregation
   buffer<float, 1> d_kaiser_window (kaiserWindow.data(), k * k);
 
+  // start measuring the total time
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // repeat the execution of kernels
+  for (int n = 0; n < REPEAT; n++) {
+
+  for(uint i = 0; i < channels; ++i) {
+    q.submit([&](handler &cgh) {
+      auto acc = d_numerator[i].get_access<sycl_discard_write>(cgh);
+      cgh.fill(acc, 0.f);
+    });
+
+    q.submit([&](handler &cgh) {
+      auto acc = d_denominator[i].get_access<sycl_discard_write>(cgh);
+      cgh.fill(acc, 0.f);
+    });
+  }
+
   //Batch processing: in each iteration only the batch_size reference patches are processed. 
   uint2 start_point;
   for(start_point.y() = 0; start_point.y() < stacks_dim.y() + p - 1; 
@@ -245,13 +254,9 @@ int main(int argc, char** argv)
             gws                      // Global work size
                );
 
-        
-        q.wait();
-
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size, 
                      lws_tr, gws_tr);
-
 
         // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
         //      3D group of a batch to complete the 3D transform.
@@ -262,7 +267,7 @@ int main(int argc, char** argv)
         run_hard_treshold_block(
             q,
             start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN/OUT: 3D groups with thransfomed patches
+            d_gathered_stacks,     // IN/OUT: 3D groups with transfomed patches
             d_w_P,                 // OUT: Weight of each 3D group
             d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
             stacks_dim,            // IN: Dimensions limiting addresses of reference patches
@@ -273,18 +278,14 @@ int main(int argc, char** argv)
             s_size_t               // Shared memory size
             );
 
-        q.wait();
-
         //Apply inverse 2D DCT transform to each layer of 3D group
         run_IDCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size, lws_tr, gws_tr);
-
-        q.wait();
 
         //Aggregates filtered patches of all 3D groups of a batch into numerator and denominator buffers
         run_aggregate_block(
             q,
             start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN: 3D groups with thransfomed patches
+            d_gathered_stacks,     // IN: 3D groups with transfomed patches
             d_w_P,                 // IN: Numbers of non zero coeficients after 3D thresholding
             d_stacks,              // IN: Array of adresses of similar patches
             d_kaiser_window,       // IN: Kaiser window
@@ -297,10 +298,9 @@ int main(int argc, char** argv)
             lws,           // Threads in block
             gws             // Blocks in grid
             );
-        q.wait();
       }
-    }  
-  }  
+    }
+  }
 
   //Divide numerator by denominator and save the result in output image
   for (uint channel = 0; channel < channels; ++channel)
@@ -314,9 +314,22 @@ int main(int argc, char** argv)
         lws_f,             // Threads in block
         gws_f               // Blocks in grid
         );
-    q.wait();
+
+
+    q.submit([&](handler &cgh) {
+      auto acc = d_denoised_image[channel].get_access<sycl_read>(cgh);
+      cgh.copy(acc, dst_image.data() + channel * image_size); 
+    });
   }
-}
+  q.wait();
+
+  } // REPEAT
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  double gpuTime = (double)elapsed_seconds.count();
+  std::cout << "Total time (s):" << gpuTime << std::endl;
+
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
