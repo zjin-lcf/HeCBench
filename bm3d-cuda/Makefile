@@ -4,8 +4,8 @@
 
 # Compiler can be set below, or via environment variable
 CC        = nvcc
-OPTIMIZE  = no
-DEBUG     = yes
+OPTIMIZE  = yes
+DEBUG     = no
 
 #===============================================================================
 # Program name & source code list
