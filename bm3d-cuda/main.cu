@@ -1,9 +1,12 @@
 #include <iostream>
 #include <string>
+#include <chrono>
 
 #include "bm3d.hpp"
 #define cimg_display 0
 #include "CImg.h"
+
+#define REPEAT 100
 
 using namespace cimg_library;
 
@@ -123,16 +126,6 @@ int main(int argc, char** argv)
   cuda_error_check( cudaMalloc((void**)&d_kaiser_window, 
         sizeof(float) * k * k) );
 
-  // Copy images to device
-  for(uint i = 0; i < channels; ++i) 
-    cuda_error_check( cudaMemcpy(d_noisy_image[i],
-          image.data()+i*image_size,image_size*sizeof(uchar), cudaMemcpyHostToDevice));
-
-  for(auto & it : d_numerator) 
-    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
-
-  for(auto & it : d_denominator)
-    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
   //image dimensions
   const uint2 image_dim = make_uint2(width, height);
@@ -155,7 +148,7 @@ int main(int argc, char** argv)
   const uint s_patch_stacks_size = N * warpSize * sizeof(uint);
 
   const uint num_warps = std::min(shared_mem_available / 
-    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), 32u);
+    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), 16u);
   uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) + 
     s_image_p_size;    
 
@@ -212,8 +205,25 @@ int main(int argc, char** argv)
     for (unsigned i = 0; i < k * k; i++)
       kaiserWindow[i] = 1.0f;
 
+  // Copy images to device
+  for(uint i = 0; i < channels; ++i) 
+    cuda_error_check( cudaMemcpy(d_noisy_image[i],
+          image.data()+i*image_size,image_size*sizeof(uchar), cudaMemcpyHostToDevice));
+
   cuda_error_check( cudaMemcpy(d_kaiser_window, &kaiserWindow[0],
     k*k*sizeof(float), cudaMemcpyHostToDevice));
+
+  // start measuring the total time
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // repeat the execution of kernels
+  for (int n = 0; n < REPEAT; n++) {
+
+  for(auto & it : d_numerator) 
+    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
+
+  for(auto & it : d_denominator)
+    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
   //Batch processing: in each iteration only the batch_size reference patches are processed. 
   uint2 start_point;
@@ -237,8 +247,8 @@ int main(int argc, char** argv)
           lmem_size_bm           // Shared memory size
           );
 
-      cuda_error_check( cudaGetLastError() );
-      cuda_error_check( cudaDeviceSynchronize() );
+      //cuda_error_check( cudaGetLastError() );
+      //cuda_error_check( cudaDeviceSynchronize() );
 
       for (uint channel = 0; channel < channels; ++channel)
       {
@@ -256,8 +266,8 @@ int main(int argc, char** argv)
             num_blocks               // Blocks in grid
                );
 
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
 
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
@@ -274,7 +284,7 @@ int main(int argc, char** argv)
 
         run_hard_treshold_block(
             start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN/OUT: 3D groups with thransfomed patches
+            d_gathered_stacks,     // IN/OUT: 3D groups with transfomed patches
             d_w_P,                 // OUT: Weight of each 3D group
             d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
             stacks_dim,            // IN: Dimensions limiting addresses of reference patches
@@ -285,19 +295,19 @@ int main(int argc, char** argv)
             s_size_t               // Shared memory size
             );
 
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
 
         //Apply inverse 2D DCT transform to each layer of 3D group
         run_IDCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
 
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
 
         //Aggregates filtered patches of all 3D groups of a batch into numerator and denominator buffers
         run_aggregate_block(
             start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN: 3D groups with thransfomed patches
+            d_gathered_stacks,     // IN: 3D groups with transfomed patches
             d_w_P,                 // IN: Numbers of non zero coeficients after 3D thresholding
             d_stacks,              // IN: Array of adresses of similar patches
             d_kaiser_window,       // IN: Kaiser window
@@ -310,10 +320,10 @@ int main(int argc, char** argv)
             num_threads,           // Threads in block
             num_blocks             // Blocks in grid
             );
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
       }
-    }  
+    }
   }  
 
   //Divide numerator by denominator and save the result in output image
@@ -327,18 +337,22 @@ int main(int argc, char** argv)
         num_threads_f,             // Threads in block
         num_blocks_f               // Blocks in grid
         );
-    cuda_error_check( cudaGetLastError() );
-    cuda_error_check( cudaDeviceSynchronize() );
-  }
-
-  for (uint channel = 0; channel < channels; ++channel)
-  {
+    //cuda_error_check( cudaGetLastError() );
+    //cuda_error_check( cudaDeviceSynchronize() );
     cuda_error_check( cudaMemcpy(
           dst_image.data()+channel*image_size,
           d_denoised_image[channel],
           image_size*sizeof(uchar), 
           cudaMemcpyDeviceToHost) );
   }
+
+  } // REPEAT
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  double gpuTime = (double)elapsed_seconds.count();
+  std::cout << "Total time (s):" << gpuTime << std::endl;
+
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
