@@ -60,6 +60,9 @@ Early results are shown [here](results/README.md)
 ### black-scholes
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
 
+### bm3d
+  Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
+
 ### bn
   Bayesian network learning (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
 
@@ -101,6 +104,9 @@ Early results are shown [here](results/README.md)
 
 ### clink
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
+
+### cmp
+  Seismic processing using the classic common midpoint (CMP) method (https://github.com/hpg-cepetro/IPDPS-CRS-CMP-code)
 
 ### cobahh
   Simulation of Random Network of Hodgkin and Huxley Neurons with Exponential Synaptic Conductances (https://dl.acm.org/doi/10.1145/3307339.3343460)
@@ -297,6 +303,9 @@ Early results are shown [here](results/README.md)
 
 ### lulesh
   Livermore unstructured Lagrangian explicit shock hydrodynamics (https://github.com/LLNL/LULESH)
+
+### match
+  Compute matching scores for two 16K 128D feature points (https://github.com/Celebrandil/CudaSift)
 
 ### matrix-mul
   Single-precision floating-point matrix multiply
@@ -528,7 +537,7 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 
 ## Acknowledgement
 I would like to thank people who answered my questions about their codes: 
-Bernhard Esslinger, Bert de Jong, Chengjian Liu, David Oro, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bernhard Esslinger, Bert de Jong, Chengjian Liu, David Oro, Edson Borin, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Matthias Noack, Mike Giles, Mohammed Alser, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Robert Harrison, Thomas Applencourt, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also used resources at the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
