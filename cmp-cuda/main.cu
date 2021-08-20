@@ -327,11 +327,9 @@ int main(int argc, const char** argv) {
 
   h_init_half(ttraces, h_scalco, h_gx, h_gy, h_sx, h_sy, h_h);
 
-  real* h_cdpsmpl = (real*) malloc (sizeof(real)*ntrs*ns);
   for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
     int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
     int t_idf = ntraces_by_cdp_id[cdp_id];
-    int stride = t_idf - t_id0;
 
     // Compute semblances for each c for each sample
     h_compute_semblances(
