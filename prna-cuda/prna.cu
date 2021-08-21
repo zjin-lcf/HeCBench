@@ -13,7 +13,7 @@
 /* penalty for a helix terminated by a pair containing a U */
 DEV static real_t terminal_U_penalty(const base_t *s, const int i, const int j, param_t p)
 {
-  return s[i] == U || s[j] == U ? p->terminal_AU_penalty : 0.0;
+  return s[i] == U || s[j] == U ? p->terminal_AU_penalty : RCONST(0.);
 }
 
 DEV static real_t dangle_3p_energy(const base_t *s,
@@ -172,10 +172,9 @@ DEV static real_t internal_loop_energy(const base_t *s,
   else
     sp = &p->tstacki;
   return p->internal_loop_initiation[d1+d2] + 
-    real_min(p->fm_array_first_element*abs(d1-d2), p->maximum_correction) +
+    real_min(p->fm_array_first_element * abs(d1-d2), p->maximum_correction) +
     (*sp)[s[i]][s[j]][s[i+1]][s[j-1]] +
     (*sp)[s[jp]][s[ip]][s[jp+1]][s[ip-1]];
-  
 }
 
 /* return -ln(e^-a + e^-b) */
@@ -233,7 +232,7 @@ DEV static int is_interior(int i, int j)
   return i < j;
 }
 
-DEV HOST real_t* array_val(real_t *a, int i, int j, int n, const int *bcp)
+DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int *__restrict bcp)
 {
   return can_pair(i,j,n,bcp) ? &a[ind(i,j,n)] : 0;
 }
@@ -248,8 +247,15 @@ DEV HOST real_t* array_val(real_t *a, int i, int j, int n, const int *bcp)
 #endif
 
 GLOBAL static void calc_hairpin_stack_exterior_multibranch
-(int d, int n, base_t *s, int *bcp, real_t *v, real_t *x, 
- real_t *w5, real_t *w3, param_t p)
+(const int d, 
+ const int n, 
+ const base_t *__restrict s, 
+ const int *__restrict bcp, 
+ real_t *__restrict v, 
+ const real_t *__restrict x, 
+ const real_t *__restrict w5, 
+ const real_t *__restrict w3, 
+ const param_t p)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -315,7 +321,12 @@ DEV static void free_energy_reduce(real_t *x, int tid, int nt)
 #endif /* __CUDACC__ */
 
 GLOBAL static void calc_internal
-(int d, int n, base_t *s, int *bcp, real_t *v, param_t p)
+(const int d,
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ const param_t p)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -400,15 +411,15 @@ DEV static real_t coaxial_mismatch2(const base_t *s,
 } 
 
 GLOBAL static void calc_coaxial
-(int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp, /* base can pair? */
- real_t *v, /* n x n */
- real_t *y, /* n x n */
- real_t *w5, /* n+1 */
- real_t *w3, /* n+1 */
- param_t p) 
+(const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ const real_t *__restrict y,
+ const real_t *__restrict w5,
+ const real_t *__restrict w3,
+ const param_t p) 
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -530,16 +541,16 @@ GLOBAL static void calc_coaxial
  ***/
 
 GLOBAL static void calc_wl
-(int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp, /* base can pair? */
- real_t *v, /* n x n */
- real_t *z, /* n x n */
- real_t *wq, /* n(n-1)/2 array - only i < j */
- real_t *w, /* 2 x n */
- real_t *wl, /* 2 x n */
- param_t p) 
+(const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ real_t *__restrict z,
+ real_t *__restrict wq,
+ real_t *__restrict w,
+ real_t *__restrict wl,
+ const param_t p) 
 {
   int i;
 
@@ -584,11 +595,11 @@ GLOBAL static void calc_wl
 } /* end calc_wl */
 
 GLOBAL static void calc_xl
-(int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- real_t *z, /* n x n */
- real_t *yl, /* n x n */
- real_t *xl) /* 2 x n */
+(const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const real_t *__restrict z,
+ const real_t *__restrict yl,
+ real_t *__restrict xl)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -629,15 +640,15 @@ GLOBAL static void calc_xl
 } /* end calc_xl */
 
 GLOBAL static void calc_z
-(int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp,  /* base can pair? */
- real_t *v, /* n x n */
- real_t *z, /* n x n */
- real_t *xl, /* 2 x n */
- real_t *wq, /* n(n-1)/2 array - only i < j */
- param_t p) 
+(const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ real_t *__restrict z,
+ real_t *__restrict xl,
+ real_t *__restrict wq,
+ const param_t p) 
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -684,15 +695,15 @@ GLOBAL static void calc_z
 } /* end calc_z */
 
 GLOBAL static void calc_x
-(int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- real_t *yl, /* n x n */
- real_t *y, /* n x n */
- real_t *w, /* 2 x n */
- real_t *wl, /* 2 x n */
- real_t *xl, /* 2 x n */
- real_t *x, /* 5 x n */
- param_t p) 
+(const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ real_t *__restrict yl,
+ real_t *__restrict y,
+ const real_t *__restrict w,
+ const real_t *__restrict wl,
+ real_t *__restrict xl,
+ real_t *__restrict x,
+ const param_t p) 
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -719,7 +730,12 @@ GLOBAL static void init_w5_and_w3(int n, real_t *w5, real_t *w3)
   w5[-1] = w5[0] = w3[n-1] = w3[n] = 0;
 }
 
-GLOBAL static void calc_w5_and_w3(int d, int n, real_t *w5, real_t *w3, real_t *wq)
+GLOBAL static void calc_w5_and_w3(
+  const int d, 
+  const int n, 
+  real_t *__restrict w5,
+  real_t *__restrict w3,
+  const real_t *__restrict wq)
 {
 #ifdef __CUDACC__
   const int istart = threadIdx.x;
