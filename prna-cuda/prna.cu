@@ -810,12 +810,9 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
   CU(cudaMalloc(&dev_bcp,(n*(n-1)/2)*sizeof(int)));
   CU(cudaMemcpy(dev_bcp, p->base_can_pair, (n*(n-1)/2)*sizeof(int), cudaMemcpyHostToDevice));
 
-  int d;
-  float t1=0, t2=0, t3=0, t4=0, t5=0, t6=0, t7=0, t8=0;
-
   init_w5_and_w3<<<1,1>>>(n,w5,w3);
 
-  for (d = 0; d < n-1; d++) {
+  for (int d = 0; d < n-1; d++) {
 
     calc_hairpin_stack_exterior_multibranch<<<n,1>>>(d, n, dev_s, dev_bcp, v, x, w5, w3, dev_par);
 
