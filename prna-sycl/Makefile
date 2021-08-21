@@ -1,0 +1,70 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = dpcpp
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+c_source = main.c base.c param.c util.c
+sycl_source = prna.cpp 
+
+obj = $(c_source:.c=.o) $(sycl_source:.cpp=.o) 
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -D__CUDACC__ -DFLOAT -std=c++14 -Wall -I../include
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3 -ffast-math
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+base.o : base.c base.h util.h
+main.o : main.c prna.h util.h base.h
+param.o : param.c param.h util.h  real.h
+prna.o : prna.cpp base.h prna.h util.h param.h real.h
+util.o : util.c util.h
+
+clean:
+	rm -rf $(program) $(obj)
+
+test: $(program)
+	./$(program) ../prna-cuda/test.seq
+
+run: $(program)
+	./$(program) ../prna-cuda/HIV1-NL43.seq
