@@ -1,0 +1,5 @@
+outs:
+- md5: 6f4e61c747d87f9db9ede78c3ffb74a2
+  size: 1574971
+  hash: md5
+  path: data_tables.tar.gz
