@@ -21,7 +21,7 @@ struct prna
   void prna_write_neg_log10_probabilities(const prna_t, const char *fn);
   void prna_write_probability_matrix(const prna_t, const char *fn);
   void prna_write_probknot(const prna_t, const char *fn, const char *s, int min_helix_length);
-  real_t* array_val(real_t *a, int i, int j, int n, const int *bcp);
+  DEV HOST real_t* array_val(real_t *a, int i, int j, int n, const int *bcp);
   real_t probability_of_pair(const prna_t p, int i, int j);
   
   int *generate_bcp(const char *s);
