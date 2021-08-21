@@ -1,0 +1,5 @@
+outs:
+- md5: dc9568e222cdaeaf87f7b867294ecf98
+  size: 289
+  hash: md5
+  path: test.tar.gz
