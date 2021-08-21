@@ -14,7 +14,7 @@
 /* penalty for a helix terminated by a pair containing a U */
 DEV static real_t terminal_U_penalty(const base_t *s, const int i, const int j, param_t p)
 {
-  return s[i] == U || s[j] == U ? p->terminal_AU_penalty : 0.0;
+  return s[i] == U || s[j] == U ? p->terminal_AU_penalty : RCONST(0.);
 }
 
 DEV static real_t dangle_3p_energy(const base_t *s,
@@ -117,7 +117,6 @@ DEV static real_t hairpin_loop_energy(const base_t *s,
     e += p->bonus_for_GGG_hairpin;
   
   return e;
-  
 }
 
 DEV static real_t real_min(real_t a, real_t b) { return a < b ? a : b; }
@@ -173,7 +172,7 @@ DEV static real_t internal_loop_energy(const base_t *s,
   else
     sp = &p->tstacki;
   return p->internal_loop_initiation[d1+d2] + 
-    real_min(p->fm_array_first_element*sycl::abs(d1-d2), p->maximum_correction) +
+    real_min(p->fm_array_first_element * sycl::abs(d1-d2), p->maximum_correction) +
     (*sp)[s[i]][s[j]][s[i+1]][s[j-1]] +
     (*sp)[s[jp]][s[ip]][s[jp+1]][s[ip-1]];
   
@@ -207,7 +206,7 @@ DEV HOST static int upper_triangle_index(int i, int j)
   return (j*(j-1))/2 + i;
 }
 
-DEV HOST inline static int can_pair(int i, int j, int n, const int *bcp)
+DEV HOST inline static int can_pair(int i, int j, int n, const int *__restrict bcp)
 {
     if (i>=0 && j<=n-1 && i != j && j>=0 && i<=n-1){
       if (i < j)
@@ -234,7 +233,7 @@ DEV static int is_interior(int i, int j)
   return i < j;
 }
 
-DEV HOST real_t* array_val(real_t *a, int i, int j, int n, const int *bcp)
+DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int *__restrict bcp)
 {
   return can_pair(i,j,n,bcp) ? &a[ind(i,j,n)] : 0;
 }
@@ -253,7 +252,15 @@ GLOBAL static void calc_hairpin_stack_exterior_multibranch
 #ifdef __CUDACC__
  nd_item<3> &wi,
 #endif
- int d, int n, base_t *s, int *bcp, real_t *v, real_t *x, real_t *w5, real_t *w3, param_t p)
+ const int d, 
+ const int n, 
+ const base_t *__restrict s, 
+ const int *__restrict bcp, 
+ real_t *__restrict v, 
+ const real_t *__restrict x, 
+ const real_t *__restrict w5, 
+ const real_t *__restrict w3, 
+ const param_t p)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -324,14 +331,19 @@ GLOBAL static void calc_internal
  nd_item<3> &wi,
  real_t *buf,
 #endif
- int d, int n, base_t *s, int *bcp, real_t *v, param_t p)
+ const int d,
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ const param_t p)
 {
   int i;
 #ifdef __CUDACC__
   const int tx = wi.get_local_id(2);
   const int ty = wi.get_local_id(1);
-  const int dimx = wi.get_group_range(2);
-  const int dimy = wi.get_group_range(1);
+  const int dimx = wi.get_local_range(2);
+  const int dimy = wi.get_local_range(1);
 #endif
 
   for (i = ISTART; i < n; i += IINC) {
@@ -421,20 +433,20 @@ GLOBAL static void calc_coaxial
  nd_item<3> &wi,
  real_t *buf,
 #endif
- int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp, /* base can pair? */
- real_t *v, /* n x n */
- real_t *y, /* n x n */
- real_t *w5, /* n+1 */
- real_t *w3, /* n+1 */
- param_t p) 
+ const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ const real_t *__restrict y,
+ const real_t *__restrict w5,
+ const real_t *__restrict w3,
+ const param_t p) 
 {
   int i;
 #ifdef __CUDACC__
   const int tx = wi.get_local_id(2);
-  const int dimx = wi.get_group_range(2);
+  const int dimx = wi.get_local_range(2);
 #endif
 
   for (i = ISTART; i < n; i += IINC) {
@@ -560,16 +572,16 @@ GLOBAL static void calc_wl
 #ifdef __CUDACC__
  nd_item<3> &wi,
 #endif
- int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp, /* base can pair? */
- real_t *v, /* n x n */
- real_t *z, /* n x n */
- real_t *wq, /* n(n-1)/2 array - only i < j */
- real_t *w, /* 2 x n */
- real_t *wl, /* 2 x n */
- param_t p) 
+ const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ real_t *__restrict z,
+ real_t *__restrict wq,
+ real_t *__restrict w,
+ real_t *__restrict wl,
+ const param_t p) 
 {
   int i;
 
@@ -619,11 +631,11 @@ GLOBAL static void calc_xl
  nd_item<3> &wi,
  real_t *buf,
 #endif
- int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- real_t *z, /* n x n */
- real_t *yl, /* n x n */
- real_t *xl) /* 2 x n */
+ const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const real_t *__restrict z,
+ const real_t *__restrict yl,
+ real_t *__restrict xl)
 {
   int i;
 #ifdef __CUDACC__
@@ -674,15 +686,15 @@ GLOBAL static void calc_z
  nd_item<3> &wi,
  real_t *buf,
 #endif
- int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- base_t *s, /* sequence */
- int *bcp,  /* base can pair? */
- real_t *v, /* n x n */
- real_t *z, /* n x n */
- real_t *xl, /* 2 x n */
- real_t *wq, /* n(n-1)/2 array - only i < j */
- param_t p) 
+ const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ real_t *__restrict z,
+ real_t *__restrict xl,
+ real_t *__restrict wq,
+ const param_t p) 
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -735,15 +747,15 @@ GLOBAL static void calc_x
 #ifdef __CUDACC__
  nd_item<3> &wi,
 #endif
- int d, /* diagonal - length of bases in between i and j, exclusive */
- int n,
- real_t *yl, /* n x n */
- real_t *y, /* n x n */
- real_t *w, /* 2 x n */
- real_t *wl, /* 2 x n */
- real_t *xl, /* 2 x n */
- real_t *x, /* 5 x n */
- param_t p) 
+ const int d, /* diagonal - length of bases in between i and j, exclusive */
+ const int n,
+ real_t *__restrict yl,
+ real_t *__restrict y,
+ const real_t *__restrict w,
+ const real_t *__restrict wl,
+ real_t *__restrict xl,
+ real_t *__restrict x,
+ const param_t p) 
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -767,7 +779,7 @@ GLOBAL static void calc_x
 
 GLOBAL static void init_w5_and_w3(int n, real_t *w5, real_t *w3)
 {
-  w5[-1] = w5[0] = w3[n-1] = w3[n] = 0;
+  w5[0] = w5[1] = w3[n-1] = w3[n] = 0;
 }
 
 GLOBAL static void calc_w5_and_w3(
@@ -775,7 +787,11 @@ GLOBAL static void calc_w5_and_w3(
  nd_item<3> &wi,
  real_t *buf,
 #endif
- int d, int n, real_t *w5, real_t *w3, real_t *wq)
+  const int d,
+  const int n, 
+  real_t *__restrict w5,
+  real_t *__restrict w3,
+  const real_t *__restrict wq)
 {
 #ifdef __CUDACC__
   const int tx = wi.get_local_id(2);
@@ -914,10 +930,10 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto s = d_s.get_access<sycl_read>(cgh);
       auto bcp = d_bcp.get_access<sycl_read>(cgh);
       auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto z = d_z.get_access<sycl_read>(cgh);
-      auto wq = d_wq.get_access<sycl_read>(cgh);
-      auto w = d_w.get_access<sycl_read>(cgh);
-      auto wl = d_wl.get_access<sycl_read>(cgh);
+      auto z = d_z.get_access<sycl_write>(cgh);
+      auto wq = d_wq.get_access<sycl_write>(cgh);
+      auto w = d_w.get_access<sycl_read_write>(cgh);
+      auto wl = d_wl.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class k_calc_wl>(nd_range<3>(gws4, lws4), [=] (nd_item<3> wi) {
         calc_wl(wi, d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
                 z.get_pointer(), wq.get_pointer(), w.get_pointer(), 
@@ -954,7 +970,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto y = d_y.get_access<sycl_write>(cgh);
       auto w = d_w.get_access<sycl_read>(cgh);
       auto wl = d_wl.get_access<sycl_read>(cgh);
-      auto xl = d_xl.get_access<sycl_read>(cgh);
+      auto xl = d_xl.get_access<sycl_read_write>(cgh);
       auto x = d_x.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class k_calc_x>(nd_range<3>(gws7, lws7), [=] (nd_item<3> wi) {
         calc_x(wi, d, n, yl.get_pointer(), y.get_pointer(), w.get_pointer(), 
