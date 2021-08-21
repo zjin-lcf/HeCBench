@@ -7,6 +7,7 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
+VPATH     = ../prna-cuda
 #===============================================================================
 # Program name & source code list
 #===============================================================================
@@ -23,7 +24,7 @@ obj = $(c_source:.c=.o) $(cuda_source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DFLOAT -D__HIP_PLATFORM_AMD__ -Wall
+CFLAGS := -DFLOAT -D__HIP_PLATFORM_AMD__ -Wall -I../prna-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -56,6 +57,12 @@ $(program): $(obj)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+base.o : base.c base.h util.h
+main.o : main.c prna.h util.h base.h
+param.o : param.c param.h util.h real.h
+prna.o : prna.cu base.h prna.h util.h param.h real.h cu.h
+util.o : util.c util.h
 
 clean:
 	rm -rf $(program) $(obj)
