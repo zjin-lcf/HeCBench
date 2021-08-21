@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include "cu.h"
 #include "base.h"
 #include "prna.h"
 #include "util.h"
