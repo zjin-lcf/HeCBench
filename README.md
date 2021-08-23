@@ -168,6 +168,9 @@ Early results are shown [here](results/README.md)
 ### f16sp
   Half-precision scalar product (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### face
+  Face detection using the Viola-Jones algorithm (https://sites.google.com/site/5kk73gpu2012/assignment/viola-jones-face-detection)
+
 ### fdtd3d
   FDTD-3D (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
@@ -186,6 +189,9 @@ Early results are shown [here](results/README.md)
 ### fpc
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
+
+### frna
+  Accelerate the fill step in predicting the lowest free energy structure and a set of suboptimal structures (http://rna.urmc.rochester.edu/Text/Fold-cuda.html)
 
 ### fwt
   Fast Walsh transformation (http://docs.nvidia.com/cuda/cuda-samples/index.html)
@@ -399,6 +405,9 @@ Early results are shown [here](results/README.md)
 
 ### present
   Lightweight cryptography (https://github.com/bozhu/PRESENT-C/blob/master/present.h)
+
+### prna
+  Calculate a partition function for a sequence, which can be used to predict base pair probabilities (http://rna.urmc.rochester.edu/Text/partition-cuda.html)
 
 ### projectile
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
