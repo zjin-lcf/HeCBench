@@ -37,14 +37,15 @@ typedef long double real_t;
 
 #ifdef __CUDACC__
 #include "common.h"
-#define LOG sycl::log
-#define EXP sycl::exp
+#define LOG   sycl::log
+#define EXP   sycl::exp
 #define LOG1P sycl::log1p
-#define COS sycl::cos
-#define SIN sycl::sin
-#define SQRT sycl::sqrt
-#define RINT sycl::rint
-#define FABS sycl::fabs
+#define COS   sycl::cos
+#define SIN   sycl::sin
+#define SQRT  sycl::sqrt
+#define RINT  sycl::rint
+#define FABS  sycl::fabs
+#define ABS   sycl::abs
 
 #else
 
@@ -56,6 +57,8 @@ typedef long double real_t;
 #define SQRT MATHFN(sqrt)
 #define RINT MATHFN(rint)
 #define FABS MATHFN(fabs)
+// integer math function
+#define ABS  abs
 
 #endif
 

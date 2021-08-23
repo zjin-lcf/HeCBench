@@ -173,7 +173,7 @@ DEV static real_t internal_loop_energy(const base_t *s,
   else
     sp = &p->tstacki;
   return p->internal_loop_initiation[d1+d2] + 
-    real_min(p->fm_array_first_element * sycl::abs(d1-d2), p->maximum_correction) +
+    real_min(p->fm_array_first_element * ABS(d1-d2), p->maximum_correction) +
     (*sp)[s[i]][s[j]][s[i+1]][s[j-1]] +
     (*sp)[s[jp]][s[ip]][s[jp+1]][s[ip-1]];
   
