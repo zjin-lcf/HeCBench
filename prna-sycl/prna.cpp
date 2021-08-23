@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <ctype.h>
 #include "cu.h"
 #include "base.h"
 #include "prna.h"
 #include "util.h"
 #include "param.h"
-#include <ctype.h>
 
 
 /* penalty for a helix terminated by a pair containing a U */
