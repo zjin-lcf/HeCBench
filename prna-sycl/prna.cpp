@@ -9,7 +9,6 @@
 #include "util.h"
 #include "param.h"
 #include <ctype.h>
-#include "common.h"
 
 
 /* penalty for a helix terminated by a pair containing a U */
@@ -241,6 +240,7 @@ DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int 
 
 
 #ifdef __CUDACC__
+#include "common.h"
 #define ISTART wi.get_group(2)
 #define IINC wi.get_group_range(2)
 #else
