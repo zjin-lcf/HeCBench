@@ -858,6 +858,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
   buffer<real_t, 1> d_xl (n*2);
   buffer<real_t, 1> d_x (n*5);
 
+  buffer<struct param, 1> d_par (par, 1);
   buffer<base_t, 1> d_s (p->seq, n);
   buffer<int, 1> d_bcp (p->base_can_pair, (n*(n-1)/2));
 
@@ -895,10 +896,11 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto x = d_x.get_access<sycl_read>(cgh);
       auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
       auto w3 = d_w3.get_access<sycl_read>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       cgh.parallel_for<class k_calc_hairpin>(nd_range<3>(gws1, lws1), [=] (nd_item<3> wi) {
         calc_hairpin_stack_exterior_multibranch(wi, d, n, s.get_pointer(), 
           bcp.get_pointer(), v.get_pointer(), x.get_pointer(), w5.get_pointer(), 
-          w3.get_pointer(), par);
+          w3.get_pointer(), par.get_pointer());
       });
     });
 
@@ -906,10 +908,11 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto s = d_s.get_access<sycl_read>(cgh);
       auto bcp = d_bcp.get_access<sycl_read>(cgh);
       auto v = d_v.get_access<sycl_read_write>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
       cgh.parallel_for<class k_calc_internal>(nd_range<3>(gws2, lws2), [=] (nd_item<3> wi) {
         calc_internal(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), 
-                      v.get_pointer(), par);
+                      v.get_pointer(), par.get_pointer());
       });
     });
 
@@ -920,10 +923,11 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto y = d_y.get_access<sycl_read>(cgh);
       auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
       auto w3 = d_w3.get_access<sycl_read>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
       cgh.parallel_for<class k_calc_coaxial>(nd_range<3>(gws3, lws3), [=] (nd_item<3> wi) {
         calc_coaxial(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
-                     y.get_pointer(), w5.get_pointer(), w3.get_pointer(), par);
+                     y.get_pointer(), w5.get_pointer(), w3.get_pointer(), par.get_pointer());
       });
     });
 
@@ -935,10 +939,11 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto wq = d_wq.get_access<sycl_write>(cgh);
       auto w = d_w.get_access<sycl_read_write>(cgh);
       auto wl = d_wl.get_access<sycl_read_write>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       cgh.parallel_for<class k_calc_wl>(nd_range<3>(gws4, lws4), [=] (nd_item<3> wi) {
         calc_wl(wi, d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
                 z.get_pointer(), wq.get_pointer(), w.get_pointer(), 
-                wl.get_pointer(), par);
+                wl.get_pointer(), par.get_pointer());
       });
     });
 
@@ -959,10 +964,11 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto z = d_z.get_access<sycl_read_write>(cgh);
       auto xl = d_xl.get_access<sycl_read_write>(cgh);
       auto wq = d_wq.get_access<sycl_read_write>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
       cgh.parallel_for<class k_calc_z>(nd_range<3>(gws6, lws6), [=] (nd_item<3> wi) {
         calc_z(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
-               z.get_pointer(), xl.get_pointer(), wq.get_pointer(), par);
+               z.get_pointer(), xl.get_pointer(), wq.get_pointer(), par.get_pointer());
       });
     });
 
@@ -973,9 +979,10 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       auto wl = d_wl.get_access<sycl_read>(cgh);
       auto xl = d_xl.get_access<sycl_read_write>(cgh);
       auto x = d_x.get_access<sycl_read_write>(cgh);
+      auto par = d_par.get_access<sycl_read>(cgh);
       cgh.parallel_for<class k_calc_x>(nd_range<3>(gws7, lws7), [=] (nd_item<3> wi) {
         calc_x(wi, d, n, yl.get_pointer(), y.get_pointer(), w.get_pointer(), 
-               wl.get_pointer(), xl.get_pointer(), x.get_pointer(), par);
+               wl.get_pointer(), xl.get_pointer(), x.get_pointer(), par.get_pointer());
       });
     });
     
