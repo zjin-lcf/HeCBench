@@ -77,33 +77,26 @@ void computeMIS(const int nodes,
   #pragma omp target data map(to: nidx[0:nodes+1], nlist[0:edges]) \
                           map(from: nstat[0:nodes])
   {
-  const int blocks = 448;
+  const int blocks = 24;
 
   auto start = std::chrono::high_resolution_clock::now();
 
+  const float avg = (float)edges / nodes;
+  const float scaledavg = ((in / 2) - 1) * avg;
   for (int n = 0; n < 100; n++) {
-    #pragma omp target teams num_teams(blocks) thread_limit(ThreadsPerBlock)
-    {
-      #pragma omp parallel 
-      {
-        const int from = omp_get_thread_num() + omp_get_team_num() * ThreadsPerBlock;
-        const int incr = omp_get_num_teams() * ThreadsPerBlock;
-        const float avg = (float)edges / nodes;
-        const float scaledavg = ((in / 2) - 1) * avg;
-
-        for (int i = from; i < nodes; i += incr) {
-          stattype val = in;
-          const int degree = nidx[i + 1] - nidx[i];
-          if (degree > 0) {
-            float x = degree - (hash(i) * 0.00000000023283064365386962890625f);
-            int res = int(scaledavg / (avg + x));
-            val = (res + res) | 1;
-          }
-          nstat[i] = val;
-        }
+    #pragma omp target teams distribute parallel for \
+      num_teams(blocks) thread_limit(ThreadsPerBlock) shared(avg, scaledavg)
+    for (int i = 0; i < nodes; i++) {
+      stattype val = in;
+      const int degree = nidx[i + 1] - nidx[i];
+      if (degree > 0) {
+        float x = degree - (hash(i) * 0.00000000023283064365386962890625f);
+        int res = int(scaledavg / (avg + x));
+        val = (res + res) | 1;
       }
+      nstat[i] = val;
     }
-
+    
     #pragma omp target teams num_teams(blocks) thread_limit(ThreadsPerBlock)
     {
       #pragma omp parallel 

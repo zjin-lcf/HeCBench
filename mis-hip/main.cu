@@ -153,7 +153,7 @@ void computeMIS(const int nodes,
     fprintf(stderr, "ERROR: copying to device failed\n\n");
   }
 
-  const int blocks = 448;
+  const int blocks = 24;
 
   hipDeviceSynchronize();
 
