@@ -355,6 +355,9 @@ Early results are shown [here](results/README.md)
 ### minisweep
   A deterministic Sn radiation transport miniapp (https://github.com/wdj/minisweep)
 
+### mis
+  Maximal independent set (http://www.cs.txstate.edu/~burtscher/research/ECL-MIS/)
+
 ### mixbench
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
 
