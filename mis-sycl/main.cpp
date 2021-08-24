@@ -145,14 +145,14 @@ void computeMIS(
   buffer<int, 1> nlist_d (nlist, edges);
   buffer<stattype, 1> nstat_d (nodes+1);
 
-  const int blocks = 448;
+  const int blocks = 24;
   range<1> gws (blocks * ThreadsPerBlock);
   range<1> lws (ThreadsPerBlock);
 
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < 1; n++) {
     q.submit([&] (handler &cgh) {
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nstat = nstat_d.get_access<sycl_write>(cgh);
