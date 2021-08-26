@@ -7,14 +7,13 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
-VPATH     = ../frna-cuda
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
 program = main
 
-c_source = main.c fbase.c fparam.c util.c
+c_source = ../frna-cuda/main.c ../frna-cuda/fbase.c ../frna-cuda/fparam.c ../frna-cuda/util.c
 cuda_source = frna.cu 
 
 obj = $(c_source:.c=.o) $(cuda_source:.cu=.o) 
@@ -24,7 +23,7 @@ obj = $(c_source:.c=.o) $(cuda_source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DINT -D__HIP_PLATFORM_AMD__ -Wall -I../frna-cuda
+CFLAGS := -DINT -std=c++14 -x hip -D__HIP_PLATFORM_AMD__ -Wall -I. -I../frna-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,19 +45,19 @@ endif
 #===============================================================================
 
 $(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
+%.o: ../frna-cuda/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-fbase.o : fbase.c fbase.h util.h cu.h
-main.o : main.c frna.h util.h fbase.h
-fparam.o : fparam.c fparam.h util.h fbase.h int.h
-fprna.o : fprna.cu frna.h util.h cu.h
-util.o : util.c util.h
+fbase.o : ../frna-cuda/fbase.c ../frna-cuda/fbase.h ../frna-cuda/util.h cu.h
+main.o : ../frna-cuda/main.c ../frna-cuda/frna.h ../frna-cuda/util.h ../frna-cuda/fbase.h
+fparam.o : ../frna-cuda/fparam.c ../frna-cuda/fparam.h ../frna-cuda/util.h ../frna-cuda/fbase.h ../frna-cuda/int.h
+fprna.o : ../frna-cuda/fprna.cu ../frna-cuda/frna.h ../frna-cuda/util.h cu.h
+util.o : ../frna-cuda/util.c ../frna-cuda/util.h
 
 clean:
 	rm -rf $(program) $(obj) *.out
