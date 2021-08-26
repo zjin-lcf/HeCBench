@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -14,8 +14,8 @@ DEVICE    = gpu
 
 program = main
 
-c_source = main.c base.c param.c util.c
-omp_source = prna.cpp 
+c_source = main.c fbase.c fparam.c util.c
+omp_source = frna.cpp
 
 obj = $(c_source:.c=.o) $(omp_source:.cpp=.o) 
 
@@ -24,7 +24,7 @@ obj = $(c_source:.c=.o) $(omp_source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DFLOAT -Wall
+CFLAGS := -DINT -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -35,19 +35,18 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DOMP_TARGET -ffast-math -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906 
+  CFLAGS +=-DOMP_TARGET -ffast-math -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=
 endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -61,17 +60,17 @@ $(program): $(obj)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-base.o : base.c base.h util.h
-main.o : main.c prna.h util.h base.h
-param.o : param.c param.h util.h  real.h
-prna.o : prna.cpp base.h prna.h util.h param.h real.h cu.h
+fbase.o : fbase.c fbase.h util.h cu.h
+main.o : main.c frna.h util.h fbase.h
+fparam.o : fparam.c fparam.h util.h fbase.h int.h
+fprna.o : fprna.cu frna.h util.h
 util.o : util.c util.h
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.out
 
 test: $(program)
-	./$(program) ../prna-cuda/test.seq
+	./$(program) ../frna-cuda/RD0260.seq rd0260.out
 
 run: $(program)
-	./$(program) ./HIV1-NL43.seq
+	./$(program) ../prna-cuda/HIV1-NL43.seq  hiv1-nl43.out
