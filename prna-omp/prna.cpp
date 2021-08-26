@@ -10,7 +10,9 @@
 #include "util.h"
 #include "param.h"
 
+#ifdef OMP_TARGET
 #pragma omp declare target
+#endif
 /* penalty for a helix terminated by a pair containing a U */
 DEV static real_t terminal_U_penalty(const base_t *s, const int i, const int j, param_t p)
 {
@@ -238,7 +240,9 @@ DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int 
   return can_pair(i,j,n,bcp) ? &a[ind(i,j,n)] : 0;
 }
 
+#ifdef OMP_TARGET
 #pragma omp end declare target
+#endif
 
 
 #ifdef OMP_TARGET
@@ -259,7 +263,9 @@ GLOBAL static void calc_hairpin_stack_exterior_multibranch
  const real_t *__restrict w3, 
  const param_t p)
 {
+#ifdef OMP_TARGET
   #pragma omp target teams distribute parallel for num_teams(n) thread_limit(1)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -307,7 +313,10 @@ GLOBAL static void calc_internal
  real_t *__restrict v,
  const param_t p)
 {
-  #pragma omp target teams distribute num_teams(n) thread_limit(NTHREAD)
+#ifdef OMP_TARGET
+  #pragma omp target teams distribute \
+  parallel for thread_limit(NTHREAD)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -318,7 +327,6 @@ GLOBAL static void calc_internal
     real_t vij = INF;
     const int dmax = int_min(LOOP_MAX, d-2);
     const int d1max = int_min(dmax, n-i-2);
-    #pragma omp parallel for reduction(+:vij)
     for (int d1 = 0; d1 <= d1max; d1++) {
       const int ip = i+d1+1;
       const int d2max = int_min(dmax-d1, j-1);
@@ -334,7 +342,9 @@ GLOBAL static void calc_internal
   }
 }
 
+#ifdef OMP_TARGET
 #pragma omp declare target
+#endif
 DEV static real_t coaxial_flush(const base_t *s,
 				const int i,
 				const int j,
@@ -369,7 +379,9 @@ DEV static real_t coaxial_mismatch2(const base_t *s,
     p->tstackcoax[s[jp]][s[ip]][s[jp+1]][s[ip-1]] +
     p->coaxstack[s[j]][s[i]][s[j+1]][s[jp+1]];
 } 
+#ifdef OMP_TARGET
 #pragma omp end declare target
+#endif
 
 GLOBAL static void calc_coaxial
 (const int d, /* diagonal - length of bases in between i and j, exclusive */
@@ -382,7 +394,9 @@ GLOBAL static void calc_coaxial
  const real_t *__restrict w3,
  const param_t p) 
 {
-  #pragma omp target teams distribute parallel for num_teams(n) thread_limit(NTHREAD)
+#ifdef OMP_TARGET
+  #pragma omp target teams distribute parallel for thread_limit(NTHREAD)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -490,7 +504,9 @@ GLOBAL static void calc_wl
  real_t *__restrict wl,
  const param_t p) 
 {
+#ifdef OMP_TARGET
   #pragma omp target teams distribute parallel for num_teams(n) thread_limit(1)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -538,7 +554,10 @@ GLOBAL static void calc_xl
  const real_t *__restrict yl,
  real_t *__restrict xl)
 {
-  #pragma omp target teams distribute num_teams(n) thread_limit(NTHREAD)
+#ifdef OMP_TARGET
+  #pragma omp target teams distribute \
+  parallel for thread_limit(NTHREAD)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -547,12 +566,9 @@ GLOBAL static void calc_xl
     xl[ind(d%2,i,n)] = INF;
     if (is_interior(i,j) && d <= 2*LOOP_MIN+1)
       continue;
-    const int kstart = i+1;
-    const int kinc = 1;
-    int ktmp;
+
     real_t tmp = INF;
-    #pragma omp parallel for reduction(+:tmp)
-    for (ktmp = kstart; ktmp < jtmp-1; ktmp += kinc) {
+    for (int ktmp = i+1; ktmp < jtmp-1; ktmp += 1) {
       if (ktmp != n-1) {
 	const int k = wrap(ktmp,n);     
 	free_energy_accumulate(&tmp, z[ind(i,k,n)] + yl[ind(k+1,j,n)]);	  
@@ -573,19 +589,18 @@ GLOBAL static void calc_z
  real_t *__restrict wq,
  const param_t p) 
 {
-  #pragma omp target teams distribute num_teams(n) thread_limit(NTHREAD)
+#ifdef OMP_TARGET
+  #pragma omp target teams distribute \
+  parallel for thread_limit(NTHREAD)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
     if ((is_exterior(i,j) && i-j <= LOOP_MIN) ||
 	(is_interior(i,j) && d <= 2*LOOP_MIN+1))
       continue;
-    const int kstart = i+LOOP_MIN+1;
-    const int kinc = 1;
-    int ktmp;
     real_t tmp1 = INF, tmp2 = INF;
-    #pragma omp parallel for reduction(+:tmp1,tmp2)
-    for (ktmp = kstart; ktmp < jtmp-LOOP_MIN-1; ktmp+= kinc) {
+    for (int ktmp = i+LOOP_MIN+1; ktmp < jtmp-LOOP_MIN-1; ktmp++) {
       const int k = wrap(ktmp,n);
       if (k == n-1)
 	continue;
@@ -618,7 +633,9 @@ GLOBAL static void calc_x
  real_t *__restrict x,
  const param_t p) 
 {
+#ifdef OMP_TARGET
   #pragma omp target teams distribute parallel for num_teams(n) thread_limit(1)
+#endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
@@ -654,14 +671,12 @@ GLOBAL static void calc_w5_and_w3(
   const real_t *__restrict wq)
 {
   real_t w5tmp = INF, w3tmp = INF;
-  #pragma omp target teams distribute parallel for \
-   num_teams(1) thread_limit(NTHREAD) reduction(+:w5tmp, w3tmp)
+  #pragma omp target 
+  {
   for (int i = 0; i <= d-LOOP_MIN; i++) {
     free_energy_accumulate(&w5tmp, w5[i-1] + wq[upper_triangle_index(i,d+1)]);
     free_energy_accumulate(&w3tmp, w3[n-i] + wq[upper_triangle_index(n-d-2,n-i-1)]);
   }
-  #pragma omp target  
-  { 
   w5[d+1] = w5[d];
   w3[n-d-2] = w3[n-d-1];
   free_energy_accumulate(&w5[d+1], w5tmp);
