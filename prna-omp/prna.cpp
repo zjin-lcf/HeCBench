@@ -941,6 +941,8 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
     calc_w5_and_w3(d, n, p->w5, p->w3, wq);
   }
    
+#endif /* OMP_TARGET */
+
   free(z);    
   free(yl);
   free(y);
@@ -949,7 +951,6 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
   free(wl);
   free(xl);
   free(x);
-#endif /* OMP_TARGET */
 
   return p;
 
