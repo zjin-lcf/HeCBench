@@ -7,24 +7,23 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
-VPATH     = ../prna-cuda
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
 program = main
 
-c_source = main.c base.c param.c util.c
+c_source = ../prna-cuda/main.c ../prna-cuda/base.c ../prna-cuda/param.c ../prna-cuda/util.c
 cuda_source = prna.cu 
 
-obj = $(c_source:.c=.o) $(cuda_source:.cu=.o) 
+obj = main.o base.o param.o util.o prna.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DFLOAT -D__HIP_PLATFORM_AMD__ -Wall -I../prna-cuda
+CFLAGS := -DFLOAT -std=c++14 -x hip -D__HIP_PLATFORM_AMD__ -Wall -I. -I../prna-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -45,24 +44,21 @@ endif
 # Targets to Build
 #===============================================================================
 
-# generate a binary seq file
-#gen: save-params.c param.c base.c util.c
-#	gcc -O2 -DFLOAT -o gen-bin-seq save-params.c param.c base.c util.c -lm
-
 $(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
+%.o: ../prna-cuda/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-base.o : base.c base.h util.h
-main.o : main.c prna.h util.h base.h
-param.o : param.c param.h util.h real.h
-prna.o : prna.cu base.h prna.h util.h param.h real.h cu.h
-util.o : util.c util.h
+base.o :  ../prna-cuda/base.c  ../prna-cuda/base.h ../prna-cuda/util.h
+main.o :  ../prna-cuda/main.c  ../prna-cuda/prna.h ../prna-cuda/util.h ../prna-cuda/base.h
+param.o : ../prna-cuda/param.c ../prna-cuda/param.h ../prna-cuda/util.h ../prna-cuda/real.h
+prna.o :  ../prna-cuda/prna.cu ../prna-cuda/base.h ../prna-cuda/prna.h ../prna-cuda/util.h \
+	  ../prna-cuda/param.h ../prna-cuda/real.h cu.h
+util.o :  ../prna-cuda/util.c ../prna-cuda/util.h
 
 clean:
 	rm -rf $(program) $(obj)
