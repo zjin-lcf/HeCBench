@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
+#include <omp.h>
 #include "cu.h"
 #include "base.h"
 #include "prna.h"
@@ -239,18 +240,18 @@ DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int 
 {
   return can_pair(i,j,n,bcp) ? &a[ind(i,j,n)] : 0;
 }
-
 #ifdef OMP_TARGET
 #pragma omp end declare target
 #endif
 
 
 #ifdef OMP_TARGET
-#define NTHREAD 128
-#endif
-
+#define ISTART omp_get_team_num()
+#define IINC omp_get_num_teams()
+#else
 #define ISTART 0
 #define IINC 1
+#endif
 
 GLOBAL static void calc_hairpin_stack_exterior_multibranch
 (const int d, 
@@ -264,7 +265,10 @@ GLOBAL static void calc_hairpin_stack_exterior_multibranch
  const param_t p)
 {
 #ifdef OMP_TARGET
-  #pragma omp target teams distribute parallel for num_teams(n) thread_limit(1)
+  #pragma omp target teams num_teams(n) thread_limit(1)
+  {
+  #pragma omp parallel
+  {
 #endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
@@ -302,8 +306,39 @@ GLOBAL static void calc_hairpin_stack_exterior_multibranch
     }
     v[ind(i,j,n)] = vij;
   }
+#ifdef OMP_TARGET
+  }
+  }
+#endif
 }
 
+
+#ifdef OMP_TARGET
+
+#define NTHREAD 128
+#define THREAD_X 8
+#define THREAD_Y 16
+
+#if THREAD_X*THREAD_Y != NTHREAD
+#error THREAD_X * THREAD_Y must be equal to NTHREAD
+#endif
+
+#pragma omp declare target
+DEV static void free_energy_reduce(real_t *buf, real_t *x, int tid, int nt)
+{
+  buf[tid] = *x;
+  #pragma omp barrier
+  for (nt /= 2; nt > 0; nt /= 2) {
+    if (tid < nt)
+      free_energy_accumulate(&buf[tid], buf[tid+nt]);
+    #pragma omp barrier
+  }
+  if (tid == 0)
+    *x = buf[0];
+}
+#pragma omp end declare target
+
+#endif /* OMP_TARGET */
 
 GLOBAL static void calc_internal
 (const int d,
@@ -314,10 +349,14 @@ GLOBAL static void calc_internal
  const param_t p)
 {
 #ifdef OMP_TARGET
-  #pragma omp target teams distribute \
-  parallel for thread_limit(NTHREAD)
+  #pragma omp target teams num_teams(n) thread_limit(NTHREAD)
+  {
+  real_t buf[NTHREAD];
+  #pragma omp parallel
+  {
 #endif
-  for (int i = ISTART; i < n; i += IINC) {
+  int i;
+  for (i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
     if ((is_exterior(i,j) && i-j <= LOOP_MIN) ||
@@ -325,26 +364,50 @@ GLOBAL static void calc_internal
 	!can_pair(i,j,n,bcp))
       continue;
     real_t vij = INF;
+#ifdef OMP_TARGET
+    const int d1start = omp_get_thread_num() % THREAD_X;
+    const int ty = omp_get_thread_num() / THREAD_X;
+    const int d1inc = 8; // blockDim.x
+#else
+    const int d1start = 0;
+    const int d1inc = 1;
+#endif
     const int dmax = int_min(LOOP_MAX, d-2);
     const int d1max = int_min(dmax, n-i-2);
-    for (int d1 = 0; d1 <= d1max; d1++) {
+    int d1;
+    for (d1 = d1start; d1 <= d1max; d1 += d1inc) {
       const int ip = i+d1+1;
       const int d2max = int_min(dmax-d1, j-1);
+#ifdef OMP_TARGET
+      const int d2start = d1 > 0 ? ty : ty + 1;
+      const int d2inc = 16; //blockDim.y;
+#else
       const int d2start = d1 > 0 ? 0 : 1;
-      for (int d2 = d2start; d2 <= d2max; d2++) {
+      const int d2inc = 1;
+#endif
+      int d2;
+      for (d2 = d2start; d2 <= d2max; d2 += d2inc) {
         const int jp = j-d2-1;
         if (can_pair(ip,jp,n,bcp))
           free_energy_accumulate(&vij, internal_loop_energy(s,i,j,ip,jp,d1,d2,p)
 				 + v[ind(ip,jp,n)]);
       }
     }
+#ifdef OMP_TARGET
+    const int tid = d1start * 16 + ty; //threadIdx.x * blockDim.y + threadIdx.y;
+    free_energy_reduce(buf, &vij, tid, NTHREAD);
+    if (tid != 0)
+      continue;
+#endif
     free_energy_accumulate(&v[ind(i,j,n)], vij);
   }
+#ifdef OMP_TARGET
+  }
+  }
+#endif
 }
 
-#ifdef OMP_TARGET
 #pragma omp declare target
-#endif
 DEV static real_t coaxial_flush(const base_t *s,
 				const int i,
 				const int j,
@@ -379,9 +442,7 @@ DEV static real_t coaxial_mismatch2(const base_t *s,
     p->tstackcoax[s[jp]][s[ip]][s[jp+1]][s[ip-1]] +
     p->coaxstack[s[j]][s[i]][s[j+1]][s[jp+1]];
 } 
-#ifdef OMP_TARGET
 #pragma omp end declare target
-#endif
 
 GLOBAL static void calc_coaxial
 (const int d, /* diagonal - length of bases in between i and j, exclusive */
@@ -395,7 +456,11 @@ GLOBAL static void calc_coaxial
  const param_t p) 
 {
 #ifdef OMP_TARGET
-  #pragma omp target teams distribute parallel for thread_limit(NTHREAD)
+  #pragma omp target teams num_teams(n) thread_limit(NTHREAD)
+  {
+  real_t buf[NTHREAD];
+  #pragma omp parallel 
+  {
 #endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
@@ -406,10 +471,14 @@ GLOBAL static void calc_coaxial
     real_t vij = INF;
     /* exterior */
     if (is_exterior(i,j)) {
-      int k, kstart;
+#ifdef OMP_TARGET
+      int kstart = omp_get_thread_num();
+      const int kinc = omp_get_num_threads();
+#else
       kstart = 0;
       const int kinc = 1;
-      for (k = kstart; k < j - LOOP_MIN; k += kinc) {
+#endif
+      for (int k = kstart; k < j - LOOP_MIN; k += kinc) {
 	if ((v1 = array_val(v,k,j-1,n,bcp)))
 	  free_energy_accumulate(&vij, w3[i+1] + w5[k-1] + coaxial_flush(s,k,j-1,j,i,p) + (*v1));
 	if (j-2 >= 0) {
@@ -419,8 +488,12 @@ GLOBAL static void calc_coaxial
 	    free_energy_accumulate(&vij, w3[i+1] + w5[k-1] + coaxial_mismatch1(s,k+1,j-2,j,i,p) + (*v1));
 	}
       }
+#ifdef OMP_TARGET
+      kstart = i+LOOP_MIN+1 + kstart; //threadIdx.x;
+#else
       kstart = i+LOOP_MIN+1;
-      for (k = kstart; k < n; k += kinc) {
+#endif
+      for (int k = kstart; k < n; k += kinc) {
 	if ((v1 = array_val(v,i+1,k,n,bcp)))
 	  free_energy_accumulate(&vij, w3[k+1] + w5[j-1] + coaxial_flush(s,j,i,i+1,k,p) + (*v1));
 	if (j > 0 && (v1 = array_val(v,i+2,k,n,bcp)))
@@ -433,8 +506,13 @@ GLOBAL static void calc_coaxial
     /* multibranch */
     if (d > 2*LOOP_MIN + 3 && i != n-1 && j != 0) { 
       int ktmp;
+#ifdef OMP_TARGET
+      int ktmpstart = i+2 + omp_get_thread_num(); //threadIdx.x;
+      const int ktmpinc = omp_get_num_threads();
+#else
       int ktmpstart = i+2;
       const int ktmpinc = 1;
+#endif
       for (ktmp = ktmpstart; ktmp < jtmp-2; ktmp += ktmpinc) {
 	const int k = wrap(ktmp,n);
 	if (k != n-1) {
@@ -450,7 +528,11 @@ GLOBAL static void calc_coaxial
 	  }
 	}
       }
+#ifdef OMP_TARGET
+      ktmpstart = i+3 + omp_get_thread_num();
+#else
       ktmpstart = i+3;
+#endif
       for (ktmp = ktmpstart; ktmp < jtmp-1; ktmp += ktmpinc) {
 	const int k = wrap(ktmp,n);
 	if (k != 0) {
@@ -467,8 +549,17 @@ GLOBAL static void calc_coaxial
 	}
       }
     } /* end multibranch */
+#ifdef OMP_TARGET
+    free_energy_reduce(buf, &vij, omp_get_thread_num(), omp_get_num_threads());
+    if (omp_get_thread_num() != 0)
+      continue;
+#endif
     free_energy_accumulate(&v[ind(i,j,n)], vij);
   } /* end loop over i */
+#ifdef OMP_TARGET
+  }
+  }
+#endif
 } /* end calc_coaxial */
 
 /***
@@ -555,27 +646,53 @@ GLOBAL static void calc_xl
  real_t *__restrict xl)
 {
 #ifdef OMP_TARGET
-  #pragma omp target teams distribute \
-  parallel for thread_limit(NTHREAD)
+  #pragma omp target teams num_teams(n) thread_limit(NTHREAD)
+  {
+  real_t buf[NTHREAD]; 
+  #pragma omp parallel
+  {
 #endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
     const int j = wrap(jtmp,n);
     if (is_exterior(i,j) && i-j <= LOOP_MIN)
       continue;
+#ifdef OMP_TARGET
+    int tx = omp_get_thread_num();
+    int dim = omp_get_num_threads();
+    if (tx == 0)
+      xl[ind(d%2,i,n)] = INF;
+#else
     xl[ind(d%2,i,n)] = INF;
+#endif
     if (is_interior(i,j) && d <= 2*LOOP_MIN+1)
       continue;
-
+#ifdef OMP_TARGET
+    const int kstart = i+1 + tx;
+    const int kinc = dim;
+#else
+    const int kstart = i+1;
+    const int kinc = 1;
+#endif
+    int ktmp;
     real_t tmp = INF;
-    for (int ktmp = i+1; ktmp < jtmp-1; ktmp += 1) {
+    for (ktmp = kstart; ktmp < jtmp-1; ktmp += kinc) {
       if (ktmp != n-1) {
 	const int k = wrap(ktmp,n);     
 	free_energy_accumulate(&tmp, z[ind(i,k,n)] + yl[ind(k+1,j,n)]);	  
       }
     }
+#ifdef OMP_TARGET
+    free_energy_reduce(buf, &tmp, tx, dim);
+    if (tx != 0)
+      continue;
+#endif
     free_energy_accumulate(&xl[ind(d%2,i,n)], tmp);
   } /* end loop over i */
+#ifdef OMP_TARGET
+  }
+  }
+#endif
 } /* end calc_xl */
 
 GLOBAL static void calc_z
@@ -590,8 +707,11 @@ GLOBAL static void calc_z
  const param_t p) 
 {
 #ifdef OMP_TARGET
-  #pragma omp target teams distribute \
-  parallel for thread_limit(NTHREAD)
+  #pragma omp target teams num_teams(n) thread_limit(NTHREAD)
+  {
+  real_t buf[NTHREAD];
+  #pragma omp parallel  
+  {
 #endif
   for (int i = ISTART; i < n; i += IINC) {
     const int jtmp = i+d+1;
@@ -599,8 +719,18 @@ GLOBAL static void calc_z
     if ((is_exterior(i,j) && i-j <= LOOP_MIN) ||
 	(is_interior(i,j) && d <= 2*LOOP_MIN+1))
       continue;
+#ifdef OMP_TARGET
+    const int tx = omp_get_thread_num();
+    const int dim = omp_get_num_threads();
+    const int kstart = i+LOOP_MIN+1 + tx;
+    const int kinc = dim;
+#else
+    const int kstart = i+LOOP_MIN+1;
+    const int kinc = 1;
+#endif
+    int ktmp;
     real_t tmp1 = INF, tmp2 = INF;
-    for (int ktmp = i+LOOP_MIN+1; ktmp < jtmp-LOOP_MIN-1; ktmp++) {
+    for (ktmp = kstart; ktmp < jtmp-LOOP_MIN-1; ktmp += kinc) {
       const int k = wrap(ktmp,n);
       if (k == n-1)
 	continue;
@@ -614,12 +744,22 @@ GLOBAL static void calc_z
       if ((v1 = array_val(v,i,k,n,bcp)) && (v2 = array_val(v,k+2,j-1,n,bcp)))
 	free_energy_accumulate(&tmp2, (*v1) + (*v2) + coaxial_mismatch2(s,i,k,k+2,j-1,p));
     }
+#ifdef OMP_TARGET
+    free_energy_reduce(buf, &tmp1, tx, dim);
+    free_energy_reduce(buf, &tmp2, tx, dim);
+    if (tx != 0)
+      continue;
+#endif
     if (is_interior(i,j))
       free_energy_accumulate(&wq[upper_triangle_index(i,j)], free_energy_sum(tmp1,tmp2));
     const real_t wcoax = free_energy_sum(tmp1 + 2*p->c, tmp2 + 2*p->b + 2*p->c);
     free_energy_accumulate(&z[ind(i,j,n)], wcoax);
     free_energy_accumulate(&xl[ind(d%2,i,n)], wcoax);
   } /* end loop over i */
+#ifdef OMP_TARGET
+  }
+  }
+#endif
 } /* end calc_z */
 
 GLOBAL static void calc_x
@@ -657,10 +797,10 @@ GLOBAL static void calc_x
 
 GLOBAL static void init_w5_and_w3(int n, real_t *w5, real_t *w3)
 {
+#ifdef OMP_TARGET
   #pragma omp target 
-  {
+#endif
   w5[-1] = w5[0] = w3[n-1] = w3[n] = 0;
-  }
 }
 
 GLOBAL static void calc_w5_and_w3(
@@ -670,18 +810,39 @@ GLOBAL static void calc_w5_and_w3(
   real_t *__restrict w3,
   const real_t *__restrict wq)
 {
-  real_t w5tmp = INF, w3tmp = INF;
-  #pragma omp target 
+#ifdef OMP_TARGET
+  #pragma omp target teams num_teams(1) thread_limit(NTHREAD)
   {
-  for (int i = 0; i <= d-LOOP_MIN; i++) {
+  real_t buf[NTHREAD];
+  #pragma omp parallel  
+  {
+  const int istart = omp_get_thread_num();
+  const int iinc = omp_get_num_threads();
+#else
+  const int istart = 0;
+  const int iinc = 1;
+#endif
+  real_t w5tmp = INF, w3tmp = INF;
+  int i;
+  for (i = istart; i + LOOP_MIN <= d; i += iinc) {
     free_energy_accumulate(&w5tmp, w5[i-1] + wq[upper_triangle_index(i,d+1)]);
     free_energy_accumulate(&w3tmp, w3[n-i] + wq[upper_triangle_index(n-d-2,n-i-1)]);
   }
+#ifdef OMP_TARGET
+  free_energy_reduce(buf, &w5tmp, istart, iinc);
+  free_energy_reduce(buf, &w3tmp, istart, iinc);
+
+  if (istart == 0) {
+#endif
   w5[d+1] = w5[d];
   w3[n-d-2] = w3[n-d-1];
   free_energy_accumulate(&w5[d+1], w5tmp);
   free_energy_accumulate(&w3[n-d-2], w3tmp);
+#ifdef OMP_TARGET
   }
+  }
+  }
+#endif
 } /* end calc_w5_and_w3 */
 
 prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
