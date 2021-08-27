@@ -350,7 +350,7 @@ void SummarizationKernel(
     const int nbodiesd,
     volatile int* const __restrict__ countd,
     const int* const __restrict__ childd,
-    volatile float4* const __restrict__ posMassd,
+    float4* const __restrict__ posMassd,
     int* const __restrict bottomd)
 {
   __shared__ int child[THREADS3 * 8];
@@ -385,7 +385,6 @@ void SummarizationKernel(
           for (i = 0; i < 8; i++) {
             ch = child[i*THREADS3+threadIdx.x];
             if (ch >= 0) {
-              // four reads due to missing copy constructor for "volatile float4"
               const float chx = posMassd[ch].x;
               const float chy = posMassd[ch].y;
               const float chz = posMassd[ch].z;
@@ -406,7 +405,6 @@ void SummarizationKernel(
           }
           countd[k] = cnt;
           m = 1.0f / cm;
-          // four writes due to missing copy constructor for "volatile float4"
           posMassd[k].x = px * m;
           posMassd[k].y = py * m;
           posMassd[k].z = pz * m;
