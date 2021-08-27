@@ -263,12 +263,12 @@ void TreeBuildingKernel(
     if (ch != -2) {  // skip if child pointer is locked and try again later
       locked = n*8+j;
       if (ch == -1) {
-        if (-1 == atomicCAS(childd+locked, -1, i)) {  // if null, just insert the new body
+        if (-1 == atomicCAS((int*)&childd[locked], -1, i)) {  // if null, just insert the new body
           i += inc;  // move on to next body
           skip = 1;
         }
       } else {  // there already is a body at this position
-        if (ch == atomicCAS(childd+locked, ch, -2)) {  // try to lock
+        if (ch == atomicCAS((int*)&childd[locked], ch, -2)) {  // try to lock
           patch = -1;
           const float4 chp = posMassd[ch];
           // create new cell(s) and insert the old and new bodies
