@@ -30,14 +30,14 @@ Early results are shown [here](results/README.md)
 ### asta
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
-### attention
-  Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
-
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### atomicCAS
   64-bit atomic add, min, and max with compare and swap (https://github.com/treecode/Bonsai/blob/master/runtime/profiling/derived_atomic_functions.h)
+
+### attention
+  Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
 
 ### axhelm
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
@@ -65,6 +65,9 @@ Early results are shown [here](results/README.md)
 
 ### bm3d
   Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
+
+### bh
+  Simulate the gravitational forces in a star cluster using the Barnes-Hut n-body algorithm (https://userweb.cs.txstate.edu/~burtscher/research/ECL-BH/)
 
 ### bn
   Bayesian network learning (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
