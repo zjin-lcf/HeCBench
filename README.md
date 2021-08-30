@@ -265,6 +265,9 @@ Early results are shown [here](results/README.md)
 ### jaccard
   Jaccard index for a sparse matrix (https://github.com/rapidsai/nvgraph/blob/main/cpp/src/jaccard_gpu.cu)
 
+### jacobi
+  Jacobi relaxation (https://github.com/NVIDIA/multi-gpu-programming-models/blob/master/single_gpu/jacobi.cu)
+
 ### jenkins-hash 
   Bob Jenkins lookup3 hash function (https://android.googlesource.com/platform/external/jenkins-hash/+/75dbeadebd95869dd623a29b720678c5c5c55630/lookup3.c)
 
