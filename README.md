@@ -427,6 +427,9 @@ Early results are shown [here](results/README.md)
 ### qrg
   Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### qtclustering
+  quality threshold clustering (https://github.com/vetter/shoc/)
+
 ### radixsort
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
