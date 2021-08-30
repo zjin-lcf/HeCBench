@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall #-arch=sm_60 --keep -v -ptx --device-debug --source-in-ptx -G
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60
 
 # Linker Flags
 LDFLAGS = 
