@@ -36,6 +36,9 @@ Early results are shown [here](results/README.md)
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### atomicCAS
+  64-bit atomic add, min, and max with compare and swap (https://github.com/treecode/Bonsai/blob/master/runtime/profiling/derived_atomic_functions.h)
+
 ### axhelm
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
 
