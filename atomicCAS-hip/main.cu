@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <float.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 #define NUM_BLOCKS 1024
 #define BLOCK_SIZE 256
@@ -165,24 +165,24 @@ int main(int argc, char** argv) {
   long long *d_res_s64;   
   double *d_res_f64;   
 
-  cudaMalloc((void**)&d_res_u64, 3*sizeof(unsigned long long));
-  cudaMalloc((void**)&d_res_s64, 3*sizeof(long long));
-  cudaMalloc((void**)&d_res_f64, 3*sizeof(double));
+  hipMalloc((void**)&d_res_u64, 3*sizeof(unsigned long long));
+  hipMalloc((void**)&d_res_s64, 3*sizeof(long long));
+  hipMalloc((void**)&d_res_f64, 3*sizeof(double));
 
   // the min/max kernels would take almost the same execution time for many iterations
   // the add kernels are very slow compared to min/max kernels
   for (int n = 0; n < repeat; n++) {
-    cudaMemcpy(d_res_u64, res_u64, 3*sizeof(unsigned long long), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_res_s64, res_s64, 3*sizeof(long long), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_res_f64, res_f64, 3*sizeof(double), cudaMemcpyHostToDevice);
-    atomicDerived<unsigned long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_u64);
-    atomicDerived<long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_s64);
-    atomicDerived<double><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_f64);
+    hipMemcpy(d_res_u64, res_u64, 3*sizeof(unsigned long long), hipMemcpyHostToDevice);
+    hipMemcpy(d_res_s64, res_s64, 3*sizeof(long long), hipMemcpyHostToDevice);
+    hipMemcpy(d_res_f64, res_f64, 3*sizeof(double), hipMemcpyHostToDevice);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<unsigned long long>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_u64);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<long long>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_s64);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<double>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_f64);
   }
 
-  cudaMemcpy(&res_u64, d_res_u64, 3*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&res_s64, d_res_s64, 3*sizeof(long long), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&res_f64, d_res_f64, 3*sizeof(double), cudaMemcpyDeviceToHost);
+  hipMemcpy(&res_u64, d_res_u64, 3*sizeof(unsigned long long), hipMemcpyDeviceToHost);
+  hipMemcpy(&res_s64, d_res_s64, 3*sizeof(long long), hipMemcpyDeviceToHost);
+  hipMemcpy(&res_f64, d_res_f64, 3*sizeof(double), hipMemcpyDeviceToHost);
 
   unsigned long long bound = NUM_BLOCKS*BLOCK_SIZE;
   unsigned long long sum = 0; 
@@ -203,8 +203,8 @@ int main(int argc, char** argv) {
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 
-  cudaFree(d_res_u64);
-  cudaFree(d_res_s64);
-  cudaFree(d_res_f64);
+  hipFree(d_res_u64);
+  hipFree(d_res_s64);
+  hipFree(d_res_f64);
   return 0;
 }

@@ -12,63 +12,95 @@
 #include <float.h>
 #include "common.h"
 
-#define NUM_BLOCKS 1
+#define NUM_BLOCKS 1024
 #define BLOCK_SIZE 256
 
-/* int64 atomic_min
-inline
+// int64 atomic_min
 long long atomic_min(long long *address, long long val)
 {
-  long long ret = *address;
-  while(val < ret)
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      reinterpret_cast<unsigned long long*>(address)));
+
+  long long old_val = *address;
+  const unsigned long long new_val = *reinterpret_cast<const unsigned long long*>(&val);
+
+  while(val < old_val) 
   {
-    long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, (unsigned long long)old, (unsigned long long)val)) == old)
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val))
       break;
   }
-  return ret;
+  return old_val;
 }
 
 // uint64 atomic_min
 inline
 unsigned long long atomic_min(unsigned long long *address, unsigned long long val)
 {
-  unsigned long long ret = *address;
-  while(val < ret)
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    (sycl::multi_ptr<unsigned long long, access::address_space::global_space>(address)));
+
+  unsigned long long old_val = *address;
+  while(val < old_val) 
   {
-    unsigned long long old = ret;
-    if((ret = atomicCAS(address, old, val)) == old)
+    if(obj.compare_exchange_strong(old_val, val))
       break;
   }
-  return ret;
+  return old_val;
+}
+
+// uint64 atomic add
+inline
+unsigned long long atomic_add(unsigned long long *address, unsigned long long val)
+{
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj ((
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      address)));
+
+  unsigned long long old_val = *address;
+  while(true)
+  {
+    const unsigned long long new_val = old_val + val;
+    if(obj.compare_exchange_strong(old_val, new_val))
+      break;
+  }
+  return old_val;
 }
 
 // int64 atomic_max
-inline
 long long atomic_max(long long *address, long long val)
 {
-  long long ret = *address;
-  while(val > ret)
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      reinterpret_cast<unsigned long long*>(address)));
+
+  long long old_val = *address;
+  const unsigned long long new_val = *reinterpret_cast<const unsigned long long*>(&val);
+
+  while(val > old_val) 
   {
-    long long old = ret;
-    if((ret = (long long)atomicCAS((unsigned long long *)address, (unsigned long long)old, (unsigned long long)val)) == old)
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val))
       break;
   }
-  return ret;
+  return old_val;
 }
 
 // uint64 atomic_max
 inline
 unsigned long long atomic_max(unsigned long long *address, unsigned long long val)
 {
-  unsigned long long ret = *address;
-  while(val > ret)
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    (sycl::multi_ptr<unsigned long long, access::address_space::global_space>(address)));
+
+  unsigned long long old_val = *address;
+  while(val > old_val) 
   {
-    unsigned long long old = ret;
-    if((ret = atomicCAS(address, old, val)) == old)
+    if(obj.compare_exchange_strong(old_val, val))
       break;
   }
-  return ret;
+  return old_val;
 }
 
 // For all double atomics:
@@ -76,19 +108,45 @@ unsigned long long atomic_max(unsigned long long *address, unsigned long long va
 //      since NaN is never equal to any other NaN
 
 // double atomic_min
-inline
 double atomic_min(double *address, double val)
 {
-  unsigned long long ret = __double_as_longlong(*address);
-  while(val < __longlong_as_double(ret))
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      reinterpret_cast<unsigned long long*>(address)));
+
+  double old_val = *address;
+  const unsigned long long new_val = *reinterpret_cast<const unsigned long long*>(&val);
+
+  while(val < old_val) 
   {
-    unsigned long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, old, __double_as_longlong(val))) == old)
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val))
       break;
   }
-  return __longlong_as_double(ret);
+  return old_val;
 }
-*/
+
+// int64 atomic add
+inline
+long long atomic_add(long long *address, long long val)
+{
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      reinterpret_cast<unsigned long long*>(address)));
+
+  long long old_val = *address;
+  while(true)
+  {
+    const long long new_val = old_val + val;
+    const unsigned long long new_val_u64 = 
+      *reinterpret_cast<const unsigned long long*>(&new_val);
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val_u64))
+      break;
+  }
+  return old_val;
+}
+
 
 // double atomic_max
 inline
@@ -96,13 +154,36 @@ double atomic_max(double *address, double val)
 {
   sycl::atomic<unsigned long long, access::address_space::global_space> obj (
     sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
-    reinterpret_cast<unsigned long long*>(address)));
+      reinterpret_cast<unsigned long long*>(address)));
 
-  const double old_val = *address;
+  double old_val = *address;
+  const unsigned long long new_val = *reinterpret_cast<const unsigned long long*>(&val);
+
   while(val > old_val) 
   {
-    unsigned long long old = *reinterpret_cast<const unsigned long long*>(&old_val);
-    if(obj.compare_exchange_strong(old, *reinterpret_cast<const unsigned long long*>(&val)))
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val))
+      break;
+  }
+  return old_val;
+}
+
+// Double-precision floating point atomic add
+inline
+double atomic_add(double *address, double val)
+{
+  sycl::atomic<unsigned long long, access::address_space::global_space> obj (
+    sycl::multi_ptr<unsigned long long, access::address_space::global_space>(
+      reinterpret_cast<unsigned long long*>(address)));
+
+  double old_val = *address;
+  while(true)
+  {
+    const double new_val = old_val + val;
+    const unsigned long long new_val_u64 = 
+      *reinterpret_cast<const unsigned long long*>(&new_val);
+    if(obj.compare_exchange_strong(
+       *reinterpret_cast<unsigned long long*>(&old_val), new_val_u64))
       break;
   }
   return old_val;
@@ -112,15 +193,19 @@ template <typename T>
 void atomicDerived (nd_item<1> &item, T *__restrict res)
 {
   int i = item.get_global_id(0) + 1;
-  //atomic_min(res, (T)i);
+  atomic_min(res, (T)i);
   atomic_max(res+1, (T)i);
+  atomic_add(res+2, (T)i);
 }
 
 
-int main() {
-  unsigned long long res_u64[2] = {ULONG_MAX,0};
-  long long res_s64[2] = {LONG_MAX,LONG_MIN};
-  double res_f64[2] = {DBL_MAX,DBL_MIN};
+int main(int argc, char** argv) {
+
+  const int repeat = atoi(argv[1]);
+
+  unsigned long long res_u64[3] = {ULONG_MAX,0,0};
+  long long res_s64[3] = {LONG_MAX,LONG_MIN,0};
+  double res_f64[3] = {DBL_MAX,DBL_MIN,0};
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -129,15 +214,16 @@ int main() {
 #endif
   queue q(dev_sel);
 
-  buffer<unsigned long long, 1> d_res_u64 (2);   
-  buffer<long long, 1> d_res_s64 (2);   
-  buffer<double, 1> d_res_f64 (2);   
+  buffer<unsigned long long, 1> d_res_u64 (3);   
+  buffer<long long, 1> d_res_s64 (3);   
+  buffer<double, 1> d_res_f64 (3);   
 
   range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
   range<1> lws (BLOCK_SIZE);
 
   // the first two kernels should take almost the same execution time
-  for (int n = 0; n < 1; n++) {
+  // the add kernels are very slow compared to min/max kernels
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
       auto acc = d_res_u64.get_access<sycl_write>(cgh);
       cgh.copy(res_u64, acc);
@@ -153,11 +239,23 @@ int main() {
       cgh.copy(res_f64, acc);
     });
 
-    //atomicDerived<unsigned long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_u64);
-    //atomicDerived<long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_s64);
+    q.submit([&] (handler &cgh) {
+      auto acc = d_res_u64.get_access<sycl_read_write>(cgh);
+      cgh.parallel_for<class k_ull>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        atomicDerived<unsigned long long>(item, acc.get_pointer());
+      });
+    });
+
+    q.submit([&] (handler &cgh) {
+      auto acc = d_res_s64.get_access<sycl_read_write>(cgh);
+      cgh.parallel_for<class k_ll>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        atomicDerived<long long>(item, acc.get_pointer());
+      });
+    });
+
     q.submit([&] (handler &cgh) {
       auto acc = d_res_f64.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class k_double>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         atomicDerived<double>(item, acc.get_pointer());
       });
     });
@@ -192,6 +290,10 @@ int main() {
   if (res_u64[1] != bound || res_s64[1] != (long long)bound || res_f64[1] != (double)bound) {
     error = true;
     printf("atomic max results: %llu %lld %lf\n", res_u64[1], res_s64[1], res_f64[1]);
+  }
+  if (res_u64[2] != sum || res_s64[2] != (long long)sum || res_f64[2] != (double)sum) {
+    error = true;
+    printf("atomic add results: %llu %lld %lf\n", res_u64[2], res_s64[2], res_f64[2]);
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 
