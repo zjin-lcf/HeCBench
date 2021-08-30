@@ -72,7 +72,7 @@ void computeMIS(const int nodes,
     const int edges,
     const int* const __restrict nidx,
     const int* const __restrict nlist,
-    stattype* const __restrict nstat)
+    volatile stattype* const __restrict nstat)
 {
   #pragma omp target data map(to: nidx[0:nodes+1], nlist[0:edges]) \
                           map(from: nstat[0:nodes])
@@ -83,6 +83,7 @@ void computeMIS(const int nodes,
 
   const float avg = (float)edges / nodes;
   const float scaledavg = ((in / 2) - 1) * avg;
+
   for (int n = 0; n < 100; n++) {
     #pragma omp target teams distribute parallel for \
       num_teams(blocks) thread_limit(ThreadsPerBlock) shared(avg, scaledavg)
