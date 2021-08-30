@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -30,7 +30,7 @@ LDFLAGS =
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
-  LDFLAGS += -g
+  LDFLAGS  += -g
 endif
 
 
@@ -53,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1
+	./$(program)
 

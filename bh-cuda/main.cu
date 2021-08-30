@@ -263,7 +263,7 @@ void TreeBuildingKernel(
     if (ch != -2) {  // skip if child pointer is locked and try again later
       locked = n*8+j;
       if (ch == -1) {
-        if (-1 == atomicCAS((int*)&childd[locked], -1, i)) {  // if null, just insert the new body
+        if (ch == atomicCAS((int*)&childd[locked], ch, i)) {  // if null, just insert the new body
           i += inc;  // move on to next body
           skip = 1;
         }
@@ -350,7 +350,7 @@ void SummarizationKernel(
     const int nbodiesd,
     volatile int* const __restrict__ countd,
     const int* const __restrict__ childd,
-    float4* const __restrict__ posMassd,
+    volatile float4* const __restrict__ posMassd, // will cause hanging for 2048 bodies without volatile
     int* const __restrict bottomd)
 {
   __shared__ int child[THREADS3 * 8];
@@ -408,7 +408,6 @@ void SummarizationKernel(
           posMassd[k].x = px * m;
           posMassd[k].y = py * m;
           posMassd[k].z = pz * m;
-          __threadfence();
           posMassd[k].w = cm;
         }
       }
@@ -477,7 +476,6 @@ void SummarizationKernel(
         posMassd[k].x = px * m;
         posMassd[k].y = py * m;
         posMassd[k].z = pz * m;
-        __threadfence();
         posMassd[k].w = cm;
         k += inc;
       }
@@ -716,7 +714,7 @@ static int randx = 7;
 static double drnd()
 {
   const int lastrand = randx;
-  randx = (1103515245 * randx + 12345) & 0x7FFFFFFF;
+  randx = (1103515245L * randx + 12345) & 0x7FFFFFFF;
   return (double)lastrand / 2147483648.0;
 }
 
