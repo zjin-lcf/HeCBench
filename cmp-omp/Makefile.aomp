@@ -8,7 +8,6 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 
-VPATH     = ../cmp-cuda
 #===============================================================================
 # Program name & source code list
 #===============================================================================
@@ -16,12 +15,12 @@ VPATH     = ../cmp-cuda
 program = main
 
 source = main.cpp \
-reference.cpp \
-su_cdp.cpp \
-su_gather.cpp \
-su_trace.cpp \
-log.cpp  \
-parser.cpp  
+../cmp-cuda/reference.cpp \
+../cmp-cuda/su_cdp.cpp \
+../cmp-cuda/su_gather.cpp \
+../cmp-cuda/su_trace.cpp \
+../cmp-cuda/log.cpp  \
+../cmp-cuda/parser.cpp  
 
 obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 
@@ -62,16 +61,18 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+main.o : main.cpp ../cmp-cuda/log.hpp ../cmp-cuda/utils.hpp ../cmp-cuda/parser.hpp ../cmp-cuda/su_gather.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-log.o : log.cpp log.hpp
-parser.o: parser.cpp parser.hpp  
-su_cdp.o : su_cdp.cpp su_cdp.hpp log.hpp
-su_gather.o : su_gather.cpp su_gather.hpp log.hpp su_trace.hpp
-su_trace.o : su_trace.cpp su_trace.hpp log.hpp
-main.o : main.cu log.hpp utils.hpp parser.hpp su_gather.hpp
-reference.o : reference.cpp utils.hpp
+%.o: ../cmp-cuda/%.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+log.o : ../cmp-cuda/log.cpp ../cmp-cuda/log.hpp
+parser.o: ../cmp-cuda/parser.cpp ../cmp-cuda/parser.hpp  
+su_cdp.o : ../cmp-cuda/su_cdp.cpp ../cmp-cuda/su_cdp.hpp ../cmp-cuda/log.hpp
+su_gather.o : ../cmp-cuda/su_gather.cpp ../cmp-cuda/su_gather.hpp ../cmp-cuda/log.hpp ../cmp-cuda/su_trace.hpp
+su_trace.o : ../cmp-cuda/su_trace.cpp ../cmp-cuda/su_trace.hpp ../cmp-cuda/log.hpp
+reference.o : ../cmp-cuda/reference.cpp ../cmp-cuda/utils.hpp
 
 clean:
 	rm -rf $(program) $(obj)
