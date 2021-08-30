@@ -16,7 +16,7 @@
 #define BLOCK_SIZE 256
 
 // int64 atomic_min
-  __device__ __forceinline__
+__device__ __forceinline__
 long long atomic_min(long long *address, long long val)
 {
   long long ret = *address;
@@ -30,7 +30,7 @@ long long atomic_min(long long *address, long long val)
 }
 
 // uint64 atomic_min
-  __device__ __forceinline__
+__device__ __forceinline__
 unsigned long long atomic_min(unsigned long long *address, unsigned long long val)
 {
   unsigned long long ret = *address;
@@ -43,8 +43,20 @@ unsigned long long atomic_min(unsigned long long *address, unsigned long long va
   return ret;
 }
 
+// int64 atomic add
+__device__ __forceinline__
+long long atomic_add(long long *address, long long val)
+{
+  long long old, newdbl, ret = *address;
+  do {
+    old = ret;
+    newdbl = old+val;
+  } while((ret = (long long)atomicCAS((unsigned long long*)address, (unsigned long long)old, (unsigned long long)newdbl)) != old);
+  return ret;
+}
+
 // int64 atomic_max
-  __device__ __forceinline__
+__device__ __forceinline__
 long long atomic_max(long long *address, long long val)
 {
   long long ret = *address;
@@ -58,7 +70,7 @@ long long atomic_max(long long *address, long long val)
 }
 
 // uint64 atomic_max
-  __device__ __forceinline__
+__device__ __forceinline__
 unsigned long long atomic_max(unsigned long long *address, unsigned long long val)
 {
   unsigned long long ret = *address;
@@ -71,12 +83,24 @@ unsigned long long atomic_max(unsigned long long *address, unsigned long long va
   return ret;
 }
 
+// uint64 atomic add
+__device__ __forceinline__
+unsigned long long atomic_add(unsigned long long *address, unsigned long long val)
+{
+  unsigned long long old, newdbl, ret = *address;
+  do {
+    old = ret;
+    newdbl = old+val;
+  } while((ret = atomicCAS(address, old, newdbl)) != old);
+  return ret;
+}
+
 // For all double atomics:
 //      Must do the compare with integers, not floating point,
 //      since NaN is never equal to any other NaN
 
 // double atomic_min
-  __device__ __forceinline__
+__device__ __forceinline__
 double atomic_min(double *address, double val)
 {
   unsigned long long ret = __double_as_longlong(*address);
@@ -90,7 +114,7 @@ double atomic_min(double *address, double val)
 }
 
 // double atomic_max
-  __device__ __forceinline__
+__device__ __forceinline__
 double atomic_max(double *address, double val)
 {
   unsigned long long ret = __double_as_longlong(*address);
@@ -103,6 +127,20 @@ double atomic_max(double *address, double val)
   return __longlong_as_double(ret);
 }
 
+// Double-precision floating point atomic add
+__device__ __forceinline__
+double atomic_add(double *address, double val)
+{
+  // Doing it all as longlongs cuts one __longlong_as_double from the inner loop
+  unsigned long long *ptr = (unsigned long long *)address;
+  unsigned long long old, newdbl, ret = *ptr;
+  do {
+    old = ret;
+    newdbl = __double_as_longlong(__longlong_as_double(old)+val);
+  } while((ret = atomicCAS(ptr, old, newdbl)) != old);
+  return __longlong_as_double(ret);
+}
+
 
 template <typename T>
 __global__ 
@@ -111,38 +149,43 @@ void atomicDerived (T *__restrict res)
   int i = threadIdx.x + blockIdx.x * blockDim.x + 1;
   atomic_min(res, (T)i);
   atomic_max(res+1, (T)i);
+  atomic_add(res+2, (T)i);
 }
 
 
-int main() {
-  unsigned long long res_u64[2] = {ULONG_MAX,0};
-  long long res_s64[2] = {LONG_MAX,LONG_MIN};
-  double res_f64[2] = {DBL_MAX,DBL_MIN};
+int main(int argc, char** argv) {
+
+  const int repeat = atoi(argv[1]);
+
+  unsigned long long res_u64[3] = {ULONG_MAX,0,0};
+  long long res_s64[3] = {LONG_MAX,LONG_MIN,0};
+  double res_f64[3] = {DBL_MAX,DBL_MIN,0};
 
   unsigned long long *d_res_u64;   
   long long *d_res_s64;   
   double *d_res_f64;   
 
-  cudaMalloc((void**)&d_res_u64, 2*sizeof(unsigned long long));
-  cudaMalloc((void**)&d_res_s64, 2*sizeof(long long));
-  cudaMalloc((void**)&d_res_f64, 2*sizeof(double));
+  cudaMalloc((void**)&d_res_u64, 3*sizeof(unsigned long long));
+  cudaMalloc((void**)&d_res_s64, 3*sizeof(long long));
+  cudaMalloc((void**)&d_res_f64, 3*sizeof(double));
 
-  // the first two kernels should take almost the same execution time
-  for (int n = 0; n < 5000; n++) {
-    cudaMemcpy(d_res_u64, res_u64, 2*sizeof(unsigned long long), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_res_s64, res_s64, 2*sizeof(long long), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_res_f64, res_f64, 2*sizeof(double), cudaMemcpyHostToDevice);
+  // the min/max kernels would take almost the same execution time for many iterations
+  // the add kernels are very slow compared to min/max kernels
+  for (int n = 0; n < repeat; n++) {
+    cudaMemcpy(d_res_u64, res_u64, 3*sizeof(unsigned long long), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_res_s64, res_s64, 3*sizeof(long long), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_res_f64, res_f64, 3*sizeof(double), cudaMemcpyHostToDevice);
     atomicDerived<unsigned long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_u64);
     atomicDerived<long long><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_s64);
     atomicDerived<double><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_res_f64);
   }
 
-  cudaMemcpy(&res_u64, d_res_u64, 2*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&res_s64, d_res_s64, 2*sizeof(long long), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&res_f64, d_res_f64, 2*sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&res_u64, d_res_u64, 3*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&res_s64, d_res_s64, 3*sizeof(long long), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&res_f64, d_res_f64, 3*sizeof(double), cudaMemcpyDeviceToHost);
 
-  unsigned long long sum = 0; 
   unsigned long long bound = NUM_BLOCKS*BLOCK_SIZE;
+  unsigned long long sum = 0; 
   for (unsigned int i = 1; i <= bound; i++) sum += i;
 
   bool error = false;
@@ -153,6 +196,10 @@ int main() {
   if (res_u64[1] != bound || res_s64[1] != (long long)bound || res_f64[1] != (double)bound) {
     error = true;
     printf("atomic max results: %llu %lld %lf\n", res_u64[1], res_s64[1], res_f64[1]);
+  }
+  if (res_u64[2] != sum || res_s64[2] != (long long)sum || res_f64[2] != (double)sum) {
+    error = true;
+    printf("atomic add results: %llu %lld %lf\n", res_u64[2], res_s64[2], res_f64[2]);
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 
