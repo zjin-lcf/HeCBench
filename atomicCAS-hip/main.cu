@@ -153,7 +153,10 @@ void atomicDerived (T *__restrict res)
 }
 
 
-int main() {
+int main(int argc, char** argv) {
+
+  const int repeat = atoi(argv[1]);
+
   unsigned long long res_u64[3] = {ULONG_MAX,0,0};
   long long res_s64[3] = {LONG_MAX,LONG_MIN,0};
   double res_f64[3] = {DBL_MAX,DBL_MIN,0};
@@ -168,7 +171,7 @@ int main() {
 
   // the min/max kernels would take almost the same execution time for many iterations
   // the add kernels are very slow compared to min/max kernels
-  for (int n = 0; n < 1; n++) {
+  for (int n = 0; n < repeat; n++) {
     hipMemcpy(d_res_u64, res_u64, 3*sizeof(unsigned long long), hipMemcpyHostToDevice);
     hipMemcpy(d_res_s64, res_s64, 3*sizeof(long long), hipMemcpyHostToDevice);
     hipMemcpy(d_res_f64, res_f64, 3*sizeof(double), hipMemcpyHostToDevice);
