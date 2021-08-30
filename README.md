@@ -497,6 +497,9 @@ Early results are shown [here](results/README.md)
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
+### split
+  The split operation in radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
 ### sptrsv
   A thread-Level synchronization-free sparse triangular solver (https://github.com/JiyaSu/CapelliniSpTRSV)
 
