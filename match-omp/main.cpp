@@ -95,14 +95,6 @@ int main(int argc, char *argv[])
     }
   }
 
-  float *d_pts1 = h_pts1;
-  float *d_pts2 = h_pts2;
-    int *d_index = h_index2.data();
-  float *d_score = h_score2.data();
-#pragma omp target data map (to: d_pts1[0:NPTS*NDIM], d_pts2[0:NPTS*NDIM]) \
-                        map (alloc: d_index[0:NPTS], d_score[0:NPTS])
-{
-
   auto start = omp_get_wtime();
   MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
   auto end = omp_get_wtime();
@@ -111,6 +103,13 @@ int main(int argc, char *argv[])
   std::cout << "MatchCPU1:   " << delay << " ms  "
             << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   
+  float *d_pts1 = h_pts1;
+  float *d_pts2 = h_pts2;
+    int *d_index = h_index2.data();
+  float *d_score = h_score2.data();
+#pragma omp target data map (to: d_pts1[0:NPTS*NDIM], d_pts2[0:NPTS*NDIM]) \
+                        map (alloc: d_index[0:NPTS], d_score[0:NPTS])
+{
   start = omp_get_wtime();
   for (int i = 0; i < REPEAT; i++) {
     #pragma omp target teams distribute parallel for thread_limit (M1W)

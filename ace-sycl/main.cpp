@@ -265,7 +265,9 @@ void swapGrid(double cnew[][DATAYSIZE][DATAXSIZE],
 
 void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
 {
+#ifdef _OPENMP
   #pragma omp parallel for collapse(3)
+#endif
   for (int idx = 0; idx < DATAXSIZE; idx++) {
     for (int idy = 0; idy < DATAYSIZE; idy++) {
       for (int idz = 0; idz < DATAZSIZE; idz++) {
@@ -284,7 +286,9 @@ void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
 
 void initializationU(double u[][DATAYSIZE][DATAXSIZE], double r0, double delta)
 {
+#ifdef _OPENMP
   #pragma omp parallel for collapse(3)
+#endif
   for (int idx = 0; idx < DATAXSIZE; idx++) {
     for (int idy = 0; idy < DATAYSIZE; idy++) {
       for (int idz = 0; idz < DATAZSIZE; idz++) {
