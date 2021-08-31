@@ -289,7 +289,7 @@ int main()
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
 
-      printf ("# codewords = %d, CW=%d, MCW=%d\r\n",total_codeword, CW, MCW);
+      printf ("# codewords = %d, CW=%d, MCW=%d\n",total_codeword, CW, MCW);
       printf ("total bit error = %d\n", total_bit_error);
       printf ("total frame error = %d\n", total_frame_error);
       printf ("BER = %1.2e, FER = %1.2e\n", 
