@@ -125,7 +125,6 @@ float4* runMergeSort(int listsize, int divisions,
   }
   largestSize *= 4;
 
-
 #ifdef MERGE_WG_SIZE_0
   const int THREADS = MERGE_WG_SIZE_0;
 #else
@@ -177,7 +176,7 @@ float4* runMergeSort(int listsize, int divisions,
     d_resultList_buff = tempList;
 
     mergeSortPass<<<grid[0], local[0]>>>(d_origList_buff, d_resultList_buff, 
-        d_constStartAddr, threadsPerDiv, nrElems);
+        d_constStartAddr, threadsPerDiv, nrElems, listsize/4);
 
     nrElems *= 2;
     floatsperthread = (nrElems*4);

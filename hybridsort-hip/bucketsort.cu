@@ -138,9 +138,6 @@ void bucketSort(float *d_input, float *d_output, int listsize,
   hipMalloc((void**)&d_bucketOutput, sizeof(float)*(listsize + DIVISIONS*4)); 
   hipMemcpyAsync(d_bucketOutput, d_output, sizeof(float)*(listsize + DIVISIONS*4), hipMemcpyHostToDevice,0); 
 
-  size_t localfinal = BUCKET_THREAD_N;
-  size_t globalfinal = blocks*BUCKET_THREAD_N;
-
   hipLaunchKernelGGL(bucketsort, dim3(blocks), dim3(BUCKET_THREAD_N), 0, 0, d_input_buff, d_indice_buff, d_bucketOutput,
       d_prefixoffsets_buff, d_offsets_buff, listsize);
 
