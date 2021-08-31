@@ -722,16 +722,16 @@ int main(int argc, char *argv[])
     }
   }
 
-  hipMemcpy(d_pts1, h_pts1, psize*NDIM, hipMemcpyHostToDevice);
-  hipMemcpy(d_pts2, h_pts2, psize*NDIM, hipMemcpyHostToDevice);
-
   auto start = std::chrono::high_resolution_clock::now();
   MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
   auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds = end - start;
+  auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   auto delay = elapsed_seconds.count() * 1000;
   std::cout << "MatchCPU1:   " << delay << " ms  "
             << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
+
+  hipMemcpy(d_pts1, h_pts1, psize*NDIM, hipMemcpyHostToDevice);
+  hipMemcpy(d_pts2, h_pts2, psize*NDIM, hipMemcpyHostToDevice);
   
   dim3 blocks, threads;
   blocks = dim3(NPTS/M1W);
@@ -741,7 +741,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match1, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU1:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -755,7 +755,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match2, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU2:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -769,7 +769,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match3, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU3:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -783,7 +783,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match4, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU4:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -797,7 +797,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match5, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU5:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -811,7 +811,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match6, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU6:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -825,7 +825,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match7, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU7:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -839,7 +839,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match8, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU8:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -853,7 +853,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match9, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU9:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
@@ -868,7 +868,7 @@ int main(int argc, char *argv[])
     hipLaunchKernelGGL(Match10, blocks, threads, 0, 0, d_pts1, d_pts2, d_score, d_index);
   hipDeviceSynchronize();
   end = std::chrono::high_resolution_clock::now();
-  elapsed_seconds = end - start;
+  elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / REPEAT;
   std::cout << "MatchGPU10:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   hipMemcpy(h_index2.data(), d_index, psize, hipMemcpyDeviceToHost);
