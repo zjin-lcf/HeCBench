@@ -30,14 +30,14 @@ Early results are shown [here](results/README.md)
 ### asta
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
-### attention
-  Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
-
 ### atomicIntrinsics
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### atomicCAS
   64-bit atomic add, min, and max with compare and swap (https://github.com/treecode/Bonsai/blob/master/runtime/profiling/derived_atomic_functions.h)
+
+### attention
+  Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
 
 ### axhelm
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
@@ -68,6 +68,9 @@ Early results are shown [here](results/README.md)
 
 ### bm3d
   Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
+
+### bh
+  Simulate the gravitational forces in a star cluster using the Barnes-Hut n-body algorithm (https://userweb.cs.txstate.edu/~burtscher/research/ECL-BH/)
 
 ### bn
   Bayesian network learning (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
@@ -149,9 +152,6 @@ Early results are shown [here](results/README.md)
 
 ### dslash
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
-
-### dtw
-  Dynamic time warping for time series (https://github.com/alexkyllo/cuTimeWarp)
 
 ### dxtc1
   DXT1 compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
@@ -264,6 +264,9 @@ Early results are shown [here](results/README.md)
 
 ### jaccard
   Jaccard index for a sparse matrix (https://github.com/rapidsai/nvgraph/blob/main/cpp/src/jaccard_gpu.cu)
+
+### jacobi
+  Jacobi relaxation (https://github.com/NVIDIA/multi-gpu-programming-models/blob/master/single_gpu/jacobi.cu)
 
 ### jenkins-hash 
   Bob Jenkins lookup3 hash function (https://android.googlesource.com/platform/external/jenkins-hash/+/75dbeadebd95869dd623a29b720678c5c5c55630/lookup3.c)
@@ -385,6 +388,9 @@ Early results are shown [here](results/README.md)
 ### murmurhash3
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
 
+### myocte
+  Myocte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
 ### nbody
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
@@ -426,6 +432,9 @@ Early results are shown [here](results/README.md)
 
 ### qrg
   Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### qtclustering
+  quality threshold clustering (https://github.com/vetter/shoc/)
 
 ### radixsort
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
@@ -497,6 +506,9 @@ Early results are shown [here](results/README.md)
 ### sph
   The simple n^2 SPH simulation (https://github.com/olcf/SPH_Simple)
 
+### split
+  The split operation in radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
 ### sptrsv
   A thread-Level synchronization-free sparse triangular solver (https://github.com/JiyaSu/CapelliniSpTRSV)
 
@@ -517,6 +529,9 @@ Early results are shown [here](results/README.md)
 
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
+
+### sw4ck
+  SW4 curvilinear kernels are five stencil kernels that account for ~50% of the solution time in SW4 (https://github.com/LLNL/SW4CK)
 
 ### testSNAP
   A proxy for the SNAP force calculation in the LAMMPS molecular dynamics package (https://github.com/FitSNAP/TestSNAP)

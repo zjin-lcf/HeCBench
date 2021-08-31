@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
