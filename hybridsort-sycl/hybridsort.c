@@ -22,7 +22,13 @@
 
 // Use a static data size for simplicity
 //
-#define SIZE (50000000)
+//#define SIZE (50000000)
+//#define SIZE (100000)
+#define SIZE (4096)
+
+#define DATA_SIZE (1024)
+#define MAX_SOURCE_SIZE (0x100000)
+#define HISTOGRAM_SIZE (1024 * sizeof(unsigned int))
 
 ////////////////////////////////////////////////////////////////////////////////
 int compare(const void *a, const void *b) {
@@ -32,8 +38,8 @@ int compare(const void *a, const void *b) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-float4* runMergeSort(int listsize, int divisions,
-    float4 *d_origList, float4 *d_resultList,
+cl::sycl::float4* runMergeSort(int listsize, int divisions,
+    cl::sycl::float4 *d_origList, cl::sycl::float4 *d_resultList,
     int *sizes, int *nullElements,
     unsigned int *origOffsets);
 
@@ -77,7 +83,8 @@ int main(int argc, char** argv)
   if(strcmp(argv[1],"r")==0) {
     for (int i = 0; i < numElements; i++) {
       // Generate random floats between 0 and 1 for the input data
-      cpu_idata[i] = (float) rand() / RAND_MAX;
+      //cpu_idata[i] = (float) rand() / RAND_MAX;
+      cpu_idata[i] = SIZE-i; //(float) rand() / RAND_MAX;
 
       //Compare data at index to data minimum, if less than current minimum, set that element as new minimum
       datamin = fminf(cpu_idata[i], datamin);
@@ -108,13 +115,20 @@ int main(int argc, char** argv)
   int *nullElements = (int*) malloc(DIVISIONS * sizeof(int));
   unsigned int *origOffsets = (unsigned int *) malloc((DIVISIONS + 1) * sizeof(int));
 
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
+
   // time bucketsort
   clock_t bucketsort_start = clock();
-  bucketSort(cpu_idata,d_output,numElements,sizes,nullElements,datamin,datamax, origOffsets);
+  bucketSort(q, cpu_idata,d_output,numElements,sizes,nullElements,datamin,datamax, origOffsets);
   clock_t bucketsort_diff = clock() - bucketsort_start;
-
-  float4 *d_origList = (float4*) d_output;
-  float4 *d_resultList = (float4*) cpu_idata;
+ 
+  cl::sycl::float4 *d_origList = (cl::sycl::float4*) d_output;
+  cl::sycl::float4 *d_resultList = (cl::sycl::float4*) cpu_idata;
 
   int newlistsize = 0;
   for(int i = 0; i < DIVISIONS; i++){
@@ -123,7 +137,7 @@ int main(int argc, char** argv)
 
   // time mergesort
   clock_t mergesort_start = clock();
-  float4* mergeresult = runMergeSort(newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
+  cl::sycl::float4* mergeresult = runMergeSort(q, newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
   clock_t mergesort_diff = clock() - mergesort_start;
   gpu_odata = (float*)mergeresult;
 

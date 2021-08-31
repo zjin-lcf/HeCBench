@@ -57,13 +57,6 @@ bucketsort.o: bucketsort.c \
        	kernel_bucketsort.h  
 	$(CC) $(CFLAGS) -o bucketsort.o -c bucketsort.c 
 
-bucketsort_opt.o: bucketsort_opt.c \
-	kernel_bucketprefix.h \
-	kernel_histogram.h \
-	kernel_bucketcount.h \
-       	kernel_bucketsort.h  
-	$(CC) $(CFLAGS) -o bucketsort_opt.o -c bucketsort_opt.c 
-
 mergesort.o: mergesort.c mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.c 
 
