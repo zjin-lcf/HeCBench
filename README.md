@@ -150,9 +150,6 @@ Early results are shown [here](results/README.md)
 ### dslash
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
-### dtw
-  Dynamic time warping for time series (https://github.com/alexkyllo/cuTimeWarp)
-
 ### dxtc1
   DXT1 compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
