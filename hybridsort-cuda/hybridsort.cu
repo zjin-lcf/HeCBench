@@ -24,10 +24,6 @@
 //
 #define SIZE (50000000)
 
-#define DATA_SIZE (1024)
-#define MAX_SOURCE_SIZE (0x100000)
-#define HISTOGRAM_SIZE (1024 * sizeof(unsigned int))
-
 ////////////////////////////////////////////////////////////////////////////////
 int compare(const void *a, const void *b) {
   if(*((float *)a) < *((float *)b)) return -1;

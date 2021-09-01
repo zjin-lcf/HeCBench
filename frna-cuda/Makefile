@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +24,7 @@ obj = $(c_source:.c=.o) $(cuda_source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DINT -std=c++14 -Xcompiler -Wall -arch=sm_60
+CFLAGS := -DINT -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

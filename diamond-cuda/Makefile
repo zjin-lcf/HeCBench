@@ -3,10 +3,11 @@
 #===============================================================================
 
 #intel
-CC          = nvcc 
-OPTIMIZE    = yes
-DEBUG       = no
-DMND_PATH   = ../diamond-sycl
+CC        = nvcc 
+OPTIMIZE  = yes
+DEBUG     = no
+ARCH      = sm_60
+DMND_PATH = ../diamond-sycl
 
 #===============================================================================
 # Program name & source code list
@@ -91,7 +92,7 @@ obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(cuda_src:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall 
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = -lz -lpthread

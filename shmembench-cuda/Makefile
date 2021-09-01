@@ -4,8 +4,9 @@
 
 # Compiler can be set below, or via environment variable
 CC        = nvcc
-OPTIMIZE  = no
+OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 
 #===============================================================================
@@ -22,7 +23,7 @@ obj = main.o shmem_kernels.o
 # Sets Flags
 #===============================================================================
 
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

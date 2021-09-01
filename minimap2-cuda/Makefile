@@ -1,15 +1,16 @@
 CXX ?= g++
 NVCC ?= nvcc
+ARCH = sm_60
 
 # path #
 SRC_PATH = src
-CUDA_PATH = device
+CUDA_PATH = device-bak
 BUILD_PATH = build
 BUILD_CUDA_PATH = build/cuda
 BIN_PATH = $(BUILD_PATH)/bin
 
 # executable #
-BIN_NAME = kernel
+BIN_NAME = kernel-2d
 
 # extensions #
 SRC_EXT = cpp
@@ -29,7 +30,7 @@ DEPS = $(OBJECTS:.o=.d)
 
 # flags #
 COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
-NVCC_COMPILE_FLAGS = -std=c++11 --default-stream per-thread -g -O3 -arch=sm_60 -gencode=arch=compute_60,code=sm_60
+NVCC_COMPILE_FLAGS = -std=c++11 --default-stream per-thread -g -O3 -arch=$(ARCH)
 INCLUDES = -I include/ -I /usr/local/include
 # Space-separated pkg-config libraries used by this project
 LIBS =

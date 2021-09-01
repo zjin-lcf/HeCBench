@@ -23,17 +23,18 @@ for (int gid = 0; gid < global[0]; gid++) {
         int bidx = 0;
         int outidx = 0;
         float4 a, b;
+        float4 zero = {0.f, 0.f, 0.f, 0.f};
         a = d_origList[Astart + aidx];
         b = d_origList[Bstart + bidx];
 
-        while(1)
+        while(true)
         {
           /**
            * For some reason, it's faster to do the texture fetches here than
            * after the merge
            */
           float4 nextA = d_origList[Astart + aidx + 1];
-          float4 nextB = d_origList[Bstart + bidx + 1];
+          float4 nextB = (Bstart + bidx + 1 >= listsize/4) ? zero : d_origList[Bstart + bidx + 1];
 
           float4 na = getLowest(a,b);
           float4 nb = getHighest(a,b);
