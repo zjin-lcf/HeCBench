@@ -1,17 +1,18 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 
 # Standard flags
-CFLAGS := -std=c++11 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker flags
 LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g #-DDEBUG
+  CFLAGS += -g -G -O0#-DDEBUG
 endif
 
 # Optimization Flags

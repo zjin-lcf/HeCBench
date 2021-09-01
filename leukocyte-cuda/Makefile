@@ -1,12 +1,13 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 # Matrix library path
 MATRIX_DIR = ./meschach_lib
 
 # Standard flags
-CFLAGS := -std=c++11 -Xcompiler -Wall -I$(MATRIX_DIR) --x cu
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) -I$(MATRIX_DIR) --x cu
 
 # Linker flags
 LDFLAGS = -lm

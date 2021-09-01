@@ -1,9 +1,10 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 # Standard flags
-CFLAGS := -std=c++11 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 
 # Debug Flags

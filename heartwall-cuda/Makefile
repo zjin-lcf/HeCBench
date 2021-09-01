@@ -1,11 +1,12 @@
-CC          = nvcc
-OPTIMIZE    = yes
-DUMP        = yes
-DEBUG       = no
+CC        = nvcc
+OPTIMIZE  = yes
+DEBUG     = no
+ARCH      = sm_60
+DUMP      = yes
 
 
 # Standard flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker flags
 LDFLAGS = -lm

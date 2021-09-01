@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC    = nvcc
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -18,7 +19,8 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++11 -Xcompiler -Wall -Ddfloat=float -Ddlong=int 
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) \
+          -Ddfloat=float -Ddlong=int 
 
 # Linker Flags
 LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran

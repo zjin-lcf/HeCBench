@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 OUTPUT    = yes
 
 #===============================================================================
@@ -23,7 +24,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=sm_60 -Xptxas -v --maxrregcount=32
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

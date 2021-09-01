@@ -12,11 +12,7 @@ ARCH      = sm_60
 # Program name & source code list
 #===============================================================================
 
-program = main
-
-source = main.cu
-
-obj = $(source:.cu=.o)
+program = vj-cpu vj-gpu
 
 #===============================================================================
 # Sets Flags
@@ -30,7 +26,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
   LDFLAGS  += -g
 endif
 
@@ -40,19 +36,40 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-#===============================================================================
-# Targets to Build
-#===============================================================================
+HEADERS := image.h haar.h stdio-wrapper.h
 
-$(program): $(obj) Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+all: build
 
-%.o: %.cu Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+build: $(program)
+
+image.o: image.cu $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+stdio-wrapper.o: stdio-wrapper.cu $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+main.o: main.cu $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+haar-gpu.o: haar.cu $(HEADERS)
+	$(CC) $(CFLAGS) -DGPU -o $@ -c $<
+
+haar-cpu.o: haar.cu $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+rectangles.o: rectangles.cu $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+vj-cpu: main.o haar-cpu.o image.o stdio-wrapper.o rectangles.o
+	$(CC) $(CFLAGS) -o $@ $+ $(LDFLAGS)
+
+vj-gpu: main.o haar-gpu.o image.o stdio-wrapper.o rectangles.o
+	$(CC) $(CFLAGS) -o $@ $+ $(LDFLAGS)
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -f $(program) *.o Output-cpu.pgm Output-gpu.pgm
 
-run: $(program)
-	./$(program) 1000
+run: build
+	./vj-cpu Face.pgm Output-cpu.pgm
+	./vj-gpu Face.pgm Output-gpu.pgm
 
