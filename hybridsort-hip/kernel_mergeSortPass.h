@@ -4,7 +4,8 @@ mergeSortPass (const float4* input,
     float4* result,
     const int* constStartAddr,
     const int threadsPerDiv,
-    const int nrElems)
+    const int nrElems,
+    const int size)
 {
 
   const int gid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -42,7 +43,8 @@ mergeSortPass (const float4* input,
      * after the merge
      */
     float4 nextA = input[Astart + aidx + 1];
-    float4 nextB = input[Bstart + bidx + 1];
+    float4 nextB = (Bstart + bidx + 1 >= size) ? 
+                   make_float4(0.f, 0.f, 0.f, 0.f) : input[Bstart + bidx + 1];
 
     float4 na = getLowest(a,b);
     float4 nb = getHighest(a,b);

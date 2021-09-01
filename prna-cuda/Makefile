@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +24,7 @@ obj = $(c_source:.c=.o) $(cuda_source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DFLOAT -std=c++14 -Xcompiler -Wall -arch=sm_60
+CFLAGS := -DFLOAT -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
@@ -43,10 +44,6 @@ endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
-
-# generate a binary seq file
-#gen: save-params.c param.c base.c util.c
-#	gcc -O2 -DFLOAT -o gen-bin-seq save-params.c param.c base.c util.c -lm
 
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)

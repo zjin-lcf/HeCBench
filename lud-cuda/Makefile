@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -20,7 +21,7 @@ source = lud.cu ./common/common.cu
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I./common
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) -I./common
 
 # Linker Flags
 LDFLAGS = 

@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -26,8 +27,9 @@ obj = $(source:.cu=.o)
 CFLAGS := -std=c++14 \
           -DMILC_COMPLEX \
           -DLDIM=32 \
-          -DPRECISION=2 \
+          -DPRECISION=1 \
           -Xcompiler -Wall \
+          -arch=$(ARCH) \
           -Xcompiler -fopenmp \
           -I../include
 
