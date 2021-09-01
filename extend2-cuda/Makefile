@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -21,7 +22,7 @@ obj = main.o read_data.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -I../extend2-sycl
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) -I../extend2-sycl
 
 # Linker Flags
 LDFLAGS = 

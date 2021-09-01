@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 OPENCV    = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -14,7 +15,7 @@ OPENCV    = no
 
 program = ced
 
-source = main.cu kernel_reference.cu 
+source = main-gpu-only-1D.cu kernel_reference.cu 
 
 obj = $(source:.cu=.o)
 
@@ -23,14 +24,14 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = -lpthread 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 

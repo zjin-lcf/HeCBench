@@ -6,6 +6,7 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -22,7 +23,7 @@ obj = main.o cOgrd.o  cOkadaFault.o  cOkadaEarthquake.o cSphere.o okada.o utilit
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

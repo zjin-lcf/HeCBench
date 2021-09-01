@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 BOOST     = $(HOME)/boost_1_76_0
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -24,14 +25,14 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -I$(BOOST) -std=c++11 -arch=sm_60
+CFLAGS := -I$(BOOST) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
