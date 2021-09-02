@@ -36,6 +36,9 @@ Early results are shown [here](results/README.md)
 ### atomicCAS
   64-bit atomic add, min, and max with compare and swap (https://github.com/treecode/Bonsai/blob/master/runtime/profiling/derived_atomic_functions.h)
 
+### atomicReduction
+  Integer sum reduction with atomics (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
+
 ### attention
   Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
 
@@ -442,9 +445,6 @@ Early results are shown [here](results/README.md)
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
   
-### reduction
-  Integer sum reduction (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
-
 ### reverse
   Reverse an input array of size 256 using shared memory
 
