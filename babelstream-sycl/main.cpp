@@ -51,15 +51,42 @@
 // Number of thread blocks for the DOT kernel 
 #define DOT_NUM_BLOCKS 256
 
-// scalar constanst for the mul, triad and nstream kernels
+// Scalar constanst for the mul, triad and nstream kernels
 #define SCALAR (0.4)
 
 // Default size of 2^25
 int ARRAY_SIZE = 33554432;
+
+// Kernel execution times
 unsigned int num_times = 100;
 
+// Forward declarations
+// SYCL spec: If the lambda function relies on template arguments,
+// then if specified, the name of the lambda function must contain 
+// those template arguments which must also be forward declarable at namespace scope.
+template <typename T>
+class init_kernel;
 
-template <class T>
+template <typename T>
+class copy_kernel;
+
+template <typename T>
+class mul_kernel;
+
+template <typename T>
+class add_kernel;
+
+template <typename T>
+class triad_kernel;
+
+template <typename T>
+class nstream_kernel;
+
+template <typename T>
+class dot_kernel;
+
+// Initialize buffers da, db, dc with initA, initB, and initC, respectively 
+template <typename T>
 void init_arrays(queue &q, 
                  buffer<T, 1> &da,
                  buffer<T, 1> &db, 
@@ -74,7 +101,7 @@ void init_arrays(queue &q,
     auto b = db.template get_access<sycl_discard_write>(cgh);
     auto c = dc.template get_access<sycl_discard_write>(cgh);
     
-    cgh.parallel_for<class init_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class init_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const int i = item.get_global_id(0);
       a[i] = initA;
       b[i] = initB;
@@ -85,7 +112,8 @@ void init_arrays(queue &q,
 }
 
 
-template <class T>
+// dc[i] = da[i] for each i
+template <typename T>
 void copy(queue &q, buffer<T, 1> &da, buffer<T, 1> &dc)
 {
   const int array_size = ARRAY_SIZE;
@@ -94,8 +122,7 @@ void copy(queue &q, buffer<T, 1> &da, buffer<T, 1> &dc)
   q.submit([&] (handler &cgh) {
     auto a = da.template get_access<sycl_read>(cgh);
     auto c = dc.template get_access<sycl_discard_write>(cgh);
-    
-    cgh.parallel_for<class copy_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class copy_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const int i = item.get_global_id(0);
       c[i] = a[i];
     });
@@ -103,7 +130,8 @@ void copy(queue &q, buffer<T, 1> &da, buffer<T, 1> &dc)
   q.wait();
 }
 
-template <class T>
+// db[i] = scalar * dc[i] for each i
+template <typename T>
 void mul(queue &q, buffer<T, 1> &db, buffer<T, 1> &dc)
 {
   const int array_size = ARRAY_SIZE;
@@ -112,7 +140,7 @@ void mul(queue &q, buffer<T, 1> &db, buffer<T, 1> &dc)
   q.submit([&] (handler &cgh) {
     auto c = dc.template get_access<sycl_read>(cgh);
     auto b = db.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class mul_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class mul_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
       b[i] = scalar * c[i];
@@ -121,7 +149,8 @@ void mul(queue &q, buffer<T, 1> &db, buffer<T, 1> &dc)
   q.wait();
 }
 
-template <class T>
+// dc[i] = da[i] + db[i] for each i
+template <typename T>
 void add(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
 {
   const int array_size = ARRAY_SIZE;
@@ -131,7 +160,7 @@ void add(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
     auto a = da.template get_access<sycl_read>(cgh);
     auto b = db.template get_access<sycl_read>(cgh);
     auto c = dc.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class add_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class add_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const int i = item.get_global_id(0);
       c[i] = a[i] + b[i];
     });
@@ -140,7 +169,8 @@ void add(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
 }
 
 
-template <class T>
+// da[i] = db[i] + scalar * dc[i] for each i
+template <typename T>
 void triad(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
 {
   const int array_size = ARRAY_SIZE;
@@ -150,7 +180,7 @@ void triad(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
     auto b = db.template get_access<sycl_read>(cgh);
     auto c = dc.template get_access<sycl_read>(cgh);
     auto a = da.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class triad_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class triad_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
       a[i] = b[i] + scalar * c[i];
@@ -160,7 +190,8 @@ void triad(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
 }
 
 
-template <class T>
+// da[i] += db[i] + scalar * dc[i] for each i
+template <typename T>
 void nstream(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
 {
   const int array_size = ARRAY_SIZE;
@@ -170,7 +201,7 @@ void nstream(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
     auto b = db.template get_access<sycl_read>(cgh);
     auto c = dc.template get_access<sycl_read>(cgh);
     auto a = da.template get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class nstream_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class nstream_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
       a[i] += b[i] + scalar * c[i];
@@ -179,7 +210,8 @@ void nstream(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
   q.wait();
 }
 
-template <class T>
+// sum += da[i] * db[i] for each i
+template <typename T>
 T dot(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dsum, T *sums)
 {
   const int array_size = ARRAY_SIZE;
@@ -190,7 +222,7 @@ T dot(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dsum, T *sums)
     auto a = da.template get_access<sycl_read_write>(cgh);
     auto sum = dsum.template get_access<sycl_discard_write>(cgh);
     accessor<T, 1, sycl_read_write, access::target::local> tb_sum(TBSIZE, cgh);
-    cgh.parallel_for<class dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class dot_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
 
       const size_t lid = item.get_local_id(0);
       const int blockIdx = item.get_group(0);
