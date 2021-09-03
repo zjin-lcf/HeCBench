@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++17 -Wall -I../include -I../cobahh-cuda \
+CFLAGS := -DUSE_GPU -std=c++17 -Wall -I../include -I. -I../cobahh-cuda \
           -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \
