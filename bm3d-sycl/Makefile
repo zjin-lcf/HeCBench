@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -I../bm3d-cuda
+CFLAGS := -std=c++14 -Wall -I../include -I. -I../bm3d-cuda
 
 # Linker Flags
 LDFLAGS = -lpthread
