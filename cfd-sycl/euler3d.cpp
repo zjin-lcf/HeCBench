@@ -109,9 +109,9 @@ template <typename T>
 void copy(queue &q, buffer<T,1> &dst, buffer<T,1> &src, const int N){
 
   q.submit([&](handler& cgh) {
-      accessor<T, 1, access::mode::write, sycl_global_buffer> 
+      accessor<T, 1, access::mode::write, access::target::global_buffer> 
       dst_acc(dst, cgh, range<1>(N), id<1>(0));  // add workgroup size
-      accessor<T, 1, sycl_read, sycl_global_buffer> 
+      accessor<T, 1, sycl_read, access::target::global_buffer> 
       src_acc(src, cgh, range<1>(N), id<1>(0));  // add workgroup size 
       cgh.copy(src_acc, dst_acc);
       });
@@ -145,7 +145,7 @@ void dump(const float *h_variables, const int nel, const int nelr){
 
 void initialize_buffer(queue &q, buffer<float,1> &mem_d, const float val, const int number_words) noexcept(false) {
   q.submit([&] (handler& cgh) {
-      accessor<float,1,sycl_discard_write,sycl_global_buffer>  \
+      accessor<float,1,sycl_discard_write,access::target::global_buffer>  \
       mem_d_acc (mem_d, cgh, range<1>(number_words), id<1>(0)); // add workgroup size
       cgh.fill(mem_d_acc, val);
       });
@@ -420,7 +420,7 @@ int main(int argc, char** argv){
     }
 
     q.submit([&](handler& cgh) {
-      accessor<float, 1, sycl_read, sycl_global_buffer> 
+      accessor<float, 1, sycl_read, access::target::global_buffer> 
       variables_acc(d_variables, cgh, range<1>(nelr*NVAR), id<1>(0));  // add workgroup size
       cgh.copy(variables_acc, h_variables);
     });
