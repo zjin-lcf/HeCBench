@@ -25,7 +25,7 @@ obj = main.o shmem_kernels.o
 #===============================================================================
 
 CFLAGS := -DUSE_GPU -std=c++17 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cppda-sycldevice \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
