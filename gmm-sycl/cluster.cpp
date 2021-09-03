@@ -639,7 +639,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       auto clusters_memberships = d_memberships.get_access<sycl_discard_write>(cgh);
       accessor<float, 1, sycl_read_write, access::target::local> means (NUM_DIMENSIONS, cgh);
       accessor<float, 1, sycl_read_write, access::target::local> Rinv (NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
-      cgh.parallel_for<class estep1>(nd_range<2>(estep1_gws, estep1_lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class init_estep1>(nd_range<2>(estep1_gws, estep1_lws), [=] (nd_item<2> item) {
         estep1_kernel( 
             item,
             data.get_pointer(), 
@@ -663,7 +663,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       auto clusters_memberships = d_memberships.get_access<sycl_read_write>(cgh);
       auto likelihood = d_likelihoods.get_access<sycl_discard_write>(cgh);
       accessor<float, 1, sycl_read_write, access::target::local> total_likelihoods (NUM_THREADS_ESTEP, cgh);
-      cgh.parallel_for<class estep2>(nd_range<1>(estep2_gws, estep2_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class init_estep2>(nd_range<1>(estep2_gws, estep2_lws), [=] (nd_item<1> item) {
         estep2_kernel(
             item,
             clusters_memberships.get_pointer(), 
@@ -713,7 +713,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       auto clusters_N = d_N.get_access<sycl_discard_write>(cgh);
       auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
       accessor<float, 1, sycl_read_write, access::target::local> temp_sums (NUM_THREADS_MSTEP, cgh);
-      cgh.parallel_for<class estep2>(nd_range<1>(mStepN_gws, mStepN_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class mstepN>(nd_range<1>(mStepN_gws, mStepN_lws), [=] (nd_item<1> item) {
         int tid = item.get_local_id(0);
         int num_threads = item.get_local_range(0);
         int c = item.get_group(0);
@@ -980,7 +980,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       accessor<float, 1, sycl_read_write, access::target::local> matrix(NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
       accessor<float, 1, sycl_read_write, access::target::local> determinant_arg(1, cgh);
       accessor<float, 1, sycl_read_write, access::target::local> sum(1, cgh);
-      cgh.parallel_for<class constants>(nd_range<1>(constants2_gws, constants_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class constants2>(nd_range<1>(constants2_gws, constants_lws), [=] (nd_item<1> item) {
         constants_kernel( item, 
                           clusters_R.get_pointer(), 
                           clusters_Rinv.get_pointer(), 
