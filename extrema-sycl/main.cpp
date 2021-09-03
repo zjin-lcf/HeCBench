@@ -15,6 +15,13 @@
 #include <stdlib.h>
 #include "common.h"
 
+// Forward declarations
+template<typename T>
+class extrema1D;
+
+template<typename T>
+class extrema2D;
+
 inline void clip_plus( const bool &clip, const int &n, int &plus ) {
   if ( clip ) {
     if ( plus >= n ) {
@@ -43,7 +50,7 @@ inline void clip_minus( const bool &clip, const int &n, int &minus ) {
 //                          BOOLRELEXTREMA 1D                                //
 ///////////////////////////////////////////////////////////////////////////////
 
-  template<typename T>
+template<typename T>
 void cpu_relextrema_1D( const int  n,
     const int  order,
     const bool clip,
@@ -72,7 +79,7 @@ void cpu_relextrema_1D( const int  n,
 
 
 
-  template<typename T>
+template<typename T>
 void cpu_relextrema_2D( const int  in_x,
     const int  in_y,
     const int  order,
@@ -143,7 +150,7 @@ void test_1D (queue &q, const int length,
       q.submit([&] (handler &cgh) {
         auto results = d_result.get_access<sycl_discard_write>(cgh);
         auto inp = d_x.template get_access<sycl_read>(cgh);
-        cgh.parallel_for<class extrema1D>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class extrema1D<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
           const int tid = item.get_global_id(0);
           if (tid < length) {
             const T data = inp[tid];
@@ -206,7 +213,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
       q.submit([&] (handler &cgh) {
         auto results = d_result.template get_access<sycl_discard_write>(cgh);
         auto inp = d_x.template get_access<sycl_read>(cgh);
-        cgh.parallel_for<class extrema2D>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        cgh.parallel_for<class extrema2D<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
           const int ty = item.get_global_id(1); 
           const int tx = item.get_global_id(0);
 
