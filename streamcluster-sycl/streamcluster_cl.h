@@ -100,10 +100,10 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 
       // copy coordinate to device memory  
       q.submit([&] (handler& cgh) {
-          accessor<float,1,sycl_write,sycl_global_buffer>  \
-          coord_d_acc (coord_d.value(), cgh, range<1>(num*dim), id<1>(0)); 
-          cgh.copy(coord_h, coord_d_acc);
-          });
+        accessor<float,1,sycl_write,access::target::global_buffer>  \
+        coord_d_acc (coord_d.value(), cgh, range<1>(num*dim), id<1>(0)); 
+        cgh.copy(coord_h, coord_d_acc);
+      });
 #ifdef PROFILE_TMP
       q.wait();
       double t6 = gettime();
@@ -131,15 +131,15 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     /***** memory transfer from host to device *****/
     /* copy to device memory */
     q.submit([&] (handler& cgh) {
-        accessor<int,1,sycl_write,sycl_global_buffer>  \
-        center_table_d_acc (center_table_d.value(), cgh, range<1>(num), id<1>(0)); 
-        cgh.copy(center_table, center_table_d_acc);
-        });
+      accessor<int,1,sycl_write,access::target::global_buffer>  \
+      center_table_d_acc (center_table_d.value(), cgh, range<1>(num), id<1>(0)); 
+      cgh.copy(center_table, center_table_d_acc);
+    });
     q.submit([&] (handler& cgh) {
-        accessor<Point_Struct,1,sycl_write,sycl_global_buffer>  \
-        p_d_acc (p_d.value(), cgh, range<1>(num), id<1>(0)); 
-        cgh.copy(p_h, p_d_acc);
-        });
+      accessor<Point_Struct,1,sycl_write,access::target::global_buffer>  \
+      p_d_acc (p_d.value(), cgh, range<1>(num), id<1>(0)); 
+      cgh.copy(p_h, p_d_acc);
+    });
 #ifdef PROFILE_TMP
     q.wait();
     double t8 = gettime();
@@ -158,16 +158,16 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 #endif
 
     q.submit([&] (handler& cgh) {
-        accessor<char,1,sycl_write,sycl_global_buffer>  \
-        switch_membership_d_acc (switch_membership_d.value(), cgh, range<1>(num), id<1>(0)); // add workgroup size
-        cgh.fill(switch_membership_d_acc, (char)0);
-        });
+      accessor<char,1,sycl_write,access::target::global_buffer>  \
+      switch_membership_d_acc (switch_membership_d.value(), cgh, range<1>(num), id<1>(0)); // add workgroup size
+      cgh.fill(switch_membership_d_acc, (char)0);
+    });
 
     q.submit([&] (handler& cgh) {
-        accessor<float,1,sycl_write,sycl_global_buffer>  \
-        work_mem_d_acc (work_mem_d.value(), cgh, range<1>(num*(K+1)), id<1>(0)); // add workgroup size
-        cgh.fill(work_mem_d_acc, 0.0f);
-        });
+      accessor<float,1,sycl_write,access::target::global_buffer>  \
+      work_mem_d_acc (work_mem_d.value(), cgh, range<1>(num*(K+1)), id<1>(0)); // add workgroup size
+      cgh.fill(work_mem_d_acc, 0.0f);
+    });
 
     int work_group_size = THREADS_PER_BLOCK;
     int work_items = num;
@@ -196,17 +196,17 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 
     /***** copy back to host for CPU side work *****/
     q.submit([&] (handler& cgh) {
-        accessor<char,1,sycl_read,sycl_global_buffer>  \
-        switch_membership_d_acc (switch_membership_d.value(), cgh, range<1>(num), id<1>(0)); // add workgroup size
-        cgh.copy(switch_membership_d_acc, switch_membership);
-        });
+      accessor<char,1,sycl_read,access::target::global_buffer>  \
+      switch_membership_d_acc (switch_membership_d.value(), cgh, range<1>(num), id<1>(0)); // add workgroup size
+      cgh.copy(switch_membership_d_acc, switch_membership);
+    });
 
     // reset on the host already
     q.submit([&] (handler& cgh) {
-        accessor<float,1,sycl_read,sycl_global_buffer>  \
-        work_mem_d_acc (work_mem_d.value(), cgh, range<1>(num*(K+1)), id<1>(0)); // add workgroup size
-        cgh.copy(work_mem_d_acc, work_mem_h);
-        });
+      accessor<float,1,sycl_read,access::target::global_buffer>  \
+      work_mem_d_acc (work_mem_d.value(), cgh, range<1>(num*(K+1)), id<1>(0)); // add workgroup size
+      cgh.copy(work_mem_d_acc, work_mem_h);
+    });
 
     q.wait();
 #ifdef PROFILE_TMP
