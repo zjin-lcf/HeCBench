@@ -171,6 +171,9 @@ Early results are shown [here](results/README.md)
 ### extrema
   Find local maxima (https://github.com/rapidsai/cusignal/)
 
+### f16max
+  Compute the maximum of half-precision floating-point numbers using bit operations (https://x.momo86.net/en?p=113)
+
 ### f16sp
   Half-precision scalar product (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
