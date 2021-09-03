@@ -24,7 +24,11 @@
 #define THREADS 32
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
-  template <typename T>
+// Forward declarations
+template <typename T>
+class sosfilter;
+
+template <typename T>
 void filtering (queue &q, const int n_signals, const int n_samples, const int n_sections, const int zi_width)
 {
   // the number of second-order sections must be less than max threads per block
@@ -32,7 +36,6 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
 
   // The number of samples must be greater than or equal to the number of sections
   assert(n_samples >= n_sections);
-
 
   // randomize input data
   srand(2);
@@ -60,7 +63,8 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
       x[i*n_samples+j] = (T)std::sin(2*3.14*(i+1+j));
 
 
-  {
+  { // sycl scope
+
   buffer<T, 1> d_sos (sos, sos_size);
   buffer<T, 1> d_zi (zi, z_size);
   buffer<T, 1> d_x (x, x_size);
@@ -74,10 +78,9 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
       auto zi = d_zi.template get_access<sycl_read>(cgh);
       auto sos = d_sos.template get_access<sycl_read>(cgh);
       auto x_in = d_x.template get_access<sycl_read_write>(cgh);
-      accessor<T, 1, sycl_read_write, access::target::local> smem (shared_mem_size, cgh);
-      cgh.parallel_for<class sosfilter>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      accessor<T, 1, sycl_read_write, access::target::local> s_out (shared_mem_size, cgh);
+      cgh.parallel_for<class sosfilter<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
 
-        T *s_out = smem.get_pointer() ;
         T *s_zi =  &s_out[n_sections] ;
         T *s_sos = &s_zi[n_sections * zi_width] ;
 
