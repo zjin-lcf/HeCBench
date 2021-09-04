@@ -1,5 +1,11 @@
 # oneAPI Direct Programming
-This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
+This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading. 
+
+# Environment
+[AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)
+[Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)
+[Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
+
 
 # Experimental Results
 Early results are shown [here](results/README.md)
