@@ -23,7 +23,7 @@ c_src= \
   src/blast/sm_blosum90.c \
   src/blast/sm_pam30.c \
   src/blast/sm_pam70.c \
-  src/blast/sm_pam250.c \
+  src/blast/sm_pam250.c
 
 cpp_src = \
   src/run/main.cpp \
@@ -78,11 +78,10 @@ cpp_src = \
   src/data/sorted_list.cpp \
   src/data/seed_set.cpp \
   src/util/binary_file.cpp \
-  src/util/simd.cpp \
   src/output/taxon_format.cpp \
   src/output/view.cpp \
   src/output/output_sink.cpp \
-  src/output/target_culling.cpp \
+  src/output/target_culling.cpp
 
 obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) 
 
