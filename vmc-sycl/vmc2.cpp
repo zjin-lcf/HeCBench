@@ -245,7 +245,7 @@ int main()
   //  zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
     q.submit([&](handler &cgh) {
       auto stats = d_stats.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class reset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         zero_stats(stats.get_pointer(), item);
       });
     });

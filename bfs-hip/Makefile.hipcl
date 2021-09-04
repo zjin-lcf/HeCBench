@@ -13,7 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = bfs.cu timer.cu
+source = bfs.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
+CFLAGS := -std=c++14 -Wall -I../bfs-sycl -pthread -fPIE `hipcl_config -C`
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
@@ -46,10 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(obj) -o $@ $(LDFLAGS)
 
-bfs.o: bfs.cu util.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-timer.o: timer.cu timer.h
+bfs.o: bfs.cu ../bfs-sycl/util.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

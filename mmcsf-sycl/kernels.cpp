@@ -712,7 +712,7 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
           auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
           auto dFbrIdx2_acc = dFbrIdx2.get_access<sycl_read>(cgh);
           auto dU_acc = dU.get_access<sycl_read_write>(cgh);
-          cgh.parallel_for<class slc_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          cgh.parallel_for<class fbrs_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(
               dVals_acc.get_pointer() + dLoc, 
               dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 

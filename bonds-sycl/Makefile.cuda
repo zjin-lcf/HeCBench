@@ -6,10 +6,8 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-#CUDA_ARCH = "--cppda-gpu-arch=sm_60"
-#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-CUDA_ARCH = "--cppda-gpu-arch=sm_70"
-GCC_TOOLCHAIN = "/auto/software/gcc/ppc64le/gcc-10.2.0/"
+CUDA_ARCH = "--cppda-gpu-arch=sm_60"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -27,7 +25,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cppda-sycldevice \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \
           --gcc-toolchain=$(GCC_TOOLCHAIN)

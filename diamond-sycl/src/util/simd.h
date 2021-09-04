@@ -38,6 +38,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <smmintrin.h>
 #endif
 
-void check_simd();
-
 #endif

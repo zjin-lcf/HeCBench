@@ -6,6 +6,13 @@ enum class MorphOpType {
 };
 
 
+// Forward declarations
+template <MorphOpType opType>
+class vert;
+
+template <MorphOpType opType>
+class horiz;
+
 template <MorphOpType opType>
 inline unsigned char elementOp(unsigned char lhs, unsigned char rhs)
 {
@@ -99,6 +106,7 @@ void vhgw_horiz(unsigned char* __restrict__ dst,
     }
 }
 
+
 template <MorphOpType opType>
 void vhgw_vert(unsigned char* __restrict__ dst,
                const unsigned char* __restrict__ src,
@@ -136,7 +144,6 @@ void vhgw_vert(unsigned char* __restrict__ dst,
     }
 }
 
-
 template <MorphOpType opType>
 void morphology(
         queue &q,
@@ -163,7 +170,7 @@ void morphology(
       auto tmp = tmp_d.get_access<sycl_discard_write>(cgh);
       auto img = img_d.get_access<sycl_read>(cgh);
       accessor<unsigned char, 1, sycl_read_write, access::target::local> sMem(4*hsize, cgh);
-      cgh.parallel_for<class horiz>(nd_range<2>(h_gws, h_lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class horiz<opType>>(nd_range<2>(h_gws, h_lws), [=] (nd_item<2> item) {
         vhgw_horiz<opType>(tmp.get_pointer(), img.get_pointer(), sMem.get_pointer(),
                            width, height, hsize, item);
       });
@@ -180,7 +187,7 @@ void morphology(
       auto tmp = img_d.get_access<sycl_discard_write>(cgh);
       auto img = tmp_d.get_access<sycl_read>(cgh);
       accessor<unsigned char, 1, sycl_read_write, access::target::local> sMem(4*vsize, cgh);
-      cgh.parallel_for<class vert>(nd_range<2>(v_gws, v_lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class vert<opType>>(nd_range<2>(v_gws, v_lws), [=] (nd_item<2> item) {
         vhgw_vert<opType>(tmp.get_pointer(), img.get_pointer(), sMem.get_pointer(), 
                           width, height, vsize, item);
       });

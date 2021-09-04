@@ -23,6 +23,7 @@
 using namespace std; 
 
 #define MAX_KERNEL_THREADS 256
+#define mask 0xFFFFFFFF
 
 // float or double 
 typedef float vtype;
@@ -52,14 +53,14 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w)
     //iterations it is the value at the last thread of the previous iterations.
 
     //get the value of the last thread
-    last = __shfl(sum, blockDim.x-1, blockDim.x);
+    last = __shfl_sync(mask, sum, blockDim.x-1, blockDim.x);
 
     //if you are valid read the value from memory, otherwise set your value to 0
     sum = (valid) ? w[ind[i]] : 0.0;
 
     //do prefix sum (of size warpSize=blockDim.x =< 32)
     for (int j=1; j<blockDim.x; j*=2) {
-      T v = __shfl_up(sum, j, blockDim.x);
+      T v = __shfl_up_sync(mask, sum, j, blockDim.x);
       if (threadIdx.x >= j) sum += v;
     }
     //shift by last
@@ -67,7 +68,7 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w)
     //notice that no __threadfence or __syncthreads are needed in this implementation
   }
   //get the value of the last thread (to all threads)
-  last = __shfl(sum, blockDim.x-1, blockDim.x);
+  last = __shfl_sync(mask, sum, blockDim.x-1, blockDim.x);
 
   return last;
 }

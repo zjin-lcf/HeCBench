@@ -21,7 +21,7 @@
 // kernel 
 #define SCORE(i, j) input_itemsets_l[j + i * (BLOCK_SIZE+1)]
 #define REF(i, j)   reference_l[j + i * BLOCK_SIZE]
-int maximum( int a, int b, int c){
+int max3( int a, int b, int c){
 
   int k;
   if( a <= b )
@@ -254,13 +254,13 @@ int main(int argc, char **argv){
     else{
     }
 
-    //traceback = maximum(nw, w, n);
+    //traceback = max3(nw, w, n);
     int new_nw, new_w, new_n;
     new_nw = nw + reference[i * max_cols + j];
     new_w = w - penalty;
     new_n = n - penalty;
 
-    traceback = maximum(new_nw, new_w, new_n);
+    traceback = max3(new_nw, new_w, new_n);
     if(traceback == new_nw)
       traceback = nw;
     if(traceback == new_w)

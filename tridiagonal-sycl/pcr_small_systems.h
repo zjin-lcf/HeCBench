@@ -57,7 +57,7 @@ double pcr_small_systems(queue &q, float *a, float *b, float *c, float *d, float
         auto d_d = device_d.get_access<sycl_read>(cgh);
         auto x_d = device_x.get_access<sycl_discard_write>(cgh);
         accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-        cgh.parallel_for<class pcr>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class pcr_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             pcr_small_systems_kernel(item, 
                 a_d.get_pointer(),
                 b_d.get_pointer(),
@@ -78,7 +78,7 @@ double pcr_small_systems(queue &q, float *a, float *b, float *c, float *d, float
         auto d_d = device_d.get_access<sycl_read>(cgh);
         auto x_d = device_x.get_access<sycl_discard_write>(cgh);
         accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-        cgh.parallel_for<class pcr_opt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class pcr_opt_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             pcr_branch_free_kernel(item, 
                 a_d.get_pointer(),
                 b_d.get_pointer(),

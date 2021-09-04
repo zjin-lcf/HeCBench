@@ -187,9 +187,6 @@ constexpr int kThreadsPerBlock = 4;
 // due to the naive math below, numbers like 2^r-1 work much better than 2^r
 constexpr int kNumLogicalThreads = 16383;
 
-// use at most this many of the system's GPUs
-constexpr int kMaxDevices = 8;
-
 // To do:  Run on CPU (right now only runs on GPU).
 #pragma omp declare target
 template <int n>
@@ -343,7 +340,6 @@ template <int n>
 void run_gpu_d(int64_t* count, Results<n>& final_results) {
   assert(sizeof(int64_t) == 8);
 
-  auto t0 = unixtime();
   constexpr int64_t kAlignedCnt = (n + 7) / 8;
   int64_t *results = (int64_t*) malloc (sizeof(int64_t) * kLimit * kAlignedCnt); 
 
