@@ -44,7 +44,7 @@ for( int m = 0 ; m < BLOCK_SIZE ; m++){
 		int t_index_x =  tx + 1;
 		int t_index_y =  m - tx + 1;
 
-		SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+		SCORE(t_index_y, t_index_x) = max3( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
 				SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
 				SCORE((t_index_y-1), (t_index_x))   - (penalty));
 	}
@@ -60,7 +60,7 @@ for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
 		int t_index_x =  tx + BLOCK_SIZE - m ;
 		int t_index_y =  BLOCK_SIZE - tx;
 
-		SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+		SCORE(t_index_y, t_index_x) = max3(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
 				SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
 				SCORE((t_index_y-1), (t_index_x))   - (penalty));
 
