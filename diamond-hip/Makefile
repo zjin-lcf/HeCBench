@@ -22,7 +22,7 @@ c_src = \
   $(DMND_PATH)/src/blast/sm_blosum90.c \
   $(DMND_PATH)/src/blast/sm_pam30.c \
   $(DMND_PATH)/src/blast/sm_pam70.c \
-  $(DMND_PATH)/src/blast/sm_pam250.c \
+  $(DMND_PATH)/src/blast/sm_pam250.c
 
 cpp_src = \
   $(DMND_PATH)/src/run/main.cpp \
@@ -76,11 +76,10 @@ cpp_src = \
   $(DMND_PATH)/src/data/sorted_list.cpp \
   $(DMND_PATH)/src/data/seed_set.cpp \
   $(DMND_PATH)/src/util/binary_file.cpp \
-  $(DMND_PATH)/src/util/simd.cpp \
   $(DMND_PATH)/src/output/taxon_format.cpp \
   $(DMND_PATH)/src/output/view.cpp \
   $(DMND_PATH)/src/output/output_sink.cpp \
-  $(DMND_PATH)/src/output/target_culling.cpp \
+  $(DMND_PATH)/src/output/target_culling.cpp
 
 hip_src = ./masking.cu
 
@@ -91,7 +90,7 @@ obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o) $(hip_src:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -x hip
 
 # Linker Flags
 LDFLAGS = -lz -lpthread
@@ -114,7 +113,7 @@ endif
 #===============================================================================
 
 $(program): $(obj) 
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
