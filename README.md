@@ -87,6 +87,9 @@ Early results are shown [here](results/README.md)
 ### bn
   Bayesian network learning (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
 
+### bonds
+  Fixed-rate bond with flat forward curve (https://github.com/cavazos-lab/FinanceBench)
+
 ### boxfilter
   Box filtering (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
