@@ -57,7 +57,7 @@ double run_smem_atomics(
       accessor <unsigned int, 1, sycl_atomic, access::target::local> 
         smem (ACTIVE_CHANNELS * NUM_BINS + 3, cgh);
 
-      cgh.parallel_for<class hist_smem_atomics>(
+      cgh.parallel_for<class hist_smem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>>(
         nd_range<2>(range<2>(64, 512), range<2>(4, 32)), [=] (nd_item<2> item) {
         int x = item.get_global_id(1);
         int y = item.get_global_id(0);
@@ -104,7 +104,7 @@ double run_smem_atomics(
     q.submit([&] (handler& cgh) {
       auto in = d_part_hist.get_access<sycl_read>(cgh);
       auto out = d_hist.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class hist_smem_accum>(
+      cgh.parallel_for<class hist_smem_accum<ACTIVE_CHANNELS, NUM_BINS, PixelType>>(
         nd_range<1>(range<1>(((ACTIVE_CHANNELS * NUM_BINS + 127) / 128 * 128)), range<1>(128)), [=] (
           nd_item<1> item) {
         int i = item.get_global_id(0);
