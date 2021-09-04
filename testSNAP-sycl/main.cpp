@@ -36,6 +36,37 @@
 
 int nsteps = 1; // num of force evaluations
 
+// Copyright (C) 2018 - 2020 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// See https://llvm.org/LICENSE.txt for license information.
+
+/// Atomically add the value operand to the value at the addr and assign the
+/// result to the value at addr, Float version.
+/// \param [in, out] addr The pointer to the data.
+/// \param operand The value to add to the value at \p addr.
+/// \param memoryOrder The memory ordering used.
+/// \returns The value at the \p addr before the call.
+inline double atomicAdd( double *addr, double operand )
+{
+  atomic<long, access::address_space::global_space> obj(
+    (multi_ptr<long, access::address_space::global_space>(reinterpret_cast<long *>(addr))));
+
+  long old_value;
+  double old_double_value;
+
+  do {
+    old_value = obj.load(memory_order::relaxed);
+    old_double_value = *reinterpret_cast<const double *>(&old_value);
+    const double new_double_value = old_double_value + operand;
+    const long new_value = *reinterpret_cast<const long *>(&new_double_value);
+    if (obj.compare_exchange_strong(old_value, new_value))
+      break;
+  } while (true);
+
+  return old_double_value;
+}
+
+
 int main(int argc, char* argv[])
 {
   options(argc, argv);
