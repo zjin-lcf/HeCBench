@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -I../testSNAP-omp \
+CFLAGS := -std=c++14 -Wall -I../include -I. -I../testSNAP-omp \
           -DREFDATA_TWOJ=14 
 
 # Linker Flags
@@ -48,12 +48,12 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp snap.h utils.cpp
+%.o: %.cpp ../testSNAP-omp/snap.h utils.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --nsteps=100
+	./$(program) --nsteps 100
 

@@ -11,6 +11,18 @@
 
 #define THREADS_PER_BLOCK 256
 
+// Forward declarations
+template <typename T>
+class k_multiply_inplace;
+
+template <typename T>
+class k_saxpy;
+
+template <typename T>
+class k_multiply;
+
+template <typename T>
+class k_dot_product;
 
 /**
  * @brief   Cuda kernel function for vector multiply in place.
@@ -27,12 +39,12 @@ void multiply_inplace_kernel(queue &q, const int n, buffer<T, 1> &device_x, cons
   range<1> lws (THREADS_PER_BLOCK);
 
   q.submit([&] (handler &cgh) {
-      auto x = device_x.template get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class multiply_inplace>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          int index = item.get_global_id(0);
-          if (index < n) x[index] *= k;
-          });
-      });
+    auto x = device_x.template get_access<sycl_read_write>(cgh);
+    cgh.parallel_for<class k_multiply_inplace<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      int index = item.get_global_id(0);
+      if (index < n) x[index] *= k;
+    });
+  });
 }
 
 
@@ -53,13 +65,13 @@ void saxpy_inplace_kernel(queue &q, const int n, buffer<T,1> &device_y, buffer<T
   range<1> lws (THREADS_PER_BLOCK);
 
   q.submit([&] (handler &cgh) {
-      auto x = device_x.template get_access<sycl_read>(cgh);
-      auto y = device_y.template get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class saxpy>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          int index = item.get_global_id(0);
-          if (index < n) y[index] += a * x[index];
-          });
-      });
+    auto x = device_x.template get_access<sycl_read>(cgh);
+    auto y = device_y.template get_access<sycl_read_write>(cgh);
+    cgh.parallel_for<class k_saxpy<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      int index = item.get_global_id(0);
+      if (index < n) y[index] += a * x[index];
+    });
+  });
 }
 
 /**
@@ -92,7 +104,7 @@ void warp_multiply_kernel(queue &q, const int group_size, const int rows,
     auto y_acc = y.template get_access<sycl_write>(cgh);
 
     accessor<T, 1, sycl_read_write, access::target::local> result(THREADS_PER_BLOCK, cgh);
-    cgh.parallel_for<class multiply>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class k_multiply<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int index = item.get_global_id(0);
       int lid = item.get_local_id(0);
       int r = index / group_size;
@@ -130,7 +142,7 @@ T device_dot_product(queue &q, const int n, buffer<T, 1> &device_x, buffer<T, 1>
     auto y = device_y.template get_access<sycl_read>(cgh);
     auto z = device_scratch.template get_access<sycl_discard_write>(cgh);
     accessor<T, 1, sycl_read_write, access::target::local> result(THREADS_PER_BLOCK, cgh);
-    cgh.parallel_for<class dot_product>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class k_dot_product<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int index = item.get_global_id(0);
       int lid = item.get_local_id(0);
       int bid = item.get_group(0);

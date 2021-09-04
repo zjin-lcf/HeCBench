@@ -25,6 +25,7 @@ int main(int argc, char* argv[])
       srcImg[i*width+j] = (i == (height/2 - 1) && 
                            j == (width/2 - 1)) ? WHITE : BLACK;
   { // sycl scope
+
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -40,6 +41,7 @@ int main(int argc, char* argv[])
     dilate(q, img_d, tmp_d, width, height, hsize, vsize);
     erode(q, img_d, tmp_d, width, height, hsize, vsize);
   }
+
   }
 
   int s = 0;

@@ -1015,7 +1015,7 @@ frna_t frna_new(const char *str, fparam_t par)
       auto v = d_v.get_access<sycl_read_write>(cgh);
       auto wm = d_wm.get_access<sycl_read>(cgh);
       auto pm = d_pm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_exterior>(nd_range<3>(gws5, lws5), [=] (nd_item<3> wi) {
+      cgh.parallel_for<class k_V_multibranch>(nd_range<3>(gws5, lws5), [=] (nd_item<3> wi) {
         calc_V_multibranch(wi, d, n, s.get_pointer(), v.get_pointer(), 
                            wm.get_pointer(), pm.get_pointer());
       });

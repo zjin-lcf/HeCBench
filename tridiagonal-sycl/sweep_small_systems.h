@@ -48,15 +48,16 @@ double runReorderKernel(queue &q, buffer<float,1> &dev_a, buffer<float,1> &dev_t
   range<2> gws (szGlobalWorkSize[1], szGlobalWorkSize[0]);
   range<2> lws (szLocalWorkSize[1], szLocalWorkSize[0]);
 
+  // warmup
   q.submit([&] (handler &cgh) {
-      auto d_t = dev_t.get_access<sycl_discard_write>(cgh);
-      auto d_a = dev_a.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> 
-      lmem(TRANSPOSE_BLOCK_DIM * (TRANSPOSE_BLOCK_DIM+1), cgh);
-      cgh.parallel_for<class transpose_array>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          transpose(item, d_t.get_pointer(), d_a.get_pointer(), lmem.get_pointer(), width, height);
-          });
-      });
+    auto d_t = dev_t.get_access<sycl_discard_write>(cgh);
+    auto d_a = dev_a.get_access<sycl_read>(cgh);
+    accessor<float, 1, sycl_read_write, access::target::local> 
+    lmem(TRANSPOSE_BLOCK_DIM * (TRANSPOSE_BLOCK_DIM+1), cgh);
+    cgh.parallel_for<class transpose_array_warmup>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      transpose(item, d_t.get_pointer(), d_a.get_pointer(), lmem.get_pointer(), width, height);
+    });
+  });
   q.wait();
 
 
@@ -66,14 +67,14 @@ double runReorderKernel(queue &q, buffer<float,1> &dev_a, buffer<float,1> &dev_t
   for (int iCycles = 0; iCycles < BENCH_ITERATIONS; iCycles++)
   {
     q.submit([&] (handler &cgh) {
-        auto d_t = dev_t.get_access<sycl_discard_write>(cgh);
-        auto d_a = dev_a.get_access<sycl_read>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> 
-        lmem(TRANSPOSE_BLOCK_DIM * (TRANSPOSE_BLOCK_DIM+1), cgh);
-        cgh.parallel_for<class transpose_array>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transpose(item, d_t.get_pointer(), d_a.get_pointer(), lmem.get_pointer(), width, height);
-            });
-        });
+      auto d_t = dev_t.get_access<sycl_discard_write>(cgh);
+      auto d_a = dev_a.get_access<sycl_read>(cgh);
+      accessor<float, 1, sycl_read_write, access::target::local> 
+      lmem(TRANSPOSE_BLOCK_DIM * (TRANSPOSE_BLOCK_DIM+1), cgh);
+      cgh.parallel_for<class transpose_array>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          transpose(item, d_t.get_pointer(), d_a.get_pointer(), lmem.get_pointer(), width, height);
+      });
+    });
   }
   q.wait();
   sum_time = shrDeltaT(0);
@@ -112,7 +113,7 @@ double runSweepKernel(queue &q,
         auto c_d = dev_c.get_access<sycl_read>(cgh);
         auto d_d = dev_d.get_access<sycl_read>(cgh);
         auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_local>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class sweep_local_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             sweep_small_systems_local_kernel(
                 item, 
                 a_d.get_pointer(), 
@@ -135,7 +136,7 @@ double runSweepKernel(queue &q,
         auto d_d = dev_d.get_access<sycl_read>(cgh);
         auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
         auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_global_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class sweep_global_v4_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             sweep_small_systems_global_vec4_kernel(
                 item, 
                 a_d.get_pointer(), 
@@ -159,7 +160,7 @@ double runSweepKernel(queue &q,
         auto d_d = dev_d.get_access<sycl_read>(cgh);
         auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
         auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_global>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class sweep_global_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             sweep_small_systems_global_kernel(
                 item, 
                 a_d.get_pointer(), 

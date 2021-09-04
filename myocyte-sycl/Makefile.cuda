@@ -6,7 +6,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 
 # Standard flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I. -I../include \
           -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \

@@ -28,6 +28,19 @@ using namespace std;
 typedef float vtype;
 typedef vector<vector<vtype>> matrix; 
 
+// Forward declarations
+template<bool weighted, typename T>
+class row_sum;
+
+template<bool weighted, typename T>
+class intersection;
+
+template<bool weighted, typename T>
+class jw;
+
+template<bool weighted, typename T>
+class fill_elements;
+
 /// Atomically add the value operand to the value at the addr and assign the
 /// result to the value at addr, Float version.
 /// \param [in, out] addr The pointer to the data.
@@ -93,7 +106,7 @@ inline double atomicAdd(
 
 
 // Volume of neighboors (*weight_s)
-  template<bool weighted, typename T>
+template<bool weighted, typename T>
 void jaccard_row_sum(queue &q, const int n, 
     buffer<int, 1> &d_csrPtr, 
     buffer<int, 1> &d_csrInd, 
@@ -110,7 +123,7 @@ void jaccard_row_sum(queue &q, const int n,
       auto csrInd = d_csrInd.get_access<sycl_read>(cgh);
       auto w = d_weight_j.template get_access<sycl_read>(cgh);
       auto work = d_work.template get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class row_sum>(nd_range<3>(sum_gws, sum_lws), [=] (nd_item<3> item) {
+      cgh.parallel_for<class row_sum<weighted,T>>(nd_range<3>(sum_gws, sum_lws), [=] (nd_item<3> item) {
 
           for(int row = item.get_global_id(1); row < n; 
               row += item.get_group_range(1)*item.get_local_range(1)) {
@@ -190,7 +203,7 @@ void jaccard_is(queue &q, const int n, const int e,
       auto weight_s = d_weight_s.template get_access<sycl_write>(cgh);
       auto v = d_weight_j.template get_access<sycl_read>(cgh);
       auto work = d_work.template get_access<sycl_read>(cgh);
-      cgh.parallel_for<class intersection>(nd_range<3>(is_gws, is_lws), [=] (nd_item<3> item) {
+      cgh.parallel_for<class intersection<weighted,T>>(nd_range<3>(is_gws, is_lws), [=] (nd_item<3> item) {
 
           for(int row = item.get_global_id(0); row < n; 
               row += item.get_group_range(0)*item.get_local_range(0)) {
@@ -262,7 +275,7 @@ void jaccard_jw(queue &q, const int e,
       auto weight_i = d_weight_i.template get_access<sycl_read>(cgh);
       auto weight_s = d_weight_s.template get_access<sycl_read>(cgh);
       auto weight_j = d_weight_j.template get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class jw>(nd_range<1>(jw_gws, jw_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class jw<weighted,T>>(nd_range<1>(jw_gws, jw_lws), [=] (nd_item<1> item) {
           for (int j = item.get_global_id(0); j < e; 
               j += item.get_group_range(0)*item.get_local_range(0)) {
           T Wi =  weight_i[j];
@@ -281,7 +294,7 @@ void fill_weights(queue &q, const int e, buffer<T, 1> &d_w, const T value)
   range<1> fill_lws(MAX_KERNEL_THREADS);
   q.submit([&] (handler &cgh) {
       auto w = d_w.template get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class fill_elements>(nd_range<1>(fill_gws, fill_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class fill_elements<weighted, T>>(nd_range<1>(fill_gws, fill_lws), [=] (nd_item<1> item) {
           int j = item.get_global_id(0);
           // e.g. w[0] is the weight of a non-zeron element when csr_ind[i] equals 0. 
           // So multiple non-zero elements on different rows of a matrix may share 

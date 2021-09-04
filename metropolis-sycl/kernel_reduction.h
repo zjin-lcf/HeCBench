@@ -75,7 +75,7 @@ void redenergy(queue &q,
     auto out = dE.template get_access<sycl_read_write>(cgh);
     auto H = dH.get_access<sycl_read>(cgh);
     accessor<T, 1, sycl_read_write, access::target::local> lmem (WARPSIZE, cgh);
-    cgh.parallel_for<class setup_pcg>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class reduce_energy>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
       int x = item.get_global_id(2);
       int y = item.get_global_id(1);
       int z = item.get_global_id(0);

@@ -1,20 +1,12 @@
-//--by Jianbin Fang
-
-#define __CL_ENABLE_EXCEPTIONS
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <cstring>
 #include <cstdio>
 
-#ifdef  PROFILING
-#include "timer.h"
-#endif
-
 #include "util.h"
 
 #define MAX_THREADS_PER_BLOCK 256
-
 
 //Structure to hold a node information
 struct Node
@@ -73,21 +65,15 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
     char *d_graph_visited, int *d_cost) throw(std::string)
 {
   char d_over[1];
-#ifdef  PROFILING
-  timer kernel_timer;
-  double kernel_time = 0.0;    
-  kernel_timer.reset();
-  kernel_timer.start();
-#endif
 
 #pragma omp target data map(to: d_graph_nodes[0:no_of_nodes], \
-                                d_graph_edges[0:edge_list_size], \
-                                d_graph_visited[0:no_of_nodes], \
-                                d_graph_mask[0:no_of_nodes], \
-                                d_updating_graph_mask[0:no_of_nodes]) \
-                        map(alloc: d_over[0:1])\
-                        map(tofrom: d_cost[0:no_of_nodes])
-{
+    d_graph_edges[0:edge_list_size], \
+    d_graph_visited[0:no_of_nodes], \
+    d_graph_mask[0:no_of_nodes], \
+    d_updating_graph_mask[0:no_of_nodes]) \
+  map(alloc: d_over[0:1])\
+  map(tofrom: d_cost[0:no_of_nodes])
+  {
 
     do {
       d_over[0] = 0;
@@ -119,15 +105,8 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
       }
 
 #pragma omp target update from (d_over[0:1])
-  } while (d_over[0]);
-}
-
-  //--statistics
-#ifdef  PROFILING
-  kernel_timer.stop();
-  kernel_time = kernel_timer.getTimeInSeconds();
-  std::cout<<"kernel time(s):"<<kernel_time<<std::endl;    
-#endif
+    } while (d_over[0]);
+  }
 }
 
 void Usage(int argc, char**argv){
@@ -147,105 +126,95 @@ int main(int argc, char * argv[])
   FILE *fp;
   Node* h_graph_nodes;
   char *h_graph_mask, *h_updating_graph_mask, *h_graph_visited;
-  try{
-    char *input_f;
-    if(argc!=2){
-      Usage(argc, argv);
-      exit(0);
-    }
-
-    input_f = argv[1];
-    printf("Reading File\n");
-    //Read in Graph from a file
-    fp = fopen(input_f,"r");
-    if(!fp){
-      printf("Error Reading graph file %s\n", input_f);
-      return 1;
-    }
-
-    int source = 0;
-
-    fscanf(fp,"%d",&no_of_nodes);
-
-    // allocate host memory
-    h_graph_nodes = (Node*) malloc(sizeof(Node)*no_of_nodes);
-    h_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
-    h_updating_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
-    h_graph_visited = (char*) malloc(sizeof(char)*no_of_nodes);
-
-    int start, edgeno;   
-    // initalize the memory
-    for(int i = 0; i < no_of_nodes; i++){
-      fscanf(fp,"%d %d",&start,&edgeno);
-      h_graph_nodes[i].starting = start;
-      h_graph_nodes[i].no_of_edges = edgeno;
-      h_graph_mask[i]=0;
-      h_updating_graph_mask[i]=0;
-      h_graph_visited[i]=0;
-    }
-    //read the source node from the file
-    fscanf(fp,"%d",&source);
-    source=0;
-    //set the source node as 1 in the mask
-    h_graph_mask[source]=1;
-    h_graph_visited[source]=1;
-    fscanf(fp,"%d",&edge_list_size);
-    int id,cost;
-    int* h_graph_edges = (int*) malloc(sizeof(int)*edge_list_size);
-    for(int i=0; i < edge_list_size ; i++){
-      fscanf(fp,"%d",&id);
-      fscanf(fp,"%d",&cost);
-      h_graph_edges[i] = id;
-    }
-
-    if(fp)
-      fclose(fp);    
-    // allocate mem for the result on host side
-    int  *h_cost = (int*) malloc(sizeof(int)*no_of_nodes);
-    int *h_cost_ref = (int*)malloc(sizeof(int)*no_of_nodes);
-    for(int i=0;i<no_of_nodes;i++){
-      h_cost[i]=-1;
-      h_cost_ref[i] = -1;
-    }
-    h_cost[source]=0;
-    h_cost_ref[source]=0;    
-    //---------------------------------------------------------
-    printf("run bfs (#nodes = %d) on device\n", no_of_nodes);
-    run_bfs_gpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, 
-        h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);  
-    //---------------------------------------------------------
-    //
-    printf("run bfs (#nodes = %d) on host (cpu) \n", no_of_nodes);
-    // initalize the memory again
-    for(int i = 0; i < no_of_nodes; i++){
-      h_graph_mask[i]=0;
-      h_updating_graph_mask[i]=0;
-      h_graph_visited[i]=0;
-    }
-    //set the source node as 1 in the mask
-    source=0;
-    h_graph_mask[source]=1;
-    h_graph_visited[source]=1;
-    run_bfs_cpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, 
-        h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost_ref);
-    //---------------------------------------------------------
-    //--result varification
-    compare_results<int>(h_cost_ref, h_cost, no_of_nodes);
-    //release host memory    
-    free(h_graph_nodes);
-    free(h_graph_mask);
-    free(h_updating_graph_mask);
-    free(h_graph_visited);
-
+  char *input_f;
+  if(argc!=2){
+    Usage(argc, argv);
+    exit(0);
   }
-  catch(std::string msg){
-    std::cout<<"--cambine: exception in main ->"<<msg<<std::endl;
-    //release host memory
-    free(h_graph_nodes);
-    free(h_graph_mask);
-    free(h_updating_graph_mask);
-    free(h_graph_visited);    
+
+  input_f = argv[1];
+  printf("Reading File\n");
+  //Read in Graph from a file
+  fp = fopen(input_f,"r");
+  if(!fp){
+    printf("Error Reading graph file %s\n", input_f);
+    return 1;
   }
+
+  int source = 0;
+
+  fscanf(fp,"%d",&no_of_nodes);
+
+  // allocate host memory
+  h_graph_nodes = (Node*) malloc(sizeof(Node)*no_of_nodes);
+  h_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
+  h_updating_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
+  h_graph_visited = (char*) malloc(sizeof(char)*no_of_nodes);
+
+  int start, edgeno;   
+  // initalize the memory
+  for(int i = 0; i < no_of_nodes; i++){
+    fscanf(fp,"%d %d",&start,&edgeno);
+    h_graph_nodes[i].starting = start;
+    h_graph_nodes[i].no_of_edges = edgeno;
+    h_graph_mask[i]=0;
+    h_updating_graph_mask[i]=0;
+    h_graph_visited[i]=0;
+  }
+  //read the source node from the file
+  fscanf(fp,"%d",&source);
+  source=0;
+  //set the source node as 1 in the mask
+  h_graph_mask[source]=1;
+  h_graph_visited[source]=1;
+  fscanf(fp,"%d",&edge_list_size);
+  int id,cost;
+  int* h_graph_edges = (int*) malloc(sizeof(int)*edge_list_size);
+  for(int i=0; i < edge_list_size ; i++){
+    fscanf(fp,"%d",&id);
+    fscanf(fp,"%d",&cost);
+    h_graph_edges[i] = id;
+  }
+
+  if(fp) fclose(fp);    
+  // allocate mem for the result on host side
+  int  *h_cost = (int*) malloc(sizeof(int)*no_of_nodes);
+  int *h_cost_ref = (int*)malloc(sizeof(int)*no_of_nodes);
+  for(int i=0;i<no_of_nodes;i++){
+    h_cost[i]=-1;
+    h_cost_ref[i] = -1;
+  }
+  h_cost[source]=0;
+  h_cost_ref[source]=0;    
+
+  printf("run bfs (#nodes = %d) on device\n", no_of_nodes);
+  run_bfs_gpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, 
+      h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);  
+
+  printf("run bfs (#nodes = %d) on host (cpu) \n", no_of_nodes);
+  // initalize the memory again
+  for(int i = 0; i < no_of_nodes; i++){
+    h_graph_mask[i]=0;
+    h_updating_graph_mask[i]=0;
+    h_graph_visited[i]=0;
+  }
+
+  //set the source node as 1 in the mask
+  source=0;
+  h_graph_mask[source]=1;
+  h_graph_visited[source]=1;
+  run_bfs_cpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, 
+      h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost_ref);
+
+  // verify
+  compare_results<int>(h_cost_ref, h_cost, no_of_nodes);
+
+  free(h_graph_nodes);
+  free(h_graph_mask);
+  free(h_updating_graph_mask);
+  free(h_graph_visited);
+  free(h_cost);
+  free(h_cost_ref);
 
   return 0;
 }

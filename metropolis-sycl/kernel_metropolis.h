@@ -42,6 +42,10 @@
 #define C(x,y,z,L)     ((z)*(L)*(L)+(y)*(L)+(x))
 #define sC(x,y,z,Lx,Ly)  ((z+1)*(Ly)*(Lx)+(y+1)*(Lx)+(x+1))
 
+// Forward declaration
+template<typename T>
+class kernel_reset;
+
 // kernel_metropolis
 
 void
@@ -255,7 +259,7 @@ void reset(queue &q,
 {
   q.submit([&] (handler &cgh) {
     auto acc = arr.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class kernel_reset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class kernel_reset<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int idx = item.get_global_id(0);
       if(idx < N) acc[idx] = val;
     });

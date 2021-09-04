@@ -1,9 +1,21 @@
 # oneAPI Direct Programming
-This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL, and OpenMP-4.5 target offloading. Intel<sup>®</sup> DPC++ Compatibility Tool (DPCT) can convert a CUDA program to a SYCL program in which memory management migration is implemented using the explicit and restricted Unified Shared Memory extension (DPCT usm) or the DPCT header files (DPCT header).
+This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading. 
+
+# Software installation
+[AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
+[Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
+[Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
+
+# Known issues
+The programs have not been evaluated on Windows  
+Kernel results do not exactly match using these programming languages on a platform for certain programs  
+Not all programs automate the verification of host and device results  
+Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
+Not all programs have OpenMP target offloading implementations  
+Raw performance of any program may be suboptimal 
 
 # Experimental Results
 Early results are shown [here](results/README.md)
-
 
 # Reference
 ### ace
@@ -173,6 +185,9 @@ Early results are shown [here](results/README.md)
 
 ### extrema
   Find local maxima (https://github.com/rapidsai/cusignal/)
+
+### f16max
+  Compute the maximum of half-precision floating-point numbers using bit operations (https://x.momo86.net/en?p=113)
 
 ### f16sp
   Half-precision scalar product (https://docs.nvidia.com/cuda/cuda-samples/index.html)

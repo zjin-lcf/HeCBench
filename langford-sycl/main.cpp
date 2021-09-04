@@ -186,9 +186,6 @@ constexpr int kThreadsPerBlock = 4;
 // due to the naive math below, numbers like 2^r-1 work much better than 2^r
 constexpr int kNumLogicalThreads = 16383;
 
-// use at most this many of the system's GPUs
-constexpr int kMaxDevices = 8;
-
 // To do:  Run on CPU (right now only runs on GPU).
 template <int n>
 void dfs(const accessor<int64_t, 1, sycl_atomic, access::target::global_buffer> &p_count,
@@ -332,13 +329,15 @@ long unixtime() {
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
+// Forward declaration
+template <int n>
+class langford;
 
 // Start and manage the computation on GPU device "device"
 template <int n>
 void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
   assert(sizeof(int64_t) == 8);
 
-  auto t0 = unixtime();
   constexpr int64_t kAlignedCnt = (n + 7) / 8;
 
   // split the CUDA buffer so that only count performs atomic add 
@@ -363,7 +362,7 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
     accessor<PositionsGPUAligned<n>, 1, sycl_read_write, access::target::local>
       pgpualigned(kThreadsPerBlock, cgh);
 
-    cgh.parallel_for<class langford>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class langford<n>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int lid = item.get_local_id(0);
       const int32_t result_index = item.get_global_id(0);
       dfs<n>(

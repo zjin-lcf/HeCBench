@@ -26,6 +26,10 @@
 #include "common.h"
 
 
+// Forward declaration
+template <typename TData>
+class copy_kernel;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Misaligned types
 ////////////////////////////////////////////////////////////////////////////////
@@ -33,56 +37,51 @@ typedef unsigned char uchar_misaligned;
 
 typedef unsigned short int ushort_misaligned;
 
-typedef struct
+struct uchar4_misaligned
 {
   unsigned char r, g, b, a;
-} uchar4_misaligned;
+};
 
-typedef struct
+struct uint2_misaligned
 {
   unsigned int l, a;
-} uint2_misaligned;
+};
 
-typedef struct
+struct uint3_misaligned
 {
   unsigned int r, g, b;
-} uint3_misaligned;
+};
 
-typedef struct
+struct uint4_misaligned
 {
   unsigned int r, g, b, a;
-} uint4_misaligned;
-
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////
 // Aligned types
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct __attribute__((__aligned__(4)))
+struct alignas(4) uchar4_aligned
 {
   unsigned char r, g, b, a;
-}
-uchar4_aligned;
+};
 
 typedef unsigned int uint_aligned;
 
-typedef struct __attribute__((__aligned__(8)))
+struct alignas(8) uint2_aligned
 {
   unsigned int l, a;
-}
-uint2_aligned;
+};
 
-typedef struct __attribute__((__aligned__(16)))
+struct alignas(16) uint3_aligned
 {
   unsigned int r, g, b;
-}
-uint3_aligned;
+};
 
-typedef struct __attribute__((__aligned__(16)))
+struct alignas(16) uint4_aligned
 {
   unsigned int r, g, b, a;
-}
-uint4_aligned;
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -94,11 +93,10 @@ uint4_aligned;
 // "Structure of arrays" storage strategy offers best performance
 // in general case. See section 5.1.2 of the Programming Guide.
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct __attribute__((__aligned__(16)))
+struct alignas(16) uint4_aligned_2
 {
   uint4_aligned c1, c2;
-}
-uint4_aligned_2;
+};
 
 
 
@@ -132,16 +130,14 @@ int iAlignDown(int a, int b)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// Simple CUDA kernel.
 // Copy is carried out on per-element basis,
 // so it's not per-byte in case of padded structures.
 ////////////////////////////////////////////////////////////////////////////////
-template<class TData> void testKernel(
-          TData *__restrict d_odata,
-    const TData *__restrict d_idata,
-    int numElements,
-    nd_item<1> &item
-    )
+template <typename TData> 
+void testKernel(TData *__restrict d_odata,
+                const TData *__restrict d_idata,
+                int numElements,
+                nd_item<1> &item)
 {
   const int pos = item.get_global_id(0);
   if (pos < numElements)
@@ -160,12 +156,12 @@ template<class TData> void testKernel(
 // is undefined, since padding is merely a placeholder
 // and doesn't contain any user data.
 ////////////////////////////////////////////////////////////////////////////////
-template<class TData> int testCPU(
+template <typename TData> 
+int testCPU(
     TData *h_odata,
     TData *h_idata,
     int numElements,
-    int packedElementSize
-    )
+    int packedElementSize)
 {
   for (int pos = 0; pos < numElements; pos++)
   {
@@ -195,8 +191,8 @@ unsigned char *d_idata, *d_odata;
 //CPU input data and instance of GPU output data
 unsigned char *h_idataCPU, *h_odataGPU;
 
-
-template<class TData> int runTest(
+template <typename TData> 
+int runTest(
   queue &q,
   buffer<unsigned char, 1> &d_idata,
   buffer<unsigned char, 1> &d_odata,
@@ -227,12 +223,8 @@ template<class TData> int runTest(
     q.submit([&] (handler &cgh) {
       auto odata = d_odata_re.template get_access<sycl_discard_write>(cgh);
       auto idata = d_idata_re.template get_access<sycl_read>(cgh);
-      cgh.parallel_for<class test>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        testKernel<TData>(
-          odata.get_pointer(),
-          idata.get_pointer(),
-          numElements, item
-        );
+      cgh.parallel_for<class copy_kernel<TData>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        testKernel<TData>(odata.get_pointer(), idata.get_pointer(), numElements, item);
       });
     });
   }
@@ -243,10 +235,8 @@ template<class TData> int runTest(
   std::chrono::duration<double> elapsed_seconds = end - start;
   double gpuTime = (double)elapsed_seconds.count() / NUM_ITERATIONS;
 
-  printf(
-      "Avg. time: %f ms / Copy throughput: %f GB/s.\n", gpuTime * 1000,
-      (double)totalMemSizeAligned / (gpuTime * 1073741824.0)
-        );
+  printf("Avg. time: %f ms / Copy throughput: %f GB/s.\n", gpuTime * 1000,
+      (double)totalMemSizeAligned / (gpuTime * 1073741824.0));
 
   //Read back GPU results and run validation
   q.submit([&] (handler &cgh) {

@@ -81,6 +81,19 @@ inline void DecodePixel(unsigned char pixel, unsigned int (&bins)[ACTIVE_CHANNEL
     bins[0] = (unsigned int) pixel;
 }
 
+// Forward declarations
+template <int ACTIVE_CHANNELS, int NUM_BINS, typename PixelType>
+class hist_gmem_atomics;
+
+template <int ACTIVE_CHANNELS, int NUM_BINS, typename PixelType>
+class hist_smem_atomics;
+
+template <int ACTIVE_CHANNELS, int NUM_BINS, typename PixelType>
+class hist_gmem_accum;
+
+template <int ACTIVE_CHANNELS, int NUM_BINS, typename PixelType>
+class hist_smem_accum;
+
 #include "histogram_gmem_atomics.hpp"
 #include "histogram_smem_atomics.hpp"
 
