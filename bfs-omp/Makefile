@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = bfs.cpp timer.cpp
+source = bfs.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I../bfs-sycl
 
 # Linker Flags
 LDFLAGS = 
@@ -49,13 +49,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-timer.o: timer.cpp timer.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-bfs.o: bfs.cpp util.h 
+bfs.o: bfs.cpp ../bfs-sycl/util.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

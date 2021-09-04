@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = bfs.cpp timer.cpp
+source = bfs.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -47,13 +47,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-bfs.o: bfs.cpp util.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-timer.o: timer.cpp timer.h Makefile
+bfs.o: bfs.cpp util.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

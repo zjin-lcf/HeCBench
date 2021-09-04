@@ -13,7 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = bfs.cu timer.cu
+source = bfs.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../bfs-sycl
 
 # Linker Flags
 LDFLAGS = 
@@ -46,10 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-bfs.o: bfs.cu util.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-timer.o: timer.cu timer.h Makefile
+bfs.o: bfs.cu ../bfs-sycl/util.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
