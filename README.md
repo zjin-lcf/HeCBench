@@ -1,15 +1,21 @@
 # oneAPI Direct Programming
 This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading. 
 
-# Environment
-[AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)
-[Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)
+# Software installation
+[AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
+[Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
 [Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
+# Known issues
+The programs have not been evaluated on Windows  
+Kernel results do not exactly match using these programming languages on a platform for certain programs  
+Not all programs automate the verification of host and device results  
+Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
+Not all programs have OpenMP target offloading implementations  
+Raw performance of any program may be suboptimal 
 
 # Experimental Results
 Early results are shown [here](results/README.md)
-
 
 # Reference
 ### ace
