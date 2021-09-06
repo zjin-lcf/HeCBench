@@ -7,7 +7,7 @@ This repository contains a collection of data-parallel programs written with CUD
 [Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
 # Known issues
-The programs have not been evaluated on Windows  
+The programs have not been evaluated on Windows
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
@@ -77,6 +77,9 @@ Early results are shown [here](results/README.md)
 
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
+
+### bitpackign
+  A bit-level operation that aims to reduce the number of bits required to store each value (https://github.com/NVIDIA/nvcomp)
 
 ### black-scholes
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
