@@ -68,13 +68,13 @@ __global__ void bitPackConfigScanKernel(
 {
   static_assert(BLOCK_SIZE % 64 == 0, "BLOCK_SIZE must a multiple of 64");
 
-  assert(BLOCK_SIZE == blockDim.x);
+  //assert(BLOCK_SIZE == blockDim.x);
 
   const size_t num = *numDevice;
   const int numBlocks = roundUpDiv(num, BLOCK_SIZE);
 
-  assert(num > 0);
-  assert(threadIdx.x < BLOCK_SIZE);
+  //assert(num > 0);
+  //assert(threadIdx.x < BLOCK_SIZE);
 
   if (blockIdx.x < numBlocks) {
     // each block processes it's chunks, updates min/max
@@ -136,12 +136,12 @@ __global__ void bitPackConfigFinalizeKernel(
       "BLOCK_WIDTH must be a multiple of BLOCK_SIZE");
   static_assert(BLOCK_SIZE % 64 == 0, "BLOCK_SIZE must a multiple of 64");
 
-  assert(blockIdx.x == 0);
+  //assert(blockIdx.x == 0);
 
   const size_t num = min(
       roundUpDiv(*numDevice, BLOCK_SIZE), static_cast<size_t>(BLOCK_WIDTH));
 
-  assert(num > 0);
+  //assert(num > 0);
 
   // each block processes it's chunk, updates min/max, and the calculates
   // the bitwidth based on the last update
@@ -198,27 +198,27 @@ __global__ void bitPackKernel(
     // for each thread.
     // And then writing the stored bits to the output.
     int const outputIdx = threadIdx.x + blockId * BLOCK_SIZE;
-    assert(outputIdx >= 0);
-    assert(*numBitsPtr <= sizeof(INPUT) * 8U);
+    //assert(outputIdx >= 0);
+    //assert(*numBitsPtr <= sizeof(INPUT) * 8U);
 
     size_t const bitStart = outputIdx * sizeof(*out) * 8U;
     size_t const bitEnd = bitStart + (sizeof(*out) * 8U);
 
     int const startIdx = clamp(bitStart / static_cast<size_t>(numBits), num);
     int const endIdx = clamp(roundUpDiv(bitEnd, numBits), num);
-    assert(startIdx >= 0);
+    //assert(startIdx >= 0);
 
     size_t const blockStartBit = blockId * BLOCK_SIZE * sizeof(*out) * 8U;
     size_t const blockEndBit = (blockId + 1) * BLOCK_SIZE * sizeof(*out) * 8U;
-    assert(blockStartBit < blockEndBit);
+    //assert(blockStartBit < blockEndBit);
 
     int const blockStartIdx = clamp(
         roundDownTo(blockStartBit / static_cast<size_t>(numBits), BLOCK_SIZE),
         num);
     int const blockEndIdx
         = clamp(roundUpTo(roundUpDiv(blockEndBit, numBits), BLOCK_SIZE), num);
-    assert(blockStartIdx >= 0);
-    assert(blockStartIdx <= blockEndIdx);
+    //assert(blockStartIdx >= 0);
+    //assert(blockStartIdx <= blockEndIdx);
 
     OUTPUT val = 0;
     for (int bufferStart = blockStartIdx; bufferStart < blockEndIdx;
@@ -244,7 +244,7 @@ __global__ void bitPackKernel(
         int const offset = static_cast<int>(
             static_cast<ssize_t>(idx * numBits)
             - static_cast<ssize_t>(bitStart));
-        assert(std::abs(offset) < sizeof(bits) * 8U);
+        //assert(std::abs(offset) < sizeof(bits) * 8U);
 
         if (offset > 0) {
           bits <<= offset;
@@ -430,7 +430,7 @@ void compress(
   }
 
   for (int n = 0; n < 100; n++)
-  NVCOMP_TYPE_SWITCH(
+    NVCOMP_TYPE_SWITCH(
       inType,
       bitPackInternal,
       workspace,
