@@ -584,6 +584,9 @@ Early results are shown [here](results/README.md)
 ### winograd
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
+### wyllie
+  List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)
+
 ### xsbench
   A proxy application for full neutron transport application like OpenMC
   (https://github.com/ANL-CESAR/XSBench/)
