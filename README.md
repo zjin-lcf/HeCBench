@@ -108,6 +108,9 @@ Early results are shown [here](results/README.md)
 ### bsw
   GPU accelerated Smith-Waterman for performing batch alignments (https://github.com/mgawan/GPU-BSW)
 
+### burger
+  2D Burger's equation (https://github.com/soumyasen1809/OpenMP_C_12_steps_to_Navier_Stokes)
+
 ### b+tree
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
