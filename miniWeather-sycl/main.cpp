@@ -88,8 +88,6 @@ int    direction_switch = 1;
 double mass0, te0;            //Initial domain totals for mass and total energy  
 double mass , te ;            //Domain totals for mass and total energy  
 
-double dmin( double a , double b ) { if (a<b) {return a;} else {return b;} };
-
 //Establish hydrstatic balance using constant potential temperature (thermally neutral atmosphere)
 //z is the input coordinate
 //r and t are the output background hydrostatic density and potential temperature
@@ -222,8 +220,6 @@ void collision( double x , double z , double &r , double &u , double &w , double
 }
 
 
-
-
 //Compute the time tendencies of the fluid state using forcing in the x-direction
 //Since the halos are set in a separate routine, this will not require MPI
 //First, compute the flux vector at each cell interface in the x-direction (including hyperviscosity)
@@ -247,43 +243,43 @@ void compute_tendencies_x(
   double hv_coef = -hv_beta * dx / (16*dt);
   //Compute fluxes in the x-direction for each cell
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_read>(cgh);
-      auto flux = d_flux.get_access<sycl_write>(cgh);
-      auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-      auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
+    auto state = d_state.get_access<sycl_read>(cgh);
+    auto flux = d_flux.get_access<sycl_write>(cgh);
+    auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
+    auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
 
-      cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
-          int k = item.get_global_id(0);
-          int i = item.get_global_id(1);
-          double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
+    cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
+      int k = item.get_global_id(0);
+      int i = item.get_global_id(1);
+      double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-          if (i < nx+1 && k < nz) { 
-          //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
-          for (int ll=0; ll<NUM_VARS; ll++) {
+      if (i < nx+1 && k < nz) { 
+        //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
+        for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s < sten_size; s++) {
-          int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+s;
-          stencil[s] = state[inds];
+            int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+s;
+            stencil[s] = state[inds];
           }
           //Fourth-order-accurate interpolation of the state
           vals[ll] = -stencil[0]/12 + 7*stencil[1]/12 + 7*stencil[2]/12 - stencil[3]/12;
           //First-order-accurate interpolation of the third spatial derivative of the state (for artificial viscosity)
           d3_vals[ll] = -stencil[0] + 3*stencil[1] - 3*stencil[2] + stencil[3];
-          }
+        }
 
-          //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
-          double r = vals[ID_DENS] + hy_dens_cell[k+hs];
-          double u = vals[ID_UMOM] / r;
-          double w = vals[ID_WMOM] / r;
-          double t = ( vals[ID_RHOT] + hy_dens_theta_cell[k+hs] ) / r;
-          double p = C0*cl::sycl::pow((r*t),gamm);
+        //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
+        double r = vals[ID_DENS] + hy_dens_cell[k+hs];
+        double u = vals[ID_UMOM] / r;
+        double w = vals[ID_WMOM] / r;
+        double t = ( vals[ID_RHOT] + hy_dens_theta_cell[k+hs] ) / r;
+        double p = C0*sycl::pow((r*t),gamm);
 
-          //Compute the flux vector
-          flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u     - hv_coef*d3_vals[ID_DENS];
-          flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*u+p - hv_coef*d3_vals[ID_UMOM];
-          flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*w   - hv_coef*d3_vals[ID_WMOM];
-          flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*t   - hv_coef*d3_vals[ID_RHOT];
-          }
-      });
+        //Compute the flux vector
+        flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u     - hv_coef*d3_vals[ID_DENS];
+        flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*u+p - hv_coef*d3_vals[ID_UMOM];
+        flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*w   - hv_coef*d3_vals[ID_WMOM];
+        flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*t   - hv_coef*d3_vals[ID_RHOT];
+      }
+    });
   });
 
   //Use the fluxes to compute tendencies for each cell
@@ -291,20 +287,20 @@ void compute_tendencies_x(
   range<3> tend_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-      auto flux = d_flux.get_access<sycl_read>(cgh);
-      auto tend = d_tend.get_access<sycl_write>(cgh);
-      cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
-          int ll = item.get_global_id(0);
-          int k = item.get_global_id(1);
-          int i = item.get_global_id(2);
-          if (i < nx && k < nz) { 
-          int indt  = ll* nz   * nx    + k* nx    + i  ;
-          int indf1 = ll*(nz+1)*(nx+1) + k*(nx+1) + i  ;
-          int indf2 = ll*(nz+1)*(nx+1) + k*(nx+1) + i+1;
-          tend[indt] = -( flux[indf2] - flux[indf1] ) / dx;
-          }
-          });
-      });
+    auto flux = d_flux.get_access<sycl_read>(cgh);
+    auto tend = d_tend.get_access<sycl_write>(cgh);
+    cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+      int ll = item.get_global_id(0);
+      int k = item.get_global_id(1);
+      int i = item.get_global_id(2);
+      if (i < nx && k < nz) { 
+        int indt  = ll* nz   * nx    + k* nx    + i  ;
+        int indf1 = ll*(nz+1)*(nx+1) + k*(nx+1) + i  ;
+        int indf2 = ll*(nz+1)*(nx+1) + k*(nx+1) + i+1;
+        tend[indt] = -( flux[indf2] - flux[indf1] ) / dx;
+      }
+    });
+  });
 }
 
 
@@ -323,7 +319,8 @@ void compute_tendencies_z(
     buffer<double,1> &d_hy_dens_int, 
     buffer<double,1> &d_hy_dens_theta_int, 
     buffer<double,1> &d_hy_pressure_int, 
-    queue &q ) {
+    queue &q ) 
+{
   //Compute the hyperviscosity coeficient
   double hv_coef = -hv_beta * dz / (16*dt);
 
@@ -333,49 +330,49 @@ void compute_tendencies_z(
   range<2> flux_lws (16, 16);
 
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_read>(cgh);
-      auto flux = d_flux.get_access<sycl_write>(cgh);
-      auto hy_dens_int = d_hy_dens_int.get_access<sycl_read>(cgh);
-      auto hy_pressure_int = d_hy_pressure_int.get_access<sycl_read>(cgh);
-      auto hy_dens_theta_int = d_hy_dens_theta_int.get_access<sycl_read>(cgh);
+    auto state = d_state.get_access<sycl_read>(cgh);
+    auto flux = d_flux.get_access<sycl_write>(cgh);
+    auto hy_dens_int = d_hy_dens_int.get_access<sycl_read>(cgh);
+    auto hy_pressure_int = d_hy_pressure_int.get_access<sycl_read>(cgh);
+    auto hy_dens_theta_int = d_hy_dens_theta_int.get_access<sycl_read>(cgh);
 
-      cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
-          int k = item.get_global_id(0);
-          int i = item.get_global_id(1);
-          double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
+    cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
+      int k = item.get_global_id(0);
+      int i = item.get_global_id(1);
+      double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-          if (i < nx && k < nz+1) { 
-          //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
-          for (int ll=0; ll<NUM_VARS; ll++) {
+      if (i < nx && k < nz+1) { 
+        //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
+        for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s<sten_size; s++) {
-          int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+s)*(nx+2*hs) + i+hs;
-          stencil[s] = state[inds];
+            int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+s)*(nx+2*hs) + i+hs;
+            stencil[s] = state[inds];
           }
           //Fourth-order-accurate interpolation of the state
           vals[ll] = -stencil[0]/12 + 7*stencil[1]/12 + 7*stencil[2]/12 - stencil[3]/12;
           //First-order-accurate interpolation of the third spatial derivative of the state
           d3_vals[ll] = -stencil[0] + 3*stencil[1] - 3*stencil[2] + stencil[3];
-          }
+        }
 
-          //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
-          double r = vals[ID_DENS] + hy_dens_int[k];
-          double u = vals[ID_UMOM] / r;
-          double w = vals[ID_WMOM] / r;
-          double t = ( vals[ID_RHOT] + hy_dens_theta_int[k] ) / r;
-          double p = C0*cl::sycl::pow((r*t),gamm) - hy_pressure_int[k];
-          //Enforce vertical boundary condition and exact mass conservation
-          if (k == 0 || k == nz) {
-            w                = 0;
-            d3_vals[ID_DENS] = 0;
-          }
+        //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
+        double r = vals[ID_DENS] + hy_dens_int[k];
+        double u = vals[ID_UMOM] / r;
+        double w = vals[ID_WMOM] / r;
+        double t = ( vals[ID_RHOT] + hy_dens_theta_int[k] ) / r;
+        double p = C0*sycl::pow((r*t),gamm) - hy_pressure_int[k];
+        //Enforce vertical boundary condition and exact mass conservation
+        if (k == 0 || k == nz) {
+          w                = 0;
+          d3_vals[ID_DENS] = 0;
+        }
 
-          //Compute the flux vector with hyperviscosity
-          flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w     - hv_coef*d3_vals[ID_DENS];
-          flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*u   - hv_coef*d3_vals[ID_UMOM];
-          flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*w+p - hv_coef*d3_vals[ID_WMOM];
-          flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*t   - hv_coef*d3_vals[ID_RHOT];
-          }
-      });
+        //Compute the flux vector with hyperviscosity
+        flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w     - hv_coef*d3_vals[ID_DENS];
+        flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*u   - hv_coef*d3_vals[ID_UMOM];
+        flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*w+p - hv_coef*d3_vals[ID_WMOM];
+        flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*t   - hv_coef*d3_vals[ID_RHOT];
+      }
+    });
   });
 
   //Use the fluxes to compute tendencies for each cell
@@ -383,25 +380,25 @@ void compute_tendencies_z(
   range<3> tend_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_read>(cgh);
-      auto flux = d_flux.get_access<sycl_read>(cgh);
-      auto tend = d_tend.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
-          int ll = item.get_global_id(0);
-          int k = item.get_global_id(1);
-          int i = item.get_global_id(2);
-          if (i < nx && k < nz) { 
-          int indt  = ll* nz   * nx    + k* nx    + i  ;
-          int indf1 = ll*(nz+1)*(nx+1) + (k  )*(nx+1) + i;
-          int indf2 = ll*(nz+1)*(nx+1) + (k+1)*(nx+1) + i;
-          tend[indt] = -( flux[indf2] - flux[indf1] ) / dz;
-          if (ll == ID_WMOM) {
+    auto state = d_state.get_access<sycl_read>(cgh);
+    auto flux = d_flux.get_access<sycl_read>(cgh);
+    auto tend = d_tend.get_access<sycl_read_write>(cgh);
+    cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+      int ll = item.get_global_id(0);
+      int k = item.get_global_id(1);
+      int i = item.get_global_id(2);
+      if (i < nx && k < nz) { 
+        int indt  = ll* nz   * nx    + k* nx    + i  ;
+        int indf1 = ll*(nz+1)*(nx+1) + (k  )*(nx+1) + i;
+        int indf2 = ll*(nz+1)*(nx+1) + (k+1)*(nx+1) + i;
+        tend[indt] = -( flux[indf2] - flux[indf1] ) / dz;
+        if (ll == ID_WMOM) {
           int inds = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
           tend[indt] = tend[indt] - state[inds]*grav;
-          }
-          }
-          });
-      });
+        }
+      }
+    });
+  });
 }
 
 
@@ -419,7 +416,8 @@ void set_halo_values_x(
     buffer<double, 1> &d_sendbuf_r,
     buffer<double, 1> &d_recvbuf_l,
     buffer<double, 1> &d_recvbuf_r,
-    queue &q ) {
+    queue &q ) 
+{
   int ierr;
   MPI_Request req_r[2], req_s[2];
 
@@ -432,28 +430,28 @@ void set_halo_values_x(
   range<3> buffer_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_read>(cgh);
-      auto sendbuf_l = d_sendbuf_l.get_access<sycl_write>(cgh);
-      auto sendbuf_r = d_sendbuf_r.get_access<sycl_write>(cgh);
-      cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
-          int ll = item.get_global_id(0);
-          int k = item.get_global_id(1);
-          int s = item.get_global_id(2);
-          if (s < hs && k < nz) { 
-          sendbuf_l[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
-          sendbuf_r[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
-          }
-          });
-      });
+    auto state = d_state.get_access<sycl_read>(cgh);
+    auto sendbuf_l = d_sendbuf_l.get_access<sycl_write>(cgh);
+    auto sendbuf_r = d_sendbuf_r.get_access<sycl_write>(cgh);
+    cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+      int ll = item.get_global_id(0);
+      int k = item.get_global_id(1);
+      int s = item.get_global_id(2);
+      if (s < hs && k < nz) { 
+        sendbuf_l[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
+        sendbuf_r[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
+      }
+    });
+  });
 
   q.submit([&] (handler &cgh) {
-      auto sendbuf_l_acc = d_sendbuf_l.get_access<sycl_read>(cgh);
-      cgh.copy(sendbuf_l_acc, sendbuf_l);
-      });
+    auto sendbuf_l_acc = d_sendbuf_l.get_access<sycl_read>(cgh);
+    cgh.copy(sendbuf_l_acc, sendbuf_l);
+  });
   q.submit([&] (handler &cgh) {
-      auto sendbuf_r_acc = d_sendbuf_r.get_access<sycl_read>(cgh);
-      cgh.copy(sendbuf_r_acc, sendbuf_r);
-      });
+    auto sendbuf_r_acc = d_sendbuf_r.get_access<sycl_read>(cgh);
+    cgh.copy(sendbuf_r_acc, sendbuf_r);
+  });
   q.wait();
 
   //#pragma omp target update from(sendbuf_l[:nz*hs*NUM_VARS],sendbuf_r[:nz*hs*NUM_VARS])
@@ -467,30 +465,29 @@ void set_halo_values_x(
 
   //#pragma omp target update to(recvbuf_l[:nz*hs*NUM_VARS],recvbuf_r[:nz*hs*NUM_VARS])
   q.submit([&] (handler &cgh) {
-      auto recvbuf_l_acc = d_recvbuf_l.get_access<sycl_write>(cgh);
-      cgh.copy(recvbuf_l, recvbuf_l_acc);
-      });
+    auto recvbuf_l_acc = d_recvbuf_l.get_access<sycl_write>(cgh);
+    cgh.copy(recvbuf_l, recvbuf_l_acc);
+  });
   q.submit([&] (handler &cgh) {
-      auto recvbuf_r_acc = d_recvbuf_r.get_access<sycl_write>(cgh);
-      cgh.copy(recvbuf_r, recvbuf_r_acc);
-      });
-  //   q.wait();
+    auto recvbuf_r_acc = d_recvbuf_r.get_access<sycl_write>(cgh);
+    cgh.copy(recvbuf_r, recvbuf_r_acc);
+  });
 
   //Unpack the receive buffers
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_write>(cgh);
-      auto recvbuf_l = d_recvbuf_l.get_access<sycl_read>(cgh);
-      auto recvbuf_r = d_recvbuf_r.get_access<sycl_read>(cgh);
-      cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
-          int ll = item.get_global_id(0);
-          int k = item.get_global_id(1);
-          int s = item.get_global_id(2);
-          if (s < hs && k < nz) { 
-          state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = recvbuf_l[ll*nz*hs + k*hs + s];
-          state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = recvbuf_r[ll*nz*hs + k*hs + s];
-          }
-          });
-      });
+    auto state = d_state.get_access<sycl_write>(cgh);
+    auto recvbuf_l = d_recvbuf_l.get_access<sycl_read>(cgh);
+    auto recvbuf_r = d_recvbuf_r.get_access<sycl_read>(cgh);
+    cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+      int ll = item.get_global_id(0);
+      int k = item.get_global_id(1);
+      int s = item.get_global_id(2);
+      if (s < hs && k < nz) { 
+        state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = recvbuf_l[ll*nz*hs + k*hs + s];
+        state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = recvbuf_r[ll*nz*hs + k*hs + s];
+      }
+    });
+  });
 
   //Wait for sends to finish
   ierr = MPI_Waitall(2,req_s,MPI_STATUSES_IGNORE);
@@ -501,27 +498,26 @@ void set_halo_values_x(
       range<2> inj_lws (16, 16);
 
       q.submit([&] (handler &cgh) {
-          auto state = d_state.get_access<sycl_read_write>(cgh);
-          auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-          auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-          cgh.parallel_for(nd_range<2>(inj_gws, inj_lws), [=] (nd_item<2> item) {
-              int k = item.get_global_id(0);
-              int i = item.get_global_id(1);
-              if (i < hs && k < nz) { 
-              double z = (k_beg + k+0.5)*dz;
-              if (cl::sycl::fabs(z-3*zlen/4) <= zlen/16) {
+        auto state = d_state.get_access<sycl_read_write>(cgh);
+        auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
+        auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
+        cgh.parallel_for(nd_range<2>(inj_gws, inj_lws), [=] (nd_item<2> item) {
+          int k = item.get_global_id(0);
+          int i = item.get_global_id(1);
+          if (i < hs && k < nz) { 
+            double z = (k_beg + k+0.5)*dz;
+            if (sycl::fabs(z-3*zlen/4) <= zlen/16) {
               int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
               int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
               int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
               state[ind_u] = (state[ind_r]+hy_dens_cell[k+hs]) * 50.;
               state[ind_t] = (state[ind_r]+hy_dens_cell[k+hs]) * 298. - hy_dens_theta_cell[k+hs];
-              }
-              }
-              });
-          });
+            }
+          }
+        });
+      });
     }
   }
-
 }
 
 
@@ -533,43 +529,44 @@ void set_halo_values_z(
     const double dx,
     const int data_spec_int,
     buffer<double, 1> &d_state,
-    queue &q ) {
+    queue &q ) 
+{
   const double mnt_width = xlen/8;
 
   range<2> gws ((NUM_VARS+15)/16*16, (nx+2*hs+15)/16*16);
   range<2> lws (16, 16);
 
   q.submit([&] (handler &cgh) {
-      auto state = d_state.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          int ll = item.get_global_id(0);
-          int i = item.get_global_id(1);
-          if (i < nx+2*hs && ll < NUM_VARS) { 
-          if (ll == ID_WMOM) {
+    auto state = d_state.get_access<sycl_read_write>(cgh);
+    cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      int ll = item.get_global_id(0);
+      int i = item.get_global_id(1);
+      if (i < nx+2*hs && ll < NUM_VARS) { 
+        if (ll == ID_WMOM) {
           state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
           state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = 0.;
           state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = 0.;
           state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = 0.;
           //Impose the vertical momentum effects of an artificial cos^2 mountain at the lower boundary
           if (data_spec_int == DATA_SPEC_MOUNTAIN) {
-          double x = (i_beg+i-hs+0.5)*dx;
-          if ( cl::sycl::fabs(x-xlen/4) < mnt_width ) {
-          double xloc = (x-(xlen/4)) / mnt_width;
-          //Compute the derivative of the fake mountain
-          double mnt_deriv = -pi*cl::sycl::cos(pi*xloc/2)*cl::sycl::sin(pi*xloc/2)*10/dx;
-          //w = (dz/dx)*u
-          state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (0)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
-          state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (1)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
+            double x = (i_beg+i-hs+0.5)*dx;
+            if ( sycl::fabs(x-xlen/4) < mnt_width ) {
+              double xloc = (x-(xlen/4)) / mnt_width;
+              //Compute the derivative of the fake mountain
+              double mnt_deriv = -pi*sycl::cos(pi*xloc/2)*sycl::sin(pi*xloc/2)*10/dx;
+              //w = (dz/dx)*u
+              state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (0)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
+              state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (1)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
+            }
           }
-          }
-          } else {
-            state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
-            state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
-            state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
-            state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
-          }
-          }
-      });
+        } else {
+          state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
+          state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
+          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
+          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
+        }
+      }
+    });
   });
 }
 
@@ -623,7 +620,7 @@ void init( int *argc , char ***argv ) {
   recvbuf_r          = (double *) malloc( hs*nz*NUM_VARS*sizeof(double) );
 
   //Define the maximum stable time step based on an assumed maximum wind speed
-  dt = dmin(dx,dz) / max_speed * cfl;
+  dt = fmin(dx,dz) / max_speed * cfl;
   //Set initial elapsed model time and output_counter to zero
   etime = 0.;
   output_counter = 0.;
@@ -753,35 +750,34 @@ void reductions(
     range<2> gws ((nz+15)/16*16, (nx+15)/16*16);
     range<2> lws (16, 16);
     q.submit([&] (handler &cgh) {
-        auto id_acc = d_identity.get_access<sycl_write>(cgh);
-        auto reducer = intel::reduction(id_acc, identity, std::plus<double2>());
-        //auto reducer = ONEAPI::reduction(id_acc, identity, std::plus<double2>());
-        auto state = d_state.get_access<sycl_read>(cgh);
-        auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-        auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class reduce>(nd_range<2>(gws, lws), reducer, 
-                                       [=] (nd_item<2> item, auto &sum) {
-          int k = item.get_global_id(0);
-          int i = item.get_global_id(1);
-          if (k < nz && i < nx) {
-            int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-            int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-            int ind_w = ID_WMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-            int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-            double r  =   state[ind_r] + hy_dens_cell[hs+k];             // Density
-            double u  =   state[ind_u] / r;                              // U-wind
-            double w  =   state[ind_w] / r;                              // W-wind
-            double th = ( state[ind_t] + hy_dens_theta_cell[hs+k] ) / r; // Potential Temperature (theta)
-            double p  = C0*cl::sycl::pow(r*th,gamm);                               // Pressure
-            double t  = th / cl::sycl::pow(p0/p,rd/cp);                            // Temperature
-            double ke = r*(u*u+w*w);                                     // Kinetic Energy
-            double ie = r*cv*t;                                          // Internal Energy
+      auto id_acc = d_identity.get_access<sycl_read_write>(cgh);
+      auto reducer = ONEAPI::reduction(id_acc, identity, std::plus<double2>());
+      auto state = d_state.get_access<sycl_read>(cgh);
+      auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
+      auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class reduce>(nd_range<2>(gws, lws), reducer, 
+                                     [=] (nd_item<2> item, auto &sum) {
+        int k = item.get_global_id(0);
+        int i = item.get_global_id(1);
+        if (k < nz && i < nx) {
+          int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+          int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+          int ind_w = ID_WMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+          int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+          double r  =   state[ind_r] + hy_dens_cell[hs+k];             // Density
+          double u  =   state[ind_u] / r;                              // U-wind
+          double w  =   state[ind_w] / r;                              // W-wind
+          double th = ( state[ind_t] + hy_dens_theta_cell[hs+k] ) / r; // Potential Temperature (theta)
+          double p  = C0*sycl::pow(r*th,gamm);                               // Pressure
+          double t  = th / sycl::pow(p0/p,rd/cp);                            // Temperature
+          double ke = r*(u*u+w*w);                                     // Kinetic Energy
+          double ie = r*cv*t;                                          // Internal Energy
 
-            // mass += r        *dx*dz; // Accumulate domain mass
-            // te   += (ke + ie)*dx*dz; // Accumulate domain total energy
-	    sum.combine({r*dx*dz, (ke+ie)*dx*dz});
-          }
-       });
+          // mass += r        *dx*dz; // Accumulate domain mass
+          // te   += (ke + ie)*dx*dz; // Accumulate domain total energy
+          sum.combine({r*dx*dz, (ke+ie)*dx*dz});
+        }
+      });
     });
   }
   double glob[2], loc[2];
@@ -895,21 +891,32 @@ void perform_timestep(
     const double dt,
     queue &q ) {
 
+// semi discrete step
+#define SEMI_DSTEP(dt, dir, state, next_state) \
+    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt, dir ,\
+		    data_spec_int, d_state, state, \
+		    next_state, d_flux, d_tend, \
+		    d_hy_dens_cell, d_hy_dens_theta_cell,\
+		    d_hy_dens_int, d_hy_dens_theta_int,\
+		    d_hy_pressure_int, d_sendbuf_l,\
+		    d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q);
+
   if (direction_switch) {
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 3 , DIR_X ,  data_spec_int, d_state , d_state     , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 2 , DIR_X ,  data_spec_int, d_state , d_state_tmp , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 1 , DIR_X ,  data_spec_int, d_state , d_state_tmp , d_state     , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 3 , DIR_Z ,  data_spec_int, d_state , d_state     , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 2 , DIR_Z ,  data_spec_int, d_state , d_state_tmp , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 1 , DIR_Z ,  data_spec_int, d_state , d_state_tmp , d_state     , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-  } else {           
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 3 , DIR_Z ,  data_spec_int, d_state , d_state     , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 2 , DIR_Z ,  data_spec_int, d_state , d_state_tmp , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 1 , DIR_Z ,  data_spec_int, d_state , d_state_tmp , d_state     , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 3 , DIR_X ,  data_spec_int, d_state , d_state     , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 2 , DIR_X ,  data_spec_int, d_state , d_state_tmp , d_state_tmp , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
-    semi_discrete_step(hs, nx, nz, k_beg, i_beg, dx, dz, dt / 1 , DIR_X ,  data_spec_int, d_state , d_state_tmp , d_state     , d_flux , d_tend, d_hy_dens_cell, d_hy_dens_theta_cell, d_hy_dens_int, d_hy_dens_theta_int, d_hy_pressure_int, d_sendbuf_l, d_sendbuf_r, d_recvbuf_l, d_recvbuf_r, q );
+    SEMI_DSTEP(dt/3, DIR_X, d_state, d_state_tmp)
+    SEMI_DSTEP(dt/2, DIR_X, d_state_tmp, d_state_tmp)
+    SEMI_DSTEP(dt/1, DIR_X, d_state_tmp, d_state)
+    SEMI_DSTEP(dt/3, DIR_Z, d_state, d_state_tmp)
+    SEMI_DSTEP(dt/2, DIR_Z, d_state_tmp, d_state_tmp)
+    SEMI_DSTEP(dt/1, DIR_Z, d_state_tmp, d_state)
+  } else {
+    SEMI_DSTEP(dt/3, DIR_Z, d_state, d_state_tmp)
+    SEMI_DSTEP(dt/2, DIR_Z, d_state_tmp, d_state_tmp)
+    SEMI_DSTEP(dt/1, DIR_Z, d_state_tmp, d_state)
+    SEMI_DSTEP(dt/3, DIR_X, d_state, d_state_tmp)
+    SEMI_DSTEP(dt/2, DIR_X, d_state_tmp, d_state_tmp)
+    SEMI_DSTEP(dt/1, DIR_X, d_state_tmp, d_state)
   }
+
   if (direction_switch) { direction_switch = 0; } else { direction_switch = 1; }
 }
 
@@ -941,8 +948,10 @@ int main(int argc, char **argv) {
 
   buffer<double, 1> d_state_tmp (state, (nz+2*hs)*(nx+2*hs)*NUM_VARS);
   d_state_tmp.set_final_data(nullptr);
+
   buffer<double, 1> d_state (state, (nz+2*hs)*(nx+2*hs)*NUM_VARS);
   d_state.set_final_data(nullptr);
+
   buffer<double, 1> d_hy_dens_cell (hy_dens_cell, nz+2*hs);
   buffer<double, 1> d_hy_dens_theta_cell (hy_dens_theta_cell, nz+2*hs);
   buffer<double, 1> d_hy_dens_int (hy_dens_int, nz+1);
@@ -962,6 +971,7 @@ int main(int argc, char **argv) {
   // MAIN TIME STEP LOOP
   ////////////////////////////////////////////////////
   auto c_start = clock();
+
   while (etime < sim_time) {
     //If the time step leads to exceeding the simulation time, shorten it for the last step
     if (etime + dt > sim_time) { dt = sim_time - etime; }
@@ -976,21 +986,20 @@ int main(int argc, char **argv) {
         d_hy_dens_int, 
         d_hy_dens_theta_int, 
         d_hy_pressure_int, 
-        d_sendbuf_l , 
-        d_sendbuf_r , 
-        d_recvbuf_l , 
-        d_recvbuf_r , 
+        d_sendbuf_l, 
+        d_sendbuf_r, 
+        d_recvbuf_l, 
+        d_recvbuf_r, 
         dt, 
         q);
-    //Inform the user
-    if (masterproc) { printf( "Elapsed Time: %lf / %lf\n", etime , sim_time ); }
+
     //Update the elapsed time and output counter
     etime = etime + dt;
   }
+
   auto c_end = clock();
-  if (masterproc) {
-    printf("Total main time step loop: %lf sec\n",( (double) (c_end-c_start) ) / CLOCKS_PER_SEC);
-  }
+  if (masterproc)
+    printf("Total main time step loop: %lf sec\n", ( (double) (c_end-c_start) ) / CLOCKS_PER_SEC);
 
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass, te, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);
