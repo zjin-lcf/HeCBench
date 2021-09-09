@@ -3,10 +3,13 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = mpiicpc
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
+CUDA_ARCH = "--cuda-gpu-arch=sm_60"
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+MPI_INCLUDE = "/usr/include/openmpi-ppc64le"
+MPI_LIB_DIR = "/usr/lib64/openmpi/lib"
 
 #===============================================================================
 # Program name & source code list
@@ -23,15 +26,19 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall \
-	  -I../include \
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+          -I$(MPI_INCLUDE) \
+          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+          -fsycl-unnamed-lambda \
+          -Xsycl-target-backend $(CUDA_ARCH) \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)\
 	  -DNX=400 \
        	  -DNZ=200 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -45,11 +52,7 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-cxx=dpcpp -DUSE_GPU
-else
-  CFLAGS +=-cxx=dpcpp
-endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -57,7 +60,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
