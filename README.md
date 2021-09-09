@@ -244,6 +244,9 @@ Early results are shown [here](results/README.md)
 ### gmm
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
 
+### goulesh
+  Simulate the dynamics of a small part of a cardiac myocyte, specifically the fast sodium m-gate  (https://github.com/LLNL/goulash)
+
 ### grep
   Regular expression matching (https://github.com/bkase/CUDA-grep)
 
