@@ -504,6 +504,9 @@ Early results are shown [here](results/README.md)
 ### secp256k1
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
+### sheath
+  Plasma sheath simulation with the particle-in-cell method (https://www.particleincell.com/2016/cuda-pic/)
+
 ### shmembench
   The shared local memory microbenchmark (https://github.com/ekondis/gpumembench)
 
