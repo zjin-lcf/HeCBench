@@ -3,19 +3,21 @@ This repository contains a collection of data-parallel programs written with CUD
 
 # Software installation
 [AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
-[Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
+[Intel DPC++ compiler](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md) or [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
 [Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
 # Dataset
 For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
 
 # Known issues
-The programs have not been evaluated on Windows
+The programs have not been evaluated on Windows  
+The lastest DPC++ compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
 Not all programs have OpenMP target offloading implementations  
-Raw performance of any program may be suboptimal 
+Raw performance of any program may be suboptimal  
+Some programs may take longer to complete on an integrated GPU
 
 # Experimental Results
 Early results are shown [here](results/README.md)
