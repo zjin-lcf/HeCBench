@@ -6,6 +6,9 @@ This repository contains a collection of data-parallel programs written with CUD
 [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
 [Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
+# Dataset
+For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
+
 # Known issues
 The programs have not been evaluated on Windows
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
@@ -210,7 +213,6 @@ Early results are shown [here](results/README.md)
 ### fhd
   A case study: advanced magnetic resonance imaging reconstruction (https://ict.senecacollege.ca/~gpu610/pages/content/cudas.html)
   
-
 ### filter
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
 
@@ -248,7 +250,7 @@ Early results are shown [here](results/README.md)
 ### gmm
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
 
-### goulesh
+### goulash
   Simulate the dynamics of a small part of a cardiac myocyte, specifically the fast sodium m-gate  (https://github.com/LLNL/goulash)
 
 ### grep
