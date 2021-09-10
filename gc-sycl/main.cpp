@@ -61,7 +61,7 @@ inline unsigned int ballot(sycl::sub_group sg, int predicate) {
 }
 
 inline int ffs(int x) {
-  return (x == 0) ? -1 : sycl::ctz(x) + 1;
+  return (x == 0) ? 0 : sycl::intel::ctz(x) + 1;
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
@@ -302,7 +302,7 @@ int main(int argc, char* argv[])
                   int val = pcol, mc = 0;
                   if (pcol == 0) {
                     const int offs = beg / WS;
-                    mc = max(1, mincol / WS);
+                    mc = sycl::max(1, mincol / WS);
                     while ((val = atomic_load(posscol2[offs + mc])) == 0) mc++;
                   }
                   int newmincol = mc * WS + sycl::clz(val);
@@ -325,6 +325,7 @@ int main(int argc, char* argv[])
       });
     });
 
+    /*
     q.submit([&] (handler &cgh) {
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
@@ -376,6 +377,7 @@ int main(int argc, char* argv[])
         } while (again);
       });
     });
+    */
   }
   q.wait();
 
