@@ -78,7 +78,7 @@ Early results are shown [here](results/README.md)
 ### bitonic-sort
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
 
-### bitpackign
+### bitpacking
   A bit-level operation that aims to reduce the number of bits required to store each value (https://github.com/NVIDIA/nvcomp)
 
 ### black-scholes
