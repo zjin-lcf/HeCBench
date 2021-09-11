@@ -61,9 +61,11 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   img -= IMG_SIZE*GCF_DIM+GCF_DIM;
 
   CmplxType *d_img;
-  cudaMalloc((void**)&d_img, sizeof(CmplxType)*IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM);
-  cudaMemcpy(d_img, img, sizeof(CmplxType)*IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM,
-		  cudaMemcpyHostToDevice);
+  cudaMalloc((void**)&d_img, sizeof(CmplxType)*
+             (IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM));
+
+  cudaMemcpy(d_img, img, sizeof(CmplxType)*
+             (IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM), cudaMemcpyHostToDevice);
 
   CmplxType *d_gcf;
   cudaMalloc((void**)&d_gcf, sizeof(CmplxType)*64*GCF_DIM*GCF_DIM);
@@ -76,6 +78,7 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   cudaMalloc((void**)&d_in, sizeof(CmplxType)*NPOINTS);
   cudaMemcpy(d_in, in, sizeof(CmplxType)*NPOINTS, cudaMemcpyHostToDevice);
 
+  // NPOINTS is a multiple of 32
   dim3 grid(NPOINTS/32, 1);
   dim3 block(32, 8);
 
