@@ -76,6 +76,7 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   buffer<      CmplxType, 1> d_out (NPOINTS);
   buffer<const CmplxType, 1> d_in  (in, NPOINTS);
 
+  // NPOINTS is a multiple of 32
   range<2> gws(8, NPOINTS);
   range<2> lws(8, 32);
 

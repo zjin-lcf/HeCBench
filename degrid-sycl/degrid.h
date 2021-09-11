@@ -1,7 +1,7 @@
 #ifndef __DEGRID_H
 #define __DEGRID_H
 
-//#define NPOINTS 4000000
+// NPOINTS is a multiple of 32
 #define NPOINTS  40000
 #define GCF_DIM  256 
 #define IMG_SIZE 8192
