@@ -167,6 +167,9 @@ Early results are shown [here](results/README.md)
 ### dct8x8
   Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### degrid
+  Radio astronomy degridding (https://github.com/NVIDIA/SKA-gpu-degrid)
+  
 ### deredundancy
   Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
   
@@ -546,6 +549,9 @@ Early results are shown [here](results/README.md)
 
 ### split
   The split operation in radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### spm
+  Image registration calculations for the statistical parametric mapping (SPM) system (http://mri.ee.ntust.edu.tw/cuda/)
 
 ### sptrsv
   A thread-Level synchronization-free sparse triangular solver (https://github.com/JiyaSu/CapelliniSpTRSV)
