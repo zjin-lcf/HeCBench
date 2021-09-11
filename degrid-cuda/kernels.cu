@@ -21,8 +21,7 @@ degrid_kernel(CmplxType* __restrict out,
       const int sub_y = floorf(GCF_GRID*(inn.y-floorf(inn.y)));
       const int main_x = floorf(inn.x); 
       const int main_y = floorf(inn.y); 
-      CmplxType sum;
-      sum.x = sum.y = 0;
+      CmplxType sum = {0,0};
       for(int a = threadIdx_x-GCF_DIM/2; a < GCF_DIM/2; a += blockDim_x)
         for(int b = -GCF_DIM/2; b < GCF_DIM/2; b++)
         {
