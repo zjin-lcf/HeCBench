@@ -275,12 +275,17 @@ int main(int argc, char** argv) {
     fpc(q, values, &cmp_size_hw, values_size, wgs);
     if (cmp_size_hw != cmp_size) {
       printf("fpc failed %u != %u\n", cmp_size_hw, cmp_size);
+      ok = false;
+      break;
     }
     fpc2(q, values, &cmp_size_hw, values_size, wgs);
     if (cmp_size_hw != cmp_size) {
       printf("fpc2 failed %u != %u\n", cmp_size_hw, cmp_size);
+      ok = false;
+      break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(values);
   free(cbuffer);
