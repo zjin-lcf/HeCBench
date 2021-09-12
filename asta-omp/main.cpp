@@ -107,12 +107,12 @@ struct Params {
 };
 
 // Input Data -----------------------------------------------------------------
-void read_input(T *x_vector, const Params &p) {
+void read_input(FP *x_vector, const Params &p) {
   int tiled_n = divceil(p.n, p.s);
   int in_size = p.m * tiled_n * p.s;
   srand(5432);
   for(int i = 0; i < in_size; i++) {
-    x_vector[i] = ((T)(rand() % 100) / 100);
+    x_vector[i] = ((FP)(rand() % 100) / 100);
   }
 }
 
@@ -131,14 +131,14 @@ int main(int argc, char **argv) {
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
-  T *h_in_out = (T *)malloc(in_size * sizeof(T));
+  FP *h_in_out = (FP *)malloc(in_size * sizeof(FP));
   int *h_finished = (int *)malloc(sizeof(int) * finished_size);
   int *h_head = (int *)malloc(sizeof(int));
-  T *h_in_backup = (T *)malloc(in_size * sizeof(T));
+  FP *h_in_backup = (FP *)malloc(in_size * sizeof(FP));
 
   // Initialize
   read_input(h_in_out, p);
-  memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
+  memcpy(h_in_backup, h_in_out, in_size * sizeof(FP)); // Backup for reuse across iterations
 
   const int A = p.m;
   const int B = tiled_n;
@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
   {
     for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-      memcpy(h_in_out, h_in_backup, in_size * sizeof(T));
+      memcpy(h_in_out, h_in_backup, in_size * sizeof(FP));
       memset((void *)h_finished, 0, sizeof(int) * finished_size);
       h_head[0] = 0;
 
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
 #pragma omp barrier
               continue;
             }
-            T   data1, data2, data3, data4;
+            FP   data1, data2, data3, data4;
             int i = tid;
             if(i < b)
               data1 = h_in_out[lmem[1] * b + i];
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
 #pragma omp barrier
 
             for(; lmem[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
-              T backup1, backup2, backup3, backup4;
+              FP backup1, backup2, backup3, backup4;
               i = tid;
               if(i < b)
                 backup1 = h_in_out[next_in_cycle * b + i];

@@ -38,9 +38,9 @@
 
 
 #ifdef DOUBLE_PRECISION
-#define T double
+#define FP double
 #else
-#define T float
+#define FP float
 #endif
 
 #define PRINT 0
