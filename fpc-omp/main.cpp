@@ -119,58 +119,60 @@ unsigned f7(ulong value, bool* mask) {
 void fpc (const ulong* values, unsigned *cmp_size, const int values_size, const int wgs)
 {
   *cmp_size= 0;
-#pragma omp target data map(to: values[0:values_size]) map(tofrom: cmp_size[0:1])
-#pragma omp target teams num_teams(values_size/wgs) thread_limit(wgs) 
+  #pragma omp target data map(to: values[0:values_size]) map(tofrom: cmp_size[0:1])
   {
-    unsigned compressable;
-#pragma omp parallel
+    #pragma omp target teams num_teams(values_size/wgs) thread_limit(wgs) 
     {
-      int lid = omp_get_thread_num();
-      int WGS = omp_get_num_threads();
-      int gid = omp_get_team_num()*WGS+lid;
+      unsigned compressable;
+      #pragma omp parallel
+      {
+        int lid = omp_get_thread_num();
+        int WGS = omp_get_num_threads();
+        int gid = omp_get_team_num()*WGS+lid;
 
-      ulong value = values[gid];
-      unsigned inc;
+        ulong value = values[gid];
+        unsigned inc;
 
-      // 000
-      if (value == 0){
-        inc = 1;
-      }
-      // 001 010
-      else if ((my_abs((int)(value)) <= 0xFF)) {
-        inc = 1;
-      }
-      // 011
-      else if ((my_abs((int)(value)) <= 0xFFFF)) {
-        inc = 2;
-      }
-      //100  
-      else if ((((value) & 0xFFFF) == 0 )) {
-        inc = 2;
-      }
-      //101
-      else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
-          && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
-        inc = 2;
-      }
-      //110
-      else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
-          (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
-          (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
-        inc = 1;
-      } else { 
-        inc = 4;
-      }
+        // 000
+        if (value == 0){
+          inc = 1;
+        }
+        // 001 010
+        else if ((my_abs((int)(value)) <= 0xFF)) {
+          inc = 1;
+        }
+        // 011
+        else if ((my_abs((int)(value)) <= 0xFFFF)) {
+          inc = 2;
+        }
+        //100  
+        else if ((((value) & 0xFFFF) == 0 )) {
+          inc = 2;
+        }
+        //101
+        else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
+            && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
+          inc = 2;
+        }
+        //110
+        else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
+            (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
+            (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
+          inc = 1;
+        } else { 
+          inc = 4;
+        }
 
-      if (lid == 0) compressable = 0;
-#pragma omp barrier
+        if (lid == 0) compressable = 0;
+        #pragma omp barrier
 
-#pragma omp atomic update 
-      compressable += inc;
-#pragma omp barrier
-      if (lid == WGS-1) {
-#pragma omp atomic update 
-        cmp_size[0] += compressable;
+        #pragma omp atomic update 
+        compressable += inc;
+        #pragma omp barrier
+        if (lid == WGS-1) {
+        #pragma omp atomic update 
+          cmp_size[0] += compressable;
+        }
       }
     }
   }
@@ -179,60 +181,63 @@ void fpc (const ulong* values, unsigned *cmp_size, const int values_size, const 
 void fpc2 (const ulong* values, unsigned *cmp_size, const int values_size, const int wgs)
 {
   *cmp_size= 0;
-#pragma omp target data map(to: values[0:values_size]) map(tofrom: cmp_size[0:1])
-#pragma omp target teams num_teams(values_size/wgs) thread_limit(wgs)
+  #pragma omp target data map(to: values[0:values_size]) map(tofrom: cmp_size[0:1])
   {
-    unsigned compressable;
-#pragma omp parallel
+    #pragma omp target teams num_teams(values_size/wgs) thread_limit(wgs)
     {
-      int lid = omp_get_thread_num();
-      int WGS = omp_get_num_threads();
-      int gid = omp_get_team_num()*WGS+lid;
+      unsigned compressable;
+      #pragma omp parallel
+      {
+        int lid = omp_get_thread_num();
+        int WGS = omp_get_num_threads();
+        int gid = omp_get_team_num()*WGS+lid;
 
-      ulong value = values[gid];
+        ulong value = values[gid];
 
-      unsigned inc;
+        unsigned inc;
 
-      bool m1 = 0;
-      bool m2 = 0;
-      bool m3 = 0;
-      bool m4 = 0;
-      bool m5 = 0;
-      bool m6 = 0;
-      bool m7 = 0;
+        bool m1 = 0;
+        bool m2 = 0;
+        bool m3 = 0;
+        bool m4 = 0;
+        bool m5 = 0;
+        bool m6 = 0;
+        bool m7 = 0;
 
-      unsigned inc1 = f1(value, &m1);
-      unsigned inc2 = f2(value, &m2);
-      unsigned inc3 = f3(value, &m3);
-      unsigned inc4 = f4(value, &m4);
-      unsigned inc5 = f5(value, &m5);
-      unsigned inc6 = f6(value, &m6);
-      unsigned inc7 = f7(value, &m7);
+        unsigned inc1 = f1(value, &m1);
+        unsigned inc2 = f2(value, &m2);
+        unsigned inc3 = f3(value, &m3);
+        unsigned inc4 = f4(value, &m4);
+        unsigned inc5 = f5(value, &m5);
+        unsigned inc6 = f6(value, &m6);
+        unsigned inc7 = f7(value, &m7);
 
-      if (m1)
-        inc = inc1;
-      else if (m2)
-        inc = inc2;
-      else if (m3)
-        inc = inc3;
-      else if (m4)
-        inc = inc4;
-      else if (m5)
-        inc = inc5;
-      else if (m6)
-        inc = inc6;
-      else
-        inc = inc7;
+        if (m1)
+          inc = inc1;
+        else if (m2)
+          inc = inc2;
+        else if (m3)
+          inc = inc3;
+        else if (m4)
+          inc = inc4;
+        else if (m5)
+          inc = inc5;
+        else if (m6)
+          inc = inc6;
+        else
+          inc = inc7;
 
-      if (lid == 0) compressable = 0;
-#pragma omp barrier
+        if (lid == 0) compressable = 0;
+        #pragma omp barrier
 
-#pragma omp atomic update 
-      compressable += inc;
-#pragma omp barrier
-      if (lid == WGS-1) {
-#pragma omp atomic update 
-        cmp_size[0] += compressable;
+        #pragma omp atomic update 
+        compressable += inc;
+
+        #pragma omp barrier
+        if (lid == WGS-1) {
+          #pragma omp atomic update 
+          cmp_size[0] += compressable;
+        }
       }
     }
   }
