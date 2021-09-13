@@ -3,11 +3,12 @@
 #include <cstdio>
 #include <cmath>
 
-typedef struct {
-  float s0;
-  float s1;
-  float s2;
-  float s3;
+typedef struct __attribute__((__aligned__(16)))
+{
+  float x;
+  float y;
+  float z;
+  float w;
 } float4;
 
 float  distance_host ( int i, float  latitude_1, float  longitude_1, float  latitude_2, float  longitude_2 )
@@ -21,10 +22,10 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   float  BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
          D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-  const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
+  const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
   const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
   const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-  const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+  const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
   const float GDC_SEMI_MINOR = 6356752.31424518f;
   const float EPS = 0.5e-5f;
 
@@ -84,26 +85,24 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
 #pragma omp target data map(to: VA[0:N]) map(from: VC[0:N])
   {
     for (int n = 0; n < iteration; n++) {
+
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int wiID = 0; wiID < N; wiID++) {
 
-        const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
+        const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
         const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
         const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-        const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+        const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
         const float GDC_SEMI_MINOR = 6356752.31424518f;
-        const float EPS                    = 0.5e-5f;
+        const float EPS = 0.5e-5f;
         float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
                D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-        const float latitude_1 = VA[wiID].s0 ;
-        const float longitude_1 = VA[wiID].s1;
-        const float latitude_2 = VA[wiID].s2 ;
-        const float longitude_2 = VA[wiID].s3;
-        const float rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
-        const float rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
-        const float rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
-        const float rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
+        const float rad_latitude_1  = VA[wiID].x * GDC_DEG_TO_RAD ;
+        const float rad_longitude_1 = VA[wiID].y * GDC_DEG_TO_RAD ;
+        const float rad_latitude_2  = VA[wiID].z * GDC_DEG_TO_RAD ;
+        const float rad_longitude_2 = VA[wiID].w * GDC_DEG_TO_RAD ;
+
         TU1 = GDC_ECCENTRICITY * sinf ( rad_latitude_1 ) /
           cosf ( rad_latitude_1 ) ;
         TU2 = GDC_ECCENTRICITY * sinf ( rad_latitude_2 ) /
@@ -186,8 +185,8 @@ int main(int argc, char** argv) {
   float*  expected_output = (float*) malloc(N*sizeof(float));
 
   while (fscanf(fp, "%f %f\n", &lat, &lon) != EOF) { 
-    input[city].s0 = lat;
-    input[city].s1 = lon;
+    input[city].x = lat;
+    input[city].y = lon;
     city++;
     if (city == num_cities) break;  
   }
@@ -201,18 +200,18 @@ int main(int argc, char** argv) {
   for (int c = 0;  c < num_ref_cities; c++) {
     int index = index_map[c] - 1;
     for(int j = c*num_cities; j < (c+1)*num_cities; ++j) {
-      input[j].s2 = input[index].s0;
-      input[j].s3 = input[index].s1;
+      input[j].z = input[index].x;
+      input[j].w = input[index].y;
     }
   }
 
   // run on the host for verification
   for (int i = 0; i < N; i++)
   {
-    float lat1 = input[i].s0;
-    float lon1 = input[i].s1;
-    float lat2 = input[i].s2;
-    float lon2 = input[i].s3;
+    float lat1 = input[i].x;
+    float lon1 = input[i].y;
+    float lat2 = input[i].z;
+    float lon2 = input[i].w;
     expected_output[i] = distance_host(i, lat1, lon1, lat2, lon2);
   }
 
