@@ -17,10 +17,10 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   float  BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
          D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-  const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
+  const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
   const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
   const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-  const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+  const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
   const float GC_SEMI_MINOR = 6356752.31424518f;
   const float EPS = 0.5e-5f;
 
@@ -97,23 +97,21 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
         const int wiID = item.get_global_id(0);
         if (wiID >= N) return;
 
-        const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
+        const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
         const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
         const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-        const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+        const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
         const float GC_SEMI_MINOR = 6356752.31424518f;
         const float EPS = 0.5e-5f;
         float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
         D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-        const float latitude_1 = accessorA[wiID].s0() ;
-        const float longitude_1 = accessorA[wiID].s1();
-        const float latitude_2 = accessorA[wiID].s2() ;
-        const float longitude_2 = accessorA[wiID].s3();
-        const float rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
-        const float rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
-        const float rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
-        const float rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
+        const float4 rad4 = accessorA[wiID] * GDC_DEG_TO_RAD; 
+        const float rad_latitude_1  = rad4.x();
+        const float rad_longitude_1 = rad4.y();
+        const float rad_latitude_2  = rad4.z();
+        const float rad_longitude_2 = rad4.w();
+
         TU1 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_1 ) /
           sycl::cos ( rad_latitude_1 ) ;
         TU2 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_2 ) /
