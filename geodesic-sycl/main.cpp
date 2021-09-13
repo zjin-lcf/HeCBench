@@ -75,7 +75,7 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   return dist;
 }
 
-void distance_device(const cl::sycl::float4* VA, float* VC, const size_t N, const int iteration) {
+void distance_device(const sycl::float4* VA, float* VC, const size_t N, const int iteration) {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -83,82 +83,81 @@ void distance_device(const cl::sycl::float4* VA, float* VC, const size_t N, cons
 #endif
   queue q(dev_sel);
 
-  range<1> global_work_size((N+255)/256*256);
-  range<1> local_work_size (256);
+  range<1> gws ((N+255)/256*256);
+  range<1> lws (256);
   const  property_list props = { property::buffer::use_host_ptr()};
-  buffer<cl::sycl::float4, 1> bufferA(VA, N, props);
+  buffer<sycl::float4, 1> bufferA(VA, N, props);
   buffer<float, 1> bufferC(VC, N, props);
 
   for (int n = 0; n < iteration; n++) {
     q.submit([&](handler& cgh) {
-        auto accessorA = bufferA.get_access<sycl_read>(cgh);
-        auto accessorC = bufferC.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class distance>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      auto accessorA = bufferA.get_access<sycl_read>(cgh);
+      auto accessorC = bufferC.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class geodesic_distance>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        const int wiID = item.get_global_id(0);
+        if (wiID >= N) return;
 
-            const int wiID = item.get_global_id(0);
-            if (wiID >= N) return;
+        const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
+        const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
+        const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
+        const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+        const float GC_SEMI_MINOR = 6356752.31424518f;
+        const float EPS = 0.5e-5f;
+        float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
+        D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-            const float  GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians      */
-            const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
-            const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-            const float  GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
-            const float GC_SEMI_MINOR = 6356752.31424518f;
-            const float EPS                    = 0.5e-5f;
-            float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
-            D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
+        const float latitude_1 = accessorA[wiID].s0() ;
+        const float longitude_1 = accessorA[wiID].s1();
+        const float latitude_2 = accessorA[wiID].s2() ;
+        const float longitude_2 = accessorA[wiID].s3();
+        const float rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
+        const float rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
+        const float rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
+        const float rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
+        TU1 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_1 ) /
+          sycl::cos ( rad_latitude_1 ) ;
+        TU2 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_2 ) /
+          sycl::cos ( rad_latitude_2 ) ;
 
-            const float latitude_1 = accessorA[wiID].s0() ;
-            const float longitude_1 = accessorA[wiID].s1();
-            const float latitude_2 = accessorA[wiID].s2() ;
-            const float longitude_2 = accessorA[wiID].s3();
-            const float rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
-            const float rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
-            const float rad_longitude_2 = longitude_2 * GDC_DEG_TO_RAD ;
-            const float rad_latitude_2 = latitude_2 * GDC_DEG_TO_RAD ;
-            TU1 = GDC_ECCENTRICITY * cl::sycl::sin ( rad_latitude_1 ) /
-              cl::sycl::cos ( rad_latitude_1 ) ;
-            TU2 = GDC_ECCENTRICITY * cl::sycl::sin ( rad_latitude_2 ) /
-              cl::sycl::cos ( rad_latitude_2 ) ;
+        CU1 = 1.0f / sycl::sqrt ( TU1 * TU1 + 1.0f ) ;
+        SU1 = CU1 * TU1 ;
+        CU2 = 1.0f / sycl::sqrt ( TU2 * TU2 + 1.0f ) ;
+        dist = CU1 * CU2 ;
+        BAZ = dist * TU2 ;
+        FAZ = BAZ * TU1 ;
+        X = rad_longitude_2 - rad_longitude_1 ;
 
-            CU1 = 1.0f / cl::sycl::sqrt ( TU1 * TU1 + 1.0f ) ;
-            SU1 = CU1 * TU1 ;
-            CU2 = 1.0f / cl::sycl::sqrt ( TU2 * TU2 + 1.0f ) ;
-            dist = CU1 * CU2 ;
-            BAZ = dist * TU2 ;
-            FAZ = BAZ * TU1 ;
-            X = rad_longitude_2 - rad_longitude_1 ;
+        do {
+          SX = sycl::sin ( X ) ;
+          CX = sycl::cos ( X ) ;
+          TU1 = CU2 * SX ;
+          TU2 = BAZ - SU1 * CU2 * CX ;
+          SY = sycl::sqrt ( TU1 * TU1 + TU2 * TU2 ) ;
+          CY = dist * CX + FAZ ;
+          Y = sycl::atan2 ( SY, CY ) ;
+          SA = dist * SX / SY ;
+          C2A = - SA * SA + 1.0f;
+          CZ = FAZ + FAZ ;
+          if ( C2A > 0.0f ) CZ = -CZ / C2A + CY ;
+          E = CZ * CZ * 2.0f - 1.0f ;
+          C = ( ( -3.0f * C2A + 4.0f ) * GDC_FLATTENING + 4.0f ) * C2A *
+            GDC_FLATTENING / 16.0f ;
+          D = X ;
+          X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA ;
+          X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_longitude_2 - rad_longitude_1 ;
+        } while ( sycl::fabs ( D - X ) > EPS ) ;
 
-            do {
-              SX = cl::sycl::sin ( X ) ;
-              CX = cl::sycl::cos ( X ) ;
-              TU1 = CU2 * SX ;
-              TU2 = BAZ - SU1 * CU2 * CX ;
-              SY = cl::sycl::sqrt ( TU1 * TU1 + TU2 * TU2 ) ;
-              CY = dist * CX + FAZ ;
-              Y = cl::sycl::atan2 ( SY, CY ) ;
-              SA = dist * SX / SY ;
-              C2A = - SA * SA + 1.0f;
-              CZ = FAZ + FAZ ;
-              if ( C2A > 0.0f ) CZ = -CZ / C2A + CY ;
-              E = CZ * CZ * 2.0f - 1.0f ;
-              C = ( ( -3.0f * C2A + 4.0f ) * GDC_FLATTENING + 4.0f ) * C2A *
-                GDC_FLATTENING / 16.0f ;
-              D = X ;
-              X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA ;
-              X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_longitude_2 - rad_longitude_1 ;
-            } while ( cl::sycl::fabs ( D - X ) > EPS ) ;
-
-            X = cl::sycl::sqrt ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f ;
-            X = ( X - 2.0f ) / X ;
-            C = 1.0f - X ;
-            C = ( X * X / 4.0f + 1.0f ) / C ;
-            D = ( 0.375f * X * X - 1.0f ) * X ;
-            X = E * CY ;
-            dist = 1.0f - E - E ;
-            dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
-                    X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
-            accessorC[wiID] = dist;
-        });
+        X = sycl::sqrt ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f ;
+        X = ( X - 2.0f ) / X ;
+        C = 1.0f - X ;
+        C = ( X * X / 4.0f + 1.0f ) / C ;
+        D = ( 0.375f * X * X - 1.0f ) * X ;
+        X = E * CY ;
+        dist = 1.0f - E - E ;
+        dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
+                X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
+        accessorC[wiID] = dist;
+      });
     });
   }
   q.wait();
@@ -193,7 +192,7 @@ int main(int argc, char** argv) {
     exit(-1);
   }
 
-  cl::sycl::float4* input  = (cl::sycl::float4*) aligned_alloc(4096, N*sizeof(cl::sycl::float4));
+  sycl::float4* input  = (sycl::float4*) aligned_alloc(4096, N*sizeof(sycl::float4));
   float*  output = (float*) aligned_alloc(4096, N*sizeof(float));
   float*  expected_output = (float*) malloc(N*sizeof(float));
 
