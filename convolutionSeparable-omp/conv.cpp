@@ -24,9 +24,9 @@
 
 
 void convolutionRows(
-    float* dst,
-    const float* src,
-    const float* kernel,
+    float* __restrict dst,
+    const float* __restrict src,
+    const float* __restrict kernel,
     const unsigned int imageW,
     const unsigned int imageH,
     const unsigned int pitch
@@ -103,9 +103,9 @@ void convolutionRows(
 }
 
 void convolutionColumns(
-    float* dst,
-    const float* src,
-    const float* kernel,
+    float* __restrict dst,
+    const float* __restrict src,
+    const float* __restrict kernel,
     const unsigned int imageW,
     const unsigned int imageH,
     const unsigned int pitch

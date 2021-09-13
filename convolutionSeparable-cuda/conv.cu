@@ -23,9 +23,9 @@
 #define COLUMNS_HALO_STEPS    1
 
 __global__ void conv_rows(
-    float *dst,
-    const float *src,
-    const float *kernel,
+    float *__restrict dst,
+    const float *__restrict src,
+    const float *__restrict kernel,
     const int imageW,
     const int imageH,
     const int pitch)
@@ -68,9 +68,9 @@ __global__ void conv_rows(
 }
 
 __global__ void conv_cols(
-    float *dst,
-    const float *src,
-    const float *kernel,
+    float *__restrict dst,
+    const float *__restrict src,
+    const float *__restrict kernel,
     const int imageW,
     const int imageH,
     const int pitch)
