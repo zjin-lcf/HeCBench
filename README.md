@@ -300,8 +300,8 @@ Early results are shown [here](results/README.md)
 ### ising
   Monte-Carlo simulations of 2D Ising Model (https://github.com/NVIDIA/ising-gpu/)
 
-### iso2dfd, mandelbrot, particle-diffusion
-  The HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
+### iso2dfd 
+  Isotropic 2-dimensional Finite Difference (https://github.com/intel/HPCKit-code-samples/)
 
 ### jaccard
   Jaccard index for a sparse matrix (https://github.com/rapidsai/nvgraph/blob/main/cpp/src/jaccard_gpu.cu)
@@ -362,6 +362,9 @@ Early results are shown [here](results/README.md)
 
 ### lulesh
   Livermore unstructured Lagrangian explicit shock hydrodynamics (https://github.com/LLNL/LULESH)
+
+### mandelbrot
+  The Mandelbrot set in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
 ### match
   Compute matching scores for two 16K 128D feature points (https://github.com/Celebrandil/CudaSift)
@@ -449,6 +452,9 @@ Early results are shown [here](results/README.md)
 
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
+
+### particle-diffusion
+  Particle diffusion in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
 ### particlefilter
   Particle Filter in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
