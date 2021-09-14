@@ -18,9 +18,8 @@ int popcount_ref(unsigned long x)
   return count;
 }
 
-// CUDA kernels
-__global__ void
-pc1 (const unsigned long* data, int* r, const int length)
+// HIP kernels
+__global__ void pc1 (const unsigned long* __restrict data, int* __restrict r, const int length)
 {
   int i = blockIdx.x*blockDim.x+threadIdx.x;
   if (i >= length) return;
@@ -34,8 +33,7 @@ pc1 (const unsigned long* data, int* r, const int length)
   r[i] = x & 0x7f;
 }
 
-__global__ void
-pc2 (const unsigned long* data, int* r, const int length)
+__global__ void pc2 (const unsigned long* __restrict data, int* __restrict r, const int length)
 {
   int i = blockIdx.x*blockDim.x+threadIdx.x;
   if (i >= length) return;
@@ -46,8 +44,7 @@ pc2 (const unsigned long* data, int* r, const int length)
   r[i] = (x * h01) >> 56;  //returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... 
 }
 
-__global__ void
-pc3 (const unsigned long* data, int* r, const int length)
+__global__ void pc3 (const unsigned long* __restrict data, int* __restrict r, const int length)
 {
   int i = blockIdx.x*blockDim.x+threadIdx.x;
   if (i >= length) return;
@@ -57,8 +54,7 @@ pc3 (const unsigned long* data, int* r, const int length)
   r[i] = count;
 }
 
-__global__ void
-pc4 (const unsigned long* data, int* r, const int length)
+__global__ void pc4 (const unsigned long* __restrict data, int* __restrict r, const int length)
 {
   int i = blockIdx.x*blockDim.x+threadIdx.x;
   if (i >= length) return;
@@ -72,8 +68,7 @@ pc4 (const unsigned long* data, int* r, const int length)
   r[i] = cnt;
 }
 
-__global__ void
-pc5 (const unsigned long* data, int* r, const int length)
+__global__ void pc5 (const unsigned long* __restrict data, int* __restrict r, const int length)
 {
   int i = blockIdx.x*blockDim.x+threadIdx.x;
   if (i >= length) return;
@@ -94,6 +89,13 @@ pc5 (const unsigned long* data, int* r, const int length)
   r[i] = (i1+i2)+(i3+i4)+(i5+i6)+(i7+i8);
 }
 
+__global__ void pc6 (const unsigned long* __restrict data, int* __restrict r, const int length)
+{
+  int i = blockIdx.x*blockDim.x+threadIdx.x;
+  if (i >= length) return;
+  r[i] = __popcll(data[i]);
+}
+
 void checkResults(const unsigned long *d, const int *r, const int length)
 {
   int error = 0;
@@ -111,9 +113,9 @@ void checkResults(const unsigned long *d, const int *r, const int length)
 
 int main(int argc, char* argv[])
 {
-  unsigned long length = atol(argv[1]);
+  const int length = atoi(argv[1]);
   unsigned long *data = NULL;
-  int* result = NULL;
+  int* __restrict result = NULL;
   posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
   posix_memalign((void**)&result, 1024, length*sizeof(int));
 
@@ -137,35 +139,42 @@ int main(int argc, char* argv[])
   dim3 threads (BLOCK_SIZE);
 
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(pc1, grids, threads, 0, 0, d_data, d_result, length);
+    hipLaunchKernelGGL(pc1, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
   }
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(pc2, grids, threads, 0, 0, d_data, d_result, length);
+    hipLaunchKernelGGL(pc2, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
   }
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(pc3, grids, threads, 0, 0, d_data, d_result, length);
+    hipLaunchKernelGGL(pc3, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
   }
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(pc4, grids, threads, 0, 0, d_data, d_result, length);
+    hipLaunchKernelGGL(pc4, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
   }
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
   for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(pc5, grids, threads, 0, 0, d_data, d_result, length);
+    hipLaunchKernelGGL(pc5, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
+  }
+  hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
+  checkResults(data, result, length);
+  //========================================================================================
+
+  for (int n = 0; n < 100; n++) {
+    hipLaunchKernelGGL(pc6, dim3(grids), dim3(threads), 0, 0, d_data, d_result, length);
   }
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
