@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc1>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc2>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc3>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         char count;
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc4>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc5>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -192,13 +192,12 @@ int main(int argc, char* argv[])
   checkResults(data, result, length);
   //========================================================================================
 
-  /* commented because OpenMP does not support builtin popcount
-     the kernel performance is slightly better than the kernel at line 95
+  // the kernel performance is slightly better than the kernel at line 95
   for (int n = 0; n < 100; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc6>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         r[i] = cl::sycl::popcount(data[i]);
@@ -211,8 +210,6 @@ int main(int argc, char* argv[])
   });
   q.wait();
   checkResults(data, result, length);
-  */
-
 
   free(data);
   free(result);

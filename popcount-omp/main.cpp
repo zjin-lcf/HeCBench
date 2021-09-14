@@ -137,15 +137,14 @@ int main(int argc, char* argv[])
   checkResults(data, result, length);
   //========================================================================================
 
-  // InvalidFunctionCall: Unexpected llvm intrinsic: llvm.ctpop.i64
-  //for (int n = 0; n < 100; n++) {
-  //  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
-  //  for (int i = 0; i < length; i++) {
-  //      result[i] = __builtin_popcountll(data[i]);
-  //  }
-  //}
-  //#pragma omp target update from (result[0:length])
-  //checkResults(data, result, length);
+  for (int n = 0; n < 100; n++) {
+    #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+    for (int i = 0; i < length; i++) {
+        result[i] = __builtin_popcountll(data[i]);
+    }
+  }
+  #pragma omp target update from (result[0:length])
+  checkResults(data, result, length);
 }
 
   free(data);
