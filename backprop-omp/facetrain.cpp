@@ -24,25 +24,21 @@ void backprop_face()
   printf("\nFinish the training for one iteration\n");
 }
 
-int setup(int argc, char **argv)
+void setup(int argc, char **argv)
 {
-	
   int seed;
 
   if (argc!=2){
-  fprintf(stderr, "usage: backprop <num of input elements>\n");
-  exit(0);
+    fprintf(stderr, "usage: backprop <num of input elements>\n");
+    exit(-1);
   }
   layer_size = atoi(argv[1]);
   if (layer_size%16!=0){
-  fprintf(stderr, "The number of input points must be divided by 16\n");
-  exit(0);
+    fprintf(stderr, "The number of input points must be divided by 16\n");
+    exit(-1);
   }
-  
 
   seed = 7;   
   bpnn_initialize(seed);
   backprop_face();
-
-  exit(0);
 }

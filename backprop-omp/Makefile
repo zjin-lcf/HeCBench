@@ -6,6 +6,7 @@
 CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = no
 DEVICE    = gpu
 
 #===============================================================================
@@ -34,10 +35,13 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
+endif
+
+ifeq ($(DUMP),yes)
+  CFLAGS += -DOUTPUT
 endif
 
 ifeq ($(DEVICE),gpu)
@@ -49,15 +53,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp backprop.h Makefile
+%.o: %.cpp backprop.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 20000000
+	./$(program) 65536
 

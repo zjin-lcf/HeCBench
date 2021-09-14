@@ -1,12 +1,10 @@
-// includes, system
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
-#include "backprop.h"
-
 #include "common.h"
+#include "backprop.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -23,10 +21,10 @@ unsigned int num_blocks = 0;
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
 ////////////////////////////////////////////////////////////////////////////////
-  int
-main( int argc, char** argv) 
+int main( int argc, char** argv) 
 {
   setup(argc, argv);
+  return 0;
 }
 
 
@@ -84,33 +82,28 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
     range<2> local_work(BLOCK_SIZE, BLOCK_SIZE);
 
     q.submit([&](handler& cgh) {
+      auto input_acc = input_sycl.get_access<sycl_read>(cgh);
+      auto input_weights_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
+      auto hidden_partial_sum_acc = hidden_partial_sum.get_access<sycl_write>(cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
 
-        auto input_acc = input_sycl.get_access<sycl_read>(cgh);
-        auto input_weights_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
-        auto hidden_partial_sum_acc = hidden_partial_sum.get_access<sycl_write>(cgh);
-        accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
-        accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
-
-        cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+      cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
 #include "bpnn_layerforward.sycl"
-            });
-        });
+      });
+    });
 
     q.submit([&](handler& cgh) {
-        accessor<float, 1, access::mode::read, access::target::global_buffer> 
-        hidden_partial_sum_acc(hidden_partial_sum, cgh, range<1>(num_blocks * WIDTH), id<1>(0));
-        cgh.copy(hidden_partial_sum_acc, partial_sum);
-        });
+      accessor<float, 1, access::mode::read, access::target::global_buffer> 
+      hidden_partial_sum_acc(hidden_partial_sum, cgh, range<1>(num_blocks * WIDTH), id<1>(0));
+      cgh.copy(hidden_partial_sum_acc, partial_sum);
+    });
     q.wait();
-
-    // use host accessor instead of copy from device to host
-    //auto h_partial_sum_acc = hidden_partial_sum.get_access<sycl_read>();   
 
     for (int j = 1; j <= hid; j++) {
       sum = 0.0;
       for (int k = 0; k < num_blocks; k++) {  
         sum += partial_sum[k * hid + j-1] ;
-        //sum += h_partial_sum_acc[k * hid + j-1] ;
       }
 #ifdef DEBUG
       printf("j=%d sum=%f\n", j,sum);
@@ -130,23 +123,24 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
     // input_weights_sycl has been written in the first kernel, so it needs to be restored.
     q.submit([&](handler& cgh) {
-        accessor<float, 1, access::mode::write, access::target::global_buffer> 
-        input_weights_acc(input_weights_sycl, cgh, range<1>((in + 1) * (hid + 1)), id<1>(0));
-        cgh.copy(input_weights_one_dim, input_weights_acc);
-        });
+      accessor<float, 1, access::mode::write, access::target::global_buffer> 
+      input_weights_acc(input_weights_sycl, cgh, range<1>((in + 1) * (hid + 1)), id<1>(0));
+      cgh.copy(input_weights_one_dim, input_weights_acc);
+    });
 
     q.submit([&](handler& cgh) {
 
-        auto delta_acc = hidden_delta_sycl.get_access<sycl_read>(cgh);
-        auto ly_acc = input_sycl.get_access<sycl_read>(cgh);
-        auto w_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
-        auto oldw_acc = input_prev_weights_sycl.get_access<sycl_read_write>(cgh);
+      auto delta_acc = hidden_delta_sycl.get_access<sycl_read>(cgh);
+      auto ly_acc = input_sycl.get_access<sycl_read>(cgh);
+      auto w_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
+      auto oldw_acc = input_prev_weights_sycl.get_access<sycl_read_write>(cgh);
 
-        cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+      cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
 #include "bpnn_adjust_weights.sycl"
-            });
-        });
+      });
+    });
   } // SYCL scope
+
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 

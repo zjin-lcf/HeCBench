@@ -1,4 +1,3 @@
-// includes, system
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,10 +24,10 @@ unsigned int num_blocks = 0;
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
 ////////////////////////////////////////////////////////////////////////////////
-  int
-main( int argc, char** argv) 
+int main( int argc, char** argv) 
 {
   setup(argc, argv);
+  return 0;
 }
 
 
@@ -46,6 +45,8 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   float *input_weights_prev_one_dim;
   float * partial_sum;
   float sum;
+
+  // Warning: the number of blocks must be less than the maximum grid dimension
   unsigned int num_blocks = in / BLOCK_SIZE;
 
   input_weights_one_dim = (float *) malloc((in + 1)* (hid + 1) * sizeof(float));
@@ -77,11 +78,12 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   cudaMalloc((void**)&d_input_weights, sizeof(float)*(in+1)*(hid+1));
   cudaMalloc((void**)&d_hidden_partial_sum, sizeof(float)*num_blocks*WIDTH);
 
-  cudaMemcpyAsync(d_input, net->input_units, sizeof(float)*(in+1), cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_input, net->input_units, sizeof(float)*(in+1), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice);
 
   dim3 grid(1, num_blocks);
   dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
+
   kernel_layerforward<<<grid, threads>>>(d_input, d_input_weights, d_hidden_partial_sum, hid);
   cudaMemcpy(partial_sum, d_hidden_partial_sum, sizeof(float)*num_blocks*WIDTH, cudaMemcpyDeviceToHost);
 
@@ -103,12 +105,11 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   bpnn_adjust_weights(net->output_delta, out, net->hidden_units, hid, net->hidden_weights, net->hidden_prev_weights);
 
   // input_weights has been written in the first kernel, so it needs to be restored.
-  cudaMemcpyAsync(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice, 0);
-
+  cudaMemcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice);
   cudaMalloc((void**)&d_hidden_delta, sizeof(float)*(hid+1));
   cudaMalloc((void**)&d_input_prev_weights, sizeof(float)*(in+1)*(hid+1));
-  cudaMemcpyAsync(d_hidden_delta, net->hidden_delta, sizeof(float)*(hid+1), cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_hidden_delta, net->hidden_delta, sizeof(float)*(hid+1), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1), cudaMemcpyHostToDevice);
   kernel_adjust_weights<<<grid, threads>>>(d_input, d_input_weights, d_hidden_delta, d_input_prev_weights, hid);
   cudaMemcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1), cudaMemcpyDeviceToHost);
 
