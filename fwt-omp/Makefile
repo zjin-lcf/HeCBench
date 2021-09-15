@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main2.cpp reference.cpp
+source = main.cpp reference.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -59,5 +59,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100
 
