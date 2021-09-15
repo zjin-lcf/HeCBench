@@ -24,13 +24,9 @@
 // kernel
 #include "adv.cu"
 
-#include <cmath>
 dfloat *drandAlloc(int N){
   dfloat *v = (dfloat*) calloc(N, sizeof(dfloat));
   for(int n = 0; n < N; ++n) v[n] = drand48();
-  dfloat m = 0;
-  for(int n = 0; n < N; ++n) m = fmax(v[n], m);
-  std::cout << "max value " << m << "\n";
   return v;
 }
 
