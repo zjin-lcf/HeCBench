@@ -168,7 +168,6 @@ void fwtBatchGPU(queue &q, buffer<float, 1> &d_Data, int M, int log2N)
     range<1> gws2 (M * N / 4);
     range<1> lws2 (N/4);
 
-    printf("N = %d\n", N);
     q.submit([&] (handler &cgh) {
       auto out = d_Data.get_access<sycl_write>(cgh);
       auto in = d_Data.get_access<sycl_read>(cgh);
