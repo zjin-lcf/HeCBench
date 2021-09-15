@@ -69,6 +69,8 @@ const int KERNEL_SIZE = kernelN * sizeof(float);
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
+    const int repeat = atoi(argv[1]);
+
     double delta, ref, sum_delta2, sum_ref2, L2norm;
 
     int i;
@@ -96,26 +98,26 @@ int main(int argc, char *argv[])
     float *d_Kernel = (float *)malloc(DATA_SIZE);
     float *d_Data   = (float *)malloc(DATA_SIZE);
 
-#pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
-{
-    for (i = 0; i < 1; i++)
+    #pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
     {
-      memset(d_Kernel, 0, DATA_SIZE);
-      memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
-      #pragma omp target update to (d_Kernel[0:dataN])
-
-      memcpy(d_Data, h_Data, DATA_SIZE);
-      #pragma omp target update to (d_Data[0:dataN])
-
-      fwtBatchGPU(d_Data, 1, log2Data);
-      fwtBatchGPU(d_Kernel, 1, log2Data);
-      modulateGPU(d_Data, d_Kernel, dataN);
-      fwtBatchGPU(d_Data, 1, log2Data);
+        for (i = 0; i < repeat; i++)
+        {
+          memset(d_Kernel, 0, DATA_SIZE);
+          memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
+          #pragma omp target update to (d_Kernel[0:dataN])
+    
+          memcpy(d_Data, h_Data, DATA_SIZE);
+          #pragma omp target update to (d_Data[0:dataN])
+    
+          fwtBatchGPU(d_Data, 1, log2Data);
+          fwtBatchGPU(d_Kernel, 1, log2Data);
+          modulateGPU(d_Data, d_Kernel, dataN);
+          fwtBatchGPU(d_Data, 1, log2Data);
+        }
+    
+        printf("Reading back GPU results...\n");
+        #pragma omp target update from (d_Data[0:dataN])
     }
-
-    printf("Reading back GPU results...\n");
-    #pragma omp target update from (d_Data[0:dataN])
-}
 
     printf("Running straightforward CPU dyadic convolution...\n");
     dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
