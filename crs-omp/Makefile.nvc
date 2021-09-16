@@ -6,7 +6,7 @@
 CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
-OUTPUT    = yes
+OUTPUT    = no
 DEVICE    = gpu
 SM        = cc70
 
