@@ -28,10 +28,9 @@ void mem_free (T* p) {
 #pragma omp declare target
 float gammafunction(unsigned int n)
 {   
-  if(n == 0)
-    return 0.0f;
-  float x = ((float)n + 0.5f) * log((float) n) - 
-            ((float)n - 1.0f) * log(exp((float) 1.0f));
+  if(n == 0) return 0.0f;
+  float x = ((float)n + 0.5f) * logf((float)n) - 
+            ((float)n - 1.0f) * logf(expf((float) 1.0f));
   return x;
 }
 
@@ -167,8 +166,8 @@ int main(int argc, char **argv)
   unsigned int* dev_data_zeros = bin_data_zeros_trans;
   unsigned int* dev_data_ones = bin_data_ones_trans;
 
-#pragma omp target data map(to: bin_data_zeros_trans[0:num_snp * PP_zeros * 2], \
-                                bin_data_ones_trans[0:num_snp * PP_zeros * 2]) \
+#pragma omp target data map(to: dev_data_zeros[0:num_snp * PP_zeros * 2], \
+                                dev_data_ones[0:num_snp * PP_ones * 2]) \
                         map(alloc: dev_scores[0:num_snp * num_snp])
 {
   int num_snp_m = num_snp;
