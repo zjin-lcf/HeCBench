@@ -6,8 +6,8 @@
 CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 OUTPUT    = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
