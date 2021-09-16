@@ -6,6 +6,8 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
+ARCH      = gfx906
 
 #===============================================================================
 # Program name & source code list
@@ -20,7 +22,7 @@ program = vj-cpu vj-gpu
 OMP_TARGET_FLAGS += -target x86_64-pc-linux-gnu \
           -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
           -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906
+          -march=$(ARCH)
 
 # Standard Flags
 CFLAGS := -Wall -I../face-sycl
