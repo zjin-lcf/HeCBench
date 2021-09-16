@@ -6,8 +6,8 @@
 CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
+OUTPUT    = no
 DEVICE    = gpu
-OUTPUT    = yes
 
 #===============================================================================
 # Program name & source code list
