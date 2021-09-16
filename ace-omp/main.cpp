@@ -326,34 +326,21 @@ int main(int argc, char *argv[])
   const int nx = DATAXSIZE;
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
-  // pointers for data set storage via malloc
-  nRarray *phi_host; // storage for result stored on host
-  nRarray *u_host;
-  nRarray *d_phiold;  // storage for result computed on device
-  nRarray *d_phinew;
-  nRarray *d_uold;
-  nRarray *d_unew;
-  nRarray *d_Fx;
-  nRarray *d_Fy;
-  nRarray *d_Fz;
-  // allocate storage for data set
 
-  phi_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
-  u_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
-
-  // allocate buffers
-  d_phinew = (nRarray*) malloc ((nx*ny*nz)*sizeof(double));
-  d_unew = (nRarray*) malloc ((nx*ny*nz)*sizeof(double));
-  d_Fx = (nRarray*) malloc ((nx*ny*nz)*sizeof(double));
-  d_Fy = (nRarray*) malloc ((nx*ny*nz)*sizeof(double));
-  d_Fz = (nRarray*) malloc ((nx*ny*nz)*sizeof(double));
-
-  // compute result
-
+  // storage for result stored on host
+  nRarray *phi_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
+  nRarray *u_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
-  d_phiold = phi_host;
-  d_uold = u_host;
+
+  // storage for result computed on device
+  double *d_phiold = (double*)phi_host;
+  double *d_uold = (double*)u_host;
+  double *d_phinew = (double*) malloc ((nx*ny*nz)*sizeof(double));
+  double *d_unew = (double*) malloc ((nx*ny*nz)*sizeof(double));
+  double *d_Fx = (double*) malloc ((nx*ny*nz)*sizeof(double));
+  double *d_Fy = (double*) malloc ((nx*ny*nz)*sizeof(double));
+  double *d_Fz = (double*) malloc ((nx*ny*nz)*sizeof(double));
 
   double start = omp_get_wtime();
 
@@ -368,24 +355,23 @@ int main(int argc, char *argv[])
   int t = 0;
   while (t <= num_steps) {
 
-    calculateForce(d_phiold,d_Fx,d_Fy,d_Fz,
+    calculateForce((nRarray*)d_phiold, (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
                    dx,dy,dz,epsilon,W0,tau0);
 
-    allenCahn(d_phinew,d_phiold,d_uold,
-              d_Fx,d_Fy,d_Fz,
-              epsilon,W0,tau0,lambda,
-              dt,dx,dy,dz);
+    allenCahn((nRarray*)d_phinew,(nRarray*)d_phiold,(nRarray*)d_uold,
+              (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
+              epsilon,W0,tau0,lambda, dt,dx,dy,dz);
 
-    boundaryConditionsPhi(d_phinew);
+    boundaryConditionsPhi((nRarray*)d_phinew);
 
-    thermalEquation(d_unew,d_uold,d_phinew,d_phiold,
+    thermalEquation((nRarray*)d_unew,(nRarray*)d_uold,(nRarray*)d_phinew,(nRarray*)d_phiold,
                     D,dt,dx,dy,dz);
 
-    boundaryConditionsU(d_unew,delta);
+    boundaryConditionsU((nRarray*)d_unew,delta);
 
-    swapGrid(d_phinew, d_phiold);
+    swapGrid((nRarray*)d_phinew, (nRarray*)d_phiold);
 
-    swapGrid(d_unew, d_uold);
+    swapGrid((nRarray*)d_unew, (nRarray*)d_uold);
 
     t++;
   }
