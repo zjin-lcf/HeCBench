@@ -8,6 +8,7 @@
 #include "kernel_common.h"
 #include "memory_scheduler.h"
 
+#pragma omp declare target
 score_dt device_ilog2(const score_dt v)
 {
     if (v < 2) return 0;
@@ -54,6 +55,7 @@ void update_anchor(const anchor_dt *in, anchor_dt* out, const int src, const int
 void update_return(const return_dt *in, return_dt* out, const int src, const int dst) {
   ((short4*)out)[dst] = ((short4*)in)[src];
 }
+#pragma omp end declare target
 
 void device_chain_kernel_wrapper(
     std::vector<control_dt> &cont,
