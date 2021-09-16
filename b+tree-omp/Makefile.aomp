@@ -2,6 +2,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+ARCH      = gfx906
 
 
 # Standard flags
@@ -25,7 +26,7 @@ ifeq ($(DEVICE),gpu)
   CFLAGS += -target x86_64-pc-linux-gnu \
           -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
           -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=gfx906
+          -march=$(ARCH)
 else
   CFLAGS +=-fopenmp
 endif
