@@ -29,8 +29,8 @@ float gammafunction(unsigned int n)
 {   
   if(n == 0)
     return 0.0f;
-  float x = ((float)n + 0.5f) * log((float) n) - 
-             ((float)n - 1.0f) * log(exp((float) 1.0f));
+  float x = ((float)n + 0.5f) * logf((float) n) - 
+             ((float)n - 1.0f) * logf(expf(1.0f));
   return x;
 }
 
