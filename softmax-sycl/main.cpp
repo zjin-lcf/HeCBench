@@ -80,13 +80,16 @@ int main() {
   } 
 
   // verification
+  bool ok = true;
   softMax_cpu(numSlice, sliceSize, input, output_cpu);
   for (int i = 0; i < numElem; i++) {
     if (fabsf(output_cpu[i] - output_gpu[i]) > 1e-3) {
       printf("@index %d cpu: %f gpu: %f\n", i, output_cpu[i], output_gpu[i]);
+      ok = false;
       break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(input);
   free(output_cpu);
