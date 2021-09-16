@@ -75,4 +75,4 @@ test: $(program)
 	./$(program) ../prna-cuda/test.seq
 
 run: $(program)
-	./$(program) ./HIV1-NL43.seq
+	./$(program) ../prna-cuda/HIV1-NL43.seq
