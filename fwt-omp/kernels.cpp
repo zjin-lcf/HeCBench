@@ -23,15 +23,21 @@
 void fwtBatchGPU(float *d_Data, int M, int log2N)
 {
     int N = 1 << log2N;
-    
+    // save the problem size
+    const int sN = N;
+    const int sM = M;
+
+    // both versions should pass the final verification
+    // 256 is the thread block size
+#if 1
     for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
     {
+      const int stride = N/4;
       #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
-      for (int m = 0; m < M; m++) {
-        for (int pos = 0; pos < N; pos++) {
-          const float *d_Src = d_Data  + m * N;
-          float *d_Dst = d_Data + m * N;
-          const int stride = N/4;
+      for (int m = 0; m < sM; m++) {
+        for (int pos = 0; pos < sN/4; pos++) {
+          const float *d_Src = d_Data  + m * sN;
+          float *d_Dst = d_Data + m * sN;
           int lo = pos & (stride - 1);
           int i0 = ((pos - lo) << 2) + lo;
           int i1 = i0 + stride;
@@ -59,6 +65,56 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
         }
       }
     }
+#else  
+    const int teamX = N/(4*256);
+    const int teamY = M;
+    const int numTeams = teamX * teamY;
+
+    for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
+    {
+      const int stride = N/4;
+      #pragma omp target teams num_teams(numTeams) thread_limit(256)
+      {
+        #pragma omp parallel
+        {
+          const int blockIdx_x = omp_get_team_num() % teamX;
+          const int threadIdx_x = omp_get_thread_num();
+          const int blockDim_x = 256;
+          const int gridDim_x = teamX;
+          const int blockIdx_y = omp_get_team_num() / teamX;
+          const int pos = blockIdx_x * blockDim_x + threadIdx_x;
+          const int   N = blockDim_x * gridDim_x * 4;
+
+          const float *d_Src = d_Data  + blockIdx_y * N;
+          float *d_Dst = d_Data + blockIdx_y * N;
+          int lo = pos & (stride - 1);
+          int i0 = ((pos - lo) << 2) + lo;
+          int i1 = i0 + stride;
+          int i2 = i1 + stride;
+          int i3 = i2 + stride;
+
+          float D0 = d_Src[i0];
+          float D1 = d_Src[i1];
+          float D2 = d_Src[i2];
+          float D3 = d_Src[i3];
+
+          float T;
+          T = D0;
+          D0        = D0 + D2;
+          D2        = T - D2;
+          T = D1;
+          D1        = D1 + D3;
+          D3        = T - D3;
+          T = D0;
+          d_Dst[i0] = D0 + D1;
+          d_Dst[i1] = T - D1;
+          T = D2;
+          d_Dst[i2] = D2 + D3;
+          d_Dst[i3] = T - D3;
+        }
+      }
+    }
+#endif
 
     #pragma omp target teams num_teams(M) thread_limit(N/4)
     {
@@ -73,7 +129,7 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
         const int    N = 1 << log2N;
         const int base = gid << log2N;
 
-        const float *d_Src = d_Data  + base;
+        const float *d_Src = d_Data + base;
         float *d_Dst = d_Data + base;
 
         for (int pos = lid; pos < N; pos += gsz)
