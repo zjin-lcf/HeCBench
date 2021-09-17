@@ -35,6 +35,9 @@ Early results are shown [here](results/README.md)
 ### affine
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
 
+### aidw
+  Adaptive inverse distance weighting (Mei, G., Xu, N. & Xu, L. Improving GPU-accelerated adaptive IDW interpolation algorithm using fast kNN search. SpringerPlus 5, 1389 (2016))
+
 ### align-types
   Alignment specification for variables of structured types (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
