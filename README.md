@@ -267,6 +267,9 @@ Early results are shown [here](results/README.md)
 ### grep
   Regular expression matching (https://github.com/bkase/CUDA-grep)
 
+### grrt
+  General-relativistic radiative transfer calculations coupled with the calculation of geodesics in the Kerr spacetime (https://github.com/hungyipu/Odyssey)
+
 ### haccmk
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
