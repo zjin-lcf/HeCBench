@@ -474,6 +474,9 @@ Early results are shown [here](results/README.md)
 ### pathfinder
   PathFinder in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### perplexity
+  Perplexity search (https://github.com/rapidsai/cuml/)  
+
 ### popcount
   Implementations of population count (Jin, Z. and Finkel, H., 2020, May. Population Count on Intel® CPU, GPU and FPGA. In 2020 IEEE International Parallel and Distributed Processing Symposium Workshops (IPDPSW) (pp. 432-439). IEEE.)
 
