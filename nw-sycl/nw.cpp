@@ -17,6 +17,7 @@
 #include <string>
 #include <sys/time.h>
 #include "common.h"
+#include "reference.cpp"
 
 // kernel 
 #define SCORE(i, j) input_itemsets_l[j + i * (BLOCK_SIZE+1)]
@@ -222,6 +223,10 @@ int main(int argc, char **argv){
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
+  // verify
+  nw_host(input_itemsets, reference, max_cols, penalty);
+  int err = memcmp(input_itemsets, output_itemsets, max_cols * max_rows * sizeof(int));
+  printf("%s\n", err ? "FAIL" : "PASS");
 
 #ifdef TRACEBACK
 

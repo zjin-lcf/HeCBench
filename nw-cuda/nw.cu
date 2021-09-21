@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <cuda.h>
+#include "reference.cpp"
 
 // kernel 
 #define SCORE(i, j) input_itemsets_l[j + i * (BLOCK_SIZE+1)]
@@ -33,7 +34,6 @@ int maximum( int a, int b, int c){
   else
     return(k);
 }
-
 
 //global variables
 
@@ -82,7 +82,7 @@ double get_time() {
 }
 
 __global__ void 
-kernel1 (int* d_input_itemsets, const int* d_reference, const int offset_r, 
+kernel1 (int*__restrict d_input_itemsets, const int*__restrict d_reference, const int offset_r, 
          const int offset_c, const int max_cols, const int blk, const int penalty) {
   __shared__ int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
   __shared__ int reference_l [BLOCK_SIZE*BLOCK_SIZE];
@@ -156,7 +156,7 @@ kernel1 (int* d_input_itemsets, const int* d_reference, const int offset_r,
 }
 
 __global__ void 
-kernel2 (int* d_input_itemsets, const int* d_reference, const int block_width, 
+kernel2 (int*__restrict d_input_itemsets, const int*__restrict d_reference, const int block_width, 
     const int offset_r, const int offset_c, const int max_cols, const int blk, const int penalty) {
 
    __shared__ int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
@@ -338,6 +338,10 @@ int main(int argc, char **argv){
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
+  // verify
+  nw_host(input_itemsets, reference, max_cols, penalty);
+  int err = memcmp(input_itemsets, output_itemsets, max_cols * max_rows * sizeof(int));
+  printf("%s\n", err ? "FAIL" : "PASS");
 
 #ifdef TRACEBACK
 
@@ -366,7 +370,6 @@ int main(int argc, char **argv){
     else{
     }
 
-    //traceback = maximum(nw, w, n);
     int new_nw, new_w, new_n;
     new_nw = nw + reference[i * max_cols + j];
     new_w = w - penalty;

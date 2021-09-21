@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <omp.h>
+#include "reference.cpp"
 
 // kernel 
 #define SCORE(i, j) input_itemsets_l[j + i * (BLOCK_SIZE+1)]
@@ -107,11 +108,10 @@ int main(int argc, char **argv){
   const int max_cols = max_cols_t + 1;
   const int penalty = penalty_t;  
 
-  int *reference;
-  int *input_itemsets;
-
-  reference = (int *)malloc( max_rows * max_cols * sizeof(int) );
-  input_itemsets = (int *)malloc( max_rows * max_cols * sizeof(int) );
+  int *reference = (int *)malloc( max_rows * max_cols * sizeof(int) );
+  // host and device results
+  int *h_input_itemsets = (int *)malloc( max_rows * max_cols * sizeof(int) );
+  int *input_itemsets = (int *)malloc( max_rows * max_cols * sizeof(int) );
 
   srand(7);
 
@@ -119,15 +119,16 @@ int main(int argc, char **argv){
   for (int i = 0 ; i < max_cols; i++){
     for (int j = 0 ; j < max_rows; j++){
       input_itemsets[i*max_cols+j] = 0;
+      h_input_itemsets[i*max_cols+j] = 0;
     }
   }
 
   for( int i=1; i< max_rows ; i++){    //initialize the cols
-    input_itemsets[i*max_cols] = rand() % 10 + 1;
+    h_input_itemsets[i*max_cols] = input_itemsets[i*max_cols] = rand() % 10 + 1;
   }
 
   for( int j=1; j< max_cols ; j++){    //initialize the rows
-    input_itemsets[j] = rand() % 10 + 1;
+    h_input_itemsets[j] = input_itemsets[j] = rand() % 10 + 1;
   }
 
   for (int i = 1 ; i < max_cols; i++){
@@ -137,9 +138,9 @@ int main(int argc, char **argv){
   }
 
   for( int i = 1; i< max_rows ; i++)
-    input_itemsets[i*max_cols] = -i * penalty;
+    h_input_itemsets[i*max_cols] = input_itemsets[i*max_cols] = -i * penalty;
   for( int j = 1; j< max_cols ; j++)
-    input_itemsets[j] = -j * penalty;
+    h_input_itemsets[j] = input_itemsets[j] = -j * penalty;
 
   double offload_start = get_time();
 
@@ -323,8 +324,13 @@ int main(int argc, char **argv){
     }
   }
 }
-double offload_end = get_time();
-printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+  double offload_end = get_time();
+  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  // verify
+  nw_host(h_input_itemsets, reference, max_cols, penalty);
+  int err = memcmp(input_itemsets, h_input_itemsets, max_cols * max_rows * sizeof(int));
+  printf("%s\n", err ? "FAIL" : "PASS");
 
 #ifdef TRACEBACK
   int *output_itemsets = input_itemsets;
@@ -391,6 +397,7 @@ printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
   free(reference);
   free(input_itemsets);
+  free(h_input_itemsets);
   return 0;
 }
 

@@ -7,7 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-DUMP      = yes
+DUMP      = no
 
 #===============================================================================
 # Program name & source code list

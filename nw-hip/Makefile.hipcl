@@ -6,7 +6,7 @@
 CC        = $(HIPCL_LLVM)/bin/clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = yes
+DUMP      = no
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
+CFLAGS := -std=c++14 -Wall -I../nw-cuda/ -pthread -fPIE `hipcl_config -C`
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
@@ -50,7 +50,7 @@ endif
 $(program): $(obj)
 	$(CC) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu
+%.o: %.cu ../nw-cuda/reference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
