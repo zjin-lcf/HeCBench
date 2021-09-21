@@ -9,7 +9,7 @@ class HACCmk;
 
 template <typename T>
 void haccmk (
-    const size_t n,  // global size
+    const size_t n,// global size
     const int ilp, // inner loop count
     const T fsrrmax,
     const T mp_rsm,
@@ -197,10 +197,8 @@ int main( int argc, char *argv[] )
     vz2[i] = vz2[i] + dz2 * fcoeff;
   }
 
-  /* =================== SYCL version ===================== */
   haccmk(n1, n2, fsrrmax2, mp_rsm2, fcoeff, xx,
       yy, zz, mass, vx2_hw, vy2_hw, vz2_hw); 
-
 
   // verify
   int error = 0;
