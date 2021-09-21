@@ -50,6 +50,9 @@ Early results are shown [here](results/README.md)
 ### aobench
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
+### asmooth
+  Adaptive smoothing (http://www.hcs.harvard.edu/admiralty/)
+
 ### asta
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
