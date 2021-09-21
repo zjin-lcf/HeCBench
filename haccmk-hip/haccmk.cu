@@ -199,7 +199,7 @@ int main( int argc, char *argv[] )
     mass[i] = (float)i * 0.01f + xx[i];
   }
 
-  for ( i = 0; i < n2; i++ ) { // i starts from zero
+  for ( i = 0; i < n2; i++ ) {
     vx2[i] = 0.f;
     vy2[i] = 0.f;
     vz2[i] = 0.f;
@@ -213,15 +213,15 @@ int main( int argc, char *argv[] )
     vx2[i] = vx2[i] + dx2 * fcoeff;
     vy2[i] = vy2[i] + dy2 * fcoeff;
     vz2[i] = vz2[i] + dz2 * fcoeff;
-  } // for i
+  }
 
 
   haccmk(n1, n2, xx, yy, zz, mass, vx2_hw, vy2_hw, vz2_hw, 
       fsrrmax2, mp_rsm2, fcoeff);
 
-  // verifiy
+  // verify
   int error = 0;
-  const float eps = 1e-1f;  // 
+  const float eps = 1e-1f;
   for (i = 0; i < n2; i++) {
     if (fabsf(vx2[i] - vx2_hw[i]) > eps) {
       printf("error at vx2[%d] %f %f\n", i, vx2[i], vx2_hw[i]);
