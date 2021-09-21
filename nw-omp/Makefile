@@ -6,8 +6,8 @@
 CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DUMP      = no
 DEVICE    = gpu
-DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I../nw-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -56,7 +56,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp  ../nw-cuda/reference.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

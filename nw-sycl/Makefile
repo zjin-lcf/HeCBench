@@ -6,7 +6,7 @@
 CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = yes
+DUMP      = no
 DEVICE    = gpu
 
 #===============================================================================
@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall -I../include -I../nw-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -55,7 +55,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernel1.sycl kernel2.sycl Makefile
+%.o: %.cpp kernel1.sycl kernel2.sycl ../nw-cuda/reference.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
