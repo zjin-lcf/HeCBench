@@ -51,17 +51,22 @@ int main() {
   cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
        << ") * b(" << N << "," << P << ")\n";
 
-  #pragma omp target teams distribute parallel for collapse(2) \
-  map(to : a_host[0:M][0:N], b_host[0:N][0:P]) map(from : c_back[0:M][0:P]) 
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < P; j++) {
-      float sum = 0.0f;
-      for (int k = 0; k < N; k++) {
-        sum += sqrtf(a_host[i][k] * b_host[k][j]);
+  #pragma omp target data map(to: a_host[0:M][0:N], b_host[0:N][0:P])\
+                          map(from : c_back[0:M][0:P]) 
+  {
+    for (int i = 0; i < 100; i++) {
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
+      for (int i = 0; i < M; i++) {
+        for (int j = 0; j < P; j++) {
+          float sum = 0.0f;
+          for (int k = 0; k < N; k++) {
+            sum += sqrtf(a_host[i][k] * b_host[k][j]);
+          }
+          const float value = 1.f - sum;
+          const float gate = (!signbit(value));
+          c_back[i][j] = sqrtf(gate * value);
+        }
       }
-      const float value = 1.f - sum;
-      const float gate = (!signbit(value));
-      c_back[i][j] = sqrtf(gate * value);
     }
   }
 
