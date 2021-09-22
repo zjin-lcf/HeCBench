@@ -3,23 +3,19 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = syclcc
+CC        = dpcpp
 OPTIMIZE  = yes
 DEBUG     = no
-MARCH     = gfx906
-PLATFORM  = rocm
 DEVICE    = gpu
 VERIFY    = yes
-ROCM_DEVICE_LIB = -nogpulib \
-	     -Xclang -mlink-bitcode-file -Xclang /opt/rocm/amdgcn/bitcode/ockl.bc
 
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-program = mm
+program = main
 
-source = main_opt.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -28,10 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../include \
-          --hipsycl-platform=$(PLATFORM) \
-	  --hipsycl-gpu-arch=$(MARCH) \
-	  $(ROCM_DEVICE_LIB) 
+CFLAGS := -Wall -I../include -I../hellinger-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -48,12 +41,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
-
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-DUSE_GPU
 endif
 #===============================================================================
 # Targets to Build
@@ -62,12 +55,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp ../hellinger-cuda/verify.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 3 1000
+	./$(program)
 

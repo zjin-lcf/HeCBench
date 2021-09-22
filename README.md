@@ -285,6 +285,9 @@ Early results are shown [here](results/README.md)
 ### heat2d
   Discrete 2D laplacian operation a number of times on a given vector (https://github.com/gpucw/cuda-lapl)
   
+### hellinger
+  Hellinger distance (https://github.com/rapidsai/raft)
+
 ### hexicton
   A Portable and Scalable Solver-Framework for the Hierarchical Equations of Motion (https://github.com/noma/hexciton_benchmark)
   
@@ -380,9 +383,6 @@ Early results are shown [here](results/README.md)
 
 ### match
   Compute matching scores for two 16K 128D feature points (https://github.com/Celebrandil/CudaSift)
-
-### matrix-mul
-  Single-precision floating-point matrix multiply
 
 ### matrix-rotate
   In-place matrix rotation

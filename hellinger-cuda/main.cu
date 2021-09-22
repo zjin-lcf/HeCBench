@@ -14,7 +14,7 @@ using namespace std;
  */
 
 // Matrix size constants.
-constexpr int m_size = 2048 * 8;  // Must be a multiple of 8.
+constexpr int m_size = 768 * 8;  // Must be a multiple of 8.
 constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
@@ -24,10 +24,11 @@ constexpr int P = m_size / 2;
  * Perform matrix multiplication on host to verify results from device.
  */
 bool ValueSame(float a, float b) {
-  return fabs(a - b) < numeric_limits<float>::epsilon();
+  return fabsf(a - b) < numeric_limits<float>::epsilon();
 }
 
-int VerifyResult(float (*a_host)[N], float (*b_host)[P], float (*c_host)[P], float (*c_back)[P]) {
+void VerifyResult(float (*a_host)[N], float (*b_host)[P], 
+                  float (*c_host)[P], float (*c_back)[P]) {
   // Check that the results are correct by comparing with host computing.
   int i, j, k;
 
@@ -37,10 +38,16 @@ int VerifyResult(float (*a_host)[N], float (*b_host)[P], float (*c_host)[P], flo
 
   for (i = 0; i < M; i++) {
     for (k = 0; k < N; k++) {
-      // Each element of the product is just the sum 1+2+...+n
       for (j = 0; j < P; j++) {
-        c_host[i][j] += a_host[i][k] * b_host[k][j];
+        c_host[i][j] += sqrtf(a_host[i][k] * b_host[k][j]);
       }
+    }
+  }
+  for (i = 0; i < M; i++) {
+    for (j = 0; j < P; j++) {
+      float value = (1 - c_host[i][j]);
+      float gate = (!signbit(value));
+      c_host[i][j] = sqrtf(gate * value);
     }
   }
 
@@ -66,17 +73,19 @@ int VerifyResult(float (*a_host)[N], float (*b_host)[P], float (*c_host)[P], flo
   }
 
   if (!mismatch_found) {
-    cout << "Success - The results are correct!\n";
-    return 0;
+    cout << "PASS\n";
   } else {
-    cout << "Fail - The results mismatch!\n";
-    return -1;
+    cout << "FAIL\n";
   }
 }
 #endif
 
-__global__ void matrix_mul(const float *a, const float *b, float *c, 
-                           const int m, const int n, const int k)
+__global__ 
+void hellinger(
+  const float *__restrict a, 
+  const float *__restrict b, 
+        float *__restrict c, 
+  const int m, const int n, const int k)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -85,9 +94,11 @@ __global__ void matrix_mul(const float *a, const float *b, float *c,
         float sum = 0;
         for(int i = 0; i < n; i++)
         {
-            sum += a[row * n + i] * b[i * k + col];
+            sum += sqrtf(a[row * n + i] * b[i * k + col]);
         }
-        c[row * k + col] = sum;
+        const float value = 1.f - sum;
+        const float gate = (!signbit(value));
+        c[row * k + col] = sqrtf(gate * value);
     }
 }
 
@@ -102,14 +113,22 @@ int main() {
   // host-side gpu result
   float(*c_back)[P] = new float[M][P];
 
-  // Each element of matrix a is 1.
   for (i = 0; i < M; i++)
-    for (j = 0; j < N; j++) a_host[i][j] = 1.0f;
+    for (j = 0; j < N; j++)
+      a_host[i][j] = 1.f / N;
 
-  // Each column of b_host is the sequence 1,2,...,N
+  srand(123);
   for (i = 0; i < N; i++)
-    for (j = 0; j < P; j++) b_host[i][j] = i + 1.0f;
+    for (j = 0; j < P; j++)
+      b_host[i][j] = rand() % 256;
 
+  for (j = 0; j < P; j++) { 
+    float sum = 0;
+    for (i = 0; i < N; i++)
+      sum += b_host[i][j];
+    for (i = 0; i < N; i++)
+      b_host[i][j] /= sum;
+  }
 
   float *a_device, *b_device, *c_device;
 
@@ -125,16 +144,16 @@ int main() {
   dim3 dimGrid(grid_cols, grid_rows);
   dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
 
-  matrix_mul<<<dimGrid, dimBlock>>>(a_device, b_device, c_device, M, N, P);
+  for (int i = 0; i < 100; i++)
+    hellinger<<<dimGrid, dimBlock>>>(a_device, b_device, c_device, M, N, P);
+
   cudaMemcpy(c_back, c_device, sizeof(int)*M*P, cudaMemcpyDeviceToHost);
 
   cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
        << ") * b(" << N << "," << P << ")\n";
 
-  int result = 0;
 #ifdef VERIFY
-  cout << "Result of matrix multiplication using DPC++: ";
-  result = VerifyResult(a_host, b_host, c_host, c_back);
+  VerifyResult(a_host, b_host, c_host, c_back);
 #endif
 
   delete[] a_host;
@@ -144,6 +163,6 @@ int main() {
   cudaFree(a_device);
   cudaFree(b_device);
   cudaFree(c_device);
-  return result;
+  return 0;
 }
 

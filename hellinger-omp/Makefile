@@ -3,20 +3,19 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 VERIFY    = yes
-CUDA_ARCH = "--cuda-gpu-arch=sm_35"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-program = mm
 
-source = main_opt.cpp
+program = main
+
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -25,11 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++14 -Wall -I../hellinger-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,6 +41,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
+
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
@@ -53,15 +54,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp ../hellinger-cuda/verify.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 3 1000
+	./$(program)
 
