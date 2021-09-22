@@ -423,6 +423,9 @@ Early results are shown [here](results/README.md)
 ### minisweep
   A deterministic Sn radiation transport miniapp (https://github.com/wdj/minisweep)
 
+### minkowski
+  Minkowski distance (https://github.com/rapidsai/raft)
+
 ### mis
   Maximal independent set (http://www.cs.txstate.edu/~burtscher/research/ECL-MIS/)
 
