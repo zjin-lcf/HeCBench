@@ -3,27 +3,27 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-
+VERIFY    = yes
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-program = mm
 
-source = main.cpp
+program = main
 
-obj = $(source:.cpp=.o)
+source = main.cu
+
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall 
+CFLAGS := -std=c++14 -Wall -I../hellinger-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -40,8 +40,8 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
 endif
 #===============================================================================
 # Targets to Build
@@ -50,12 +50,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cu ../hellinger-cuda/verify.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 
+	./$(program)
 

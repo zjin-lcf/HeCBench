@@ -12,66 +12,12 @@ using namespace std;
  */
 
 // Matrix size constants.
-constexpr int m_size = 2048 * 8;  // Must be a multiple of 8.
+constexpr int m_size = 768 * 8;  // Must be a multiple of 8.
 constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
 
-#ifdef VERIFY
-/**
- * Perform matrix multiplication on host to verify results from device.
- */
-bool ValueSame(float a, float b) {
-  return std::fabs(a - b) < numeric_limits<float>::epsilon();
-}
-
-int VerifyResult(float (*a_host)[N], float (*b_host)[P], float (*c_host)[P], float (*c_back)[P]) {
-  // Check that the results are correct by comparing with host computing.
-  int i, j, k;
-
-  // c_host is initialized to zero.
-  for (i = 0; i < M; i++)
-    for (j = 0; j < P; j++) c_host[i][j] = 0.0f;
-
-  for (i = 0; i < M; i++) {
-    for (k = 0; k < N; k++) {
-      // Each element of the product is just the sum 1+2+...+n
-      for (j = 0; j < P; j++) {
-        c_host[i][j] += a_host[i][k] * b_host[k][j];
-      }
-    }
-  }
-
-  bool mismatch_found = false;
-
-  // Compare host side results with the result buffer from device side: print
-  // mismatched data 5 times only.
-  int print_count = 0;
-
-  for (i = 0; i < M; i++) {
-    for (j = 0; j < P; j++) {
-      if (!ValueSame(c_back[i][j], c_host[i][j])) {
-        cout << "Fail - The result is incorrect for element: [" << i << ", "
-             << j << "], expected: " << c_host[i][j]
-             << ", but found: " << c_back[i][j] << "\n";
-        mismatch_found = true;
-        print_count++;
-        if (print_count == 5) break;
-      }
-    }
-
-    if (print_count == 5) break;
-  }
-
-  if (!mismatch_found) {
-    cout << "Success - The results are correct!\n";
-    return 0;
-  } else {
-    cout << "Fail - The results mismatch!\n";
-    return -1;
-  }
-}
-#endif
+#include "verify.cpp"
 
 int main() {
   int i, j;
@@ -84,14 +30,22 @@ int main() {
   // host-side gpu result
   float(*c_back)[P] = new float[M][P];
 
-  // Each element of matrix a is 1.
   for (i = 0; i < M; i++)
-    for (j = 0; j < N; j++) a_host[i][j] = 1.0f;
+    for (j = 0; j < N; j++)
+      a_host[i][j] = 1.f / N;
 
-  // Each column of b_host is the sequence 1,2,...,N
+  srand(123);
   for (i = 0; i < N; i++)
-    for (j = 0; j < P; j++) b_host[i][j] = i + 1.0f;
+    for (j = 0; j < P; j++)
+      b_host[i][j] = rand() % 256;
 
+  for (j = 0; j < P; j++) { 
+    float sum = 0;
+    for (i = 0; i < N; i++)
+      sum += b_host[i][j];
+    for (i = 0; i < N; i++)
+      b_host[i][j] /= sum;
+  }
 
   // Initialize the device queue with the default selector. The device queue is
   // used to enqueue kernels. It encapsulates all states needed for execution.
@@ -101,7 +55,7 @@ int main() {
 #else
     cpu_selector dev_sel;
 #endif
-    cl::sycl::queue q(dev_sel);
+    sycl::queue q(dev_sel);
 
     // Create buffers for matrices, buffer c is bound with host memory c_back
     buffer<float, 1> a(reinterpret_cast<float*>(a_host), range<1>(M*N));
@@ -124,31 +78,31 @@ int main() {
       auto C = c.get_access<sycl_discard_write>(h);
 
       // Execute kernel.
-      h.parallel_for<class mm>(nd_range<2>(global_ndrange, local_ndrange), [=](nd_item<2> index) {
+      h.parallel_for<class hellinger>(nd_range<2>(global_ndrange, local_ndrange), [=](nd_item<2> index) {
         int row = index.get_global_id(0);
         int col = index.get_global_id(1);
         if( col < P && row < M) {
           float sum = 0;
           // Compute the result of one element of c
           for (int i = 0; i < N; i++) {
-            sum += A[row * N + i] * B[i * P + col];
+            sum += sycl::sqrt(A[row * N + i] * B[i * P + col]);
           }
-          C[row * P + col] = sum;
+          const float value = 1.f - sum;
+          const float gate = (!sycl::signbit(value));
+          C[row * P + col] = sycl::sqrt(gate * sum);
 	}
       });
     });
   }
 
-  int result = 0;
 #ifdef VERIFY
-  cout << "Result of matrix multiplication using DPC++: ";
-  result = VerifyResult(a_host, b_host, c_host, c_back);
+  VerifyResult(a_host, b_host, c_host, c_back);
 #endif
 
   delete[] a_host;
   delete[] b_host;
   delete[] c_host;
   delete[] c_back;
-  return result;
+  return 0;
 }
 
