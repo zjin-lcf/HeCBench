@@ -67,32 +67,34 @@ int main() {
 
     auto grid_rows = (M + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
     auto grid_cols = (P + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
-    auto local_ndrange = range<2>(BLOCK_SIZE, BLOCK_SIZE);
-    auto global_ndrange = range<2>(grid_rows, grid_cols);
+    range<2> gws (grid_rows, grid_cols);
+    range<2> lws (BLOCK_SIZE, BLOCK_SIZE);
 
-    // Submit command group to queue to multiply matrices: c = a * b
-    q.submit([&](handler &h) {
-      // Read from a and b, write to c
-      auto A = a.get_access<sycl_read>(h);
-      auto B = b.get_access<sycl_read>(h);
-      auto C = c.get_access<sycl_discard_write>(h);
+    for (int i = 0; i < 100; i++) {
+      // Submit command group to queue to multiply matrices: c = a * b
+      q.submit([&](handler &h) {
+        // Read from a and b, write to c
+        auto A = a.get_access<sycl_read>(h);
+        auto B = b.get_access<sycl_read>(h);
+        auto C = c.get_access<sycl_discard_write>(h);
 
-      // Execute kernel.
-      h.parallel_for<class hellinger>(nd_range<2>(global_ndrange, local_ndrange), [=](nd_item<2> index) {
-        int row = index.get_global_id(0);
-        int col = index.get_global_id(1);
-        if( col < P && row < M) {
-          float sum = 0;
-          // Compute the result of one element of c
-          for (int i = 0; i < N; i++) {
-            sum += sycl::sqrt(A[row * N + i] * B[i * P + col]);
+        // Execute kernel.
+        h.parallel_for<class hellinger>(nd_range<2>(gws, lws), [=](nd_item<2> index) {
+          int row = index.get_global_id(0);
+          int col = index.get_global_id(1);
+          if( col < P && row < M) {
+            float sum = 0;
+            // Compute the result of one element of c
+            for (int i = 0; i < N; i++) {
+              sum += sycl::sqrt(A[row * N + i] * B[i * P + col]);
+            }
+            const float value = 1.f - sum;
+            const float gate = (!sycl::signbit(value));
+            C[row * P + col] = sycl::sqrt(gate * value);
           }
-          const float value = 1.f - sum;
-          const float gate = (!sycl::signbit(value));
-          C[row * P + col] = sycl::sqrt(gate * sum);
-	}
+        });
       });
-    });
+    }
   }
 
 #ifdef VERIFY
