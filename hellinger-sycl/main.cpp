@@ -71,20 +71,15 @@ int main() {
     range<2> lws (BLOCK_SIZE, BLOCK_SIZE);
 
     for (int i = 0; i < 100; i++) {
-      // Submit command group to queue to multiply matrices: c = a * b
       q.submit([&](handler &h) {
-        // Read from a and b, write to c
         auto A = a.get_access<sycl_read>(h);
         auto B = b.get_access<sycl_read>(h);
         auto C = c.get_access<sycl_discard_write>(h);
-
-        // Execute kernel.
         h.parallel_for<class hellinger>(nd_range<2>(gws, lws), [=](nd_item<2> index) {
           int row = index.get_global_id(0);
           int col = index.get_global_id(1);
           if( col < P && row < M) {
             float sum = 0;
-            // Compute the result of one element of c
             for (int i = 0; i < N; i++) {
               sum += sycl::sqrt(A[row * N + i] * B[i * P + col]);
             }
