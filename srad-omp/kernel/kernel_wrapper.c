@@ -76,15 +76,8 @@ kernel_wrapper(  fp* image,                      // input image
     fp varROI;
     fp q0sqr;
 
-
-    printf("Iterations Progress: ");
-
-
     // execute main loop
     for (iter=0; iter<niter; iter++){ // do for the number of iterations input parameter
-
-      printf("%d ", iter);
-      fflush(NULL);
 
       // Prepare kernel
 #pragma omp target teams distribute parallel for num_teams(blocks_work_size) thread_limit(NUMBER_THREADS)

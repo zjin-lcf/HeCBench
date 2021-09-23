@@ -105,7 +105,6 @@ int main(int argc, char *argv []){
   int blocks_x;
   dim3 blocks;
   dim3 blocks2;
-  dim3 blocks3;
 
   // memory sizes
   int mem_size;                              // matrix memory size
@@ -161,15 +160,14 @@ int main(int argc, char *argv []){
   image_ori_rows = 502;
   image_ori_cols = 458;
   image_ori_elem = image_ori_rows * image_ori_cols;
-
   image_ori = (fp*)malloc(sizeof(fp) * image_ori_elem);
 
-  if ( !read_graphics(  "../data/srad/image.pgm",
-                image_ori,
-                image_ori_rows,
-                image_ori_cols,
-                1) ) 
+  const char* input_image_path = "../data/srad/image.pgm";
+  if ( !read_graphics(input_image_path, image_ori, image_ori_rows, image_ori_cols, 1) ) { 
+    printf("ERROR: failed to read input image at %s\n", input_image_path);
+    if (image_ori != NULL) free(image_ori);
     return -1;
+  }
 
   time3 = get_time();
 
@@ -434,7 +432,8 @@ int main(int argc, char *argv []){
   //   WRITE IMAGE AFTER PROCESSING
   //================================================================================80
 
-  write_graphics(  "image_out.pgm",
+  write_graphics(
+          "image_out.pgm",
           image,
           Nr,
           Nc,
