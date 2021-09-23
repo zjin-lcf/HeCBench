@@ -61,7 +61,7 @@ nn (const int numRecords, const float lat, const float lng, const LatLong *locat
 
   if (globalId < numRecords) {
     LatLong latLong = locations[globalId];
-    distances[globalId] = sqrt((lat-latLong.lat)*(lat-latLong.lat)+
+    distances[globalId] = sqrtf((lat-latLong.lat)*(lat-latLong.lat)+
         (lng-latLong.lng)*(lng-latLong.lng));
   }
 }
