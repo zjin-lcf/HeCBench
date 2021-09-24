@@ -49,7 +49,8 @@ int main(int argc, char* argv[]) {
   buffer<float,1> d_img (size);
   buffer<float,1> d_norm (size);
   buffer<  int,1> d_box (size);
-  buffer<float,1> d_out (size);
+  buffer<float,1> d_out (out, size);
+  d_out.set_final_data(nullptr);
 
   range<2> gws ((Ly+15)/16*16, (Lx+15)/16*16);
   range<2> lws (16, 16);
@@ -211,35 +212,7 @@ int main(int argc, char* argv[]) {
 
   // verify
   reference (Lx, Ly, Threshold, MaxRad, img, h_box, h_norm, h_out);
-
-  bool ok = true;
-  int cnt[10] = {0,0,0,0,0,0,0,0,0,0};
-  for (int i = 0; i < size; i++) {
-    if (fabsf(norm[i] - h_norm[i]) > 1e-3f) {
-      printf("%d %f %f\n", i, norm[i], h_norm[i]);
-      ok = false;
-      break;
-    }
-    if (fabsf(out[i] - h_out[i]) > 1e-3f) {
-      printf("%d %f %f\n", i, out[i], h_out[i]);
-      ok = false;
-      break;
-    }
-    if (box[i] != h_box[i]) {
-      printf("%d %d %d\n", i, box[i], h_box[i]);
-      ok = false;
-      break;
-    } else {
-      for (int j = 0; j < MaxRad; j++)
-        if (box[i] == j) { cnt[j]++; break; }
-    }
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
-  if (ok) {
-    printf("Distribution of box sizes:\n");
-    for (int j = 1; j < MaxRad; j++)
-      printf("size=%d: %f\n", j, (float)cnt[j]/(Lx*Ly));
-  }
+  verify(size, MaxRad, norm, h_norm, out, h_out, box, h_box);
 
   free(img);
   free(norm);
