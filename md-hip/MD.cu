@@ -184,9 +184,8 @@ int main(int argc, char** argv)
 
   cout << "Finished.\n";
   int totalPairs = buildNeighborList<FPTYPE, POSVECTYPE>(nAtom, position, neighborList);
-  cout << totalPairs << " of " << nAtom*maxNeighbors <<
-    " pairs within cutoff distance = " <<
-    100.0 * ((double)totalPairs / (nAtom*maxNeighbors)) << " %\n";
+  cout << totalPairs << " of " << nAtom*maxNeighbors << " pairs within cutoff distance = "
+       << 100.0 * ((double)totalPairs / (nAtom*maxNeighbors)) << " %\n";
 
   // see MD.h
   FPTYPE lj1_t   = (FPTYPE) lj1;
