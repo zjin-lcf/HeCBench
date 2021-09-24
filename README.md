@@ -381,6 +381,9 @@ Early results are shown [here](results/README.md)
 ### mandelbrot
   The Mandelbrot set in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
 
+### marchingCubes
+  A practical isosurfacing algorithm for large data on many-core architectures (https://github.com/LRLVEC/MarchingCubes)
+
 ### match
   Compute matching scores for two 16K 128D feature points (https://github.com/Celebrandil/CudaSift)
 
