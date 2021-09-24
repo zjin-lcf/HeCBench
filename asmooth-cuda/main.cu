@@ -128,91 +128,67 @@ int main(int argc, char* argv[]) {
   // only a square image is supported
   const int Lx = atoi(argv[1]);
   const int Ly = Lx;
+  const int size = Lx * Ly;
 
   const int Threshold = atoi(argv[2]);
   const int MaxRad = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
  
   // input image
-  float *img = (float*) malloc (sizeof(float) * Lx * Ly);
+  float *img = (float*) malloc (sizeof(float) * size);
 
   // host and device results
-  float *norm = (float*) malloc (sizeof(float) * Lx * Ly);
-  float *h_norm = (float*) malloc (sizeof(float) * Lx * Ly);
+  float *norm = (float*) malloc (sizeof(float) * size);
+  float *h_norm = (float*) malloc (sizeof(float) * size);
 
-  int *box = (int*) malloc (sizeof(int) * Lx * Ly);
-  int *h_box = (int*) malloc (sizeof(int) * Lx * Ly);
+  int *box = (int*) malloc (sizeof(int) * size);
+  int *h_box = (int*) malloc (sizeof(int) * size);
 
-  float *out = (float*) malloc (sizeof(float) * Lx * Ly);
-  float *h_out = (float*) malloc (sizeof(float) * Lx * Ly);
+  float *out = (float*) malloc (sizeof(float) * size);
+  float *h_out = (float*) malloc (sizeof(float) * size);
 
   srand(123);
-  for (int i = 0; i < Lx * Ly; i++) {
+  for (int i = 0; i < size; i++) {
     img[i] = rand() % 256;
     norm[i] = box[i] = out[i] = 0;
   }
 
   float *d_img;
-  cudaMalloc((void**)&d_img, sizeof(float) * Lx * Ly);
+  cudaMalloc((void**)&d_img, sizeof(float) * size);
 
   float *d_norm;
-  cudaMalloc((void**)&d_norm, sizeof(float) * Lx * Ly);
+  cudaMalloc((void**)&d_norm, sizeof(float) * size);
 
   int *d_box;
-  cudaMalloc((void**)&d_box, sizeof(int) * Lx * Ly);
+  cudaMalloc((void**)&d_box, sizeof(int) * size);
 
   float *d_out;
-  cudaMalloc((void**)&d_out, sizeof(float) * Lx * Ly);
+  cudaMalloc((void**)&d_out, sizeof(float) * size);
 
   dim3 grids ((Lx+15)/16, (Ly+15)/16);
   dim3 blocks (16, 16);
 
+  // reset output
+  cudaMemcpy(d_out, out, sizeof(float) * size, cudaMemcpyHostToDevice);
+
   for (int i = 0; i < repeat; i++) {
     // restore input image
-    cudaMemcpy(d_img, img, sizeof(float) * Lx * Ly, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_img, img, sizeof(float) * size, cudaMemcpyHostToDevice);
     // reset norm
-    cudaMemcpy(d_norm, norm, sizeof(float) * Lx * Ly, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_norm, norm, sizeof(float) * size, cudaMemcpyHostToDevice);
     // launch three kernels
     smoothingFilter<<<grids, blocks>>>(Lx, Ly, Threshold, MaxRad, d_img, d_box, d_norm);
     normalizeFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_norm);
     outFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_box, d_out);
   }
 
-  cudaMemcpy(out, d_out, sizeof(float) * Lx * Ly, cudaMemcpyDeviceToHost);
-  cudaMemcpy(box, d_box, sizeof(int) * Lx * Ly, cudaMemcpyDeviceToHost);
-  cudaMemcpy(norm, d_norm, sizeof(float) * Lx * Ly, cudaMemcpyDeviceToHost);
+  cudaMemcpy(out, d_out, sizeof(float) * size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(box, d_box, sizeof(int) * size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(norm, d_norm, sizeof(float) * size, cudaMemcpyDeviceToHost);
 
   // verify
   reference (Lx, Ly, Threshold, MaxRad, img, h_box, h_norm, h_out);
-
-  bool ok = true;
-  int cnt[10] = {0,0,0,0,0,0,0,0,0,0};
-  for (int i = 0; i < Lx * Ly; i++) {
-    if (fabsf(norm[i] - h_norm[i]) > 1e-3f) {
-      printf("%d %f %f\n", i, norm[i], h_norm[i]);
-      ok = false;
-      break;
-    }
-    if (fabsf(out[i] - h_out[i]) > 1e-3f) {
-      printf("%d %f %f\n", i, out[i], h_out[i]);
-      ok = false;
-      break;
-    }
-    if (box[i] != h_box[i]) {
-      printf("%d %d %d\n", i, box[i], h_box[i]);
-      ok = false;
-      break;
-    } else {
-      for (int j = 0; j < MaxRad; j++)
-        if (box[i] == j) { cnt[j]++; break; }
-    }
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
-  if (ok) {
-    printf("Distribution of box sizes:\n");
-    for (int j = 1; j < MaxRad; j++)
-      printf("size=%d: %f\n", j, (float)cnt[j]/(Lx*Ly));
-  }
+  verify(size, MaxRad, norm, h_norm, out, h_out, box, h_box);
 
   cudaFree(d_img);
   cudaFree(d_norm);

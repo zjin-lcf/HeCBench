@@ -57,3 +57,45 @@ void reference (int Lx, int Ly, int threshold, int maxRad,
     }
   }
 }
+
+void verify (
+  const int size,
+  const int MaxRad,
+  const float* norm,
+  const float* h_norm,
+  const float* out,
+  const float* h_out,
+  const   int* box,
+  const   int* h_box)
+{
+  bool ok = true;
+  int cnt[10] = {0,0,0,0,0,0,0,0,0,0};
+  for (int i = 0; i < size; i++) {
+    if (fabsf(norm[i] - h_norm[i]) > 1e-3f) {
+      printf("norm: %d %f %f\n", i, norm[i], h_norm[i]);
+      ok = false;
+      break;
+    }
+    if (fabsf(out[i] - h_out[i]) > 1e-3f) {
+      printf("out: %d %f %f\n", i, out[i], h_out[i]);
+      ok = false;
+      break;
+    }
+    if (box[i] != h_box[i]) {
+      printf("box: %d %d %d\n", i, box[i], h_box[i]);
+      ok = false;
+      break;
+    } else {
+      for (int j = 0; j < MaxRad; j++)
+        if (box[i] == j) { cnt[j]++; break; }
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  if (ok) {
+    printf("Distribution of box sizes:\n");
+    for (int j = 1; j < MaxRad; j++)
+      printf("size=%d: %f\n", j, (float)cnt[j]/size);
+  }
+}
+
+
