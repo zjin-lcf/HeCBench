@@ -513,6 +513,9 @@ Early results are shown [here](results/README.md)
 ### randomAccess
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
   
+### reaction
+  3D Gray-Scott reaction diffusion (https://github.com/ifilot/wavefuse)
+
 ### reverse
   Reverse an input array of size 256 using shared memory
 
