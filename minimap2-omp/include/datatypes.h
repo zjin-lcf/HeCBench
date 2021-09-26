@@ -34,7 +34,6 @@ typedef int32_t  score_dt;
 typedef int32_t  parent_dt;
 typedef uint16_t width_dt;
 
-#pragma pack (2)
 struct anchor_dt {
     loc_dt   x;   // 16 bits alignment
     loc_dt   y;   // 16 bits alignment
@@ -44,7 +43,6 @@ struct anchor_dt {
 static_assert(sizeof(anchor_dt) == 8, // bytes
         "Failed to pack anchor_dt");
 
-#pragma pack (2)
 struct control_dt {
     float avg_qspan;
     uint16_t tile_num;
@@ -53,7 +51,6 @@ struct control_dt {
 static_assert(sizeof(control_dt) == 8, // bytes
         "Failed to pack control_dt");
 
-#pragma pack (2)
 struct return_dt {
     score_dt  score;
     parent_dt parent;
