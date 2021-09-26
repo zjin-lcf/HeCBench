@@ -4,7 +4,7 @@ ARCH = sm_60
 
 # path #
 SRC_PATH = src
-CUDA_PATH = device-bak
+CUDA_PATH = device
 BUILD_PATH = build
 BUILD_CUDA_PATH = build/cuda
 BIN_PATH = $(BUILD_PATH)/bin
