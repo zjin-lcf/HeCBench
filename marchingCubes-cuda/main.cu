@@ -108,7 +108,7 @@ __global__ void computeMinMaxLv1(float*__restrict minMax)
   }
 }
 
-__global__ void compatingLv1(
+__global__ void compactLv1(
   float isoValue, 
   const float*__restrict minMax,
   unsigned int*__restrict blockIndices,
@@ -197,7 +197,7 @@ __global__ void computeMinMaxLv2(
   }
 }
 
-__global__ void compatingLv2(
+__global__ void compactLv2(
   float isoValue,
   const float*__restrict minMax,
   const unsigned int*__restrict blockIndicesLv1,
@@ -502,7 +502,7 @@ int main(int argc, char* argv[])
     cudaMemset(coordZPDevice, 0, sizeof(float));
 
     computeMinMaxLv1 <<< GridSizeLv1, BlockSizeLv1 >>> (minMaxLv1Device);
-    compatingLv1 <<< countingBlockNumLv1, countingThreadNumLv1 >>> (
+    compactLv1 <<< countingBlockNumLv1, countingThreadNumLv1 >>> (
       isoValue, minMaxLv1Device, blockIndicesLv1Device, countedBlockNumLv1Device);
 
     cudaMemcpy(&countedBlockNumLv1, countedBlockNumLv1Device, sizeof(unsigned int), cudaMemcpyDeviceToHost);
@@ -513,7 +513,7 @@ int main(int argc, char* argv[])
     cudaMalloc(&blockIndicesLv2Device, countedBlockNumLv1 * voxelNumLv2 * sizeof(unsigned int));
     unsigned int countingBlockNumLv2((countedBlockNumLv1 * voxelNumLv2 + countingThreadNumLv2 - 1) / countingThreadNumLv2);
 
-    compatingLv2 <<< countingBlockNumLv2, countingThreadNumLv2 >>> (
+    compactLv2 <<< countingBlockNumLv2, countingThreadNumLv2 >>> (
       isoValue, minMaxLv2Device, blockIndicesLv1Device, blockIndicesLv2Device, countedBlockNumLv1, countedBlockNumLv2Device);
 
     cudaMemcpy(&countedBlockNumLv2, countedBlockNumLv2Device, sizeof(unsigned int), cudaMemcpyDeviceToHost);

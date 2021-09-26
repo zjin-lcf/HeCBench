@@ -108,7 +108,7 @@ __global__ void computeMinMaxLv1(float*__restrict minMax)
   }
 }
 
-__global__ void compatingLv1(
+__global__ void compactLv1(
   float isoValue, 
   const float*__restrict minMax,
   unsigned int*__restrict blockIndices,
@@ -197,7 +197,7 @@ __global__ void computeMinMaxLv2(
   }
 }
 
-__global__ void compatingLv2(
+__global__ void compactLv2(
   float isoValue,
   const float*__restrict minMax,
   const unsigned int*__restrict blockIndicesLv1,
@@ -502,7 +502,7 @@ int main(int argc, char* argv[])
     hipMemset(coordZPDevice, 0, sizeof(float));
 
     hipLaunchKernelGGL(computeMinMaxLv1, GridSizeLv1, BlockSizeLv1, 0, 0, minMaxLv1Device);
-    hipLaunchKernelGGL(compatingLv1, dim3(countingBlockNumLv1), dim3(countingThreadNumLv1), 0, 0, 
+    hipLaunchKernelGGL(compactLv1, dim3(countingBlockNumLv1), dim3(countingThreadNumLv1), 0, 0, 
       isoValue, minMaxLv1Device, blockIndicesLv1Device, countedBlockNumLv1Device);
 
     hipMemcpy(&countedBlockNumLv1, countedBlockNumLv1Device, sizeof(unsigned int), hipMemcpyDeviceToHost);
@@ -513,7 +513,7 @@ int main(int argc, char* argv[])
     hipMalloc(&blockIndicesLv2Device, countedBlockNumLv1 * voxelNumLv2 * sizeof(unsigned int));
     unsigned int countingBlockNumLv2((countedBlockNumLv1 * voxelNumLv2 + countingThreadNumLv2 - 1) / countingThreadNumLv2);
 
-    hipLaunchKernelGGL(compatingLv2, dim3(countingBlockNumLv2), dim3(countingThreadNumLv2 ), 0, 0, 
+    hipLaunchKernelGGL(compactLv2, dim3(countingBlockNumLv2), dim3(countingThreadNumLv2 ), 0, 0, 
       isoValue, minMaxLv2Device, blockIndicesLv1Device, blockIndicesLv2Device, countedBlockNumLv1, countedBlockNumLv2Device);
 
     hipMemcpy(&countedBlockNumLv2, countedBlockNumLv2Device, sizeof(unsigned int), hipMemcpyDeviceToHost);

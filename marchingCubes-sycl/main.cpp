@@ -114,7 +114,7 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, nd_ite
   }
 }
 
-void compatingLv1(
+void compactLv1(
   float isoValue, 
   const float*__restrict minMax,
   unsigned int*__restrict blockIndices,
@@ -214,7 +214,7 @@ void computeMinMaxLv2(
   }
 }
 
-void compatingLv2(
+void compactLv2(
   float isoValue,
   const float*__restrict minMax,
   const unsigned int*__restrict blockIndicesLv1,
@@ -398,10 +398,10 @@ int main(int argc, char* argv[])
       auto blockIndicesLv1 = blockIndicesLv1Device.get_access<sycl_discard_write>(cgh);
       auto countedBlockNumLv1 = countedBlockNumLv1Device.get_access<sycl_discard_write>(cgh);
       accessor<unsigned int, 1, sycl_read_write, access::target::local> smem(32, cgh);
-      cgh.parallel_for<class compating1>(nd_range<1>(
+      cgh.parallel_for<class compact1>(nd_range<1>(
         range<1>(countingBlockNumLv1*countingThreadNumLv1), 
         range<1>(countingThreadNumLv1)), [=] (nd_item<1> item) {
-        compatingLv1(isoValue, 
+        compactLv1(isoValue, 
                      minMaxLv1.get_pointer(),
                      blockIndicesLv1.get_pointer(),
                      countedBlockNumLv1.get_pointer(),
@@ -436,10 +436,10 @@ int main(int argc, char* argv[])
       auto blockIndicesLv2 = blockIndicesLv2Device.get_access<sycl_discard_write>(cgh);
       auto countedBlockNumLv2 = countedBlockNumLv2Device.get_access<sycl_discard_write>(cgh);
       accessor<unsigned int, 1, sycl_read_write, access::target::local> smem(32, cgh);
-      cgh.parallel_for<class compating2>(nd_range<1>(
+      cgh.parallel_for<class compact2>(nd_range<1>(
         range<1>(countingBlockNumLv2*countingThreadNumLv2),
         range<1>(countingThreadNumLv2)), [=] (nd_item<1> item) {
-        compatingLv2(isoValue, 
+        compactLv2(isoValue, 
                      minMaxLv2.get_pointer(),
                      blockIndicesLv1.get_pointer(),
                      blockIndicesLv2.get_pointer(),
