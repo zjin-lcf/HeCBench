@@ -607,6 +607,9 @@ Early results are shown [here](results/README.md)
 ### su3
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
+### svd3x3
+  Compute the singular value decomposition of 3x3 matrices (https://github.com/kuiwuchn/3x3_SVD_CUDA)
+
 ### sw4ck
   SW4 curvilinear kernels are five stencil kernels that account for ~50% of the solution time in SW4 (https://github.com/LLNL/SW4CK)
 
