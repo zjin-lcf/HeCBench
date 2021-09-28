@@ -598,6 +598,9 @@ Early results are shown [here](results/README.md)
 ### sssp
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
 
+### stddev
+  Standard deviation (https://github.com/rapidsai/raft)
+
 ### stencil
   1D stencil using shared memory
 
