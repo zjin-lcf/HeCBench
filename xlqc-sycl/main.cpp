@@ -562,11 +562,10 @@ int main(int argc, char* argv[])
       }
     }
 
-
-//#ifdef DEBUG
+#ifdef DEBUG
     printf("J:\n"); my_print_matrix(J);
     printf("K:\n"); my_print_matrix(K);
-//#endif
+#endif
 
     if (use_incr_fock) { form_Fock(p_basis->num, Fock_prev, J, K, Fock); }
     else               { form_Fock(p_basis->num, H_core, J, K, Fock); }
@@ -630,7 +629,6 @@ int main(int argc, char* argv[])
 
     // count iterations
     ++ iter;
-    break;
   }
 
   // SCF converged
