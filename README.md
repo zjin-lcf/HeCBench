@@ -206,6 +206,9 @@ Early results are shown [here](results/README.md)
 ### epistatis
   Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
    
+### ert
+  Modified microkernel in the empirical roofline tool (https://bitbucket.org/berkeleylab/cs-roofline-toolkit/src/master/)
+   
 ### extend2
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
 
