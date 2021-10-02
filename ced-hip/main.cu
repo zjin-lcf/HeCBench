@@ -503,8 +503,6 @@ int main(int argc, char **argv) {
   if(p.alpha < 0.0 || p.alpha > 1.0) { // Dynamic partitioning
     worklist[0].store(0);
   }
-  std::atomic<int> next_frame;
-  next_frame.store(0);
 
   unsigned char* cpu_in_out = (unsigned char *)malloc(in_size);
   unsigned char* gpu_in_out = (unsigned char *)malloc(in_size);
