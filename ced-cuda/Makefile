@@ -15,7 +15,7 @@ ARCH      = sm_60
 
 program = ced
 
-source = main-gpu-only-1D.cu kernel_reference.cu 
+source = main.cu kernel_reference.cu 
 
 obj = $(source:.cu=.o)
 
