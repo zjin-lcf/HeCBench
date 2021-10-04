@@ -1,10 +1,7 @@
-/* This example is a very small one designed to show how compact SYCL code
- * can be. That said, it includes no error checking and is rather terse. */
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
 #include "common.h"
-
 
 float  distance_host ( int i, float  latitude_1, float  longitude_1, float  latitude_2, float  longitude_2 )
 {
