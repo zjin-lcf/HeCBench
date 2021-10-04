@@ -249,6 +249,9 @@ Early results are shown [here](results/README.md)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
 
+### fresnel
+  Fresnel integral (http://www.mymathlib.com/functions/fresnel_sin_cos_integrals.html)
+
 ### frna
   Accelerate the fill step in predicting the lowest free energy structure and a set of suboptimal structures (http://rna.urmc.rochester.edu/Text/Fold-cuda.html)
 
