@@ -297,6 +297,9 @@ Early results are shown [here](results/README.md)
 ### hellinger
   Hellinger distance (https://github.com/rapidsai/raft)
 
+### henry
+  Henry coefficient (https://github.com/CorySimon/HenryCoefficient)
+
 ### hexicton
   A Portable and Scalable Solver-Framework for the Hierarchical Equations of Motion (https://github.com/noma/hexciton_benchmark)
   
@@ -530,6 +533,9 @@ Early results are shown [here](results/README.md)
 
 ### rng-wallace
    Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
+
+### romberg
+  Romberg's method (https://github.com/SwayambhuNathRay/Parallel-Romberg-Integration)
 
 ### rsbench
   A proxy application for full neutron transport application like OpenMC that support multipole cross section representations
