@@ -342,6 +342,9 @@ Early results are shown [here](results/README.md)
 ### keccaktreehash 
   A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
 
+### keogh 
+  Keogh's lower bound (https://github.com/gravitino/cudadtw)
+
 ### kmeans 
   K-means in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
