@@ -61,7 +61,11 @@ unsigned int num_times = 100;
 
 
 template <class T>
-void init_arrays(T *a, T *b, T *c, T initA, T initB, T initC)
+void init_arrays(
+  T *__restrict a,
+  T *__restrict b,
+  T *__restrict c,
+  T initA, T initB, T initC)
 {
   const int array_size = ARRAY_SIZE; 
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -74,7 +78,7 @@ void init_arrays(T *a, T *b, T *c, T initA, T initB, T initC)
 
 
 template <class T>
-void copy(const T *a, T *c)
+void copy(const T *__restrict a, T *__restrict c)
 {
   const int array_size = ARRAY_SIZE;
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -83,7 +87,7 @@ void copy(const T *a, T *c)
 }
 
 template <class T>
-void mul(T *b, const T *c)
+void mul(T *__restrict b, const T *__restrict c)
 {
   const int array_size = ARRAY_SIZE;
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -94,7 +98,7 @@ void mul(T *b, const T *c)
 }
 
 template <class T>
-void add(const T *a, const T *b, T *c)
+void add(const T *__restrict a, const T *__restrict b, T *__restrict c)
 {
   const int array_size = ARRAY_SIZE;
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -105,7 +109,7 @@ void add(const T *a, const T *b, T *c)
 
 
 template <class T>
-void triad(T *a, const T *b, const T *c)
+void triad(T *__restrict a, const T *__restrict b, const T *__restrict c)
 {
   const int array_size = ARRAY_SIZE;
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -117,7 +121,7 @@ void triad(T *a, const T *b, const T *c)
 
 
 template <class T>
-void nstream(T * a, const T * b, const T * c)
+void nstream(T *__restrict a, const T *__restrict b, const T *__restrict c)
 {
   const int array_size = ARRAY_SIZE;
   #pragma omp target teams distribute parallel for simd thread_limit(TBSIZE)
@@ -128,7 +132,7 @@ void nstream(T * a, const T * b, const T * c)
 }
 
 template <class T>
-T dot(const T * a, const T * b)
+T dot(const T *__restrict a, const T *__restrict b)
 {
   const int array_size = ARRAY_SIZE;
   T sum = 0.0;

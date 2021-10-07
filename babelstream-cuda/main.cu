@@ -70,7 +70,11 @@ void check_error(void)
 }
 
 template <typename T>
-__global__ void init_kernel(T * a, T * b, T * c, T initA, T initB, T initC)
+__global__ void init_kernel(
+  T *__restrict__ a,
+  T *__restrict__ b,
+  T *__restrict__ c,
+  T initA, T initB, T initC)
 {
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   a[i] = initA;
@@ -90,7 +94,9 @@ void init_arrays(T *da, T *db, T *dc, T initA, T initB, T initC)
 
 
 template <typename T>
-__global__ void copy_kernel(const T * a, T * c)
+__global__ void copy_kernel(
+  const T *__restrict__ a,
+        T *__restrict__ c)
 {
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   c[i] = a[i];
@@ -107,7 +113,9 @@ void copy(const T *da, T *dc)
 }
 
 template <typename T>
-__global__ void mul_kernel(T * b, const T * c)
+__global__ void mul_kernel(
+        T *__restrict__ b,
+  const T *__restrict__ c)
 {
   const T scalar = SCALAR;
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -125,7 +133,10 @@ void mul(T *db, const T *dc)
 }
 
 template <typename T>
-__global__ void add_kernel(const T * a, const T * b, T * c)
+__global__ void add_kernel(
+  const T *__restrict__ a,
+  const T *__restrict__ b,
+        T *__restrict__ c)
 {
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   c[i] = a[i] + b[i];
@@ -142,7 +153,10 @@ void add(const T *da, const T *db, T *dc)
 }
 
 template <typename T>
-__global__ void triad_kernel(T * a, const T * b, const T * c)
+__global__ void triad_kernel(
+        T *__restrict__ a,
+  const T *__restrict__ b,
+  const T *__restrict__ c)
 {
   const T scalar = SCALAR;
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -160,7 +174,10 @@ void triad(T *da, const T *db, const T *dc)
 }
 
 template <typename T>
-__global__ void nstream_kernel(T * a, const T * b, const T * c)
+__global__ void nstream_kernel(
+        T *__restrict__ a,
+  const T *__restrict__ b,
+  const T *__restrict__ c)
 {
   const T scalar = SCALAR;
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -178,7 +195,11 @@ void nstream(T * da, const T * db, const T * dc)
 }
 
 template <class T>
-__global__ void dot_kernel(const T * a, const T * b, T * sum, int array_size)
+__global__ void dot_kernel(
+  const T *__restrict__ a,
+  const T *__restrict__ b,
+        T *__restrict__ sum,
+  int array_size)
 {
   __shared__ T tb_sum[TBSIZE];
 
