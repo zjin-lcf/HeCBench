@@ -288,8 +288,9 @@ int main(int argc, char **argv) {
 
   q.wait();
 
-  // Verify answer
+  // Verify
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
+  printf("%s\n", (status == 0) ? "PASS" : "FAIL");
 
   // Free memory
   free(h_in_out);
@@ -297,6 +298,5 @@ int main(int argc, char **argv) {
   free(h_head);
   free(h_in_backup);
 
-  if (status == 0) printf("Test Passed\n");
   return 0;
 }
