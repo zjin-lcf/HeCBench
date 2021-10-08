@@ -85,9 +85,9 @@ float* attention_device(const float* key, const float* value, const float* query
           for (int j = 0; j < d; j++)
             sum += key[i * d + j] * query[j];
           dot_product[i] = sum;
-          auto atomic_obj_ref = ONEAPI::atomic_ref<float, 
-            ONEAPI::memory_order::relaxed,
-            ONEAPI::memory_scope::device,
+          auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
+            ext::oneapi::memory_order::relaxed,
+            ext::oneapi::memory_scope::device,
             access::address_space::global_space> (exp_sum[0]);
           atomic_obj_ref.fetch_add(sycl::exp(sum));
         }
