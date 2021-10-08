@@ -284,8 +284,9 @@ int main(int argc, char **argv) {
   // Copy back
   hipMemcpy(h_in_out, d_in_out, in_size * sizeof(T), hipMemcpyDeviceToHost);
 
-  // Verify answer
+  // Verify
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
+  printf("%s\n", (status == 0) ? "PASS" : "FAIL");
 
   // Free memory
   free(h_in_out);
@@ -297,6 +298,5 @@ int main(int argc, char **argv) {
   hipFree(d_finished);
   hipFree(d_head);
 
-  if (status == 0) printf("Test Passed\n");
   return 0;
 }
