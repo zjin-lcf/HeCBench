@@ -309,6 +309,9 @@ Early results are shown [here](results/README.md)
 ### hmm
   Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
 
+### hogbom
+  The benchmark implements the kernel of the Hogbom Clean deconvolution algorithm (https://github.com/ATNF/askap-benchmarks/)
+
 ### hotspot3D
   Hotspot3D in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
