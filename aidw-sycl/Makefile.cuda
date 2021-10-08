@@ -24,9 +24,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
+CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include -I../aidw-cuda\
           -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-	  -ffast-math \
           -fsycl-unnamed-lambda \
           -Xsycl-target-backend $(CUDA_ARCH) \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
@@ -53,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../aidw-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

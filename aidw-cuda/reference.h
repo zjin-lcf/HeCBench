@@ -9,8 +9,8 @@
 // thread block size
 #define BLOCK_SIZE  256
 
-// accuracy 
-#define EPS 1e-3f
+// accuracy
+#define EPS 1e-1f
 
 void reference(
   const float *__restrict dx, 
