@@ -24,61 +24,7 @@
 #include <vector>
 #include <cmath>
 #include "common.h"
-
-#define a1 1.5f
-#define a2 2.f
-#define a3 2.5f
-#define a4 3.f
-#define a5 3.5f
-#define R_min 0.f
-#define R_max 2.f
-#define BLOCK_SIZE  256
-#define EPS 1e-1f
-
-void reference(
-    const float *__restrict dx, 
-    const float *__restrict dy,
-    const float *__restrict dz,
-    const int dnum,   // Data points
-    const float *__restrict ix,
-    const float *__restrict iy,
-          float *__restrict iz,
-    const int inum,   // Interplated points
-    const float area, // Area of planar region
-    const float *__restrict avg_dist)
-
-{
-  for (int tid = 0; tid < inum; tid++) {
-    float sum = 0.f, dist = 0.f, t = 0.f, z = 0.f, alpha = 0.f;
-
-    float r_obs = avg_dist[tid];                // The observed average nearest neighbor distance
-    float r_exp = 1.f / (2.f * sqrtf(dnum / area)); // The expected nearest neighbor distance for a random pattern
-    float R_S0 = r_obs / r_exp;                 // The nearest neighbor statistic
-
-    // Normalize the R(S0) measure such that it is bounded by 0 and 1 by a fuzzy membership function 
-    float u_R = 0.f;
-    if(R_S0 >= R_min) u_R = 0.5f-0.5f * cosf(3.1415926f / R_max * (R_S0 - R_min));
-    if(R_S0 >= R_max) u_R = 1.f;
-
-    // Determine the appropriate distance-decay parameter alpha by a triangular membership function
-    // Adaptive power parameter: a (alpha)
-    if(u_R>= 0.f && u_R<=0.1f)  alpha = a1; 
-    if(u_R>0.1f && u_R<=0.3f)  alpha = a1*(1.f-5.f*(u_R-0.1f)) + a2*5.f*(u_R-0.1f);
-    if(u_R>0.3f && u_R<=0.5f)  alpha = a3*5.f*(u_R-0.3f) + a1*(1.f-5.f*(u_R-0.3f));
-    if(u_R>0.5f && u_R<=0.7f)  alpha = a3*(1.f-5.f*(u_R-0.5f)) + a4*5.f*(u_R-0.5f);
-    if(u_R>0.7f && u_R<=0.9f)  alpha = a5*5.f*(u_R-0.7f) + a4*(1.f-5.f*(u_R-0.7f));
-    if(u_R>0.9f && u_R<=1.f)  alpha = a5;
-    alpha *= 0.5f; // Half of the power
-
-    // Weighted average
-    for(int j = 0; j < dnum; j++) {
-      dist = (ix[tid] - dx[j]) * (ix[tid] - dx[j]) + (iy[tid] - dy[j]) * (iy[tid] - dy[j]) ;
-      t = 1.f /( pow(dist, alpha));  sum += t;  z += dz[j] * t;
-    }
-    iz[tid] = z / sum;
-  }
-}
-
+#include "reference.h"
 
 // Calculate the power parameter, and then weighted interpolating
 // Without using shared memory 
@@ -97,12 +43,11 @@ void AIDW_Kernel(
 
 {
   int tid = item.get_global_id(0);
-
   if(tid < inum) {
-    float sum = 0.f, dist = 0.f, t = 0.f, z = 0.f, alpha = 0.f;
+    float sum = 0.f, dist = 0.f, t = 0.f, z = 0.f, alpha = 1.f;
 
     float r_obs = avg_dist[tid];                // The observed average nearest neighbor distance
-    float r_exp = 1.f / (2.f * sycl::sqrt(dnum / area)); // The expected nearest neighbor distance for a random pattern
+    float r_exp = 0.5f / sycl::sqrt(dnum / area); // The expected nearest neighbor distance for a random pattern
     float R_S0 = r_obs / r_exp;                 // The nearest neighbor statistic
 
     // Normalize the R(S0) measure such that it is bounded by 0 and 1 by a fuzzy membership function 
@@ -123,7 +68,7 @@ void AIDW_Kernel(
     // Weighted average
     for(int j = 0; j < dnum; j++) {
       dist = (ix[tid] - dx[j]) * (ix[tid] - dx[j]) + (iy[tid] - dy[j]) * (iy[tid] - dy[j]) ;
-      t = 1.f /( sycl::pow(dist, alpha));  sum += t;  z += dz[j] * t;
+      t = 1.f / sycl::pow(dist, alpha);  sum += t;  z += dz[j] * t;
     }
     iz[tid] = z / sum;
   }
@@ -148,7 +93,7 @@ void AIDW_Kernel_Tiled(
     nd_item<1> &item) 
 {
   int tid = item.get_global_id(0);
-  int lid = item.get_local_id(0);
+  if (tid >= inum) return;
 
   float dist = 0.f, t = 0.f, alpha = 0.f;
 
@@ -160,7 +105,7 @@ void AIDW_Kernel_Tiled(
   float six_s, siy_s;
 
   float r_obs = avg_dist[tid];               //The observed average nearest neighbor distance
-  float r_exp = 1.f / (2.f * sycl::sqrt(dnum / area)); // The expected nearest neighbor distance for a random pattern
+  float r_exp = 0.5f / sycl::sqrt(dnum / area); // The expected nearest neighbor distance for a random pattern
   float R_S0 = r_obs / r_exp;                //The nearest neighbor statistic
 
   float u_R = 0.f;
@@ -177,40 +122,23 @@ void AIDW_Kernel_Tiled(
   if(u_R>0.9f && u_R<=1.f)  alpha = a5;
   alpha *= 0.5f; // Half of the power
 
-  for(m = 0; m < part; m++) {  // Weighted Sum  
-    sdx[lid] = dx[lid + BLOCK_SIZE * m];
-    sdy[lid] = dy[lid + BLOCK_SIZE * m];
-    sdz[lid] = dz[lid + BLOCK_SIZE * m];
-    item.barrier(access::fence_space::local_space);
-
-    if (tid < inum) {        
-      float six_t = ix[tid];
-      float siy_t = iy[tid];
-      for(e = 0; e < BLOCK_SIZE; e++) {            
-        six_s = six_t - sdx[e];
-        siy_s = siy_t - sdy[e];
-        dist = (six_s * six_s + siy_s * siy_s);
-        t = 1.f / (sycl::pow(dist, alpha));  sum_dn += t;  sum_up += t * sdz[e];                
-      }
+  float six_t = ix[tid];
+  float siy_t = iy[tid];
+  int lid = item.get_local_id(0);
+  for(m = 0; m <= part; m++) {  // Weighted Sum  
+    int num_threads = sycl::min(BLOCK_SIZE, dnum - BLOCK_SIZE *m);
+    if (lid < num_threads) {
+      sdx[lid] = dx[lid + BLOCK_SIZE * m];
+      sdy[lid] = dy[lid + BLOCK_SIZE * m];
+      sdz[lid] = dz[lid + BLOCK_SIZE * m];
     }
     item.barrier(access::fence_space::local_space);
-  }
 
-  if(lid < (dnum - BLOCK_SIZE * m ) ) {        
-    sdx[lid] = dx[lid + BLOCK_SIZE * m];
-    sdy[lid] = dy[lid + BLOCK_SIZE * m];
-    sdz[lid] = dz[lid + BLOCK_SIZE * m];
-  }
-  item.barrier(access::fence_space::local_space);
-
-  if (tid < inum) {    
-    float six_t = ix[tid];
-    float siy_t = iy[tid];
-    for(e = 0; e < (dnum - BLOCK_SIZE * m ); e++) {        
+    for(e = 0; e < BLOCK_SIZE; e++) {
       six_s = six_t - sdx[e];
       siy_s = siy_t - sdy[e];
-      dist = (six_s * six_s + siy_s * siy_s);         
-      t = 1.f / (sycl::pow(dist, alpha));  sum_dn += t;  sum_up += t * sdz[e]; 
+      dist = (six_s * six_s + siy_s * siy_s);
+      t = 1.f / (sycl::pow(dist, alpha));  sum_dn += t;  sum_up += t * sdz[e];
     }
   }
   iz[tid] = sum_up / sum_dn;
@@ -225,7 +153,7 @@ int main(int argc, char *argv[])
   const int inum = dnum;
 
   // Area of planar region
-  const float width = 2000 , height =2000;
+  const float width = 2000, height = 2000;
   const float area = width * height;
 
   std::vector<float> dx(dnum), dy(dnum), dz(dnum);
@@ -264,7 +192,6 @@ int main(int argc, char *argv[])
     printf("Verification disabled\n");
   }
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -294,7 +221,7 @@ int main(int argc, char *argv[])
       auto iy = d_iy.get_access<sycl_read>(cgh);
       auto iz = d_iz.get_access<sycl_discard_write>(cgh);
       auto avg_dist = d_avg_dist.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class naive>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class aidw>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         AIDW_Kernel(dx.get_pointer(), 
                     dy.get_pointer(),
                     dz.get_pointer(),
@@ -310,6 +237,16 @@ int main(int argc, char *argv[])
     });
   }
 
+  q.submit([&] (handler &cgh) {
+    auto acc = d_iz.get_access<sycl_read>(cgh);
+    cgh.copy(acc, iz.data());
+  }).wait();
+
+  if (check) {
+    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
+
   for (int i = 0; i < 100; i++) {
     q.submit([&] (handler &cgh) {
       auto dx = d_dx.get_access<sycl_read>(cgh);
@@ -322,7 +259,7 @@ int main(int argc, char *argv[])
       accessor<float, 1, sycl_read_write, access::target::local> sdx(BLOCK_SIZE, cgh);
       accessor<float, 1, sycl_read_write, access::target::local> sdy(BLOCK_SIZE, cgh);
       accessor<float, 1, sycl_read_write, access::target::local> sdz(BLOCK_SIZE, cgh);
-      cgh.parallel_for<class tiled>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class aidw_tiled>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         AIDW_Kernel_Tiled(dx.get_pointer(), 
                           dy.get_pointer(),
                           dz.get_pointer(),
@@ -341,18 +278,15 @@ int main(int argc, char *argv[])
     });
   }
 
-  }  // sycl scope
+  q.submit([&] (handler &cgh) {
+    auto acc = d_iz.get_access<sycl_read>(cgh);
+    cgh.copy(acc, iz.data());
+  }).wait();
 
   if (check) {
-    bool ok = true;
-    for(int i = 0; i < inum; i++) {
-      if (fabsf(iz[i] - h_iz[i]) > EPS) {
-        printf("%d %f %f\n", i, iz[i], h_iz[i]);
-        ok = false;
-        break;
-      }
-    }
+    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
     printf("%s\n", ok ? "PASS" : "FAIL");
   }
+
   return 0;
 }

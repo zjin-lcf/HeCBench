@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall -I../include -I../aidw-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -50,7 +50,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../aidw-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
