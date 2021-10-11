@@ -337,7 +337,7 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
     //ratx4_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_c, gpu_rf, gpu_rb);
     q.submit([&] (handler &cgh) {
         auto C = gpu_c.template get_access<sycl_read>(cgh);
-        auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
+        //auto RF = gpu_rf.template get_access<sycl_read_write>(cgh);
         auto RB = gpu_rb.template get_access<sycl_read_write>(cgh);
         cgh.parallel_for<class ratx4<real>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
 #include "ratx4.sycl"

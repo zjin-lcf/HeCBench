@@ -3,16 +3,22 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = SobolQRNG
+program = main
 
 source = sobol.cpp sobol_gold.cpp sobol_gpu.cpp sobol_primitives.cpp
 
@@ -23,50 +29,57 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) 
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-sobol.o:sobol.cpp
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
+
+sobol.o:sobol.cpp
 
 sobol_gold.o:sobol_gold.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
 
 sobol_gpu.o:sobol_gpu.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
 
 sobol_primitives.o:sobol_primitives.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
-
-
-run: $(program)
-	./$(program) 1000000 1000
 
 clean:
 	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) 1000000 1000
 

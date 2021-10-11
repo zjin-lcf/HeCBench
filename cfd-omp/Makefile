@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+DUMP      = yes
 
 #===============================================================================
 # Program name & source code list
@@ -45,6 +46,11 @@ ifeq ($(DEVICE),gpu)
 else
   CFLAGS +=-qopenmp
 endif
+
+ifeq ($(DUMP),yes)
+  CFLAGS += -DOUTPUT
+endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================

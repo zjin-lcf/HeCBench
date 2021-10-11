@@ -1,35 +1,54 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
 
-# turning the work-group size
-BLOCK_SIZE=256
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall -DBLOCK_SIZE=$(BLOCK_SIZE) 
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Linker flags
-LDFLAGS = -lm
+program = main
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+source = main.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -DBLOCK_SIZE=256 -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
-# Enable checksum and output file
+# Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -37,29 +56,24 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-ALL: main
-
-main: main.o \
-	kernel_find_index.sycl  \
-	kernel_likelihood.sycl  \
-	kernel_normalize_weights.sycl  \
-	kernel_sum.sycl
-	$(CC) $(CFLAGS) main.o $(LDFLAGS)  -o main 
-
-%.o: %.[ch]
-	$(CC) $(CFLAGS) $< -c
-
-main.o: main.cpp
-	$(CC) $(CFLAGS) main.cpp -c
-
-run: main
-	./main -x 128 -y 128 -z 10 -np 400000
-	#./main -x 128 -y 128 -z 10 -np 1024
+%.o: %.cpp kernel_find_index.sycl  \
+           kernel_likelihood.sycl  \
+           kernel_normalize_weights.sycl  \
+           kernel_sum.sycl
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f *.o *~ main 
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./main -x 128 -y 128 -z 10 -np 400000

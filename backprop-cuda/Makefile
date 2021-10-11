@@ -40,7 +40,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-# 
 ifeq ($(DUMP),yes)
   CFLAGS += -DOUTPUT
 endif

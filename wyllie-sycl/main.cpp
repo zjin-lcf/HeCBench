@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
             long temp = (node & MASK) ;
             temp += (next & MASK) ;
             temp += (next >> 32) << 32;
-            __syncthreads();
+            item.barrier(access::fence_space::local_space);
             list [ index ] = temp ;
           }
         }

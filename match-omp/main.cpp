@@ -57,8 +57,11 @@ void CheckMatches(int *h_index, int *h_index2, float *h_score, float *h_score2)
   int ndiff = 0;
   for (int i=0;i<NPTS;i++) {
     ndiff += (h_index[i] != h_index2[i]);
+#ifdef DEBUG
     if (h_index[i] != h_index2[i])
-      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " << h_score[i] << " " << h_score2[i] << std::endl;
+      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " 
+                << h_score[i] << " " << h_score2[i] << std::endl;
+#endif
   }
   std::cout << "Number of incorrect matches: " << ndiff << std::endl;
 }

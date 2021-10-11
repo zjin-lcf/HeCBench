@@ -3,12 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_70"
-#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-GCC_TOOLCHAIN = "/auto/software/gcc/ppc64le/gcc-9.1.0"
 
 #===============================================================================
 # Program name & source code list
@@ -16,27 +13,23 @@ GCC_TOOLCHAIN = "/auto/software/gcc/ppc64le/gcc-9.1.0"
 
 program = main
 
-source = main.cpp
+source = backprop.cu  facetrain.cu  imagenet.cu  main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++17 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++14 -Xcompiler -Wall
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
 
@@ -50,15 +43,15 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cu backprop.h bpnn_adjust_weights.h bpnn_layerforward.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100
+	./$(program) 20000000
 

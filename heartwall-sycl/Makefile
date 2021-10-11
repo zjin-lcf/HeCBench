@@ -1,57 +1,80 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
 DUMP      = yes
-DEVICE      = gpu
 
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall
+program = main
 
-# Linker flags
-LDFLAGS = -lm
+source = main.cpp
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-	CC = compute++
-	CFLAGS += -no-serial-memop -sycl -sycl-driver
-	LDFLAGS += -lComputeCpp
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-	CC = dpcpp
-	CFLAGS += 
-	LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
-# Enable checksum and output file
+# Debug Flags
 ifeq ($(DEBUG),yes)
-	CFLAGS += -g  
-	TEST_ON = -DTEST_CHECKSUM 
-endif
-
-ifeq ($(DUMP),yes)
-	OUTPUT  = -DOUTPUT
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+  TEST_ON = -DTEST_CHECKSUM 
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3
+  CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-	CFLAGS +=-DUSE_GPU
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
 endif
 
+ifeq ($(DUMP),yes)
+  OUTPUT  = -DOUTPUT
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-heartwall:	./main.o \
-	./kernel/kernel.o \
-	./util/avi/avilib.o \
-	./util/avi/avimod.o \
-	./util/file/file.o \
-	./util/timer/timer.o 
+heartwall:./main.o \
+          ./kernel/kernel.o \
+          ./util/avi/avilib.o \
+          ./util/avi/avimod.o \
+          ./util/file/file.o \
+          ./util/timer/timer.o 
 	$(CC)	$(CFLAGS) ./main.o \
 		./kernel/kernel.o \
 		./util/avi/avilib.o \
@@ -64,58 +87,42 @@ heartwall:	./main.o \
 #	MAIN FUNCTION
 # ======================================================================================================================================================150
 
-./main.o:	./main.h \
-	./main.c
+./main.o:./main.h ./main.c
 	$(CC)	$(OUTPUT) $(KERNEL_DIM) ./main.c \
 		-I./util/timer/ \
 		-I./util/file/ \
 		-c \
 		-o ./main.o 
 
-# ======================================================================================================================================================150
-#	KERNELS
-# ======================================================================================================================================================150
-
 ./kernel/kernel.o:./kernel/kernel.sycl ./kernel/kernel.cpp
-	$(CC) $(CFLAGS) $(TEST_ON) $(KERNEL_DIM)	./kernel/kernel.cpp \
+	$(CC) $(CFLAGS) $(TEST_ON) $(KERNEL_DIM) ./kernel/kernel.cpp \
 		-c \
 		-o ./kernel/kernel.o 
 
-# ======================================================================================================================================================150
-#	UTILITIES
-# ======================================================================================================================================================150
-
-./util/avi/avilib.o:./util/avi/avilib.h \
-	./util/avi/avilib.c
+./util/avi/avilib.o:./util/avi/avilib.h ./util/avi/avilib.c
 	$(CC)	$(CFLAGS) ./util/avi/avilib.c \
 		-I./util/avi \
 		-c \
 		-o ./util/avi/avilib.o 
 
-./util/avi/avimod.o:./util/avi/avilib.h \
-	./util/avi/avimod.c
+./util/avi/avimod.o:./util/avi/avilib.h ./util/avi/avimod.c
 	$(CC)	$(CFLAGS) ./util/avi/avimod.c \
 		-I./util/avi \
 		-c \
 		-o ./util/avi/avimod.o 
 
-./util/file/file.o:	./util/file/file.h \
-	./util/file/file.c
+./util/file/file.o:./util/file/file.h ./util/file/file.c
 	$(CC)	$(CFLAGS) ./util/file/file.c \
 		-I./util/file \
 		-I./util/timer \
 		-c \
 		-o ./util/file/file.o 
 
-./util/timer/timer.o:	./util/timer/timer.h \
-	./util/timer/timer.c
+./util/timer/timer.o:./util/timer/timer.h ./util/timer/timer.c
 	$(CC)	$(CFLAGS) ./util/timer/timer.c \
 		-I./util/timer \
 		-c \
 		-o ./util/timer/timer.o 
-
-run: heartwall
-	./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \
@@ -123,3 +130,7 @@ clean:
 		./util/avi/*.o \
 		./util/file/*.o \
 		./util/timer/*.o 
+
+run: heartwall
+	./heartwall 104
+

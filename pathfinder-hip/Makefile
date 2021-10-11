@@ -6,7 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-OUTPUT    = no
+OUTPUT    = yes
 
 #===============================================================================
 # Program name & source code list

@@ -1,32 +1,54 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# Linker flags
-LDFLAGS = -lm
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+program = main
+
+source = cluster.c getopt.c read_input.c rmse.c kmeans.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -34,21 +56,18 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-ifeq ($(INORDER),yes)
-  CFLAGS +=-DUSE_IOQ
-endif
-
-all: kmeans
-
-kmeans: cluster.o getopt.o read_input.o rmse.o kmeans.o
-	$(CC) $(KERNEL_DIM) $(CFLAGS) $^ -o kmeans $(LDFLAGS)
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) $< -c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 kmeans.o: kmeans.c kmeans.h
 
@@ -61,9 +80,7 @@ read_input.o: read_input.c kmeans.h
 rmse.o: rmse.c kmeans.h
 
 clean:
-	rm -f *.o *~ kmeans *.linkinfo
+	rm -rf $(program) $(obj)
 
-run: kmeans
-	./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
-
-
+run: $(program)
+	./$(program) -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup

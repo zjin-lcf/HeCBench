@@ -271,6 +271,7 @@ int main(int argc, char** argv) {
   queue q(dev_sel);
 
   // fpc is faster than fpc2 on a GPU
+  bool ok = true;
   for (int i = 0; i < 100; i++) {
     fpc(q, values, &cmp_size_hw, values_size, wgs);
     if (cmp_size_hw != cmp_size) {

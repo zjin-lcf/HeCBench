@@ -287,8 +287,7 @@ dot(const Vector& x,
 {
   const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
-  typedef typename Vector::ScalarType Scalar;
-
+  //typedef typename Vector::ScalarType Scalar;
   //const Scalar*  xcoefs = &x.coefs[0];
   //const Scalar*  ycoefs = &y.coefs[0];
 
@@ -406,7 +405,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
 
   const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
-  typedef typename Vector::ScalarType Scalar;
+  //typedef typename Vector::ScalarType Scalar;
 
   MINIFE_SCALAR result = 0;
 

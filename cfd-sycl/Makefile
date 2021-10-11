@@ -1,34 +1,55 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
-DUMP        = yes
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+DUMP      = no
 
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Linker flags
-LDFLAGS = -lm
+program = main
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+source = euler3d.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
-# Enable checksum and output file
+# Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g 
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -36,29 +57,31 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 
 ifeq ($(DUMP),yes)
   CFLAGS += -DOUTPUT
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-SRC = euler3d.cpp
-EXE = euler3d
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-$(EXE):$(SRC) kernel_compute_flux.sycl  \
-               kernel_compute_step_factor.sycl  \
-	       kernel_initialize_variables.sycl \
-	       kernel_memset.sycl \
-	       kernel_time_step.sycl
-	$(CC) $(CFLAGS) $(KERNEL_DIM) $(SRC) -o $(EXE) $(LDFLAGS)
+%.o: %.cpp kernel_compute_flux.sycl  \
+           kernel_compute_step_factor.sycl  \
+	   kernel_initialize_variables.sycl \
+	   kernel_memset.sycl \
+	   kernel_time_step.sycl
+	$(CC) $(CFLAGS) -c $< -o $@
 
-run: $(EXE)
-	./euler3d ../data/cfd/fvcorr.domn.097K 
-	#./euler3d ../data/cfd/fvcorr.domn.193K   
-	#./euler3d ../data/cfd/missile.domn.0.2M  
+clean:
+	rm -rf $(program) $(obj) result* density momentum density_energy
 
-
-clean: 
-	rm -f $(EXE) $(EXE).linkinfo result*  density momentum density_energy
+run: $(program)
+	./$(program) ../data/cfd/fvcorr.domn.097K 
+	#./$(program) ../data/cfd/fvcorr.domn.193K   
+	#./$(program) ../data/cfd/missile.domn.0.2M  

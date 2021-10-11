@@ -29,7 +29,7 @@ DEPS = $(OBJECTS:.o=.d)
 
 # flags #
 COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
-HIPCC_COMPILE_FLAGS = -std=c++11 --default-stream per-thread -g -O3 
+HIPCC_COMPILE_FLAGS = -std=c++11 -g -O3 
 INCLUDES = -I include/ -I /usr/local/include
 # Space-separated pkg-config libraries used by this project
 LIBS =

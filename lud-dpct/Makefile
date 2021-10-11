@@ -43,10 +43,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj) 
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp lud_kernels.cpp Makefile
+%.o: %.cpp lud_kernels.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -9,10 +9,9 @@
 
 typedef unsigned int T;
 
-bool verifySort(const T *keys, const size_t size)
+void verifySort(const T *keys, const size_t size)
 {
   bool passed = true;
-
   for (size_t i = 0; i < size - 1; i++)
   {
     if (keys[i] > keys[i + 1])
@@ -22,15 +21,13 @@ bool verifySort(const T *keys, const size_t size)
       std::cout << "Idx: " << i;
       std::cout << " Key: " << keys[i] << "\n";
 #endif
+      break;
     }
   }
-  std::cout << "Test ";
   if (passed)
-    std::cout << "Passed" << std::endl;
+    std::cout << "PASS" << std::endl;
   else
-    std::cout << "---FAILED---" << std::endl;
-
-  return passed;
+    std::cout << "FAIL" << std::endl;
 }
 
 int main(int argc, char** argv) 

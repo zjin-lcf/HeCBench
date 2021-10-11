@@ -1,54 +1,69 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
 
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall -I.
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
-# Linker flags
-LDFLAGS = -lm
+# Linker Flags
+LDFLAGS = 
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-	CC = compute++
-	CFLAGS += -no-serial-memop -sycl -sycl-driver
-	LDFLAGS += -lComputeCpp
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-	CC = dpcpp
-	CFLAGS += 
-	LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-	CFLAGS += -g -DDEBUG
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3
+  CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-	CFLAGS +=-DUSE_GPU
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-# ========================================================================================================================================================================================================200
-#	EXECUTABLES (LINK OBJECTS TOGETHER INTO BINARY)
-# ========================================================================================================================================================================================================200
-
-./myocyte.out:	./main.o \
-	./kernel/kernel_wrapper.o \
-	./util/file/file.o \
-	./util/num/num.o \
-	./util/timer/timer.o 
-	$(CC)	./main.o \
+./myocyte.out:./main.o \
+              ./kernel/kernel_wrapper.o \
+              ./util/file/file.o \
+              ./util/num/num.o \
+              ./util/timer/timer.o 
+	$(CC) $(CFLAGS)	./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/file/file.o \
 		./util/num/num.o \
@@ -56,22 +71,12 @@ endif
 		$(LDFLAGS) \
 		-o myocyte.out
 
-# ======================================================================================================================================================150
-#	MAIN FUNCTION
-# ======================================================================================================================================================150
-
-./main.o:	./common.h \
-	./main.h \
-	./main.c
+./main.o:./common.h ./main.h ./main.c
 	$(CC) $(CFLAGS)	./main.c \
 		-c \
 		-o ./main.o 
 
-# ======================================================================================================================================================150
-#	KERNELS
-# ======================================================================================================================================================150
-
-./kernel/kernel_wrapper.o:	./common.h \
+./kernel/kernel_wrapper.o:./common.h \
 	./kernel/kernel_wrapper.h \
 	./kernel/kernel_wrapper.c \
 	./kernel/solver.c \
@@ -83,11 +88,7 @@ endif
 		-c \
 		-o ./kernel/kernel_wrapper.o 
 
-# ======================================================================================================================================================150
-#	UTILITIES
-# ======================================================================================================================================================150
-
-./util/file/file.o:	./common.h \
+./util/file/file.o:./common.h \
 	./util/file/file.h \
 	./util/file/file.c
 	$(CC)	./util/file/file.c \
@@ -95,7 +96,7 @@ endif
 		-o ./util/file/file.o \
 		-O3
 
-./util/num/num.o:	./common.h \
+./util/num/num.o:./common.h \
 	./util/num/num.h \
 	./util/num/num.c
 	$(CC)	./util/num/num.c \
@@ -103,17 +104,13 @@ endif
 		-o ./util/num/num.o \
 		-O3
 
-./util/timer/timer.o:	./common.h \
+./util/timer/timer.o:./common.h \
 	./util/timer/timer.h \
 	./util/timer/timer.c
 	$(CC)	./util/timer/timer.c \
 		-c \
 		-o ./util/timer/timer.o \
 		-O3
-
-
-run: myocyte.out
-	./myocyte.out -time 100
 
 clean:
 	rm	*.o *.out \
@@ -122,3 +119,6 @@ clean:
 		./util/timer/*.o \
 		./util/num/*.o \
 		./output.txt
+
+run: myocyte.out
+	./myocyte.out -time 100

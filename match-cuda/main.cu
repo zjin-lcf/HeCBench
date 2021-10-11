@@ -50,9 +50,13 @@ void CheckMatches(int *h_index, int *h_index2, float *h_score, float *h_score2)
   int ndiff = 0;
   for (int i=0;i<NPTS;i++) {
     ndiff += (h_index[i] != h_index2[i]);
+#ifdef DEBUG
     if (h_index[i] != h_index2[i])
-      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " << h_score[i] << " " << h_score2[i] << std::endl;
+      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " 
+                << h_score[i] << " " << h_score2[i] << std::endl;
+#endif
   }
+
   std::cout << "Number of incorrect matches: " << ndiff << std::endl;
 }
       
@@ -723,7 +727,7 @@ int main(int argc, char *argv[])
   }
 
   auto start = std::chrono::high_resolution_clock::now();
-  MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
+  //MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   auto delay = elapsed_seconds.count() * 1000;

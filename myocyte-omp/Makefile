@@ -55,7 +55,7 @@ endif
 ./main.o:	./common.h \
 	./main.h \
 	./main.c
-	$(CC) ./main.c \
+	$(CC) $(CFLAGS) ./main.c \
 		-c \
 		-o ./main.o \
 		-O3

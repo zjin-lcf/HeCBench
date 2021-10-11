@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp lud_kernels.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

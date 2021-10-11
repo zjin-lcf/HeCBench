@@ -16,7 +16,7 @@
  */
 
 
-static void geodesic(double* Variables, double* VariablesIn, double *y, double *dydx)
+static void geodesic(double* Variables, const double* VariablesIn, double *y, double *dydx)
 {
   double r = y[0];
   double theta = y[1];
@@ -52,7 +52,8 @@ static void geodesic(double* Variables, double* VariablesIn, double *y, double *
   dydx[5] = -sintheta * costheta*(L * L / (sin2 * sin2) - a2) * siginv;
 }
 
-static void rkstep(double* Variables, double* VariablesIn,double *y, double *dydx, double h, double *yout, double *yerr)
+static void rkstep(double* Variables, const double* VariablesIn,
+                   double *y, double *dydx, double h, double *yout, double *yerr)
 {
   int i;
   double ak[N];
@@ -127,7 +128,7 @@ static void rkstep(double* Variables, double* VariablesIn,double *y, double *dyd
 }
 
 
-static double rk5(double* Variables, double* VariablesIn, double *y, double *dydx, 
+static double rk5(double* Variables, const double* VariablesIn, double *y, double *dydx, 
                              double htry, double escal, double *yscal, double *hdid)
 {
   int i;
@@ -181,7 +182,7 @@ static double rk5(double* Variables, double* VariablesIn, double *y, double *dyd
 }
 
 
-static void initial(double* Variables, double* VariablesIn, double *y0, double *ydot0)
+static void initial(double* Variables, const double* VariablesIn, double *y0, double *ydot0)
 {
   double alpha = grid_x;
   double beta  = grid_y;
@@ -243,7 +244,7 @@ static void initial(double* Variables, double* VariablesIn, double *y0, double *
 }
 
 
-static float ISCO(double* VariablesIn)
+static float ISCO(const double* VariablesIn)
 {
   double z1       = 1 + sycl::pow(1 - A * A, 1 / 3.0) * sycl::pow(1 + A, 1 / 3.0) + sycl::pow(1 - A, 1 / 3.0);
   double z2       = sycl::sqrt(3 * A * A + z1 * z1);
@@ -339,7 +340,7 @@ static double K2(double Te, const double *K2_tab)
 }
 
 
-static double Jansky_Correction(double* VariablesIn,double ima_width)
+static double Jansky_Correction(const double* VariablesIn,double ima_width)
 {
   double distance=C_sgrA_d*C_pc;
   double theta=sycl::atan(ima_width*C_sgrA_mbh*C_rgeo/distance);
@@ -347,7 +348,7 @@ static double Jansky_Correction(double* VariablesIn,double ima_width)
   return pix_str/C_Jansky;
 }
 
-static double Luminosity_Correction(double* VariablesIn,double ima_width)
+static double Luminosity_Correction(const double* VariablesIn,double ima_width)
 {
   double distance=C_sgrA_d*C_pc;
   double theta=sycl::atan(ima_width*C_sgrA_mbh*C_rgeo/distance);
@@ -355,7 +356,7 @@ static double Luminosity_Correction(double* VariablesIn,double ima_width)
   return pix_str*distance*distance*4.*PI*freq_obs;
 }
 
-double task1fun_GetZ(double* Variables, double* VariablesIn, double *y)
+double task1fun_GetZ(double* Variables, const double* VariablesIn, double *y)
 {
   double r1 = y[0];
   double E_local = -(r1 * r1 + A * sycl::sqrt(r1)) / (r1 * sycl::sqrt(r1 * r1 - 3. * r1 + 2. * A * sycl::sqrt(r1))) + 
@@ -422,7 +423,7 @@ void task1(nd_item<2> &item, double*__restrict ResultsPixel, const double*__rest
 }
 
 
-double task2fun_GetZ(double* Variables, double* VariablesIn, double *y)
+double task2fun_GetZ(double* Variables, const double* VariablesIn, double *y)
 {
   double ut,uphi,ur,E_local;
   double E_inf= -1.0;   
@@ -503,7 +504,7 @@ void task2(nd_item<2> &item, double*__restrict ResultsPixel, const double*__rest
   double ima_width = 10.;
   double s1  = ima_width;                      
   double s2  = 2.*ima_width/((int)SIZE+1.);   
-  double Jy_corr=Jansky_Correction(VariablesIn,ima_width);
+  //double Jy_corr=Jansky_Correction(VariablesIn,ima_width);
   double L_corr=Luminosity_Correction(VariablesIn,ima_width);
 
   grid_x = -s1 + s2*(X1+1.);
