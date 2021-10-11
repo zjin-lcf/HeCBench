@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp ../split-sycl/verify.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -51,7 +51,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../split-sycl/verify.cpp
+%.o: %.cpp verify.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

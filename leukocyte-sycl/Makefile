@@ -1,38 +1,50 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 # Matrix library path
 MATRIX_DIR = ./meschach_lib
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall -I$(MATRIX_DIR)
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-# Linker flags
-LDFLAGS = -lm
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG 
-endif
-
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g  
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
   OUTPUT = -DOUTPUT
 endif
 
@@ -41,11 +53,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
-
-
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
 leukocyte: detect_main.o \
 	avilib.o \
@@ -83,9 +96,10 @@ track_ellipse_sycl.o: track_ellipse_sycl.c track_ellipse.h common.h kernel_IMGVF
 $(MATRIX_DIR)/meschach.a:
 	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC) CFLAGS=-O3; make clean
 
+clean:
+	rm -f *.o leukocyte 
+	cd $(MATRIX_DIR); make cleanup
+
 run: leukocyte
 	./leukocyte ../data/leukocyte/testfile.avi 100
 
-clean:
-	rm -f *.o *~ leukocyte 
-	cd $(MATRIX_DIR); make cleanup

@@ -1,33 +1,49 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
 
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I. -fsycl
 
-# Linker flags
-LDFLAGS = -lm
+# Linker Flags
+LDFLAGS = 
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -35,17 +51,19 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-
-b+tree.out:	./main.o \
-		./kernel/kernel_wrapper.o \
-		./kernel/kernel2_wrapper.o \
-		./util/timer/timer.o \
-		./util/num/num.o 
-	$(CC)	./main.o \
+b+tree.out:./main.o \
+           ./kernel/kernel_wrapper.o \
+           ./kernel/kernel2_wrapper.o \
+           ./util/timer/timer.o \
+           ./util/num/num.o 
+	$(CC) $(CFLAGS)	./main.o \
 			./kernel/kernel_wrapper.o \
 			./kernel/kernel2_wrapper.o \
 			./util/timer/timer.o \
@@ -54,41 +72,38 @@ b+tree.out:	./main.o \
 	                -o b+tree.out
 
 
-main.o:	./common.h \
-	./main.c
-	$(CC) $(CFLAGS) $(KERNEL_DIM) ./main.c \
-		-c \
-		-o ./main.o
+main.o:	./common.h ./main.c
+	$(CC) $(CFLAGS) $(KERNEL_DIM) ./main.c -c -o main.o
 
 
-./kernel/kernel_wrapper.o:	./common.h \
-	./kernel/kernel_wrapper.h \
-	./kernel/kernel_wrapper.c \
-	./kernel/findK.sycl
+./kernel/kernel_wrapper.o: ./common.h \
+                    ./kernel/kernel_wrapper.h \
+                    ./kernel/kernel_wrapper.c \
+                    ./kernel/findK.sycl
 	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel_wrapper.c \
 		-c \
 		-o ./kernel/kernel_wrapper.o
 
-./kernel/kernel2_wrapper.o:	./common.h \
-	./kernel/kernel2_wrapper.h \
-	./kernel/kernel2_wrapper.c \
-	./kernel/findRangeK.sycl
+./kernel/kernel2_wrapper.o: ./common.h \
+                   ./kernel/kernel2_wrapper.h \
+                   ./kernel/kernel2_wrapper.c \
+                   ./kernel/findRangeK.sycl
 	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel2_wrapper.c \
 		-c \
 		-o ./kernel/kernel2_wrapper.o 
 
 
-./util/timer/timer.o:	./common.h \
-	./util/timer/timer.h \
-	./util/timer/timer.c
+./util/timer/timer.o: ./common.h \
+                  ./util/timer/timer.h \
+                  ./util/timer/timer.c
 	$(CC)	./util/timer/timer.c \
 		-c \
 		-o ./util/timer/timer.o \
 		-O3
 
-./util/num/num.o:	./common.h \
-	./util/num/num.h \
-	./util/num/num.c
+./util/num/num.o: ./common.h \
+                  ./util/num/num.h \
+                  ./util/num/num.c
 	$(CC)	./util/num/num.c \
 		-c \
 		-o ./util/num/num.o \

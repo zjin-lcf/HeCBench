@@ -3,12 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_60"
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -16,22 +13,16 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Ddfloat=double -Ddlong=int \
-          -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -ffast-math \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++14 -Wall -I../mis-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -42,13 +33,10 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
-endif
-
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
 endif
 
 #===============================================================================
@@ -58,12 +46,12 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cu ../mis-cuda/graph.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 7 15 8000 100
+	./$(program) ../mis-cuda/internet.egr
 

@@ -1,33 +1,54 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
 
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall -I../include
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Linker flags
-LDFLAGS =
+program = main
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+source = 3D.cpp 3D_helper.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g  
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -35,16 +56,21 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-3D: 3D.cpp 3D_helper.cpp kernel_hotspot.sycl
-	$(CC) 3D.cpp 3D_helper.cpp $(CFLAGS) $(LIBS) $(LDFLAGS) -o $@
-
-run: 3D
-	./3D 512 8 5000 ../data/hotspot3D/power_512x8 ../data/hotspot3D/temp_512x8 output.out
+%.o: %.cpp kernel_hotspot.sycl
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f 3D output.out 
+	rm -rf $(program) $(obj) output.out
+
+run: $(program)
+	./$(program) 512 8 5000 ../data/hotspot3D/power_512x8 ../data/hotspot3D/temp_512x8 output.out

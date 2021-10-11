@@ -6,7 +6,12 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_60"
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
@@ -15,7 +20,10 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = main.cpp lsqt.cpp sigma.cpp vector.cpp hamiltonian.cpp model.cpp \
+         model_general.cpp model_lattice.cpp anderson.cpp charge.cpp
+
+header = sigma.h vector.h lsqt.h hamiltonian.h model.h anderson.h charge.h
 
 obj = $(source:.cpp=.o)
 
@@ -24,27 +32,36 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,14 +69,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-$(obj): main.cpp aes.h ../include/SDKBitMap.h kernels.cpp utils.cpp
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.out
 
-# reuse the image
 run: $(program)
-	./$(program) 100 0 ../urng-sycl/URNG_Input.bmp
-	./$(program) 100 1 ../urng-sycl/URNG_Input.bmp
-
+	./$(program) ../lsqt-cuda/examples/input.txt

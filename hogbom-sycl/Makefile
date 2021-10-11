@@ -3,11 +3,17 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 VERIFY    = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +21,7 @@ VERIFY    = no
 
 program = main
 
-src = ../hogbom-cuda
+inc = ../hogbom-cuda
 
 obj = main.o kernels.o reference.o timer.o
 
@@ -24,16 +30,26 @@ obj = main.o kernels.o reference.o timer.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++14 -Wall -I../include -I$(src)
-
+CFLAGS := -std=c++17 -Wall -I../include -I$(inc) -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+endif
+
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -41,10 +57,13 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
+endif
+
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -52,20 +71,20 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: $(src)/main.cpp $(src)/utils.h $(src)/timer.h $(src)/reference.h $(src)/kernels.h
+main.o: $(inc)/main.cpp $(inc)/utils.h $(inc)/timer.h $(inc)/reference.h $(inc)/kernels.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-reference.o: $(src)/reference.cpp $(src)/reference.h 
+reference.o: $(inc)/reference.cpp $(inc)/reference.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-timer.o: $(src)/timer.cpp $(src)/timer.h 
+timer.o: $(inc)/timer.cpp $(inc)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o: kernels.cpp $(src)/kernels.h 
+kernels.o: kernels.cpp $(inc)/kernels.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) $(src)/data/dirty_4096.img $(src)/data/psf_4096.img 1000
+	./$(program) $(inc)/data/dirty_4096.img $(inc)/data/psf_4096.img 1000

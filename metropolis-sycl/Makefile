@@ -3,10 +3,16 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
-OPTIMIZE  = no
-DEBUG     = yes
-DEVICE    = gpu
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -14,31 +20,43 @@ DEVICE    = gpu
 
 program = main
 
-obj = main.o utils.o heap.o
+source = main.cpp utils.cpp heap.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 #===============================================================================
@@ -48,21 +66,20 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-heap.o: heap.cpp heap.h
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
+
+heap.o: heap.cpp heap.h
 
 utils.o: utils.cpp heap.h utils.h
-	$(CC) $(CFLAGS) -c $< -o $@
 
 main.o: main.cpp utils.h kernel_metropolis.h kernel_prng.h kernel_reduction.h  
-	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.dat
+	rm -rf $(program) $(obj)
 
 dbg: $(program)
 	./$(program) -l 32 11 -t 4.7 0.1 -a 1 1 1 1 -h 1.0 -z 7919
 
 run: $(program)
 	./$(program) -l 32 11 -t 4.7 0.1 -a 10 2 2000 10 -h 1.0 -z 7919
-

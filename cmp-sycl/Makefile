@@ -3,25 +3,24 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
-VPATH     = ../cmp-cuda
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
 program = main
 
-source = main.cpp \
-reference.cpp \
-su_cdp.cpp \
-su_gather.cpp \
-su_trace.cpp \
-log.cpp  \
-parser.cpp  
+inc = ../cmp-cuda
 
 obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 
@@ -30,23 +29,34 @@ obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -I../cmp-cuda
+CFLAGS := -std=c++17 -Wall -I../include -I$(inc) -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+endif
+
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3 -ffp-contract=off
+  CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 #===============================================================================
@@ -59,18 +69,17 @@ $(program): $(obj)
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-log.o : log.cpp log.hpp
-parser.o: parser.cpp parser.hpp  
-su_cdp.o : su_cdp.cpp su_cdp.hpp log.hpp
-su_gather.o : su_gather.cpp su_gather.hpp log.hpp su_trace.hpp
-su_trace.o : su_trace.cpp su_trace.hpp log.hpp
-main.o : main.cu log.hpp utils.hpp parser.hpp su_gather.hpp
-reference.o : reference.cpp utils.hpp
+log.o : $(inc)/log.cpp $(inc)/log.hpp
+parser.o: $(inc)/parser.cpp $(inc)/parser.hpp  
+su_cdp.o : $(inc)/su_cdp.cpp $(inc)/su_cdp.hpp $(inc)/log.hpp
+su_gather.o : $(inc)/su_gather.cpp $(inc)/su_gather.hpp $(inc)/log.hpp $(inc)/su_trace.hpp
+su_trace.o : $(inc)/su_trace.cpp $(inc)/su_trace.hpp $(inc)/log.hpp
+main.o : main.cpp $(inc)/log.hpp $(inc)/utils.hpp $(inc)/parser.hpp $(inc)/su_gather.hpp
+reference.o : $(inc)/reference.cpp $(inc)/utils.hpp
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) -c0 1.98e-7 -c1 1.77e-6 -nc 5 -aph 600 -tau 0.002 -v 2 \
-                     -i ../cmp-cuda/data/simple-synthetic.su
-
+                     -i $(inc)/data/simple-synthetic.su

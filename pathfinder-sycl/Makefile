@@ -1,38 +1,55 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
-OUTPUT      = no
+#===============================================================================
+# User Options
+#===============================================================================
 
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+OUTPUT    = no
 
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall -I../include
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Linker flags
-LDFLAGS = -lm
+program = main
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-  CC = compute++
-  CFLAGS += -no-serial-memop -sycl -sycl-driver
-  LDFLAGS += -lComputeCpp
+source = main.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
+
+# Linker Flags
+LDFLAGS = 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-  CC = dpcpp
-  CFLAGS += 
-  LDFLAGS += 
-endif
-
-ifeq ($(OUTPUT),yes)
-  CFLAGS += -DBENCH_PRINT
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g 
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -40,21 +57,25 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 
+ifeq ($(OUTPUT),yes)
+  CFLAGS += -DBENCH_PRINT
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-# link objects(binaries) together
-pathfinder: main.o 
-	$(CC) main.o $(LDFLAGS) -o pathfinder
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-# compile main function file into object (binary)
-main.o: main.cpp  kernel.sycl
-	$(CC) $(CFLAGS) main.cpp -c -o main.o
+%.o: %.cpp kernel.sycl
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
 
 run: pathfinder
 	./pathfinder 100000 500 5
-
-clean:
-	@rm -f pathfinder *.o *.out *~ *\#

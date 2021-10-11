@@ -77,19 +77,17 @@ int main(int argc, char** argv) {
   q.wait();
   }
 
-  int errors = 0;
+  bool ok = true;
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (serial_res[i*n+j] != parallel_res[i*n+j]) {
-        errors++; 
+        ok = false;
         break;
       }
     }
   }
-  if (errors) 
-    printf("fail\n");
-  else 
-    printf("success\n");
+
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(serial_res);
   free(parallel_res);

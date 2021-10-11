@@ -1,50 +1,69 @@
-VENDOR      = intel
-OPTIMIZE    = yes
-DEBUG       = no
-DEVICE      = gpu
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
 
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-# Standard flags
-CFLAGS := -std=c++11 -Wall
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
-# Linker flags
-LDFLAGS = -lm
+# Linker Flags
+LDFLAGS = 
 
-# Codeplay Compiler
-ifneq (,$(findstring codeplay,$(VENDOR)))
-	CC = compute++
-	CFLAGS += -no-serial-memop -sycl -sycl-driver
-	LDFLAGS += -lComputeCpp
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
-# Intel DPC++ Compiler
-ifneq (,$(findstring intel,$(VENDOR)))
-	CC = dpcpp
-	CFLAGS += 
-	LDFLAGS += 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-	CFLAGS += -g  
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3
+  CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-	CFLAGS +=-DUSE_GPU
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
 endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
 ./srad:	./main.o \
 	./kernel/kernel_wrapper.o \
 	./util/graphics/graphics.o \
 	./util/graphics/resize.o \
 	./util/timer/timer.o
-	$(CC)	./main.o \
+	$(CC) $(CFLAGS)	./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/graphics/graphics.o \
 		./util/graphics/resize.o \
@@ -52,22 +71,13 @@ endif
 		-lm \
 		$(LDFLAGS) -o srad
 
-# ======================================================================================================================================================150
-#	MAIN FUNCTION
-# ======================================================================================================================================================150
-
-./main.o:	./main.h \
-	./main.c
-	$(CC)	$(KERNEL_DIM) ./main.c \
+./main.o:./main.c ./main.h 
+	$(CC)	$(CFLAGS) $(KERNEL_DIM) ./main.c \
 		-c \
 		-o ./main.o \
 		-O3
 
-# ======================================================================================================================================================150
-#	KERNELS
-# ======================================================================================================================================================150
-
-./kernel/kernel_wrapper.o:	./kernel/kernel_wrapper.h \
+./kernel/kernel_wrapper.o:./kernel/kernel_wrapper.h \
 	./kernel/kernel_wrapper.c \
 	./kernel/kernel_compress.sycl \
 	./kernel/kernel_extract.sycl \
@@ -79,36 +89,30 @@ endif
 		-c \
 		-o ./kernel/kernel_wrapper.o 
 
-# ======================================================================================================================================================150
-#	UTILITIES
-# ======================================================================================================================================================150
-
-./util/graphics/graphics.o:	./util/graphics/graphics.h \
-	./util/graphics/graphics.c
+./util/graphics/graphics.o:./util/graphics/graphics.h ./util/graphics/graphics.c
 	$(CC)	./util/graphics/graphics.c \
 		-c \
 		-o ./util/graphics/graphics.o \
 		-O3
 
-./util/graphics/resize.o:	./util/graphics/resize.h \
-	./util/graphics/resize.c
+./util/graphics/resize.o:./util/graphics/resize.h ./util/graphics/resize.c
 	$(CC)	./util/graphics/resize.c \
 		-c \
 		-o ./util/graphics/resize.o \
 		-O3
 
-./util/timer/timer.o:	./util/timer/timer.h \
-	./util/timer/timer.c
+./util/timer/timer.o:./util/timer/timer.h ./util/timer/timer.c
 	$(CC)	./util/timer/timer.c \
 		-c \
 		-o ./util/timer/timer.o \
 		-O3
-
-run: srad
-	./srad 1000 0.5 502 458
 
 clean:
 	rm	./*.o srad *.pgm\
 		./kernel/*.o \
 		./util/graphics/*.o \
 		./util/timer/*.o
+
+run: srad
+	./srad 1000 0.5 502 458
+

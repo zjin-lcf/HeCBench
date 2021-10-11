@@ -6,7 +6,12 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-CUDA_ARCH = "--cuda-gpu-arch=sm_60"
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
@@ -24,28 +29,36 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_GPU -std=c++17 -Wall -I../include \
-          -fsycl -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-	  -ffast-math \
-          -fsycl-unnamed-lambda \
-          -Xsycl-target-backend $(CUDA_ARCH) \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -61,4 +74,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

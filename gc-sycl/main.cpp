@@ -72,6 +72,125 @@ static unsigned int hash(unsigned int val)
   return (val >> 16) ^ val;
 }
 
+void kernel_runLarge(
+    nd_item<1> &item,
+    const int nodes, 
+    const int* const __restrict__ nidx,
+    const int* const __restrict__ nlist,
+    int* const __restrict__ posscol,
+    int* const __restrict__ posscol2,
+    volatile int* const __restrict__ color,
+    const int* const __restrict__ wl,
+    const int* __restrict__ wlsize)
+{
+  const int stop = wlsize[0];
+  if (stop != 0) {
+    const int lane = item.get_local_id(0) % WS;
+    const int thread = item.get_global_id(0);
+    const int threads = item.get_group_range(0) * ThreadsPerBlock;
+    auto sg = item.get_sub_group();
+    bool again;
+    do {
+      again = false;
+      for (int w = thread; ext::oneapi::any_of(item.get_group(), w < stop); w += threads) {
+        bool shortcut, done, cond = false;
+        int v, data, range, beg, pcol;
+        if (w < stop) {
+          v = wl[w];
+          data = color[v];
+          range = data >> (WS / 2);
+          if (range > 0) {
+            beg = nidx[v];
+            pcol = posscol[v];
+            cond = true;
+          }
+        }
+
+        int bal = ballot(sg, cond);
+        while (bal != 0) {
+          const int who = ffs(bal) - 1;
+          bal &= bal - 1;
+          const int wdata = sg.shuffle(data, who);
+          const int wrange = wdata >> (WS / 2);
+          const int wbeg = sg.shuffle(beg, who);
+          const int wmincol = wdata & Mask;
+          const int wmaxcol = wmincol + wrange;
+          const int wend = wbeg + wmaxcol;
+          const int woffs = wbeg / WS;
+          int wpcol = sg.shuffle(pcol, who);
+
+          bool wshortcut = true;
+          bool wdone = true;
+          for (int i = wbeg + lane; ext::oneapi::any_of(item.get_group(), i < wend); i += WS) {
+            int nei, neidata, neirange;
+            if (i < wend) {
+              nei = nlist[i];
+              neidata = color[nei];
+              neirange = neidata >> (WS / 2);
+              const bool neidone = (neirange == 0);
+              wdone &= neidone; //consolidated below
+              if (neidone) {
+                const int neicol = neidata;
+                if (neicol < WS) {
+                  wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
+                } else {
+                  if ((wmincol <= neicol) && (neicol < wmaxcol) && ((posscol2[woffs + neicol / WS] << (neicol % WS)) < 0)) {
+
+                    //atomic_fetch_and(posscol2[woffs + neicol / WS], (int)(~((unsigned int)MSB >> (neicol % WS))));
+                    auto ao = ext::oneapi::atomic_ref<int, 
+                         ext::oneapi::memory_order::relaxed,
+                         ext::oneapi::memory_scope::device,
+                         access::address_space::global_space> (posscol2[woffs + neicol / WS]);
+                    ao &= (int)(~((unsigned int)MSB >> (neicol % WS)));
+                  }
+                }
+              } else {
+                const int neimincol = neidata & Mask;
+                const int neimaxcol = neimincol + neirange;
+                if ((neimincol <= wmincol) && (neimaxcol >= wmincol)) wshortcut = false; //consolidated below
+              }
+            }
+          }
+          wshortcut = ext::oneapi::all_of(item.get_group(), wshortcut);
+          wdone = ext::oneapi::all_of(item.get_group(), wdone);
+          wpcol &= sg.shuffle_xor(wpcol, 1);
+          wpcol &= sg.shuffle_xor(wpcol, 2);
+          wpcol &= sg.shuffle_xor(wpcol, 4);
+          wpcol &= sg.shuffle_xor(wpcol, 8);
+          wpcol &= sg.shuffle_xor(wpcol, 16);
+          if (who == lane) pcol = wpcol;
+          if (who == lane) done = wdone;
+          if (who == lane) shortcut = wshortcut;
+        }
+
+        if (w < stop) {
+          if (range > 0) {
+            const int mincol = data & Mask;
+            int val = pcol, mc = 0;
+            if (pcol == 0) {
+              const int offs = beg / WS;
+              mc = sycl::max(1, mincol / WS);
+              while ((val = posscol2[offs + mc]) == 0) mc++;
+            }
+            int newmincol = mc * WS + sycl::clz(val);
+            if (mincol != newmincol) shortcut = false;
+            if (shortcut || done) {
+              pcol = (newmincol < WS) ? ((unsigned int)MSB >> newmincol) : 0;
+            } else {
+              const int maxcol = mincol + range;
+              const int range = maxcol - newmincol;
+              newmincol = (range << (WS / 2)) | newmincol;
+              again = true;
+            }
+            posscol[v] = pcol;
+            color[v] = newmincol;
+          }
+        }
+      }
+    } while (ext::oneapi::any_of(item.get_group(), again));
+  }
+}
+
 int main(int argc, char* argv[])
 {
   printf("ECL-GC v1.2 (%s)\n", __FILE__);
@@ -151,7 +270,7 @@ int main(int argc, char* argv[])
         auto sg = item.get_sub_group();
 
         int maxrange = -1;
-        for (int v = thread; sycl::ONEAPI::any_of(item.get_group(), v < nodes); v += threads) {
+        for (int v = thread; ext::oneapi::any_of(item.get_group(), v < nodes); v += threads) {
           bool cond = false;
           int beg, end, pos, degv, active;
           if (v < nodes) {
@@ -184,7 +303,7 @@ int main(int argc, char* argv[])
             const int wend = sg.shuffle(end, who);
             const int wdegv = wend - wbeg;
             int wpos = wbeg;
-            for (int i = wbeg + lane; sycl::ONEAPI::any_of(item.get_group(), i < wend); i += WS) {
+            for (int i = wbeg + lane; ext::oneapi::any_of(item.get_group(), i < wend); i += WS) {
               int wnei;
               bool prio = false;
               if (i < wend) {
@@ -222,110 +341,18 @@ int main(int argc, char* argv[])
       auto wl = wl_d.get_access<sycl_read>(cgh);
       auto wlsize = wlsize_d.get_access<sycl_read>(cgh);
       cgh.parallel_for<class runLarge>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        const int stop = wlsize[0];
-        if (stop != 0) {
-          const int lane = item.get_local_id(0) % WS;
-          const int thread = item.get_global_id(0);
-          const int threads = item.get_group_range(0) * ThreadsPerBlock;
-          auto sg = item.get_sub_group();
-          bool again;
-          do {
-            again = false;
-            for (int w = thread; sycl::ONEAPI::any_of(item.get_group(), w < stop); w += threads) {
-              bool shortcut, done, cond = false;
-              int v, data, range, beg, pcol;
-              if (w < stop) {
-                v = wl[w];
-                data = color[v];
-                range = data >> (WS / 2);
-                if (range > 0) {
-                  beg = nidx[v];
-                  pcol = posscol[v];
-                  cond = true;
-                }
-              }
+        kernel_runLarge(item, nodes, 
+                        nidx.get_pointer(),
+                        nlist.get_pointer(),
+                        posscol.get_pointer(), 
+                        posscol2.get_pointer(), 
+                        color.get_pointer(), 
+                        wl.get_pointer(), 
+                        wlsize.get_pointer());
 
-              int bal = ballot(sg, cond);
-              while (bal != 0) {
-                const int who = ffs(bal) - 1;
-                bal &= bal - 1;
-                const int wdata = sg.shuffle(data, who);
-                const int wrange = wdata >> (WS / 2);
-                const int wbeg = sg.shuffle(beg, who);
-                const int wmincol = wdata & Mask;
-                const int wmaxcol = wmincol + wrange;
-                const int wend = wbeg + wmaxcol;
-                const int woffs = wbeg / WS;
-                int wpcol = sg.shuffle(pcol, who);
-
-                bool wshortcut = true;
-                bool wdone = true;
-                for (int i = wbeg + lane; sycl::ONEAPI::any_of(item.get_group(), i < wend); i += WS) {
-                  int nei, neidata, neirange;
-                  if (i < wend) {
-                    nei = nlist[i];
-                    neidata = color[nei];
-                    neirange = neidata >> (WS / 2);
-                    const bool neidone = (neirange == 0);
-                    wdone &= neidone; //consolidated below
-                    if (neidone) {
-                      const int neicol = neidata;
-                      if (neicol < WS) {
-                        wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
-                      } else {
-                        if ((wmincol <= neicol) && (neicol < wmaxcol) && ((atomic_load(posscol2[woffs + neicol / WS]) << (neicol % WS)) < 0)) {
-                          atomic_fetch_and(posscol2[woffs + neicol / WS], (int)(~((unsigned int)MSB >> (neicol % WS))));
-                        }
-                      }
-                    } else {
-                      const int neimincol = neidata & Mask;
-                      const int neimaxcol = neimincol + neirange;
-                      if ((neimincol <= wmincol) && (neimaxcol >= wmincol)) wshortcut = false; //consolidated below
-                    }
-                  }
-                }
-                wshortcut = sycl::ONEAPI::all_of(item.get_group(), wshortcut);
-                wdone = sycl::ONEAPI::all_of(item.get_group(), wdone);
-                wpcol &= sg.shuffle_xor(wpcol, 1);
-                wpcol &= sg.shuffle_xor(wpcol, 2);
-                wpcol &= sg.shuffle_xor(wpcol, 4);
-                wpcol &= sg.shuffle_xor(wpcol, 8);
-                wpcol &= sg.shuffle_xor(wpcol, 16);
-                if (who == lane) pcol = wpcol;
-                if (who == lane) done = wdone;
-                if (who == lane) shortcut = wshortcut;
-              }
-
-              if (w < stop) {
-                if (range > 0) {
-                  const int mincol = data & Mask;
-                  int val = pcol, mc = 0;
-                  if (pcol == 0) {
-                    const int offs = beg / WS;
-                    mc = sycl::max(1, mincol / WS);
-                    while ((val = atomic_load(posscol2[offs + mc])) == 0) mc++;
-                  }
-                  int newmincol = mc * WS + sycl::clz(val);
-                  if (mincol != newmincol) shortcut = false;
-                  if (shortcut || done) {
-                    pcol = (newmincol < WS) ? ((unsigned int)MSB >> newmincol) : 0;
-                  } else {
-                    const int maxcol = mincol + range;
-                    const int range = maxcol - newmincol;
-                    newmincol = (range << (WS / 2)) | newmincol;
-                    again = true;
-                  }
-                  posscol[v] = pcol;
-                  color[v] = newmincol;
-                }
-              }
-            }
-          } while (sycl::ONEAPI::any_of(item.get_group(), again));
-        }
       });
     });
 
-    /*
     q.submit([&] (handler &cgh) {
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
@@ -377,7 +404,6 @@ int main(int argc, char* argv[])
         } while (again);
       });
     });
-    */
   }
   q.wait();
 
@@ -394,17 +420,24 @@ int main(int argc, char* argv[])
     cgh.copy(acc, color);
   }).wait();
 
-  for (int v = 0; v < nodes; v++) {
-    if (color[v] < 0) 
+  bool ok = true;
+  for (int v = 0; v < g.nodes; v++) {
+    if (color[v] < 0) {
       printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n",
           v, g.nindex[v + 1] - g.nindex[v]);
+      ok = false;
+      break;
+    }
     for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
-      if (color[g.nlist[i]] == color[v]) 
+      if (color[g.nlist[i]] == color[v]) {
         printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n",
             color[v], v, g.nlist[i]);
+        ok = false;
+        break;
+      }
     }
   }
-  printf("Passed\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
 #ifdef DEBUG
   const int vals = 16;

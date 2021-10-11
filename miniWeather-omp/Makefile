@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = mpiicpc
+CC        = mpicc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu

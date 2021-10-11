@@ -1,4 +1,4 @@
-ARCH = gfx906
+ARCH = gfx908
 
 NVCC = hipcc
 NVCC_ARCH =

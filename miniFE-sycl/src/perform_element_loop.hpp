@@ -72,9 +72,6 @@ perform_element_loop(const simple_mesh_description<GlobalOrdinal>& mesh,
                                        iter.x, iter.y, iter.z);
   }
 
-  timer_type t_gn = 0, t_ce = 0, t_si = 0;
-  timer_type t0 = 0;
-
   const MINIFE_GLOBAL_ORDINAL elemID_size = elemIDs.size();
 
   #pragma omp parallel for shared (elemIDs)

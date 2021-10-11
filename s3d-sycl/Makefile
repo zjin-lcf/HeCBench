@@ -3,19 +3,24 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = dpcpp
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
 
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = s3d
+program = main
 
-source = main.cpp  Option.cpp  OptionParser.cpp  S3D.cpp 
+source = main.cpp Option.cpp OptionParser.cpp S3D.cpp 
 
 obj = $(source:.cpp=.o)
 
@@ -24,50 +29,56 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
+ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
 
 main.o: main.cpp OptionParser.h Utility.h 
-	$(CC) $(CFLAGS) -c $< -o $@
 
 Option.o: Option.cpp Option.h 
-	$(CC) $(CFLAGS) -c $< -o $@
 
-OptionParser.o: OptionParser.cpp OptionParser.h  Utility.h
-	$(CC) $(CFLAGS) -c $< -o $@
+OptionParser.o: OptionParser.cpp OptionParser.h Utility.h
 
 S3D.o: S3D.cpp S3D.h OptionParser.h *.sycl
-	$(CC) $(CFLAGS) -c $< -o $@
-
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) -q -n 100 -s 1
-
