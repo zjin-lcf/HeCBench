@@ -15,10 +15,10 @@ warpReduceMax_with_index_reverse(short val, short& myIndex, short& myIndex2, uns
   for (int offset = warpSize / 2; offset > 0; offset /= 2)
   {
 
-    short tempVal = __shfl_down(val, offset);
+    short tempVal = __shfl_down_sync(0xffffffff, val, offset);
     val     = max(val,tempVal);
-    newInd  = __shfl_down(ind, offset);
-    newInd2 = __shfl_down(ind2, offset);
+    newInd  = __shfl_down_sync(0xffffffff, ind, offset);
+    newInd2 = __shfl_down_sync(0xffffffff, ind2, offset);
 
     if(val != myMax)
     {
@@ -58,10 +58,10 @@ warpReduceMax_with_index(short val, short& myIndex, short& myIndex2, unsigned le
   for (int offset = warpSize / 2; offset > 0; offset /= 2)
   {
 
-    short tempVal = __shfl_down(val, offset);
+    short tempVal = __shfl_down_sync(0xffffffff, val, offset);
     val     = max(val,tempVal);
-    newInd  = __shfl_down(ind, offset);
-    newInd2 = __shfl_down(ind2, offset);
+    newInd  = __shfl_down_sync(0xffffffff, ind, offset);
+    newInd2 = __shfl_down_sync(0xffffffff, ind2, offset);
     if(val != myMax)
     {
       ind   = newInd;
@@ -346,8 +346,8 @@ sequence_aa_kernel(
 
       short fVal = _prev_F + extendGap;
       short hfVal = _prev_H + startGap;
-      short valeShfl = __shfl(_prev_E, laneId - 1, 32);
-      short valheShfl = __shfl(_prev_H, laneId - 1, 32);
+      short valeShfl = __shfl_sync(0xffffffff, _prev_E, laneId - 1, 32);
+      short valheShfl = __shfl_sync(0xffffffff, _prev_H, laneId - 1, 32);
 
       short eVal=0, heVal = 0;
 
@@ -370,7 +370,7 @@ sequence_aa_kernel(
       _curr_F = (fVal > hfVal) ? fVal : hfVal;
       _curr_E = (eVal > heVal) ? eVal : heVal;
 
-      short testShufll = __shfl(_prev_prev_H, laneId - 1, 32);
+      short testShufll = __shfl_sync(0xffffffff, _prev_prev_H, laneId - 1, 32);
       short final_prev_prev_H = 0;
       if(diag >= maxSize)
       {
@@ -582,8 +582,8 @@ sequence_aa_reverse_kernel(
 
       short fVal = _prev_F + extendGap;
       short hfVal = _prev_H + startGap;
-      short valeShfl = __shfl(_prev_E, laneId- 1, 32);
-      short valheShfl = __shfl(_prev_H, laneId - 1, 32);
+      short valeShfl = __shfl_sync(0xffffffff, _prev_E, laneId- 1, 32);
+      short valheShfl = __shfl_sync(0xffffffff, _prev_H, laneId - 1, 32);
 
       short eVal=0;
       short heVal = 0;
@@ -613,7 +613,7 @@ sequence_aa_reverse_kernel(
       }
       _curr_F = (fVal > hfVal) ? fVal : hfVal;
       _curr_E = (eVal > heVal) ? eVal : heVal;
-      short testShufll = __shfl(_prev_prev_H, laneId - 1, 32);
+      short testShufll = __shfl_sync(0xffffffff, _prev_prev_H, laneId - 1, 32);
       short final_prev_prev_H =0;
 
       if(diag >= maxSize)
