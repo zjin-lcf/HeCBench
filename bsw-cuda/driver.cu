@@ -174,7 +174,6 @@ void kernel_driver_aa(std::string filename,
     cudaMemcpyAsync(d_offset_query, h_offsetB, sizeof(unsigned) * sequences_per_stream,
         cudaMemcpyHostToDevice, 0);
 
-
     cudaMemcpyAsync(d_strA, h_strA, sizeof(char) * totalLengthA, 
         cudaMemcpyHostToDevice, 0);
 

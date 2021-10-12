@@ -10,15 +10,15 @@ warpReduceMax_with_index_reverse(short val, short& myIndex, short& myIndex2, uns
   short ind      = myIndex;
   short ind2     = myIndex2;
   myMax          = val;
-  //unsigned mask  = __ballot_sync(0xffffffff, threadIdx.x < lengthSeqB);  // blockDim.x
+  unsigned mask  = __ballot_sync(0xffffffff, threadIdx.x < lengthSeqB);  // blockDim.x
   // unsigned newmask;
   for (int offset = warpSize / 2; offset > 0; offset /= 2)
   {
 
-    short tempVal = __shfl_down_sync(0xffffffff, val, offset);
+    short tempVal = __shfl_down_sync(mask, val, offset);
     val     = max(val,tempVal);
-    newInd  = __shfl_down_sync(0xffffffff, ind, offset);
-    newInd2 = __shfl_down_sync(0xffffffff, ind2, offset);
+    newInd  = __shfl_down_sync(mask, ind, offset);
+    newInd2 = __shfl_down_sync(mask, ind2, offset);
 
     if(val != myMax)
     {
@@ -53,15 +53,15 @@ warpReduceMax_with_index(short val, short& myIndex, short& myIndex2, unsigned le
   short ind      = myIndex;
   short ind2     = myIndex2;
   myMax          = val;
-  // unsigned mask  = __ballot_sync(0xffffffff, threadIdx.x < lengthSeqB);  // blockDim.x
+  unsigned mask  = __ballot_sync(0xffffffff, threadIdx.x < lengthSeqB);  // blockDim.x
   // unsigned newmask;
   for (int offset = warpSize / 2; offset > 0; offset /= 2)
   {
 
-    short tempVal = __shfl_down_sync(0xffffffff, val, offset);
+    short tempVal = __shfl_down_sync(mask, val, offset);
     val     = max(val,tempVal);
-    newInd  = __shfl_down_sync(0xffffffff, ind, offset);
-    newInd2 = __shfl_down_sync(0xffffffff, ind2, offset);
+    newInd  = __shfl_down_sync(mask, ind, offset);
+    newInd2 = __shfl_down_sync(mask, ind2, offset);
     if(val != myMax)
     {
       ind   = newInd;
@@ -342,12 +342,11 @@ sequence_aa_kernel(
 
     if(is_valid[thread_Id] && thread_Id < minSize)
     {
-      // unsigned mask  = __ballot_sync(__activemask(), (is_valid[thread_Id] &&( thread_Id < minSize)));
-
+      unsigned mask  = __ballot_sync(__activemask(), (is_valid[thread_Id] &&( thread_Id < minSize)));
       short fVal = _prev_F + extendGap;
       short hfVal = _prev_H + startGap;
-      short valeShfl = __shfl_sync(0xffffffff, _prev_E, laneId - 1, 32);
-      short valheShfl = __shfl_sync(0xffffffff, _prev_H, laneId - 1, 32);
+      short valeShfl = __shfl_sync(mask, _prev_E, laneId - 1, 32);
+      short valheShfl = __shfl_sync(mask, _prev_H, laneId - 1, 32);
 
       short eVal=0, heVal = 0;
 
@@ -370,7 +369,7 @@ sequence_aa_kernel(
       _curr_F = (fVal > hfVal) ? fVal : hfVal;
       _curr_E = (eVal > heVal) ? eVal : heVal;
 
-      short testShufll = __shfl_sync(0xffffffff, _prev_prev_H, laneId - 1, 32);
+      short testShufll = __shfl_sync(mask, _prev_prev_H, laneId - 1, 32);
       short final_prev_prev_H = 0;
       if(diag >= maxSize)
       {
@@ -577,13 +576,11 @@ sequence_aa_reverse_kernel(
     if(is_valid[thread_Id] && thread_Id < minSize)
     {
 
-      //unsigned mask  = __ballot_sync(__activemask(), (is_valid[thread_Id] &&( thread_Id < minSize)));
-
-
+      unsigned mask  = __ballot_sync(__activemask(), (is_valid[thread_Id] &&( thread_Id < minSize)));
       short fVal = _prev_F + extendGap;
       short hfVal = _prev_H + startGap;
-      short valeShfl = __shfl_sync(0xffffffff, _prev_E, laneId- 1, 32);
-      short valheShfl = __shfl_sync(0xffffffff, _prev_H, laneId - 1, 32);
+      short valeShfl = __shfl_sync(mask, _prev_E, laneId- 1, 32);
+      short valheShfl = __shfl_sync(mask, _prev_H, laneId - 1, 32);
 
       short eVal=0;
       short heVal = 0;
@@ -613,7 +610,7 @@ sequence_aa_reverse_kernel(
       }
       _curr_F = (fVal > hfVal) ? fVal : hfVal;
       _curr_E = (eVal > heVal) ? eVal : heVal;
-      short testShufll = __shfl_sync(0xffffffff, _prev_prev_H, laneId - 1, 32);
+      short testShufll = __shfl_sync(mask, _prev_prev_H, laneId - 1, 32);
       short final_prev_prev_H =0;
 
       if(diag >= maxSize)
