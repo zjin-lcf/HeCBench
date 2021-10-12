@@ -751,7 +751,7 @@ void reductions(
     range<2> lws (16, 16);
     q.submit([&] (handler &cgh) {
       auto id_acc = d_identity.get_access<sycl_read_write>(cgh);
-      auto reducer = ONEAPI::reduction(id_acc, identity, std::plus<double2>());
+      auto reducer = ext::oneapi::reduction(id_acc, identity, std::plus<double2>());
       auto state = d_state.get_access<sycl_read>(cgh);
       auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
       auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);

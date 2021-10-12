@@ -62,7 +62,7 @@ __global__ void sigmas_kernel(const value_t* __restrict distances,
 
     const value_t entropy      = __logf(sum_Pi) + beta * sum_disti_Pi;
     const value_t entropy_diff = entropy - desired_entropy;
-    if (fabs(entropy_diff) <= tol) {
+    if (fabsf(entropy_diff) <= tol) {
       break;
     }
 

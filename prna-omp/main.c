@@ -117,7 +117,8 @@ int main(int argc, char **argv)
 	  binary_parameter_filename, 
 	  par.use_dna_params ? "is from" : "is not from");
   } else {
-    const char *path = getenv("DATAPATH");
+    const char *path = "../prna-cuda/data_tables"; //getenv("DATAPATH");
+    //const char *path = getenv("DATAPATH");
     if (!path)
       die("%s: need to set environment variable $DATAPATH", cmd);
     param_read_from_text(path, &par, use_dna_params,0);

@@ -24,7 +24,6 @@
 #include <vector>
 #include <cmath>
 #include <cuda.h>
-
 #include "reference.h"
 
 // Calculate the power parameter, and then weighted interpolating

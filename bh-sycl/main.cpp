@@ -778,7 +778,7 @@ int main(int argc, char* argv[])
                 dy = pn.y() - pi.y();
                 dz = pn.z() - pi.z();
                 tmp = dx*dx + (dy*dy + (dz*dz + epssq));  // compute distance squared (plus softening)
-                if ((n < nbodies) || sycl::ONEAPI::all_of(item.get_group(), tmp >= dq[depth])) {  
+                if ((n < nbodies) || ext::oneapi::all_of(item.get_group(), tmp >= dq[depth])) {  
                 // check if all threads agree that cell is far enough away (or is a body)
                   tmp = sycl::rsqrt(tmp);  // compute distance
                   tmp = pn.w() * tmp * tmp * tmp;

@@ -6,7 +6,8 @@
 
 #define ERT_ALIGN           256
 #define ERT_NUM_EXPERIMENTS 1
-#define ERT_MEMORY_MAX      33554432
+//#define ERT_MEMORY_MAX      33554432
+#define ERT_MEMORY_MAX      1000
 #define ERT_WORKING_SET_MIN 128
 #define ERT_TRIALS_MIN      1
 #define ERT_WSS_MULT        1.3

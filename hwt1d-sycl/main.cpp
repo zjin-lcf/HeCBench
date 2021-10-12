@@ -75,13 +75,6 @@ int main(int argc, char * argv[])
   buffer<float, 1> partialOutDataBuf (signalLength);
   buffer<float, 1> outDataBuf (signalLength);
 
-  // Warm up
-  for(int i = 0; i < 2 && iterations != 1; i++)
-  {
-    runKernel(q, inData, hOutData, dOutData, dPartialOutData,
-        signalLength, inDataBuf, partialOutDataBuf, outDataBuf);
-  }
-
   std::cout << "Executing kernel for " 
             << iterations << " iterations" << std::endl;
   std::cout << "-------------------------------------------" << std::endl;

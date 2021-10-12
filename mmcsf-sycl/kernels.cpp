@@ -48,9 +48,9 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
         diffFiber = true;
         for(unsigned int r=laneId; r<R; r+=32) { 
           //atomicAdd(&dU0[idx0 * R + r], tmp); //2PR
-          auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                       ONEAPI::memory_order::relaxed, 
-                       ONEAPI::memory_scope::device, 
+          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                       ext::oneapi::memory_order::relaxed, 
+                       ext::oneapi::memory_scope::device, 
                        access::address_space::global_space> (dU0[idx0 * R + r]);
           atomic_obj_ref.fetch_add(tmp);
         } 
@@ -61,9 +61,9 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
     if(!diffFiber) {  
       for(unsigned int r=laneId; r<R; r+=32) { 
         //atomicAdd(&dU0[idx0 * R + r], tmp); 
-        auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (dU0[idx0 * R + r]);
         atomic_obj_ref.fetch_add(tmp);
       }  
@@ -124,9 +124,9 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
         diffFiber = true;
         for(unsigned int r=laneId; r<R; r+=32) { 
           //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR
-          auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                       ONEAPI::memory_order::relaxed, 
-                       ONEAPI::memory_scope::device, 
+          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                       ext::oneapi::memory_order::relaxed, 
+                       ext::oneapi::memory_scope::device, 
                        access::address_space::global_space> (dU0[idx0 * R + r]);
           atomic_obj_ref.fetch_add(tmp2);
         } 
@@ -137,9 +137,9 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
     if(!diffFiber) {  
       for(unsigned int r=laneId; r<R; r+=32) {
         //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR           
-        auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (dU0[idx0 * R + r]);
         atomic_obj_ref.fetch_add(tmp2);
       }
@@ -183,9 +183,9 @@ void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeS
     for(unsigned int r=laneId; r<R; r+=32) { 
       tmp2 = tmp * dU3[idx3 * R + r];
       //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR
-      auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                   ONEAPI::memory_order::relaxed, 
-                   ONEAPI::memory_scope::device, 
+      auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                   ext::oneapi::memory_order::relaxed, 
+                   ext::oneapi::memory_scope::device, 
                    access::address_space::global_space> (dU0[idx0 * R + r]);
       atomic_obj_ref.fetch_add(tmp2);
     }    
@@ -223,9 +223,9 @@ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
     for(unsigned int r=laneId; r<R; r+=32) { 
       tmp = tmp_val * dU2[idx2 * R + r] ;
       //atomicAdd(&dU0[idx0 * R + r], tmp); //2PR
-      auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                   ONEAPI::memory_order::relaxed, 
-                   ONEAPI::memory_scope::device, 
+      auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                   ext::oneapi::memory_order::relaxed, 
+                   ext::oneapi::memory_scope::device, 
                    access::address_space::global_space> (dU0[idx0 * R + r]);
       atomic_obj_ref.fetch_add(tmp);
 
@@ -264,9 +264,9 @@ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
       }
       for(unsigned int r=laneId; r<R; r+=32)  {
         //atomicAdd(&dU0[idx0 * R + r], tmp * dU2[idx2 * R + r] * dU3[idx3 * R + r]) ;  
-        auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (dU0[idx0 * R + r]);
         atomic_obj_ref.fetch_add(tmp * dU2[idx2 * R + r] * dU3[idx3 * R + r]);
       }
@@ -304,9 +304,9 @@ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
       for(unsigned int r=laneId; r<R; r+=32) {
         tmp_val = vals[x] * tmp;///dU1[idx1 * R + r] * dU2[idx2 * R + r] ; //2MR
         //atomicAdd(&dU0[idx0 * R + r], tmp_val);
-        auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (dU0[idx0 * R + r]);
         atomic_obj_ref.fetch_add(tmp_val);
       }
@@ -346,9 +346,9 @@ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
         for(unsigned int r=laneId; r<R; r+=32) {
           tmp = vals[x] * dU3[idx3 * R + r] * tmp_val;//2MR
           //atomicAdd(&dU0[idx0 * R + r], tmp);
-          auto atomic_obj_ref = ONEAPI::atomic_ref<DTYPE,
-                       ONEAPI::memory_order::relaxed, 
-                       ONEAPI::memory_scope::device, 
+          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
+                       ext::oneapi::memory_order::relaxed, 
+                       ext::oneapi::memory_scope::device, 
                        access::address_space::global_space> (dU0[idx0 * R + r]);
           atomic_obj_ref.fetch_add(tmp);
         }

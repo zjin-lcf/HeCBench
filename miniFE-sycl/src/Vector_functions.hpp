@@ -307,7 +307,7 @@ dot(const Vector& x,
     auto ycoefs_acc = d_ycoefs.template get_access<sycl_read>(h);
     auto result_acc = d_result.template get_access<sycl_read_write>(h);
     h.parallel_for(nd_range<1>(gws, lws), 
-      ONEAPI::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
+      ext::oneapi::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
       [=] (nd_item<1> item, auto& result_acc) {
       int i = item.get_global_id(0);
       if (i < n) result_acc += xcoefs_acc[i] * ycoefs_acc[i];
@@ -425,7 +425,7 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
     auto xcoefs_acc = d_xcoefs.template get_access<sycl_read>(h);
     auto result_acc = d_result.template get_access<sycl_read_write>(h);
     h.parallel_for<class reduction_kernel>(nd_range<1>(gws, lws), 
-      ONEAPI::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
+      ext::oneapi::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
       [=] (nd_item<1> item, auto& result_acc) {
       int i = item.get_global_id(0);
       if (i < n) result_acc += xcoefs_acc[i] * xcoefs_acc[i];

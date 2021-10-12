@@ -449,8 +449,8 @@ bool compact_check_results(full_data cc, compact_data ccc)
   int sizex = cc.sizex;
   int sizey = cc.sizey;
   int Nmats = cc.Nmats;
-  int mmc_cells = ccc.mmc_cells;
-  int mm_len = ccc.mm_len;
+  //int mmc_cells = ccc.mmc_cells;
+  //int mm_len = ccc.mm_len;
 
 
   printf("Checking results of compact representation... ");

@@ -4,18 +4,13 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
-
 #include <string.h>
 #include <string>
 
-#include <CL/sycl.hpp>
+#include "lud.h"
 #include "common.h"
 
-
 #define BLOCK_SIZE 16
-
-using namespace cl::sycl;
-constexpr access::mode sycl_read_write = access::mode::read_write;
 
 
 double gettime() {

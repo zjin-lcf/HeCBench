@@ -32,9 +32,9 @@ void k_hashtable_insert(
     {
       uint32_t expected = kEmpty;
 
-      auto atomic_obj_ref = ONEAPI::atomic_ref<uint32_t, 
-                            ONEAPI::memory_order::relaxed,
-                            ONEAPI::memory_scope::device,
+      auto atomic_obj_ref = ext::oneapi::atomic_ref<uint32_t, 
+                            ext::oneapi::memory_order::relaxed,
+                            ext::oneapi::memory_scope::device,
                             access::address_space::global_space> (hashtable[slot].key);
       atomic_obj_ref.compare_exchange_strong(expected, key);
 
@@ -140,9 +140,9 @@ void k_iterate_hashtable(
       uint32_t value = pHashTable[tid].value;
       if (value != kEmpty)
       {
-        auto atomic_obj_ref = ONEAPI::atomic_ref<uint32_t, 
-            ONEAPI::memory_order::relaxed,
-            ONEAPI::memory_scope::device,
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<uint32_t, 
+            ext::oneapi::memory_order::relaxed,
+            ext::oneapi::memory_scope::device,
             access::address_space::global_space> (kvs_size[0]);
         uint32_t size = atomic_obj_ref.fetch_add(1);
 

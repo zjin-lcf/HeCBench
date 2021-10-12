@@ -28,14 +28,15 @@
 	a = input_acc[Astart + aidx];
 	b = input_acc[Bstart + bidx];
 	
-	while(true)//aidx < nrElems/2)// || (bidx < nrElems/2  && (Bstart + bidx < constEndAddr[division])))
+	while(true)
 	{
 		/**
 		 * For some reason, it's faster to do the texture fetches here than
 		 * after the merge
 		 */
 		cl::sycl::float4 nextA = input_acc[Astart + aidx + 1];
-		cl::sycl::float4 nextB = input_acc[Bstart + bidx + 1];
+                cl::sycl::float4 nextB = (Bstart + bidx + 1 >= listsize/4) ? 
+                                         cl::sycl::float4(0.f) : input_acc[Bstart + bidx + 1];
         
 		cl::sycl::float4 na = getLowest(a,b);
 		cl::sycl::float4 nb = getHighest(a,b);

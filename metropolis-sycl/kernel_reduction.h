@@ -94,9 +94,9 @@ void redenergy(queue &q,
       sum = block_reduce<T>(sum, lmem.get_pointer(), item); 
 
       if(tid == 0) {
-        auto atomic_obj_ref = ONEAPI::atomic_ref<float,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<float,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (out[k]);
         atomic_obj_ref.fetch_add(sum);
       }

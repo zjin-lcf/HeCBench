@@ -334,7 +334,7 @@ int main(int argc, char** argv)
     GPUGaussianFilterRGBA(uiInput, uiTmp, uiOutput, uiImageWidth, uiImageHeight, &GP);
 
     // Start round-trip timer and process iCycles loops on the GPU
-    const int iCycles = 0;
+    const int iCycles = 100;
     printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
     for (int i = 0; i < iCycles; i++)
     {

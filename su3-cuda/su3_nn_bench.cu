@@ -19,7 +19,7 @@ typedef std::chrono::system_clock Clock;
 #  define LDIM 32       // Lattice size = LDIM^4
 #endif
 #ifndef PRECISION
-#  define PRECISION 2  // 1->single, 2->double
+#  define PRECISION 1  // 1->single, 2->double
 #endif
 
 // Global variables

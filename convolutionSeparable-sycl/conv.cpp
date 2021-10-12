@@ -41,7 +41,7 @@ void convolutionRows(
     range<2> gws (imageH, imageW / ROWS_RESULT_STEPS);
 
     q.submit([&] (handler &cgh) {
-      auto dst = d_Dst.get_access<sycl_write>(cgh);
+      auto dst = d_Dst.get_access<sycl_discard_write>(cgh);
       auto src = d_Src.get_access<sycl_read>(cgh);
       auto kernel = d_Kernel.get_access<sycl_read>(cgh);
       accessor<float, 2, sycl_read_write, access::target::local> 

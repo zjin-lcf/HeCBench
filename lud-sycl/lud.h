@@ -4,9 +4,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-
-
-
 #define GET_RAND_FP ( (float)rand() /   \
                      ((float)(RAND_MAX)+(float)(1)) )
 
