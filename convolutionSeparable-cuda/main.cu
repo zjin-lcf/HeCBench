@@ -58,8 +58,6 @@ int main(int argc, char **argv)
       imageW
            );
   cudaMemcpy(h_Buffer, d_Buffer, sizeof(float)*imageW * imageH, cudaMemcpyDeviceToHost);
-    for (int i = 0; i < 32; i++)
-      printf("%d %f\n", i, h_Buffer[i]);
 
   convolutionColumns(
       d_Output,

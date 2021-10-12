@@ -559,14 +559,14 @@ void scatter(double lc, float value, float* field)
   int i    = (int)lc;
   float di = lc - i;
 
-  auto f1 = ONEAPI::atomic_ref<float, 
-    ONEAPI::memory_order::relaxed,
-    ONEAPI::memory_scope::device,
+  auto f1 = ext::oneapi::atomic_ref<float, 
+    ext::oneapi::memory_order::relaxed,
+    ext::oneapi::memory_scope::device,
     access::address_space::global_space> (field[i]);
   f1 += value * (1 - di);
-  auto f2 = ONEAPI::atomic_ref<float, 
-    ONEAPI::memory_order::relaxed,
-    ONEAPI::memory_scope::device,
+  auto f2 = ext::oneapi::atomic_ref<float, 
+    ext::oneapi::memory_order::relaxed,
+    ext::oneapi::memory_scope::device,
     access::address_space::global_space> (field[i+1]);
   f2 += value * di;
 }

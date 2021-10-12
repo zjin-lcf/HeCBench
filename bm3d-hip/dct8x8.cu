@@ -221,7 +221,7 @@ __global__ void IDCT2D8x8(float *__restrict dst, const float *__restrict src, co
   InplaceIDCTvector(bl_ptr - threadIdx.x + BLOCK_SIZE * threadIdx.x, 1);
 
   //process columns
-      InplaceIDCTvector(bl_ptr, BLOCK_SIZE);    
+  InplaceIDCTvector(bl_ptr, BLOCK_SIZE);    
 
   for (unsigned int i = 0; i < BLOCK_SIZE; i++)
     dst[i * BLOCK_SIZE] = bl_ptr[i * BLOCK_SIZE];

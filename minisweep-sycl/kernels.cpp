@@ -336,9 +336,9 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
         }
 
         /*--- ref_state inline ---*/
-        auto atomic_obj_ref = ONEAPI::atomic_ref<P,
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+        auto atomic_obj_ref = ext::oneapi::atomic_ref<P,
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (
          vo[im + dims.nm     * (
            iu + NU           * (

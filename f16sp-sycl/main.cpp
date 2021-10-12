@@ -53,7 +53,7 @@ void scalarProductKernel_intrinsics(const half2 *a,
 
   for (int i = item.get_global_id(0); i < size; i += stride)
   {
-    value = fma(a[i], b[i], value);
+    value = sycl::fma(a[i], b[i], value);
   }
 
   shArray[lid] = value;

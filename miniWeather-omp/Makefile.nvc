@@ -27,9 +27,9 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := -std=c++14 -Wall \
-	-DNX=80 \
-       	-DNZ=40 \
-	-DSIM_TIME=5 \
+	-DNX=100 \
+       	-DNZ=50 \
+	-DSIM_TIME=800 \
 	-DDATA_SPEC=DATA_SPEC_THERMAL
 
 # Linker Flags

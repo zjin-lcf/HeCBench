@@ -22,13 +22,7 @@
 
 // Use a static data size for simplicity
 //
-//#define SIZE (50000000)
-//#define SIZE (100000)
-#define SIZE (4096)
-
-#define DATA_SIZE (1024)
-#define MAX_SOURCE_SIZE (0x100000)
-#define HISTOGRAM_SIZE (1024 * sizeof(unsigned int))
+#define SIZE (50000000)
 
 ////////////////////////////////////////////////////////////////////////////////
 int compare(const void *a, const void *b) {

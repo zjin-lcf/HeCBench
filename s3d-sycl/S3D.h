@@ -12,6 +12,9 @@
 //alleviate aliasing issues
 #define RESTRICT __restrict__
 
+// ISO C++17 does not allow 'register' storage class specifier
+#define register
+
 //replace divisions by multiplication with the reciprocal
 #define REPLACE_DIV_WITH_RCP 1
 

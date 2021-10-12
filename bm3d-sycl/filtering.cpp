@@ -293,15 +293,15 @@ void aggregate_block(
     float value = ( patch_stack[ idx3(lidx, lidy, z, params.k, params.k) ]);
     int idx = idx2(outer_address.x() + x + lidx, outer_address.y() + y + lidy, image_dim.x());
 
-    auto num_ref = ONEAPI::atomic_ref<float,
-                   ONEAPI::memory_order::relaxed, 
-                   ONEAPI::memory_scope::device, 
+    auto num_ref = ext::oneapi::atomic_ref<float,
+                   ext::oneapi::memory_order::relaxed, 
+                   ext::oneapi::memory_scope::device, 
                    access::address_space::global_space> (numerator[idx]);
     num_ref.fetch_add(value * kaiser_value * wp);
 
-    auto den_ref = ONEAPI::atomic_ref<float,
-                   ONEAPI::memory_order::relaxed, 
-                   ONEAPI::memory_scope::device, 
+    auto den_ref = ext::oneapi::atomic_ref<float,
+                   ext::oneapi::memory_order::relaxed, 
+                   ext::oneapi::memory_scope::device, 
                    access::address_space::global_space> (denominator[idx]);
     den_ref.fetch_add(kaiser_value * wp);
   }

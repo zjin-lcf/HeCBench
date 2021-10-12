@@ -155,9 +155,9 @@ void compactLv1(
   if (warpid != 0)testSum += sums[warpid - 1];
   if (tid == countingThreadNumLv1 - 1 && testSum != 0) {
     //sums[31] = atomicAdd(countedBlockNum, testSum);
-    auto atomic_obj_ref = ONEAPI::atomic_ref<unsigned int, 
-                          ONEAPI::memory_order::relaxed,
-                          ONEAPI::memory_scope::device,
+    auto atomic_obj_ref = ext::oneapi::atomic_ref<unsigned int, 
+                          ext::oneapi::memory_order::relaxed,
+                          ext::oneapi::memory_scope::device,
                           access::address_space::global_space> (countedBlockNum[0]);
     sums[31] = atomic_obj_ref.fetch_add(testSum);
   }
@@ -264,9 +264,9 @@ void compactLv2(
   if (warpid != 0) testSum += sums[warpid - 1];
   if (tid == countingThreadNumLv2 - 1) {
     //sums[31] = atomicAdd(countedBlockNumLv2, testSum);
-    auto atomic_obj_ref = ONEAPI::atomic_ref<unsigned int, 
-                          ONEAPI::memory_order::relaxed,
-                          ONEAPI::memory_scope::device,
+    auto atomic_obj_ref = ext::oneapi::atomic_ref<unsigned int, 
+                          ext::oneapi::memory_order::relaxed,
+                          ext::oneapi::memory_scope::device,
                           access::address_space::global_space> (countedBlockNumLv2[0]);
     sums[31] = atomic_obj_ref.fetch_add(testSum);
   }
@@ -577,14 +577,14 @@ int main(int argc, char* argv[])
         {
           //sumsVertices[31] = atomicAdd(countedVerticesNum, sumVertices);
           //sumsTriangles[31] = atomicAdd(countedTrianglesNum, sumTriangles);
-          auto cv_ref = ONEAPI::atomic_ref<unsigned int, 
-            ONEAPI::memory_order::relaxed,
-            ONEAPI::memory_scope::device,
+          auto cv_ref = ext::oneapi::atomic_ref<unsigned int, 
+            ext::oneapi::memory_order::relaxed,
+            ext::oneapi::memory_scope::device,
             access::address_space::global_space> (countedVerticesNum[0]);
 
-          auto ct_ref = ONEAPI::atomic_ref<unsigned int, 
-            ONEAPI::memory_order::relaxed,
-            ONEAPI::memory_scope::device,
+          auto ct_ref = ext::oneapi::atomic_ref<unsigned int, 
+            ext::oneapi::memory_order::relaxed,
+            ext::oneapi::memory_scope::device,
             access::address_space::global_space> (countedTrianglesNum[0]);
 
           sumsVertices[31] = cv_ref.fetch_add(sumVertices);
@@ -608,9 +608,9 @@ int main(int argc, char* argv[])
               vertexIndices[threadIdx_z + edgePos.z()][threadIdx_y + edgePos.y()][threadIdx_x + edgePos.x()]);
             unsigned int tp(sycl::popcount(vertexIndex >> (16 - edgePos.w())) + (vertexIndex & 0x1fff));
             //atomicAdd(triangles, (unsigned long long)(sumsVertices[31] + tp));
-            auto triangles_ref = ONEAPI::atomic_ref<unsigned long long, 
-                  ONEAPI::memory_order::relaxed,
-                  ONEAPI::memory_scope::device,
+            auto triangles_ref = ext::oneapi::atomic_ref<unsigned long long, 
+                  ext::oneapi::memory_order::relaxed,
+                  ext::oneapi::memory_scope::device,
                   access::address_space::global_space> (triangles[0]);
             triangles_ref.fetch_add((unsigned long long)(sumsVertices[31] + tp));
           }
@@ -641,27 +641,27 @@ int main(int argc, char* argv[])
         //atomicAdd(coordY, cy);
         //atomicAdd(coordZ, cz);
         //atomicAdd(coordZP, zp);
-        auto x_ref = ONEAPI::atomic_ref<float, 
-          ONEAPI::memory_order::relaxed,
-          ONEAPI::memory_scope::device,
+        auto x_ref = ext::oneapi::atomic_ref<float, 
+          ext::oneapi::memory_order::relaxed,
+          ext::oneapi::memory_scope::device,
           access::address_space::global_space> (coordX[0]);
         x_ref.fetch_add(cx);
 
-        auto y_ref = ONEAPI::atomic_ref<float, 
-          ONEAPI::memory_order::relaxed,
-          ONEAPI::memory_scope::device,
+        auto y_ref = ext::oneapi::atomic_ref<float, 
+          ext::oneapi::memory_order::relaxed,
+          ext::oneapi::memory_scope::device,
           access::address_space::global_space> (coordY[0]);
         y_ref.fetch_add(cy);
 
-        auto z_ref = ONEAPI::atomic_ref<float, 
-          ONEAPI::memory_order::relaxed,
-          ONEAPI::memory_scope::device,
+        auto z_ref = ext::oneapi::atomic_ref<float, 
+          ext::oneapi::memory_order::relaxed,
+          ext::oneapi::memory_scope::device,
           access::address_space::global_space> (coordZ[0]);
         z_ref.fetch_add(cz);
 
-        auto zp_ref = ONEAPI::atomic_ref<float, 
-          ONEAPI::memory_order::relaxed,
-          ONEAPI::memory_scope::device,
+        auto zp_ref = ext::oneapi::atomic_ref<float, 
+          ext::oneapi::memory_order::relaxed,
+          ext::oneapi::memory_scope::device,
           access::address_space::global_space> (coordZP[0]);
         zp_ref.fetch_add(zp);
       });

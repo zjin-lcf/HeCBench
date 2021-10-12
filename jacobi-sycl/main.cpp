@@ -178,9 +178,9 @@ int main () {
             err += sg.shuffle_down(err, offset);
           }
           if (tx == 0) {
-            auto atomic_obj_ref = ONEAPI::atomic_ref<float, 
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+            auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (error[0]);
             atomic_obj_ref.fetch_add(err);
           }

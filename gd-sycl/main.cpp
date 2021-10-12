@@ -109,9 +109,9 @@ int main(int argc, const char *argv[]) {
 
           // compute objective 
           float v = cl::sycl::log(1+cl::sycl::exp(-1*A_y_label[i]*xp));
-          auto atomic_obj_ref = ONEAPI::atomic_ref<float, 
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+          auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (total_obj_val[0]);
           atomic_obj_ref.fetch_add(v);
 
@@ -119,9 +119,9 @@ int main(int argc, const char *argv[]) {
           float prediction = 1.f/(1.f + cl::sycl::exp(-xp));
           int t = (prediction >= 0.5f) ? 1 : -1;
           if (A_y_label[i] == t) {
-            auto atomic_correct_ref = ONEAPI::atomic_ref<int, 
-                       ONEAPI::memory_order::relaxed, 
-                       ONEAPI::memory_scope::device, 
+            auto atomic_correct_ref = ext::oneapi::atomic_ref<int, 
+                       ext::oneapi::memory_order::relaxed, 
+                       ext::oneapi::memory_scope::device, 
                        access::address_space::global_space> (correct[0]);
             atomic_correct_ref.fetch_add(1);
 	  }
@@ -131,9 +131,9 @@ int main(int argc, const char *argv[]) {
           accum = accum / (1.f + accum);
           for(int j = A_row_ptr[i]; j < A_row_ptr[i+1]; ++j){
             float temp = -accum*A_value[j]*A_y_label[i];
-            auto atomic_grad_ref = ONEAPI::atomic_ref<float, 
-                       ONEAPI::memory_order::relaxed, 
-                       ONEAPI::memory_scope::device, 
+            auto atomic_grad_ref = ext::oneapi::atomic_ref<float, 
+                       ext::oneapi::memory_order::relaxed, 
+                       ext::oneapi::memory_scope::device, 
                        access::address_space::global_space> (grad[A_col_index[j]]);
             atomic_grad_ref.fetch_add(temp);
           }
@@ -148,9 +148,9 @@ int main(int argc, const char *argv[]) {
       cgh.parallel_for<class norm>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
-          auto atomic_l2norm_ref = ONEAPI::atomic_ref<float, 
-                     ONEAPI::memory_order::relaxed, 
-                     ONEAPI::memory_scope::device, 
+          auto atomic_l2norm_ref = ext::oneapi::atomic_ref<float, 
+                     ext::oneapi::memory_order::relaxed, 
+                     ext::oneapi::memory_scope::device, 
                      access::address_space::global_space> (l2_norm[0]);
           atomic_l2norm_ref.fetch_add(x[i]*x[i]);
         }

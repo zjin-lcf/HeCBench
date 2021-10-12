@@ -95,6 +95,7 @@ void radixSortStepKeysOnly(unsigned int* d_keys,
   free(h_tempKeys);
 #endif
 
+
   findRadixOffsets(d_tempKeys, d_counters, d_blockOffsets, startbit, numElements);
 
 #ifdef DEBUG
@@ -141,6 +142,7 @@ void radixSortKeys(unsigned int* d_keys,
   {
     radixSortStepKeysOnly(d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum,
                           d_buffer, bitStep, i*bitStep, numElements, batchSize);
+break;
     i++;
   }
 }

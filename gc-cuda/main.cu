@@ -54,8 +54,6 @@ static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
-static __device__ int wlsize = 0;
-
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
 static __device__ unsigned int hash(unsigned int val)
@@ -75,7 +73,8 @@ void init(const int nodes,
     int* const __restrict__ posscol,
     int* const __restrict__ posscol2,
     int* const __restrict__ color,
-    int* const __restrict__ wl)
+    int* const __restrict__ wl,
+    int* __restrict__ wlsize)
 {
   const int lane = threadIdx.x % WS;
   const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
@@ -91,7 +90,7 @@ void init(const int nodes,
       degv = end - beg;
       cond = (degv >= WS);
       if (cond) {
-        wl[atomicAdd(&wlsize, 1)] = v;
+        wl[atomicAdd(wlsize, 1)] = v;
       } else {
         active = 0;
         pos = beg;
@@ -151,9 +150,10 @@ void runLarge(const int nodes,
     int* const __restrict__ posscol,
     int* const __restrict__ posscol2,
     volatile int* const __restrict__ color,
-    const int* const __restrict__ wl)
+    const int* const __restrict__ wl,
+    const int* __restrict__ wlsize)
 {
-  const int stop = wlsize;
+  const int stop = *wlsize;
   if (stop != 0) {
     const int lane = threadIdx.x % WS;
     const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
@@ -261,11 +261,10 @@ void runSmall(const int nodes,
     const int* const __restrict__ nlist,
     volatile int* const __restrict__ posscol,
     int* const __restrict__ color)
+    //int* __restrict__ wlsize)
 {
   const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
   const int threads = gridDim.x * ThreadsPerBlock;
-
-  if (thread == 0) wlsize = 0;
 
   bool again;
   do {
@@ -335,7 +334,7 @@ int main(int argc, char* argv[])
 
   int* const color = new int [g.nodes];
 
-  int *nidx_d, *nlist_d, *nlist2_d, *posscol_d, *posscol2_d, *color_d, *wl_d;
+  int *nidx_d, *nlist_d, *nlist2_d, *posscol_d, *posscol2_d, *color_d, *wl_d, *wlsize_d;
   if (cudaSuccess != cudaMalloc((void **)&nidx_d, (g.nodes + 1) * sizeof(int))) 
     printf("ERROR: could not allocate nidx_d\n\n");
   if (cudaSuccess != cudaMalloc((void **)&nlist_d, g.edges * sizeof(int)))
@@ -350,6 +349,8 @@ int main(int argc, char* argv[])
     printf("ERROR: could not allocate color_d\n\n");
   if (cudaSuccess != cudaMalloc((void **)&wl_d, g.nodes * sizeof(int))) 
     printf("ERROR: could not allocate wl_d\n\n");
+  if (cudaSuccess != cudaMalloc((void **)&wlsize_d, sizeof(int))) 
+    printf("ERROR: could not allocate wlsize\n\n");
 
   if (cudaSuccess != cudaMemcpy(nidx_d, g.nindex, (g.nodes + 1) * sizeof(int), cudaMemcpyHostToDevice)) 
     printf("ERROR: copying nidx to device failed\n\n");
@@ -363,24 +364,26 @@ int main(int argc, char* argv[])
   auto start = std::chrono::high_resolution_clock::now();
 
   for (int n = 0; n < 100; n++) {
-    init<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, nidx_d, nlist_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d);
-    runLarge<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d);
-    runSmall<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist_d, posscol_d, color_d);
+    cudaMemset(wlsize_d, 0, sizeof(int));
+    init<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, nidx_d, nlist_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
+    runLarge<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
+    //runSmall<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist_d, posscol_d, color_d);
   }
 
   cudaDeviceSynchronize();
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = (float)elapsed_seconds.count() / 100;
+  double runtime = elapsed_seconds.count() / 100;
 
-  printf("runtime:    %.6f s\n", runtime);
+  printf("average runtime:    %.6f s\n", runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
   if (cudaSuccess != cudaMemcpy(color, color_d, g.nodes * sizeof(int), cudaMemcpyDeviceToHost)) 
     printf("ERROR: copying color from device failed\n\n");
 
+  cudaFree(wlsize_d);
   cudaFree(wl_d);
   cudaFree(color_d);
   cudaFree(posscol2_d);
@@ -389,17 +392,24 @@ int main(int argc, char* argv[])
   cudaFree(nlist_d);
   cudaFree(nidx_d);
 
+  bool ok = true;
   for (int v = 0; v < g.nodes; v++) {
-    if (color[v] < 0) 
+    if (color[v] < 0) {
       printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n",
           v, g.nindex[v + 1] - g.nindex[v]);
+      ok = false;
+      break;
+    }
     for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
-      if (color[g.nlist[i]] == color[v]) 
+      if (color[g.nlist[i]] == color[v]) {
         printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n",
             color[v], v, g.nlist[i]);
+        ok = false;
+        break;
+      }
     }
   }
-  printf("Passed\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
 #ifdef DEBUG
   const int vals = 16;

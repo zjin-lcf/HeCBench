@@ -20,7 +20,7 @@ bool verifySortUint(unsigned int *keysSorted,
 
 int main(int argc, const char **argv)
 {
-  const unsigned int numElements = 128*128*128*2; // 1048576; 
+  const unsigned int numElements = 128*128*2; //128*128*128*2; // 1048576; 
   const int keybits = 32;  // bit size of uint 
   const int batchSize = 1; // only support a batch size of 1
   const unsigned int numBlocks = ((numElements % (CTA_SIZE * 4)) == 0) ? 
@@ -31,14 +31,14 @@ int main(int argc, const char **argv)
   unsigned int arrayLength = numElements/2/CTA_SIZE*16;
   unsigned int log2L;
   unsigned int factorizationRemainder = factorRadix2(log2L, arrayLength);
-  assert(factorizationRemainder == 1);
+  //assert(factorizationRemainder == 1);
 
   //Check supported size range
-  assert((arrayLength >= MIN_LARGE_ARRAY_SIZE) && (arrayLength <= MAX_LARGE_ARRAY_SIZE));
-  assert(arrayLength > MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE);
+  //assert((arrayLength >= MIN_LARGE_ARRAY_SIZE) && (arrayLength <= MAX_LARGE_ARRAY_SIZE));
+  //assert(arrayLength > MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE);
 
   //Check total batch size limit
-  assert((batchSize * arrayLength) <= MAX_BATCH_ELEMENTS);
+  //assert((batchSize * arrayLength) <= MAX_BATCH_ELEMENTS);
 
   // Alloc and init some data on the host, then alloc and init GPU buffer  
   unsigned int* h_keys       = (unsigned int*)malloc(numElements * sizeof(unsigned int));
@@ -72,7 +72,7 @@ int main(int argc, const char **argv)
   cudaMalloc((void**)&d_buffer, sizeof(unsigned int) * 
              (arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE));
 
-  int numIterations = 100;
+  int numIterations = 1;
   for (int i = 0; i < numIterations; i++)
   {
     radixSortKeys(d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum, 

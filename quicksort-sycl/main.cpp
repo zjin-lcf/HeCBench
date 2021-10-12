@@ -429,6 +429,7 @@ void lqsort(queue &q,
   beginClock = seconds();
 #endif
 
+  printf("done.size() = %d\n", done.size());
   buffer<work_record<T>>  done_buffer(done.data(), done.size(), {property::buffer::use_host_ptr()});
 
   q.submit([&](handler& cgh) {

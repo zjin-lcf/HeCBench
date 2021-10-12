@@ -90,9 +90,9 @@ void stddev(queue &q,
       item.barrier(access::fence_space::local_space);
 
       //atomicAdd(sstd + thisColId, thread_data);
-      auto atomic_local = ONEAPI::atomic_ref<Type, 
-            ONEAPI::memory_order::relaxed,
-            ONEAPI::memory_scope::work_group,
+      auto atomic_local = ext::oneapi::atomic_ref<Type, 
+            ext::oneapi::memory_order::relaxed,
+            ext::oneapi::memory_scope::work_group,
             access::address_space::local_space> (sstd[thisColId]);
           atomic_local.fetch_add(thread_data);
 
@@ -100,9 +100,9 @@ void stddev(queue &q,
 
       if (tx < ColsPerBlk) {
         // atomicAdd(std + colId, sstd[thisColId]);
-        auto atomic_global = ONEAPI::atomic_ref<Type, 
-                             ONEAPI::memory_order::relaxed,
-                             ONEAPI::memory_scope::device,
+        auto atomic_global = ext::oneapi::atomic_ref<Type, 
+                             ext::oneapi::memory_order::relaxed,
+                             ext::oneapi::memory_scope::device,
                              access::address_space::global_space> (std[colId]);
         atomic_global.fetch_add(sstd[thisColId]);
       }

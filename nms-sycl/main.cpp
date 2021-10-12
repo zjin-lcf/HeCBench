@@ -220,13 +220,13 @@ int main(int argc, char *argv[])
         int idx = bid * MAX_DETECTIONS + lid;
 
         pointsbitmap[bid] = ( item.barrier(access::fence_space::local_space),
-              ONEAPI::all_of(g, nmsbitmap[idx]));
+              ext::oneapi::all_of(g, nmsbitmap[idx]));
 
         for(int i=0; i<(N_PARTITIONS-1); i++)
         {
           idx += MAX_DETECTIONS / N_PARTITIONS;
           pointsbitmap[bid] = ( item.barrier(access::fence_space::local_space),
-              ONEAPI::all_of(g, pointsbitmap[bid] && nmsbitmap[idx]));
+              ext::oneapi::all_of(g, pointsbitmap[bid] && nmsbitmap[idx]));
         }
       });
     });

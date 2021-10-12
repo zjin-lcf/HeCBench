@@ -249,19 +249,12 @@ int main(int argc, const char** argv) {
   cudaMemcpy(d_scalco, h_scalco, sizeof(real)*ttraces, cudaMemcpyHostToDevice);
 
   cudaMalloc((void** ) &d_c  , sizeof(real)*nc      );
-  cudaMemset(d_c  , 0, sizeof(real)*nc      );
   cudaMalloc((void** ) &d_h  , sizeof(real)*ttraces );
-  cudaMemset(d_h  , 0, sizeof(real)*ttraces );
   cudaMalloc((void** ) &d_num, sizeof(real)*ns*nc   );
-  cudaMemset(d_num, 0, sizeof(real)*ns*nc   );
   cudaMalloc((void** ) &d_stt, sizeof(real)*ns*nc   );
-  cudaMemset(d_stt, 0, sizeof(real)*ns*nc   );
   cudaMalloc((void** ) &d_ctr, sizeof(int )*ncdps*ns);
-  cudaMemset(d_ctr, 0, sizeof(int )*ncdps*ns);
   cudaMalloc((void** ) &d_str, sizeof(real)*ncdps*ns);
-  cudaMemset(d_str, 0, sizeof(real)*ncdps*ns);
   cudaMalloc((void** ) &d_stk, sizeof(real)*ncdps*ns);
-  cudaMemset(d_stk, 0,sizeof(real)*ncdps*ns);
 
   h_ctr = (int*) malloc (sizeof(int )*ncdps*ns);
   h_str = (real*) malloc (sizeof(real)*ncdps*ns);
