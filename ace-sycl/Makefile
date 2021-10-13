@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+VERIFY    = no
 
 GPU       = yes
 CUDA      = no
@@ -29,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -I../ace-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -59,6 +60,10 @@ endif
 ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+
+ifeq ($(VERIFY),yes)
+  CFLAGS +=-DVERIFY -fopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -66,7 +71,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../ace-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

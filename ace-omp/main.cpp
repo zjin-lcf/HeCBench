@@ -6,12 +6,18 @@
 #include <omp.h>
 
 //define the data set size (cubic volume)
-#define DATAXSIZE 600
-#define DATAYSIZE 600
-#define DATAZSIZE 600
+#define DATAXSIZE 100
+#define DATAYSIZE 100
+#define DATAZSIZE 100
 
 #define SQ(x) ((x)*(x))
 
+typedef double nRarray[DATAYSIZE][DATAXSIZE];
+
+#ifdef VERIFY
+#include <string.h>
+#include "reference.h"
+#endif
 
 #pragma omp declare target
 double dFphi(double phi, double u, double lambda)
@@ -304,7 +310,6 @@ void initializationU(double u[][DATAYSIZE][DATAXSIZE], double r0, double delta)
 
 int main(int argc, char *argv[])
 {
-  typedef double nRarray[DATAYSIZE][DATAXSIZE];
   const int num_steps = atoi(argv[1]);  //6000;
   const double dx = 0.4;
   const double dy = 0.4;
@@ -326,31 +331,40 @@ int main(int argc, char *argv[])
   const int nx = DATAXSIZE;
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
+  const int vol = nx * ny * nz;
 
   // storage for result stored on host
-  nRarray *phi_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
-  nRarray *u_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
+  nRarray *phi_host = (nRarray *)malloc(vol*sizeof(double));
+  nRarray *u_host = (nRarray *)malloc(vol*sizeof(double));
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
+
+#ifdef VERIFY
+  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
+  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
+  memcpy(phi_ref, phi_host, vol*sizeof(double));
+  memcpy(u_ref, u_host, vol*sizeof(double));
+  reference(phi_ref, u_ref, vol, num_steps);
+#endif 
 
   // storage for result computed on device
   double *d_phiold = (double*)phi_host;
   double *d_uold = (double*)u_host;
-  double *d_phinew = (double*) malloc ((nx*ny*nz)*sizeof(double));
-  double *d_unew = (double*) malloc ((nx*ny*nz)*sizeof(double));
-  double *d_Fx = (double*) malloc ((nx*ny*nz)*sizeof(double));
-  double *d_Fy = (double*) malloc ((nx*ny*nz)*sizeof(double));
-  double *d_Fz = (double*) malloc ((nx*ny*nz)*sizeof(double));
+  double *d_phinew = (double*) malloc (vol*sizeof(double));
+  double *d_unew = (double*) malloc (vol*sizeof(double));
+  double *d_Fx = (double*) malloc (vol*sizeof(double));
+  double *d_Fy = (double*) malloc (vol*sizeof(double));
+  double *d_Fz = (double*) malloc (vol*sizeof(double));
 
   double start = omp_get_wtime();
 
-#pragma omp target data map(tofrom: d_phiold[0:nx*ny*nz], \
-                                    d_uold[0:nx*ny*nz]) \
-                        map(alloc: d_phinew[0:nx*ny*nz], \
-                                   d_unew[0:nx*ny*nz], \
-                                   d_Fx[0:nx*ny*nz],\
-                                   d_Fy[0:nx*ny*nz],\
-                                   d_Fz[0:nx*ny*nz])
+#pragma omp target data map(tofrom: d_phiold[0:vol], \
+                                    d_uold[0:vol]) \
+                        map(alloc: d_phinew[0:vol], \
+                                   d_unew[0:vol], \
+                                   d_Fx[0:vol],\
+                                   d_Fy[0:vol],\
+                                   d_Fz[0:vol])
 {
   int t = 0;
   while (t <= num_steps) {
@@ -380,11 +394,21 @@ int main(int argc, char *argv[])
   double end = omp_get_wtime();
   printf("Offload time = %.3f(s)\n", end - start);
 
-#ifdef DEBUG
-  for (int ix = 0; ix < nx; ix++)
-    for (int iy = 0; iy < ny; iy++)
-      for (int iz = 0; iz < nz; iz++)
-        printf("%lf %lf\n", phi_host[ix][iy][iz], u_host[ix][iy][iz]);
+#ifdef VERIFY
+  bool ok = true;
+  for (int idx = 0; idx < nx; idx++)
+    for (int idy = 0; idy < ny; idy++)
+      for (int idz = 0; idz < nz; idz++) {
+        if (fabs(phi_ref[idx][idy][idz] - phi_host[idx][idy][idz]) > 1e-3) {
+          ok = false; printf("phi: %lf %lf\n", phi_ref[idx][idy][idz], phi_host[idx][idy][idz]);
+	}
+        if (fabs(u_ref[idx][idy][idz] - u_host[idx][idy][idz]) > 1e-3) {
+          ok = false; printf("u: %lf %lf\n", u_ref[idx][idy][idz], u_host[idx][idy][idz]);
+        }
+      }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  free(phi_ref);
+  free(u_ref);
 #endif
 
   free(phi_host);

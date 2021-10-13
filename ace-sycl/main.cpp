@@ -9,9 +9,15 @@
 #define DATAYSIZE 600
 #define DATAZSIZE 600
 
+typedef double nRarray[DATAYSIZE][DATAXSIZE];
+
 // square
 #define SQ(x) ((x)*(x))
 
+#ifdef VERIFY
+#include <string.h>
+#include "reference.h"
+#endif
 
 double dFphi(double phi, double u, double lambda)
 {
@@ -307,7 +313,6 @@ void initializationU(double u[][DATAYSIZE][DATAXSIZE], double r0, double delta)
 
 int main(int argc, char *argv[])
 {
-  typedef double nRarray[DATAYSIZE][DATAXSIZE];
   const int num_steps = atoi(argv[1]);  //6000;
   const double dx = 0.4;
   const double dy = 0.4;
@@ -329,19 +334,26 @@ int main(int argc, char *argv[])
   const int nx = DATAXSIZE;
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
+  const int vol = nx * ny * nz;
+
   // pointers for data set storage via malloc
-  nRarray *phi_host; // storage for result stored on host
+  nRarray *phi_host;
   nRarray *u_host;
 
-  // allocate storage for data set
-
-  phi_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
-  u_host = (nRarray *)malloc((nx*ny*nz)*sizeof(double));
-
-  // compute result
+  phi_host = (nRarray *)malloc(vol*sizeof(double));
+  u_host = (nRarray *)malloc(vol*sizeof(double));
 
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
+
+#ifdef VERIFY
+  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
+  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
+  memcpy(phi_ref, phi_host, vol*sizeof(double));
+  memcpy(u_ref, u_host, vol*sizeof(double));
+  reference(phi_ref, u_ref, vol, num_steps);
+#endif 
+
 
   double clock_d = double(clock()) / CLOCKS_PER_SEC;
 
@@ -354,13 +366,13 @@ int main(int argc, char *argv[])
   queue q(dev_sel);
 
   // allocate GPU device buffers
-  buffer<double, 1> d_phiold ((double*)phi_host, nx*ny*nz);
-  buffer<double, 1> d_uold ((double*)u_host, nx*ny*nz);
-  buffer<double, 1> d_phinew (nx*ny*nz);
-  buffer<double, 1> d_unew (nx*ny*nz);
-  buffer<double, 1> d_Fx (nx*ny*nz);
-  buffer<double, 1> d_Fy (nx*ny*nz);
-  buffer<double, 1> d_Fz (nx*ny*nz);
+  buffer<double, 1> d_phiold ((double*)phi_host, vol);
+  buffer<double, 1> d_uold ((double*)u_host, vol);
+  buffer<double, 1> d_phinew (vol);
+  buffer<double, 1> d_unew (vol);
+  buffer<double, 1> d_Fx (vol);
+  buffer<double, 1> d_Fy (vol);
+  buffer<double, 1> d_Fz (vol);
 
   // define the chunk sizes that each threadblock will work on
   range<3> gws ((DATAXSIZE+3)/4*4, (DATAYSIZE+7)/8*8, (DATAZSIZE+7)/8*8);
@@ -461,16 +473,26 @@ int main(int argc, char *argv[])
     t++;
   }
 
-  }
+  } // sycl scope
 
   clock_d = double(clock()) / CLOCKS_PER_SEC - clock_d; 
   printf("Offload time = %.3fms\n", clock_d*1e3);
 
-#ifdef DEBUG
+#ifdef VERIFY
+  bool ok = true;
   for (int idx = 0; idx < nx; idx++)
     for (int idy = 0; idy < ny; idy++)
-      for (int idz = 0; idz < nz; idz++)
-        printf("%lf %lf\n", phi_host[idx][idy][idz], u_host[idx][idy][idz]);
+      for (int idz = 0; idz < nz; idz++) {
+        if (fabs(phi_ref[idx][idy][idz] - phi_host[idx][idy][idz]) > 1e-3) {
+          ok = false; printf("phi: %lf %lf\n", phi_ref[idx][idy][idz], phi_host[idx][idy][idz]);
+	}
+        if (fabs(u_ref[idx][idy][idz] - u_host[idx][idy][idz]) > 1e-3) {
+          ok = false; printf("u: %lf %lf\n", u_ref[idx][idy][idz], u_host[idx][idy][idz]);
+        }
+      }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  free(phi_ref);
+  free(u_ref);
 #endif
 
   free(phi_host);
