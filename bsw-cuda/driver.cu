@@ -192,6 +192,7 @@ void kernel_driver_aa(std::string filename,
     dim3 lws_aa(minSize);
 
     sequence_aa_kernel<<<gws_aa, lws_aa, ShmemBytes>>> (
+        false,
         d_strA,
         d_strB,
         d_offset_ref,
@@ -227,7 +228,8 @@ void kernel_driver_aa(std::string filename,
     dim3 gws_aa_r(sequences_per_stream);
     dim3 lws_aa_r(newMin);
 
-    sequence_aa_reverse_kernel<<<gws_aa_r, lws_aa_r, ShmemBytes>>>(
+    sequence_aa_kernel<<<gws_aa_r, lws_aa_r, ShmemBytes>>>(
+        true,
         d_strA,
         d_strB,
         d_offset_ref,
