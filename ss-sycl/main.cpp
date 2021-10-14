@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
         auto resultBuffer = resultBuf.get_access<sycl_discard_write>(cgh);
         auto resultCountPerWG = resultCountBuf.get_access<sycl_discard_write>(cgh);
         accessor<uchar, 1, sycl_read_write, access::target::local> localPattern(subStrLength, cgh);
-        accessor<uint, 1, sycl_atomic, access::target::local> groupSuccessCounter(1, cgh);
+        accessor<uint, 1, sycl_read_write, access::target::local> groupSuccessCounter(1, cgh);
         cgh.parallel_for<class ss_naive>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
           int localIdx = item.get_local_id(0);
           int localSize = item.get_local_range(0);
@@ -253,21 +253,25 @@ int main(int argc, char* argv[])
             localPattern[idx] = TOLOWER(pattern[idx]);
           }
 
-          if(localIdx == 0) atomic_store(groupSuccessCounter[0], (uint)0);
+          if(localIdx == 0) groupSuccessCounter[0] = 0u;
           item.barrier(access::fence_space::local_space);
 
+          auto groupCnt_atomic_ref = ext::oneapi::atomic_ref<uint, 
+                                     ext::oneapi::memory_order::relaxed,
+                                     ext::oneapi::memory_scope::work_group,
+                                     access::address_space::local_space> (groupSuccessCounter[0]);
           // loop over positions in global buffer
           for(uint stringPos=beginSearchIdx+localIdx; stringPos<endSearchIdx; stringPos+=localSize)
           {
             if (compare(text.get_pointer()+stringPos, localPattern.get_pointer(), patternLength) == 1)
             {
-              int count = atomic_fetch_add(groupSuccessCounter[0], (uint)1);
+              int count = groupCnt_atomic_ref.fetch_add(1u);
               resultBuffer[beginSearchIdx+count] = stringPos;
             }
           }
 
           item.barrier(access::fence_space::local_space);
-          if(localIdx == 0) resultCountPerWG[groupIdx] = atomic_load(groupSuccessCounter[0]);
+          if(localIdx == 0) resultCountPerWG[groupIdx] = groupSuccessCounter[0];
        });
     });
 
@@ -309,9 +313,9 @@ int main(int argc, char* argv[])
           accessor<uchar, 1, sycl_read_write, access::target::local> localPattern(subStrLength, cgh);
           accessor<uint, 1, sycl_read_write, access::target::local> stack1(LOCAL_SIZE * 2, cgh);
           accessor<uint, 1, sycl_read_write, access::target::local> stack2(LOCAL_SIZE * 2, cgh);
-          accessor<uint, 1, sycl_atomic, access::target::local> stack1Counter(1, cgh);
-          accessor<uint, 1, sycl_atomic, access::target::local> stack2Counter(1, cgh);
-          accessor<uint, 1, sycl_atomic, access::target::local> groupSuccessCounter(1, cgh);
+          accessor<uint, 1, sycl_read_write, access::target::local> stack1Counter(1, cgh);
+          accessor<uint, 1, sycl_read_write, access::target::local> stack2Counter(1, cgh);
+          accessor<uint, 1, sycl_read_write, access::target::local> groupSuccessCounter(1, cgh);
           cgh.parallel_for<class ss_loadbalance>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             int localIdx = item.get_local_id(0);
             int localSize = item.get_local_range(0);
@@ -320,9 +324,9 @@ int main(int argc, char* argv[])
             // Initialize the local variaables
             if(localIdx == 0)
             {
-                atomic_store(groupSuccessCounter[0],(uint)0);
-                atomic_store(stack1Counter[0],(uint)0);
-                atomic_store(stack2Counter[0],(uint)0);
+                stack1Counter[0] = 0u;
+                stack2Counter[0] = 0u;
+                groupSuccessCounter[0] = 0u;
             }
             
             // Last search idx for all work items
@@ -350,6 +354,18 @@ int main(int argc, char* argv[])
             int stackPos = 0;
             int revStackPos = 0;
         
+            auto stack1Cnt_atomic_ref = ext::oneapi::atomic_ref<uint, 
+                                        ext::oneapi::memory_order::relaxed,
+                                        ext::oneapi::memory_scope::work_group,
+                                        access::address_space::local_space> (stack1Counter[0]);
+            auto stack2Cnt_atomic_ref = ext::oneapi::atomic_ref<uint, 
+                                        ext::oneapi::memory_order::relaxed,
+                                        ext::oneapi::memory_scope::work_group,
+                                        access::address_space::local_space> (stack2Counter[0]);
+            auto groupCnt_atomic_ref  = ext::oneapi::atomic_ref<uint, 
+                                        ext::oneapi::memory_order::relaxed,
+                                        ext::oneapi::memory_scope::work_group,
+                                        access::address_space::local_space> (groupSuccessCounter[0]);
             while (true)    // loop over positions in global buffer
             {
         
@@ -359,7 +375,7 @@ int main(int argc, char* argv[])
                     // Queue the initial match positions. Make sure queue has sufficient positions for each work-item.
                     if ((first == TOLOWER(text[beginSearchIdx+stringPos])) && (second == TOLOWER(text[beginSearchIdx+stringPos+1])))
                     {
-                        stackPos = atomic_fetch_add(stack1Counter[0], (uint)1);
+                        stackPos = stack1Cnt_atomic_ref.fetch_add(1u);
                         stack1[stackPos] = stringPos;
                     }
                 }
@@ -367,7 +383,7 @@ int main(int argc, char* argv[])
                 stringPos += localSize;     // next search idx
         
                 item.barrier(access::fence_space::local_space);
-                stackSize = atomic_load(stack1Counter[0]);
+                stackSize = stack1Counter[0];
                 item.barrier(access::fence_space::local_space);
                 
                 // continue until stack1 has sufficient good positions for proceed to next Level
@@ -378,7 +394,7 @@ int main(int argc, char* argv[])
               // another 8-bytes from the positions in stack1 and store the match positions in stack2.
                 if(localIdx < stackSize)
                 {
-                    revStackPos = atomic_fetch_sub(stack1Counter[0], (uint)1);
+                    revStackPos = stack1Cnt_atomic_ref.fetch_sub(1u);
                     int pos = stack1[--revStackPos];
                     bool status = (localPattern[2] == TOLOWER(text[beginSearchIdx+pos+2]));
                     status = status && (localPattern[3] == TOLOWER(text[beginSearchIdx+pos+3]));
@@ -391,13 +407,13 @@ int main(int argc, char* argv[])
         
                     if (status)
                     {
-                        stackPos = atomic_fetch_add(stack2Counter[0], (uint)1);
+                        stackPos = stack2Cnt_atomic_ref.fetch_add(1u);
                         stack2[stackPos] = pos;
                     }
                 }
         
                 item.barrier(access::fence_space::local_space);
-                stackSize = atomic_load(stack2Counter[0]);
+                stackSize = stack2Counter[0];
                 item.barrier(access::fence_space::local_space);
         
                 // continue until stack2 has sufficient good positions proceed to next level
@@ -409,27 +425,27 @@ int main(int argc, char* argv[])
                 if(localIdx < stackSize)
                 {
         #ifdef ENABLE_2ND_LEVEL_FILTER
-                    revStackPos = atomic_fetch_sub(stack2Counter[0], (uint)1);
+                    revStackPos = stack2Cnt_atomic_ref.fetch_sub(1u);
                     int pos = stack2[--revStackPos];
                     if (compare(text.get_pointer()+beginSearchIdx+pos+10, localPattern.get_pointer()+10, patternLength-10) == 1)
         #else
-                    revStackPos = atomic_fetch_sub(stack1Counter[0], (uint)1);
+                    revStackPos = stack1Cnt_atomic_ref.fetch_sub(1u);
                     int pos = stack1[--revStackPos];
                     if (compare(text.get_pointer()+beginSearchIdx+pos+2, localPattern.get_pointer()+2, patternLength-2) == 1)
         #endif
                     {
                         // Full match found
-                        int count = atomic_fetch_add(groupSuccessCounter[0], (uint)1);
+                        int count = groupCnt_atomic_ref.fetch_add(1u);
                         resultBuffer[beginSearchIdx+count] = beginSearchIdx+pos;
                     }
                 }
         
                 item.barrier(access::fence_space::local_space);
                 if((((stringPos/localSize)*localSize) >= searchLength) && 
-                   (atomic_load(stack1Counter[0]) <= 0) && (atomic_load(stack2Counter[0]) <= 0)) break;
+                   (stack1Counter[0] <= 0) && (stack2Counter[0] <= 0)) break;
             }
         
-            if(localIdx == 0) resultCountPerWG[groupIdx] = atomic_load(groupSuccessCounter[0]);
+            if(localIdx == 0) resultCountPerWG[groupIdx] = groupSuccessCounter[0];
           });
       });
 
