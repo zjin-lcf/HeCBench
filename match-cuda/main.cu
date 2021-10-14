@@ -727,7 +727,7 @@ int main(int argc, char *argv[])
   }
 
   auto start = std::chrono::high_resolution_clock::now();
-  //MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
+  MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   auto delay = elapsed_seconds.count() * 1000;
