@@ -109,19 +109,19 @@ findMaxFour(short first, short second, short third, short fourth)
   __global__ void
 sequence_aa_kernel(
           bool  inverse,
-    const char* seqA_array,
-    const char* seqB_array,
-    const unsigned* prefix_lengthA,
-    const unsigned* prefix_lengthB,
-          short* seqA_align_begin,
-          short* seqA_align_end,
-          short* seqB_align_begin,
-          short* seqB_align_end,
-          short* top_scores,
+    const char*__restrict__ seqA_array,
+    const char*__restrict__ seqB_array,
+    const unsigned*__restrict__ prefix_lengthA,
+    const unsigned*__restrict__ prefix_lengthB,
+          short*__restrict__ seqA_align_begin,
+          short*__restrict__ seqA_align_end,
+          short*__restrict__ seqB_align_begin,
+          short*__restrict__ seqB_align_end,
+          short*__restrict__ top_scores,
     const short startGap,
     const short extendGap,
-    const short* scoring_matrix,
-    const short* encoding_matrix)
+    const short*__restrict__ scoring_matrix,
+    const short*__restrict__ encoding_matrix)
 {
   int block_Id  = blockIdx.x;
   int thread_Id = threadIdx.x;
