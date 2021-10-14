@@ -193,6 +193,7 @@ void kernel_driver_aa(std::string filename,
     dim3 lws_aa(minSize);
 
     hipLaunchKernelGGL(sequence_aa_kernel, dim3(gws_aa), dim3(lws_aa), ShmemBytes, 0, 
+        false,
         d_strA,
         d_strB,
         d_offset_ref,
@@ -228,7 +229,8 @@ void kernel_driver_aa(std::string filename,
     dim3 gws_aa_r(sequences_per_stream);
     dim3 lws_aa_r(newMin);
 
-    hipLaunchKernelGGL(sequence_aa_reverse_kernel, dim3(gws_aa_r), dim3(lws_aa_r), ShmemBytes, 0, 
+    hipLaunchKernelGGL(sequence_aa_kernel, dim3(gws_aa_r), dim3(lws_aa_r), ShmemBytes, 0, 
+        true,
         d_strA,
         d_strB,
         d_offset_ref,
