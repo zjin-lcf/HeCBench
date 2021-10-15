@@ -12,6 +12,7 @@
   } while(0)
 
 //each thread is responsible for 1 BLOCKSIZE each time
+__global__
 void kernel0_write(char*__restrict__ ptr, unsigned long size)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -46,6 +47,7 @@ void kernel0_write(char*__restrict__ ptr, unsigned long size)
   }
 }
 
+__global__
 void kernel0_read(
     const char*__restrict__ ptr, unsigned long size,
     unsigned int*__restrict__ err_count,
@@ -89,6 +91,7 @@ void kernel0_read(
 }
 
 
+__global__
 void kernel1_write(char* ptr, unsigned long size)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -101,6 +104,7 @@ void kernel1_write(char* ptr, unsigned long size)
     buf[i] = (unsigned long)(buf+i);
 }
 
+__global__
 void kernel1_read(
     const char*__restrict__ ptr, unsigned long size,
     unsigned int*__restrict__ err_count,
@@ -120,6 +124,7 @@ void kernel1_read(
   }
 }
 
+__global__
 void kernel_write(char* ptr, unsigned long size, TYPE p1)
 {
   TYPE* buf = (TYPE*)ptr;
@@ -132,6 +137,7 @@ void kernel_write(char* ptr, unsigned long size, TYPE p1)
 }
 
 
+__global__
 void kernel_read_write(
     char*__restrict__ ptr, unsigned long size, TYPE p1, TYPE p2,
     unsigned int*__restrict__ err_count,
@@ -156,6 +162,7 @@ void kernel_read_write(
   }
 }
 
+__global__
 void kernel_read(
     const char*__restrict__ ptr, unsigned long size, TYPE p1,
     unsigned int*__restrict__ err_count,
@@ -176,6 +183,7 @@ void kernel_read(
   }
 }
 
+__global__
 void kernel5_init(char* ptr, unsigned long size)
 {
   unsigned int * buf = (unsigned int*)ptr;
@@ -207,6 +215,7 @@ void kernel5_init(char* ptr, unsigned long size)
   }
 }
 
+__global__
 void kernel5_move(char* ptr, unsigned long size)
 {
   int i, j;
@@ -229,6 +238,7 @@ void kernel5_move(char* ptr, unsigned long size)
 }
 
 
+__global__
 void kernel5_check(
     const char*__restrict__ ptr, unsigned long size,
     unsigned int*__restrict__ err_count,
