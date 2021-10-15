@@ -3,7 +3,7 @@
 #include "kernels.cu"
 
 // check the test result
-void check (unsigned *err_cnt) {
+void check (const unsigned *err_cnt) {
   unsigned err = 0;
   // read error
   cudaMemcpy(&err, err_cnt, sizeof(unsigned), cudaMemcpyDeviceToHost);
@@ -29,10 +29,10 @@ void moving_inversion (
   dim3 grid (1024);
   dim3 block (64);
 
-  kernel_write(dev_mem, mem_size, p1);
+  kernel_write <<<grid, block>>> (dev_mem, mem_size, p1);
 
   for(int i = 0; i < 100; i++){
-    kernel_read_write <<<grid, block>> (
+    kernel_read_write <<<grid, block>>> (
         dev_mem, 
         mem_size,
         p1, p2,
@@ -45,14 +45,15 @@ void moving_inversion (
     p2 = ~p1;
   }
 
-  kernel_read <<<grid, block>>> (mem, mem_size,
+  kernel_read <<<grid, block>>> (dev_mem, mem_size,
       p1, 
       err_cnt,
       err_addr,
       err_expect,
       err_current,
-      err_read);
-  check(q, err_cnt);
+      err_second_read);
+
+  check(err_cnt);
 }
 
 int main() {
@@ -88,12 +89,12 @@ int main() {
 
   kernel0_read <<<grid0, block0>>> (dev_mem, mem_size,
       err_cnt,
-      err_address,
+      err_addr,
       err_expect,
       err_current,
       err_second_read);
 
-  check(q, err_cnt);
+  check(err_cnt);
 
   printf("test1..\n\n");
   dim3 grid1 (1024);
@@ -103,11 +104,12 @@ int main() {
 
   kernel1_read <<<grid1, block1>>> (dev_mem, mem_size,
       err_cnt,
-      err_address,
+      err_addr,
       err_expect,
       err_current,
       err_second_read);
-  check(q, err_cnt);
+
+  check(err_cnt);
 
   printf("test2..\n\n");
   unsigned long p1 = 0;
@@ -147,14 +149,15 @@ int main() {
 
   kernel5_check <<<grid5, block5>>> (dev_mem, mem_size,
       err_cnt,
-      err_address,
+      err_addr,
       err_expect,
       err_current,
       err_second_read);
-  check(q, err_cnt);
+  
+  check(err_cnt);
 
   cudaFree(err_cnt);
-  cudaFree(err_address);
+  cudaFree(err_addr);
   cudaFree(err_expect);
   cudaFree(err_current);
   cudaFree(err_second_read);
