@@ -3,18 +3,16 @@
    Here, the 1D stencil kernel adds all its neighboring data within a radius.
 
    The C model is added to verify the stencil result on a GPU
-
-Developer: Zheming Jin
  */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <hip/hip_runtime.h>
 
 #define LENGTH 1024
 #define THREADS_PER_BLOCK 256
 #define RADIUS 7
 #define BLOCK_SIZE THREADS_PER_BLOCK
-
-#include <stdio.h>
-#include <assert.h>
-#include <hip/hip_runtime.h>
 
 __global__ void stencil_1d(int *in, int *out) {
   __shared__ int temp[BLOCK_SIZE + 2 * RADIUS];
@@ -70,37 +68,34 @@ int main(void) {
   hipMemcpy(b, d_b, size, hipMemcpyDeviceToHost);
 
   // verification
-  bool error = false;
+  bool ok = true;
   for (int i = 0; i < 2*RADIUS; i++) {
     int s = 0;
-    for (int j = i; j <= i+2*RADIUS; j++) {
+    for (int j = i; j <= i+2*RADIUS; j++)
       s += j < RADIUS ? 0 : (a[j] - RADIUS);
-    }
     if (s != b[i]) {
-      printf("FAILED at %d: %d (cpu) != %d (gpu)\n", i, s, b[i]);
-      error = true;
+      printf("Error at %d: %d (host) != %d (device)\n", i, s, b[i]);
+      ok = false;
       break;
     }
   }
 
   for (int i = 2*RADIUS; i < LENGTH; i++) {
     int s = 0;
-    for (int j = i-RADIUS; j <= i+RADIUS; j++) {
+    for (int j = i-RADIUS; j <= i+RADIUS; j++)
       s += a[j];
-    }
     if (s != b[i]) {
-      printf("FAILED at %d: %d (cpu) != %d (gpu)\n", i, s, b[i]);
-      error = true;
+      printf("Error at %d: %d (host) != %d (device)\n", i, s, b[i]);
+      ok = false;
       break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   // Cleanup
   free(a);
   free(b); 
   hipFree(d_a); 
   hipFree(d_b); 
-
-  if (!error) printf("PASSED\n");
   return 0;
 }
