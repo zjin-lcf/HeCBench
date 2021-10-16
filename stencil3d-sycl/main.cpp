@@ -19,9 +19,9 @@ void stencil3d(
     const Real*__restrict d_sigmaZ,
     int nx, int ny, int nz)
 {
-  #define V0(y,z) sm_psi[pii*BSIZE*BSIZE+y*BSIZE+z]
-  #define V1(y,z) sm_psi[cii*BSIZE*BSIZE+y*BSIZE+z]
-  #define V2(y,z) sm_psi[nii*BSIZE*BSIZE+y*BSIZE+z]
+  #define V0(y,z) sm_psi[pii*BSIZE*BSIZE+(y)*BSIZE+(z)]
+  #define V1(y,z) sm_psi[cii*BSIZE*BSIZE+(y)*BSIZE+(z)]
+  #define V2(y,z) sm_psi[nii*BSIZE*BSIZE+(y)*BSIZE+(z)]
   
   #define sigmaX(x,y,z,dir) d_sigmaX[ z + nz * ( y + ny * ( x + nx * dir ) ) ]
   #define sigmaY(x,y,z,dir) d_sigmaY[ z + nz * ( y + ny * ( x + nx * dir ) ) ]
@@ -93,7 +93,7 @@ void stencil3d(
     item.barrier(access::fence_space::local_space);
 
     if ((tkk>0) && (tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
-      dV -= sm_psi[3*BSIZE*BSIZE+tjj-1*BSIZE+tkk];  //bring from left
+      dV -= sm_psi[3*BSIZE*BSIZE+(tjj-1)*BSIZE+tkk];  //bring from left
 
     item.barrier(access::fence_space::local_space);
 
