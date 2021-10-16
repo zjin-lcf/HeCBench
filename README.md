@@ -429,6 +429,9 @@ Early results are shown [here](results/README.md)
 ### memcpy
   A benchmark for memory copy from a host to a device
 
+### memtest
+  Selected memory tests (https://github.com/ComputationalRadiationPhysics/cuda_memtest)
+
 ### metropolis
    Simulation of an ensemble of replicas with Metropolis–Hastings computation in the trial run (https://github.com/crinavar/trueke) 
 
