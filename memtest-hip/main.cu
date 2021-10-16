@@ -1,17 +1,18 @@
+#include "hip/hip_runtime.h"
 #include <stdio.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "kernels.cu"
 
 // check the test result
 void check (const unsigned *err_cnt) {
   unsigned err = 0;
   // read error
-  cudaMemcpy(&err, err_cnt, sizeof(unsigned), cudaMemcpyDeviceToHost);
+  hipMemcpy(&err, err_cnt, sizeof(unsigned), hipMemcpyDeviceToHost);
 
   printf("%s\n", (err != 0) ? "FAIL" : "PASS");
 
   // reset
-  cudaMemset(&err, 0, sizeof(unsigned));
+  hipMemset(&err, 0, sizeof(unsigned));
 }
 
 // moving inversion tests with complementary patterns
@@ -29,10 +30,10 @@ void moving_inversion (
   dim3 grid (1024);
   dim3 block (64);
 
-  kernel_write <<<grid, block>>> (dev_mem, mem_size, p1);
+  hipLaunchKernelGGL(kernel_write, grid, block, 0, 0, dev_mem, mem_size, p1);
 
   for(int i = 0; i < 100; i++){
-    kernel_read_write <<<grid, block>>> (
+    hipLaunchKernelGGL(kernel_read_write, grid, block, 0, 0, 
         dev_mem, 
         mem_size,
         p1, p2,
@@ -45,7 +46,7 @@ void moving_inversion (
     p2 = ~p1;
   }
 
-  kernel_read <<<grid, block>>> (dev_mem, mem_size,
+  hipLaunchKernelGGL(kernel_read, grid, block, 0, 0, dev_mem, mem_size,
       p1, 
       err_cnt,
       err_addr,
@@ -61,33 +62,33 @@ int main() {
   unsigned err_count = 0;
 
   unsigned *err_cnt;
-  cudaMalloc((void**)&err_cnt, sizeof(unsigned));
-  cudaMemcpy(err_cnt, &err_count, sizeof(unsigned), cudaMemcpyHostToDevice);
+  hipMalloc((void**)&err_cnt, sizeof(unsigned));
+  hipMemcpy(err_cnt, &err_count, sizeof(unsigned), hipMemcpyHostToDevice);
 
   unsigned long *err_addr;
-  cudaMalloc((void**)&err_addr, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
+  hipMalloc((void**)&err_addr, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
 
   unsigned long *err_expect;
-  cudaMalloc((void**)&err_expect, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
+  hipMalloc((void**)&err_expect, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
 
   unsigned long *err_current;
-  cudaMalloc((void**)&err_current, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
+  hipMalloc((void**)&err_current, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
 
   unsigned long *err_second_read;
-  cudaMalloc((void**)&err_second_read, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
+  hipMalloc((void**)&err_second_read, sizeof(unsigned long) * (MAX_ERR_RECORD_COUNT));
 
   // 2GB
   unsigned long mem_size = 2*1024*1024*1024UL;
   char *dev_mem;
-  cudaMalloc((void**)&dev_mem, mem_size);
+  hipMalloc((void**)&dev_mem, mem_size);
 
   printf("test0..\n\n");
   dim3 grid0 (1024);
   dim3 block0 (64);
 
-  kernel0_write <<<grid0, block0>>> (dev_mem, mem_size);
+  hipLaunchKernelGGL(kernel0_write, grid0, block0, 0, 0, dev_mem, mem_size);
 
-  kernel0_read <<<grid0, block0>>> (dev_mem, mem_size,
+  hipLaunchKernelGGL(kernel0_read, grid0, block0, 0, 0, dev_mem, mem_size,
       err_cnt,
       err_addr,
       err_expect,
@@ -100,9 +101,9 @@ int main() {
   dim3 grid1 (1024);
   dim3 block1 (64);
 
-  kernel1_write <<<grid1, block1>>> (dev_mem, mem_size);
+  hipLaunchKernelGGL(kernel1_write, grid1, block1, 0, 0, dev_mem, mem_size);
 
-  kernel1_read <<<grid1, block1>>> (dev_mem, mem_size,
+  hipLaunchKernelGGL(kernel1_read, grid1, block1, 0, 0, dev_mem, mem_size,
       err_cnt,
       err_addr,
       err_expect,
@@ -143,11 +144,11 @@ int main() {
   dim3 grid5 (64*1024);
   dim3 block5 (64);
 
-  kernel5_init <<<grid5, block5>>> (dev_mem, mem_size);
+  hipLaunchKernelGGL(kernel5_init, grid5, block5, 0, 0, dev_mem, mem_size);
 
-  kernel5_move <<<grid5, block5>>> (dev_mem, mem_size);
+  hipLaunchKernelGGL(kernel5_move, grid5, block5, 0, 0, dev_mem, mem_size);
 
-  kernel5_check <<<grid5, block5>>> (dev_mem, mem_size,
+  hipLaunchKernelGGL(kernel5_check, grid5, block5, 0, 0, dev_mem, mem_size,
       err_cnt,
       err_addr,
       err_expect,
@@ -156,11 +157,11 @@ int main() {
   
   check(err_cnt);
 
-  cudaFree(err_cnt);
-  cudaFree(err_addr);
-  cudaFree(err_expect);
-  cudaFree(err_current);
-  cudaFree(err_second_read);
-  cudaFree(dev_mem);
+  hipFree(err_cnt);
+  hipFree(err_addr);
+  hipFree(err_expect);
+  hipFree(err_current);
+  hipFree(err_second_read);
+  hipFree(dev_mem);
   return 0;
 }
