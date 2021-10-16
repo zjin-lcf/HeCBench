@@ -631,8 +631,11 @@ Early results are shown [here](results/README.md)
 ### stddev
   Standard deviation (https://github.com/rapidsai/raft)
 
-### stencil
-  1D stencil using shared memory
+### stencil1d
+  1D stencil (https://www.olcf.ornl.gov/wp-content/uploads/2019/12/02-CUDA-Shared-Memory.pdf)
+
+### stencil3d
+  3D stencil (https://github.com/LLNL/cardioid)
 
 ### streamcluster
   Streamcluster in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
