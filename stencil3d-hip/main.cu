@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
 
   // reset dVm
   hipMalloc((void**)&d_dVm,sizeof(Real)*vol);
-  hipMemset(d_dVm, 0.0, sizeof(Real) * vol);
+  hipMemset(d_dVm, 0, sizeof(Real) * vol);
 
   //determine block sizes
   int bdimz = (nz-2)/(BSIZE-2) + ((nz-2)%(BSIZE-2)==0?0:1);
