@@ -667,6 +667,9 @@ Early results are shown [here](results/README.md)
 ### tridiagonal
   Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### tsa
+  Trotter-Suzuki approximation (https://bitbucket.org/zzzoom/trottersuzuki/src/master/)
+
 ### tsp
   Solving the symmetric traveling salesman problem with iterative hill climbing (https://userweb.cs.txstate.edu/~burtscher/research/TSP_GPU/) 
 
