@@ -1,5 +1,5 @@
-# oneAPI Direct Programming
-This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading. 
+# P3Bench
+This repository contains a collection of data-parallel programs written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
 
 # Software installation
 [AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
@@ -10,8 +10,8 @@ This repository contains a collection of data-parallel programs written with CUD
 For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
 
 # Known issues
-The programs have not been evaluated on Windows  
-The lastest DPC++ compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
+The programs have not been evaluated on Windows or MacOS
+The lastest Intel SYCL compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
