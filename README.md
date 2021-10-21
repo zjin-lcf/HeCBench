@@ -516,6 +516,9 @@ Early results are shown [here](results/README.md)
 ### pointwise
   Fused point-wise operations (https://developer.nvidia.com/blog/optimizing-recurrent-neural-networks-cudnn-5/)
 
+### pool
+  Pooling layer (https://github.com/PaddlePaddle/Paddle)
+
 ### present
   Lightweight cryptography (https://github.com/bozhu/PRESENT-C/blob/master/present.h)
 
