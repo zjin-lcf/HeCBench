@@ -4,6 +4,11 @@
 #include <time.h>
 #include "lebesgue.h"
 
+//
+// The expected test results are shown in 
+// https://people.math.sc.edu/Burkardt/c_src/lebesgue/lebesgue_test.txt
+// 
+
 void test01 ( int nfun  )
 {
   //char label[] = "Chebyshev1 points for N = 11";
