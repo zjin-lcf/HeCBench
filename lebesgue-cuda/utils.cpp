@@ -194,14 +194,13 @@ double *fejer2 ( int n )
 double lebesgue_constant ( int n, double x[], int nfun, double xfun[] )
 
 {
-  double *lfun;
-  double lmax;
+  double lmax = 0.0;
 
-  lfun = lebesgue_function ( n, x, nfun, xfun );
-
-  lmax = r8vec_max ( nfun, lfun );
-
-  free ( lfun );
+  // lmax is always 1 when n = 1
+  if (n > 1)
+    lmax = lebesgue_function ( n, x, nfun, xfun );
+  else
+    lmax = 1.0;
 
   return lmax;
 }
@@ -248,31 +247,7 @@ double *r8vec_linspace_new ( int n, double a, double b )
   return x;
 }
 
-// the value of the maximum element in a R8VEC.
-double r8vec_max ( int n, double r8vec[] )
-{
-  int i;
-  double value;
-
-  if ( n <= 0 )
-  {
-    value = 0.0;
-    return value;
-  }
-
-  value = r8vec[0];
-
-  for ( i = 1; i < n; i++ )
-  {
-    if ( value < r8vec[i] )
-    {
-      value = r8vec[i];
-    }
-  }
-  return value;
-}
-
-void r8vec_print ( int n, double a[], char *title )
+void r8vec_print ( int n, double a[], const char *title )
 {
   int i;
 
