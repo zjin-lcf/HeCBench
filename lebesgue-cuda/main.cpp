@@ -6,9 +6,8 @@
 
 void test01 ( int nfun  )
 {
-  char filename[] = "chebyshev1";
+  //char label[] = "Chebyshev1 points for N = 11";
   double *l;
-  char label[] = "Chebyshev1 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -45,9 +44,8 @@ void test01 ( int nfun  )
 
 void test02 ( int nfun  )
 {
-  char filename[] = "chebyshev2";
+  //char label[] = "Chebyshev2 points for N = 11";
   double *l;
-  char label[] = "Chebyshev2 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -84,9 +82,8 @@ void test02 ( int nfun  )
 
 void test03 ( int nfun  )
 {
-  char filename[] = "chebyshev3";
+  // char label[] = "Chebyshev3 points for N = 11";
   double *l;
-  char label[] = "Chebyshev3 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -123,9 +120,8 @@ void test03 ( int nfun  )
 
 void test04 ( int nfun  )
 {
-  char filename[] = "chebyshev4";
+  //char label[] = "Chebyshev4 points for N = 11";
   double *l;
-  char label[] = "Chebyshev4 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -162,9 +158,8 @@ void test04 ( int nfun  )
 
 void test05 ( int nfun  )
 {
-  char filename[] = "equidistant1";
+  //char label[] = "Equidistant1 points for N = 11";
   double *l;
-  char label[] = "Equidistant1 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -201,9 +196,8 @@ void test05 ( int nfun  )
 
 void test06 ( int nfun  )
 {
-  char filename[] = "equidistant2";
+  //char label[] = "Equidistant2 points for N = 11";
   double *l;
-  char label[] = "Equidistant2 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -240,9 +234,8 @@ void test06 ( int nfun  )
 
 void test07 ( int nfun  )
 {
-  char filename[] = "equidistant3";
+  //char label[] = "Equidistant3 points for N = 11";
   double *l;
-  char label[] = "Equidistant3 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -279,9 +272,8 @@ void test07 ( int nfun  )
 
 void test08 ( int nfun  )
 {
-  char filename[] = "fejer1";
+  //char label[] = "Fejer1 points for N = 11";
   double *l;
-  char label[] = "Fejer1 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
@@ -318,9 +310,8 @@ void test08 ( int nfun  )
 
 void test09 ( int nfun  )
 {
-  char filename[] = "fejer2";
+  //char label[] = "Fejer2 points for N = 11";
   double *l;
-  char label[] = "Fejer2 points for N = 11";
   int n;
   int n_max = 11;
   double *x;
