@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdlib.h>
 #include <cuda.h>
 
 // double-precision atomic max
@@ -42,7 +41,6 @@ void kernel (double *__restrict__ lmax,
 
 double lebesgue_function ( int n, double x[], int nfun, double xfun[] )
 {
-  double *lfun = ( double * ) malloc ( nfun * sizeof ( double ) );
   double lmax = 0.0;
 
   double *d_max, *d_interp, *d_xfun, *d_x;
