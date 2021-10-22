@@ -372,6 +372,9 @@ Early results are shown [here](results/README.md)
 ### ldpc
   QC-LDPC decoding (https://github.com/robertwgh/cuLDPC)
 
+### lebesgue
+  Estimate the Lebesgue constant (https://people.math.sc.edu/Burkardt/c_src/lebesgue/lebesgue.html)
+
 ### leukocyte 
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
