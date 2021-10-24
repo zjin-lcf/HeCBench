@@ -127,7 +127,6 @@ int main(int argc, char *argv[]) {
 #endif
   queue q(dev_sel);
 
-
   surfelRenderTest<float>(q, n, w, h);
   surfelRenderTest<double>(q, n, w, h);
   return 0;
