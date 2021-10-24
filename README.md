@@ -86,6 +86,9 @@ Early results are shown [here](results/README.md)
 ### bh
   Simulate the gravitational forces in a star cluster using the Barnes-Hut n-body algorithm (https://userweb.cs.txstate.edu/~burtscher/research/ECL-BH/)
 
+### bilateral
+  Bilateral filter (https://github.com/jstraub/cudaPcl)
+
 ### binomial
   Evaluate fair call price for a given set of European options under binomial model (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
