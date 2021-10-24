@@ -24,7 +24,7 @@ class k;
 template<typename T>
 void surfel_render(
   nd_item<2> &item,
-  T *__restrict__ s,
+  const T *__restrict__ s,
   int N,
   T f,
   int w,
@@ -33,7 +33,6 @@ void surfel_render(
 {
   const int idx = item.get_global_id(1);
   const int idy = item.get_global_id(0);
-  const int id = idy * w + idx;
 
   if(idx < w && idy < h)
   {
@@ -66,7 +65,7 @@ void surfel_render(
         dMin = t; // ray hit the surfel 
       }
     }
-    d[id] = dMin > (T)100 ? (T)0 : dMin;
+    d[id*w+idx] = dMin > (T)100 ? (T)0 : dMin;
   }
 }
 

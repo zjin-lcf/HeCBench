@@ -19,7 +19,7 @@
 // compute the xyz images using the inverse focal length invF
   template<typename T>
 void surfel_render(
-    T *__restrict__ s,
+    const T *__restrict__ s,
     int N,
     T f,
     int w,
@@ -29,7 +29,6 @@ void surfel_render(
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
   for (int idy = 0; idy < h; idy++)
     for (int idx = 0; idx < w; idx++) {
-      const int id = idy * w + idx;
 
       T ray[3];
       ray[0] = T(idx)-(w-1)*(T)0.5;
@@ -60,7 +59,7 @@ void surfel_render(
           dMin = t; // ray hit the surfel 
         }
       }
-      d[id] = dMin > (T)100 ? (T)0 : dMin;
+      d[id*w+idx] = dMin > (T)100 ? (T)0 : dMin;
     }
 }
 
