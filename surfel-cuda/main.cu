@@ -19,7 +19,7 @@
 // compute the xyz images using the inverse focal length invF
 template<typename T>
 __global__ void surfel_render(
-  T *__restrict__ s,
+  const T *__restrict__ s,
   int N,
   T f,
   int w,
@@ -28,7 +28,6 @@ __global__ void surfel_render(
 {
   const int idx = threadIdx.x + blockIdx.x*blockDim.x;
   const int idy = threadIdx.y + blockIdx.y*blockDim.y;
-  const int id = idy * w + idx;
 
   if(idx < w && idy < h)
   {
@@ -61,7 +60,7 @@ __global__ void surfel_render(
         dMin = t; // ray hit the surfel 
       }
     }
-    d[id] = dMin > (T)100 ? (T)0 : dMin;
+    d[idy*w+idx] = dMin > (T)100 ? (T)0 : dMin;
   }
 }
 
