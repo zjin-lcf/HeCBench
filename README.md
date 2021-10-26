@@ -595,6 +595,9 @@ Early results are shown [here](results/README.md)
 ### simplemoc
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
 
+### slu
+  Sparse LU factorization (https://github.com/sheldonucr/GLU_public)
+
 ### snake
   Genome pre-alignment filtering (https://github.com/CMU-SAFARI/SneakySnake)
 
