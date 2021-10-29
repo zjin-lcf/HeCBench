@@ -21,8 +21,8 @@ int main(int argc, char** argv)
   printf("output image height %d\n", o_img_height);
 
   // Generate random values for each image
-  unsigned int size_image = i_img_width*i_img_height;
-  unsigned int mem_size_image = sizeof(DTYPE) * size_image;
+  int size_image = i_img_width*i_img_height;
+  size_t mem_size_image = sizeof(DTYPE) * size_image;
   DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
 
   for(int j=0;j<i_img_count;j++)
@@ -33,11 +33,10 @@ int main(int argc, char** argv)
     }
   }
 
-  unsigned int size_output = o_img_width * o_img_height;
-  unsigned int mem_size_output = sizeof(DTYPE) * size_output;
-  // host result
+  // host and device results
+  int size_output = o_img_width * o_img_height;
+  size_t mem_size_output = sizeof(DTYPE) * size_output;
   DTYPE* h_output = (DTYPE*) malloc(mem_size_output*i_img_count);
-  // device result 
   DTYPE* d_output = (DTYPE*) malloc(mem_size_output*i_img_count);
 
   // filter size same as stride size
