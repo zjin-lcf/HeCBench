@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
   // Generate random values for each image
   int size_image = i_img_width*i_img_height;
-  int mem_size_image = sizeof(DTYPE) * size_image;
+  size_t mem_size_image = sizeof(DTYPE) * size_image;
   DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
 
   for(int j=0;j<i_img_count;j++)
@@ -65,11 +65,10 @@ int main(int argc, char** argv)
     }
   }
 
+  // host and device results
   int size_output = o_img_width * o_img_height;
-  int mem_size_output = sizeof(DTYPE) * size_output;
-  // host result
+  size_t mem_size_output = sizeof(DTYPE) * size_output;
   DTYPE* h_output = (DTYPE*) malloc(mem_size_output*i_img_count);
-  // device result 
   DTYPE* d_output = (DTYPE*) malloc(mem_size_output*i_img_count);
 
   // Create the input and output arrays in device memory 
