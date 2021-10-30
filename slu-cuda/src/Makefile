@@ -3,17 +3,15 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvc++
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = yes
-DEVICE    = gpu
-SM        = cc70
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-SLU_PATH = ../slu-cuda/src
+SLU_PATH = .
 
 SLU_LIBS = $(SLU_PATH)/nicslu/lib/nicslu.a \
            $(SLU_PATH)/nicslu/util/nicslu_util.a
@@ -30,15 +28,15 @@ SLU_INC = -I$(SLU_PATH)/../include \
           -I$(SLU_PATH)/nicslu/util
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall $(SLU_INC)
+CFLAGS := -std=c++14 -Xcompiler -Wall $(SLU_INC)
 
 # Linker Flags
-LDFLAGS = -lpthread
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g 
+  LDFLAGS  += -g
 endif
 
 # Optimization Flags
@@ -48,12 +46,6 @@ endif
 
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
-endif
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
-else
-  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -65,7 +57,7 @@ $(program): $(obj)
 Timer.o: $(SLU_PATH)/Timer.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-numeric.o: numeric.cpp
+numeric.o: numeric.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
 symbolic.o: $(SLU_PATH)/symbolic.cpp

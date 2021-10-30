@@ -80,7 +80,7 @@ clean:
 	make -C $(SLU_PATH)/nicslu/ clean
 
 test: $(program)
-	./$(program) -i $(SLU_PATH)/add32.mtx
+	./$(program) -i $(SLU_PATH)/nicslu/test/add32.mtx
 
 run: $(program)
 	./$(program) -i $(SLU_PATH)/nicslu/demo/ASIC_100k.mtx
