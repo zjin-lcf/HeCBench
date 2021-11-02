@@ -186,7 +186,7 @@ void Symbolic_Matrix::ABFTCheckResult()
 
   //Compare CCA and CCA_ABFT
   for(unsigned i = 0; i < n; ++i) {
-    if (abs(CCA_ABFT[i] - CCA[i]) > 1e-5) {
+    if (fabs(CCA_ABFT[i] - CCA[i]) > 1e-3) {
       m_err << "Column " << i << ": CCA = " << CCA[i] <<
         ", CCA_ABFT[i] = " << CCA_ABFT[i] << endl;
       m_err << "More to come..." << endl;

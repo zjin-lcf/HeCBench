@@ -6,7 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-VERIFY    = no
+VERIFY    = yes
 
 GPU       = yes
 CUDA      = no
@@ -102,9 +102,7 @@ clean:
 	make -C $(SLU_PATH)/nicslu/ clean
 
 test: $(program)
-	./$(program) -i $(SLU_PATH)/add32.mtx
-	./$(program) -i $(SLU_PATH)/add32.mtx -p
+	./$(program) -i $(SLU_PATH)/nicslu/test/add32.mtx
 
 run: $(program)
 	./$(program) -i $(SLU_PATH)/nicslu/demo/ASIC_100k.mtx
-	./$(program) -i $(SLU_PATH)/nicslu/demo/ASIC_100k.mtx -p
