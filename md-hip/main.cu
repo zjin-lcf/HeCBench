@@ -52,7 +52,6 @@ __global__ void md (
     }
     j++;
   }
-  // store the resuls
   force[idx] = f;
 }
 

@@ -53,7 +53,6 @@ void md (
     }
     j++;
   }
-  // store the resuls
   force[idx] = f;
 }
 
@@ -114,7 +113,7 @@ int main(int argc, char** argv)
   range<1> lws (256);
   range<1> gws ((nAtom + 255) / 256 * 256);
 
-  // Warm up the kernel and check correctness
+  // warmup and result verification
   q.submit([&](handler& cgh) {
     auto force = d_force.get_access<sycl_discard_write>(cgh);
     auto position = d_position.get_access<sycl_read>(cgh);
