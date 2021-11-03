@@ -11,9 +11,9 @@ SP        = yes
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-program = md
+program = main
 
-source = MD.cu
+source = main.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../md-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -50,7 +50,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu MD.h Makefile
+%.o: %.cu ../md-cuda/MD.h ../md-cuda/reference.h ../md-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
