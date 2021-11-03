@@ -6,6 +6,7 @@
 CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
+SP        = yes
 DEVICE    = gpu
 
 
@@ -13,12 +14,9 @@ DEVICE    = gpu
 # Program name & source code list
 #===============================================================================
 
+program = main
 
-SP = yes
-
-program = md
-
-source = MD.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -57,17 +55,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp MD.h Makefile
+%.o: %.cpp MD.h ../md-cuda/reference.h ../md-cuda/utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
-
-check: $(program)
-	./$(program) 3 1
 
 run: $(program)
 	./$(program) 3 1000
