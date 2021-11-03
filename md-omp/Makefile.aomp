@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+SP        = yes
 ARCH      = gfx906
 
 
@@ -14,12 +15,9 @@ ARCH      = gfx906
 # Program name & source code list
 #===============================================================================
 
+program = main
 
-SP = yes
-
-program = md
-
-source = MD.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -28,7 +26,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 
+CFLAGS := -std=c++14 -I../md-cuda/
 
 # Linker Flags
 LDFLAGS = 
@@ -38,7 +36,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -61,17 +58,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp MD.h Makefile
+%.o: %.cpp MD.h ../md-cuda/reference.h ../md-cuda/utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
-
-check: $(program)
-	./$(program) 3 1
 
 run: $(program)
 	./$(program) 3 1000

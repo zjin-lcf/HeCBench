@@ -6,19 +6,16 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+SP        = yes
 ARCH      = sm_60
-
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
+program = main
 
-SP = yes
-
-program = md
-
-source = MD.cu
+source = main.cu
 
 obj = $(source:.cu=.o)
 
@@ -55,7 +52,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu MD.h Makefile
+%.o: %.cu MD.h utils.h reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
