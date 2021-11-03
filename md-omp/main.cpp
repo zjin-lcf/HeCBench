@@ -39,7 +39,7 @@ void md (
       FPTYPE r2inv = delx*delx + dely*dely + delz*delz;
 
       // If distance is less than cutoff, calculate force
-      if (r2inv < cutsq_t)
+      if (r2inv > 0 && r2inv < cutsq_t)
       {
         r2inv = (FPTYPE)1.0 / r2inv;
         FPTYPE r6inv = r2inv * r2inv * r2inv;
