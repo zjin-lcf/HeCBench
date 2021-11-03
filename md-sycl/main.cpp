@@ -1,9 +1,9 @@
 #include <cassert>
 #include <cfloat>
 #include <list>
+#include <iostream>
 #include <math.h>
 #include <stdlib.h>
-#include <iostream>
 #include "MD.h"
 #include "common.h"
 
@@ -44,9 +44,9 @@ inline int populateNeighborList(std::list<T>& currDist,
 // Modifications:
 //
 // ****************************************************************************
-  template <class T, class forceVecType, class posVecType>
+template <class T, class forceVecType, class posVecType>
 bool checkResults(forceVecType* d_force, posVecType *position,
-    int *neighList, int nAtom)
+                  int *neighList, int nAtom)
 {
   T max_error = 0;
   for (int i = 0; i < nAtom; i++)
@@ -67,7 +67,7 @@ bool checkResults(forceVecType* d_force, posVecType *position,
       // If distance is less than cutoff, calculate force
       if (r2inv < cutsq) {
 
-        r2inv = 1.0f/r2inv;
+        r2inv = (T)1.0 / r2inv;
         T r6inv = r2inv * r2inv * r2inv;
         T force = r2inv*r6inv*(lj1*r6inv - lj2);
 
@@ -109,16 +109,11 @@ int main(int argc, char** argv)
   int nAtom = probSizes[sizeClass];
 
   // Allocate problem data on host
-  POSVECTYPE*   position;
-  FORCEVECTYPE* h_force;
-  int* neighborList;
+  POSVECTYPE* position = (POSVECTYPE*) malloc(nAtom * sizeof(POSVECTYPE));
+  FORCEVECTYPE* h_force = (FORCEVECTYPE*) malloc(nAtom * sizeof(FORCEVECTYPE));
+  int *neighborList = (int*) malloc(maxNeighbors * nAtom * sizeof(int));
 
-  position = (POSVECTYPE*) malloc(nAtom * sizeof(POSVECTYPE));
-  h_force = (FORCEVECTYPE*) malloc(nAtom * sizeof(FORCEVECTYPE));
-  neighborList = (int*) malloc(maxNeighbors * nAtom * sizeof(int));
-
-  std::cout << "Initializing test problem (this can take several "
-    "minutes for large problems).\n                   ";
+  std::cout << "Initializing test problem (this can take several minutes for large problems).\n";
 
   // Seed random number generator
   srand48(8650341L);
@@ -134,14 +129,14 @@ int main(int argc, char** argv)
 
   std::cout << "Finished.\n";
   int totalPairs = buildNeighborList<FPTYPE, POSVECTYPE>(nAtom, position, neighborList);
-  std::cout << totalPairs << " of " << nAtom*maxNeighbors <<
-    " pairs within cutoff distance = " <<
-    100.0 * ((double)totalPairs / (nAtom*maxNeighbors)) << " %\n";
+  std::cout << totalPairs << " of " << nAtom*maxNeighbors
+            << " pairs within cutoff distance = "
+            << 100.0 * ((double)totalPairs / (nAtom*maxNeighbors)) << " %\n";
 
   // see MD.h
-  FPTYPE lj1_t   = (FPTYPE) lj1;
-  FPTYPE lj2_t   = (FPTYPE) lj2;
-  FPTYPE cutsq_t = (FPTYPE) cutsq;
+  FPTYPE lj1_t   = lj1;
+  FPTYPE lj2_t   = lj2;
+  FPTYPE cutsq_t = cutsq;
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -156,24 +151,23 @@ int main(int argc, char** argv)
   buffer<POSVECTYPE, 1> d_position(position, nAtom, props);
   buffer<int, 1> d_neighborList(neighborList, nAtom * maxNeighbors, props);
 
-  size_t localSize  = 256;
-  size_t globalSize = (nAtom + localSize - 1) / localSize * localSize ;
+  range<1> lws (256);
+  range<1> gws ((nAtom + 255) / 256 * 256);
 
   // Warm up the kernel and check correctness
   q.submit([&](handler& cgh) {
-      auto force = d_force.template get_access<sycl_discard_write>(cgh);
-      auto position = d_position.template get_access<sycl_read>(cgh);
-      auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class compute_lj_force>(nd_range<1>(
-            range<1>(globalSize), range<1>(localSize)), [=] (nd_item<1> item) {
-#include "MD.sycl"
-          });
-      });
+    auto force = d_force.get_access<sycl_discard_write>(cgh);
+    auto position = d_position.get_access<sycl_read>(cgh);
+    auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
+    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+       #include "MD.sycl"
+    });
+  });
 
   q.submit([&](handler& cgh) {
-      auto force = d_force.template get_access<sycl_read>(cgh);
-      cgh.copy(force, h_force);
-      });
+    auto force = d_force.get_access<sycl_read>(cgh);
+    cgh.copy(force, h_force);
+  });
   q.wait();
 
   std::cout << "Performing Correctness Check (may take several minutes)\n";
@@ -184,14 +178,13 @@ int main(int argc, char** argv)
   {
     //Launch Kernels
     q.submit([&](handler& cgh) {
-        auto force = d_force.template get_access<sycl_write>(cgh);
-        auto position = d_position.template get_access<sycl_read>(cgh);
-        auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class md>(nd_range<1>(range<1>(globalSize),
-              range<1>(localSize)), [=] (nd_item<1> item) {
-#include "MD.sycl"
-            });
-        });
+      auto force = d_force.get_access<sycl_write>(cgh);
+      auto position = d_position.get_access<sycl_read>(cgh);
+      auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class md>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        #include "MD.sycl"
+      });
+    });
   }
   q.wait();
 
@@ -220,7 +213,7 @@ int main(int argc, char** argv)
 // Modifications:
 //
 // ********************************************************
-  template <class T, class posVecType>
+template <class T, class posVecType>
 inline T distance(const posVecType* position, const int i, const int j)
 {
   posVecType ipos = position[i];
@@ -255,7 +248,7 @@ inline T distance(const posVecType* position, const int i, const int j)
 // Modifications:
 //
 // ********************************************************
-  template <class T>
+template <class T>
 inline void insertInOrder(std::list<T>& currDist, std::list<int>& currList,
     const int j, const T distIJ, const int maxNeighbors)
 {
@@ -306,7 +299,7 @@ inline void insertInOrder(std::list<T>& currDist, std::list<int>& currList,
 // Modifications:
 //
 // ********************************************************
-  template <class T, class posVecType>
+template <class T, class posVecType>
 inline int buildNeighborList(const int nAtom, const posVecType* position,
     int* neighborList)
 {
@@ -366,7 +359,7 @@ inline int buildNeighborList(const int nAtom, const posVecType* position,
 // Modifications:
 //
 // ********************************************************
-  template <class T>
+template <class T>
 inline int populateNeighborList(std::list<T>& currDist,
     std::list<int>& currList, const int i, const int nAtom,
     int* neighborList)
