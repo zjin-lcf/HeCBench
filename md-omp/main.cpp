@@ -51,7 +51,6 @@ void md (
       }
       j++;
     }
-    // store the results
     force[idx] = f;
   }
 }
@@ -102,6 +101,7 @@ int main(int argc, char** argv)
                                   neighborList[0:nAtom * maxNeighbors]) \
                           map(alloc: force[0:nAtom])
   {
+    // warmup and result verification
     md(position,
        force,
        neighborList,
