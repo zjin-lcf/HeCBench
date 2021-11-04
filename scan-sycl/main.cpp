@@ -17,45 +17,47 @@ void runTest (const dataType *in, dataType *out, const int n)
   buffer<dataType,1> d_in(in, n);
   buffer<dataType,1> d_out(out, n);
 
+  range<1> lws (n/2);
+  range<1> gws (n/2);
   for (int i = 0; i < ITERATION; i++) {
     q.submit([&] (handler &cgh) {
-    auto g_odata = d_out.template get_access<sycl_discard_write>(cgh);
-    auto g_idata = d_in.template get_access<sycl_read>(cgh);
-    accessor<dataType, 1, sycl_read_write, access::target::local> temp(N, cgh);
-    cgh.parallel_for<class scan_block>(nd_range<1>(range<1>(N/2), range<1>(N/2)), [=] (nd_item<1> item) {
-      int thid = item.get_local_id(0);
-      int offset = 1;
-      temp[2*thid]   = g_idata[2*thid];
-      temp[2*thid+1] = g_idata[2*thid+1];
-      for (int d = n >> 1; d > 0; d >>= 1) 
-      {
-        item.barrier(access::fence_space::local_space);
-        if (thid < d) 
+      auto g_odata = d_out.template get_access<sycl_discard_write>(cgh);
+      auto g_idata = d_in.template get_access<sycl_read>(cgh);
+      accessor<dataType, 1, sycl_read_write, access::target::local> temp(N, cgh);
+      cgh.parallel_for<class scan_block>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int thid = item.get_local_id(0);
+        int offset = 1;
+        temp[2*thid]   = g_idata[2*thid];
+        temp[2*thid+1] = g_idata[2*thid+1];
+        for (int d = n >> 1; d > 0; d >>= 1) 
         {
-          int ai = offset*(2*thid+1)-1;
-          int bi = offset*(2*thid+2)-1;
-          temp[bi] += temp[ai];
+          item.barrier(access::fence_space::local_space);
+          if (thid < d) 
+          {
+            int ai = offset*(2*thid+1)-1;
+            int bi = offset*(2*thid+2)-1;
+            temp[bi] += temp[ai];
+          }
+          offset *= 2;
         }
-        offset *= 2;
-      }
-      
-      if (thid == 0) temp[n-1] = 0; // clear the last elem
-      for (int d = 1; d < n; d *= 2) // traverse down
-      {
-        offset >>= 1;     
-        item.barrier(access::fence_space::local_space);
-        if (thid < d)
+        
+        if (thid == 0) temp[n-1] = 0; // clear the last elem
+        for (int d = 1; d < n; d *= 2) // traverse down
         {
-          int ai = offset*(2*thid+1)-1;
-          int bi = offset*(2*thid+2)-1;
-          float t = temp[ai];
-          temp[ai] = temp[bi];
-          temp[bi] += t;
+          offset >>= 1;     
+          item.barrier(access::fence_space::local_space);
+          if (thid < d)
+          {
+            int ai = offset*(2*thid+1)-1;
+            int bi = offset*(2*thid+2)-1;
+            float t = temp[ai];
+            temp[ai] = temp[bi];
+            temp[bi] += t;
+          }
         }
-      }
-      g_odata[2*thid] = temp[2*thid];
-      g_odata[2*thid+1] = temp[2*thid+1];
-    });
+        g_odata[2*thid] = temp[2*thid];
+        g_odata[2*thid+1] = temp[2*thid+1];
+      });
     });
   }
   q.wait();

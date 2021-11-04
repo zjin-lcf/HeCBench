@@ -8,10 +8,10 @@
 template <typename dataType>
 void runTest (const dataType *in, dataType *out, const int n) 
 {
-  #pragma omp target data map(to: in[0:N]) map(from: out[0:N])
+  #pragma omp target data map(to: in[0:n]) map(from: out[0:n])
   {
     for (int i = 0; i < ITERATION; i++) {
-      #pragma omp target teams num_teams(1) thread_limit(N/2)
+      #pragma omp target teams num_teams(1) thread_limit(n/2)
       {
         dataType temp[N];
         #pragma omp parallel 
