@@ -217,13 +217,13 @@ void bilinear_interpolation_kernel(
   // Adjust the mapped coordinates to cross the range of (0-nDetX).*duMap 
   // Divide by pixelSize to get a unitary pixel size
   const double xNormData = nDetX - d_pObjX[py] / d_pDetmX[0];
-  const int    xData = floor(xNormData);
+  const int    xData = sycl::floor(xNormData);
   const double alpha = xNormData - xData;
 
   // Adjust the mapped coordinates to cross the range of (0-nDetY).*dyMap  
   // Divide by pixelSize to get a unitary pixel size
   const double yNormData = (d_pObjY[px] / d_pDetmX[0]) - (d_pDetmY[0] / d_pDetmX[0]);
-  const int    yData = floor(yNormData);
+  const int    yData = sycl::floor(yNormData);
   const double beta = yNormData - yData;
 
   double d00, d01, d10, d11;
