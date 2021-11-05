@@ -358,9 +358,9 @@ void division_kernel(
 
 // Branchless distance-driven backprojection 
 void backprojectionDDb(double* const h_pVolume,
-    double* const h_pProj,
-    double* const h_pTubeAngle,
-    double* const h_pDetAngle,
+    const double* const h_pProj,
+    const double* const h_pTubeAngle,
+    const double* const h_pDetAngle,
     const int idXProj,
     const int nProj,
     const int nPixX,
@@ -405,7 +405,7 @@ void backprojectionDDb(double* const h_pVolume,
   // Copy projection data padding with zeros for image integation
 
   // Initialize first column and row with zeros
-  double* h_pProj_tmp;
+  const double* h_pProj_tmp;
 
   lws[2] = maxThreadsPerBlock;
   gws[2] = (nDetXMap / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
@@ -760,6 +760,9 @@ int main()
 
   // random values
   srand(123);
+  for (size_t i = 0; i < pixVol; i++) 
+    h_pVolume[i] = (double)rand() / (double)RAND_MAX;
+
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
@@ -778,7 +781,7 @@ int main()
     DSD, DDR, DAG);
   
   double checkSum = 0;
-  for (int i = 0; i < nSlices * nPixX * nPixY; i++)
+  for (size_t i = 0; i < pixVol; i++)
     checkSum += h_pVolume[i];
   printf("checksum = %lf\n", checkSum);
 

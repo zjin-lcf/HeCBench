@@ -155,12 +155,10 @@ __global__ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + (offsetY + spot) * nPixY + px];
       }
-      __syncthreads();
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      __syncthreads();
     }
   }
   else
@@ -174,12 +172,10 @@ __global__ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + py * nPixY + spot + offsetX];
       }
-      __syncthreads();
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      __syncthreads();
     }
   }
 }
@@ -350,9 +346,9 @@ __global__ void division_kernel(
 
 // Branchless distance-driven backprojection 
 void backprojectionDDb(double* const h_pVolume,
-    double* const h_pProj,
-    double* const h_pTubeAngle,
-    double* const h_pDetAngle,
+    const double* const h_pProj,
+    const double* const h_pTubeAngle,
+    const double* const h_pDetAngle,
     const int idXProj,
     const int nProj,
     const int nPixX,
@@ -380,14 +376,10 @@ void backprojectionDDb(double* const h_pVolume,
   double* d_pProj;
   double* d_sliceI;
   double* d_pVolume;
-  double* d_pTubeAngle;
-  double* d_pDetAngle;
 
   cudaMalloc((void **)&d_pProj, nDetXMap*nDetYMap*nProj * sizeof(double)); 
   cudaMalloc((void **)&d_sliceI, nPixXMap*nPixYMap * sizeof(double));
   cudaMalloc((void **)&d_pVolume, nPixX*nPixY*nSlices * sizeof(double));
-  cudaMalloc((void **)&d_pTubeAngle, nProj * sizeof(double));
-  cudaMalloc((void **)&d_pDetAngle, nProj * sizeof(double));
 
   // Will reuse grid configurations
   dim3 threadsPerBlock (1,1,1);
@@ -398,7 +390,7 @@ void backprojectionDDb(double* const h_pVolume,
   // Copy projection data padding with zeros for image integation
 
   // Initialize first column and row with zeros
-  double* h_pProj_tmp;
+  const double* h_pProj_tmp;
   double* d_pProj_tmp;
 
   threadsPerBlock.x = maxThreadsPerBlock;
@@ -625,8 +617,6 @@ void backprojectionDDb(double* const h_pVolume,
   cudaFree(d_pProj);
   cudaFree(d_sliceI);
   cudaFree(d_pVolume);
-  cudaFree(d_pTubeAngle);
-  cudaFree(d_pDetAngle);
   cudaFree(d_pDetX);
   cudaFree(d_pDetY);
   cudaFree(d_pDetZ);
@@ -703,7 +693,7 @@ int main()
     DSD, DDR, DAG);
 
   double checkSum = 0;
-  for (int i = 0; i < nSlices * nPixX * nPixY; i++)
+  for (size_t i = 0; i < pixVol; i++)
     checkSum += h_pVolume[i];
   printf("checksum = %lf\n", checkSum);
 
