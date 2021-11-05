@@ -389,9 +389,6 @@ void backprojectionDDb(double* const h_pVolume,
   cudaMalloc((void **)&d_pTubeAngle, nProj * sizeof(double));
   cudaMalloc((void **)&d_pDetAngle, nProj * sizeof(double));
 
-  cudaMemcpy((void *)d_pTubeAngle, (void *)h_pTubeAngle, nProj * sizeof(double), cudaMemcpyHostToDevice);
-  cudaMemcpy((void *)d_pDetAngle, (void *)h_pDetAngle, nProj * sizeof(double), cudaMemcpyHostToDevice);
-
   // Will reuse grid configurations
   dim3 threadsPerBlock (1,1,1);
   dim3 blockSize (1,1,1);
@@ -585,10 +582,9 @@ void backprojectionDDb(double* const h_pVolume,
       blockSize.y = (nDetXMap / threadsPerBlock.y) + 1;
       blockSize.z = 1;
 
-
       mapDet2Slice_kernel <<<blockSize, threadsPerBlock>>> (
           d_pDetmX, d_pDetmY, tubeX, rtubeY, rtubeZ, d_pDetX,
-          d_pRdetY, d_pRdetZ,d_pObjZ, nDetXMap, nDetYMap, nz);
+          d_pRdetY, d_pRdetZ, d_pObjZ, nDetXMap, nDetYMap, nz);
 
       //  S.2. Interpolation - Liu et al (2017)
 
@@ -684,6 +680,8 @@ int main()
   for (int i = 0; i < nProj; i++) 
     h_pDetAngle[i] = -2.1 + i * 4.2/nProj;
 
+  // random values
+  srand(123);
   for (size_t i = 0; i < pixVol; i++) 
     h_pVolume[i] = (double)rand() / (double)RAND_MAX;
 
@@ -703,6 +701,11 @@ int main()
     dx, dy, dz,
     du, dv,
     DSD, DDR, DAG);
+
+  double checkSum = 0;
+  for (int i = 0; i < nSlices * nPixX * nPixY; i++)
+    checkSum += h_pVolume[i];
+  printf("checksum = %lf\n", checkSum);
 
   free(h_pVolume);
   free(h_pTubeAngle);

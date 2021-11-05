@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -53,7 +52,5 @@ $(obj): main.cu
 clean:
 	rm -rf $(program) $(obj)
 
-# reuse the image
 run: $(program)
-	./$(program) 100 128 128 
-
+	./$(program)
