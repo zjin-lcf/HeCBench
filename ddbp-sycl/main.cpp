@@ -160,12 +160,10 @@ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + (offsetY + spot) * nPixY + px];
       }
-      item.barrier(access::fence_space::local_space);
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      item.barrier(access::fence_space::local_space);
     }
   }
   else
@@ -179,12 +177,10 @@ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + py * nPixY + spot + offsetX];
       }
-      item.barrier(access::fence_space::local_space);
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      item.barrier(access::fence_space::local_space);
     }
   }
 }
