@@ -21,7 +21,7 @@ void fluidSim (
         double *h_of5678);
 
 // Calculates equivalent distribution 
-double computefEq(double weight, const double dir[2], double rho, double velocity[2]);
+double computefEq(double rho, double weight, const double dir[2], const double velocity[2]);
 
 #ifdef VERIFY
 void reference (

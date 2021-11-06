@@ -4,11 +4,11 @@
 #define GROUP_SIZE 256
 
 // Calculates equivalent distribution 
-double ced(double rho, double weight, double2 dir, double2 u)
+double ced(double rho, double weight, const double2 dir, const double2 u)
 {
   double u2 = (u.x() * u.x()) + (u.y() * u.y());
   double eu = (dir.x() * u.x()) + (dir.y() * u.y());
-  return rho * weight * (1.0f + 3.0f * eu + 4.5f * eu * eu - 1.5f * u2);
+  return rho * weight * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * u2);
 }
 
 // convert_int8() may be language specific
@@ -95,7 +95,7 @@ void lbm (
     u.y() = (sycl::dot(f1234, y1234) + sycl::dot(f5678, y5678)) / rho;
 
     // Compute f
-    e0 = ced(rho, weight[0], (double2)(0), u);
+    e0        = ced(rho, weight[0], (double2)(0), u);
     e1234.x() = ced(rho, weight[1], (double2)(dirX.s0(), dirY.s0()), u);
     e1234.y() = ced(rho, weight[2], (double2)(dirX.s1(), dirY.s1()), u);
     e1234.z() = ced(rho, weight[3], (double2)(dirX.s2(), dirY.s2()), u);
@@ -279,4 +279,6 @@ void fluidSim (
     auto acc = d_if5678.get_access<sycl_read>(cgh);
     cgh.copy(acc, (double4*)h_of5678);
   });
+
+  q.wait();
 }
