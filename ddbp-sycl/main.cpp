@@ -351,9 +351,9 @@ void division_kernel(
   }
 }
 
-
 // Branchless distance-driven backprojection 
-void backprojectionDDb(double* const h_pVolume,
+void backprojectionDDb(
+          double* const h_pVolume,
     const double* const h_pProj,
     const double* const h_pTubeAngle,
     const double* const h_pDetAngle,
@@ -565,8 +565,6 @@ void backprojectionDDb(double* const h_pVolume,
     });
   }
 
-  //double* d_pDetmX_tmp = d_pDetmX + (nDetYMap * (nDetXMap-2));
-
   // loop over all projections ?
   int projIni, projEnd, nProj2Run;
   if (idXProj == -1) {
@@ -617,8 +615,6 @@ void backprojectionDDb(double* const h_pVolume,
                             isoY, isoZ, phi, nDetYMap);
       });
     });
-
-    //printf("Detector rotation -- Threads:%d Blocks:%d \n", threads, blocks);
 
     lws[2] = 16;
     lws[1] = 16;

@@ -36,7 +36,7 @@ Original author: Rodrigo de Barros Vimieiro
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 // thread block size
 #define BLOCK_SIZE 256
@@ -378,9 +378,9 @@ void backprojectionDDb(
   double* d_sliceI;
   double* d_pVolume;
 
-  cudaMalloc((void **)&d_pProj, nDetXMap*nDetYMap*nProj * sizeof(double)); 
-  cudaMalloc((void **)&d_sliceI, nPixXMap*nPixYMap * sizeof(double));
-  cudaMalloc((void **)&d_pVolume, nPixX*nPixY*nSlices * sizeof(double));
+  hipMalloc((void **)&d_pProj, nDetXMap*nDetYMap*nProj * sizeof(double)); 
+  hipMalloc((void **)&d_sliceI, nPixXMap*nPixYMap * sizeof(double));
+  hipMalloc((void **)&d_pVolume, nPixX*nPixY*nSlices * sizeof(double));
 
   // Will reuse grid configurations
   dim3 threadsPerBlock (1,1,1);
@@ -400,11 +400,11 @@ void backprojectionDDb(
   for (int np = 0; np < nProj; np++) {
 
     // Pad on X coord direction
-    pad_projections_kernel <<<blockSize, threadsPerBlock>>> (d_pProj, nDetXMap, nDetYMap, nDetXMap, np);
+    hipLaunchKernelGGL(pad_projections_kernel, blockSize, threadsPerBlock, 0, 0, d_pProj, nDetXMap, nDetYMap, nDetXMap, np);
 
     // Pad on Y coord direction
     d_pProj_tmp = d_pProj + (nDetXMap*nDetYMap*np) + 1;
-    cudaMemset(d_pProj_tmp, 0, nPixY * sizeof(double));
+    hipMemset(d_pProj_tmp, 0, nPixY * sizeof(double));
   }
 
   // Copy projections data from host to device
@@ -412,7 +412,7 @@ void backprojectionDDb(
     for (int c = 0; c < nDetX; c++) {
       h_pProj_tmp = h_pProj + (c * nDetY) + (nDetX*nDetY*np);
       d_pProj_tmp = d_pProj + (((c + 1) * nDetYMap) + 1) + (nDetXMap*nDetYMap*np);
-      cudaMemcpy(d_pProj_tmp, h_pProj_tmp, nDetY * sizeof(double), cudaMemcpyHostToDevice);
+      hipMemcpy(d_pProj_tmp, h_pProj_tmp, nDetY * sizeof(double), hipMemcpyHostToDevice);
     }
 
   // device memory for projections coordinates
@@ -423,26 +423,26 @@ void backprojectionDDb(
   double* d_pObjY;
   double* d_pObjZ;
 
-  cudaMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
+  hipMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
+  hipMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
+  hipMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
+  hipMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
 
   // device memory for mapped coordinates
   double* d_pDetmY;
   double* d_pDetmX;
 
-  cudaMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
+  hipMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
 
   // device memory for rotated detector coords
   double* d_pRdetY;
   double* d_pRdetZ;
 
-  cudaMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
 
   // Generate detector and object boudaries
 
@@ -450,27 +450,27 @@ void backprojectionDDb(
 
   blockSize.x = (nDetX / maxThreadsPerBlock) + 1;
 
-  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
+  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
 
   blockSize.x = (nDetY / maxThreadsPerBlock) + 1;
 
-  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
+  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
 
   blockSize.x = (nPixX / maxThreadsPerBlock) + 1;
 
-  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
+  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
 
   blockSize.x = (nPixY / maxThreadsPerBlock) + 1;
 
-  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
+  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
 
   blockSize.x = (nSlices / maxThreadsPerBlock) + 1;
 
-  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
+  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
 
   // Initiate variables value with 0
-  cudaMemset(d_pDetZ, 0, nDetYMap * sizeof(double));
-  cudaMemset(d_pVolume, 0, nPixX * nPixY * nSlices * sizeof(double));
+  hipMemset(d_pDetZ, 0, nDetYMap * sizeof(double));
+  hipMemset(d_pVolume, 0, nPixX * nPixY * nSlices * sizeof(double));
 
   // X - ray tube initial position
   double tubeX = 0;
@@ -496,7 +496,7 @@ void backprojectionDDb(
   int Xk = (int)ceilf((float)nDetXMap / (threadsPerBlock.x - 1));
   for (int k = 0; k < Xk; k++) {
 
-    img_integration_kernel <<<blockSize, threadsPerBlock>>> (
+    hipLaunchKernelGGL(img_integration_kernel, blockSize, threadsPerBlock, 0, 0, 
         d_pProj, nDetXMap, nDetYMap, integrateXcoord, 0, k * 9, nProj);
   }
 
@@ -512,7 +512,7 @@ void backprojectionDDb(
   int Yk = (int)ceilf((float)nDetYMap / (threadsPerBlock.y - 1));
   for (int k = 0; k < Yk; k++) {
 
-    img_integration_kernel <<<blockSize, threadsPerBlock>>> (
+    hipLaunchKernelGGL(img_integration_kernel, blockSize, threadsPerBlock, 0, 0, 
         d_pProj, nDetXMap, nDetYMap, integrateYcoord, k * 9, 0, nProj);
   }
 
@@ -556,7 +556,7 @@ void backprojectionDDb(
     blockSize.y = 1;
     blockSize.z = 1;
 
-    rot_detector_kernel <<<blockSize, threadsPerBlock>>> (
+    hipLaunchKernelGGL(rot_detector_kernel, blockSize, threadsPerBlock, 0, 0, 
         d_pRdetY, d_pRdetZ, d_pDetY, d_pDetZ, isoY, isoZ, phi, nDetYMap);
 
     threadsPerBlock.x = 16;
@@ -572,7 +572,7 @@ void backprojectionDDb(
       blockSize.y = (nDetXMap / threadsPerBlock.y) + 1;
       blockSize.z = 1;
 
-      mapDet2Slice_kernel <<<blockSize, threadsPerBlock>>> (
+      hipLaunchKernelGGL(mapDet2Slice_kernel, blockSize, threadsPerBlock, 0, 0, 
           d_pDetmX, d_pDetmY, tubeX, rtubeY, rtubeZ, d_pDetX,
           d_pRdetY, d_pRdetZ, d_pObjZ, nDetXMap, nDetYMap, nz);
 
@@ -581,7 +581,7 @@ void backprojectionDDb(
       blockSize.x = (nPixYMap / threadsPerBlock.x) + 1;
       blockSize.y = (nPixXMap / threadsPerBlock.y) + 1;
 
-      bilinear_interpolation_kernel <<<blockSize, threadsPerBlock>>> (
+      hipLaunchKernelGGL(bilinear_interpolation_kernel, blockSize, threadsPerBlock, 0, 0, 
           d_sliceI, d_pProj, d_pObjX, d_pObjY, d_pDetmX_tmp, d_pDetmY,
           nPixXMap, nPixYMap, nDetXMap, nDetYMap, nDetX, nDetY, p);
 
@@ -590,7 +590,7 @@ void backprojectionDDb(
       blockSize.x = (nPixY / threadsPerBlock.x) + 1;
       blockSize.y = (nPixX / threadsPerBlock.y) + 1;
 
-      differentiation_kernel <<<blockSize, threadsPerBlock>>> (
+      hipLaunchKernelGGL(differentiation_kernel, blockSize, threadsPerBlock, 0, 0, 
           d_pVolume, d_sliceI, tubeX, rtubeY, rtubeZ, d_pObjX, d_pObjY, d_pObjZ,
           nPixX, nPixY, nPixXMap, nPixYMap, du, dv, dx, dy, dz, nz);
 
@@ -608,23 +608,23 @@ void backprojectionDDb(
   blockSize.y = (nPixX / threadsPerBlock.y) + 1;
   blockSize.z = (nSlices / threadsPerBlock.z) + 1;
 
-  division_kernel <<<blockSize, threadsPerBlock>>> (d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
+  hipLaunchKernelGGL(division_kernel, blockSize, threadsPerBlock, 0, 0, d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
 
-  cudaMemcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double), cudaMemcpyDeviceToHost);
+  hipMemcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double), hipMemcpyDeviceToHost);
 
-  cudaFree(d_pProj);
-  cudaFree(d_sliceI);
-  cudaFree(d_pVolume);
-  cudaFree(d_pDetX);
-  cudaFree(d_pDetY);
-  cudaFree(d_pDetZ);
-  cudaFree(d_pObjX);
-  cudaFree(d_pObjY);
-  cudaFree(d_pObjZ);
-  cudaFree(d_pDetmY);
-  cudaFree(d_pDetmX);
-  cudaFree(d_pRdetY);
-  cudaFree(d_pRdetZ);
+  hipFree(d_pProj);
+  hipFree(d_sliceI);
+  hipFree(d_pVolume);
+  hipFree(d_pDetX);
+  hipFree(d_pDetY);
+  hipFree(d_pDetZ);
+  hipFree(d_pObjX);
+  hipFree(d_pObjY);
+  hipFree(d_pObjZ);
+  hipFree(d_pDetmY);
+  hipFree(d_pDetmX);
+  hipFree(d_pRdetY);
+  hipFree(d_pRdetZ);
 }
 
 int main() 
