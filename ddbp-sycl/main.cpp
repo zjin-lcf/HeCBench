@@ -160,12 +160,10 @@ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + (offsetY + spot) * nPixY + px];
       }
-      item.barrier(access::fence_space::local_space);
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      item.barrier(access::fence_space::local_space);
     }
   }
   else
@@ -179,12 +177,10 @@ void img_integration_kernel(
       if (spot >= 0) {
         val = d_img[(pz*nPixY*nPixX) + py * nPixY + spot + offsetX];
       }
-      item.barrier(access::fence_space::local_space);
 
       if (spot >= 0) {
         d_img[(pz*nPixY*nPixX) + (py * nPixY) + px] += val;
       }
-      item.barrier(access::fence_space::local_space);
     }
   }
 }
@@ -217,13 +213,13 @@ void bilinear_interpolation_kernel(
   // Adjust the mapped coordinates to cross the range of (0-nDetX).*duMap 
   // Divide by pixelSize to get a unitary pixel size
   const double xNormData = nDetX - d_pObjX[py] / d_pDetmX[0];
-  const int    xData = floor(xNormData);
+  const int    xData = sycl::floor(xNormData);
   const double alpha = xNormData - xData;
 
   // Adjust the mapped coordinates to cross the range of (0-nDetY).*dyMap  
   // Divide by pixelSize to get a unitary pixel size
   const double yNormData = (d_pObjY[px] / d_pDetmX[0]) - (d_pDetmY[0] / d_pDetmX[0]);
-  const int    yData = floor(yNormData);
+  const int    yData = sycl::floor(yNormData);
   const double beta = yNormData - yData;
 
   double d00, d01, d10, d11;
@@ -355,12 +351,12 @@ void division_kernel(
   }
 }
 
-
 // Branchless distance-driven backprojection 
-void backprojectionDDb(double* const h_pVolume,
-    double* const h_pProj,
-    double* const h_pTubeAngle,
-    double* const h_pDetAngle,
+void backprojectionDDb(
+          double* const h_pVolume,
+    const double* const h_pProj,
+    const double* const h_pTubeAngle,
+    const double* const h_pDetAngle,
     const int idXProj,
     const int nProj,
     const int nPixX,
@@ -405,7 +401,7 @@ void backprojectionDDb(double* const h_pVolume,
   // Copy projection data padding with zeros for image integation
 
   // Initialize first column and row with zeros
-  double* h_pProj_tmp;
+  const double* h_pProj_tmp;
 
   lws[2] = maxThreadsPerBlock;
   gws[2] = (nDetXMap / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
@@ -569,8 +565,6 @@ void backprojectionDDb(double* const h_pVolume,
     });
   }
 
-  //double* d_pDetmX_tmp = d_pDetmX + (nDetYMap * (nDetXMap-2));
-
   // loop over all projections ?
   int projIni, projEnd, nProj2Run;
   if (idXProj == -1) {
@@ -621,8 +615,6 @@ void backprojectionDDb(double* const h_pVolume,
                             isoY, isoZ, phi, nDetYMap);
       });
     });
-
-    //printf("Detector rotation -- Threads:%d Blocks:%d \n", threads, blocks);
 
     lws[2] = 16;
     lws[1] = 16;
@@ -760,6 +752,9 @@ int main()
 
   // random values
   srand(123);
+  for (size_t i = 0; i < pixVol; i++) 
+    h_pVolume[i] = (double)rand() / (double)RAND_MAX;
+
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
@@ -778,7 +773,7 @@ int main()
     DSD, DDR, DAG);
   
   double checkSum = 0;
-  for (int i = 0; i < nSlices * nPixX * nPixY; i++)
+  for (size_t i = 0; i < pixVol; i++)
     checkSum += h_pVolume[i];
   printf("checksum = %lf\n", checkSum);
 
