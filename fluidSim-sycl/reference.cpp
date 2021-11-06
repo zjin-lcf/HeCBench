@@ -4,15 +4,16 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 // error bound
 const double EPISON = 1e-3;
 
-double computefEq(double weight, const double dir[2], double rho, double velocity[2])
+double computefEq(double rho, double weight, const double dir[2], const double velocity[2])
 {
   double u2 = velocity[0] * velocity[0] + velocity[1] * velocity[1];
   double eu = dir[0] * velocity[0] + dir[1] * velocity[1];
-  return rho * weight * (1.0 + 3.0*eu + 4.5*eu*eu - 1.5*u2);
+  return rho * weight * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * u2);
 }
 
 void reference (
@@ -126,15 +127,15 @@ void reference (
           vel[1] /= den;
 
           // Calculate Equivalent distribution
-          v_ef0[pos] = computefEq(weight[0], dir[0], den, vel);
-          v_ef1234[pos * 4 + 0] = computefEq(weight[1], dir[1], den, vel);
-          v_ef1234[pos * 4 + 1] = computefEq(weight[2], dir[2], den, vel);
-          v_ef1234[pos * 4 + 2] = computefEq(weight[3], dir[3], den, vel);
-          v_ef1234[pos * 4 + 3] = computefEq(weight[4], dir[4], den, vel);
-          v_ef5678[pos * 4 + 0] = computefEq(weight[5], dir[5], den, vel);
-          v_ef5678[pos * 4 + 1] = computefEq(weight[6], dir[6], den, vel);
-          v_ef5678[pos * 4 + 2] = computefEq(weight[7], dir[7], den, vel);
-          v_ef5678[pos * 4 + 3] = computefEq(weight[8], dir[8], den, vel);
+          v_ef0[pos]            = computefEq(den, weight[0], dir[0], vel);
+          v_ef1234[pos * 4 + 0] = computefEq(den, weight[1], dir[1], vel);
+          v_ef1234[pos * 4 + 1] = computefEq(den, weight[2], dir[2], vel);
+          v_ef1234[pos * 4 + 2] = computefEq(den, weight[3], dir[3], vel);
+          v_ef1234[pos * 4 + 3] = computefEq(den, weight[4], dir[4], vel);
+          v_ef5678[pos * 4 + 0] = computefEq(den, weight[5], dir[5], vel);
+          v_ef5678[pos * 4 + 1] = computefEq(den, weight[6], dir[6], vel);
+          v_ef5678[pos * 4 + 2] = computefEq(den, weight[7], dir[7], vel);
+          v_ef5678[pos * 4 + 3] = computefEq(den, weight[8], dir[8], vel);
 
           v_ef0[pos] = (1 - omega) * v_if0[pos] + omega * v_ef0[pos];
           v_ef1234[pos * 4 + 0] = (1 - omega) * v_if1234[pos * 4 + 0] + omega * v_ef1234[pos * 4 + 0];
@@ -154,13 +155,13 @@ void reference (
     {
       for (int x = 1; x < dims[0]-1; x++)
       {
+        int src_pos = x + dims[0] * y;
         for (int k=0; k<9; k++)
         {
           // New positions to write
           int nx = x + (int)dir[k][0];
           int ny = y + (int)dir[k][1];
           int dst_pos = nx + dims[0] * ny;
-          int src_pos = x + dims[0] * y;
           switch(k)
           {
             case 0:
@@ -205,6 +206,7 @@ void reference (
   memcpy(h_of1234, v_if1234, dbl4_size);
   memcpy(h_of5678, v_if5678, dbl4_size);
 
+  // Release input and intermediate arrays
   if (iterations % 2) {
     std::swap(v_if0, v_of0);
     std::swap(v_if1234, v_of1234);
@@ -236,8 +238,8 @@ void verify(
       int pos = x + y * dims[0];
       if(h_of0[pos] - v_of0[pos] > EPISON)
       {
-        std::cout << "of0 @" << pos << " device:" << h_of0[pos] 
-                  << " host:" << v_of0[pos] << std::endl;
+        //std::cout << "of0 @" << pos << " device:" << h_of0[pos] 
+        //          << " host:" << v_of0[pos] << std::endl;
         flag0 = 1;
         break;
       }
@@ -252,8 +254,8 @@ void verify(
       int pos = x + y * dims[0];
       if(h_of1234[pos] - v_of1234[pos] > EPISON)
       {
-        std::cout << "of1234 @" << pos << " device:" << h_of1234[pos]
-                  << " host:" << v_of1234[pos] << std::endl;
+        //std::cout << "of1234 @" << pos << " device:" << h_of1234[pos]
+        //          << " host:" << v_of1234[pos] << std::endl;
         flag1234 = 1;
         break;
       } 
@@ -268,8 +270,8 @@ void verify(
       int pos = x + y * dims[0];
       if(h_of5678[pos] - v_of5678[pos] > EPISON)
       {
-        std::cout << "of5678 @" << pos << " device:" << h_of5678[pos]
-                  << " host:" << v_of5678[pos] << std::endl;
+        //std::cout << "of5678 @" << pos << " device:" << h_of5678[pos]
+        //          << " host:" << v_of5678[pos] << std::endl;
         flag5678 = 1;
         break;
       } 
