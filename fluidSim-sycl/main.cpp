@@ -17,13 +17,16 @@ int main(int argc, char * argv[])
   int dims[2] = {lbm_width, lbm_height};
   size_t temp = dims[0] * dims[1];
 
-  // Directions
+  // Nine velocity directions for each cell
+  // 8  3  5
+  // 2  0  1
+  // 6  4  7 
   double e[9][2] = {{0,0}, {1,0}, {0,1}, {-1,0}, {0,-1}, {1,1}, {-1,1}, {-1,-1}, {1,-1}};
    
-  // Weights
+  // Weights depend on lattice geometry
   double w[9] = {4.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/36.0, 1.0/36.0, 1.0/36.0, 1.0/36.0};
 
-  // Omega
+  // Omega equals time step divided by Tau (viscosity of the fluid) 
   const double omega = 1.2f;
 
   double8 dirX, dirY; // Directions
@@ -71,6 +74,8 @@ int main(int argc, char * argv[])
       u[pos].x() = u0[0];
       u[pos].y() = u0[1];
 
+      // Initialize the frequency (i.e. the number of particles in 
+      // a cell going in each velocity direction)
       h_if0[pos]            = computefEq(den, w[0], e[0], u0);
       h_if1234[pos * 4 + 0] = computefEq(den, w[1], e[1], u0);
       h_if1234[pos * 4 + 1] = computefEq(den, w[2], e[2], u0);
@@ -91,7 +96,7 @@ int main(int argc, char * argv[])
     }
   }
 
-  // initialize direction vectors
+  // Initialize direction vectors for each cell
   dirX.s0() = e[1][0]; dirY.s0() = e[1][1];
   dirX.s1() = e[2][0]; dirY.s1() = e[2][1];
   dirX.s2() = e[3][0]; dirY.s2() = e[3][1];

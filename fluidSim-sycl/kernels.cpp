@@ -3,7 +3,7 @@
 // Thread block size
 #define GROUP_SIZE 256
 
-// Calculates equivalent distribution 
+// Calculates equilibrium distribution 
 double ced(double rho, double weight, const double2 dir, const double2 u)
 {
   double u2 = (u.x() * u.x()) + (u.y() * u.y());
@@ -80,13 +80,12 @@ void lbm (
   }
   else // Fluid
   {
-    // Compute rho and u
-    // Rho is computed by doing a reduction on f
+    // Compute Rho (density) of a cell by a reduction on f
     double4 temp = f1234 + f5678;
     temp.lo() += temp.hi();
     rho = f0 + temp.x() + temp.y();
 
-    // Compute velocity in x and y directions
+    // Compute u (velocity) of a cell in x and y directions
     double4 x1234 = dirX.lo();
     double4 x5678 = dirX.hi();
     double4 y1234 = dirY.lo();
@@ -94,7 +93,7 @@ void lbm (
     u.x() = (sycl::dot(f1234, x1234) + sycl::dot(f5678, x5678)) / rho;
     u.y() = (sycl::dot(f1234, y1234) + sycl::dot(f5678, y5678)) / rho;
 
-    // Compute f
+    // Compute f with respect to space and time
     e0        = ced(rho, weight[0], (double2)(0), u);
     e1234.x() = ced(rho, weight[1], (double2)(dirX.s0(), dirY.s0()), u);
     e1234.y() = ced(rho, weight[2], (double2)(dirX.s1(), dirY.s1()), u);
@@ -105,12 +104,12 @@ void lbm (
     e5678.z() = ced(rho, weight[7], (double2)(dirX.s6(), dirY.s6()), u);
     e5678.w() = ced(rho, weight[8], (double2)(dirX.s7(), dirY.s7()), u);
 
-    e0 = (1.0 - omega) * f0 + omega * e0;
+    e0    = (1.0 - omega) * f0    + omega * e0;
     e1234 = (1.0 - omega) * f1234 + omega * e1234;
     e5678 = (1.0 - omega) * f5678 + omega * e5678;
   }
 
-  // Propagate
+  // Distribute the newly computed frequency distribution to neighbors
   bool t3 = idx > 0;          // Not on Left boundary
   bool t1 = idx < width - 1;  // Not on Right boundary
   bool t4 = idy > 0;          // Not on Upper boundary
