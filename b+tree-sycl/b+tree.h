@@ -2,15 +2,7 @@
 #include <stdbool.h>        // (in path known to compiler)      needed by true/false, bool
 #include <stdlib.h>          // (in path known to compiler)      needed by malloc
 #include <sys/time.h>          // (in path known to compiler)      needed by malloc
-#include <CL/sycl.hpp>
-
-using namespace cl::sycl;
-constexpr access::mode sycl_read       = access::mode::read;
-constexpr access::mode sycl_write      = access::mode::write;
-constexpr access::mode sycl_read_write = access::mode::read_write;
-constexpr access::mode sycl_discard_read_write = access::mode::discard_read_write;
-constexpr access::mode sycl_discard_write = access::mode::discard_write;
-constexpr access::mode sycl_atomic     = access::mode::atomic;
+#include "common.h"
 
 #define fp float
 
