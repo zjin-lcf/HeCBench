@@ -3,18 +3,8 @@
 // 2011.10; Lukasz G. Szafaryn; code converted to portable form, to C, OpenMP, CUDA, PGI versions; 
 // 2011.12; Lukasz G. Szafaryn; Split different versions for Rodinia.
 // 2011.12; Lukasz G. Szafaryn; code converted to OpenCL;
-// 2020.06; Zheming Jin; code converted to SYCL
-// 2020.09; Zheming Jin; update SYCL sources
-
-//======================================================================================================================================================150
-//  DESCRIPTION
-//======================================================================================================================================================150
 
 // Description
-
-//======================================================================================================================================================150
-//  USE
-//======================================================================================================================================================150
 
 // EXAMPLE:
 // ./a.out -file ./input/mil.txt
@@ -30,58 +20,16 @@
 // y <a> <b> -- Run a single range search for range a-b on the GPU and CPU
 // q -- Quit. (Or use Ctl-D.)
 
-//======================================================================================================================================================150
-//  END
-//======================================================================================================================================================150
 
-//========================================================================================================================================================================================================200
-//  DEFINE/INCLUDE
-//========================================================================================================================================================================================================200
-
-//======================================================================================================================================================150
-//  LIBRARIES
-//======================================================================================================================================================150
-
-#include <stdio.h>                  // (in directory known to compiler)      needed by printf, stderr
-#include <limits.h>                  // (in directory known to compiler)      needed by INT_MIN, INT_MAX
-#include <math.h>                  // (in directory known to compiler)      needed by log, pow
-#include <string.h>                  // (in directory known to compiler)      needed by ::memset
-
-//======================================================================================================================================================150
-//  COMMON
-//======================================================================================================================================================150
-
-#include "./common.h"                // (in directory provided here)
-
-//======================================================================================================================================================150
-//  DEFINE
-//======================================================================================================================================================150
-
-//======================================================================================================================================================150
-//  UTILITIES
-//======================================================================================================================================================150
-
-#include "./util/timer/timer.h"            // (in directory provided here)
-#include "./util/num/num.h"              // (in directory provided here)
-
-//======================================================================================================================================================150
-//  KERNEL HEADERS
-//======================================================================================================================================================150
-
-#include "./kernel/kernel_wrapper.h"    // (in directory provided here)
-#include "./kernel/kernel2_wrapper.h"    // (in directory provided here)
-
-//======================================================================================================================================================150
-//  HEADER
-//======================================================================================================================================================150
-
-//======================================================================================================================================================150
-//  END
-//======================================================================================================================================================150
-
-//========================================================================================================================================================================================================200
-//  VARIABLES
-//========================================================================================================================================================================================================200
+#include <stdio.h>  // printf, stderr
+#include <limits.h> // INT_MIN, INT_MAX
+#include <math.h>   // log, pow
+#include <string.h> // memset
+#include "b+tree.h"
+#include "./util/timer/timer.h"
+#include "./util/num/num.h"
+#include "./kernel/kernel_wrapper.h"
+#include "./kernel/kernel2_wrapper.h"
 
 // general variables
 knode *knodes;
@@ -118,16 +66,7 @@ node *tree_queue = NULL;
  */
 bool verbose_output = false;
 
-//========================================================================================================================================================================================================200
-//  FUNCTIONS
-//========================================================================================================================================================================================================200
-
-//======================================================================================================================================================150
-//  Components
-//======================================================================================================================================================150
-
-  void 
-list_init(  list_t *l,
+void list_init(  list_t *l,
     int32_t (*compare)(const void *key, 
       const void *with),
     void (*datum_delete)(void *))
@@ -138,8 +77,7 @@ list_init(  list_t *l,
   l->datum_delete = datum_delete;
 }
 
-  void 
-list_delete(list_t *l)
+void list_delete(list_t *l)
 {
 
   list_item_t *li, *del;
@@ -155,15 +93,12 @@ list_delete(list_t *l)
   l->length = 0;
 }
 
-  void 
-list_reset(list_t *l)
+void list_reset(list_t *l)
 {
   list_delete(l);
 }
 
-  void 
-list_insert_item_head(  list_t *l, 
-    list_item_t *i)
+void list_insert_item_head(  list_t *l, list_item_t *i)
 {
   if (l->head) {
     i->next = l->head;
@@ -177,9 +112,7 @@ list_insert_item_head(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_item_tail(  list_t *l, 
-    list_item_t *i)
+void list_insert_item_tail(  list_t *l, list_item_t *i)
 {
   if (l->head) {
     l->tail->next = i;
@@ -193,8 +126,7 @@ list_insert_item_tail(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_item_before(list_t *l, 
+void list_insert_item_before(list_t *l, 
     list_item_t *next, 
     list_item_t *i)
 {
@@ -214,8 +146,7 @@ list_insert_item_before(list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_item_after(  list_t *l, 
+void list_insert_item_after(  list_t *l, 
     list_item_t *pred, 
     list_item_t *i)
 {
@@ -235,9 +166,7 @@ list_insert_item_after(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_item_sorted(list_t *l, 
-    list_item_t *i)
+void list_insert_item_sorted(list_t *l, list_item_t *i)
 {
   list_item_t *itr;
 
@@ -264,9 +193,7 @@ list_insert_item_sorted(list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_head(  list_t *l, 
-    void *v)
+void list_insert_head(  list_t *l, void *v)
 {
   list_item_t *i;
   i = (list_item_t *)malloc(sizeof (*i));
@@ -284,12 +211,9 @@ list_insert_head(  list_t *l,
 
 }
 
-  void 
-list_insert_tail(  list_t *l, 
-    void *v)
+void list_insert_tail(  list_t *l, void *v)
 {
   list_item_t *i;
-
   i = (list_item_t *)malloc(sizeof (*i));
   list_item_init(i, v);
   if (l->head) {
@@ -304,10 +228,7 @@ list_insert_tail(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_before(  list_t *l, 
-    list_item_t *next, 
-    void *v)
+void list_insert_before(  list_t *l, list_item_t *next, void *v)
 {
   list_item_t *i;
 
@@ -330,10 +251,7 @@ list_insert_before(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_after(  list_t *l, 
-    list_item_t *pred, 
-    void *v)
+void list_insert_after(list_t *l, list_item_t *pred, void *v)
 {
   list_item_t *i;
 
@@ -356,16 +274,13 @@ list_insert_after(  list_t *l,
   l->length++;
 }
 
-  void 
-list_insert_sorted(  list_t *l, 
-    void *v)
+void list_insert_sorted(  list_t *l, void *v)
 {
   list_item_t *itr;
   list_item_t *i;
 
   i = (list_item_t *)malloc(sizeof (*i));
   list_item_init(i, v);
-
 
   if (l->head) {
     for (itr = l->head; itr && l->compare(list_item_get_datum(i),
@@ -390,9 +305,7 @@ list_insert_sorted(  list_t *l,
   l->length++;
 }
 
-  void 
-list_remove_item(  list_t *l, 
-    list_item_t *i)
+void list_remove_item(  list_t *l, list_item_t *i)
 {
   if (i == l->head) {
     l->head = l->head->next;
@@ -411,21 +324,17 @@ list_remove_item(  list_t *l,
   list_item_delete(i, l->datum_delete);
 }
 
-  void 
-list_remove_head(list_t *l)
+void list_remove_head(list_t *l)
 {
   list_remove_item(l, l->head);
 }
 
-  void 
-list_remove_tail(list_t *l)
+void list_remove_tail(list_t *l)
 {
   list_remove_item(l, l->tail);
 }
 
-  list_item_t* 
-list_find_item(  list_t *l, 
-    void *datum)
+list_item_t* list_find_item(  list_t *l, void *datum)
 {
   list_item_t *li;
 
@@ -436,21 +345,17 @@ list_find_item(  list_t *l,
   return li;
 }
 
-  list_item_t* 
-list_get_head_item(list_t *l)
+list_item_t* list_get_head_item(list_t *l)
 {
   return l->head;
 }
 
-  list_item_t* 
-list_get_tail_item(list_t *l)
+list_item_t* list_get_tail_item(list_t *l)
 {
   return l->tail;
 }
 
-  void* 
-list_find(  list_t *l, 
-    void *datum)
+void* list_find(  list_t *l, void *datum)
 {
   list_item_t *li;
 
@@ -461,39 +366,32 @@ list_find(  list_t *l,
   return li ? li->datum : NULL;
 }
 
-  void* 
-list_get_head(list_t *l)
+void* list_get_head(list_t *l)
 {
   return l->head ? l->head->datum : NULL;
 }
 
-  void* 
-list_get_tail(list_t *l)
+void* list_get_tail(list_t *l)
 {
   return l->tail ? l->tail->datum : NULL;
 }
 
-  uint32_t 
-list_get_length(list_t *l)
+uint32_t list_get_length(list_t *l)
 {
   return l->length;
 }
 
-  bool 
-list_is_empty(list_t *l)
+bool list_is_empty(list_t *l)
 {
   return (l->length == 0);
 }
 
-  bool 
-list_not_empty(list_t *l)
+bool list_not_empty(list_t *l)
 {
   return (l->length != 0);
 }
 
-  void 
-list_visit_items(  list_t *l, 
-    void (*visitor)(void *v))
+void list_visit_items(  list_t *l, void (*visitor)(void *v))
 {
   list_item_t *li;
 
@@ -501,16 +399,13 @@ list_visit_items(  list_t *l,
     visitor(list_item_get_datum(li));
 }
 
-  void 
-list_item_init(  list_item_t *li, 
-    void *datum)
+void list_item_init(  list_item_t *li, void *datum)
 {
   li->pred = li->next = NULL;
   li->datum = datum;
 }
 
-  void 
-list_item_delete(  list_item_t *li, 
+void list_item_delete(  list_item_t *li, 
     void (*datum_delete)(void *datum))
 {
   if (datum_delete) {
@@ -520,100 +415,78 @@ list_item_delete(  list_item_t *li,
   free(li);
 }
 
-  void *
-list_item_get_datum(list_item_t *li)
+void * list_item_get_datum(list_item_t *li)
 {
   return li->datum;
 }
 
-  void 
-list_iterator_init(  list_t *l, 
-    list_iterator_t *li)
+void list_iterator_init(list_t *l, list_iterator_t *li)
 {
   *li = l ? l->head : NULL;
 }
 
-  void 
-list_iterator_delete(list_iterator_t *li)
+void list_iterator_delete(list_iterator_t *li)
 {
   *li = NULL;
 }
 
-  void 
-list_iterator_next(list_iterator_t *li)
+void list_iterator_next(list_iterator_t *li)
 {
   if (*li)
     *li = (*li)->next;
 }
 
-  void 
-list_iterator_prev(list_iterator_t *li)
+void list_iterator_prev(list_iterator_t *li)
 {
   if (*li)
     *li = (*li)->pred;
 }
 
-  void *
-list_iterator_get_datum(list_iterator_t *li)
+void * list_iterator_get_datum(list_iterator_t *li)
 {
   return *li ? (*li)->datum : NULL;
 }
 
-  bool 
-list_iterator_is_valid(list_iterator_t *li)
+bool list_iterator_is_valid(list_iterator_t *li)
 {
   return (*li != NULL);
 }
 
-  void 
-list_reverse_iterator_init(  list_t *l, 
+void list_reverse_iterator_init(  list_t *l, 
     list_reverse_iterator_t *li)
 {
   *li = l ? l->tail : NULL;
 }
 
-  void 
-list_reverse_iterator_delete(list_reverse_iterator_t *li)
+void list_reverse_iterator_delete(list_reverse_iterator_t *li)
 {
   *li = NULL;
 }
 
-  void 
-list_reverse_iterator_next(list_reverse_iterator_t *li)
+void list_reverse_iterator_next(list_reverse_iterator_t *li)
 {
   if (*li)
     *li = (*li)->pred;
 }
 
-  void 
-list_reverse_iterator_prev(list_reverse_iterator_t *li)
+void list_reverse_iterator_prev(list_reverse_iterator_t *li)
 {
   if (*li)
     *li = (*li)->next;
 }
 
-  void *
-list_reverse_iterator_get_datum(list_reverse_iterator_t *li)
+void * list_reverse_iterator_get_datum(list_reverse_iterator_t *li)
 {
   return *li ? (*li)->datum : NULL;
 }
 
-  bool 
-list_reverse_iterator_is_valid(list_reverse_iterator_t *li)
+bool list_reverse_iterator_is_valid(list_reverse_iterator_t *li)
 {
   return (li != NULL);
 }
 
-//======================================================================================================================================================150
-// OUTPUT AND UTILITIES
-//======================================================================================================================================================150
-
-/*   */
-  void *
-kmalloc(int size)
+void * kmalloc(int size)
 {
-
-  //printf("size: %d, current offset: %p\n",size,freeptr);
   void * r = (void *)freeptr;
   freeptr+=size;
   if(freeptr > malloc_size+(long)mem){
@@ -624,11 +497,8 @@ kmalloc(int size)
 }
 
 //transforms the current B+ Tree into a single, contiguous block of memory to be used on the GPU
-  long 
-transform_to_cuda(  node * root, 
-    bool verbose)
+long transform_to_cuda(  node * root, bool verbose)
 {
-
   struct timeval one,two;
   double time;
   gettimeofday (&one, NULL);
@@ -675,10 +545,6 @@ transform_to_cuda(  node * root,
         k->keys[i] = n->keys[i-1];
         enqueue((node * )n->pointers[i-1]);
         k->indices[i] = nodeindex++;
-        // if(k->indices[i]>3953){
-        // printf("ERROR 1: %d\n", k->indices[i]);
-        // }
-        //knodes[nodeindex].location = nodeindex++;
       }
       //for final point of n
       enqueue((node * )n->pointers[i-1]);
@@ -689,16 +555,10 @@ transform_to_cuda(  node * root,
         k->keys[i] = n->keys[i-1];
         krecords[recordindex].value=((record *)n->pointers[i-1])->value;
         k->indices[i] = recordindex++;
-        // if(k->indices[i]>3953){
-        // printf("ERROR 2: %d\n", k->indices[i]);
-        // }
       }
     }
 
     k->indices[k->num_keys-1]=queueindex;
-    // if(k->indices[k->num_keys-1]>3953){
-    // printf("ERROR 3: %d\n", k->indices[k->num_keys-1]);
-    // }
 
     if(verbose){
       printf("Successfully created knode with index %d\n", k->location);
@@ -727,16 +587,10 @@ transform_to_cuda(  node * root,
   printf("Tree transformation took %f\n", time);
 
   return mem_used;
-
 }
 
-/*   */
-  list_t *
-findRange(  node * root, 
-    int start, 
-    int end) 
+list_t * findRange(  node * root, int start, int end) 
 {
-
   int i;
   node * c = find_leaf( root, start, false );
 
@@ -765,10 +619,8 @@ findRange(  node * root,
 }
 
 /* First message to the user. */
-  void 
-usage_1( void ) 
+void usage_1( void ) 
 {
-
   printf("B+ Tree of Order %d.\n", order);
   printf("\tAmittai Aviram -- amittai.aviram@yale.edu  Version %s\n", Version);
   printf("\tfollowing Silberschatz, Korth, Sidarshan, Database Concepts, 5th ed.\n\n");
@@ -777,14 +629,11 @@ usage_1( void )
   printf("3 <= order <=20\n");
   printf("To start with input from a file of newline-delimited integers, start again and enter\n");
   printf("the order followed by the filename:  bpt <order> <inputfile>.\n");
-
 }
 
 /* Second message to the user. */
-  void 
-usage_2( void ) 
+void usage_2( void ) 
 {
-
   printf("Enter any of the following commands after the prompt > :\n");
   printf("\ti <k>  -- Insert <k> (an integer) as both key and value).\n");
   printf("\tf <k>  -- Find the value under key <k>.\n");
@@ -799,8 +648,7 @@ usage_2( void )
 }
 
 /* Helper function for printing the tree out.  See print_tree. */
-  void 
-enqueue( node* new_node ) 
+void enqueue( node* new_node ) 
 {
   node * c;
   if (tree_queue == NULL) {
@@ -818,8 +666,7 @@ enqueue( node* new_node )
 }
 
 /* Helper function for printing the tree out.  See print_tree. */
-  node *
-dequeue( void ) 
+node * dequeue( void ) 
 {
   node * n = tree_queue;
   tree_queue = tree_queue->next;
@@ -828,8 +675,7 @@ dequeue( void )
 }
 
 /* Prints the bottom row of keys of the tree (with their respective pointers, if the verbose_output flag is set. */
-  void 
-print_leaves( node* root ) 
+void print_leaves( node* root ) 
 {
   int i;
   node * c = root;
@@ -858,8 +704,7 @@ print_leaves( node* root )
 }
 
 /* Utility function to give the height of the tree, which length in number of edges of the path from the root to any leaf. */
-  int 
-height( node* root ) 
+int height( node* root ) 
 {
   int h = 0;
   node * c = root;
@@ -884,10 +729,8 @@ path_to_root( node* root, node* child )
 }
 
 /* Prints the B+ tree in the command line in level (rank) order, with the keys in each node and the '|' symbol to separate nodes. With the verbose_output flag set. the values of the pointers corresponding to the keys also appear next to their respective keys, in hexadecimal notation. */
-  void 
-print_tree( node* root ) 
+void print_tree( node* root ) 
 {
-
   node * n = NULL;
   int i = 0;
   int rank = 0;
@@ -930,10 +773,8 @@ print_tree( node* root )
 }
 
 /* Traces the path from the root to a leaf, searching by key.  Displays information about the path if the verbose flag is set. Returns the leaf containing the given key. */
-  node *
-find_leaf( node* root, int key, bool verbose ) 
+node * find_leaf( node* root, int key, bool verbose ) 
 {
-
   int i = 0;
   node * c = root;
   if (c == NULL) {
@@ -966,14 +807,11 @@ find_leaf( node* root, int key, bool verbose )
     printf("%d] ->\n", c->keys[i]);
   }
   return c;
-
 }
 
 /* Finds and returns the record to which a key refers. */
-  record *
-find( node* root, int key, bool verbose ) 
+record * find( node* root, int key, bool verbose ) 
 {
-
   int i = 0;
   node * c = find_leaf( root, key, verbose );
   if (c == NULL) 
@@ -985,12 +823,10 @@ find( node* root, int key, bool verbose )
     return NULL;
   else
     return (record *)c->pointers[i];
-
 }
 
 /* Finds the appropriate place to split a node that is too big into two. */
-  int 
-cut( int length ) 
+int cut( int length ) 
 {
   if (length % 2 == 0)
     return length/2;
@@ -1003,8 +839,7 @@ cut( int length )
 //======================================================================================================================================================150
 
 /* Creates a new record to hold the value to which a key refers. */
-  record *
-make_record(int value) 
+record * make_record(int value) 
 {
   record * new_record = (record *)malloc(sizeof(record));
   if (new_record == NULL) {
@@ -1018,8 +853,7 @@ make_record(int value)
 }
 
 /* Creates a new general node, which can be adapted to serve as either a leaf or an internal node. */
-  node *
-make_node( void ) 
+node * make_node( void ) 
 {
   node * new_node;
   new_node = (node *) malloc(sizeof(node));
@@ -1045,8 +879,7 @@ make_node( void )
 }
 
 /* Creates a new leaf by creating a node and then adapting it appropriately. */
-  node *
-make_leaf( void ) 
+node * make_leaf( void ) 
 {
   node* leaf = make_node();
   leaf->is_leaf = true;
@@ -1054,10 +887,8 @@ make_leaf( void )
 }
 
 /* Helper function used in insert_into_parent to find the index of the parent's pointer to the node to the left of the key to be inserted. */
-  int 
-get_left_index(node* parent, node* left) 
+int get_left_index(node* parent, node* left) 
 {
-
   int left_index = 0;
   while (left_index <= parent->num_keys && 
       parent->pointers[left_index] != left)
@@ -1066,10 +897,8 @@ get_left_index(node* parent, node* left)
 }
 
 /* Inserts a new pointer to a record and its corresponding key into a leaf. Returns the altered leaf. */
-  node *
-insert_into_leaf( node* leaf, int key, record* pointer ) 
+node * insert_into_leaf( node* leaf, int key, record* pointer ) 
 {
-
   int i, insertion_point;
 
   insertion_point = 0;
@@ -1087,13 +916,11 @@ insert_into_leaf( node* leaf, int key, record* pointer )
 }
 
 /* Inserts a new key and pointer to a new record into a leaf so as to exceed the tree's order, causing the leaf to be split in half. */
-  node *
-insert_into_leaf_after_splitting(  node* root, 
+node * insert_into_leaf_after_splitting(  node* root, 
     node* leaf, 
     int key, 
     record* pointer) 
 {
-
   node * new_leaf;
   int * temp_keys;
   void ** temp_pointers;
@@ -1160,16 +987,13 @@ insert_into_leaf_after_splitting(  node* root,
 }
 
 /* Inserts a new key and pointer to a node into a node into which these can fit without violating the B+ tree properties. */
-  node *
-insert_into_node(  node* root, 
+node * insert_into_node(  node* root, 
     node* n, 
     int left_index, 
     int key, 
     node* right) 
 {
-
   int i;
-
   for (i = n->num_keys; i > left_index; i--) {
     n->pointers[i + 1] = n->pointers[i];
     n->keys[i] = n->keys[i - 1];
@@ -1181,14 +1005,12 @@ insert_into_node(  node* root,
 }
 
 /* Inserts a new key and pointer to a node into a node, causing the node's size to exceed the order, and causing the node to split into two. */
-  node *
-insert_into_node_after_splitting(  node* root, 
+node * insert_into_node_after_splitting(  node* root, 
     node* old_node, 
     int left_index, 
     int key, 
     node * right) 
 {
-
   int i, j, split, k_prime;
   node * new_node, * child;
   int * temp_keys;
@@ -1264,13 +1086,11 @@ insert_into_node_after_splitting(  node* root,
 }
 
 /* Inserts a new node (leaf or internal node) into the B+ tree. Returns the root of the tree after insertion. */
-  node *
-insert_into_parent(  node* root, 
+node * insert_into_parent(  node* root, 
     node* left, 
     int key, 
     node* right) 
 {
-
   int left_index;
   node * parent;
 
@@ -1306,12 +1126,10 @@ insert_into_parent(  node* root,
 }
 
 /* Creates a new root for two subtrees and inserts the appropriate key into the new root. */
-  node *
-insert_into_new_root(  node* left, 
+node * insert_into_new_root(  node* left, 
     int key, 
     node* right) 
 {
-
   node * root = make_node();
   root->keys[0] = key;
   root->pointers[0] = left;
@@ -1324,11 +1142,8 @@ insert_into_new_root(  node* left,
 }
 
 /* First insertion: start a new tree. */
-  node *
-start_new_tree(  int key, 
-    record* pointer) 
+node * start_new_tree(  int key, record* pointer) 
 {
-
   node * root = make_leaf();
   root->keys[0] = key;
   root->pointers[0] = pointer;
@@ -1339,12 +1154,8 @@ start_new_tree(  int key,
 }
 
 /* Master insertion function. Inserts a key and an associated value into the B+ tree, causing the tree to be adjusted however necessary to maintain the B+ tree properties. */
-  node *
-insert(  node* root, 
-    int key, 
-    int value ) 
+node * insert(  node* root, int key, int value ) 
 {
-
   record* pointer;
   node* leaf;
 
@@ -1375,12 +1186,9 @@ insert(  node* root,
 //======================================================================================================================================================150
 // DELETION
 //======================================================================================================================================================150
-
 /* Utility function for deletion. Retrieves the index of a node's nearest neighbor (sibling) to the left if one exists.  If not (the node is the leftmost child), returns -1 to signify this special case. */
-  int 
-get_neighbor_index( node* n ) 
+int get_neighbor_index( node* n ) 
 {
-
   int i;
 
   /* Return the index of the key to the left
@@ -1400,12 +1208,8 @@ get_neighbor_index( node* n )
 }
 
 /*   */
-  node* 
-remove_entry_from_node(  node* n, 
-    int key, 
-    node * pointer) 
+node* remove_entry_from_node(  node* n, int key, node * pointer) 
 {
-
   int i, num_pointers;
 
   // Remove the key and shift other keys accordingly.
@@ -1441,10 +1245,8 @@ remove_entry_from_node(  node* n,
 }
 
 /*   */
-  node* 
-adjust_root(node* root) 
+node* adjust_root(node* root) 
 {
-
   node * new_root;
 
   /* Case: nonempty root.
@@ -1481,14 +1283,12 @@ adjust_root(node* root)
 }
 
 /* Coalesces a node that has become too small after deletion with a neighboring node that can accept the additional entries without exceeding the maximum. */
-  node* 
-coalesce_nodes(  node* root, 
+node* coalesce_nodes(  node* root, 
     node* n, 
     node* neighbor, 
     int neighbor_index, 
     int k_prime) 
 {
-
   int i, j, neighbor_insertion_index, n_start, n_end, new_k_prime;
   node * tmp;
   bool split;
@@ -1618,19 +1418,16 @@ coalesce_nodes(  node* root,
       }
 
   return root;
-
 }
 
 /* Redistributes entries between two nodes when one has become too small after deletion but its neighbor is too big to append the small node's entries without exceeding the maximum */
-  node* 
-redistribute_nodes(  node* root, 
+node* redistribute_nodes(  node* root, 
     node* n, 
     node* neighbor, 
     int neighbor_index, 
     int k_prime_index, 
     int k_prime) 
-{  
-
+{
   int i;
   node * tmp;
 
@@ -1700,13 +1497,11 @@ redistribute_nodes(  node* root,
 }
 
 /* Deletes an entry from the B+ tree. Removes the record and its key and pointer from the leaf, and then makes all appropriate changes to preserve the B+ tree properties. */
-  node* 
-delete_entry(  node* root, 
+node* delete_entry(  node* root, 
     node* n, 
     int key, 
     void* pointer ) 
 {
-
   int min_keys;
   node * neighbor;
   int neighbor_index;
@@ -1773,11 +1568,8 @@ delete_entry(  node* root,
 }
 
 /* Master deletion function. */
-  node* 
-deleteVal(  node* root, 
-    int key) 
+node* deleteVal(node* root, int key) 
 {
-
   node * key_leaf;
   record * key_record;
 
@@ -1791,8 +1583,7 @@ deleteVal(  node* root,
 }
 
 /*   */
-  void 
-destroy_tree_nodes(node* root) 
+void destroy_tree_nodes(node* root) 
 {
   int i;
   if (root->is_leaf)
@@ -1807,26 +1598,14 @@ destroy_tree_nodes(node* root)
 }
 
 /*   */
-  node* 
-destroy_tree(node* root) 
+node* destroy_tree(node* root) 
 {
   destroy_tree_nodes(root);
   return NULL;
 }
 
-//======================================================================================================================================================150
-//  END
-//======================================================================================================================================================150
-
-//========================================================================================================================================================================================================200
-//  MAIN FUNCTION
-//========================================================================================================================================================================================================200
-
-  int 
-main(  int argc, 
-    char** argv ) 
+int main(int argc, char** argv ) 
 {
-
   srand(2);
   printf("WG size of kernel 1 = %d WG size of kernel 2 = %d \n", DEFAULT_ORDER, DEFAULT_ORDER_2);
   // ------------------------------------------------------------60
@@ -2326,7 +2105,7 @@ main(  int argc,
             reclength[i] = 0;
           }
 
-          // CUDA kernel
+          // kernel
           kernel2_wrapper(
               q,
               knodes,
@@ -2372,7 +2151,6 @@ main(  int argc,
 
           // break out of case
           break;
-
         }
 
         // ----------------------------------------40
@@ -2381,15 +2159,11 @@ main(  int argc,
 
       default:
         {
-
           //usage_2();
           break;
-
         }
-
     }
     printf("> ");
-
   }
   printf("\n");
 
@@ -2399,10 +2173,4 @@ main(  int argc,
 
   free(mem);
   return EXIT_SUCCESS;
-
 }
-
-//========================================================================================================================================================================================================200
-//  END
-//========================================================================================================================================================================================================200
-

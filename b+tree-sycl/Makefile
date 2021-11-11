@@ -3,7 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
+ifeq ($(VENDOR), codeplay)
+CC        = compute++
+else
 CC        = clang++
+endif
+
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -24,10 +29,21 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I. -fsycl
+CFLAGS := -std=c++17 -Wall -I../include
+
+ifeq ($(VENDOR), codeplay)
+CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
+          -no-serial-memop -sycl -sycl-driver
+else
+CFLAGS += -fsycl
+endif
 
 # Linker Flags
 LDFLAGS = 
+
+ifeq ($(VENDOR), codeplay)
+LDFLAGS += -lComputeCpp
+endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
@@ -72,11 +88,11 @@ b+tree.out:./main.o \
 	                -o b+tree.out
 
 
-main.o:	./common.h ./main.c
+main.o:	./b+tree.h ./main.c
 	$(CC) $(CFLAGS) $(KERNEL_DIM) ./main.c -c -o main.o
 
 
-./kernel/kernel_wrapper.o: ./common.h \
+./kernel/kernel_wrapper.o: ./b+tree.h \
                     ./kernel/kernel_wrapper.h \
                     ./kernel/kernel_wrapper.c \
                     ./kernel/findK.sycl
@@ -84,7 +100,7 @@ main.o:	./common.h ./main.c
 		-c \
 		-o ./kernel/kernel_wrapper.o
 
-./kernel/kernel2_wrapper.o: ./common.h \
+./kernel/kernel2_wrapper.o: ./b+tree.h \
                    ./kernel/kernel2_wrapper.h \
                    ./kernel/kernel2_wrapper.c \
                    ./kernel/findRangeK.sycl
@@ -93,7 +109,7 @@ main.o:	./common.h ./main.c
 		-o ./kernel/kernel2_wrapper.o 
 
 
-./util/timer/timer.o: ./common.h \
+./util/timer/timer.o: ./b+tree.h \
                   ./util/timer/timer.h \
                   ./util/timer/timer.c
 	$(CC)	./util/timer/timer.c \
@@ -101,7 +117,7 @@ main.o:	./common.h ./main.c
 		-o ./util/timer/timer.o \
 		-O3
 
-./util/num/num.o: ./common.h \
+./util/num/num.o: ./b+tree.h \
                   ./util/num/num.h \
                   ./util/num/num.c
 	$(CC)	./util/num/num.c \

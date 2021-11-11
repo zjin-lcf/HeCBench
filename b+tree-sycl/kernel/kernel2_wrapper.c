@@ -1,6 +1,6 @@
 #include <string.h>
 #include <stdio.h>
-#include "../common.h"
+#include "../b+tree.h"
 #include "../util/timer/timer.h"
 #include "./kernel2_wrapper.h"
 
