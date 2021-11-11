@@ -1,3 +1,4 @@
+#include "common.h"
 void 
 kernel_wrapper(	queue &q,
 		record *records,

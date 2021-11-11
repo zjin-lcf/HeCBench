@@ -2,7 +2,6 @@
 #include <stdbool.h>        // (in path known to compiler)      needed by true/false, bool
 #include <stdlib.h>          // (in path known to compiler)      needed by malloc
 #include <sys/time.h>          // (in path known to compiler)      needed by malloc
-#include "common.h"
 
 #define fp float
 

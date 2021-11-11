@@ -1,3 +1,4 @@
+#include "common.h"
 void 
 kernel2_wrapper(queue &q,
 		knode *knodes,
