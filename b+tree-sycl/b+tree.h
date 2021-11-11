@@ -1,11 +1,12 @@
+#ifndef BTREE_H
+#define BTREE_H
+
 #include <stdint.h>          // (in path known to compiler)      needed by uint32_t
 #include <stdbool.h>        // (in path known to compiler)      needed by true/false, bool
 #include <stdlib.h>          // (in path known to compiler)      needed by malloc
 #include <sys/time.h>          // (in path known to compiler)      needed by malloc
 
 #define fp float
-
-#define Version "1.5"
 
 #ifdef WINDOWS
 #define bool char
@@ -35,17 +36,6 @@
 #define  DEFAULT_ORDER_2 256
 #endif
 
-
-#define malloc(size) ({                                                   \
-    void *_tmp;                                                             \
-    \
-    if (!(_tmp = malloc(size))) {                                           \
-    fprintf(stderr, "Allocation failed at %s:%d!\n", __FILE__, __LINE__); \
-    exit(-1);                                                             \
-    }                                                                       \
-    \
-    _tmp;                                                                   \
-    })
 
 //  STRUCTURES
 
@@ -414,3 +404,5 @@ delete_entry(node * root,
 node * 
 deleteVal(node * root, 
     int key );
+
+#endif

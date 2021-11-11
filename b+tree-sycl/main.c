@@ -25,11 +25,12 @@
 #include <limits.h> // INT_MIN, INT_MAX
 #include <math.h>   // log, pow
 #include <string.h> // memset
+#include "common.h"
 #include "b+tree.h"
-#include "./util/timer/timer.h"
-#include "./util/num/num.h"
-#include "./kernel/kernel_wrapper.h"
-#include "./kernel/kernel2_wrapper.h"
+#include "timer.h"
+#include "num.h"
+#include "kernel_wrapper.h"
+#include "kernel2_wrapper.h"
 
 // general variables
 knode *knodes;
@@ -622,7 +623,6 @@ list_t * findRange(  node * root, int start, int end)
 void usage_1( void ) 
 {
   printf("B+ Tree of Order %d.\n", order);
-  printf("\tAmittai Aviram -- amittai.aviram@yale.edu  Version %s\n", Version);
   printf("\tfollowing Silberschatz, Korth, Sidarshan, Database Concepts, 5th ed.\n\n");
   printf("To build a B+ tree of a different order, start again and enter the order\n");
   printf("as an integer argument:  bpt <order>.  ");
