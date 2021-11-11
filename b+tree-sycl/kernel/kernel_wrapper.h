@@ -1,3 +1,6 @@
+#ifndef KERNEL_WRAPPER_H
+#define KERNEL_WRAPPER_H
+
 #include "common.h"
 void 
 kernel_wrapper(	queue &q,
@@ -15,3 +18,4 @@ kernel_wrapper(	queue &q,
 		long *offset,
 		int *keys,
 		record *ans);
+#endif
