@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -14,26 +13,25 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu
-
-obj = $(source:.cu=.o)
+obj = main.o force_kernel.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -I../mcmd-cuda \
+          -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES -D__STRICT_ANSI__ \
+          -DGPU
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -44,14 +42,21 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): $(obj)
+	$(CC) $(obj) $(CFLAGS) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+main.o: ../mcmd-cuda/main.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+force_kernel.o: force_kernel.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
+	rm -rf ../mcmd-cuda/dataset/*.pdb
+	rm -rf ../mcmd-cuda/dataset/*.xyz
+	rm -rf ../mcmd-cuda/dataset/*.bak
+	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	./$(program) 100
+	cd ../mcmd-cuda/dataset && ../../mcmd-hip/$(program) mcmd.inp && cd ../../mcmd-hip
