@@ -3,7 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
+ifeq ($(VENDOR), codeplay)
+CC        = compute++
+else
 CC        = clang++
+endif
+
 OPTIMIZE  = yes
 DEBUG     = no
 OUTPUT    = no
@@ -30,10 +35,18 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include
 
-# Linker Flags
-LDFLAGS = 
+ifeq ($(VENDOR), codeplay)
+CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
+          -no-serial-memop -sycl -sycl-driver
+else
+CFLAGS += -fsycl
+endif
+
+ifeq ($(VENDOR), codeplay)
+LDFLAGS += -lComputeCpp
+endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
@@ -77,5 +90,5 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj)
 
-run: pathfinder
-	./pathfinder 100000 500 5
+run: $(program)
+	./$(program) 100000 500 5
