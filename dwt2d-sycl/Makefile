@@ -25,7 +25,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = nearestNeighbor.cpp utils.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -63,7 +63,7 @@ endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS  += -g -DDEBUG
+  CFLAGS += -g -DOUTPUT -DDEBUG
   LDFLAGS += -g
 endif
 
@@ -82,11 +82,16 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp nearestNeighbor.h utils.h
+$(obj): main.cpp \
+       kernel_CopySrcToComponent.sycl \
+       kernel_CopySrcToComponents.sycl \
+       kernel_fdwt53.sycl dwt.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
+	rm -rf *.bmp.dwt.*
 
 run: $(program)
-	./$(program) filelist.txt -r 5 -lat 30 -lng 90 -t
+	#./$(program) 192.bmp -d 192x192 -f -5 -l 3
+	./$(program) rgb.bmp -d 1024x1024 -f -5 -l 3

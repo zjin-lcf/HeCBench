@@ -3,7 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
+ifeq ($(VENDOR), codeplay)
+CC        = compute++
+else
 CC        = clang++
+endif
+
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -29,10 +34,21 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DBLOCK_SIZE=256 -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -DBLOCK_SIZE=256 -std=c++17 -Wall -I../include
+
+ifeq ($(VENDOR), codeplay)
+CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
+          -no-serial-memop -sycl -sycl-driver
+else
+CFLAGS += -fsycl
+endif
 
 # Linker Flags
 LDFLAGS = 
+
+ifeq ($(VENDOR), codeplay)
+LDFLAGS += -lComputeCpp
+endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \

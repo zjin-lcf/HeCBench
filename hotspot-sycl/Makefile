@@ -25,7 +25,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = nearestNeighbor.cpp utils.cpp
+source = hotspot.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -82,11 +82,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp nearestNeighbor.h utils.h
+$(obj): hotspot.cpp hotspot.h kernel_hotspot.sycl
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.out
 
 run: $(program)
-	./$(program) filelist.txt -r 5 -lat 30 -lng 90 -t
+	./$(program) 512 2 2 ../data/hotspot/temp_512 ../data/hotspot/power_512 output_512.out
