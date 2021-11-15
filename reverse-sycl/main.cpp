@@ -16,10 +16,10 @@ int main(int argc, char* argv[]) {
   // number of elements to reverse
   const int len = 256;
 
-  // device result
+  // save device result
   int test[len];
 
-  // expected results after reverse operations even/odd times
+  // save expected results after performing reverse operations even/odd times
   int error = 0;
   int gold_odd[len];
   int gold_even[len];
@@ -44,7 +44,8 @@ int main(int argc, char* argv[]) {
   srand(123);
   for (int i = 0; i < iteration; i++) {
 
-    const int count = rand() % 10000 + 100;  // bound the reverse range
+    // bound the number of reverse operations
+    const int count = rand() % 10000 + 100;
 
     q.submit([&](handler &cgh) {
       auto acc = d_test.get_access<sycl_discard_write>(cgh);
