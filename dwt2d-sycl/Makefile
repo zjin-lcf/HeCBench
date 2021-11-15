@@ -23,13 +23,18 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
+program = main
+
+source = main.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I. -I./util/num -I./util/timer -I./kernel
+CFLAGS := -std=c++17 -Wall -I../include
 
 ifeq ($(VENDOR), codeplay)
 CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
@@ -58,7 +63,7 @@ endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS  += -g -DDEBUG
+  CFLAGS += -g -DOUTPUT -DDEBUG
   LDFLAGS += -g
 endif
 
@@ -74,63 +79,19 @@ endif
 # Targets to Build
 #===============================================================================
 
-b+tree.out:./main.o \
-           ./kernel/kernel_wrapper.o \
-           ./kernel/kernel2_wrapper.o \
-           ./util/timer/timer.o \
-           ./util/num/num.o 
-	$(CC) $(CFLAGS)	./main.o \
-			./kernel/kernel_wrapper.o \
-			./kernel/kernel2_wrapper.o \
-			./util/timer/timer.o \
-			./util/num/num.o \
-			$(LDFLAGS) \
-	                -o b+tree.out
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-
-main.o:	./b+tree.h ./main.c
-	$(CC) $(CFLAGS) $(KERNEL_DIM) ./main.c -c -o main.o
-
-
-./kernel/kernel_wrapper.o: ./b+tree.h \
-                    ./kernel/kernel_wrapper.h \
-                    ./kernel/kernel_wrapper.c \
-                    ./kernel/findK.sycl
-	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel_wrapper.c \
-		-c \
-		-o ./kernel/kernel_wrapper.o
-
-./kernel/kernel2_wrapper.o: ./b+tree.h \
-                   ./kernel/kernel2_wrapper.h \
-                   ./kernel/kernel2_wrapper.c \
-                   ./kernel/findRangeK.sycl
-	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel2_wrapper.c \
-		-c \
-		-o ./kernel/kernel2_wrapper.o 
-
-
-./util/timer/timer.o: ./b+tree.h \
-                  ./util/timer/timer.h \
-                  ./util/timer/timer.c
-	$(CC)	./util/timer/timer.c \
-		-c \
-		-o ./util/timer/timer.o \
-		-O3
-
-./util/num/num.o: ./b+tree.h \
-                  ./util/num/num.h \
-                  ./util/num/num.c
-	$(CC)	./util/num/num.c \
-		-c \
-		-o ./util/num/num.o \
-		-O3
-
-run: b+tree.out
-	./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
+$(obj): main.cpp \
+       kernel_CopySrcToComponent.sycl \
+       kernel_CopySrcToComponents.sycl \
+       kernel_fdwt53.sycl dwt.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f	*.o *.out \
-		./kernel/*.o \
-		./util/timer/*.o \
-		./util/num/*.o \
-		output.txt
+	rm -rf $(program) $(obj)
+	rm -rf *.bmp.dwt.*
+
+run: $(program)
+	#./$(program) 192.bmp -d 192x192 -f -5 -l 3
+	./$(program) rgb.bmp -d 1024x1024 -f -5 -l 3

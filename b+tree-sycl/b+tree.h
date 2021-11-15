@@ -1,20 +1,12 @@
+#ifndef BTREE_H
+#define BTREE_H
+
 #include <stdint.h>          // (in path known to compiler)      needed by uint32_t
 #include <stdbool.h>        // (in path known to compiler)      needed by true/false, bool
 #include <stdlib.h>          // (in path known to compiler)      needed by malloc
 #include <sys/time.h>          // (in path known to compiler)      needed by malloc
-#include <CL/sycl.hpp>
-
-using namespace cl::sycl;
-constexpr access::mode sycl_read       = access::mode::read;
-constexpr access::mode sycl_write      = access::mode::write;
-constexpr access::mode sycl_read_write = access::mode::read_write;
-constexpr access::mode sycl_discard_read_write = access::mode::discard_read_write;
-constexpr access::mode sycl_discard_write = access::mode::discard_write;
-constexpr access::mode sycl_atomic     = access::mode::atomic;
 
 #define fp float
-
-#define Version "1.5"
 
 #ifdef WINDOWS
 #define bool char
@@ -44,17 +36,6 @@ constexpr access::mode sycl_atomic     = access::mode::atomic;
 #define  DEFAULT_ORDER_2 256
 #endif
 
-
-#define malloc(size) ({                                                   \
-    void *_tmp;                                                             \
-    \
-    if (!(_tmp = malloc(size))) {                                           \
-    fprintf(stderr, "Allocation failed at %s:%d!\n", __FILE__, __LINE__); \
-    exit(-1);                                                             \
-    }                                                                       \
-    \
-    _tmp;                                                                   \
-    })
 
 //  STRUCTURES
 
@@ -423,3 +404,5 @@ delete_entry(node * root,
 node * 
 deleteVal(node * root, 
     int key );
+
+#endif

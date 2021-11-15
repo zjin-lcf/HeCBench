@@ -1,3 +1,7 @@
+#ifndef KERNEL2_WRAPPER_H
+#define KERNEL2_WRAPPER_H
+
+#include "common.h"
 void 
 kernel2_wrapper(queue &q,
 		knode *knodes,
@@ -16,3 +20,4 @@ kernel2_wrapper(queue &q,
 		int *end,
 		int *recstart,
 		int *reclength);
+#endif
