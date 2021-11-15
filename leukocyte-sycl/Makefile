@@ -3,7 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
+ifeq ($(VENDOR), codeplay)
+CC        = compute++
+else
 CC        = clang++
+endif
+
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -25,10 +30,21 @@ MATRIX_DIR = ./meschach_lib
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I$(MATRIX_DIR)
+
+ifeq ($(VENDOR), codeplay)
+CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
+          -no-serial-memop -sycl -sycl-driver
+else
+CFLAGS += -fsycl
+endif
 
 # Linker Flags
 LDFLAGS = 
+
+ifeq ($(VENDOR), codeplay)
+LDFLAGS += -lComputeCpp
+endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
