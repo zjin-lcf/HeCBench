@@ -57,7 +57,7 @@ void swapBlock(int *key, int posLeft, int posRight, int length) {
 void decodeKernel(
   const float *__restrict d_scores, 
     const int *__restrict d_encrypted,
-  unsigned int*__restrict globalState, 
+  const unsigned int*__restrict globalState, 
           int *__restrict d_decrypted,
         float *__restrict shared_scores) {
 
