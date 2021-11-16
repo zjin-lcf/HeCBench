@@ -89,6 +89,7 @@ int main(int argc, char* argv[]) {
   {
     #pragma omp target teams distribute parallel for thread_limit(T)
     for (int idx = 0; idx < THREADS; idx++) {
+      state[idx] = idx;
       for (int i = 0; i < idx; i++)
         LCG_random_init(&state[idx]);
     }
