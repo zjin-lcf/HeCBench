@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
   range<1> lws(T);
 
   q.submit([&] (handler &cgh) {
-    auto states = d_states.get_access<sycl_discard_write>(cgh);
+    auto states = d_states.get_access<sycl_read_write>(cgh);
     cgh.parallel_for<class setup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       setupKernel(item, states.get_pointer());
     });
