@@ -15,8 +15,10 @@ void LCG_random_init(unsigned int * seed) {
 
 void setupKernel(nd_item<1> &item, unsigned int* state) {
   int idx = item.get_global_id(0);
-  for (int i = 0; i < idx; i++)
+  state[idx] = idx;
+  for (int i = 0; i < idx; i++) {
     LCG_random_init(&state[idx]);
+  }
 }
 
 void decrypt(const int* encrypted, const int* key, int* decrypted) {
@@ -63,7 +65,7 @@ void decodeKernel(
   nd_item<1> &item,
   const float *__restrict d_scores, 
     const int *__restrict d_encrypted,
-  unsigned int*__restrict globalState, 
+  const unsigned int*__restrict globalState, 
           int *__restrict d_decrypted,
         float *__restrict shared_scores) {
 

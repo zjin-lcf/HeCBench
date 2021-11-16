@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 __device__
 float LCG_random_float(unsigned int * seed) {
   const unsigned int m = 2147483648;
@@ -19,6 +18,7 @@ void LCG_random_init(unsigned int * seed) {
 __global__
 void setupKernel(unsigned int* state) {
   int idx = blockIdx.x*blockDim.x + threadIdx.x;
+  state[idx] = idx;
   for (int i = 0; i < idx; i++)
     LCG_random_init(&state[idx]);
 }
@@ -69,7 +69,7 @@ void swapBlock(int *key, int posLeft, int posRight, int length) {
 __global__ 
 void decode(const float *__restrict d_scores, 
             const int *__restrict d_encrypted,
-            unsigned int*__restrict  globalState, 
+            const unsigned int*__restrict  globalState, 
             int *__restrict d_decrypted) {
 
   __shared__ float shared_scores[ALPHABET*ALPHABET];
