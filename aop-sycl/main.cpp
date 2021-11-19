@@ -1188,9 +1188,9 @@ void do_run(queue &q,
 
   // Copy the result to the host.
   q.submit([&] (handler &cgh) {
-    auto acc = d_temp_storage.get_access<sycl_read>(cgh);
+    auto acc = d_temp_storage.get_access<sycl_read>(cgh, range<1>(1));
     cgh.copy(acc, h_price);
-  });
+  }).wait();
 }
 
 template< typename Payoff >
