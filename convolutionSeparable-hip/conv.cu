@@ -128,7 +128,7 @@ void convolutionRows(
   dim3 block (ROWS_BLOCKDIM_X, ROWS_BLOCKDIM_Y);
   dim3 grid (imageW / ROWS_RESULT_STEPS / ROWS_BLOCKDIM_X, imageH/ROWS_BLOCKDIM_Y );
 
-  hipLaunchKernelGGL(conv_rows, dim3(grid), dim3(block), 0, 0, 
+  hipLaunchKernelGGL(conv_rows, grid, block, 0, 0, 
       dst,
       src,
       kernel,
@@ -153,7 +153,7 @@ void convolutionColumns(
   dim3 block (COLUMNS_BLOCKDIM_X, COLUMNS_BLOCKDIM_Y);
   dim3 grid (imageW / COLUMNS_BLOCKDIM_X, imageH / COLUMNS_RESULT_STEPS / COLUMNS_BLOCKDIM_Y);
 
-  hipLaunchKernelGGL(conv_cols, dim3(grid), dim3(block), 0, 0, 
+  hipLaunchKernelGGL(conv_cols, grid, block, 0, 0, 
       dst,
       src,
       kernel,
