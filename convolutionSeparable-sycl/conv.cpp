@@ -28,9 +28,9 @@ void convolutionRows(
     buffer<float,1> &d_Dst,
     buffer<float,1> &d_Src,
     buffer<float,1> &d_Kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 )
 {
     assert ( ROWS_BLOCKDIM_X * ROWS_HALO_STEPS >= KERNEL_RADIUS );
@@ -90,9 +90,9 @@ void convolutionColumns(
     buffer<float,1> &d_Dst,
     buffer<float,1> &d_Src,
     buffer<float,1> &d_Kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 )
 {
     assert ( COLUMNS_BLOCKDIM_Y * COLUMNS_HALO_STEPS >= KERNEL_RADIUS );
