@@ -1,0 +1,7 @@
+This segfault happens in the deconstruction of command group execution graph. In its actual form, the benchmark spawns a long chain of dependent events which need to be deleted on exit. Actually, this deletion occurs in a recursive manner. In our case, this recursion fills the stack memory causing the segfault.
+
+There are two options to avoid this, the first is to set as unlimited the stack size with 
+ $ ulimit -s unlimited.
+
+The second is moving buffer d_test definition (line 40) within the outer loop (line 45). This shorts the event chain allowing its deconstruction to fit in the default stack size.
+
