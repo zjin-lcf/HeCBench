@@ -9,8 +9,8 @@
  *
  */
 
+#include <assert.h>
 #include <hip/hip_runtime.h>
-#include <cassert>
 #include "conv.h"
 
 #define ROWS_BLOCKDIM_X       16
@@ -23,9 +23,9 @@
 #define COLUMNS_HALO_STEPS    1
 
 __global__ void conv_rows(
-    float *__restrict dst,
-    const float *__restrict src,
-    const float *__restrict kernel,
+    float *__restrict__ dst,
+    const float *__restrict__ src,
+    const float *__restrict__ kernel,
     const int imageW,
     const int imageH,
     const int pitch)
@@ -68,9 +68,9 @@ __global__ void conv_rows(
 }
 
 __global__ void conv_cols(
-    float *__restrict dst,
-    const float *__restrict src,
-    const float *__restrict kernel,
+    float *__restrict__ dst,
+    const float *__restrict__ src,
+    const float *__restrict__ kernel,
     const int imageW,
     const int imageH,
     const int pitch)
@@ -117,9 +117,9 @@ void convolutionRows(
     float* dst,
     const float* src,
     const float* kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch)
+    const int imageW,
+    const int imageH,
+    const int pitch)
 {
   assert ( ROWS_BLOCKDIM_X * ROWS_HALO_STEPS >= KERNEL_RADIUS );
   assert ( imageW % (ROWS_RESULT_STEPS * ROWS_BLOCKDIM_X) == 0 );
@@ -128,7 +128,7 @@ void convolutionRows(
   dim3 block (ROWS_BLOCKDIM_X, ROWS_BLOCKDIM_Y);
   dim3 grid (imageW / ROWS_RESULT_STEPS / ROWS_BLOCKDIM_X, imageH/ROWS_BLOCKDIM_Y );
 
-  hipLaunchKernelGGL(conv_rows, grid, block, 0, 0, 
+  hipLaunchKernelGGL(conv_rows, dim3(grid), dim3(block), 0, 0, 
       dst,
       src,
       kernel,
@@ -142,9 +142,9 @@ void convolutionColumns(
     float* dst,
     const float* src,
     const float* kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch)
+    const int imageW,
+    const int imageH,
+    const int pitch)
 {
   assert ( COLUMNS_BLOCKDIM_Y * COLUMNS_HALO_STEPS >= KERNEL_RADIUS );
   assert ( imageW % COLUMNS_BLOCKDIM_X == 0 );
@@ -153,7 +153,7 @@ void convolutionColumns(
   dim3 block (COLUMNS_BLOCKDIM_X, COLUMNS_BLOCKDIM_Y);
   dim3 grid (imageW / COLUMNS_BLOCKDIM_X, imageH / COLUMNS_RESULT_STEPS / COLUMNS_BLOCKDIM_Y);
 
-  hipLaunchKernelGGL(conv_cols, grid, block, 0, 0, 
+  hipLaunchKernelGGL(conv_cols, dim3(grid), dim3(block), 0, 0, 
       dst,
       src,
       kernel,

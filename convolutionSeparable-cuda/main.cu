@@ -10,8 +10,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda.h>
 #include <math.h>
+#include <cuda.h>
 #include "conv.h"
 
 int main(int argc, char **argv)
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
       d_Kernel,
       imageW,
       imageH,
-      imageW
-           );
+      imageW);
+
   cudaMemcpy(h_Buffer, d_Buffer, sizeof(float)*imageW * imageH, cudaMemcpyDeviceToHost);
 
   convolutionColumns(
@@ -65,10 +65,9 @@ int main(int argc, char **argv)
       d_Kernel,
       imageW,
       imageH,
-      imageW
-      );
+      imageW);
 
-  const int numIterations = 0;
+  const int numIterations = 100;
 
   for(int iter = 0; iter < numIterations; iter++){
     convolutionRows(
@@ -77,8 +76,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-             );
+        imageW);
 
     convolutionColumns(
         d_Output,
@@ -86,8 +84,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-        );
+        imageW);
   }
 
   cudaMemcpy(h_OutputGPU, d_Output, sizeof(float)*imageW * imageH, cudaMemcpyDeviceToHost);
@@ -114,10 +111,6 @@ int main(int argc, char **argv)
   cudaFree(d_Buffer);
   cudaFree(d_Output);
 
-  if (L2norm < 1e-6)
-    printf("PASS\n"); 
-  else
-    printf("FAIL\n");
-
+  printf("%s\n", L2norm < 1e-6 ? "PASS" : "FAIL");
   return 0;
 }

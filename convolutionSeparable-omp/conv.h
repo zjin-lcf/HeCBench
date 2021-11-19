@@ -42,18 +42,18 @@ void convolutionRows(
     float* dst,
     const float* src,
     const float* kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 );
 
 void convolutionColumns(
     float* dst,
     const float* src,
     const float* kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 );
 
 #endif
