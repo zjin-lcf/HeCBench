@@ -43,9 +43,9 @@ void convolutionRows(
     buffer<float,1> &d_Dst,
     buffer<float,1> &d_Src,
     buffer<float,1> &c_Kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 );
 
 void convolutionColumns(
@@ -53,9 +53,9 @@ void convolutionColumns(
     buffer<float,1> &d_Dst,
     buffer<float,1> &d_Src,
     buffer<float,1> &c_Kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 );
 
 #endif
