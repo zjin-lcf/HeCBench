@@ -65,7 +65,7 @@ int main(int argc, char **argv)
         imageH,
         imageW);
 
-    const int numIterations = 0;
+    const int numIterations = 100;
 
     for(int iter = 0; iter < numIterations; iter++){
       convolutionRows(
@@ -108,10 +108,6 @@ int main(int argc, char **argv)
   free(h_Input);
   free(h_Kernel);
 
-  if (L2norm < 1e-6)
-    printf("PASS\n"); 
-  else
-    printf("FAIL\n");
-
+  printf("%s\n", L2norm < 1e-6 ? "PASS" : "FAIL");
   return 0;
 }

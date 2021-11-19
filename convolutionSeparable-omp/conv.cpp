@@ -9,8 +9,8 @@
  *
  */
 
-#include <cassert>
 #include <omp.h>
+#include <assert.h>
 #include "conv.h"
 
 #define ROWS_BLOCKDIM_X       16
@@ -27,9 +27,9 @@ void convolutionRows(
     float* __restrict dst,
     const float* __restrict src,
     const float* __restrict kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 )
 {
     assert ( ROWS_BLOCKDIM_X * ROWS_HALO_STEPS >= KERNEL_RADIUS );
@@ -106,9 +106,9 @@ void convolutionColumns(
     float* __restrict dst,
     const float* __restrict src,
     const float* __restrict kernel,
-    const unsigned int imageW,
-    const unsigned int imageH,
-    const unsigned int pitch
+    const int imageW,
+    const int imageH,
+    const int pitch
 ){
     assert ( COLUMNS_BLOCKDIM_Y * COLUMNS_HALO_STEPS >= KERNEL_RADIUS );
     assert ( imageW % COLUMNS_BLOCKDIM_X == 0 );

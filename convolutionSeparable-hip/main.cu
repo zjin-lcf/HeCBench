@@ -10,8 +10,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <hip/hip_runtime.h>
 #include <math.h>
+#include <hip/hip_runtime.h>
 #include "conv.h"
 
 int main(int argc, char **argv)
@@ -55,8 +55,9 @@ int main(int argc, char **argv)
       d_Kernel,
       imageW,
       imageH,
-      imageW
-           );
+      imageW);
+
+  hipMemcpy(h_Buffer, d_Buffer, sizeof(float)*imageW * imageH, hipMemcpyDeviceToHost);
 
   convolutionColumns(
       d_Output,
@@ -64,8 +65,7 @@ int main(int argc, char **argv)
       d_Kernel,
       imageW,
       imageH,
-      imageW
-      );
+      imageW);
 
   const int numIterations = 100;
 
@@ -76,8 +76,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-             );
+        imageW);
 
     convolutionColumns(
         d_Output,
@@ -85,8 +84,7 @@ int main(int argc, char **argv)
         d_Kernel,
         imageW,
         imageH,
-        imageW
-        );
+        imageW);
   }
 
   hipMemcpy(h_OutputGPU, d_Output, sizeof(float)*imageW * imageH, hipMemcpyDeviceToHost);
@@ -113,10 +111,7 @@ int main(int argc, char **argv)
   hipFree(d_Buffer);
   hipFree(d_Output);
 
-  if (L2norm < 1e-6)
-    printf("PASS\n"); 
-  else
-    printf("FAIL\n");
+  printf("%s\n", L2norm < 1e-6 ? "PASS" : "FAIL");
 
   return 0;
 }

@@ -9,9 +9,9 @@
  *
  */
 
+#include <assert.h>
 #include "common.h"
 #include "conv.h"
-#include <cassert>
 
 #define ROWS_BLOCKDIM_X       16
 #define COLUMNS_BLOCKDIM_X    16
