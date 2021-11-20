@@ -580,6 +580,9 @@ Early results are shown [here](results/README.md)
 ### s3d
   Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
 
+### sad
+  Naive template matching with SAD (https://github.com/gholomia/CTMC)
+
 ### scan
   A block-level scan (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
 
