@@ -501,13 +501,10 @@ void prepare_svd_kernel(nd_item<1> &item,
   int found_paths = 0;
 
   // Iterate over the paths.
-  //for( int path = lid ; path < num_paths ; path += NUM_THREADS_PER_BLOCK )
   for( int path = lid ; path < num_paths ; path += NUM_THREADS_PER_BLOCK )
   {
     // Load the asset price to determine if it pays off.
-    double S = 0.0;
-    if( path < num_paths )
-      S = paths[offset + path];
+    double S = paths[offset + path];
 
     // Check if it pays off.
     //const int in_the_money = payoff.is_in_the_money(S);

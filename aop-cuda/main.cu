@@ -225,7 +225,7 @@ static __device__ __forceinline__ void assemble_R(int m, double4 &sums, double *
   smem_svds[5] = (1.0-beta)*x0 - (beta/v0)*sigma;
 }
 
-static __host__ __device__ double off_diag_norm(double A01, double A02, double A12)
+static __device__ double off_diag_norm(double A01, double A02, double A12)
 {
   return sqrt(2.0 * (A01*A01 + A02*A02 + A12*A12));
 }
@@ -500,7 +500,8 @@ void prepare_svd_kernel(int num_paths,
   const int offset = timestep * num_paths;
 
   // Sums.
-  int m = 0; double4 sums = { 0.0, 0.0, 0.0, 0.0 };
+  int m = 0;
+  double4 sums = make_double4(0,0,0,0);
 
   // Initialize the shared memory. DBL_MAX is a marker to specify that the value is invalid.
   if( threadIdx.x < R_W_MATRICES_SMEM_SLOTS )
@@ -511,13 +512,10 @@ void prepare_svd_kernel(int num_paths,
   int found_paths = 0;
 
   // Iterate over the paths.
-  //for( int path = threadIdx.x ; path < num_paths ; path += NUM_THREADS_PER_BLOCK )
   for( int path = threadIdx.x ; path < num_paths ; path += NUM_THREADS_PER_BLOCK )
   {
     // Load the asset price to determine if it pays off.
-    double S = 0.0;
-    if( path < num_paths )
-      S = paths[offset + path];
+    double S = paths[offset + path];
 
     // Check if it pays off.
     const int in_the_money = payoff.is_in_the_money(S);
@@ -589,7 +587,6 @@ void prepare_svd_kernel(int num_paths,
   else
   {
     // Compute the final reductions.
-
     if (threadIdx.x == 0)
       lsums = make_double4(0,0,0,0);
     __syncthreads();
