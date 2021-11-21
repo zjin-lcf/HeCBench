@@ -504,6 +504,9 @@ Early results are shown [here](results/README.md)
 ### nw
   Needleman-Wunsch in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### openmp
+  Multi-threading over a single device (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### page-rank
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
 
