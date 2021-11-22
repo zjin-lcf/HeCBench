@@ -490,7 +490,7 @@ void prepare_svd_kernel(nd_item<1> &item,
 
   // Sums.
   int m = 0; 
-  double4 sums (0.0);
+  double4 sums = double4(0.0);
 
   // Initialize the shared memory. DBL_MAX is a marker to specify that the value is invalid.
   if( lid < R_W_MATRICES_SMEM_SLOTS )
@@ -590,7 +590,7 @@ void prepare_svd_kernel(nd_item<1> &item,
     // Compute the final reductions.
 
     if (lid == 0)
-      lsums[0] = double4(0);
+      lsums[0] = double4(0.0);
     syncthreads();
 
     auto sumx_obj = ext::oneapi::atomic_ref<double, 
