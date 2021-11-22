@@ -50,6 +50,9 @@ Early results are shown [here](results/README.md)
 ### aobench
   A lightweight ambient occlusion renderer (https://code.google.com/archive/p/aobench)
 
+### aop
+  American options pricing (https://github.com/NVIDIA-developer-blog)
+
 ### asmooth
   Adaptive smoothing (http://www.hcs.harvard.edu/admiralty/)
 
