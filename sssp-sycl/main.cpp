@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  cl::sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel);
 
   // Allocate
   int n_nodes, n_edges;
@@ -183,29 +183,30 @@ int main(int argc, char **argv) {
   Edge * h_edges = (Edge *)malloc(sizeof(Edge) * n_edges);
   buffer<Edge, 1> d_edges (n_edges);
   std::atomic_int *h_color = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  buffer<std::atomic_int, 1> d_color (n_nodes);
+  buffer<int, 1> d_color (n_nodes);
   std::atomic_int *h_cost  = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  buffer<std::atomic_int, 1> d_cost (n_nodes);
+  buffer<int, 1> d_cost (n_nodes);
   int *            h_q1    = (int *)malloc(n_nodes * sizeof(int));
   buffer<int, 1> d_q1 (n_nodes);
   int *            h_q2    = (int *)malloc(n_nodes * sizeof(int));
   buffer<int, 1> d_q2 (n_nodes);
   std::atomic_int  h_head[1];
-  buffer<std::atomic_int, 1> d_head (1);
+  buffer<int, 1> d_head (1);
   std::atomic_int  h_tail[1];
-  buffer<std::atomic_int, 1> d_tail (1);
+  buffer<int, 1> d_tail (1);
   std::atomic_int  h_threads_end[1];
-  buffer<std::atomic_int, 1> d_threads_end (1);
+  buffer<int, 1> d_threads_end (1);
   std::atomic_int  h_threads_run[1];
-  buffer<std::atomic_int, 1> d_threads_run (1);
+  buffer<int, 1> d_threads_run (1);
   int              h_num_t[1];
   buffer<int, 1> d_num_t (1);
   int              h_overflow[1];
   buffer<int, 1> d_overflow (1);
   std::atomic_int  h_gray_shade[1];
-  buffer<std::atomic_int, 1> d_gray_shade (1);
+  buffer<int, 1> d_gray_shade (1);
   std::atomic_int  h_iter[1];
-  buffer<std::atomic_int, 1> d_iter (1);
+  buffer<int, 1> d_iter (1);
+  q.wait();
   timer.stop("Allocation");
 
   // Initialize
@@ -234,13 +235,13 @@ int main(int argc, char **argv) {
   // Copy to device
   timer.start("Copy To Device");
   q.submit([&] (handler &h) {
-      auto d_nodes_acc = d_nodes.get_access<sycl_write>(h);
-      h.copy(h_nodes, d_nodes_acc);
-      });
+    auto d_nodes_acc = d_nodes.get_access<sycl_write>(h);
+    h.copy(h_nodes, d_nodes_acc);
+  });
   q.submit([&] (handler &h) {
-      auto d_edges_acc = d_edges.get_access<sycl_write>(h);
-      h.copy(h_edges, d_edges_acc);
-      });
+    auto d_edges_acc = d_edges.get_access<sycl_write>(h);
+    h.copy(h_edges, d_edges_acc);
+  });
   q.wait();
   timer.stop("Copy To Device");
 
@@ -344,37 +345,37 @@ int main(int argc, char **argv) {
           timer.start("Copy To Device");
 
         q.submit([&] (handler &h) {
-            auto d_cost_acc = d_cost.get_access<sycl_write>(h);
-            h.copy(h_cost, d_cost_acc);
-            });
+          auto d_cost_acc = d_cost.get_access<sycl_write>(h);
+          h.copy(h_cost, d_cost_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_color_acc = d_color.get_access<sycl_write>(h);
-            h.copy(h_color, d_color_acc);
-            });
+          auto d_color_acc = d_color.get_access<sycl_write>(h);
+          h.copy(h_color, d_color_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_threads_run_acc = d_threads_run.get_access<sycl_write>(h);
-            h.copy(h_threads_run, d_threads_run_acc);
-            });
+          auto d_threads_run_acc = d_threads_run.get_access<sycl_write>(h);
+          h.copy(h_threads_run, d_threads_run_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_threads_end_acc = d_threads_end.get_access<sycl_write>(h);
-            h.copy(h_threads_end, d_threads_end_acc);
-            });
+          auto d_threads_end_acc = d_threads_end.get_access<sycl_write>(h);
+          h.copy(h_threads_end, d_threads_end_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_overflow_acc = d_overflow.get_access<sycl_write>(h);
-            h.copy(h_overflow, d_overflow_acc);
-            });
+          auto d_overflow_acc = d_overflow.get_access<sycl_write>(h);
+          h.copy(h_overflow, d_overflow_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_q1_acc = d_q1.get_access<sycl_write>(h);
-            h.copy(h_q1, d_q1_acc);
-            });
+          auto d_q1_acc = d_q1.get_access<sycl_write>(h);
+          h.copy(h_q1, d_q1_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_q2_acc = d_q2.get_access<sycl_write>(h);
-            h.copy(h_q2, d_q2_acc);
-            });
+          auto d_q2_acc = d_q2.get_access<sycl_write>(h);
+          h.copy(h_q2, d_q2_acc);
+        });
         q.submit([&] (handler &h) {
-            auto d_iter_acc = d_iter.get_access<sycl_write>(h);
-            h.copy(h_iter, d_iter_acc);
-            });
+          auto d_iter_acc = d_iter.get_access<sycl_write>(h);
+          h.copy(h_iter, d_iter_acc);
+        });
         q.wait();
         if(rep >= p.n_warmup)
           timer.stop("Copy To Device");
@@ -391,21 +392,21 @@ int main(int argc, char **argv) {
             timer.start("Copy To Device");
 
           q.submit([&] (handler &h) {
-              auto d_num_acc = d_num_t.get_access<sycl_write>(h);
-              h.copy(h_num_t, d_num_acc);
-              });
+            auto d_num_acc = d_num_t.get_access<sycl_write>(h);
+            h.copy(h_num_t, d_num_acc);
+          });
           q.submit([&] (handler &h) {
-              auto d_tail_acc = d_tail.get_access<sycl_write>(h);
-              h.copy(h_tail, d_tail_acc);
-              });
+            auto d_tail_acc = d_tail.get_access<sycl_write>(h);
+            h.copy(h_tail, d_tail_acc);
+          });
           q.submit([&] (handler &h) {
-              auto d_head_acc = d_head.get_access<sycl_write>(h);
-              h.copy(h_head, d_head_acc);
-              });
+            auto d_head_acc = d_head.get_access<sycl_write>(h);
+            h.copy(h_head, d_head_acc);
+          });
           q.submit([&] (handler &h) {
-              auto d_gray_shade_acc = d_gray_shade.get_access<sycl_write>(h);
-              h.copy(h_gray_shade, d_gray_shade_acc);
-              });
+            auto d_gray_shade_acc = d_gray_shade.get_access<sycl_write>(h);
+            h.copy(h_gray_shade, d_gray_shade_acc);
+          });
           q.wait();
           if(rep >= p.n_warmup)
             timer.stop("Copy To Device");
@@ -417,126 +418,126 @@ int main(int argc, char **argv) {
           int blocks = p.n_gpu_blocks;
           int threads = p.n_gpu_threads;
           q.submit([&] (handler &h) {
-              auto graph_nodes_av = d_nodes.get_access<sycl_read>(h);
-              auto graph_edges_av = d_edges.get_access<sycl_read>(h);
-              auto cost = d_cost.get_access<sycl_atomic>(h);
-              auto color = d_color.get_access<sycl_atomic>(h);
-              auto q1 = (*d_qin).get_access<sycl_read>(h);
-              auto q2 = (*d_qout).get_access<sycl_write>(h);
-              auto n_t = d_num_t.get_access<sycl_atomic>(h);
-              auto head = d_head.get_access<sycl_atomic>(h);
-              auto tail = d_tail.get_access<sycl_atomic>(h);
-              auto threads_end = d_threads_end.get_access<sycl_read>(h);
-              auto threads_run = d_threads_run.get_access<sycl_read>(h);
-              auto overflow = d_overflow.get_access<sycl_read_write>(h);
-              auto gray_shade = d_gray_shade.get_access<sycl_atomic>(h);
-              auto iter = d_iter.get_access<sycl_atomic>(h);
-              accessor<int, 1, sycl_atomic, access::target::local> tail_bin (1, h);
-              accessor<int, 1, sycl_read_write, access::target::local> l_mem (W_QUEUE_SIZE + 2, h);
-              h.parallel_for(nd_range<1>(range<1>(blocks*threads), range<1>(threads)), [=] (nd_item<1> item) {
-                  int* l_q2 = &l_mem[0];
-                  int* shift = &l_mem[W_QUEUE_SIZE];
-                  int* base = &l_mem[W_QUEUE_SIZE+1];
+            auto graph_nodes_av = d_nodes.get_access<sycl_read>(h);
+            auto graph_edges_av = d_edges.get_access<sycl_read>(h);
+            auto cost = d_cost.get_access<sycl_atomic>(h);
+            auto color = d_color.get_access<sycl_atomic>(h);
+            auto q1 = (*d_qin).get_access<sycl_read>(h);
+            auto q2 = (*d_qout).get_access<sycl_write>(h);
+            auto n_t = d_num_t.get_access<sycl_atomic>(h);
+            auto head = d_head.get_access<sycl_atomic>(h);
+            auto tail = d_tail.get_access<sycl_atomic>(h);
+            auto threads_end = d_threads_end.get_access<sycl_read>(h);
+            auto threads_run = d_threads_run.get_access<sycl_read>(h);
+            auto overflow = d_overflow.get_access<sycl_read_write>(h);
+            auto gray_shade = d_gray_shade.get_access<sycl_atomic>(h);
+            auto iter = d_iter.get_access<sycl_atomic>(h);
+            accessor<int, 1, sycl_atomic, access::target::local> tail_bin (1, h);
+            accessor<int, 1, sycl_read_write, access::target::local> l_mem (W_QUEUE_SIZE + 2, h);
+            h.parallel_for(nd_range<1>(range<1>(blocks*threads), range<1>(threads)), [=] (nd_item<1> item) {
+              int* l_q2 = &l_mem[0];
+              int* shift = &l_mem[W_QUEUE_SIZE];
+              int* base = &l_mem[W_QUEUE_SIZE+1];
 
-                  const int tid     = item.get_local_id(0); 
-                  const int gtid    = item.get_global_id(0); 
-                  const int MAXWG   = item.get_global_range(0);
-                  const int WG_SIZE = item.get_group_range(0);
+              const int tid     = item.get_local_id(0); 
+              const int gtid    = item.get_global_id(0); 
+              const int MAXWG   = item.get_global_range(0);
+              const int WG_SIZE = item.get_group_range(0);
 
-                  int iter_local = atomic_fetch_add(iter[0], 0); //atomicAdd(&iter[0], 0);
-                  int n_t_local = atomic_fetch_add(n_t[0], 0); //atomicAdd(n_t, 0);
-                  int gray_shade_local = atomic_fetch_add(gray_shade[0], 0); //atomicAdd(&gray_shade[0], 0);
+              int iter_local = atomic_fetch_add(iter[0], 0); //atomicAdd(&iter[0], 0);
+              int n_t_local = atomic_fetch_add(n_t[0], 0); //atomicAdd(n_t, 0);
+              int gray_shade_local = atomic_fetch_add(gray_shade[0], 0); //atomicAdd(&gray_shade[0], 0);
 
+              if(tid == 0) {
+                // Reset queue
+                tail_bin[0].store(0);
+              }
+
+              // Fetch frontier elements from the queue
+              if(tid == 0)
+                *base = atomic_fetch_add(head[0], WG_SIZE); //atomicAdd(&head[0], WG_SIZE);
+              item.barrier(access::fence_space::local_space);
+
+              int my_base = *base;
+              while(my_base < n_t_local) {
+
+                // If local queue might overflow
+                if(atomic_load(tail_bin[0]) >= W_QUEUE_SIZE / 2) {
                   if(tid == 0) {
-                    // Reset queue
-                    tail_bin[0].store(0);
-                  }
-
-                  // Fetch frontier elements from the queue
-                  if(tid == 0)
-                    *base = atomic_fetch_add(head[0], WG_SIZE); //atomicAdd(&head[0], WG_SIZE);
-                  item.barrier(access::fence_space::local_space);
-
-                  int my_base = *base;
-                  while(my_base < n_t_local) {
-
-                    // If local queue might overflow
-                    if(atomic_load(tail_bin[0]) >= W_QUEUE_SIZE / 2) {
-                      if(tid == 0) {
-                        // Add local tail_bin to tail
-                        *shift = atomic_fetch_add(tail[0], atomic_load(tail_bin[0])); //atomicAdd(&tail[0], *tail_bin);
-                      }
-                      item.barrier(access::fence_space::local_space);
-                      int local_shift = tid;
-                      while(local_shift < atomic_load(tail_bin[0])) {
-                        q2[*shift + local_shift] = l_q2[local_shift];
-                        // Multiple threads are copying elements at the same time, so we shift by multiple elements for next iteration
-                        local_shift += WG_SIZE;
-                      }
-                      item.barrier(access::fence_space::local_space);
-                      if(tid == 0) {
-                        // Reset local queue
-                        tail_bin[0].store(0);
-                      }
-                      item.barrier(access::fence_space::local_space);
-                    }
-
-                    if(my_base + tid < n_t_local && overflow[0] == 0) {
-                      // Visit a node from the current frontier
-                      int pid = q1[my_base + tid];
-                      //////////////// Visit node ///////////////////////////
-                      atomic_exchange(color[pid], BLACK); //atomicExch(&color[pid], BLACK); // Node visited
-                      int  cur_cost = atomic_fetch_add(cost[pid], 0); //atomicAdd(&cost[pid], 0); // Look up shortest-path distance to this node
-                      Node cur_node;
-                      cur_node.x = graph_nodes_av[pid].x;
-                      cur_node.y = graph_nodes_av[pid].y;
-                      Edge cur_edge;
-                      // For each outgoing edge
-                      for(int i = cur_node.x; i < cur_node.y + cur_node.x; i++) {
-                        cur_edge.x = graph_edges_av[i].x;
-                        cur_edge.y = graph_edges_av[i].y;
-                        int id     = cur_edge.x;
-                        int cost_local   = cur_edge.y;
-                        cost_local += cur_cost;
-                        int orig_cost = atomic_fetch_max(cost[id], cost_local); //atomicMax(&cost[id], cost_local);
-                        if(orig_cost < cost_local) {
-                          int old_color = atomic_fetch_max(color[id], gray_shade_local); //atomicMax(&color[id], gray_shade_local);
-                          if(old_color != gray_shade_local) {
-                            // Push to the queue
-                            int tail_index = atomic_fetch_add(tail_bin[0], 1); // atomicAdd(tail_bin, 1);
-                            if(tail_index >= W_QUEUE_SIZE) {
-                              overflow[0] = 1;
-                            } else
-                              l_q2[tail_index] = id;
-                          }
-                        }
-                      }
-                    }
-
-                    if(tid == 0)
-                      *base = atomic_fetch_add(head[0], WG_SIZE); //atomicAdd(&head[0], WG_SIZE); // Fetch more frontier elements from the queue
-                    item.barrier(access::fence_space::local_space);
-                    my_base = *base;
-                  }
-                  /////////////////////////////////////////////////////////
-                  // Compute size of the output and allocate space in the global queue
-                  if(tid == 0) {
+                    // Add local tail_bin to tail
                     *shift = atomic_fetch_add(tail[0], atomic_load(tail_bin[0])); //atomicAdd(&tail[0], *tail_bin);
                   }
                   item.barrier(access::fence_space::local_space);
-                  ///////////////////// CONCATENATE INTO GLOBAL MEMORY /////////////////////
                   int local_shift = tid;
                   while(local_shift < atomic_load(tail_bin[0])) {
                     q2[*shift + local_shift] = l_q2[local_shift];
                     // Multiple threads are copying elements at the same time, so we shift by multiple elements for next iteration
                     local_shift += WG_SIZE;
                   }
-                  //////////////////////////////////////////////////////////////////////////
-
-                  if(gtid == 0) {
-                    atomic_fetch_add(iter[0], 1); //atomicAdd(&iter[0], 1);
+                  item.barrier(access::fence_space::local_space);
+                  if(tid == 0) {
+                    // Reset local queue
+                    tail_bin[0].store(0);
                   }
-              });
+                  item.barrier(access::fence_space::local_space);
+                }
+
+                if(my_base + tid < n_t_local && overflow[0] == 0) {
+                  // Visit a node from the current frontier
+                  int pid = q1[my_base + tid];
+                  //////////////// Visit node ///////////////////////////
+                  atomic_exchange(color[pid], BLACK); //atomicExch(&color[pid], BLACK); // Node visited
+                  int  cur_cost = atomic_fetch_add(cost[pid], 0); //atomicAdd(&cost[pid], 0); // Look up shortest-path distance to this node
+                  Node cur_node;
+                  cur_node.x = graph_nodes_av[pid].x;
+                  cur_node.y = graph_nodes_av[pid].y;
+                  Edge cur_edge;
+                  // For each outgoing edge
+                  for(int i = cur_node.x; i < cur_node.y + cur_node.x; i++) {
+                    cur_edge.x = graph_edges_av[i].x;
+                    cur_edge.y = graph_edges_av[i].y;
+                    int id     = cur_edge.x;
+                    int cost_local   = cur_edge.y;
+                    cost_local += cur_cost;
+                    int orig_cost = atomic_fetch_max(cost[id], cost_local); //atomicMax(&cost[id], cost_local);
+                    if(orig_cost < cost_local) {
+                      int old_color = atomic_fetch_max(color[id], gray_shade_local); //atomicMax(&color[id], gray_shade_local);
+                      if(old_color != gray_shade_local) {
+                        // Push to the queue
+                        int tail_index = atomic_fetch_add(tail_bin[0], 1); // atomicAdd(tail_bin, 1);
+                        if(tail_index >= W_QUEUE_SIZE) {
+                          overflow[0] = 1;
+                        } else
+                          l_q2[tail_index] = id;
+                      }
+                    }
+                  }
+                }
+
+                if(tid == 0)
+                  *base = atomic_fetch_add(head[0], WG_SIZE); //atomicAdd(&head[0], WG_SIZE); // Fetch more frontier elements from the queue
+                item.barrier(access::fence_space::local_space);
+                my_base = *base;
+              }
+              /////////////////////////////////////////////////////////
+              // Compute size of the output and allocate space in the global queue
+              if(tid == 0) {
+                *shift = atomic_fetch_add(tail[0], atomic_load(tail_bin[0])); //atomicAdd(&tail[0], *tail_bin);
+              }
+              item.barrier(access::fence_space::local_space);
+              ///////////////////// CONCATENATE INTO GLOBAL MEMORY /////////////////////
+              int local_shift = tid;
+              while(local_shift < atomic_load(tail_bin[0])) {
+                q2[*shift + local_shift] = l_q2[local_shift];
+                // Multiple threads are copying elements at the same time, so we shift by multiple elements for next iteration
+                local_shift += WG_SIZE;
+              }
+              //////////////////////////////////////////////////////////////////////////
+
+              if(gtid == 0) {
+                atomic_fetch_add(iter[0], 1); //atomicAdd(&iter[0], 1);
+              }
+            });
           });
 
           q.wait();
@@ -565,40 +566,38 @@ int main(int argc, char **argv) {
             h_gray_shade[0].store(GRAY0);
           else
             h_gray_shade[0].store(GRAY1);
-
-
         }
 
         if(rep >= p.n_warmup)
           timer.start("Copy Back and Merge");
         q.submit([&] (handler &h) {
-            auto d_cost_acc = d_cost.get_access<sycl_read>(h);
-            h.copy(d_cost_acc, h_cost);
-            });
+          auto d_cost_acc = d_cost.get_access<sycl_read>(h);
+          h.copy(d_cost_acc, h_cost);
+        });
         q.submit([&] (handler &h) {
-            auto d_color_acc = d_color.get_access<sycl_read>(h);
-            h.copy(d_color_acc, h_color);
-            });
+          auto d_color_acc = d_color.get_access<sycl_read>(h);
+          h.copy(d_color_acc, h_color);
+        });
         q.submit([&] (handler &h) {
-            auto d_threads_run_acc = d_threads_run.get_access<sycl_read>(h);
-            h.copy(d_threads_run_acc, h_threads_run);
-            });
+          auto d_threads_run_acc = d_threads_run.get_access<sycl_read>(h);
+          h.copy(d_threads_run_acc, h_threads_run);
+        });
         q.submit([&] (handler &h) {
-            auto d_threads_end_acc = d_threads_end.get_access<sycl_read>(h);
-            h.copy(d_threads_end_acc, h_threads_end);
-            });
+          auto d_threads_end_acc = d_threads_end.get_access<sycl_read>(h);
+          h.copy(d_threads_end_acc, h_threads_end);
+        });
         q.submit([&] (handler &h) {
-            auto d_overflow_acc = d_overflow.get_access<sycl_read>(h);
-            h.copy(d_overflow_acc, h_overflow);
-            });
+          auto d_overflow_acc = d_overflow.get_access<sycl_read>(h);
+          h.copy(d_overflow_acc, h_overflow);
+        });
         q.submit([&] (handler &h) {
-            auto d_q1_acc = d_q1.get_access<sycl_read>(h);
-            h.copy(d_q1_acc, h_q1);
-            });
+          auto d_q1_acc = d_q1.get_access<sycl_read>(h);
+          h.copy(d_q1_acc, h_q1);
+        });
         q.submit([&] (handler &h) {
-            auto d_q2_acc = d_q2.get_access<sycl_read>(h);
-            h.copy(d_q2_acc, h_q2);
-            });
+          auto d_q2_acc = d_q2.get_access<sycl_read>(h);
+          h.copy(d_q2_acc, h_q2);
+        });
         q.wait();
         if(rep >= p.n_warmup)
           timer.stop("Copy Back and Merge");
