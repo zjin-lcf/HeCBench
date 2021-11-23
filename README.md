@@ -393,6 +393,9 @@ Early results are shown [here](results/README.md)
 ### lid-driven-cavity 
   GPU solver for a 2D lid-driven cavity problem (https://github.com/kyleniemeyer/lid-driven-cavity_gpu)
 
+### lif
+   A leaky integrate-and-fire neuron model (https://github.com/e2crawfo/hrr-scaling)
+
 ### linearprobing
   A simple lock-free hash table (https://github.com/nosferalatu/SimpleGPUHashTable)
 
