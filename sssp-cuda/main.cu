@@ -580,7 +580,7 @@ int main(int argc, char **argv) {
     timer.print("Copy Back and Merge", p.n_reps);
 
     // Verify answer
-    verify(h_cost, n_nodes, p.comparison_file);
+    bool ok = verify(h_cost, n_nodes, p.comparison_file);
 
     // Free memory
     timer.start("Deallocation");
@@ -608,7 +608,6 @@ int main(int argc, char **argv) {
     timer.stop("Deallocation");
     timer.print("Deallocation", 1);
 
-
-    printf("Test Passed\n");
+    if (ok) printf("Test Passed\n");
     return 0;
 }
