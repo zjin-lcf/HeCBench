@@ -688,6 +688,12 @@ Early results are shown [here](results/README.md)
 ### thomas
   Solve tridiagonal systems of equations using the Thomas algorithm (https://pm.bsc.es/gitlab/run-math/cuThomasBatch/tree/master)
 
+### threadfence
+  Memory fence function (https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#memory-fence-functions)
+
+### tissue
+  Accumulate contributions of tissue source strengths and previous solute levels to current tissue solute levels (https://github.com/secomb/GreensTD19_GPU)
+
 ### tonemapping
   Tone mapping (https://github.com/OpenCL/AMD_APP_samples)
 
