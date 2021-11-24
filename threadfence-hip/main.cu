@@ -1,0 +1,128 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <hip/hip_runtime.h>
+
+__global__ void sum (
+    const float*__restrict__ array,
+    const int N,
+    unsigned int *__restrict__ count,
+    volatile float*__restrict__ result)
+{
+  __shared__ bool isLastBlockDone;
+  __shared__ float partialSum;
+
+  // Each block sums a subset of the input array.
+  unsigned int bid = blockIdx.x;
+  unsigned int num_blocks = gridDim.x;
+  unsigned int block_size = blockDim.x;
+  unsigned int lid = threadIdx.x;
+  unsigned int gid = bid * block_size + lid;
+
+  if (lid == 0) partialSum = 0;
+  __syncthreads();
+
+  if (gid < N)
+    atomicAdd(&partialSum, array[gid]);
+
+  __syncthreads();
+
+  if (lid == 0) {
+
+    // Thread 0 of each block stores the partial sum
+    // to global memory. The compiler will use 
+    // a store operation that bypasses the L1 cache
+    // since the "result" variable is declared as
+    // volatile. This ensures that the threads of
+    // the last block will read the correct partial
+    // sums computed by all other blocks.
+    result[bid] = partialSum;
+
+    // Thread 0 makes sure that the incrementation
+    // of the "count" variable is only performed after
+    // the partial sum has been written to global memory.
+    __threadfence();
+
+    // Thread 0 signals that it is done.
+    unsigned int value = atomicAdd(count, 1);
+
+    // Thread 0 determines if its block is the last
+    // block to be done.
+    isLastBlockDone = (value == (num_blocks - 1));
+  }
+
+  // Synchronize to make sure that each thread reads
+  // the correct value of isLastBlockDone.
+  __syncthreads();
+
+  if (isLastBlockDone) {
+
+    // The last block sums the partial sums
+    // stored in result[0 .. num_blocks-1]
+    if (lid == 0) partialSum = 0;
+    __syncthreads();
+
+    for (int i = lid; i < num_blocks; i += block_size)
+      atomicAdd(&partialSum, result[i]);
+
+    __syncthreads();
+
+    if (lid == 0) {
+
+      // Thread 0 of last block stores the total sum
+      // to global memory and resets the count
+      // varialble, so that the next kernel call
+      // works properly.
+      result[0] = partialSum;
+      *count = 0;
+    }
+  }
+}
+
+int main(int argc, char** argv) {
+
+  const int iterations = atoi(argv[1]);
+  const int N = atoi(argv[2]);
+
+  const int blocks = 256;
+  const int grids = (N + blocks - 1) / blocks;
+
+  float* h_array = (float*) malloc (N * sizeof(float));
+  float h_sum;
+
+  float* d_result;
+  hipMalloc((void**)&d_result, grids * sizeof(float));
+
+  float* d_array;
+  hipMalloc((void**)&d_array, N * sizeof(float));
+
+  unsigned int* d_count;
+  hipMalloc((void**)&d_count, sizeof(unsigned int));
+  hipMemset(d_count, 0u, sizeof(unsigned int));
+
+  bool ok = true;
+  for (int n = 0; n < iterations; n++) {
+
+    for (int i = 0; i < N; i++)
+      h_array[i] = -1.f;
+
+    hipMemcpy(d_array, h_array, N * sizeof(float), hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL(sum, dim3(grids), dim3(blocks), 0, 0, d_array, N, d_count, d_result);
+
+    hipMemcpy(&h_sum, d_result, sizeof(float), hipMemcpyDeviceToHost);
+
+    if (h_sum != -1.f * N) {
+      ok = false;
+      break;
+    }
+  }
+
+  free(h_array);
+  hipFree(d_result);
+  hipFree(d_array);
+  hipFree(d_count);
+
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  return 0;
+}
