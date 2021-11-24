@@ -15,8 +15,7 @@ long long get_time() {
 }
 
 // create both matrix and right hand side, Ke Wang 2013/08/12 11:51:06
-void
-create_matrix(float *m, int size){
+void create_matrix(float *m, int size){
   int i,j;
   float lamda = -0.01;
   float coe[2*size-1];
@@ -79,7 +78,6 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-
   if(size < 1)
   {
     fp = fopen(filename, "r");
@@ -92,7 +90,6 @@ int main(int argc, char *argv[]) {
     InitAry(fp, b, size);
 
     fclose(fp);
-
   }
   else
   {
@@ -102,7 +99,6 @@ int main(int argc, char *argv[]) {
     b = (float *) malloc(size * sizeof(float));
     for (int i =0; i< size; i++)
       b[i]=1.0;
-
   }
 
 
@@ -190,73 +186,64 @@ int main(int argc, char *argv[]) {
 void ForwardSub(float *a, float *b, float *m, int size,int timing){    
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<float,1> d_a (a, size*size, props);
-    buffer<float,1> d_b(b, size, props);
-    buffer<float,1> d_m(m, size*size, props);
+  const property_list props = property::buffer::use_host_ptr();
+  buffer<float,1> d_a (a, size*size, props);
+  buffer<float,1> d_b(b, size, props);
+  buffer<float,1> d_m(m, size*size, props);
 
-    range<1> localWorksizeFan1(BLOCK_SIZE_0);
-    range<1> globalWorksizeFan1((size + BLOCK_SIZE_0 - 1)/ BLOCK_SIZE_0 * BLOCK_SIZE_0);
+  range<1> lws(BLOCK_SIZE_0);
+  range<1> gws((size + BLOCK_SIZE_0 - 1)/ BLOCK_SIZE_0 * BLOCK_SIZE_0);
 
-    range<2> localWorksizeFan2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
-    range<2> globalWorksizeFan2(
-        (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
-        (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y );
+  range<2> lws2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
+  range<2> gws2(
+      (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y,
+      (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X);
 
-
-    // 4. Setup and Run kernels
-    for (int t=0; t<(size-1); t++) {
-      q.submit([&](handler& cgh) {
-
-          auto a_acc = d_a.get_access<sycl_read>(cgh);
-          auto m_acc = d_m.get_access<sycl_write>(cgh);
-
-          cgh.parallel_for<class fan1>(
-            nd_range<1>(globalWorksizeFan1, localWorksizeFan1), [=] (nd_item<1> item) {
-            int globalId = item.get_global_id(0);
-            if (globalId < size-1-t) {
-              m_acc[size * (globalId + t + 1)+t] = 
-              a_acc[size * (globalId + t + 1) + t] / a_acc[size * t + t];
-              }
-            });
-          });
-
-      q.submit([&](handler& cgh) {
-
-          auto a_acc = d_a.get_access<sycl_read_write>(cgh);
-          auto b_acc = d_b.get_access<sycl_read_write>(cgh);
-          auto m_acc = d_m.get_access<sycl_read>(cgh);
-
-          cgh.parallel_for<class fan2>(
-            nd_range<2>(globalWorksizeFan2, localWorksizeFan2), [=] (nd_item<2> item) {
-            int globalIdx = item.get_global_id(0);
-            int globalIdy = item.get_global_id(1);
-            if (globalIdx < size-1-t && globalIdy < size-t) {
-              a_acc[size*(globalIdx+1+t)+(globalIdy+t)] -= 
-              m_acc[size*(globalIdx+1+t)+t] * a_acc[size*t+(globalIdy+t)];
-
-              if(globalIdy == 0){
-                b_acc[globalIdx+1+t] -= 
-                m_acc[size*(globalIdx+1+t)+(globalIdy+t)] * b_acc[t];
-              }
-            }
-            });
+  // Run kernels
+  for (int t=0; t<(size-1); t++) {
+    q.submit([&](handler& cgh) {
+      auto a_acc = d_a.get_access<sycl_read>(cgh);
+      auto m_acc = d_m.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class fan1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int globalId = item.get_global_id(0);
+        if (globalId < size-1-t) {
+          m_acc[size * (globalId + t + 1) + t] = 
+          a_acc[size * (globalId + t + 1) + t] / a_acc[size * t + t];
+        }
       });
+    });
 
-    } // for (t=0; t<(size-1); t++) 
+    q.submit([&](handler& cgh) {
+      auto a_acc = d_a.get_access<sycl_read_write>(cgh);
+      auto b_acc = d_b.get_access<sycl_read_write>(cgh);
+      auto m_acc = d_m.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class fan2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+        int globalIdx = item.get_global_id(1);
+        int globalIdy = item.get_global_id(0);
+        if (globalIdx < size-1-t && globalIdy < size-t) {
+          a_acc[size * (globalIdx+1+t) + (globalIdy+t)] -= 
+          m_acc[size * (globalIdx+1+t) + t] * a_acc[size*t + (globalIdy+t)];
 
+          if(globalIdy == 0) {
+            b_acc[globalIdx+1+t] -= 
+            m_acc[size * (globalIdx+1+t) + (globalIdy+t)] * b_acc[t];
+          }
+        }
+      });
+    });
+  } // for (t=0; t<(size-1); t++) 
 }
 
 
-// Ke Wang add a function to generate input internally
 int parseCommandline(int argc, char *argv[], char* filename,
-    int *q, int *t, int *size){
+                     int *q, int *t, int *size)
+{
   int i;
   if (argc < 2) return 1; // error
   // strncpy(filename,argv[1],100);
