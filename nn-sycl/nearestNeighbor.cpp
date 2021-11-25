@@ -42,7 +42,6 @@ int main(int argc, char *argv[]) {
   // find the resultsCount least distances
   findLowest(records,recordDistances,numRecords,resultsCount);
 
-
   // print out results
   if (!quiet)
     for(i=0;i<resultsCount;i++) {
@@ -54,7 +53,9 @@ int main(int argc, char *argv[]) {
 
 void SyclFindNearestNeighbors(
     int numRecords,
-    std::vector<LatLong> &locations,float lat,float lng,
+    std::vector<LatLong> &locations,
+    float lat,
+    float lng,
     float* distances,
     int timing) {
 
@@ -73,27 +74,28 @@ void SyclFindNearestNeighbors(
     buffer<LatLong,1> d_locations(locations.data(), numRecords,props);
     buffer<float,1> d_distances(distances, numRecords,props);
 
-    size_t globalWorkSize = (numRecords + 63)/64 * 64;
     size_t localWorkSize  = 64;
+    size_t globalWorkSize = (numRecords + localWorkSize-1) / localWorkSize * localWorkSize;
 #ifdef DEBUG
     printf("Global Work Size: %zu\n",globalWorkSize);      
     printf("Local Work Size: %zu\n",localWorkSize);      
 #endif
 
+    // measure the total kernel execution time
     for (int i = 0; i < 10000; i++)
-    q.submit([&](handler& cgh) {
-      auto d_locations_acc = d_locations.get_access<sycl_read>(cgh);
-      auto d_distances_acc = d_distances.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class nn>(nd_range<1>(
-        range<1>(globalWorkSize), range<1>(localWorkSize)), [=] (nd_item<1> item) {
-        int globalId = item.get_global_id(0);
-        if (globalId < numRecords) {
-          LatLong latLong = d_locations_acc[globalId];
-          d_distances_acc[globalId] = (float)cl::sycl::sqrt(
-           (lat-latLong.lat)*(lat-latLong.lat)+(lng-latLong.lng)*(lng-latLong.lng));
-        }
+      q.submit([&](handler& cgh) {
+        auto d_locations_acc = d_locations.get_access<sycl_read>(cgh);
+        auto d_distances_acc = d_distances.get_access<sycl_discard_write>(cgh);
+        cgh.parallel_for<class nn>(nd_range<1>(
+          range<1>(globalWorkSize), range<1>(localWorkSize)), [=] (nd_item<1> item) {
+          int gid = item.get_global_id(0);
+          if (gid < numRecords) {
+            LatLong latLong = d_locations_acc[gid];
+            d_distances_acc[gid] = cl::sycl::sqrt(
+             (lat-latLong.lat)*(lat-latLong.lat)+(lng-latLong.lng)*(lng-latLong.lng));
+          }
+        });
       });
-    });
 #ifdef DEBUG
     auto h_distances_acc =  d_distances.get_access<sycl_read>();
     for (int i = 0; i < 10; i++) {
