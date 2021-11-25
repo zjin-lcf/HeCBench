@@ -11,15 +11,12 @@ long long get_time() {
 int main(int argc, char *argv[]) {
   std::vector<Record> records;
   float *recordDistances;
-  //LatLong locations[REC_WINDOW];
   std::vector<LatLong> locations;
   int i;
-  // args
   char filename[100];
   int resultsCount=10,quiet=0,timing=0;
   float lat=0.0,lng=0.0;
 
-  // parse command line
   if (parseCommandline(argc, argv, filename,&resultsCount,&lat,&lng,
         &quiet, &timing)) {
     printUsage();
@@ -27,10 +24,6 @@ int main(int argc, char *argv[]) {
   }
 
   int numRecords = loadData(filename,records,locations);
-
-  //for(i=0;i<numRecords;i++)
-  //    printf("%s, %f, %f\n",(records[i].recString),locations[i].lat,locations[i].lng);
-
 
   if (!quiet) {
     printf("Number of records: %d\n",numRecords);
@@ -87,6 +80,7 @@ void SyclFindNearestNeighbors(
     printf("Local Work Size: %zu\n",localWorkSize);      
 #endif
 
+    for (int i = 0; i < 10000; i++)
     q.submit([&](handler& cgh) {
       auto d_locations_acc = d_locations.get_access<sycl_read>(cgh);
       auto d_distances_acc = d_distances.get_access<sycl_discard_write>(cgh);
