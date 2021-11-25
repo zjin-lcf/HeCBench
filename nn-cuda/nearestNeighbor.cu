@@ -11,15 +11,12 @@ long long get_time() {
 int main(int argc, char *argv[]) {
   std::vector<Record> records;
   float *recordDistances;
-  //LatLong locations[REC_WINDOW];
   std::vector<LatLong> locations;
   int i;
-  // args
   char filename[100];
   int resultsCount=10,quiet=0,timing=0;
   float lat=0.0,lng=0.0;
 
-  // parse command line
   if (parseCommandline(argc, argv, filename,&resultsCount,&lat,&lng,
         &quiet, &timing)) {
     printUsage();
@@ -54,14 +51,15 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-  __global__ void 
-nn (const int numRecords, const float lat, const float lng, const LatLong *locations, float* distances) 
+__global__ void 
+nn (const int numRecords, const float lat, const float lng,
+    const LatLong *__restrict__ locations,
+    float*__restrict__ distances) 
 {
-  int globalId = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (globalId < numRecords) {
-    LatLong latLong = locations[globalId];
-    distances[globalId] = sqrtf((lat-latLong.lat)*(lat-latLong.lat)+
+  int gid = blockDim.x * blockIdx.x + threadIdx.x;
+  if (gid < numRecords) {
+    LatLong latLong = locations[gid];
+    distances[gid] = sqrtf((lat-latLong.lat)*(lat-latLong.lat)+
         (lng-latLong.lng)*(lng-latLong.lng));
   }
 }
@@ -82,7 +80,10 @@ void FindNearestNeighbors(
 
   dim3 gridDim((numRecords + 63)/64);
   dim3 blockDim(64);
-  nn<<<gridDim, blockDim>>> (numRecords, lat, lng, d_locations, d_distances);
+
+  for (int i = 0; i < 10000; i++)
+    nn<<<gridDim, blockDim>>> (numRecords, lat, lng, d_locations, d_distances);
+
   cudaMemcpy(distances, d_distances, numRecords * sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(d_locations);
   cudaFree(d_distances);

@@ -10,15 +10,12 @@ long long get_time() {
 int main(int argc, char *argv[]) {
   std::vector<Record> records;
   float *recordDistances;
-  //LatLong locations[REC_WINDOW];
   std::vector<LatLong> locations;
   int i;
-  // args
   char filename[100];
   int resultsCount=10,quiet=0,timing=0;
   float lat=0.0,lng=0.0;
 
-  // parse command line
   if (parseCommandline(argc, argv, filename,&resultsCount,&lat,&lng,
         &quiet, &timing)) {
     printUsage();
@@ -53,7 +50,6 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-
 void FindNearestNeighbors(
     int numRecords,
     std::vector<LatLong> &locations,
@@ -67,11 +63,13 @@ void FindNearestNeighbors(
   #pragma omp target data map(to: p_locations[0:numRecords]) \
                           map(from: distances[0:numRecords])
   {
-    #pragma omp target teams distribute parallel for thread_limit(64)
-    for (int globalId = 0; globalId < numRecords; globalId++) {
-      LatLong latLong = p_locations[globalId];
-      distances[globalId] = sqrtf((lat-latLong.lat)*(lat-latLong.lat)+
-          (lng-latLong.lng)*(lng-latLong.lng));
+    for (int i = 0; i < 10000; i++) {
+      #pragma omp target teams distribute parallel for thread_limit(64)
+      for (int gid = 0; gid < numRecords; gid++) {
+        LatLong latLong = p_locations[gid];
+        distances[gid] = sqrtf((lat-latLong.lat)*(lat-latLong.lat)+
+            (lng-latLong.lng)*(lng-latLong.lng));
+      }
     }
   }
 }
