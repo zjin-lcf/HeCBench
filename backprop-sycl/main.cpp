@@ -27,8 +27,6 @@ int main( int argc, char** argv)
   return 0;
 }
 
-
-
 int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 {
   int in, hid, out;
@@ -87,7 +85,6 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
       auto hidden_partial_sum_acc = hidden_partial_sum.get_access<sycl_write>(cgh);
       accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
       accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
-
       cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
 #include "bpnn_layerforward.sycl"
       });
@@ -129,12 +126,10 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
     });
 
     q.submit([&](handler& cgh) {
-
       auto delta_acc = hidden_delta_sycl.get_access<sycl_read>(cgh);
       auto ly_acc = input_sycl.get_access<sycl_read>(cgh);
       auto w_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
       auto oldw_acc = input_prev_weights_sycl.get_access<sycl_read_write>(cgh);
-
       cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
 #include "bpnn_adjust_weights.sycl"
       });
