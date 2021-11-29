@@ -1,0 +1,5 @@
+outs:
+- md5: 838eacfcf0f945b7186e7ed7e25f1b1c
+  size: 56108
+  hash: md5
+  path: data.tar.gz
