@@ -1,6 +1,5 @@
 /**************************************************************************
  * Condition-dependent Correlation Subgroups (CCS) 
- * Compilation: nvcc ccs.cu -o ccs_cuda -lm
  * Description: Biclustering has been emerged as a powerful tool for 
  identification of a group of co-expressed genes under a subset 
  of experimental conditions (measurements) present in a gene 
