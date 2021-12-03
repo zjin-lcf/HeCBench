@@ -523,6 +523,9 @@ Early results are shown [here](results/README.md)
 ### nbody (opencl)
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
+### ne (cuda)
+  Normal estimation in 3D (https://github.com/PointCloudLibrary/pcl)
+
 ### nms (cuda)
   Work-efficient parallel non-maximum suppression kernels (https://github.com/hertasecurity/gpu-nms)
 
