@@ -195,6 +195,9 @@ Early results are shown [here](results/README.md)
 ### ddbp (cuda)
   Distance-driven backprojection (https://github.com/LAVI-USP/DBT-Reconstruction)
 
+### debayer (opencl)
+  Convert a Bayer mosaic raw image to RGB (https://github.com/GrokImageCompression/latke)
+
 ### degrid (cuda)
   Radio astronomy degridding (https://github.com/NVIDIA/SKA-gpu-degrid)
   
