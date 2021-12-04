@@ -370,6 +370,9 @@ Early results are shown [here](results/README.md)
 ### jenkins-hash (c)
   Bob Jenkins lookup3 hash function (https://android.googlesource.com/platform/external/jenkins-hash/+/75dbeadebd95869dd623a29b720678c5c5c55630/lookup3.c)
 
+### kalman (cuda)
+  Kalman filter (https://github.com/rapidsai/cuml/)  
+
 ### keccaktreehash (cuda)
   A Keccak tree hash function (http://sites.google.com/site/keccaktreegpu/)
 
