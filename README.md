@@ -395,7 +395,7 @@ Early results are shown [here](results/README.md)
   AoS and SoA comparison (https://github.com/OpenCL/AMD_APP_samples)
 
 ### lda (cuda)
-  Latent lirichlet allocation (https://github.com/js1010/cusim)
+  Latent Dirichlet allocation (https://github.com/js1010/cusim)
 
 ### ldpc (cuda)
   QC-LDPC decoding (https://github.com/robertwgh/cuLDPC)
