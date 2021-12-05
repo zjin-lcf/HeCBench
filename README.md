@@ -138,6 +138,9 @@ Early results are shown [here](results/README.md)
 ### b+tree (opencl)
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### cbsfil (cuda)
+  Cubic b-spline filtering (https://github.com/DannyRuijters/CubicInterpolationCUDA)
+
 ### ccs (cuda)
   Condition-dependent Correlation Subgroups (https://github.com/abhatta3/Condition-dependent-Correlation-Subgroups-CCS)
 
