@@ -201,7 +201,6 @@ int main ( int argc, char **argv )
 
   q.wait(); 
 
-  printf ( "  %e %d\n", err, n_inside );
   err = sqrt ( err / ( double ) ( n_inside ) );
   printf ( "\n" );
   printf ( "  RMS absolute error in solution = %e\n", err );
