@@ -177,7 +177,6 @@ int main ( int argc, char **argv )
   cudaFree(d_err);
   cudaFree(d_n_inside);
 
-  printf ( "  %e %d\n", err, n_inside );
   err = sqrt ( err / ( double ) ( n_inside ) );
   printf ( "\n" );
   printf ( "  RMS absolute error in solution = %e\n", err );
