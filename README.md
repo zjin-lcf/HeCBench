@@ -252,6 +252,9 @@ Early results are shown [here](results/README.md)
 ### fdtd3d (opencl)
   FDTD-3D (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### feynman-kac (c)
+  Use of Feynman-Kac algorithm to solve Poisson's equation in a 2D ellipse (https://people.sc.fsu.edu/~jburkardt/c_src/feynman_kac_2d/feynman_kac_2d.html)
+
 ### fhd (cuda)
   A case study: advanced magnetic resonance imaging reconstruction (https://ict.senecacollege.ca/~gpu610/pages/content/cudas.html)
   
