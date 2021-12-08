@@ -10,14 +10,14 @@ This repository contains a collection of Heterogeneous Computing benchmarks writ
 For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
 
 # Known issues
-The programs have not been evaluated on Windows or MacOS
+The programs have not been evaluated on Windows or MacOS  
 The lastest Intel SYCL compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
 Not all programs have OpenMP target offloading implementations  
 Raw performance of any program may be suboptimal  
-Some programs may take longer to complete on an integrated GPU
+Some programs may take longer to complete on an integrated GPU  
 Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform 
 
 # Experimental Results
