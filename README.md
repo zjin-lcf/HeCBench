@@ -18,7 +18,10 @@ Not all CUDA programs have SYCL, HIP or OpenMP equivalents
 Not all programs have OpenMP target offloading implementations  
 Raw performance of any program may be suboptimal  
 Some programs may take longer to complete on an integrated GPU  
-Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform 
+Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
+
+# Feedback
+I appreciate your feedback when any examples don't look right.
 
 # Experimental Results
 Early results are shown [here](results/README.md)
@@ -752,7 +755,7 @@ Early results are shown [here](results/README.md)
 ### tridiagonal (opencl)
   Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
-### tsa
+### tsa (cuda)
   Trotter-Suzuki approximation (https://bitbucket.org/zzzoom/trottersuzuki/src/master/)
 
 ### tsp (cuda)
