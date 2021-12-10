@@ -286,6 +286,9 @@ Early results are shown [here](results/README.md)
 ### fwt (cuda)
   Fast Walsh transformation (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### ga (cuda)
+  Gene alignment (https://github.com/NUCAR-DEV/Hetero-Mark)
+
 ### gamma-correction (sycl)
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
 
