@@ -526,6 +526,9 @@ Early results are shown [here](results/README.md)
 ### morphology (cuda)
   Morphological operators: Erosion and Dilation (https://github.com/yszheda/CUDA-Morphology)
 
+### mr (c)
+  The Miller-Rabin primality test (https://github.com/wizykowski/miller-rabin)
+
 ### mt (opencl)
   Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
