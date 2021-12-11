@@ -487,6 +487,9 @@ Early results are shown [here](results/README.md)
 ### memtest (cuda)
   Selected memory tests (https://github.com/ComputationalRadiationPhysics/cuda_memtest)
 
+### merge (cuda)
+  Merge two unsorted arrays into a sorted array (https://github.com/ogreen/MergePathGPU)
+
 ### metropolis (cuda)
    Simulation of an ensemble of replicas with Metropolis–Hastings computation in the trial run (https://github.com/crinavar/trueke) 
 
