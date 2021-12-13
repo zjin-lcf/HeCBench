@@ -559,6 +559,9 @@ Early results are shown [here](results/README.md)
 ### nqueen (cuda)
   N-Queens (https://github.com/tcarneirop/ChOp)
 
+### ntt (cuda)
+  Number-theoretic transform (https://github.com/vernamlab/cuHE)
+
 ### nw (opencl)
   Needleman-Wunsch in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
