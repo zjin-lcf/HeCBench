@@ -1,17 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda.h>
+#include "common.h"
 
-#define  bidx  blockIdx.x
-#define  tidx  threadIdx.x
+#define  bidx  item.get_group(0)
+#define  tidx  item.get_local_id(0)
 
 #include "modP.h"
 
-__global__ void intt_3_64k_modcrt(
-        uint32 *__restrict__ dst,
-  const uint64 *__restrict__ src)
+void intt_3_64k_modcrt(
+        nd_item<1> &item,
+        uint64 *__restrict buffer,
+        uint32 *__restrict dst,
+  const uint64 *__restrict src)
 {
-  __shared__ uint64 buffer[512];
   register uint64 samples[8], s8[8];
   register uint32 fmem, tmem, fbuf, tbuf;
   fmem = (bidx<<9)|((tidx&0x3E)<<3)|(tidx&0x1);
@@ -26,7 +27,7 @@ __global__ void intt_3_64k_modcrt(
 #pragma unroll
   for (int i=0; i<8; i++)
     buffer[tbuf|i] = _ls_modP(samples[i], ((tidx&0x1)<<2)*i*3);
-  __syncthreads();
+  item.barrier(access::fence_space::local_space);
 
 #pragma unroll
   for (int i=0; i<8; i++)
@@ -57,24 +58,36 @@ int main() {
     ntt[i] = (hi << 32) | lo;
   }
 
-  uint64 *d_ntt;
-  uint32 *d_res;
-  cudaMalloc(&d_ntt, nttLen*sizeof(uint64));
-  cudaMalloc(&d_res, nttLen*sizeof(uint32));
-  cudaMemcpy(d_ntt, ntt, nttLen*sizeof(uint64), cudaMemcpyHostToDevice);
+  {
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
 
+  buffer<uint64, 1> d_ntt (ntt, nttLen);
+  buffer<uint32, 1> d_res (res, nttLen);
+
+  range<1> gws (nttLen/512 * 64);
+  range<1> lws (64);
+  
   for (int i = 0; i < 100; i++)
-    intt_3_64k_modcrt<<<nttLen/512, 64>>>(d_res, d_ntt);
-
-  cudaMemcpy(res, d_res, nttLen*sizeof(uint32), cudaMemcpyDeviceToHost);
+    q.submit([&] (handler &cgh) {
+      auto dst = d_res.get_access<sycl_discard_write>(cgh);
+      auto src = d_ntt.get_access<sycl_read>(cgh);
+      accessor<uint64, 1, sycl_read_write, access::target::local> sm (512, cgh);
+      cgh.parallel_for<class intt_modcrt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        intt_3_64k_modcrt(item, sm.get_pointer(), dst.get_pointer(), src.get_pointer());
+      });
+    });
+  }
 
   uint64_t checksum = 0;
   for (int i = 0; i < nttLen; i++)
     checksum += res[i];
   printf("Checksum: %lu\n", checksum);
 
-  cudaFree(d_ntt);
-  cudaFree(d_res);
   free(ntt);
   free(res);
   return 0;

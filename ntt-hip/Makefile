@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall -I../ntt-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -45,7 +44,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu modP.h Makefile
+%.o: %.cu ../ntt-cuda/modP.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
