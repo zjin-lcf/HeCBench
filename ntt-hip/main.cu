@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 #define  bidx  blockIdx.x
 #define  tidx  threadIdx.x
@@ -59,22 +59,22 @@ int main() {
 
   uint64 *d_ntt;
   uint32 *d_res;
-  cudaMalloc(&d_ntt, nttLen*sizeof(uint64));
-  cudaMalloc(&d_res, nttLen*sizeof(uint32));
-  cudaMemcpy(d_ntt, ntt, nttLen*sizeof(uint64), cudaMemcpyHostToDevice);
+  hipMalloc(&d_ntt, nttLen*sizeof(uint64));
+  hipMalloc(&d_res, nttLen*sizeof(uint32));
+  hipMemcpy(d_ntt, ntt, nttLen*sizeof(uint64), hipMemcpyHostToDevice);
 
   for (int i = 0; i < 100; i++)
-    intt_3_64k_modcrt<<<nttLen/512, 64>>>(d_res, d_ntt);
+    hipLaunchKernelGGL(intt_3_64k_modcrt, dim3(nttLen/512), dim3(64), 0, 0, d_res, d_ntt);
 
-  cudaMemcpy(res, d_res, nttLen*sizeof(uint32), cudaMemcpyDeviceToHost);
+  hipMemcpy(res, d_res, nttLen*sizeof(uint32), hipMemcpyDeviceToHost);
 
   uint64_t checksum = 0;
   for (int i = 0; i < nttLen; i++)
     checksum += res[i];
   printf("Checksum: %lu\n", checksum);
 
-  cudaFree(d_ntt);
-  cudaFree(d_res);
+  hipFree(d_ntt);
+  hipFree(d_res);
   free(ntt);
   free(res);
   return 0;
