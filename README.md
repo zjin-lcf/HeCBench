@@ -10,15 +10,18 @@ This repository contains a collection of Heterogeneous Computing benchmarks writ
 For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
 
 # Known issues
-The programs have not been evaluated on Windows or MacOS
+The programs have not been evaluated on Windows or MacOS  
 The lastest Intel SYCL compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
 Not all programs have OpenMP target offloading implementations  
 Raw performance of any program may be suboptimal  
-Some programs may take longer to complete on an integrated GPU
-Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform 
+Some programs may take longer to complete on an integrated GPU  
+Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
+
+# Feedback
+I appreciate your feedback when any examples don't look right.
 
 # Experimental Results
 Early results are shown [here](results/README.md)
@@ -761,7 +764,7 @@ Early results are shown [here](results/README.md)
 ### tridiagonal (opencl)
   Matrix solvers for large number of small independent tridiagonal linear systems(http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
-### tsa
+### tsa (cuda)
   Trotter-Suzuki approximation (https://bitbucket.org/zzzoom/trottersuzuki/src/master/)
 
 ### tsp (cuda)
@@ -790,6 +793,6 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
-Results presented were obtained using the Chameleon testbed supported by the National Science Foundation and the Intel<sup>®</sup> DevCloud. The project also used resources at the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
+Results presented were obtained using the Chameleon testbed supported by the National Science Foundation, JLSE testbeds at Argonne National Laboratory, and the Intel<sup>®</sup> DevCloud. The project also used resources at the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
