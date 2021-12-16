@@ -1,6 +1,4 @@
 /*
-   This is a Version 2.0 MPI + OpenMP implementation of LULESH
-
    Copyright (c) 2010-2013.
    Lawrence Livermore National Security, LLC.
    Produced at the Lawrence Livermore National Laboratory.
@@ -698,7 +696,7 @@ Real_t CalcElemCharacteristicLength( const Real_t x[8],
       z[3],z[0],z[4],z[7]) ;
   charLength = max(a,charLength) ;
 
-  charLength = Real_t(4.0) * volume / cl::sycl::sqrt(charLength);
+  charLength = Real_t(4.0) * volume / sycl::sqrt(charLength);
 
   return charLength;
 }
@@ -1073,9 +1071,8 @@ int main(int argc, char *argv[])
   buffer<Real_t, 1> d_delx_eta (numElem);
   buffer<Real_t, 1> d_delv_zeta (numElem);
   buffer<Real_t, 1> d_delx_zeta (numElem);
-  buffer<Real_t> d_p (numElem);
-  buffer<Real_t> d_q (numElem);
-
+  buffer<Real_t, 1> d_p (numElem);
+  buffer<Real_t, 1> d_q (numElem);
   buffer<Real_t, 1> d_volo(numElem);
   buffer<Real_t, 1> d_v(numElem);
   buffer<int, 1> d_vol_error(1);
@@ -1084,9 +1081,9 @@ int main(int argc, char *argv[])
   Index_t len1 = numNode + 1;
   Index_t *nodeElemCornerList = &locDom->m_nodeElemCornerList[0];
   Index_t len2 = nodeElemStart[numNode];
+
   buffer<Index_t, 1> d_nodeElemStart(nodeElemStart, len1); 
   buffer<Index_t, 1> d_nodeElemCornerList(nodeElemCornerList, len2); 
-
 
   Real_t  gamma[32] __attribute__((__aligned__(64)));
   gamma[0] = Real_t( 1.);
@@ -1123,10 +1120,8 @@ int main(int argc, char *argv[])
   gamma[31] = Real_t(-1.);
 
   buffer<Real_t, 1> d_gamma(gamma, 32);
-
   buffer<Real_t, 1> d_ss(numElem);
   buffer<Real_t, 1> d_elemMass(numElem);
-
   buffer<Real_t, 1> d_nodalMass(numNode);
 
   Index_t size = locDom->sizeX();
@@ -1143,36 +1138,34 @@ int main(int argc, char *argv[])
   buffer<Real_t, 1> d_dzz (numElem);
   buffer<Real_t, 1> d_vnew (numElem);
 
-  buffer<Index_t> d_lzetam(numElem);
-  buffer<Index_t> d_lzetap(numElem);
-  buffer<Index_t> d_letap(numElem);
-  buffer<Index_t> d_letam(numElem);
-  buffer<Index_t> d_lxip(numElem);
-  buffer<Index_t> d_lxim(numElem);
-  buffer<Index_t> d_elemBC(numElem);
-  buffer<Real_t> d_ql(numElem);
-  buffer<Real_t> d_qq(numElem);
+  buffer<Index_t, 1> d_lzetam(numElem);
+  buffer<Index_t, 1> d_lzetap(numElem);
+  buffer<Index_t, 1> d_letap(numElem);
+  buffer<Index_t, 1> d_letam(numElem);
+  buffer<Index_t, 1> d_lxip(numElem);
+  buffer<Index_t, 1> d_lxim(numElem);
+  buffer<Index_t, 1> d_elemBC(numElem);
+  buffer<Real_t, 1> d_ql(numElem);
+  buffer<Real_t, 1> d_qq(numElem);
+  buffer<Real_t, 1> d_e (numElem);
+  buffer<Index_t, 1> d_elemRep (numElem);
+  buffer<Index_t, 1> d_elemElem (numElem);
 
-  buffer<Real_t> d_e (numElem);
-  buffer<Index_t> d_elemRep (numElem);
-  buffer<Index_t> d_elemElem (numElem);
+  sycl::queue &device_queue = locDom->device_queue;
 
-  cl::sycl::queue &device_queue = locDom->device_queue;
+  // error checking on the host
+  Real_t *determ = Allocate<Real_t>(numElem) ;
 
+  // resize m_dxx, m_dyy, and m_dzz
+  locDom->AllocateStrains(numElem);
 
+  // resize position and velocity gradients
   Int_t allElem = numElem +  /* local elem */
       2*locDom->sizeX()*locDom->sizeY() + /* plane ghosts */
       2*locDom->sizeX()*locDom->sizeZ() + /* row ghosts */
       2*locDom->sizeY()*locDom->sizeZ() ; /* col ghosts */
 
-  // resize position and velocity gradients
   locDom->AllocateGradients(numElem, allElem);
-
-  // resize m_dxx, m_dyy, and m_dzz
-  locDom->AllocateStrains(numElem);
-
-  // error checking on the host
-  Real_t *determ = Allocate<Real_t>(numElem) ;
 
   while((locDom->time() < locDom->stoptime()) && (locDom->cycle() < opts.its)) {
 
@@ -1209,152 +1202,149 @@ int main(int argc, char *argv[])
     Real_t *q = &domain.m_q[0];
 
     device_queue.submit([&] (handler &cgh) {
-        auto p_acc = d_p.get_access<sycl_write>(cgh);
-        cgh.copy(p, p_acc);
-        });
-    device_queue.submit([&] (handler &cgh) {
-        auto q_acc = d_q.get_access<sycl_write>(cgh);
-        cgh.copy(q, q_acc);
-        });
+      auto acc = d_p.get_access<sycl_write>(cgh);
+      cgh.copy(p, acc);
+    });
 
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_q.get_access<sycl_write>(cgh);
+      cgh.copy(q, acc);
+    });
 
     range<1> gws_elem ((numElem+THREADS-1)/THREADS*THREADS);
     range<1> gws_node ((numNode+THREADS-1)/THREADS*THREADS);
     range<1> lws (THREADS);
 
-
     device_queue.submit([&] (handler &cgh) {
-        auto sigxx = d_sigxx.get_access<sycl_discard_write>(cgh);
-        auto sigyy = d_sigyy.get_access<sycl_discard_write>(cgh);
-        auto sigzz = d_sigzz.get_access<sycl_discard_write>(cgh);
-        auto p = d_p.get_access<sycl_read>(cgh);
-        auto q = d_q.get_access<sycl_read>(cgh);
-
-        cgh.parallel_for<class hgc>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            Index_t i = item.get_global_id(0);
-            if (i >= numElem) return;
-            sigxx[i] = sigyy[i] = sigzz[i] = - p[i] - q[i] ;
-            });
-        });
+      auto sigxx = d_sigxx.get_access<sycl_discard_write>(cgh);
+      auto sigyy = d_sigyy.get_access<sycl_discard_write>(cgh);
+      auto sigzz = d_sigzz.get_access<sycl_discard_write>(cgh);
+      auto p = d_p.get_access<sycl_read>(cgh);
+      auto q = d_q.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class hgc>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        Index_t i = item.get_global_id(0);
+        if (i >= numElem) return;
+        sigxx[i] = sigyy[i] = sigzz[i] = - p[i] - q[i] ;
+      });
+    });
 
     //==============================================================================================
     // IntegrateStressForElems( domain, sigxx, sigyy, sigzz, determ, numElem, domain.numNode())
     //==============================================================================================
 
     device_queue.submit([&] (handler &cgh) {
-        auto fx_elem = d_fx_elem.get_access<sycl_discard_write>(cgh);
-        auto fy_elem = d_fy_elem.get_access<sycl_discard_write>(cgh);
-        auto fz_elem = d_fz_elem.get_access<sycl_discard_write>(cgh);
-        auto x = d_x.get_access<sycl_read>(cgh);
-        auto y = d_y.get_access<sycl_read>(cgh);
-        auto z = d_z.get_access<sycl_read>(cgh);
-        auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
-        auto sigxx = d_sigxx.get_access<sycl_read>(cgh);
-        auto sigyy = d_sigyy.get_access<sycl_read>(cgh);
-        auto sigzz = d_sigzz.get_access<sycl_read>(cgh);
-        auto determ = d_determ.get_access<sycl_discard_write>(cgh);
+      auto fx_elem = d_fx_elem.get_access<sycl_discard_write>(cgh);
+      auto fy_elem = d_fy_elem.get_access<sycl_discard_write>(cgh);
+      auto fz_elem = d_fz_elem.get_access<sycl_discard_write>(cgh);
+      auto x = d_x.get_access<sycl_read>(cgh);
+      auto y = d_y.get_access<sycl_read>(cgh);
+      auto z = d_z.get_access<sycl_read>(cgh);
+      auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
+      auto sigxx = d_sigxx.get_access<sycl_read>(cgh);
+      auto sigyy = d_sigyy.get_access<sycl_read>(cgh);
+      auto sigzz = d_sigzz.get_access<sycl_read>(cgh);
+      auto determ = d_determ.get_access<sycl_discard_write>(cgh);
 
-        cgh.parallel_for<class integrateStress>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            Index_t k = item.get_global_id(0);
-            if (k >= numElem) return;
+      cgh.parallel_for<class integrateStress>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        Index_t k = item.get_global_id(0);
+        if (k >= numElem) return;
 
-            const Index_t* const elemToNode = nodelist.get_pointer() + Index_t(8)*k;
-            Real_t B[3][8] ;// shape function derivatives
-            Real_t x_local[8] ;
-            Real_t y_local[8] ;
-            Real_t z_local[8] ;
-            determ[k] = Real_t(10.0);
+        const Index_t* const elemToNode = nodelist.get_pointer() + Index_t(8)*k;
+        Real_t B[3][8] ;// shape function derivatives
+        Real_t x_local[8] ;
+        Real_t y_local[8] ;
+        Real_t z_local[8] ;
+        determ[k] = Real_t(10.0);
 
-            // get nodal coordinates from global arrays and copy into local arrays.
-            Index_t nd0i = elemToNode[0] ;
-            Index_t nd1i = elemToNode[1] ;
-            Index_t nd2i = elemToNode[2] ;
-            Index_t nd3i = elemToNode[3] ;
-            Index_t nd4i = elemToNode[4] ;
-            Index_t nd5i = elemToNode[5] ;
-            Index_t nd6i = elemToNode[6] ;
-            Index_t nd7i = elemToNode[7] ;
+        // get nodal coordinates from global arrays and copy into local arrays.
+        Index_t nd0i = elemToNode[0] ;
+        Index_t nd1i = elemToNode[1] ;
+        Index_t nd2i = elemToNode[2] ;
+        Index_t nd3i = elemToNode[3] ;
+        Index_t nd4i = elemToNode[4] ;
+        Index_t nd5i = elemToNode[5] ;
+        Index_t nd6i = elemToNode[6] ;
+        Index_t nd7i = elemToNode[7] ;
 
-            x_local[0] = x[nd0i];
-            x_local[1] = x[nd1i];
-            x_local[2] = x[nd2i];
-            x_local[3] = x[nd3i];
-            x_local[4] = x[nd4i];
-            x_local[5] = x[nd5i];
-            x_local[6] = x[nd6i];
-            x_local[7] = x[nd7i];
+        x_local[0] = x[nd0i];
+        x_local[1] = x[nd1i];
+        x_local[2] = x[nd2i];
+        x_local[3] = x[nd3i];
+        x_local[4] = x[nd4i];
+        x_local[5] = x[nd5i];
+        x_local[6] = x[nd6i];
+        x_local[7] = x[nd7i];
 
-            y_local[0] = y[nd0i];
-            y_local[1] = y[nd1i];
-            y_local[2] = y[nd2i];
-            y_local[3] = y[nd3i];
-            y_local[4] = y[nd4i];
-            y_local[5] = y[nd5i];
-            y_local[6] = y[nd6i];
-            y_local[7] = y[nd7i];
+        y_local[0] = y[nd0i];
+        y_local[1] = y[nd1i];
+        y_local[2] = y[nd2i];
+        y_local[3] = y[nd3i];
+        y_local[4] = y[nd4i];
+        y_local[5] = y[nd5i];
+        y_local[6] = y[nd6i];
+        y_local[7] = y[nd7i];
 
-            z_local[0] = z[nd0i];
-            z_local[1] = z[nd1i];
-            z_local[2] = z[nd2i];
-            z_local[3] = z[nd3i];
-            z_local[4] = z[nd4i];
-            z_local[5] = z[nd5i];
-            z_local[6] = z[nd6i];
-            z_local[7] = z[nd7i];
+        z_local[0] = z[nd0i];
+        z_local[1] = z[nd1i];
+        z_local[2] = z[nd2i];
+        z_local[3] = z[nd3i];
+        z_local[4] = z[nd4i];
+        z_local[5] = z[nd5i];
+        z_local[6] = z[nd6i];
+        z_local[7] = z[nd7i];
 
-            // Volume calculation involves extra work for numerical consistency
-            CalcElemShapeFunctionDerivatives(x_local, y_local, z_local, B, &determ[k]);
+        // Volume calculation involves extra work for numerical consistency
+        CalcElemShapeFunctionDerivatives(x_local, y_local, z_local, B, &determ[k]);
 
-            CalcElemNodeNormals( B[0] , B[1], B[2], x_local, y_local, z_local );
+        CalcElemNodeNormals( B[0], B[1], B[2], x_local, y_local, z_local );
 
-            // Eliminate thread writing conflicts at the nodes by giving
-            // each element its own copy to write to
-            SumElemStressesToNodeForces( B, sigxx[k], sigyy[k], sigzz[k],
-                &fx_elem[k*8],
-                &fy_elem[k*8],
-                &fz_elem[k*8] ) ;
-        });
+        // Eliminate thread writing conflicts at the nodes by giving
+        // each element its own copy to write to
+        SumElemStressesToNodeForces( B, sigxx[k], sigyy[k], sigzz[k],
+            &fx_elem[k*8],
+            &fy_elem[k*8],
+            &fz_elem[k*8] ) ;
+      });
     });
 
     device_queue.submit([&] (handler &cgh) {
-        auto fx_elem = d_fx_elem.get_access<sycl_read>(cgh);
-        auto fy_elem = d_fy_elem.get_access<sycl_read>(cgh);
-        auto fz_elem = d_fz_elem.get_access<sycl_read>(cgh);
-        auto fx = d_fx.get_access<sycl_discard_write>(cgh);
-        auto fy = d_fy.get_access<sycl_discard_write>(cgh);
-        auto fz = d_fz.get_access<sycl_discard_write>(cgh);
-        auto nodeElemStart = d_nodeElemStart.get_access<sycl_read>(cgh);
-        auto nodeElemCornerList = d_nodeElemCornerList.get_access<sycl_read>(cgh);
+      auto fx_elem = d_fx_elem.get_access<sycl_read>(cgh);
+      auto fy_elem = d_fy_elem.get_access<sycl_read>(cgh);
+      auto fz_elem = d_fz_elem.get_access<sycl_read>(cgh);
+      auto fx = d_fx.get_access<sycl_discard_write>(cgh);
+      auto fy = d_fy.get_access<sycl_discard_write>(cgh);
+      auto fz = d_fz.get_access<sycl_discard_write>(cgh);
+      auto nodeElemStart = d_nodeElemStart.get_access<sycl_read>(cgh);
+      auto nodeElemCornerList = d_nodeElemCornerList.get_access<sycl_read>(cgh);
 
-        cgh.parallel_for<class acc_final_force>(nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
-            Index_t gnode = item.get_global_id(0);
-            if (gnode >= numNode) return;
-            // element count
-            const Index_t count = nodeElemStart[gnode+1] - nodeElemStart[gnode];//domain.nodeElemCount(gnode) ;
-            // list of all corners
-            const Index_t *cornerList = nodeElemCornerList.get_pointer() + nodeElemStart[gnode];//domain.nodeElemCornerList(gnode) ;
-            Real_t fx_tmp = Real_t(0.0) ;
-            Real_t fy_tmp = Real_t(0.0) ;
-            Real_t fz_tmp = Real_t(0.0) ;
-            for (Index_t i=0 ; i < count ; ++i) {
-            Index_t elem = cornerList[i] ;
-            fx_tmp += fx_elem[elem] ;
-            fy_tmp += fy_elem[elem] ;
-            fz_tmp += fz_elem[elem] ;
-            }
-            fx[gnode] = fx_tmp ;
-            fy[gnode] = fy_tmp ;
-            fz[gnode] = fz_tmp ;
-            });
+      cgh.parallel_for<class acc_final_force>(nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
+        Index_t gnode = item.get_global_id(0);
+        if (gnode >= numNode) return;
+        // element count
+        const Index_t count = nodeElemStart[gnode+1] - nodeElemStart[gnode];//domain.nodeElemCount(gnode) ;
+        // list of all corners
+        const Index_t *cornerList = nodeElemCornerList.get_pointer() + nodeElemStart[gnode];//domain.nodeElemCornerList(gnode) ;
+        Real_t fx_tmp = Real_t(0.0) ;
+        Real_t fy_tmp = Real_t(0.0) ;
+        Real_t fz_tmp = Real_t(0.0) ;
+        for (Index_t i=0 ; i < count ; ++i) {
+          Index_t elem = cornerList[i] ;
+          fx_tmp += fx_elem[elem] ;
+          fy_tmp += fy_elem[elem] ;
+          fz_tmp += fz_elem[elem] ;
+        }
+        fx[gnode] = fx_tmp ;
+        fy[gnode] = fy_tmp ;
+        fz[gnode] = fz_tmp ;
+      });
     });
 
     // check for negative element volume on the host
 
     device_queue.submit([&] (handler &cgh) {
-        auto d_acc = d_determ.get_access<sycl_read>(cgh);
-        cgh.copy(d_acc, determ);
-        });
-    device_queue.wait();
+      auto d_acc = d_determ.get_access<sycl_read>(cgh);
+      cgh.copy(d_acc, determ);
+    }).wait();
 
 #ifdef _OPENMP
 #pragma omp parallel for firstprivate(numElem)
@@ -1374,102 +1364,101 @@ int main(int argc, char *argv[])
     int vol_error = -1;
 
     device_queue.submit([&] (handler &cgh) {
-        auto volo_acc = d_volo.get_access<sycl_write>(cgh);
-        cgh.copy(volo, volo_acc);
-        });
+      auto acc = d_volo.get_access<sycl_write>(cgh);
+      cgh.copy(volo, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto v_acc = d_v.get_access<sycl_write>(cgh);
-        cgh.copy(v, v_acc);
-        });
+      auto acc = d_v.get_access<sycl_write>(cgh);
+      cgh.copy(v, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto vol_error_acc = d_vol_error.get_access<sycl_write>(cgh);
-        cgh.copy(&vol_error, vol_error_acc);
-        });
+      auto acc = d_vol_error.get_access<sycl_write>(cgh);
+      cgh.copy(&vol_error, acc);
+    });
 
     device_queue.submit([&] (handler &cgh) {
-        auto dvdx = d_dvdx.get_access<sycl_discard_write>(cgh);
-        auto dvdy = d_dvdy.get_access<sycl_discard_write>(cgh);
-        auto dvdz = d_dvdz.get_access<sycl_discard_write>(cgh);
-        auto x8n = d_x8n.get_access<sycl_discard_write>(cgh);
-        auto y8n = d_y8n.get_access<sycl_discard_write>(cgh);
-        auto z8n = d_z8n.get_access<sycl_discard_write>(cgh);
-        auto determ = d_determ.get_access<sycl_write>(cgh);
+      auto dvdx = d_dvdx.get_access<sycl_discard_write>(cgh);
+      auto dvdy = d_dvdy.get_access<sycl_discard_write>(cgh);
+      auto dvdz = d_dvdz.get_access<sycl_discard_write>(cgh);
+      auto x8n = d_x8n.get_access<sycl_discard_write>(cgh);
+      auto y8n = d_y8n.get_access<sycl_discard_write>(cgh);
+      auto z8n = d_z8n.get_access<sycl_discard_write>(cgh);
+      auto determ = d_determ.get_access<sycl_write>(cgh);
+      auto x = d_x.get_access<sycl_read>(cgh);
+      auto y = d_y.get_access<sycl_read>(cgh);
+      auto z = d_z.get_access<sycl_read>(cgh);
+      auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
+      auto volo = d_volo.get_access<sycl_read>(cgh);
+      auto v = d_v.get_access<sycl_read>(cgh);
+      auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
 
-        auto x = d_x.get_access<sycl_read>(cgh);
-        auto y = d_y.get_access<sycl_read>(cgh);
-        auto z = d_z.get_access<sycl_read>(cgh);
-        auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
-        auto volo = d_volo.get_access<sycl_read>(cgh);
-        auto v = d_v.get_access<sycl_read>(cgh);
-        auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class hgcfe>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i >= numElem) return;
 
-        cgh.parallel_for<class hgcfe>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i >= numElem) return;
+        Real_t  x1[8],  y1[8],  z1[8] ;
+        Real_t pfx[8], pfy[8], pfz[8] ;
 
-            Real_t  x1[8],  y1[8],  z1[8] ;
-            Real_t pfx[8], pfy[8], pfz[8] ;
+        const Index_t* elemToNode = nodelist.get_pointer() + Index_t(8)*i;
 
-            const Index_t* elemToNode = nodelist.get_pointer() + Index_t(8)*i;
+        // inline the function manually
+        Index_t nd0i = elemToNode[0] ;
+        Index_t nd1i = elemToNode[1] ;
+        Index_t nd2i = elemToNode[2] ;
+        Index_t nd3i = elemToNode[3] ;
+        Index_t nd4i = elemToNode[4] ;
+        Index_t nd5i = elemToNode[5] ;
+        Index_t nd6i = elemToNode[6] ;
+        Index_t nd7i = elemToNode[7] ;
 
-            // inline the function manually
-            Index_t nd0i = elemToNode[0] ;
-            Index_t nd1i = elemToNode[1] ;
-            Index_t nd2i = elemToNode[2] ;
-            Index_t nd3i = elemToNode[3] ;
-            Index_t nd4i = elemToNode[4] ;
-            Index_t nd5i = elemToNode[5] ;
-            Index_t nd6i = elemToNode[6] ;
-            Index_t nd7i = elemToNode[7] ;
+        x1[0] = x[nd0i];
+        x1[1] = x[nd1i];
+        x1[2] = x[nd2i];
+        x1[3] = x[nd3i];
+        x1[4] = x[nd4i];
+        x1[5] = x[nd5i];
+        x1[6] = x[nd6i];
+        x1[7] = x[nd7i];
 
-            x1[0] = x[nd0i];
-            x1[1] = x[nd1i];
-            x1[2] = x[nd2i];
-            x1[3] = x[nd3i];
-            x1[4] = x[nd4i];
-            x1[5] = x[nd5i];
-            x1[6] = x[nd6i];
-            x1[7] = x[nd7i];
+        y1[0] = y[nd0i];
+        y1[1] = y[nd1i];
+        y1[2] = y[nd2i];
+        y1[3] = y[nd3i];
+        y1[4] = y[nd4i];
+        y1[5] = y[nd5i];
+        y1[6] = y[nd6i];
+        y1[7] = y[nd7i];
 
-            y1[0] = y[nd0i];
-            y1[1] = y[nd1i];
-            y1[2] = y[nd2i];
-            y1[3] = y[nd3i];
-            y1[4] = y[nd4i];
-            y1[5] = y[nd5i];
-            y1[6] = y[nd6i];
-            y1[7] = y[nd7i];
+        z1[0] = z[nd0i];
+        z1[1] = z[nd1i];
+        z1[2] = z[nd2i];
+        z1[3] = z[nd3i];
+        z1[4] = z[nd4i];
+        z1[5] = z[nd5i];
+        z1[6] = z[nd6i];
+        z1[7] = z[nd7i];
 
-            z1[0] = z[nd0i];
-            z1[1] = z[nd1i];
-            z1[2] = z[nd2i];
-            z1[3] = z[nd3i];
-            z1[4] = z[nd4i];
-            z1[5] = z[nd5i];
-            z1[6] = z[nd6i];
-            z1[7] = z[nd7i];
+        CalcElemVolumeDerivative(pfx, pfy, pfz, x1, y1, z1);
 
-            CalcElemVolumeDerivative(pfx, pfy, pfz, x1, y1, z1);
+        /* load into temporary storage for FB Hour Glass control */
+        for(Index_t ii=0;ii<8;++ii){
+          Index_t jj=8*i+ii;
 
-            /* load into temporary storage for FB Hour Glass control */
-            for(Index_t ii=0;ii<8;++ii){
-              Index_t jj=8*i+ii;
+          dvdx[jj] = pfx[ii];
+          dvdy[jj] = pfy[ii];
+          dvdz[jj] = pfz[ii];
+          x8n[jj]  = x1[ii];
+          y8n[jj]  = y1[ii];
+          z8n[jj]  = z1[ii];
+        }
 
-              dvdx[jj] = pfx[ii];
-              dvdy[jj] = pfy[ii];
-              dvdz[jj] = pfz[ii];
-              x8n[jj]  = x1[ii];
-              y8n[jj]  = y1[ii];
-              z8n[jj]  = z1[ii];
-            }
+        determ[i] = volo[i] * v[i];
 
-            determ[i] = volo[i] * v[i];
-
-            /* Do a check for negative volumes */
-            if ( v[i] <= Real_t(0.0) ) {
-              vol_error[0] = i;
-            }
-        });
+        /* Do a check for negative volumes */
+        if ( v[i] <= Real_t(0.0) ) {
+          vol_error[0] = i;
+        }
+      });
     });
 
 #ifdef VERIFY
@@ -1481,9 +1470,9 @@ int main(int argc, char *argv[])
     auto z8n = d_z8n.get_access<sycl_read>();
 
     device_queue.submit([&] (handler &cgh) {
-        auto d_acc = d_determ.get_access<sycl_read>(cgh);
-        cgh.copy(d_acc, determ);
-        });
+      auto d_acc = d_determ.get_access<sycl_read>(cgh);
+      cgh.copy(d_acc, determ);
+    });
     device_queue.wait();
     // volumn derivative
     for (int i = 0; i < numElem8; i++) {
@@ -1493,11 +1482,9 @@ int main(int argc, char *argv[])
 #endif
 
     device_queue.submit([&] (handler &cgh) {
-        auto vol_error_acc = d_vol_error.get_access<sycl_read>(cgh);
-        cgh.copy(vol_error_acc, &vol_error);
-        });
-
-    device_queue.wait();
+      auto vol_error_acc = d_vol_error.get_access<sycl_read>(cgh);
+      cgh.copy(vol_error_acc, &vol_error);
+    }).wait();
 
     if (vol_error >= 0){
       printf("VolumeError: negative volumn\n");
@@ -1522,268 +1509,267 @@ int main(int argc, char *argv[])
       }
 #endif
       device_queue.submit([&] (handler &cgh) {
-          auto ss_acc = d_ss.get_access<sycl_write>(cgh);
-          cgh.copy(ss, ss_acc);
-          });
+        auto acc = d_ss.get_access<sycl_write>(cgh);
+        cgh.copy(ss, acc);
+      });
       device_queue.submit([&] (handler &cgh) {
-          auto elemMass_acc = d_elemMass.get_access<sycl_write>(cgh);
-          cgh.copy(elemMass, elemMass_acc);
-          });
-
-      device_queue.submit([&] (handler &cgh) {
-          auto dvdx = d_dvdx.get_access<sycl_read>(cgh);
-          auto dvdy = d_dvdy.get_access<sycl_read>(cgh);
-          auto dvdz = d_dvdz.get_access<sycl_read>(cgh);
-          auto x8n = d_x8n.get_access<sycl_read>(cgh);
-          auto y8n = d_y8n.get_access<sycl_read>(cgh);
-          auto z8n = d_z8n.get_access<sycl_read>(cgh);
-          auto determ = d_determ.get_access<sycl_read>(cgh);
-          auto xd = d_xd.get_access<sycl_read>(cgh);
-          auto yd = d_yd.get_access<sycl_read>(cgh);
-          auto zd = d_zd.get_access<sycl_read>(cgh);
-          auto ss = d_ss.get_access<sycl_read>(cgh);
-          auto elemMass = d_elemMass.get_access<sycl_read>(cgh);
-          auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
-          auto gamma = d_gamma.get_access<sycl_read>(cgh);
-          auto fx_elem = d_fx_elem.get_access<sycl_discard_write>(cgh);
-          auto fy_elem = d_fy_elem.get_access<sycl_discard_write>(cgh);
-          auto fz_elem = d_fz_elem.get_access<sycl_discard_write>(cgh);
-
-          cgh.parallel_for<class fb>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-              int i2 = item.get_global_id(0);
-              if (i2 >= numElem) return;
-
-              Index_t i3 = 8*i2;
-
-              const Index_t* elemToNode = nodelist.get_pointer() + i3;
-
-              Real_t hgfx[8], hgfy[8], hgfz[8] ;
-
-              Real_t coefficient;
-
-              Real_t hourgam[8][4];
-              Real_t xd1[8], yd1[8], zd1[8] ;
-
-              Real_t volinv = ONE/determ[i2];
-              Real_t ss1, mass1, volume13 ;
-
-
-              for(Index_t i1=0;i1<4;++i1) {
-
-                Real_t hourmodx =
-                  x8n[i3]   * gamma[i1*8+0] + x8n[i3+1] * gamma[i1*8+1] +
-                  x8n[i3+2] * gamma[i1*8+2] + x8n[i3+3] * gamma[i1*8+3] +
-                  x8n[i3+4] * gamma[i1*8+4] + x8n[i3+5] * gamma[i1*8+5] +
-                  x8n[i3+6] * gamma[i1*8+6] + x8n[i3+7] * gamma[i1*8+7];
-
-                Real_t hourmody =
-                  y8n[i3]   * gamma[i1*8+0] + y8n[i3+1] * gamma[i1*8+1] +
-                  y8n[i3+2] * gamma[i1*8+2] + y8n[i3+3] * gamma[i1*8+3] +
-                  y8n[i3+4] * gamma[i1*8+4] + y8n[i3+5] * gamma[i1*8+5] +
-                  y8n[i3+6] * gamma[i1*8+6] + y8n[i3+7] * gamma[i1*8+7];
-
-                Real_t hourmodz =
-                  z8n[i3]   * gamma[i1*8+0] + z8n[i3+1] * gamma[i1*8+1] +
-                  z8n[i3+2] * gamma[i1*8+2] + z8n[i3+3] * gamma[i1*8+3] +
-                  z8n[i3+4] * gamma[i1*8+4] + z8n[i3+5] * gamma[i1*8+5] +
-                  z8n[i3+6] * gamma[i1*8+6] + z8n[i3+7] * gamma[i1*8+7];
-
-                hourgam[0][i1] = gamma[i1*8+0] - volinv*(dvdx[i3  ] * hourmodx +
-                    dvdy[i3  ] * hourmody +
-                    dvdz[i3  ] * hourmodz );
-
-                hourgam[1][i1] = gamma[i1*8+1] - volinv*(dvdx[i3+1] * hourmodx +
-                    dvdy[i3+1] * hourmody +
-                    dvdz[i3+1] * hourmodz );
-
-                hourgam[2][i1] = gamma[i1*8+2] - volinv*(dvdx[i3+2] * hourmodx +
-                    dvdy[i3+2] * hourmody +
-                    dvdz[i3+2] * hourmodz );
-
-                hourgam[3][i1] = gamma[i1*8+3] - volinv*(dvdx[i3+3] * hourmodx +
-                    dvdy[i3+3] * hourmody +
-                    dvdz[i3+3] * hourmodz );
-
-                hourgam[4][i1] = gamma[i1*8+4] - volinv*(dvdx[i3+4] * hourmodx +
-                    dvdy[i3+4] * hourmody +
-                    dvdz[i3+4] * hourmodz );
-
-                hourgam[5][i1] = gamma[i1*8+5] - volinv*(dvdx[i3+5] * hourmodx +
-                    dvdy[i3+5] * hourmody +
-                    dvdz[i3+5] * hourmodz );
-
-                hourgam[6][i1] = gamma[i1*8+6] - volinv*(dvdx[i3+6] * hourmodx +
-                    dvdy[i3+6] * hourmody +
-                    dvdz[i3+6] * hourmodz );
-
-                hourgam[7][i1] = gamma[i1*8+7] - volinv*(dvdx[i3+7] * hourmodx +
-                    dvdy[i3+7] * hourmody +
-                    dvdz[i3+7] * hourmodz );
-
-              }
-
-              /* compute forces */
-              /* store forces into h arrays (force arrays) */
-
-              ss1 = ss[i2];
-              mass1 = elemMass[i2];
-              volume13 = cl::sycl::cbrt(determ[i2]);
-
-              Index_t n0si2 = elemToNode[0];
-              Index_t n1si2 = elemToNode[1];
-              Index_t n2si2 = elemToNode[2];
-              Index_t n3si2 = elemToNode[3];
-              Index_t n4si2 = elemToNode[4];
-              Index_t n5si2 = elemToNode[5];
-              Index_t n6si2 = elemToNode[6];
-              Index_t n7si2 = elemToNode[7];
-
-              xd1[0] = xd[n0si2];
-              xd1[1] = xd[n1si2];
-              xd1[2] = xd[n2si2];
-              xd1[3] = xd[n3si2];
-              xd1[4] = xd[n4si2];
-              xd1[5] = xd[n5si2];
-              xd1[6] = xd[n6si2];
-              xd1[7] = xd[n7si2];
-
-              yd1[0] = yd[n0si2];
-              yd1[1] = yd[n1si2];
-              yd1[2] = yd[n2si2];
-              yd1[3] = yd[n3si2];
-              yd1[4] = yd[n4si2];
-              yd1[5] = yd[n5si2];
-              yd1[6] = yd[n6si2];
-              yd1[7] = yd[n7si2];
-
-              zd1[0] = zd[n0si2];
-              zd1[1] = zd[n1si2];
-              zd1[2] = zd[n2si2];
-              zd1[3] = zd[n3si2];
-              zd1[4] = zd[n4si2];
-              zd1[5] = zd[n5si2];
-              zd1[6] = zd[n6si2];
-              zd1[7] = zd[n7si2];
-
-              coefficient = hgcoef * Real_t(-0.01) * ss1 * mass1 / volume13;
-
-              Real_t hxx[4], hyy[4], hzz[4];
-
-              for(Index_t i = 0; i < 4; i++) {
-                hxx[i] = hourgam[0][i] * xd1[0] + hourgam[1][i] * xd1[1] +
-                  hourgam[2][i] * xd1[2] + hourgam[3][i] * xd1[3] +
-                  hourgam[4][i] * xd1[4] + hourgam[5][i] * xd1[5] +
-                  hourgam[6][i] * xd1[6] + hourgam[7][i] * xd1[7];
-              }
-              for(Index_t i = 0; i < 8; i++) {
-                hgfx[i] = coefficient *
-                  (hourgam[i][0] * hxx[0] + hourgam[i][1] * hxx[1] +
-                   hourgam[i][2] * hxx[2] + hourgam[i][3] * hxx[3]);
-              }
-              for(Index_t i = 0; i < 4; i++) {
-                hyy[i] = hourgam[0][i] * yd1[0] + hourgam[1][i] * yd1[1] +
-                  hourgam[2][i] * yd1[2] + hourgam[3][i] * yd1[3] +
-                  hourgam[4][i] * yd1[4] + hourgam[5][i] * yd1[5] +
-                  hourgam[6][i] * yd1[6] + hourgam[7][i] * yd1[7];
-              }
-              for(Index_t i = 0; i < 8; i++) {
-                hgfy[i] = coefficient *
-                  (hourgam[i][0] * hyy[0] + hourgam[i][1] * hyy[1] +
-                   hourgam[i][2] * hyy[2] + hourgam[i][3] * hyy[3]);
-              }
-              for(Index_t i = 0; i < 4; i++) {
-                hzz[i] = hourgam[0][i] * zd1[0] + hourgam[1][i] * zd1[1] +
-                  hourgam[2][i] * zd1[2] + hourgam[3][i] * zd1[3] +
-                  hourgam[4][i] * zd1[4] + hourgam[5][i] * zd1[5] +
-                  hourgam[6][i] * zd1[6] + hourgam[7][i] * zd1[7];
-              }
-              for(Index_t i = 0; i < 8; i++) {
-                hgfz[i] = coefficient *
-                  (hourgam[i][0] * hzz[0] + hourgam[i][1] * hzz[1] +
-                   hourgam[i][2] * hzz[2] + hourgam[i][3] * hzz[3]);
-              }
-
-              // With the threaded version, we write into local arrays per elem
-              // so we don't have to worry about race conditions
-
-              Real_t *fx_local = fx_elem.get_pointer() + i3 ;
-              fx_local[0] = hgfx[0];
-              fx_local[1] = hgfx[1];
-              fx_local[2] = hgfx[2];
-              fx_local[3] = hgfx[3];
-              fx_local[4] = hgfx[4];
-              fx_local[5] = hgfx[5];
-              fx_local[6] = hgfx[6];
-              fx_local[7] = hgfx[7];
-
-              Real_t *fy_local = fy_elem.get_pointer() + i3 ;
-              fy_local[0] = hgfy[0];
-              fy_local[1] = hgfy[1];
-              fy_local[2] = hgfy[2];
-              fy_local[3] = hgfy[3];
-              fy_local[4] = hgfy[4];
-              fy_local[5] = hgfy[5];
-              fy_local[6] = hgfy[6];
-              fy_local[7] = hgfy[7];
-
-              Real_t *fz_local = fz_elem.get_pointer() + i3 ;
-              fz_local[0] = hgfz[0];
-              fz_local[1] = hgfz[1];
-              fz_local[2] = hgfz[2];
-              fz_local[3] = hgfz[3];
-              fz_local[4] = hgfz[4];
-              fz_local[5] = hgfz[5];
-              fz_local[6] = hgfz[6];
-              fz_local[7] = hgfz[7];
-          });
+        auto acc = d_elemMass.get_access<sycl_write>(cgh);
+        cgh.copy(elemMass, acc);
       });
 
+      device_queue.submit([&] (handler &cgh) {
+        auto dvdx = d_dvdx.get_access<sycl_read>(cgh);
+        auto dvdy = d_dvdy.get_access<sycl_read>(cgh);
+        auto dvdz = d_dvdz.get_access<sycl_read>(cgh);
+        auto x8n = d_x8n.get_access<sycl_read>(cgh);
+        auto y8n = d_y8n.get_access<sycl_read>(cgh);
+        auto z8n = d_z8n.get_access<sycl_read>(cgh);
+        auto determ = d_determ.get_access<sycl_read>(cgh);
+        auto xd = d_xd.get_access<sycl_read>(cgh);
+        auto yd = d_yd.get_access<sycl_read>(cgh);
+        auto zd = d_zd.get_access<sycl_read>(cgh);
+        auto ss = d_ss.get_access<sycl_read>(cgh);
+        auto elemMass = d_elemMass.get_access<sycl_read>(cgh);
+        auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
+        auto gamma = d_gamma.get_access<sycl_read>(cgh);
+        auto fx_elem = d_fx_elem.get_access<sycl_discard_write>(cgh);
+        auto fy_elem = d_fy_elem.get_access<sycl_discard_write>(cgh);
+        auto fz_elem = d_fz_elem.get_access<sycl_discard_write>(cgh);
+
+        cgh.parallel_for<class fb>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+          int i2 = item.get_global_id(0);
+          if (i2 >= numElem) return;
+
+          Index_t i3 = 8*i2;
+
+          const Index_t* elemToNode = nodelist.get_pointer() + i3;
+
+          Real_t hgfx[8], hgfy[8], hgfz[8] ;
+
+          Real_t coefficient;
+
+          Real_t hourgam[8][4];
+          Real_t xd1[8], yd1[8], zd1[8] ;
+
+          Real_t volinv = ONE/determ[i2];
+          Real_t ss1, mass1, volume13 ;
+
+
+          for(Index_t i1=0;i1<4;++i1) {
+
+            Real_t hourmodx =
+              x8n[i3]   * gamma[i1*8+0] + x8n[i3+1] * gamma[i1*8+1] +
+              x8n[i3+2] * gamma[i1*8+2] + x8n[i3+3] * gamma[i1*8+3] +
+              x8n[i3+4] * gamma[i1*8+4] + x8n[i3+5] * gamma[i1*8+5] +
+              x8n[i3+6] * gamma[i1*8+6] + x8n[i3+7] * gamma[i1*8+7];
+
+            Real_t hourmody =
+              y8n[i3]   * gamma[i1*8+0] + y8n[i3+1] * gamma[i1*8+1] +
+              y8n[i3+2] * gamma[i1*8+2] + y8n[i3+3] * gamma[i1*8+3] +
+              y8n[i3+4] * gamma[i1*8+4] + y8n[i3+5] * gamma[i1*8+5] +
+              y8n[i3+6] * gamma[i1*8+6] + y8n[i3+7] * gamma[i1*8+7];
+
+            Real_t hourmodz =
+              z8n[i3]   * gamma[i1*8+0] + z8n[i3+1] * gamma[i1*8+1] +
+              z8n[i3+2] * gamma[i1*8+2] + z8n[i3+3] * gamma[i1*8+3] +
+              z8n[i3+4] * gamma[i1*8+4] + z8n[i3+5] * gamma[i1*8+5] +
+              z8n[i3+6] * gamma[i1*8+6] + z8n[i3+7] * gamma[i1*8+7];
+
+            hourgam[0][i1] = gamma[i1*8+0] - volinv*(dvdx[i3  ] * hourmodx +
+                dvdy[i3  ] * hourmody +
+                dvdz[i3  ] * hourmodz );
+
+            hourgam[1][i1] = gamma[i1*8+1] - volinv*(dvdx[i3+1] * hourmodx +
+                dvdy[i3+1] * hourmody +
+                dvdz[i3+1] * hourmodz );
+
+            hourgam[2][i1] = gamma[i1*8+2] - volinv*(dvdx[i3+2] * hourmodx +
+                dvdy[i3+2] * hourmody +
+                dvdz[i3+2] * hourmodz );
+
+            hourgam[3][i1] = gamma[i1*8+3] - volinv*(dvdx[i3+3] * hourmodx +
+                dvdy[i3+3] * hourmody +
+                dvdz[i3+3] * hourmodz );
+
+            hourgam[4][i1] = gamma[i1*8+4] - volinv*(dvdx[i3+4] * hourmodx +
+                dvdy[i3+4] * hourmody +
+                dvdz[i3+4] * hourmodz );
+
+            hourgam[5][i1] = gamma[i1*8+5] - volinv*(dvdx[i3+5] * hourmodx +
+                dvdy[i3+5] * hourmody +
+                dvdz[i3+5] * hourmodz );
+
+            hourgam[6][i1] = gamma[i1*8+6] - volinv*(dvdx[i3+6] * hourmodx +
+                dvdy[i3+6] * hourmody +
+                dvdz[i3+6] * hourmodz );
+
+            hourgam[7][i1] = gamma[i1*8+7] - volinv*(dvdx[i3+7] * hourmodx +
+                dvdy[i3+7] * hourmody +
+                dvdz[i3+7] * hourmodz );
+
+          }
+
+          /* compute forces */
+          /* store forces into h arrays (force arrays) */
+
+          ss1 = ss[i2];
+          mass1 = elemMass[i2];
+          volume13 = sycl::cbrt(determ[i2]);
+
+          Index_t n0si2 = elemToNode[0];
+          Index_t n1si2 = elemToNode[1];
+          Index_t n2si2 = elemToNode[2];
+          Index_t n3si2 = elemToNode[3];
+          Index_t n4si2 = elemToNode[4];
+          Index_t n5si2 = elemToNode[5];
+          Index_t n6si2 = elemToNode[6];
+          Index_t n7si2 = elemToNode[7];
+
+          xd1[0] = xd[n0si2];
+          xd1[1] = xd[n1si2];
+          xd1[2] = xd[n2si2];
+          xd1[3] = xd[n3si2];
+          xd1[4] = xd[n4si2];
+          xd1[5] = xd[n5si2];
+          xd1[6] = xd[n6si2];
+          xd1[7] = xd[n7si2];
+
+          yd1[0] = yd[n0si2];
+          yd1[1] = yd[n1si2];
+          yd1[2] = yd[n2si2];
+          yd1[3] = yd[n3si2];
+          yd1[4] = yd[n4si2];
+          yd1[5] = yd[n5si2];
+          yd1[6] = yd[n6si2];
+          yd1[7] = yd[n7si2];
+
+          zd1[0] = zd[n0si2];
+          zd1[1] = zd[n1si2];
+          zd1[2] = zd[n2si2];
+          zd1[3] = zd[n3si2];
+          zd1[4] = zd[n4si2];
+          zd1[5] = zd[n5si2];
+          zd1[6] = zd[n6si2];
+          zd1[7] = zd[n7si2];
+
+          coefficient = hgcoef * Real_t(-0.01) * ss1 * mass1 / volume13;
+
+          Real_t hxx[4], hyy[4], hzz[4];
+
+          for(Index_t i = 0; i < 4; i++) {
+            hxx[i] = hourgam[0][i] * xd1[0] + hourgam[1][i] * xd1[1] +
+              hourgam[2][i] * xd1[2] + hourgam[3][i] * xd1[3] +
+              hourgam[4][i] * xd1[4] + hourgam[5][i] * xd1[5] +
+              hourgam[6][i] * xd1[6] + hourgam[7][i] * xd1[7];
+          }
+          for(Index_t i = 0; i < 8; i++) {
+            hgfx[i] = coefficient *
+              (hourgam[i][0] * hxx[0] + hourgam[i][1] * hxx[1] +
+               hourgam[i][2] * hxx[2] + hourgam[i][3] * hxx[3]);
+          }
+          for(Index_t i = 0; i < 4; i++) {
+            hyy[i] = hourgam[0][i] * yd1[0] + hourgam[1][i] * yd1[1] +
+              hourgam[2][i] * yd1[2] + hourgam[3][i] * yd1[3] +
+              hourgam[4][i] * yd1[4] + hourgam[5][i] * yd1[5] +
+              hourgam[6][i] * yd1[6] + hourgam[7][i] * yd1[7];
+          }
+          for(Index_t i = 0; i < 8; i++) {
+            hgfy[i] = coefficient *
+              (hourgam[i][0] * hyy[0] + hourgam[i][1] * hyy[1] +
+               hourgam[i][2] * hyy[2] + hourgam[i][3] * hyy[3]);
+          }
+          for(Index_t i = 0; i < 4; i++) {
+            hzz[i] = hourgam[0][i] * zd1[0] + hourgam[1][i] * zd1[1] +
+              hourgam[2][i] * zd1[2] + hourgam[3][i] * zd1[3] +
+              hourgam[4][i] * zd1[4] + hourgam[5][i] * zd1[5] +
+              hourgam[6][i] * zd1[6] + hourgam[7][i] * zd1[7];
+          }
+          for(Index_t i = 0; i < 8; i++) {
+            hgfz[i] = coefficient *
+              (hourgam[i][0] * hzz[0] + hourgam[i][1] * hzz[1] +
+               hourgam[i][2] * hzz[2] + hourgam[i][3] * hzz[3]);
+          }
+
+          // With the threaded version, we write into local arrays per elem
+          // so we don't have to worry about race conditions
+
+          Real_t *fx_local = fx_elem.get_pointer() + i3 ;
+          fx_local[0] = hgfx[0];
+          fx_local[1] = hgfx[1];
+          fx_local[2] = hgfx[2];
+          fx_local[3] = hgfx[3];
+          fx_local[4] = hgfx[4];
+          fx_local[5] = hgfx[5];
+          fx_local[6] = hgfx[6];
+          fx_local[7] = hgfx[7];
+
+          Real_t *fy_local = fy_elem.get_pointer() + i3 ;
+          fy_local[0] = hgfy[0];
+          fy_local[1] = hgfy[1];
+          fy_local[2] = hgfy[2];
+          fy_local[3] = hgfy[3];
+          fy_local[4] = hgfy[4];
+          fy_local[5] = hgfy[5];
+          fy_local[6] = hgfy[6];
+          fy_local[7] = hgfy[7];
+
+          Real_t *fz_local = fz_elem.get_pointer() + i3 ;
+          fz_local[0] = hgfz[0];
+          fz_local[1] = hgfz[1];
+          fz_local[2] = hgfz[2];
+          fz_local[3] = hgfz[3];
+          fz_local[4] = hgfz[4];
+          fz_local[5] = hgfz[5];
+          fz_local[6] = hgfz[6];
+          fz_local[7] = hgfz[7];
+        });
+      });
 
       device_queue.submit([&] (handler &cgh) {
-          auto fx_elem = d_fx_elem.get_access<sycl_read>(cgh);
-          auto fy_elem = d_fy_elem.get_access<sycl_read>(cgh);
-          auto fz_elem = d_fz_elem.get_access<sycl_read>(cgh);
-          auto fx = d_fx.get_access<sycl_discard_write>(cgh);
-          auto fy = d_fy.get_access<sycl_discard_write>(cgh);
-          auto fz = d_fz.get_access<sycl_discard_write>(cgh);
-          auto nodeElemStart = d_nodeElemStart.get_access<sycl_read>(cgh);
-          auto nodeElemCornerList = d_nodeElemCornerList.get_access<sycl_read>(cgh);
+        auto fx_elem = d_fx_elem.get_access<sycl_read>(cgh);
+        auto fy_elem = d_fy_elem.get_access<sycl_read>(cgh);
+        auto fz_elem = d_fz_elem.get_access<sycl_read>(cgh);
+        auto fx = d_fx.get_access<sycl_discard_write>(cgh);
+        auto fy = d_fy.get_access<sycl_discard_write>(cgh);
+        auto fz = d_fz.get_access<sycl_discard_write>(cgh);
+        auto nodeElemStart = d_nodeElemStart.get_access<sycl_read>(cgh);
+        auto nodeElemCornerList = d_nodeElemCornerList.get_access<sycl_read>(cgh);
 
-          cgh.parallel_for<class collect_final_force>(nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
-              Index_t gnode = item.get_global_id(0);
-              if (gnode >= numNode) return;
-              // element count
-              const Index_t count = nodeElemStart[gnode+1] - nodeElemStart[gnode];//domain.nodeElemCount(gnode) ;
-              // list of all corners
-              const Index_t *cornerList = nodeElemCornerList.get_pointer() + nodeElemStart[gnode];//domain.nodeElemCornerList(gnode) ;
-              Real_t fx_tmp = Real_t(0.0) ;
-              Real_t fy_tmp = Real_t(0.0) ;
-              Real_t fz_tmp = Real_t(0.0) ;
-              for (Index_t i=0 ; i < count ; ++i) {
-              Index_t elem = cornerList[i] ;
-              fx_tmp += fx_elem[elem] ;
-              fy_tmp += fy_elem[elem] ;
-              fz_tmp += fz_elem[elem] ;
-              }
-              fx[gnode] = fx_tmp ;
-              fy[gnode] = fy_tmp ;
-              fz[gnode] = fz_tmp ;
-              });
+        cgh.parallel_for<class collect_final_force>(nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
+          Index_t gnode = item.get_global_id(0);
+          if (gnode >= numNode) return;
+          // element count
+          const Index_t count = nodeElemStart[gnode+1] - nodeElemStart[gnode];//domain.nodeElemCount(gnode) ;
+          // list of all corners
+          const Index_t *cornerList = nodeElemCornerList.get_pointer() + nodeElemStart[gnode];//domain.nodeElemCornerList(gnode) ;
+          Real_t fx_tmp = Real_t(0.0) ;
+          Real_t fy_tmp = Real_t(0.0) ;
+          Real_t fz_tmp = Real_t(0.0) ;
+          for (Index_t i=0 ; i < count ; ++i) {
+            Index_t elem = cornerList[i] ;
+            fx_tmp += fx_elem[elem] ;
+            fy_tmp += fy_elem[elem] ;
+            fz_tmp += fz_elem[elem] ;
+          }
+          fx[gnode] = fx_tmp ;
+          fy[gnode] = fy_tmp ;
+          fz[gnode] = fz_tmp ;
+        });
       });
 
 #ifdef VERIFY
       device_queue.submit([&] (handler &cgh) {
-          auto fx_acc = d_fx.get_access<sycl_read>(cgh);
-          cgh.copy(fx_acc, fx);
-          });
+        auto acc = d_fx.get_access<sycl_read>(cgh);
+        cgh.copy(acc, fx);
+      });
       device_queue.submit([&] (handler &cgh) {
-          auto fy_acc = d_fy.get_access<sycl_read>(cgh);
-          cgh.copy(fy_acc, fy);
-          });
+        auto acc = d_fy.get_access<sycl_read>(cgh);
+        cgh.copy(acc, fy);
+      });
       device_queue.submit([&] (handler &cgh) {
-          auto fz_acc = d_fz.get_access<sycl_read>(cgh);
-          cgh.copy(fz_acc, fz);
-          });
+        auto acc = d_fz.get_access<sycl_read>(cgh);
+        cgh.copy(acc, fz);
+      });
 
       device_queue.wait();
 
@@ -1799,28 +1785,28 @@ int main(int argc, char *argv[])
     Real_t *nodalMass = &domain.m_nodalMass[0];
 
     device_queue.submit([&] (handler &cgh) {
-        auto nodalMass_acc = d_nodalMass.get_access<sycl_write>(cgh);
-        cgh.copy(nodalMass, nodalMass_acc);
-        });
+      auto acc = d_nodalMass.get_access<sycl_write>(cgh);
+      cgh.copy(nodalMass, acc);
+    });
 
     device_queue.submit([&] (handler &cgh) {
-        auto fx = d_fx.get_access<sycl_read>(cgh);
-        auto fy = d_fy.get_access<sycl_read>(cgh);
-        auto fz = d_fz.get_access<sycl_read>(cgh);
-        auto nodalMass = d_nodalMass.get_access<sycl_read>(cgh);
-        auto xdd = d_xdd.get_access<sycl_discard_write>(cgh);
-        auto ydd = d_ydd.get_access<sycl_discard_write>(cgh);
-        auto zdd = d_zdd.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class AccelerationForNodes>(
-            nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
-            Index_t i = item.get_global_id(0);
-            if (i >= numNode) return;
-            Real_t one_over_nMass = Real_t(1.) / nodalMass[i];
-            xdd[i] = fx[i] * one_over_nMass;
-            ydd[i] = fy[i] * one_over_nMass;
-            zdd[i] = fz[i] * one_over_nMass;
-            });
-        });
+      auto fx = d_fx.get_access<sycl_read>(cgh);
+      auto fy = d_fy.get_access<sycl_read>(cgh);
+      auto fz = d_fz.get_access<sycl_read>(cgh);
+      auto nodalMass = d_nodalMass.get_access<sycl_read>(cgh);
+      auto xdd = d_xdd.get_access<sycl_discard_write>(cgh);
+      auto ydd = d_ydd.get_access<sycl_discard_write>(cgh);
+      auto zdd = d_zdd.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class AccelerationForNodes>(
+        nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
+        Index_t i = item.get_global_id(0);
+        if (i >= numNode) return;
+        Real_t one_over_nMass = Real_t(1.) / nodalMass[i];
+        xdd[i] = fx[i] * one_over_nMass;
+        ydd[i] = fy[i] * one_over_nMass;
+        zdd[i] = fz[i] * one_over_nMass;
+      });
+    });
 
     //======================================================================================
     //ApplyAccelerationBoundaryConditionsForNodes(domain); // uses m_xdd
@@ -1833,119 +1819,117 @@ int main(int argc, char *argv[])
     Index_t *symmZ = &domain.m_symmZ[0];
 
     device_queue.submit([&] (handler &cgh) {
-        auto symmX_acc = d_symmX.get_access<sycl_write>(cgh);
-        cgh.copy(symmX, symmX_acc);
-        });
+      auto acc = d_symmX.get_access<sycl_write>(cgh);
+      cgh.copy(symmX, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto symmY_acc = d_symmY.get_access<sycl_write>(cgh);
-        cgh.copy(symmY, symmY_acc);
-        });
+      auto acc = d_symmY.get_access<sycl_write>(cgh);
+      cgh.copy(symmY, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto symmZ_acc = d_symmZ.get_access<sycl_write>(cgh);
-        cgh.copy(symmZ, symmZ_acc);
-        });
-
+      auto acc = d_symmZ.get_access<sycl_write>(cgh);
+      cgh.copy(symmZ, acc);
+    });
 
     Index_t s1 = domain.symmXempty();
     Index_t s2 = domain.symmYempty();
     Index_t s3 = domain.symmZempty();
 
     device_queue.submit([&] (handler &cgh) {
-        auto symmX = d_symmX.get_access<sycl_read>(cgh);
-        auto symmY = d_symmY.get_access<sycl_read>(cgh);
-        auto symmZ = d_symmZ.get_access<sycl_read>(cgh);
-        auto xdd = d_xdd.get_access<sycl_write>(cgh);
-        auto ydd = d_ydd.get_access<sycl_write>(cgh);
-        auto zdd = d_zdd.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class ApplyAccelerationBoundaryConditionsForNodes>(
-            nd_range<1>(range<1>((numNodeBC+255)/256*256), range<1>(256)), [=] (nd_item<1> item) {
-            Index_t i = item.get_global_id(0);
-            if (i >= numNodeBC) return;
-            if ((!s1) != 0) xdd[symmX[i]] = Real_t(0.0) ;
-            if ((!s2) != 0) ydd[symmY[i]] = Real_t(0.0) ;
-            if ((!s3) != 0) zdd[symmZ[i]] = Real_t(0.0) ;
-            });
-        });
+      auto symmX = d_symmX.get_access<sycl_read>(cgh);
+      auto symmY = d_symmY.get_access<sycl_read>(cgh);
+      auto symmZ = d_symmZ.get_access<sycl_read>(cgh);
+      auto xdd = d_xdd.get_access<sycl_write>(cgh);
+      auto ydd = d_ydd.get_access<sycl_write>(cgh);
+      auto zdd = d_zdd.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class ApplyAccelerationBoundaryConditionsForNodes>(
+        nd_range<1>(range<1>((numNodeBC+255)/256*256), range<1>(256)), [=] (nd_item<1> item) {
+        Index_t i = item.get_global_id(0);
+        if (i >= numNodeBC) return;
+        if ((!s1) != 0) xdd[symmX[i]] = Real_t(0.0) ;
+        if ((!s2) != 0) ydd[symmY[i]] = Real_t(0.0) ;
+        if ((!s3) != 0) zdd[symmZ[i]] = Real_t(0.0) ;
+      });
+    });
 
     //=================================================================
     // CalcVelocityForNodes( domain, delt, u_cut, domain.numNode()) ; //uses m_xd and m_xdd
     //=================================================================
 
     device_queue.submit([&] (handler &cgh) {
-        auto xd = d_xd.get_access<sycl_read_write>(cgh);
-        auto yd = d_yd.get_access<sycl_read_write>(cgh);
-        auto zd = d_zd.get_access<sycl_read_write>(cgh);
-        auto xdd = d_xdd.get_access<sycl_read>(cgh);
-        auto ydd = d_ydd.get_access<sycl_read>(cgh);
-        auto zdd = d_zdd.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class CalcVelocityForNodes>(
-            nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
-            Index_t i = item.get_global_id(0);
-            if (i >= numNode) return;
+      auto xd = d_xd.get_access<sycl_read_write>(cgh);
+      auto yd = d_yd.get_access<sycl_read_write>(cgh);
+      auto zd = d_zd.get_access<sycl_read_write>(cgh);
+      auto xdd = d_xdd.get_access<sycl_read>(cgh);
+      auto ydd = d_ydd.get_access<sycl_read>(cgh);
+      auto zdd = d_zdd.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class CalcVelocityForNodes>(
+        nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
+        Index_t i = item.get_global_id(0);
+        if (i >= numNode) return;
 
-            Real_t xdtmp = xd[i] + xdd[i] * deltaTime;
-            // FABS is not compiled with target regions in mind
-            // To get around this, compute the absolute value manually:
-            // if( xdtmp > Real_t(0.0) && xdtmp < u_cut || Real_t(-1.0) * xdtmp < u_cut)
-            if( cl::sycl::fabs(xdtmp) < u_cut ) xdtmp = Real_t(0.0);
-            xd[i] = xdtmp ;
+        Real_t xdtmp = xd[i] + xdd[i] * deltaTime;
+        // FABS is not compiled with target regions in mind
+        // To get around this, compute the absolute value manually:
+        // if( xdtmp > Real_t(0.0) && xdtmp < u_cut || Real_t(-1.0) * xdtmp < u_cut)
+        if( sycl::fabs(xdtmp) < u_cut ) xdtmp = Real_t(0.0);
+        xd[i] = xdtmp ;
 
-            Real_t ydtmp = yd[i] + ydd[i] * deltaTime;
-            if( cl::sycl::fabs(ydtmp) < u_cut ) ydtmp = Real_t(0.0);
-            yd[i] = ydtmp ;
+        Real_t ydtmp = yd[i] + ydd[i] * deltaTime;
+        if( sycl::fabs(ydtmp) < u_cut ) ydtmp = Real_t(0.0);
+        yd[i] = ydtmp ;
 
-            Real_t zdtmp = zd[i] + zdd[i] * deltaTime;
-            if( cl::sycl::fabs(zdtmp) < u_cut ) zdtmp = Real_t(0.0);
-            zd[i] = zdtmp ;
-            });
+        Real_t zdtmp = zd[i] + zdd[i] * deltaTime;
+        if( sycl::fabs(zdtmp) < u_cut ) zdtmp = Real_t(0.0);
+        zd[i] = zdtmp ;
+      });
     });
-
 
     //=================================================================================
     // CalcPositionForNodes( domain, delt, domain.numNode() );  //uses m_xd and m_x 
     //=================================================================================
     device_queue.submit([&] (handler &cgh) {
-        auto x = d_x.get_access<sycl_read_write>(cgh);
-        auto y = d_y.get_access<sycl_read_write>(cgh);
-        auto z = d_z.get_access<sycl_read_write>(cgh);
-        auto xd = d_xd.get_access<sycl_read>(cgh);
-        auto yd = d_yd.get_access<sycl_read>(cgh);
-        auto zd = d_zd.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class CalcPositionForNodes>(
-            nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
-            Index_t i = item.get_global_id(0);
-            if (i >= numNode) return;
-            x[i] += xd[i] * deltaTime;
-            y[i] += yd[i] * deltaTime;
-            z[i] += zd[i] * deltaTime;
-            });
-        });
+      auto x = d_x.get_access<sycl_read_write>(cgh);
+      auto y = d_y.get_access<sycl_read_write>(cgh);
+      auto z = d_z.get_access<sycl_read_write>(cgh);
+      auto xd = d_xd.get_access<sycl_read>(cgh);
+      auto yd = d_yd.get_access<sycl_read>(cgh);
+      auto zd = d_zd.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class CalcPositionForNodes>(
+          nd_range<1>(gws_node, lws), [=] (nd_item<1> item) {
+          Index_t i = item.get_global_id(0);
+          if (i >= numNode) return;
+          x[i] += xd[i] * deltaTime;
+          y[i] += yd[i] * deltaTime;
+          z[i] += zd[i] * deltaTime;
+      });
+    });
 
 #ifdef VERIFY
     device_queue.submit([&] (handler &cgh) {
-        auto xd_acc = d_xd.get_access<sycl_read>(cgh);
-        cgh.copy(xd_acc, xd);
-        });
+      auto acc = d_xd.get_access<sycl_read>(cgh);
+      cgh.copy(acc, xd);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto yd_acc = d_yd.get_access<sycl_read>(cgh);
-        cgh.copy(yd_acc, yd);
-        });
+      auto acc = d_yd.get_access<sycl_read>(cgh);
+      cgh.copy(acc, yd);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto zd_acc = d_zd.get_access<sycl_read>(cgh);
-        cgh.copy(zd_acc, zd);
-        });
+      auto acc = d_zd.get_access<sycl_read>(cgh);
+      cgh.copy(acc, zd);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto x_acc = d_x.get_access<sycl_read>(cgh);
-        cgh.copy(x_acc, x);
-        });
+      auto acc = d_x.get_access<sycl_read>(cgh);
+      cgh.copy(acc, x);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto y_acc = d_y.get_access<sycl_read>(cgh);
-        cgh.copy(y_acc, y);
-        });
+      auto acc = d_y.get_access<sycl_read>(cgh);
+      cgh.copy(acc, y);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto z_acc = d_z.get_access<sycl_read>(cgh);
-        cgh.copy(z_acc, z);
-        });
+      auto acc = d_z.get_access<sycl_read>(cgh);
+      cgh.copy(acc, z);
+    });
 
     device_queue.wait();
 
@@ -1967,192 +1951,191 @@ int main(int argc, char *argv[])
     Real_t *arealg = &domain.m_arealg[0];
     Real_t *vdov = &domain.m_vdov[0];
 
-
     device_queue.submit([&] (handler &cgh) {
-        auto vdov_acc = d_vdov.get_access<sycl_write>(cgh);
-        cgh.copy(vdov, vdov_acc);
-        });
+      auto acc = d_vdov.get_access<sycl_write>(cgh);
+      cgh.copy(vdov, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto delv_acc = d_delv.get_access<sycl_write>(cgh);
-        cgh.copy(delv, delv_acc);
-        });
+      auto acc = d_delv.get_access<sycl_write>(cgh);
+      cgh.copy(delv, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto arealg_acc = d_arealg.get_access<sycl_write>(cgh);
-        cgh.copy(arealg, arealg_acc);
-        });
+      auto acc = d_arealg.get_access<sycl_write>(cgh);
+      cgh.copy(arealg, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto dxx_acc = d_dxx.get_access<sycl_write>(cgh);
-        cgh.copy(dxx, dxx_acc);
-        });
+      auto acc = d_dxx.get_access<sycl_write>(cgh);
+      cgh.copy(dxx, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto dyy_acc = d_dyy.get_access<sycl_write>(cgh);
-        cgh.copy(dyy, dyy_acc);
-        });
+      auto acc = d_dyy.get_access<sycl_write>(cgh);
+      cgh.copy(dyy, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto dzz_acc = d_dzz.get_access<sycl_write>(cgh);
-        cgh.copy(dzz, dzz_acc);
-        });
+      auto acc = d_dzz.get_access<sycl_write>(cgh);
+      cgh.copy(dzz, acc);
+    });
 
     //========================================================================
     // void CalcKinematicsForElems( Domain &domain, Real_t *vnew, 
     //========================================================================
     device_queue.submit([&] (handler &cgh) {
-        auto xd = d_xd.get_access<sycl_read>(cgh);
-        auto yd = d_yd.get_access<sycl_read>(cgh);
-        auto zd = d_zd.get_access<sycl_read>(cgh);
-        auto x = d_x.get_access<sycl_read>(cgh);
-        auto y = d_y.get_access<sycl_read>(cgh);
-        auto z = d_z.get_access<sycl_read>(cgh);
-        auto nodeList = d_nodelist.get_access<sycl_read>(cgh);
-        auto volo = d_volo.get_access<sycl_read>(cgh);
-        auto v = d_v.get_access<sycl_read>(cgh);
-        auto delv = d_delv.get_access<sycl_discard_write>(cgh);
-        auto arealg = d_arealg.get_access<sycl_discard_write>(cgh);
-        auto dxx = d_dxx.get_access<sycl_discard_write>(cgh);
-        auto dyy = d_dyy.get_access<sycl_discard_write>(cgh);
-        auto dzz = d_dzz.get_access<sycl_discard_write>(cgh);
-        auto vnew = d_vnew.get_access<sycl_discard_write>(cgh);
+      auto xd = d_xd.get_access<sycl_read>(cgh);
+      auto yd = d_yd.get_access<sycl_read>(cgh);
+      auto zd = d_zd.get_access<sycl_read>(cgh);
+      auto x = d_x.get_access<sycl_read>(cgh);
+      auto y = d_y.get_access<sycl_read>(cgh);
+      auto z = d_z.get_access<sycl_read>(cgh);
+      auto nodeList = d_nodelist.get_access<sycl_read>(cgh);
+      auto volo = d_volo.get_access<sycl_read>(cgh);
+      auto v = d_v.get_access<sycl_read>(cgh);
+      auto delv = d_delv.get_access<sycl_discard_write>(cgh);
+      auto arealg = d_arealg.get_access<sycl_discard_write>(cgh);
+      auto dxx = d_dxx.get_access<sycl_discard_write>(cgh);
+      auto dyy = d_dyy.get_access<sycl_discard_write>(cgh);
+      auto dzz = d_dzz.get_access<sycl_discard_write>(cgh);
+      auto vnew = d_vnew.get_access<sycl_discard_write>(cgh);
 
-        cgh.parallel_for<class kintec>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            int k = item.get_global_id(0);
-            if (k >= numElem) return;
+      cgh.parallel_for<class kintec>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        int k = item.get_global_id(0);
+        if (k >= numElem) return;
 
-            Real_t B[3][8] ; // shape function derivatives 
-            Real_t D[6] ;
-            Real_t x_local[8] ;
-            Real_t y_local[8] ;
-            Real_t z_local[8] ;
-            Real_t xd_local[8] ;
-            Real_t yd_local[8] ;
-            Real_t zd_local[8] ;
-            Real_t detJ = Real_t(0.0) ;
+        Real_t B[3][8] ; // shape function derivatives 
+        Real_t D[6] ;
+        Real_t x_local[8] ;
+        Real_t y_local[8] ;
+        Real_t z_local[8] ;
+        Real_t xd_local[8] ;
+        Real_t yd_local[8] ;
+        Real_t zd_local[8] ;
+        Real_t detJ = Real_t(0.0) ;
 
-            Real_t volume ;
-            Real_t relativeVolume ;
-            const Index_t* elemToNode = nodeList.get_pointer() + Index_t(8)*k;
+        Real_t volume ;
+        Real_t relativeVolume ;
+        const Index_t* elemToNode = nodeList.get_pointer() + Index_t(8)*k;
 
-            // get nodal coordinates from global arrays and copy into local arrays.
+        // get nodal coordinates from global arrays and copy into local arrays.
 
-            Index_t nd0i = elemToNode[0] ;
-            Index_t nd1i = elemToNode[1] ;
-            Index_t nd2i = elemToNode[2] ;
-            Index_t nd3i = elemToNode[3] ;
-            Index_t nd4i = elemToNode[4] ;
-            Index_t nd5i = elemToNode[5] ;
-            Index_t nd6i = elemToNode[6] ;
-            Index_t nd7i = elemToNode[7] ;
+        Index_t nd0i = elemToNode[0] ;
+        Index_t nd1i = elemToNode[1] ;
+        Index_t nd2i = elemToNode[2] ;
+        Index_t nd3i = elemToNode[3] ;
+        Index_t nd4i = elemToNode[4] ;
+        Index_t nd5i = elemToNode[5] ;
+        Index_t nd6i = elemToNode[6] ;
+        Index_t nd7i = elemToNode[7] ;
 
-            x_local[0] = x[nd0i];
-            x_local[1] = x[nd1i];
-            x_local[2] = x[nd2i];
-            x_local[3] = x[nd3i];
-            x_local[4] = x[nd4i];
-            x_local[5] = x[nd5i];
-            x_local[6] = x[nd6i];
-            x_local[7] = x[nd7i];
+        x_local[0] = x[nd0i];
+        x_local[1] = x[nd1i];
+        x_local[2] = x[nd2i];
+        x_local[3] = x[nd3i];
+        x_local[4] = x[nd4i];
+        x_local[5] = x[nd5i];
+        x_local[6] = x[nd6i];
+        x_local[7] = x[nd7i];
 
-            y_local[0] = y[nd0i];
-            y_local[1] = y[nd1i];
-            y_local[2] = y[nd2i];
-            y_local[3] = y[nd3i];
-            y_local[4] = y[nd4i];
-            y_local[5] = y[nd5i];
-            y_local[6] = y[nd6i];
-            y_local[7] = y[nd7i];
+        y_local[0] = y[nd0i];
+        y_local[1] = y[nd1i];
+        y_local[2] = y[nd2i];
+        y_local[3] = y[nd3i];
+        y_local[4] = y[nd4i];
+        y_local[5] = y[nd5i];
+        y_local[6] = y[nd6i];
+        y_local[7] = y[nd7i];
 
-            z_local[0] = z[nd0i];
-            z_local[1] = z[nd1i];
-            z_local[2] = z[nd2i];
-            z_local[3] = z[nd3i];
-            z_local[4] = z[nd4i];
-            z_local[5] = z[nd5i];
-            z_local[6] = z[nd6i];
-            z_local[7] = z[nd7i];
+        z_local[0] = z[nd0i];
+        z_local[1] = z[nd1i];
+        z_local[2] = z[nd2i];
+        z_local[3] = z[nd3i];
+        z_local[4] = z[nd4i];
+        z_local[5] = z[nd5i];
+        z_local[6] = z[nd6i];
+        z_local[7] = z[nd7i];
 
-            // volume calculations
-            volume = CalcElemVolume(x_local, y_local, z_local );
-            relativeVolume = volume / volo[k] ;
-            vnew[k] = relativeVolume ;
-            delv[k] = relativeVolume - v[k] ;
+        // volume calculations
+        volume = CalcElemVolume(x_local, y_local, z_local );
+        relativeVolume = volume / volo[k] ;
+        vnew[k] = relativeVolume ;
+        delv[k] = relativeVolume - v[k] ;
 
-            // set characteristic length
-            arealg[k] = CalcElemCharacteristicLength(x_local, y_local, z_local,
-                volume);
+        // set characteristic length
+        arealg[k] = CalcElemCharacteristicLength(x_local, y_local, z_local,
+            volume);
 
-            // get nodal velocities from global array and copy into local arrays.
-            for( Index_t lnode=0 ; lnode<8 ; ++lnode )
-            {
-              Index_t gnode = elemToNode[lnode];
-              xd_local[lnode] = xd[gnode];
-              yd_local[lnode] = yd[gnode];
-              zd_local[lnode] = zd[gnode];
-            }
+        // get nodal velocities from global array and copy into local arrays.
+        for( Index_t lnode=0 ; lnode<8 ; ++lnode )
+        {
+          Index_t gnode = elemToNode[lnode];
+          xd_local[lnode] = xd[gnode];
+          yd_local[lnode] = yd[gnode];
+          zd_local[lnode] = zd[gnode];
+        }
 
-            Real_t dt2 = Real_t(0.5) * deltaTime;
-            for ( Index_t j=0 ; j<8 ; ++j )
-            {
-              x_local[j] -= dt2 * xd_local[j];
-              y_local[j] -= dt2 * yd_local[j];
-              z_local[j] -= dt2 * zd_local[j];
-            }
+        Real_t dt2 = Real_t(0.5) * deltaTime;
+        for ( Index_t j=0 ; j<8 ; ++j )
+        {
+          x_local[j] -= dt2 * xd_local[j];
+          y_local[j] -= dt2 * yd_local[j];
+          z_local[j] -= dt2 * zd_local[j];
+        }
 
-            CalcElemShapeFunctionDerivatives( x_local, y_local, z_local,
-                B, &detJ );
+        CalcElemShapeFunctionDerivatives( x_local, y_local, z_local,
+            B, &detJ );
 
-            CalcElemVelocityGradient( xd_local, yd_local, zd_local,
-                B, detJ, D );
+        CalcElemVelocityGradient( xd_local, yd_local, zd_local,
+            B, detJ, D );
 
-            // put velocity gradient quantities into their global arrays.
-            dxx[k] = D[0];
-            dyy[k] = D[1];
-            dzz[k] = D[2];
-        });
+        // put velocity gradient quantities into their global arrays.
+        dxx[k] = D[0];
+        dyy[k] = D[1];
+        dzz[k] = D[2];
+      });
     });
 
     vol_error = -1; // reset volumn error
     device_queue.submit([&] (handler &cgh) {
-        auto vol_error_acc = d_vol_error.get_access<sycl_write>(cgh);
-        cgh.copy(&vol_error, vol_error_acc);
-        });
-
-    device_queue.submit([&] (handler &cgh) {
-        auto dxx = d_dxx.get_access<sycl_read_write>(cgh);
-        auto dyy = d_dyy.get_access<sycl_read_write>(cgh);
-        auto dzz = d_dzz.get_access<sycl_read_write>(cgh);
-        auto vnew = d_vnew.get_access<sycl_read>(cgh);
-        auto vdov = d_vdov.get_access<sycl_discard_write>(cgh);
-        auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class strainRate>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            int k = item.get_global_id(0);
-            if (k >= numElem) return;
-
-            // calc strain rate and apply as constraint (only done in FB element)
-            Real_t vvdov = dxx[k] + dyy[k] + dzz[k] ;
-            Real_t vdovthird = vvdov/Real_t(3.0) ;
-
-            // make the rate of deformation tensor deviatoric
-            vdov[k] = vvdov;
-            dxx[k] -= vdovthird ;  //LG:   why to update dxx?  it is deallocated right after
-            dyy[k] -= vdovthird ;
-            dzz[k] -= vdovthird ;
-
-            // See if any volumes are negative, and take appropriate action.
-            if (vnew[k] <= Real_t(0.0))
-            {
-            vol_error[0] = k;
-            }
-            });
+      auto acc = d_vol_error.get_access<sycl_write>(cgh);
+      cgh.copy(&vol_error, acc);
     });
 
     device_queue.submit([&] (handler &cgh) {
-        auto vdov_acc = d_vdov.get_access<sycl_read>(cgh);
-        cgh.copy(vdov_acc, vdov);
-        });
+      auto dxx = d_dxx.get_access<sycl_read_write>(cgh);
+      auto dyy = d_dyy.get_access<sycl_read_write>(cgh);
+      auto dzz = d_dzz.get_access<sycl_read_write>(cgh);
+      auto vnew = d_vnew.get_access<sycl_read>(cgh);
+      auto vdov = d_vdov.get_access<sycl_discard_write>(cgh);
+      auto vol_error = d_vol_error.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class strainRate>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        int k = item.get_global_id(0);
+        if (k >= numElem) return;
+
+        // calc strain rate and apply as constraint (only done in FB element)
+        Real_t vvdov = dxx[k] + dyy[k] + dzz[k] ;
+        Real_t vdovthird = vvdov/Real_t(3.0) ;
+
+        // make the rate of deformation tensor deviatoric
+        vdov[k] = vvdov;
+        dxx[k] -= vdovthird ;  //LG:   why to update dxx?  it is deallocated right after
+        dyy[k] -= vdovthird ;
+        dzz[k] -= vdovthird ;
+
+        // See if any volumes are negative, and take appropriate action.
+        if (vnew[k] <= Real_t(0.0))
+        {
+          vol_error[0] = k;
+        }
+      });
+    });
 
     device_queue.submit([&] (handler &cgh) {
-        auto vol_error_acc = d_vol_error.get_access<sycl_read>(cgh);
-        cgh.copy(vol_error_acc, &vol_error);
-        });
+      auto acc = d_vdov.get_access<sycl_read>(cgh);
+      cgh.copy(acc, vdov);
+    });
+
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_vol_error.get_access<sycl_read>(cgh);
+      cgh.copy(acc, &vol_error);
+    });
 
     device_queue.wait();
 
@@ -2179,162 +2162,162 @@ int main(int argc, char *argv[])
     //================================================================
 
     device_queue.submit([&] (handler &cgh) {
-        auto xd = d_xd.get_access<sycl_read>(cgh);
-        auto yd = d_yd.get_access<sycl_read>(cgh);
-        auto zd = d_zd.get_access<sycl_read>(cgh);
-        auto x = d_x.get_access<sycl_read>(cgh);
-        auto y = d_y.get_access<sycl_read>(cgh);
-        auto z = d_z.get_access<sycl_read>(cgh);
-        auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
-        auto volo = d_volo.get_access<sycl_read>(cgh);
-        auto delv_eta = d_delv_eta.get_access<sycl_discard_write>(cgh);
-        auto delx_eta = d_delx_eta.get_access<sycl_discard_write>(cgh);
-        auto delv_zeta = d_delv_zeta.get_access<sycl_discard_write>(cgh);
-        auto delx_zeta = d_delx_zeta.get_access<sycl_discard_write>(cgh);
-        auto delv_xi = d_delv_xi.get_access<sycl_discard_write>(cgh);
-        auto delx_xi = d_delx_xi.get_access<sycl_discard_write>(cgh);
-        auto vnew = d_vnew.get_access<sycl_read>(cgh);
+      auto xd = d_xd.get_access<sycl_read>(cgh);
+      auto yd = d_yd.get_access<sycl_read>(cgh);
+      auto zd = d_zd.get_access<sycl_read>(cgh);
+      auto x = d_x.get_access<sycl_read>(cgh);
+      auto y = d_y.get_access<sycl_read>(cgh);
+      auto z = d_z.get_access<sycl_read>(cgh);
+      auto nodelist = d_nodelist.get_access<sycl_read>(cgh);
+      auto volo = d_volo.get_access<sycl_read>(cgh);
+      auto delv_eta = d_delv_eta.get_access<sycl_discard_write>(cgh);
+      auto delx_eta = d_delx_eta.get_access<sycl_discard_write>(cgh);
+      auto delv_zeta = d_delv_zeta.get_access<sycl_discard_write>(cgh);
+      auto delx_zeta = d_delx_zeta.get_access<sycl_discard_write>(cgh);
+      auto delv_xi = d_delv_xi.get_access<sycl_discard_write>(cgh);
+      auto delx_xi = d_delx_xi.get_access<sycl_discard_write>(cgh);
+      auto vnew = d_vnew.get_access<sycl_read>(cgh);
 
-        cgh.parallel_for<class monotonicQgradients>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i >= numElem) return;
+      cgh.parallel_for<class monotonicQgradients>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i >= numElem) return;
 
-            Real_t ax,ay,az ;
-            Real_t dxv,dyv,dzv ;
+        Real_t ax,ay,az ;
+        Real_t dxv,dyv,dzv ;
 
-            const Index_t *elemToNode = nodelist.get_pointer() + Index_t(8) * i;
-            Index_t n0 = elemToNode[0] ;
-            Index_t n1 = elemToNode[1] ;
-            Index_t n2 = elemToNode[2] ;
-            Index_t n3 = elemToNode[3] ;
-            Index_t n4 = elemToNode[4] ;
-            Index_t n5 = elemToNode[5] ;
-            Index_t n6 = elemToNode[6] ;
-            Index_t n7 = elemToNode[7] ;
+        const Index_t *elemToNode = nodelist.get_pointer() + Index_t(8) * i;
+        Index_t n0 = elemToNode[0] ;
+        Index_t n1 = elemToNode[1] ;
+        Index_t n2 = elemToNode[2] ;
+        Index_t n3 = elemToNode[3] ;
+        Index_t n4 = elemToNode[4] ;
+        Index_t n5 = elemToNode[5] ;
+        Index_t n6 = elemToNode[6] ;
+        Index_t n7 = elemToNode[7] ;
 
-            Real_t x0 = x[n0] ;
-            Real_t x1 = x[n1] ;
-            Real_t x2 = x[n2] ;
-            Real_t x3 = x[n3] ;
-            Real_t x4 = x[n4] ;
-            Real_t x5 = x[n5] ;
-            Real_t x6 = x[n6] ;
-            Real_t x7 = x[n7] ;
+        Real_t x0 = x[n0] ;
+        Real_t x1 = x[n1] ;
+        Real_t x2 = x[n2] ;
+        Real_t x3 = x[n3] ;
+        Real_t x4 = x[n4] ;
+        Real_t x5 = x[n5] ;
+        Real_t x6 = x[n6] ;
+        Real_t x7 = x[n7] ;
 
-            Real_t y0 = y[n0] ;
-            Real_t y1 = y[n1] ;
-            Real_t y2 = y[n2] ;
-            Real_t y3 = y[n3] ;
-            Real_t y4 = y[n4] ;
-            Real_t y5 = y[n5] ;
-            Real_t y6 = y[n6] ;
-            Real_t y7 = y[n7] ;
+        Real_t y0 = y[n0] ;
+        Real_t y1 = y[n1] ;
+        Real_t y2 = y[n2] ;
+        Real_t y3 = y[n3] ;
+        Real_t y4 = y[n4] ;
+        Real_t y5 = y[n5] ;
+        Real_t y6 = y[n6] ;
+        Real_t y7 = y[n7] ;
 
-            Real_t z0 = z[n0] ;
-            Real_t z1 = z[n1] ;
-            Real_t z2 = z[n2] ;
-            Real_t z3 = z[n3] ;
-            Real_t z4 = z[n4] ;
-            Real_t z5 = z[n5] ;
-            Real_t z6 = z[n6] ;
-            Real_t z7 = z[n7] ;
+        Real_t z0 = z[n0] ;
+        Real_t z1 = z[n1] ;
+        Real_t z2 = z[n2] ;
+        Real_t z3 = z[n3] ;
+        Real_t z4 = z[n4] ;
+        Real_t z5 = z[n5] ;
+        Real_t z6 = z[n6] ;
+        Real_t z7 = z[n7] ;
 
-            Real_t xv0 = xd[n0] ;
-            Real_t xv1 = xd[n1] ;
-            Real_t xv2 = xd[n2] ;
-            Real_t xv3 = xd[n3] ;
-            Real_t xv4 = xd[n4] ;
-            Real_t xv5 = xd[n5] ;
-            Real_t xv6 = xd[n6] ;
-            Real_t xv7 = xd[n7] ;
+        Real_t xv0 = xd[n0] ;
+        Real_t xv1 = xd[n1] ;
+        Real_t xv2 = xd[n2] ;
+        Real_t xv3 = xd[n3] ;
+        Real_t xv4 = xd[n4] ;
+        Real_t xv5 = xd[n5] ;
+        Real_t xv6 = xd[n6] ;
+        Real_t xv7 = xd[n7] ;
 
-            Real_t yv0 = yd[n0] ;
-            Real_t yv1 = yd[n1] ;
-            Real_t yv2 = yd[n2] ;
-            Real_t yv3 = yd[n3] ;
-            Real_t yv4 = yd[n4] ;
-            Real_t yv5 = yd[n5] ;
-            Real_t yv6 = yd[n6] ;
-            Real_t yv7 = yd[n7] ;
+        Real_t yv0 = yd[n0] ;
+        Real_t yv1 = yd[n1] ;
+        Real_t yv2 = yd[n2] ;
+        Real_t yv3 = yd[n3] ;
+        Real_t yv4 = yd[n4] ;
+        Real_t yv5 = yd[n5] ;
+        Real_t yv6 = yd[n6] ;
+        Real_t yv7 = yd[n7] ;
 
-            Real_t zv0 = zd[n0] ;
-            Real_t zv1 = zd[n1] ;
-            Real_t zv2 = zd[n2] ;
-            Real_t zv3 = zd[n3] ;
-            Real_t zv4 = zd[n4] ;
-            Real_t zv5 = zd[n5] ;
-            Real_t zv6 = zd[n6] ;
-            Real_t zv7 = zd[n7] ;
+        Real_t zv0 = zd[n0] ;
+        Real_t zv1 = zd[n1] ;
+        Real_t zv2 = zd[n2] ;
+        Real_t zv3 = zd[n3] ;
+        Real_t zv4 = zd[n4] ;
+        Real_t zv5 = zd[n5] ;
+        Real_t zv6 = zd[n6] ;
+        Real_t zv7 = zd[n7] ;
 
-            Real_t vol = volo[i] * vnew[i] ;
-            Real_t norm = Real_t(1.0) / ( vol + PTINY ) ;
+        Real_t vol = volo[i] * vnew[i] ;
+        Real_t norm = Real_t(1.0) / ( vol + PTINY ) ;
 
-            Real_t dxj = Real_t(-0.25)*((x0+x1+x5+x4) - (x3+x2+x6+x7)) ;
-            Real_t dyj = Real_t(-0.25)*((y0+y1+y5+y4) - (y3+y2+y6+y7)) ;
-            Real_t dzj = Real_t(-0.25)*((z0+z1+z5+z4) - (z3+z2+z6+z7)) ;
+        Real_t dxj = Real_t(-0.25)*((x0+x1+x5+x4) - (x3+x2+x6+x7)) ;
+        Real_t dyj = Real_t(-0.25)*((y0+y1+y5+y4) - (y3+y2+y6+y7)) ;
+        Real_t dzj = Real_t(-0.25)*((z0+z1+z5+z4) - (z3+z2+z6+z7)) ;
 
-            Real_t dxi = Real_t( 0.25)*((x1+x2+x6+x5) - (x0+x3+x7+x4)) ;
-            Real_t dyi = Real_t( 0.25)*((y1+y2+y6+y5) - (y0+y3+y7+y4)) ;
-            Real_t dzi = Real_t( 0.25)*((z1+z2+z6+z5) - (z0+z3+z7+z4)) ;
+        Real_t dxi = Real_t( 0.25)*((x1+x2+x6+x5) - (x0+x3+x7+x4)) ;
+        Real_t dyi = Real_t( 0.25)*((y1+y2+y6+y5) - (y0+y3+y7+y4)) ;
+        Real_t dzi = Real_t( 0.25)*((z1+z2+z6+z5) - (z0+z3+z7+z4)) ;
 
-            Real_t dxk = Real_t( 0.25)*((x4+x5+x6+x7) - (x0+x1+x2+x3)) ;
-            Real_t dyk = Real_t( 0.25)*((y4+y5+y6+y7) - (y0+y1+y2+y3)) ;
-            Real_t dzk = Real_t( 0.25)*((z4+z5+z6+z7) - (z0+z1+z2+z3)) ;
+        Real_t dxk = Real_t( 0.25)*((x4+x5+x6+x7) - (x0+x1+x2+x3)) ;
+        Real_t dyk = Real_t( 0.25)*((y4+y5+y6+y7) - (y0+y1+y2+y3)) ;
+        Real_t dzk = Real_t( 0.25)*((z4+z5+z6+z7) - (z0+z1+z2+z3)) ;
 
-            /* find delvk and delxk ( i cross j ) */
+        /* find delvk and delxk ( i cross j ) */
 
-            ax = dyi*dzj - dzi*dyj ;
-            ay = dzi*dxj - dxi*dzj ;
-            az = dxi*dyj - dyi*dxj ;
+        ax = dyi*dzj - dzi*dyj ;
+        ay = dzi*dxj - dxi*dzj ;
+        az = dxi*dyj - dyi*dxj ;
 
-            delx_zeta[i] = vol / cl::sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
+        delx_zeta[i] = vol / sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
 
-            ax *= norm ;
-            ay *= norm ;
-            az *= norm ;
+        ax *= norm ;
+        ay *= norm ;
+        az *= norm ;
 
-            dxv = Real_t(0.25)*((xv4+xv5+xv6+xv7) - (xv0+xv1+xv2+xv3)) ;
-            dyv = Real_t(0.25)*((yv4+yv5+yv6+yv7) - (yv0+yv1+yv2+yv3)) ;
-            dzv = Real_t(0.25)*((zv4+zv5+zv6+zv7) - (zv0+zv1+zv2+zv3)) ;
+        dxv = Real_t(0.25)*((xv4+xv5+xv6+xv7) - (xv0+xv1+xv2+xv3)) ;
+        dyv = Real_t(0.25)*((yv4+yv5+yv6+yv7) - (yv0+yv1+yv2+yv3)) ;
+        dzv = Real_t(0.25)*((zv4+zv5+zv6+zv7) - (zv0+zv1+zv2+zv3)) ;
 
-            delv_zeta[i] = ax*dxv + ay*dyv + az*dzv ;
+        delv_zeta[i] = ax*dxv + ay*dyv + az*dzv ;
 
-            /* find delxi and delvi ( j cross k ) */
+        /* find delxi and delvi ( j cross k ) */
 
-            ax = dyj*dzk - dzj*dyk ;
-            ay = dzj*dxk - dxj*dzk ;
-            az = dxj*dyk - dyj*dxk ;
+        ax = dyj*dzk - dzj*dyk ;
+        ay = dzj*dxk - dxj*dzk ;
+        az = dxj*dyk - dyj*dxk ;
 
-            delx_xi[i] = vol / cl::sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
+        delx_xi[i] = vol / sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
 
-            ax *= norm ;
-            ay *= norm ;
-            az *= norm ;
+        ax *= norm ;
+        ay *= norm ;
+        az *= norm ;
 
-            dxv = Real_t(0.25)*((xv1+xv2+xv6+xv5) - (xv0+xv3+xv7+xv4)) ;
-            dyv = Real_t(0.25)*((yv1+yv2+yv6+yv5) - (yv0+yv3+yv7+yv4)) ;
-            dzv = Real_t(0.25)*((zv1+zv2+zv6+zv5) - (zv0+zv3+zv7+zv4)) ;
+        dxv = Real_t(0.25)*((xv1+xv2+xv6+xv5) - (xv0+xv3+xv7+xv4)) ;
+        dyv = Real_t(0.25)*((yv1+yv2+yv6+yv5) - (yv0+yv3+yv7+yv4)) ;
+        dzv = Real_t(0.25)*((zv1+zv2+zv6+zv5) - (zv0+zv3+zv7+zv4)) ;
 
-            delv_xi[i] = ax*dxv + ay*dyv + az*dzv ;
+        delv_xi[i] = ax*dxv + ay*dyv + az*dzv ;
 
-            /* find delxj and delvj ( k cross i ) */
+        /* find delxj and delvj ( k cross i ) */
 
-            ax = dyk*dzi - dzk*dyi ;
-            ay = dzk*dxi - dxk*dzi ;
-            az = dxk*dyi - dyk*dxi ;
+        ax = dyk*dzi - dzk*dyi ;
+        ay = dzk*dxi - dxk*dzi ;
+        az = dxk*dyi - dyk*dxi ;
 
-            delx_eta[i] = vol / cl::sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
+        delx_eta[i] = vol / sycl::sqrt(ax*ax + ay*ay + az*az + PTINY) ;
 
-            ax *= norm ;
-            ay *= norm ;
-            az *= norm ;
+        ax *= norm ;
+        ay *= norm ;
+        az *= norm ;
 
-            dxv = Real_t(-0.25)*((xv0+xv1+xv5+xv4) - (xv3+xv2+xv6+xv7)) ;
-            dyv = Real_t(-0.25)*((yv0+yv1+yv5+yv4) - (yv3+yv2+yv6+yv7)) ;
-            dzv = Real_t(-0.25)*((zv0+zv1+zv5+zv4) - (zv3+zv2+zv6+zv7)) ;
+        dxv = Real_t(-0.25)*((xv0+xv1+xv5+xv4) - (xv3+xv2+xv6+xv7)) ;
+        dyv = Real_t(-0.25)*((yv0+yv1+yv5+yv4) - (yv3+yv2+yv6+yv7)) ;
+        dzv = Real_t(-0.25)*((zv0+zv1+zv5+zv4) - (zv3+zv2+zv6+zv7)) ;
 
-            delv_eta[i] = ax*dxv + ay*dyv + az*dzv ;
-        });
+        delv_eta[i] = ax*dxv + ay*dyv + az*dzv ;
+      });
     });
 
     //=========================================================
@@ -2357,205 +2340,205 @@ int main(int argc, char *argv[])
     Real_t *qq = &domain.m_qq[0];
 
     device_queue.submit([&] (handler &cgh) {
-        auto lzetam_acc = d_lzetam.get_access<sycl_write>(cgh);
-        cgh.copy(lzetam, lzetam_acc);
-        });
+      auto acc = d_lzetam.get_access<sycl_write>(cgh);
+      cgh.copy(lzetam, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto lzetap_acc = d_lzetap.get_access<sycl_write>(cgh);
-        cgh.copy(lzetap, lzetap_acc);
-        });
+      auto acc = d_lzetap.get_access<sycl_write>(cgh);
+      cgh.copy(lzetap, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto letap_acc = d_letap.get_access<sycl_write>(cgh);
-        cgh.copy(letap, letap_acc);
-        });
+      auto acc = d_letap.get_access<sycl_write>(cgh);
+      cgh.copy(letap, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto letam_acc = d_letam.get_access<sycl_write>(cgh);
-        cgh.copy(letam, letam_acc);
-        });
+      auto acc = d_letam.get_access<sycl_write>(cgh);
+      cgh.copy(letam, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto lxip_acc = d_lxip.get_access<sycl_write>(cgh);
-        cgh.copy(lxip, lxip_acc);
-        });
+      auto acc = d_lxip.get_access<sycl_write>(cgh);
+      cgh.copy(lxip, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto lxim_acc = d_lxim.get_access<sycl_write>(cgh);
-        cgh.copy(lxim, lxim_acc);
-        });
+      auto acc = d_lxim.get_access<sycl_write>(cgh);
+      cgh.copy(lxim, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto elemBC_acc = d_elemBC.get_access<sycl_write>(cgh);
-        cgh.copy(elemBC, elemBC_acc);
-        });
+      auto acc = d_elemBC.get_access<sycl_write>(cgh);
+      cgh.copy(elemBC, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto elemMass_acc = d_elemMass.get_access<sycl_write>(cgh);
-        cgh.copy(elemMass, elemMass_acc);
-        });
+      auto acc = d_elemMass.get_access<sycl_write>(cgh);
+      cgh.copy(elemMass, acc);
+    });
 
     device_queue.submit([&] (handler &cgh) {
-        auto elemBC = d_elemBC.get_access<sycl_read>(cgh);
-        auto elemMass = d_elemMass.get_access<sycl_read>(cgh);
-        auto ql = d_ql.get_access<sycl_discard_write>(cgh);
-        auto qq = d_qq.get_access<sycl_discard_write>(cgh);
-        auto vdov = d_vdov.get_access<sycl_read>(cgh);
-        auto volo = d_volo.get_access<sycl_read>(cgh);
-        auto delv_eta = d_delv_eta.get_access<sycl_read>(cgh);
-        auto delx_eta = d_delx_eta.get_access<sycl_read>(cgh);
-        auto delv_zeta = d_delv_zeta.get_access<sycl_read>(cgh);
-        auto delx_zeta = d_delx_zeta.get_access<sycl_read>(cgh);
-        auto delv_xi = d_delv_xi.get_access<sycl_read>(cgh);
-        auto delx_xi = d_delx_xi.get_access<sycl_read>(cgh);
-        auto lxim = d_lxim.get_access<sycl_read>(cgh);
-        auto lxip = d_lxip.get_access<sycl_read>(cgh);
-        auto lzetam = d_lzetam.get_access<sycl_read>(cgh);
-        auto lzetap = d_lzetap.get_access<sycl_read>(cgh);
-        auto letap = d_letap.get_access<sycl_read>(cgh);
-        auto letam = d_letam.get_access<sycl_read>(cgh);
-        auto vnew = d_vnew.get_access<sycl_read>(cgh);
+      auto elemBC = d_elemBC.get_access<sycl_read>(cgh);
+      auto elemMass = d_elemMass.get_access<sycl_read>(cgh);
+      auto ql = d_ql.get_access<sycl_discard_write>(cgh);
+      auto qq = d_qq.get_access<sycl_discard_write>(cgh);
+      auto vdov = d_vdov.get_access<sycl_read>(cgh);
+      auto volo = d_volo.get_access<sycl_read>(cgh);
+      auto delv_eta = d_delv_eta.get_access<sycl_read>(cgh);
+      auto delx_eta = d_delx_eta.get_access<sycl_read>(cgh);
+      auto delv_zeta = d_delv_zeta.get_access<sycl_read>(cgh);
+      auto delx_zeta = d_delx_zeta.get_access<sycl_read>(cgh);
+      auto delv_xi = d_delv_xi.get_access<sycl_read>(cgh);
+      auto delx_xi = d_delx_xi.get_access<sycl_read>(cgh);
+      auto lxim = d_lxim.get_access<sycl_read>(cgh);
+      auto lxip = d_lxip.get_access<sycl_read>(cgh);
+      auto lzetam = d_lzetam.get_access<sycl_read>(cgh);
+      auto lzetap = d_lzetap.get_access<sycl_read>(cgh);
+      auto letap = d_letap.get_access<sycl_read>(cgh);
+      auto letam = d_letam.get_access<sycl_read>(cgh);
+      auto vnew = d_vnew.get_access<sycl_read>(cgh);
 
-        cgh.parallel_for<class monotonicQ>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            Index_t  i = item.get_global_id(0);
-            if (i >= numElem) return;
+      cgh.parallel_for<class monotonicQ>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        Index_t  i = item.get_global_id(0);
+        if (i >= numElem) return;
 
-            Real_t qlin, qquad ;
-            Real_t phixi, phieta, phizeta ;
-            Int_t bcMask = elemBC[i] ;
-            Real_t delvm = 0.0, delvp =0.0;
+        Real_t qlin, qquad ;
+        Real_t phixi, phieta, phizeta ;
+        Int_t bcMask = elemBC[i] ;
+        Real_t delvm = 0.0, delvp =0.0;
 
-            /*  phixi     */
-            Real_t norm = Real_t(1.) / (delv_xi[i]+ PTINY ) ;
+        /*  phixi     */
+        Real_t norm = Real_t(1.) / (delv_xi[i]+ PTINY ) ;
 
-            switch (bcMask & XI_M) {
-            case XI_M_COMM: /* needs comm data */
-            case 0:         delvm = delv_xi[lxim[i]]; break ;
-            case XI_M_SYMM: delvm = delv_xi[i] ;       break ;
-            case XI_M_FREE: delvm = Real_t(0.0) ;      break ;
-            default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
-            delvm = 0; /* ERROR - but quiets the compiler */
-            break;
-            }
-            switch (bcMask & XI_P) {
-              case XI_P_COMM: /* needs comm data */
-              case 0:         delvp = delv_xi[lxip[i]] ; break ;
-              case XI_P_SYMM: delvp = delv_xi[i] ;       break ;
-              case XI_P_FREE: delvp = Real_t(0.0) ;      break ;
-              default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
-                  delvp = 0; /* ERROR - but quiets the compiler */
-                  break;
-            }
+        switch (bcMask & XI_M) {
+        case XI_M_COMM: /* needs comm data */
+        case 0:         delvm = delv_xi[lxim[i]]; break ;
+        case XI_M_SYMM: delvm = delv_xi[i] ;       break ;
+        case XI_M_FREE: delvm = Real_t(0.0) ;      break ;
+        default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
+        delvm = 0; /* ERROR - but quiets the compiler */
+        break;
+        }
+        switch (bcMask & XI_P) {
+          case XI_P_COMM: /* needs comm data */
+          case 0:         delvp = delv_xi[lxip[i]] ; break ;
+          case XI_P_SYMM: delvp = delv_xi[i] ;       break ;
+          case XI_P_FREE: delvp = Real_t(0.0) ;      break ;
+          default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
+              delvp = 0; /* ERROR - but quiets the compiler */
+              break;
+        }
 
-            delvm = delvm * norm ;
-            delvp = delvp * norm ;
+        delvm = delvm * norm ;
+        delvp = delvp * norm ;
 
-            phixi = Real_t(.5) * ( delvm + delvp ) ;
+        phixi = Real_t(.5) * ( delvm + delvp ) ;
 
-            delvm *= monoq_limiter_mult ;
-            delvp *= monoq_limiter_mult ;
+        delvm *= monoq_limiter_mult ;
+        delvp *= monoq_limiter_mult ;
 
-            if ( delvm < phixi ) phixi = delvm ;
-            if ( delvp < phixi ) phixi = delvp ;
-            if ( phixi < Real_t(0.)) phixi = Real_t(0.) ;
-            if ( phixi > monoq_max_slope) phixi = monoq_max_slope;
+        if ( delvm < phixi ) phixi = delvm ;
+        if ( delvp < phixi ) phixi = delvp ;
+        if ( phixi < Real_t(0.)) phixi = Real_t(0.) ;
+        if ( phixi > monoq_max_slope) phixi = monoq_max_slope;
 
 
-            /*  phieta     */
-            norm = Real_t(1.) / ( delv_eta[i] + PTINY ) ;
+        /*  phieta     */
+        norm = Real_t(1.) / ( delv_eta[i] + PTINY ) ;
 
-            switch (bcMask & ETA_M) {
-              case ETA_M_COMM: /* needs comm data */
-              case 0:          delvm = delv_eta[letam[i]] ; break ;
-              case ETA_M_SYMM: delvm = delv_eta[i] ;        break ;
-              case ETA_M_FREE: delvm = Real_t(0.0) ;        break ;
-              default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
-                   delvm = 0; /* ERROR - but quiets the compiler */
-                   break;
-            }
-            switch (bcMask & ETA_P) {
-              case ETA_P_COMM: /* needs comm data */
-              case 0:          delvp = delv_eta[letap[i]] ; break ;
-              case ETA_P_SYMM: delvp = delv_eta[i] ;        break ;
-              case ETA_P_FREE: delvp = Real_t(0.0) ;        break ;
-              default: 
-                   delvp = 0; /* ERROR - but quiets the compiler */
-                   break;
-            }
+        switch (bcMask & ETA_M) {
+          case ETA_M_COMM: /* needs comm data */
+          case 0:          delvm = delv_eta[letam[i]] ; break ;
+          case ETA_M_SYMM: delvm = delv_eta[i] ;        break ;
+          case ETA_M_FREE: delvm = Real_t(0.0) ;        break ;
+          default: //fprintf(stderr, "Error in switch at %s line %d\n", __FILE__, __LINE__);
+               delvm = 0; /* ERROR - but quiets the compiler */
+               break;
+        }
+        switch (bcMask & ETA_P) {
+          case ETA_P_COMM: /* needs comm data */
+          case 0:          delvp = delv_eta[letap[i]] ; break ;
+          case ETA_P_SYMM: delvp = delv_eta[i] ;        break ;
+          case ETA_P_FREE: delvp = Real_t(0.0) ;        break ;
+          default: 
+               delvp = 0; /* ERROR - but quiets the compiler */
+               break;
+        }
 
-            delvm = delvm * norm ;
-            delvp = delvp * norm ;
+        delvm = delvm * norm ;
+        delvp = delvp * norm ;
 
-            phieta = Real_t(.5) * ( delvm + delvp ) ;
+        phieta = Real_t(.5) * ( delvm + delvp ) ;
 
-            delvm *= monoq_limiter_mult ;
-            delvp *= monoq_limiter_mult ;
+        delvm *= monoq_limiter_mult ;
+        delvp *= monoq_limiter_mult ;
 
-            if ( delvm  < phieta ) phieta = delvm ;
-            if ( delvp  < phieta ) phieta = delvp ;
-            if ( phieta < Real_t(0.)) phieta = Real_t(0.) ;
-            if ( phieta > monoq_max_slope)  phieta = monoq_max_slope;
+        if ( delvm  < phieta ) phieta = delvm ;
+        if ( delvp  < phieta ) phieta = delvp ;
+        if ( phieta < Real_t(0.)) phieta = Real_t(0.) ;
+        if ( phieta > monoq_max_slope)  phieta = monoq_max_slope;
 
-            /*  phizeta     */
-            norm = Real_t(1.) / ( delv_zeta[i] + PTINY ) ;
+        /*  phizeta     */
+        norm = Real_t(1.) / ( delv_zeta[i] + PTINY ) ;
 
-            switch (bcMask & ZETA_M) {
-              case ZETA_M_COMM: /* needs comm data */
-              case 0:           delvm = delv_zeta[lzetam[i]] ; break ;
-              case ZETA_M_SYMM: delvm = delv_zeta[i] ;         break ;
-              case ZETA_M_FREE: delvm = Real_t(0.0) ;          break ;
-              default: 
-                    delvm = 0; /* ERROR - but quiets the compiler */
-                    break;
-            }
-            switch (bcMask & ZETA_P) {
-              case ZETA_P_COMM: /* needs comm data */
-              case 0:           delvp = delv_zeta[lzetap[i]] ; break ;
-              case ZETA_P_SYMM: delvp = delv_zeta[i] ;         break ;
-              case ZETA_P_FREE: delvp = Real_t(0.0) ;          break ;
-              default:
-                    delvp = 0; /* ERROR - but quiets the compiler */
-                    break;
-            }
+        switch (bcMask & ZETA_M) {
+          case ZETA_M_COMM: /* needs comm data */
+          case 0:           delvm = delv_zeta[lzetam[i]] ; break ;
+          case ZETA_M_SYMM: delvm = delv_zeta[i] ;         break ;
+          case ZETA_M_FREE: delvm = Real_t(0.0) ;          break ;
+          default: 
+                delvm = 0; /* ERROR - but quiets the compiler */
+                break;
+        }
+        switch (bcMask & ZETA_P) {
+          case ZETA_P_COMM: /* needs comm data */
+          case 0:           delvp = delv_zeta[lzetap[i]] ; break ;
+          case ZETA_P_SYMM: delvp = delv_zeta[i] ;         break ;
+          case ZETA_P_FREE: delvp = Real_t(0.0) ;          break ;
+          default:
+                delvp = 0; /* ERROR - but quiets the compiler */
+                break;
+        }
 
-            delvm = delvm * norm ;
-            delvp = delvp * norm ;
+        delvm = delvm * norm ;
+        delvp = delvp * norm ;
 
-            phizeta = Real_t(.5) * ( delvm + delvp ) ;
+        phizeta = Real_t(.5) * ( delvm + delvp ) ;
 
-            delvm *= monoq_limiter_mult ;
-            delvp *= monoq_limiter_mult ;
+        delvm *= monoq_limiter_mult ;
+        delvp *= monoq_limiter_mult ;
 
-            if ( delvm   < phizeta ) phizeta = delvm ;
-            if ( delvp   < phizeta ) phizeta = delvp ;
-            if ( phizeta < Real_t(0.)) phizeta = Real_t(0.);
-            if ( phizeta > monoq_max_slope  ) phizeta = monoq_max_slope;
+        if ( delvm   < phizeta ) phizeta = delvm ;
+        if ( delvp   < phizeta ) phizeta = delvp ;
+        if ( phizeta < Real_t(0.)) phizeta = Real_t(0.);
+        if ( phizeta > monoq_max_slope  ) phizeta = monoq_max_slope;
 
-            /* Remove length scale */
+        /* Remove length scale */
 
-            if ( vdov[i] > Real_t(0.) )  {
-              qlin  = Real_t(0.) ;
-              qquad = Real_t(0.) ;
-            }
-            else {
-              Real_t delvxxi   = delv_xi[i]   * delx_xi[i]   ;
-              Real_t delvxeta  = delv_eta[i]  * delx_eta[i]  ;
-              Real_t delvxzeta = delv_zeta[i] * delx_zeta[i] ;
+        if ( vdov[i] > Real_t(0.) )  {
+          qlin  = Real_t(0.) ;
+          qquad = Real_t(0.) ;
+        }
+        else {
+          Real_t delvxxi   = delv_xi[i]   * delx_xi[i]   ;
+          Real_t delvxeta  = delv_eta[i]  * delx_eta[i]  ;
+          Real_t delvxzeta = delv_zeta[i] * delx_zeta[i] ;
 
-              if ( delvxxi   > Real_t(0.) ) delvxxi   = Real_t(0.) ;
-              if ( delvxeta  > Real_t(0.) ) delvxeta  = Real_t(0.) ;
-              if ( delvxzeta > Real_t(0.) ) delvxzeta = Real_t(0.) ;
+          if ( delvxxi   > Real_t(0.) ) delvxxi   = Real_t(0.) ;
+          if ( delvxeta  > Real_t(0.) ) delvxeta  = Real_t(0.) ;
+          if ( delvxzeta > Real_t(0.) ) delvxzeta = Real_t(0.) ;
 
-              Real_t rho = elemMass[i] / (volo[i] * vnew[i]) ;
+          Real_t rho = elemMass[i] / (volo[i] * vnew[i]) ;
 
-              qlin = -qlc_monoq * rho *
-                (  delvxxi   * (Real_t(1.) - phixi) +
-                   delvxeta  * (Real_t(1.) - phieta) +
-                   delvxzeta * (Real_t(1.) - phizeta)  ) ;
+          qlin = -qlc_monoq * rho *
+            (  delvxxi   * (Real_t(1.) - phixi) +
+               delvxeta  * (Real_t(1.) - phieta) +
+               delvxzeta * (Real_t(1.) - phizeta)  ) ;
 
-              qquad = qqc_monoq * rho *
-                (  delvxxi*delvxxi     * (Real_t(1.) - phixi*phixi) +
-                   delvxeta*delvxeta   * (Real_t(1.) - phieta*phieta) +
-                   delvxzeta*delvxzeta * (Real_t(1.) - phizeta*phizeta)  ) ;
-            }
+          qquad = qqc_monoq * rho *
+            (  delvxxi*delvxxi     * (Real_t(1.) - phixi*phixi) +
+               delvxeta*delvxeta   * (Real_t(1.) - phieta*phieta) +
+               delvxzeta*delvxzeta * (Real_t(1.) - phizeta*phizeta)  ) ;
+        }
 
-            qq[i] = qquad ;
-            ql[i] = qlin  ;
-        });
+        qq[i] = qquad ;
+        ql[i] = qlin  ;
+      });
     });
 
 #ifdef VERIFY
@@ -2602,265 +2585,259 @@ int main(int argc, char *argv[])
     Index_t *elemElem = &domain.m_elemElem[0];
 
     device_queue.submit([&] (handler &cgh) {
-        auto e_acc = d_e.get_access<sycl_write>(cgh);
-        cgh.copy(e, e_acc);
-        });
-
+      auto acc = d_e.get_access<sycl_write>(cgh);
+      cgh.copy(e, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto ss_acc = d_ss.get_access<sycl_write>(cgh);
-        cgh.copy(ss, ss_acc);
-        });
-
+      auto acc = d_ss.get_access<sycl_write>(cgh);
+      cgh.copy(ss, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto elemRep_acc = d_elemRep.get_access<sycl_write>(cgh);
-        cgh.copy(elemRep, elemRep_acc);
-        });
+      auto acc = d_elemRep.get_access<sycl_write>(cgh);
+      cgh.copy(elemRep, acc);
+    });
     device_queue.submit([&] (handler &cgh) {
-        auto elemElem_acc = d_elemElem.get_access<sycl_write>(cgh);
-        cgh.copy(elemElem, elemElem_acc);
-        });
-
-    device_queue.submit([&] (handler &cgh) {
-        auto ql = d_ql.get_access<sycl_read>(cgh);
-        auto qq = d_qq.get_access<sycl_read>(cgh);
-        auto delv = d_delv.get_access<sycl_read>(cgh);
-        auto elemRep = d_elemRep.get_access<sycl_read>(cgh);
-        auto elemElem = d_elemElem.get_access<sycl_read>(cgh);
-        auto q = d_q.get_access<sycl_read_write>(cgh);
-        auto p = d_p.get_access<sycl_read_write>(cgh);
-        auto e = d_e.get_access<sycl_read_write>(cgh);
-        auto ss = d_ss.get_access<sycl_read_write>(cgh);
-        auto v = d_v.get_access<sycl_read_write>(cgh);
-        auto vnewc = d_vnew.get_access<sycl_read_write>(cgh);
-
-        cgh.parallel_for<class eos>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
-            int elem = item.get_global_id(0);
-            if (elem >= numElem) return;
-            Index_t rep = elemRep[elem];
-            Real_t e_old, delvc, p_old, q_old, qq_old, ql_old;
-            Real_t p_new, q_new, e_new;
-            Real_t work, compression, compHalfStep, bvc, pbvc, pHalfStep;
-            Real_t vchalf ;
-            Real_t vhalf ;
-            Real_t ssc ;
-            Real_t q_tilde ;
-            Real_t ssTmp ;
-
-            if (eosvmin != ZERO) {
-            if (vnewc[elem] < eosvmin)
-            vnewc[elem] = eosvmin ;
-            }
-
-            if (eosvmax != ZERO) {
-            if (vnewc[elem] > eosvmax)
-            vnewc[elem] = eosvmax ;
-            }
-
-            // This check may not make perfect sense in LULESH, but
-            // it's representative of something in the full code -
-            // just leave it in, please
-            Real_t vc = v[elem] ;
-            if (eosvmin != ZERO) {
-              if (vc < eosvmin)
-                vc = eosvmin ;
-            }
-            if (eosvmax != ZERO) {
-              if (vc > eosvmax)
-                vc = eosvmax ;
-            }
-
-            Real_t vnewc_t = vnewc[elem];
-
-            Real_t e_temp    =    e[elem];
-            Real_t delv_temp = delv[elem];
-            Real_t p_temp    =    p[elem];
-            Real_t q_temp    =    q[elem];
-            Real_t qq_temp   =   qq[elem];
-            Real_t ql_temp   =   ql[elem];
-            for(Index_t j = 0; j < rep; j++) {
-
-              e_old  =    e_temp ;
-              delvc  = delv_temp ;
-              p_old  =    p_temp ;
-              q_old  =    q_temp ;
-              qq_old =   qq_temp ;
-              ql_old =   ql_temp ;
-
-              compression = ONE / vnewc_t - ONE;
-              vchalf = vnewc_t - delvc * HALF;
-              compHalfStep = ONE / vchalf - ONE;
-              if (vnewc_t <= eosvmin) { /* impossible due to calling func? */
-                compHalfStep = compression ;
-              }
-              if (vnewc_t >= eosvmax) { /* impossible due to calling func? */
-                p_old        = ZERO ;
-                compression  = ZERO ;
-                compHalfStep = ZERO ;
-              }
-              work = ZERO ;
-
-              e_new = e_old - HALF * delvc * (p_old + q_old)
-                + HALF * work;
-
-              if (e_new  < emin ) {
-                e_new = emin ;
-              }
-
-              bvc = C1S * (compHalfStep + ONE);
-              pbvc = C1S;
-
-              pHalfStep = bvc * e_new ;
-
-              if    (cl::sycl::fabs(pHalfStep) <  p_cut   )
-                pHalfStep = ZERO ;
-
-              if    ( vnewc_t >= eosvmax ) /* impossible condition here? */
-                pHalfStep = ZERO ;
-
-              if    (pHalfStep      <  pmin)
-                pHalfStep   = pmin ;
-
-              vhalf = ONE / (ONE + compHalfStep) ;
-
-              if ( delvc > ZERO ) {
-                q_new /* = qq_old[elem] = ql_old[elem] */ = ZERO ;
-              } else {
-                ssc = ( pbvc * e_new + vhalf * vhalf * bvc * pHalfStep ) / rho0 ;
-
-                if ( ssc <= C1 ) {
-                  ssc = C2 ;
-                } else {
-                  ssc = cl::sycl::sqrt(ssc) ;
-                }
-
-                q_new = (ssc*ql_old + qq_old) ;
-              }
-
-              e_new = e_new + HALF * delvc
-                * (THREE*(p_old     + q_old)
-                    - FOUR*(pHalfStep + q_new)) ;
-
-              e_new += HALF * work;
-
-              if (cl::sycl::fabs(e_new) < e_cut) {
-                e_new = ZERO  ;
-              }
-              if (     e_new  < emin ) {
-                e_new = emin ;
-              }
-
-              bvc = C1S * (compression + ONE);
-              pbvc = C1S;
-
-              p_new = bvc * e_new ;
-
-              if    (cl::sycl::fabs(p_new) <  p_cut   )
-                p_new = ZERO ;
-
-              if    ( vnewc_t >= eosvmax ) /* impossible condition here? */
-                p_new = ZERO ;
-
-              if    (p_new  <  pmin)
-                p_new   = pmin ;
-
-
-              if (delvc > ZERO) {
-                q_tilde = ZERO ;
-              }
-              else {
-                Real_t ssc = ( pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new ) / rho0 ;
-
-                if ( ssc <= C1 ) {
-                  ssc = C2 ;
-                } else {
-                  ssc = cl::sycl::sqrt(ssc) ;
-                }
-
-                q_tilde = (ssc * ql_old + qq_old) ;
-              }
-
-              e_new = e_new - (  SEVEN*(p_old     + q_old)
-                  - EIGHT*(pHalfStep + q_new)
-                  + (p_new + q_tilde)) * delvc*SIXTH ;
-
-              if (cl::sycl::fabs(e_new) < e_cut) {
-                e_new = ZERO  ;
-              }
-              if (e_new < emin) {
-                e_new = emin ;
-              }
-
-              bvc = C1S * (compression + ONE);
-              pbvc = C1S;
-
-              p_new = bvc * e_new ;
-
-              if ( cl::sycl::fabs(p_new) <  p_cut )
-                p_new = ZERO ;
-
-              if ( vnewc_t >= eosvmax ) /* impossible condition here? */
-                p_new = ZERO ;
-
-              if (p_new < pmin)
-                p_new = pmin ;
-              if ( delvc <= ZERO ) {
-                ssc = ( pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new ) / rho0 ;
-
-                if ( ssc <= C1 ) {
-                  ssc = C2 ;
-                } else {
-                  ssc = cl::sycl::sqrt(ssc) ;
-                }
-
-                q_new = (ssc*ql_old + qq_old) ;
-
-                if (cl::sycl::fabs(q_new) < q_cut) q_new = ZERO ;
-              }
-            } //this is the end of the rep loop
-
-            p[elem] = p_new ;
-            e[elem] = e_new ;
-            q[elem] = q_new ;
-
-            ssTmp = (pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new) / rho0;
-            if (ssTmp <= C1) {
-              ssTmp = C2;
-            } else {
-              ssTmp = cl::sycl::sqrt(ssTmp);
-            }
-            ss[elem] = ssTmp ;
-
-            if ( cl::sycl::fabs(vnewc_t - ONE) < v_cut )
-              vnewc_t = ONE ;
-
-            v[elem] = vnewc_t ;
-        });
+      auto acc = d_elemElem.get_access<sycl_write>(cgh);
+      cgh.copy(elemElem, acc);
     });
 
     device_queue.submit([&] (handler &cgh) {
-        auto q_acc = d_q.get_access<sycl_read>(cgh);
-        cgh.copy(q_acc, q);
-        });
-    device_queue.submit([&] (handler &cgh) {
-        auto p_acc = d_p.get_access<sycl_read>(cgh);
-        cgh.copy(p_acc, p);
-        });
-    device_queue.submit([&] (handler &cgh) {
-        auto e_acc = d_e.get_access<sycl_read>(cgh);
-        cgh.copy(e_acc, e);
-        });
-    device_queue.submit([&] (handler &cgh) {
-        auto ss_acc = d_ss.get_access<sycl_read>(cgh);
-        cgh.copy(ss_acc, ss);
-        });
-    device_queue.submit([&] (handler &cgh) {
-        auto v_acc = d_v.get_access<sycl_read>(cgh);
-        cgh.copy(v_acc, v);
-        });
+      auto ql = d_ql.get_access<sycl_read>(cgh);
+      auto qq = d_qq.get_access<sycl_read>(cgh);
+      auto delv = d_delv.get_access<sycl_read>(cgh);
+      auto elemRep = d_elemRep.get_access<sycl_read>(cgh);
+      auto elemElem = d_elemElem.get_access<sycl_read>(cgh);
+      auto q = d_q.get_access<sycl_read_write>(cgh);
+      auto p = d_p.get_access<sycl_read_write>(cgh);
+      auto e = d_e.get_access<sycl_read_write>(cgh);
+      auto ss = d_ss.get_access<sycl_read_write>(cgh);
+      auto v = d_v.get_access<sycl_read_write>(cgh);
+      auto vnewc = d_vnew.get_access<sycl_read_write>(cgh);
 
+      cgh.parallel_for<class eos>(nd_range<1>(gws_elem, lws), [=] (nd_item<1> item) {
+        int elem = item.get_global_id(0);
+        if (elem >= numElem) return;
+        Index_t rep = elemRep[elem];
+        Real_t e_old, delvc, p_old, q_old, qq_old, ql_old;
+        Real_t p_new, q_new, e_new;
+        Real_t work, compression, compHalfStep, bvc, pbvc, pHalfStep;
+        Real_t vchalf ;
+        Real_t vhalf ;
+        Real_t ssc ;
+        Real_t q_tilde ;
+        Real_t ssTmp ;
+
+        if (eosvmin != ZERO) {
+          if (vnewc[elem] < eosvmin)
+            vnewc[elem] = eosvmin ;
+        }
+
+        if (eosvmax != ZERO) {
+          if (vnewc[elem] > eosvmax)
+            vnewc[elem] = eosvmax ;
+        }
+
+        // This check may not make perfect sense in LULESH, but
+        // it's representative of something in the full code -
+        // just leave it in, please
+        Real_t vc = v[elem] ;
+        if (eosvmin != ZERO) {
+          if (vc < eosvmin)
+            vc = eosvmin ;
+        }
+        if (eosvmax != ZERO) {
+          if (vc > eosvmax)
+            vc = eosvmax ;
+        }
+
+        Real_t vnewc_t = vnewc[elem];
+
+        Real_t e_temp    =    e[elem];
+        Real_t delv_temp = delv[elem];
+        Real_t p_temp    =    p[elem];
+        Real_t q_temp    =    q[elem];
+        Real_t qq_temp   =   qq[elem];
+        Real_t ql_temp   =   ql[elem];
+
+        for(Index_t j = 0; j < rep; j++) {
+
+          e_old  =    e_temp ;
+          delvc  = delv_temp ;
+          p_old  =    p_temp ;
+          q_old  =    q_temp ;
+          qq_old =   qq_temp ;
+          ql_old =   ql_temp ;
+
+          compression = ONE / vnewc_t - ONE;
+          vchalf = vnewc_t - delvc * HALF;
+          compHalfStep = ONE / vchalf - ONE;
+          if (vnewc_t <= eosvmin) { /* impossible due to calling func? */
+            compHalfStep = compression ;
+          }
+          if (vnewc_t >= eosvmax) { /* impossible due to calling func? */
+            p_old        = ZERO ;
+            compression  = ZERO ;
+            compHalfStep = ZERO ;
+          }
+          work = ZERO ;
+
+          e_new = e_old - HALF * delvc * (p_old + q_old)
+            + HALF * work;
+
+          if (e_new  < emin) {
+            e_new = emin ;
+          }
+
+          bvc = C1S * (compHalfStep + ONE);
+          pbvc = C1S;
+
+          pHalfStep = bvc * e_new ;
+
+          if (sycl::fabs(pHalfStep) <  p_cut)
+            pHalfStep = ZERO ;
+
+          if (vnewc_t >= eosvmax) /* impossible condition here? */
+            pHalfStep = ZERO ;
+
+          if (pHalfStep <  pmin)
+            pHalfStep   = pmin ;
+
+          vhalf = ONE / (ONE + compHalfStep) ;
+
+          if (delvc > ZERO) {
+            q_new /* = qq_old[elem] = ql_old[elem] */ = ZERO ;
+          } else {
+            ssc = ( pbvc * e_new + vhalf * vhalf * bvc * pHalfStep ) / rho0 ;
+
+            if ( ssc <= C1 ) {
+              ssc = C2 ;
+            } else {
+              ssc = sycl::sqrt(ssc) ;
+            }
+
+            q_new = (ssc*ql_old + qq_old) ;
+          }
+
+          e_new = e_new + HALF * delvc * (THREE*(p_old + q_old) - FOUR*(pHalfStep + q_new)) ;
+
+          e_new += HALF * work;
+
+          if (sycl::fabs(e_new) < e_cut) {
+            e_new = ZERO  ;
+          }
+          if (e_new < emin) {
+            e_new = emin ;
+          }
+
+          bvc = C1S * (compression + ONE);
+          pbvc = C1S;
+
+          p_new = bvc * e_new ;
+
+          if (sycl::fabs(p_new) < p_cut)
+            p_new = ZERO ;
+
+          if (vnewc_t >= eosvmax) /* impossible condition here? */
+            p_new = ZERO ;
+
+          if (p_new  <  pmin)
+            p_new = pmin ;
+
+
+          if (delvc > ZERO) {
+            q_tilde = ZERO ;
+          }
+          else {
+            Real_t ssc = ( pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new ) / rho0 ;
+
+            if ( ssc <= C1 ) {
+              ssc = C2 ;
+            } else {
+              ssc = sycl::sqrt(ssc) ;
+            }
+
+            q_tilde = (ssc * ql_old + qq_old) ;
+          }
+
+          e_new = e_new - (SEVEN*(p_old + q_old) - EIGHT*(pHalfStep + q_new)
+              + (p_new + q_tilde)) * delvc*SIXTH ;
+
+          if (sycl::fabs(e_new) < e_cut) {
+            e_new = ZERO  ;
+          }
+          if (e_new < emin) {
+            e_new = emin ;
+          }
+
+          bvc = C1S * (compression + ONE);
+          pbvc = C1S;
+
+          p_new = bvc * e_new ;
+
+          if (sycl::fabs(p_new) <  p_cut)
+            p_new = ZERO ;
+
+          if (vnewc_t >= eosvmax) /* impossible condition here? */
+            p_new = ZERO ;
+
+          if (p_new < pmin)
+            p_new = pmin ;
+          if (delvc <= ZERO) {
+            ssc = ( pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new ) / rho0 ;
+
+            if (ssc <= C1) {
+              ssc = C2 ;
+            } else {
+              ssc = sycl::sqrt(ssc) ;
+            }
+
+            q_new = (ssc*ql_old + qq_old) ;
+
+            if (sycl::fabs(q_new) < q_cut) q_new = ZERO ;
+          }
+        } //this is the end of the rep loop
+
+        p[elem] = p_new ;
+        e[elem] = e_new ;
+        q[elem] = q_new ;
+
+        ssTmp = (pbvc * e_new + vnewc_t * vnewc_t * bvc * p_new) / rho0;
+        if (ssTmp <= C1) {
+          ssTmp = C2;
+        } else {
+          ssTmp = sycl::sqrt(ssTmp);
+        }
+        ss[elem] = ssTmp ;
+
+        if ( sycl::fabs(vnewc_t - ONE) < v_cut )
+          vnewc_t = ONE ;
+
+        v[elem] = vnewc_t ;
+      });
+    });
+
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_q.get_access<sycl_read>(cgh);
+      cgh.copy(acc, q);
+    });
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_p.get_access<sycl_read>(cgh);
+      cgh.copy(acc, p);
+    });
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_e.get_access<sycl_read>(cgh);
+      cgh.copy(acc, e);
+    });
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_ss.get_access<sycl_read>(cgh);
+      cgh.copy(acc, ss);
+    });
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_v.get_access<sycl_read>(cgh);
+      cgh.copy(acc, v);
+    });
 
     device_queue.wait();
-
 
 #ifdef VERIFY
     for (int i = 0; i < numElem; i++) {
