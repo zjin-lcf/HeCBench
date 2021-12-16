@@ -526,6 +526,9 @@ Early results are shown [here](results/README.md)
 ### mmcsf (cuda)
   MTTKRP kernel using mixed-mode CSF (https://github.com/isratnisa/MM-CSF)
 
+### mnist (cuda)
+  Chapter 4.2: Converting CUDA CNN to HIP (https://developer.amd.com/wp-content/resources)
+
 ### morphology (cuda)
   Morphological operators: Erosion and Dilation (https://github.com/yszheda/CUDA-Morphology)
 
