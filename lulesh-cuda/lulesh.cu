@@ -1,6 +1,4 @@
 /*
-   This is a Version 2.0 MPI + OpenMP implementation of LULESH
-
    Copyright (c) 2010-2013.
    Lawrence Livermore National Security, LLC.
    Produced at the Lawrence Livermore National Laboratory.
@@ -186,8 +184,7 @@ notice, this list of conditions and the disclaimer (as noted below)
   /*********************************/
   /* CUDA kernels                  */
   /*********************************/
-  __device__
-  static inline
+__device__ static inline
 void SumElemFaceNormal(Real_t *normalX0, Real_t *normalY0, Real_t *normalZ0,
     Real_t *normalX1, Real_t *normalY1, Real_t *normalZ1,
     Real_t *normalX2, Real_t *normalY2, Real_t *normalZ2,
@@ -224,8 +221,7 @@ void SumElemFaceNormal(Real_t *normalX0, Real_t *normalY0, Real_t *normalZ0,
 }
 
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void CalcElemShapeFunctionDerivatives( Real_t const x[],
     Real_t const y[],
     Real_t const z[],
@@ -314,8 +310,7 @@ void CalcElemShapeFunctionDerivatives( Real_t const x[],
   *volume = Real_t(8.) * ( fjxet * cjxet + fjyet * cjyet + fjzet * cjzet);
 }
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void CalcElemNodeNormals(Real_t pfx[8],
     Real_t pfy[8],
     Real_t pfz[8],
@@ -373,8 +368,7 @@ void CalcElemNodeNormals(Real_t pfx[8],
 }
 //#pragma omp end declare target
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void SumElemStressesToNodeForces( const Real_t B[][8],
     const Real_t stress_xx,
     const Real_t stress_yy,
@@ -392,8 +386,7 @@ void SumElemStressesToNodeForces( const Real_t B[][8],
 
 
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void VoluDer(const Real_t x0, const Real_t x1, const Real_t x2,
     const Real_t x3, const Real_t x4, const Real_t x5,
     const Real_t y0, const Real_t y1, const Real_t y2,
@@ -425,8 +418,7 @@ void VoluDer(const Real_t x0, const Real_t x1, const Real_t x2,
 //#pragma omp end declare target
 
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void CalcElemVolumeDerivative(Real_t dvdx[8],
     Real_t dvdy[8],
     Real_t dvdz[8],
@@ -469,8 +461,7 @@ void CalcElemVolumeDerivative(Real_t dvdx[8],
 }
 
 /******************************************/
-__host__ __device__
-  static inline
+__host__ __device__ static inline
 Real_t calcElemVolume( const Real_t x0, const Real_t x1,
     const Real_t x2, const Real_t x3,
     const Real_t x4, const Real_t x5,
@@ -564,8 +555,7 @@ Real_t CalcElemVolume( const Real_t x[8], const Real_t y[8], const Real_t z[8] )
       z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7]);
 }
 
-__device__
-  static inline
+__device__ static inline
 Real_t AreaFace( const Real_t x0, const Real_t x1,
     const Real_t x2, const Real_t x3,
     const Real_t y0, const Real_t y1,
@@ -590,8 +580,7 @@ Real_t AreaFace( const Real_t x0, const Real_t x1,
 /******************************************/
 //#pragma omp declare target
 #define max(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
-__device__
-  static inline
+__device__ static inline
 Real_t CalcElemCharacteristicLength( const Real_t x[8],
     const Real_t y[8],
     const Real_t z[8],
@@ -635,8 +624,7 @@ Real_t CalcElemCharacteristicLength( const Real_t x[8],
 }
 //#pragma omp end declare target
 /******************************************/
-__device__
-  static inline
+__device__ static inline
 void CalcElemVelocityGradient( const Real_t* const xvel,
     const Real_t* const yvel,
     const Real_t* const zvel,
@@ -776,7 +764,7 @@ __global__ void integrateStress (
   // Volume calculation involves extra work for numerical consistency
   CalcElemShapeFunctionDerivatives(x_local, y_local, z_local, B, &determ[k]);
 
-  CalcElemNodeNormals( B[0] , B[1], B[2], x_local, y_local, z_local );
+  CalcElemNodeNormals( B[0], B[1], B[2], x_local, y_local, z_local );
 
   // Eliminate thread writing conflicts at the nodes by giving
   // each element its own copy to write to
@@ -1226,7 +1214,6 @@ __global__ void calcPositionForNodes (
     const Real_t deltaTime,
     const Index_t numNode) 
 {
-
   Index_t i = blockDim.x*blockIdx.x+threadIdx.x;
   if (i >= numNode) return;
   x[i] += xd[i] * deltaTime;
@@ -2384,7 +2371,6 @@ int main(int argc, char *argv[])
   cudaMalloc((void**)&d_nodeElemCornerList, sizeof(Index_t)*len2);
   cudaMemcpy(d_nodeElemCornerList, nodeElemCornerList, sizeof(Index_t)*len2, cudaMemcpyHostToDevice);
 
-
   Real_t  gamma[32] __attribute__((__aligned__(64)));
   gamma[0] = Real_t( 1.);
   gamma[1] = Real_t( 1.);
@@ -2454,7 +2440,6 @@ int main(int argc, char *argv[])
   cudaMalloc((void**)&d_dzz, sizeof(Real_t)*numElem);
   Real_t* d_vnew;
   cudaMalloc((void**)&d_vnew, sizeof(Real_t)*numElem);
-
 
   Index_t* d_lzetam;
   cudaMalloc((void**)&d_lzetam, sizeof(Index_t)*numElem);
@@ -2531,11 +2516,9 @@ int main(int argc, char *argv[])
     cudaMemcpy(d_p, p, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
     cudaMemcpy(d_q, q, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
 
-
     dim3 gws_elem ((numElem+THREADS-1)/THREADS);
     dim3 gws_node ((numNode+THREADS-1)/THREADS);
     dim3 lws (THREADS);
-
 
     fill_sig<<<gws_elem, lws>>>(d_sigxx, d_sigyy, d_sigzz, d_p, d_q, numElem);
 
@@ -2593,7 +2576,6 @@ int main(int argc, char *argv[])
     cudaMemcpy(d_volo, volo, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice); 
     cudaMemcpy(d_v, v, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice); 
     cudaMemcpy(d_vol_error, &vol_error, sizeof(int), cudaMemcpyHostToDevice); 
-
 
     hgc<<<gws_elem, lws>>>(
         d_dvdx,
@@ -2670,7 +2652,6 @@ int main(int argc, char *argv[])
       cudaMemcpy(d_ss, ss, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
       cudaMemcpy(d_elemMass, elemMass, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
 
-
       fb<<<gws_elem, lws>>>(
           d_dvdx,
           d_dvdy,
@@ -2692,7 +2673,6 @@ int main(int argc, char *argv[])
           hgcoef,
           numElem );
 
-
       collect_final_force <<<gws_node, lws>>>  (
           d_fx_elem,
           d_fy_elem,
@@ -2703,7 +2683,6 @@ int main(int argc, char *argv[])
           d_nodeElemStart,
           d_nodeElemCornerList,
           numNode );
-
 
 #ifdef VERIFY
       Real_t *fx_tmp = (Real_t*) malloc (sizeof(Real_t)*numNode);
@@ -2729,7 +2708,6 @@ int main(int argc, char *argv[])
     Real_t *nodalMass = &domain.m_nodalMass[0];
 
     cudaMemcpy(d_nodalMass, nodalMass, sizeof(Real_t)*numNode, cudaMemcpyHostToDevice);
-
 
     accelerationForNode<<<gws_node, lws>>>(
         d_fx,
@@ -2770,7 +2748,6 @@ int main(int argc, char *argv[])
         s2,
         s3,
         numNodeBC ) ;
-
 
     //=================================================================
     // CalcVelocityForNodes( domain, delt, u_cut, domain.numNode()) ; //uses m_xd and m_xdd
@@ -2838,7 +2815,6 @@ int main(int argc, char *argv[])
     Real_t *delv = &domain.m_delv[0];
     Real_t *arealg = &domain.m_arealg[0];
     Real_t *vdov = &domain.m_vdov[0];
-
 
     cudaMemcpy(d_vdov, vdov, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
     cudaMemcpy(d_delv, delv, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
@@ -3065,7 +3041,6 @@ int main(int argc, char *argv[])
     cudaMemcpy(e, d_e, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(ss, d_ss, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(v, d_v, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
-
 
 #ifdef VERIFY
     for (int i = 0; i < numElem; i++) {
