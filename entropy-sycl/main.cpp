@@ -45,7 +45,6 @@ void entropy(
   if(y < height && x < width) d_entropy[y * width + x] = entropy;
 }
 
-
 int main(int argc, char* argv[]) {
   if (argc != 3) {
     printf("Usage: %s <width> <height>\n", argv[0]);
@@ -77,14 +76,53 @@ int main(int argc, char* argv[]) {
   buffer<float, 1> d_output (output, width * height);
 
   range<2> gws ((height+15)/16*16, (width+15)/16*16);
-  range<2> lws  (16, 16);
+  range<2> lws (16, 16);
 
   for (int i = 0; i < 100; i++)
     q.submit([&] (handler &cgh) {
       auto in = d_input.get_access<sycl_read>(cgh);
       auto out = d_output.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class test>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class base>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         entropy (item, out.get_pointer(), in.get_pointer(), height, width);
+      });
+    });
+
+  float logTable[26];
+  for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
+  buffer<float, 1> d_logTable (logTable, 26);
+
+  for (int i = 0; i < 100; i++)
+    q.submit([&] (handler &cgh) {
+      auto input = d_input.get_access<sycl_read>(cgh);
+      auto logTable = d_logTable.get_access<sycl_read>(cgh);
+      auto output = d_output.get_access<sycl_discard_write>(cgh);
+      accessor<char, 2, sycl_read_write, access::target::local> sd_count ({16, 256}, cgh);
+      cgh.parallel_for<class opt>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        const int x = item.get_global_id(1);
+        const int y = item.get_global_id(0);
+        const int idx = item.get_local_id(0)*16 + item.get_local_id(1);
+
+        for(int i = 0; i < 16;i++) sd_count[i][idx] = 0;
+
+        char total = 0;
+        for(int dy = -2; dy <= 2; dy++) {
+          for(int dx = -2; dx <= 2; dx++) {
+            int xx = x + dx,
+                yy = y + dy;
+
+            if(xx >= 0 && yy >= 0 && yy < height && xx < width) {
+              sd_count[input[yy*width+xx]][idx]++;
+              total++;
+            }
+          }
+        }
+
+        float entropy = 0;
+        for(int k = 0; k < 16; k++)
+          entropy -= logTable[sd_count[k][idx]];
+        
+        entropy = entropy / total + sycl::log2((float)total);
+        if(y < height && x < width) output[y*width+x] = entropy;
       });
     });
   }
@@ -109,5 +147,3 @@ int main(int argc, char* argv[]) {
   free(output_ref);
   return 0;
 }
-
-

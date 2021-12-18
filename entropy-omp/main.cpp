@@ -5,9 +5,9 @@
 #include "reference.h"
 
 void entropy(
-        float *__restrict d_entropy,
-    const char*__restrict d_val, 
-    int height, int width)
+      float *__restrict d_entropy,
+  const char*__restrict d_val, 
+  int height, int width)
 {
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256) 
   for (int y = 0; y < height; y++)
@@ -45,6 +45,56 @@ void entropy(
     }
 }
 
+template<int bsize_x, int bsize_y>
+void entropy_opt(
+       float *__restrict d_entropy,
+  const  char*__restrict d_val, 
+  const float*__restrict d_logTable,
+  int m, int n)
+{
+  const int teamX = (n+bsize_x-1)/bsize_x;
+  const int teamY = (m+bsize_y-1)/bsize_y;
+  const int numTeams = teamX * teamY;
+
+  #pragma omp target teams num_teams(numTeams) thread_limit(bsize_x*bsize_y)
+  {
+    int sd_count[16][bsize_x*bsize_y];
+    #pragma omp parallel
+    {
+      const int threadIdx_x = omp_get_num_threads() % bsize_x;
+      const int threadIdx_y = omp_get_num_threads() / bsize_x;
+      const int teamIdx_x = omp_get_num_teams() % teamX;
+      const int teamIdx_y = omp_get_num_teams() / teamX;
+      const int x = teamIdx_x * bsize_x + threadIdx_x;
+      const int y = teamIdx_y * bsize_y + threadIdx_y;
+
+      const int idx = threadIdx_y*bsize_x + threadIdx_x;
+
+      for(int i = 0; i < 16; i++) sd_count[i][idx] = 0;
+
+      char total = 0;
+      for(int dy = -2; dy <= 2; dy++) {
+        for(int dx = -2; dx <= 2; dx++) {
+          int xx = x + dx,
+              yy = y + dy;
+
+          if(xx >= 0 && yy >= 0 && yy < m && xx < n) {
+            sd_count[d_val[yy*n+xx]][idx]++;
+            total++;
+          }
+        }
+      }
+
+      float entropy = 0;
+      for(int k = 0; k < 16; k++)
+        entropy -= d_logTable[sd_count[k][idx]];
+      
+      entropy = entropy / total + log2f(total);
+      if(y < m && x < n) d_entropy[y*n+x] = entropy;
+    }
+  } 
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 3) {
     printf("Usage: %s <width> <height>\n", argv[0]);
@@ -59,16 +109,22 @@ int main(int argc, char* argv[]) {
   float* output = (float*) malloc (output_bytes);
   float* output_ref = (float*) malloc (output_bytes);
 
+  float logTable[26];
+  for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
+
   srand(123);
   for (int i = 0; i < height; i++)
     for (int j = 0; j < width; j++)
       input[i * width + j] = rand() % 16;
 
-  #pragma omp target data map(to: input[0:width*height]) \
+  #pragma omp target data map(to: input[0:width*height], logTable[0:26]) \
                           map(from: output[0:width*height])
   {
     for (int i = 0; i < 100; i++)
       entropy(output, input, height, width);
+
+    for (int i = 0; i < 100; i++)
+      entropy_opt<16, 16>(output, input, logTable, height, width);
   }
 
   // verify

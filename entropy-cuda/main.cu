@@ -45,6 +45,41 @@ void entropy(
   if(y < height && x < width) d_entropy[y * width + x] = entropy;
 }
 
+template<int bsize_x, int bsize_y>
+__global__ void entropy_opt(
+       float *__restrict__ d_entropy,
+  const  char*__restrict__ d_val, 
+  const float*__restrict__ d_logTable,
+  int m, int n)
+{
+  __shared__ int sd_count[16][bsize_y*bsize_x];
+
+  const int x = threadIdx.x + blockIdx.x * blockDim.x;
+  const int y = threadIdx.y + blockIdx.y * blockDim.y;
+  const int idx = threadIdx.y*bsize_x + threadIdx.x;
+
+  for(int i = 0; i < 16;i++) sd_count[i][idx] = 0;
+
+  char total = 0;
+  for(int dy = -2; dy <= 2; dy++) {
+    for(int dx = -2; dx <= 2; dx++) {
+      int xx = x + dx,
+          yy = y + dy;
+
+      if(xx >= 0 && yy >= 0 && yy < m && xx < n) {
+        sd_count[d_val[yy*n+xx]][idx]++;
+        total++;
+      }
+    }
+  }
+
+  float entropy = 0;
+  for(int k = 0; k < 16; k++)
+    entropy -= d_logTable[sd_count[k][idx]];
+  
+  entropy = entropy / total + log2f(total);
+  if(y < m && x < n) d_entropy[y*n+x] = entropy;
+}
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
@@ -75,9 +110,20 @@ int main(int argc, char* argv[]) {
   dim3 grids ((width+15)/16, (height+15)/16);
   dim3 blocks (16, 16);
 
+  // baseline kernel
   for (int i = 0; i < 100; i++)
     entropy <<< grids, blocks >>> (d_output, d_input, height, width);
 
+  // optimized kernel
+
+  float logTable[26];
+  for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
+  float* d_logTable;
+  cudaMalloc((void**)&d_logTable, sizeof(logTable));
+  cudaMemcpy(d_logTable, logTable, sizeof(logTable), cudaMemcpyHostToDevice);
+ 
+  for (int i = 0; i < 100; i++)
+    entropy_opt<16, 16> <<< grids, blocks >>> (d_output, d_input, d_logTable, height, width);
   cudaMemcpy(output, d_output, output_bytes, cudaMemcpyDeviceToHost);
 
   cudaFree(d_input);
@@ -103,5 +149,3 @@ int main(int argc, char* argv[]) {
   free(output_ref);
   return 0;
 }
-
-
