@@ -153,13 +153,12 @@ int main(int argc, char* argv[]) {
 
   for (int n = 0; n < nArrays; n++) {
     // sum over each array
+    const float f = factor[n];
     q.submit([&] (handler &cgh) {
-      //auto arr = d_arrays.get_access<sycl_read>(cgh, range<1>(nElems), id<1>(n*nElems));
-      //auto out = d_result.get_access<sycl_read_write>(cgh, range<1>(1), id<1>(n));
-      auto arr = d_arrays.get_access<sycl_read>(cgh);
-      auto out = d_result.get_access<sycl_read_write>(cgh);
+      auto arr = d_arrays.get_access<sycl_read>(cgh, range<1>(nElems), id<1>(n*nElems));
+      auto out = d_result.get_access<sycl_read_write>(cgh, range<1>(1), id<1>(n));
       cgh.parallel_for<class sum_array>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        sumArray (item, factor[n], nElems, arr.get_pointer() + n*nElems, out.get_pointer() + n);
+        sumArray (item, f, nElems, arr.get_pointer(), out.get_pointer());
       });
     });
   }
