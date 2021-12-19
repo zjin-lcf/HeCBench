@@ -637,6 +637,9 @@ Early results are shown [here](results/README.md)
 ### reverse (cuda)
   Reverse an input array of size 256 using shared memory
 
+### rfs (cuda)
+  Reproducible floating sum (https://github.com/facebookarchive/fbcuda)
+
 ### rng-wallace (cuda)
   Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
 
