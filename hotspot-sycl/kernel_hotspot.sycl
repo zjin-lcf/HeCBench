@@ -10,9 +10,9 @@
 
   step_div_Cap =step/Cap;
 
-  Rx_1=1/Rx;
-  Ry_1=1/Ry;
-  Rz_1=1/Rz;
+  Rx_1 = 1.f/Rx;
+  Ry_1 = 1.f/Ry;
+  Rz_1 = 1.f/Rz;
 
   // each block finally computes result for a small block
   // after N iters.
@@ -71,8 +71,8 @@
     IN_RANGE(ty, validYmin, validYmax) ) {
       computed = true;
       temp_t[ty][tx] =   temp_on_device[ty][tx] + step_div_Cap * (power_on_device[ty][tx] +
-      (temp_on_device[S][tx] + temp_on_device[N][tx] - 2.0f * temp_on_device[ty][tx]) * Ry_1 +
-      (temp_on_device[ty][E] + temp_on_device[ty][W] - 2.0f * temp_on_device[ty][tx]) * Rx_1 +
+      (temp_on_device[S][tx] + temp_on_device[N][tx] - 2.f * temp_on_device[ty][tx]) * Ry_1 +
+      (temp_on_device[ty][E] + temp_on_device[ty][W] - 2.f * temp_on_device[ty][tx]) * Rx_1 +
       (amb_temp - temp_on_device[ty][tx]) * Rz_1);
 
     }
