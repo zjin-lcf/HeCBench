@@ -76,8 +76,8 @@ int compute_tran_temp(
   float grid_width = chip_width / col;
 
   float Cap = FACTOR_CHIP * SPEC_HEAT_SI * t_chip * grid_width * grid_height;
-  float Rx = grid_width / (2.0 * K_SI * t_chip * grid_height);
-  float Ry = grid_height / (2.0 * K_SI * t_chip * grid_width);
+  float Rx = grid_width / (2.f * K_SI * t_chip * grid_height);
+  float Ry = grid_height / (2.f * K_SI * t_chip * grid_width);
   float Rz = t_chip / (K_SI * grid_height * grid_width);
 
   float max_slope = MAX_PD / (FACTOR_CHIP * t_chip * SPEC_HEAT_SI);
@@ -113,7 +113,7 @@ int compute_tran_temp(
       accessor <float, 2, sycl_read_write, access::target::local> temp_on_device ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
       accessor <float, 2, sycl_read_write, access::target::local> power_on_device ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
       accessor <float, 2, sycl_read_write, access::target::local> temp_t ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
-      cgh.parallel_for<class hotspot>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class calc_temp>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
          #include "kernel_hotspot.sycl"
       });
     });
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
 
   int size;
   int grid_rows,grid_cols = 0;
-  float *FilesavingTemp,*FilesavingPower; //,*MatrixOut; 
+  float *FilesavingTemp,*FilesavingPower;
   char *tfile, *pfile, *ofile;
 
   int total_iterations = 60;  // this can be overwritten by the commandline argument
@@ -182,7 +182,6 @@ int main(int argc, char** argv) {
 
   FilesavingTemp = (float *) malloc(size*sizeof(float));
   FilesavingPower = (float *) malloc(size*sizeof(float));
-  // MatrixOut = (float *) calloc (size, sizeof(float));
 
   if( !FilesavingPower || !FilesavingTemp) {
     printf("unable to allocate memory");
