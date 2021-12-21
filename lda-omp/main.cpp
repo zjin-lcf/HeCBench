@@ -64,17 +64,17 @@ int main(int argc, char* argv[]) {
   int *d_cols = cols.data();
   int *d_indptr = indptr.data();
 
+  // reset the values
   bool *d_vali = (bool*) calloc (num_cols, sizeof(bool));
 
   // gamma will be initialized in the kernel
   float *d_gamma = (float*) malloc (sizeof(float) * num_indptr * num_topics);
 
-  // reset losses
-  float *d_train_losses = (float*) calloc (block_cnt, sizeof(float));
-  float *d_vali_losses = (float*) calloc (block_cnt, sizeof(float));
+  // store device results (reset losses)
+  std::vector<float> train_losses(block_cnt, 0.f), vali_losses(block_cnt, 0.f);
 
-  // store device results
-  std::vector<float> train_losses(block_cnt), vali_losses(block_cnt);
+  float *d_train_losses = train_losses.data();
+  float *d_vali_losses = vali_losses.data();
 
   #pragma omp target data map (to: d_alpha[0:num_topics], \
                                    d_beta[0:num_topics * num_words],\
@@ -137,8 +137,6 @@ int main(int argc, char* argv[]) {
 
   free(d_vali);
   free(d_gamma);
-  free(d_train_losses);
-  free(d_vali_losses);
 
   return 0;
 }
