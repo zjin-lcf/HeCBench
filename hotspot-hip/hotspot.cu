@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
   char *tfile, *pfile, *ofile;
 
   int total_iterations = 60;  // this can be overwritten by the commandline argument
-  int pyramid_height = 1; // number of iterations
+  int pyramid_height = 1;     // step size
 
   if (argc < 7) usage(argc, argv);
 
