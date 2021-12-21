@@ -4,13 +4,12 @@
 // This source code is licensed under the Apache 2.0 license found in the
 // LICENSE file in the root directory of this source tree.
 //
-#define WARP_SIZE 32
 #define EPS 1e-6f
 
 #pragma omp declare target 
 inline float ReduceSum(const float* vec, const int length) {
   float s = 0.f;
-  //#pragma omp parallel for reduction (+:s)
+  // #pragma omp parallel for reduction (+:s)
   for (int i = 0; i < length; i++) 
     s += vec[i];
   return s;
