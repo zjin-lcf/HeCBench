@@ -15,7 +15,7 @@ LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g  
+  CFLAGS += -g -DDEBUG
 endif
 
 ifeq ($(DEBUG),yes)
