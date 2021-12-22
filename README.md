@@ -553,7 +553,10 @@ Early results are shown [here](results/README.md)
 ### myocte (opencl)
   Myocte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
-### nbody (opencl)
+## nbnxm (sycl)
+  Computing non-bonded pair interactions (https://manual.gromacs.org/current/doxygen/html-full/page_nbnxm.xhtml)
+
+## nbody (opencl)
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
 ### ne (cuda)
@@ -808,6 +811,6 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Anton Gorshkov, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
 Results presented were obtained using the Chameleon testbed supported by the National Science Foundation, JLSE testbeds at Argonne National Laboratory, and the Intel<sup>®</sup> DevCloud. The project also used resources at the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
