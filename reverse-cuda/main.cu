@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <random>
 #include <cuda.h>
 
 __global__ void reverse (int *d, const int len)
@@ -42,11 +43,12 @@ int main(int argc, char* argv[]) {
   int *d_test;
   cudaMalloc((void**)&d_test, elem_size);
 
-  srand(123);
-  for (int i = 0; i < iteration; i++) {
+  std::default_random_engine generator (123);
+  // bound the number of reverse operations
+  std::uniform_int_distribution<int> distribution(100, 9999);
 
-    // bound the number of reverse operations
-    const int count = rand() % 10000 + 100;
+  for (int i = 0; i < iteration; i++) {
+    const int count = distribution(generator);
 
     cudaMemcpy(d_test, gold_even, elem_size, cudaMemcpyHostToDevice);
 

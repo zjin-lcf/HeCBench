@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <random>
 #include <omp.h>
 
 int main(int argc, char* argv[]) {
@@ -30,13 +31,14 @@ int main(int argc, char* argv[]) {
     gold_even[i] = i;
   }
 
+  std::default_random_engine generator (123);
+  // bound the number of reverse operations
+  std::uniform_int_distribution<int> distribution(100, 9999);
+
   #pragma omp target data map(alloc: test[0:len]) 
   {
-    srand(123);
     for (int i = 0; i < iteration; i++) {
-
-      // bound the number of reverse operations
-      const int count = rand() % 10000 + 100;
+      const int count = distribution(generator);
 
       memcpy(test, gold_even, elem_size);
       #pragma omp target update to (test[0:len])
