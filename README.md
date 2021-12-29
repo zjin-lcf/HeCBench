@@ -598,6 +598,9 @@ Early results are shown [here](results/README.md)
 ### perplexity (cuda)
   Perplexity search (https://github.com/rapidsai/cuml/)  
 
+### phmm (cuda)
+  Pair hidden Markov model (https://github.com/lienliang/Pair_HMM_forward_GPU)
+
 ### pointwise (cuda)
   Fused point-wise operations (https://developer.nvidia.com/blog/optimizing-recurrent-neural-networks-cudnn-5/)
 
