@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DNuints=8 -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../snake-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../snake-cuda/kernel.h ../snake-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -54,4 +54,3 @@ clean:
 
 run: $(program)
 	./$(program) 100 ../snake-cuda/Datasets/ERR240727_1_E2_30000Pairs.txt 30000
-
