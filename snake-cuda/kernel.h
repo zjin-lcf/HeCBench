@@ -1,10 +1,13 @@
-__global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq, 
-    int* Ftest_Results, const int NumReads, const int F_ErrorThreshold)
+__global__ void sneaky_snake(
+  const uint*__restrict__ F_ReadSeq,
+  const uint*__restrict__ F_RefSeq, 
+  int*__restrict__ Ftest_Results, 
+  const int NumReads,
+  const int F_ErrorThreshold)
 {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if(tid >= NumReads) return;
 
-  // const int NBytes = 8;
   uint ReadsPerThread[NBytes];
   uint RefsPerThread[NBytes];
 
@@ -36,18 +39,18 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
   int Max_leading_zeros = 0;
   int AccumulatedErrs = 0;
 
-  int ShiftValue = 0;
   int Diagonal = 0;
+  int ShiftValue = 0;
 
-  int j = 0; //specifying the j-th uint that we are reading in each read-ref comparison (can be from 0 to 7)
+  int j = 0; //specifying the j-th int that we are reading in each read-ref comparison (can be from 0 to 7)
 
   while ( (j < 7) && (globalCounter < 200))
   {
     Diagonal = 0;
-    RefTmp1 = RefsPerThread[j] << ShiftValue;
-    RefTmp2 = RefsPerThread[j + 1] >> (32 - ShiftValue);
-    ReadTmp1 = ReadsPerThread[j] << ShiftValue;
-    ReadTmp2 = ReadsPerThread[j + 1] >> (32 - ShiftValue);
+    RefTmp1 = lsl(RefsPerThread[j], ShiftValue);
+    RefTmp2 = lsr(RefsPerThread[j + 1], 32 - ShiftValue);
+    ReadTmp1 = lsl(ReadsPerThread[j], ShiftValue);
+    ReadTmp2 = lsr(ReadsPerThread[j + 1], 32 - ShiftValue);
 
     ReadCompTmp = ReadTmp1 | ReadTmp2;
     RefCompTmp = RefTmp1 | RefTmp2;
@@ -60,9 +63,9 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
     {
       Diagonal += 1;
       CornerCase = 0;
-      if ( (j == 0) && ( (ShiftValue - (2*e))  < 0 ) )
+      if ( (j == 0) && ( (ShiftValue - (2*e)) < 0 ) )
       {
-        ReadTmp1 = ReadsPerThread[j] >> ( (2*e) - ShiftValue );
+        ReadTmp1 = lsr(ReadsPerThread[j], 2*e - ShiftValue);
         ReadTmp2 = 0;
 
         ReadCompTmp = ReadTmp1 | ReadTmp2;
@@ -73,7 +76,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
         CornerCase = 0;
         for(int Ci = 0; Ci < (2*e) - ShiftValue; Ci++)
         {
-          SetBit(CornerCase, 31 - Ci);
+          set_bit(CornerCase, 31 - Ci);
         }
 
         DiagonalResult  = DiagonalResult | CornerCase;
@@ -82,8 +85,8 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
       }
       else if ( (ShiftValue - (2*e) ) < 0 )
       {
-        ReadTmp1 = ReadsPerThread[j-1] << (32 - (2*e - ShiftValue));
-        ReadTmp2 = ReadsPerThread[j] >> ((2*e) - ShiftValue);
+        ReadTmp1 = lsl(ReadsPerThread[j-1], 32 - (2*e - ShiftValue));
+        ReadTmp2 = lsr(ReadsPerThread[j], 2*e - ShiftValue);
 
         ReadCompTmp = ReadTmp1 | ReadTmp2;
         RefCompTmp = RefTmp1 | RefTmp2;
@@ -94,8 +97,8 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
       }
       else
       {
-        ReadTmp1 = ReadsPerThread[j] << (ShiftValue - 2*e);
-        ReadTmp2 = ReadsPerThread[j+1] >> (32 - (ShiftValue - 2*e)) ;
+        ReadTmp1 = lsl(ReadsPerThread[j], ShiftValue - 2*e);
+        ReadTmp2 = lsr(ReadsPerThread[j+1], 32 - (ShiftValue - 2*e)) ;
 
         ReadCompTmp = ReadTmp1 | ReadTmp2;
         RefCompTmp = RefTmp1 | RefTmp2;
@@ -126,10 +129,10 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
       CornerCase = 0;
       if (j<5)
       {
-        if ((ShiftValue + 2*e)  < 32)
+        if ((ShiftValue + 2*e) < 32)
         {
-          ReadTmp1 = ReadsPerThread[j] << (ShiftValue + 2*e);
-          ReadTmp2 = ReadsPerThread[j+1] >> (32 - (ShiftValue + 2*e));
+          ReadTmp1 = lsl(ReadsPerThread[j], ShiftValue + 2*e);
+          ReadTmp2 = lsr(ReadsPerThread[j+1], 32 - (ShiftValue + 2*e));
 
           ReadCompTmp = ReadTmp1 | ReadTmp2;
           RefCompTmp = RefTmp1 | RefTmp2;
@@ -139,8 +142,8 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
         }
         else
         {
-          ReadTmp1 = ReadsPerThread[j+1] << ((ShiftValue + 2*e) % 32);
-          ReadTmp2 = ReadsPerThread[j+2] >>  (32 - (ShiftValue + 2*e) % 32);
+          ReadTmp1 = lsl(ReadsPerThread[j+1], (ShiftValue + 2*e) % 32);
+          ReadTmp2 = lsr(ReadsPerThread[j+2], 32 - (ShiftValue + 2*e) % 32);
 
           ReadCompTmp = ReadTmp1 | ReadTmp2;
           RefCompTmp = RefTmp1 | RefTmp2;
@@ -154,9 +157,8 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
       }
       else
       {
-        //printf("HI3");
-        ReadTmp1 = ReadsPerThread[j] << (ShiftValue + 2*e);
-        ReadTmp2 = ReadsPerThread[j+1] >> (32 - (ShiftValue + 2*e));
+        ReadTmp1 = lsl(ReadsPerThread[j], ShiftValue + 2*e);
+        ReadTmp2 = lsr(ReadsPerThread[j+1], 32 - (ShiftValue + 2*e));
 
         ReadCompTmp = ReadTmp1 | ReadTmp2;
         RefCompTmp = RefTmp1 | RefTmp2;
@@ -165,9 +167,9 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
         CornerCase = 0;
         if ((globalCounter+32)>200) {
 
-          for(int Ci = ((globalCounter+32)-200); Ci < (((globalCounter+32)-200)+ 2*e); Ci++)
+          for(int Ci = globalCounter+32-200; Ci < globalCounter+32-200+2*e; Ci++)
           {
-            SetBit(CornerCase, Ci);
+            set_bit(CornerCase, Ci);
           }
         }
 
@@ -175,7 +177,7 @@ __global__ void sneaky_snake(const uint* F_ReadSeq, const uint* F_RefSeq,
 
           for(int Ci = 0; Ci < (2*e); Ci++)
           {
-            SetBit(CornerCase, Ci);
+            set_bit(CornerCase, Ci);
           }
         }
         DiagonalResult = DiagonalResult | CornerCase;

@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DNuints=8 -std=c++14 -Xcompiler -Wall -arch=$(ARCH) 
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) 
 
 # Linker Flags
 LDFLAGS = 
@@ -47,7 +47,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernel.h Makefile
+%.o: %.cu kernel.h reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
