@@ -315,6 +315,8 @@ Early results are shown [here](results/README.md)
 
 ### goulash (cuda)
   Simulate the dynamics of a small part of a cardiac myocyte, specifically the fast sodium m-gate  (https://github.com/LLNL/goulash)
+### gpp (cuda, omp)
+  General Plasman Pole Self-Energy Simulation the BerkeleyGW software package (https://github.com/NERSC/gpu-for-science-day-july-2019)
 
 ### grep (cuda)
   Regular expression matching (https://github.com/bkase/CUDA-grep)
