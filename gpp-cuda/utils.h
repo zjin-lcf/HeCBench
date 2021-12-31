@@ -1,17 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define aqsmtemp_size number_bands* ncouls
-#define aqsntemp_size number_bands* ncouls
-#define I_eps_array_size ngpown* ncouls
-#define achtemp_size (nend - nstart)
-#define achtemp_re_size (nend - nstart)
-#define achtemp_im_size (nend - nstart)
-#define vcoul_size ncouls
+#define aqsmtemp_size      (number_bands * ncouls)
+#define aqsntemp_size      (number_bands * ncouls)
+#define I_eps_array_size   (ngpown * ncouls)
+#define achtemp_size       (nend - nstart)
+#define achtemp_re_size    (nend - nstart)
+#define achtemp_im_size    (nend - nstart)
+#define vcoul_size         ncouls
 #define inv_igp_index_size ngpown
-#define indinv_size (ncouls + 1)
-#define wx_array_size (nend - nstart)
-#define wtilde_array_size ngpown* ncouls
+#define indinv_size        (ncouls + 1)
+#define wx_array_size      (nend - nstart)
+#define wtilde_array_size  (ngpown * ncouls)
 
 #define aqsmtemp(n1, ig) aqsmtemp[n1 * ncouls + ig]
 #define aqsntemp(n1, ig) aqsntemp[n1 * ncouls + ig]
@@ -34,20 +34,17 @@ inline void correctness(int problem_size, CustomComplex<dataType> result) {
     dataType im_diff = result.get_imag() - 2957453.638101;
 
     if (re_diff < 0.00001 && im_diff < 0.00001)
-      printf("\nBenchmark Problem !!!! SUCCESS - !!!! Correctness test passed "
-             ":-D :-D\n\n");
+      printf("\nBenchmark result: SUCCESS\n");
     else
-      printf("\nBenchmark Problem !!!! FAILURE - Correctness test failed :-( "
-             ":-(  \n");
+      printf("\nBenchmark result: FAILURE\n");
+
   } else {
     dataType re_diff = result.get_real() - -0.096066;
     dataType im_diff = result.get_imag() - 11.431852;
 
     if (re_diff < 0.00001 && im_diff < 0.00001)
-      printf("\nTest Problem !!!! SUCCESS - !!!! Correctness test passed :-D "
-             ":-D\n\n");
+      printf("\nTest result: SUCCESS\n");
     else
-      printf(
-          "\nTest Problem !!!! FAILURE - Correctness test failed :-( :-(  \n");
+      printf("\nTest result: FAILURE\n");
   }
 }
