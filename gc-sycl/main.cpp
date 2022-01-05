@@ -77,7 +77,7 @@ void kernel_runLarge(
     const int nodes, 
     const int* const __restrict__ nidx,
     const int* const __restrict__ nlist,
-    int* const __restrict__ posscol,
+    volatile int* const __restrict__ posscol,
     int* const __restrict__ posscol2,
     volatile int* const __restrict__ color,
     const int* const __restrict__ wl,
@@ -88,8 +88,8 @@ void kernel_runLarge(
     const int lane = item.get_local_id(0) % WS;
     const int thread = item.get_global_id(0);
     const int threads = item.get_group_range(0) * ThreadsPerBlock;
-    auto sg = item.get_sub_group();
     bool again;
+    auto sg = item.get_sub_group();
     do {
       again = false;
       for (int w = thread; ext::oneapi::any_of(item.get_group(), w < stop); w += threads) {
@@ -246,7 +246,7 @@ int main(int argc, char* argv[])
   range<1> gws (blocks * ThreadsPerBlock);
   range<1> lws (ThreadsPerBlock);
 
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < 1; n++) {
     q.submit([&] (handler &cgh) {
       auto wlsize = wlsize_d.get_access<sycl_write>(cgh);
       cgh.fill(wlsize, 0);
@@ -336,7 +336,7 @@ int main(int argc, char* argv[])
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist2_d.get_access<sycl_read>(cgh);
       auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
-      auto posscol2 = posscol2_d.get_access<sycl_atomic>(cgh);
+      auto posscol2 = posscol2_d.get_access<sycl_read_write>(cgh);
       auto color = color_d.get_access<sycl_read_write>(cgh);
       auto wl = wl_d.get_access<sycl_read>(cgh);
       auto wlsize = wlsize_d.get_access<sycl_read>(cgh);
