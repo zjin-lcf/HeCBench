@@ -63,8 +63,7 @@ static __device__ unsigned int hash(unsigned int val)
   return (val >> 16) ^ val;
 }
 
-
-  __global__
+__global__
 void init(const int nodes,
     const int edges, 
     const int* const __restrict__ nidx,
@@ -367,7 +366,7 @@ int main(int argc, char* argv[])
     cudaMemset(wlsize_d, 0, sizeof(int));
     init<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, nidx_d, nlist_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
     runLarge<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
-    //runSmall<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist_d, posscol_d, color_d);
+    runSmall<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist_d, posscol_d, color_d);
   }
 
   cudaDeviceSynchronize();
