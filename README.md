@@ -289,6 +289,9 @@ Early results are shown [here](results/README.md)
 ### frna (cuda)
   Accelerate the fill step in predicting the lowest free energy structure and a set of suboptimal structures (http://rna.urmc.rochester.edu/Text/Fold-cuda.html)
 
+### fsm (cuda)
+  A GPU-accelerated implementation of a genetic algorithm for finding well-performing finite-state machines for predicting binary sequences (https://userweb.cs.txstate.edu/~burtscher/research/FSM_GA/)
+
 ### fwt (cuda)
   Fast Walsh transformation (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
