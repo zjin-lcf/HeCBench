@@ -1,6 +1,6 @@
-#include <cuda.h>
 #include <cstdio>
-#include <time.h>
+#include <chrono>
+#include <cuda.h>
 
 #define USE_MNIST_LOADER
 #define MNIST_DOUBLE
@@ -19,8 +19,8 @@ static Layer l_f = Layer(6*6*6, 10, 10);
 static void learn(int iter);
 static unsigned int classify(double data[28][28]);
 static void test();
-static double forward_pass(double data[28][28]);
-static double back_pass();
+void forward_pass(double data[28][28]);
+void back_pass();
 
 static inline void loaddata()
 {
@@ -54,13 +54,17 @@ int main(int argc, const  char **argv)
   const int iter = atoi(argv[1]);
   srand(123);
   loaddata();
+  auto t1 = std::chrono::high_resolution_clock::now();
   learn(iter);
   test();
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time (learn + test) %lf secs \n", total_time / 1.0e6);
   return 0;
 }
 
 // Forward propagation of a single row in dataset
-static double forward_pass(double data[28][28])
+void forward_pass(double data[28][28])
 {
   float input[28][28];
 
@@ -75,9 +79,6 @@ static double forward_pass(double data[28][28])
   l_s1.clear();
   l_f.clear();
 
-  clock_t start, end;
-  start = clock();
-
   l_input.setOutput((float *)input);
 
   fp_preact_c1<<<64, 64>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
@@ -91,18 +92,11 @@ static double forward_pass(double data[28][28])
   fp_preact_f<<<64, 64>>>((float (*)[6][6])l_s1.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
   fp_bias_f<<<64, 64>>>(l_f.preact, l_f.bias);
   apply_step_function<<<64, 64>>>(l_f.preact, l_f.output, l_f.O);
-
-  end = clock();
-  return ((double) (end - start)) / CLOCKS_PER_SEC;
 }
 
 // Back propagation to update weights
-static double back_pass()
+void back_pass()
 {
-  clock_t start, end;
-
-  start = clock();
-
   bp_weight_f<<<64, 64>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_s1.output);
   bp_bias_f<<<64, 64>>>(l_f.bias, l_f.d_preact);
 
@@ -120,16 +114,11 @@ static double back_pass()
   apply_grad<<<64, 64>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
   apply_grad<<<64, 64>>>(l_s1.weight, l_s1.d_weight, l_s1.M * l_s1.N);
   apply_grad<<<64, 64>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
-
-  end = clock();
-  return ((double) (end - start)) / CLOCKS_PER_SEC;
 }
 
 static void learn(int iter)
 {
   float err;
-
-  double time_taken = 0.0;
 
   fprintf(stdout ,"Learning\n");
 
@@ -139,7 +128,7 @@ static void learn(int iter)
     for (unsigned int i = 0; i < train_cnt; ++i) {
       float tmp_err;
 
-      time_taken += forward_pass(train_set[i].data);
+      forward_pass(train_set[i].data);
 
       l_f.bp_clear();
       l_s1.bp_clear();
@@ -150,30 +139,26 @@ static void learn(int iter)
       snrm2(10, l_f.d_preact, tmp_err);
       err += tmp_err;
 
-      time_taken += back_pass();
+      back_pass();
     }
 
     err /= train_cnt;
-    fprintf(stdout, "error: %e, time_on_gpu: %lf\n", err, time_taken);
+    fprintf(stdout, "error: %e\n", err);
 
     if (err < threshold) {
       fprintf(stdout, "Training complete, error less than threshold\n\n");
       break;
     }
-
   }
-
-  fprintf(stdout, "\n Time - %lf\n", time_taken);
 }
 
 
 // Returns label of given data (0-9)
 static unsigned int classify(double data[28][28])
 {
-  float res[10];
-
   forward_pass(data);
 
+  float res[10];
   unsigned int max = 0;
 
   cudaMemcpy(res, l_f.output, sizeof(float) * 10, cudaMemcpyDeviceToHost);
