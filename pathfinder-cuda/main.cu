@@ -40,11 +40,11 @@ double get_time() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
-  __global__ void
-pathfinder (const int* gpuWall, 
-    const int* gpuSrc, 
-    int* gpuResult, 
-    int* outputBuffer, 
+__global__ void pathfinder (
+    const int*__restrict__ gpuWall, 
+    const int*__restrict__ gpuSrc, 
+    int*__restrict__ gpuResult, 
+    int*__restrict__ outputBuffer, 
     const int iteration, 
     const int theHalo,
     const int borderCols, 
