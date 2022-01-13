@@ -1,7 +1,9 @@
-__global__ void
-kernel_layerforward(const float* input, float* input_weights, float* hidden_partial_sum, const int hid) 
+__global__ void kernel_layerforward(
+  const float*__restrict__ input,
+        float*__restrict__ input_weights,
+        float*__restrict__ hidden_partial_sum,
+  const int hid) 
 {
-
   __shared__ float input_node[HEIGHT];
   __shared__ float weight_matrix[HEIGHT * WIDTH];
 
