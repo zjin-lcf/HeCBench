@@ -41,13 +41,13 @@ double get_time() {
 }
 
 __global__ void pathfinder (
-    const int*__restrict__ gpuWall, 
-    const int*__restrict__ gpuSrc, 
-    int*__restrict__ gpuResult, 
-    int*__restrict__ outputBuffer, 
-    const int iteration, 
+    const int*__restrict__ gpuWall,
+    const int*__restrict__ gpuSrc,
+          int*__restrict__ gpuResult,
+          int*__restrict__ outputBuffer,
+    const int iteration,
     const int theHalo,
-    const int borderCols, 
+    const int borderCols,
     const int cols,
     const int t)
 {
