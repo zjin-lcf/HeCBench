@@ -41,13 +41,13 @@ double get_time() {
 }
 
 __global__ void pathfinder (
-    const int*__restrict__ gpuWall, 
-    const int*__restrict__ gpuSrc, 
-    int*__restrict__ gpuResult, 
-    int*__restrict__ outputBuffer, 
-    const int iteration, 
+    const int*__restrict__ gpuWall,
+    const int*__restrict__ gpuSrc,
+          int*__restrict__ gpuResult,
+          int*__restrict__ outputBuffer,
+    const int iteration,
     const int theHalo,
-    const int borderCols, 
+    const int borderCols,
     const int cols,
     const int t)
 {
@@ -207,7 +207,6 @@ int main(int argc, char** argv)
      pyramid_height, cols, borderCols, NUMBER_THREADS, blockCols, smallBlockCol); */
 
   int size = rows * cols; // the size (global work size) is a multiple of lws 
-
   // running the opencl application shows lws=4000 (cpu) and lws=250 (gpu)
   int lws = 250;
   int theHalo = HALO;
@@ -274,7 +273,6 @@ int main(int argc, char** argv)
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
-
 
   return EXIT_SUCCESS;
 }
