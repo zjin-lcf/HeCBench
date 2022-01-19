@@ -1,11 +1,20 @@
 #include <iostream>
-#include <limits>
+#include <new>
 #include <cmath>
 #include <hip/hip_runtime.h>
 
-using namespace std;
-
 #define BLOCK_SIZE 16
+
+#ifdef DOUBLE_PRECISION
+  #define SQRT sqrt
+  #define FABS fabs
+  #define FP double
+#else
+  #define SQRT sqrtf
+  #define FABS fabsf
+  #define FP float
+#endif
+
 
 /**
  * Each element of the product matrix c[i][j] is computed from a unique row and
@@ -18,27 +27,29 @@ constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
 
-#include "verify.cpp"
+#ifdef VERIFY
+#include "verify.h"
+#endif
 
 __global__ 
 void hellinger(
-  const float *__restrict a, 
-  const float *__restrict b, 
-        float *__restrict c, 
+  const FP *__restrict__ a, 
+  const FP *__restrict__ b, 
+        FP *__restrict__ c, 
   const int m, const int n, const int k)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     if( col < k && row < m)
     {
-        float sum = 0;
+        FP sum = 0;
         for(int i = 0; i < n; i++)
         {
-            sum += sqrtf(a[row * n + i] * b[i * k + col]);
+            sum += SQRT(a[row * n + i] * b[i * k + col]);
         }
-        const float value = 1.f - sum;
-        const float gate = (!signbit(value));
-        c[row * k + col] = sqrtf(gate * value);
+        const FP value = (FP)1.0 - sum;
+        const FP gate = (!signbit(value));
+        c[row * k + col] = SQRT(gate * value);
     }
 }
 
@@ -46,16 +57,16 @@ int main() {
   int i, j;
 
   // 2D arrays on host side.
-  float(*a_host)[N] = new float[M][N];
-  float(*b_host)[P] = new float[N][P];
+  FP(*a_host)[N] = new FP[M][N];
+  FP(*b_host)[P] = new FP[N][P];
   // host-side cpu result
-  float(*c_host)[P] = new float[M][P];
+  FP(*c_host)[P] = new FP[M][P];
   // host-side gpu result
-  float(*c_back)[P] = new float[M][P];
+  FP(*c_back)[P] = new FP[M][P];
 
   for (i = 0; i < M; i++)
     for (j = 0; j < N; j++)
-      a_host[i][j] = 1.f / N;
+      a_host[i][j] = (FP)1.0 / N;
 
   srand(123);
   for (i = 0; i < N; i++)
@@ -63,21 +74,21 @@ int main() {
       b_host[i][j] = rand() % 256;
 
   for (j = 0; j < P; j++) { 
-    float sum = 0;
+    FP sum = 0;
     for (i = 0; i < N; i++)
       sum += b_host[i][j];
     for (i = 0; i < N; i++)
       b_host[i][j] /= sum;
   }
 
-  float *a_device, *b_device, *c_device;
+  FP *a_device, *b_device, *c_device;
 
-  hipMalloc((void **) &a_device, sizeof(float)*M*N);
-  hipMalloc((void **) &b_device, sizeof(float)*N*P);
-  hipMalloc((void **) &c_device, sizeof(float)*M*P);
+  hipMalloc((void **) &a_device, sizeof(FP)*M*N);
+  hipMalloc((void **) &b_device, sizeof(FP)*N*P);
+  hipMalloc((void **) &c_device, sizeof(FP)*M*P);
 
-  hipMemcpy(a_device, a_host, sizeof(float)*M*N, hipMemcpyHostToDevice);
-  hipMemcpy(b_device, b_host, sizeof(float)*N*P, hipMemcpyHostToDevice);
+  hipMemcpy(a_device, a_host, sizeof(FP)*M*N, hipMemcpyHostToDevice);
+  hipMemcpy(b_device, b_host, sizeof(FP)*N*P, hipMemcpyHostToDevice);
 
   unsigned int grid_cols = (P + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int grid_rows = (M + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -89,8 +100,8 @@ int main() {
 
   hipMemcpy(c_back, c_device, sizeof(int)*M*P, hipMemcpyDeviceToHost);
 
-  cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
-       << ") * b(" << N << "," << P << ")\n";
+  std::cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
+            << ") * b(" << N << "," << P << ")\n";
 
 #ifdef VERIFY
   VerifyResult(a_host, b_host, c_host, c_back);
@@ -105,4 +116,3 @@ int main() {
   hipFree(c_device);
   return 0;
 }
-

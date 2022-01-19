@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 VERIFY    = yes
+FP64      = no
 
 #===============================================================================
 # Program name & source code list
@@ -41,6 +42,10 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(FP64),yes)
+  CFLAGS += -DDOUBLE_PRECISION
+endif
+
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
@@ -51,7 +56,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu verify.cpp Makefile
+%.o: %.cu verify.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -59,4 +64,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

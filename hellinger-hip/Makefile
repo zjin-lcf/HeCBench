@@ -7,6 +7,7 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = yes
+FP64      = no
 
 #===============================================================================
 # Program name & source code list
@@ -40,6 +41,10 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(FP64),yes)
+  CFLAGS += -DDOUBLE_PRECISION
+endif
+
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
@@ -50,7 +55,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../hellinger-cuda/verify.cpp Makefile
+%.o: %.cu ../hellinger-cuda/verify.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
