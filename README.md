@@ -805,6 +805,9 @@ Early results are shown [here](results/README.md)
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
+### wse (cuda)
+  Water snow estimation (https://github.com/gpgpu-sim/ispass2009-benchmarks)
+
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)
 
