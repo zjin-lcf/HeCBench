@@ -45,38 +45,18 @@ February 2020.
 #include <sys/time.h>
 #include "graph.h"
 
-
-
 static const int BPI = 32;  // bits per int
 static const int MSB = 1 << (BPI - 1);
 static const int Mask = (1 << (BPI / 2)) - 1;
 
 // source of hash function: https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
+#ifdef OMP_TARGET
 #pragma omp declare target
+#endif
 
+// should be supported by omp compilers
 #define popcount(x)  __builtin_popcount(x)
-
-// popcount and clz for omp target 
-int __builtin_popcount( int i )
-{
-  unsigned int x = (unsigned int) i; 
-  x -= ((x >> 1) & 0x55555555);
-  x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
-  x = (((x >> 4) + x) & 0x0f0f0f0f);
-  x += (x >> 8);
-  x += (x >> 16);
-  return x & 0x0000003f;
-}
-
-inline int __builtin_clz( int x )
-{
-  x |= (x >> 1);
-  x |= (x >> 2);
-  x |= (x >> 4);
-  x |= (x >> 8);
-  x |= (x >> 16);
-  return 32 - __builtin_popcount(x);
-}
+#define clz(x)  __builtin_clz(x)
 
 static unsigned int hash(unsigned int val)
 {
@@ -84,7 +64,9 @@ static unsigned int hash(unsigned int val)
   val = ((val >> 16) ^ val) * 0x45d9f3b;
   return (val >> 16) ^ val;
 }
+#ifdef OMP_TARGET
 #pragma omp end declare target
+#endif
 
 static int init(
   const int nodes,
@@ -100,9 +82,13 @@ static int init(
 {
   int wlsize = 0;
   int maxrange = -1;
+#ifdef OMP_TARGET
   #pragma omp target teams distribute parallel for thread_limit(threads) default(none) \
-  reduction(max: maxrange) \
-  shared(nodes, wlsize, wl, nidx, nlist, nlist2, color, posscol)
+  reduction(max: maxrange) shared(nodes, wlsize, wl, nidx, nlist, nlist2, color, posscol)
+#else
+  #pragma omp parallel for num_threads(threads) default(none) \
+  reduction(max: maxrange) shared(nodes, wlsize, wl, nidx, nlist, nlist2, color, posscol)
+#endif
   for (int v = 0; v < nodes; v++) {
     int active;
     const int beg = nidx[v];
@@ -141,7 +127,11 @@ static int init(
   }
   if (maxrange >= Mask) {printf("too many active neighbors\n"); exit(-1);}
 
+#ifdef OMP_TARGET
   #pragma omp target teams distribute parallel for thread_limit(threads) default(none) shared(edges, posscol2)
+#else
+  #pragma omp parallel for num_threads(threads) default(none) shared(edges, posscol2)
+#endif
   for (int i = 0; i < edges / BPI + 1; i++) posscol2[i] = -1;
   return wlsize;
 }
@@ -159,12 +149,16 @@ void runLarge(
 {
   if (wlsize != 0) {
     bool again;
+#ifdef OMP_TARGET
     #pragma omp target parallel num_threads(threads) \
-    default(none) shared(wlsize, wl, nidx, nlist, color, posscol, posscol2) \
-    private(again)
+    default(none) shared(wlsize, wl, nidx, nlist, color, posscol, posscol2) private(again)
+#else
+    #pragma omp parallel num_threads(threads) \
+    default(none) shared(wlsize, wl, nidx, nlist, color, posscol, posscol2) private(again)
+#endif
     do {
       again = false;
-      #pragma omp for
+      #pragma omp for nowait
       for (int w = 0; w < wlsize; w++) {
         bool shortcut = true;
         bool done = true;
@@ -219,7 +213,7 @@ void runLarge(
               val = posscol2[offs + mc];
             } while (val == 0);
           }
-          int newmincol = mc * BPI + __builtin_clz(val);
+          int newmincol = mc * BPI + clz(val);
           if (mincol != newmincol) shortcut = false;
           if (shortcut || done) {
             pcol = (newmincol < BPI) ? ((unsigned int)MSB >> newmincol) : 0;
@@ -248,10 +242,14 @@ void runSmall(
   const int threads)
 {
   bool again;
+#ifdef OMP_TARGET
   #pragma omp target parallel num_threads(threads) default(none) shared(nodes, nidx, nlist, color, posscol) private(again)
+#else
+  #pragma omp parallel num_threads(threads) default(none) shared(nodes, nidx, nlist, color, posscol) private(again)
+#endif
   do {
     again = false;
-    #pragma omp for
+    #pragma omp for nowait
     for (int v = 0; v < nodes; v++) {
       int pcol;
       #pragma omp atomic read
@@ -267,7 +265,7 @@ void runSmall(
           const int curr = old ^ active;
           const int i = beg + __builtin_clz(curr);
           const int nei = nlist[i];
-          int neipcol;  // const
+          int neipcol;
           #pragma omp atomic read
           neipcol = posscol[nei];
           allnei |= neipcol;
@@ -333,6 +331,7 @@ int main(int argc, char* argv[])
   const int* nindex = g.nindex;
   const int* nlist = g.nlist;
   
+#ifdef OMP_TARGET
   #pragma omp target data map (from: color[0:g.nodes]) \
                           map (alloc: nlist2[0:g.edges],\
                                       posscol[0:g.nodes],\
@@ -341,10 +340,13 @@ int main(int argc, char* argv[])
                           map (to: nindex[0:g.nodes+1], \
                                    nlist[0:g.edges])
   {
+#endif
     const int wlsize = init(g.nodes, g.edges, nindex, nlist, nlist2, posscol, posscol2, color, wl, threads);
     runLarge(nindex, nlist2, posscol, posscol2, color, wl, wlsize, threads);
     runSmall(g.nodes, nindex, nlist, posscol, color, threads);
+#ifdef OMP_TARGET
   }
+#endif
 
   const float runtime = timer.stop();
 
