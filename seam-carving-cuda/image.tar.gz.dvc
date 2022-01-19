@@ -1,0 +1,5 @@
+outs:
+- md5: b528f5a5759bb6e544a7fcd72b6f0ad4
+  size: 115674
+  hash: md5
+  path: image.tar.gz
