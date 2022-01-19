@@ -1,8 +1,16 @@
 #include <iostream>
-#include <limits>
+#include <new>
 #include <cmath>
 
-using namespace std;
+#ifdef DOUBLE_PRECISION
+  #define SQRT sqrt
+  #define FABS fabs
+  #define FP double
+#else
+  #define SQRT sqrtf
+  #define FABS fabsf
+  #define FP float
+#endif
 
 /**
  * Each element of the product matrix c[i][j] is computed from a unique row and
@@ -15,22 +23,24 @@ constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
 
-#include "verify.cpp"
+#ifdef VERIFY
+#include "verify.h"
+#endif
 
 int main() {
   int i, j;
 
   // 2D arrays on host side.
-  float(*a_host)[N] = new float[M][N];
-  float(*b_host)[P] = new float[N][P];
+  FP(*a_host)[N] = new FP[M][N];
+  FP(*b_host)[P] = new FP[N][P];
   // host-side cpu result
-  float(*c_host)[P] = new float[M][P];
+  FP(*c_host)[P] = new FP[M][P];
   // host-side gpu result
-  float(*c_back)[P] = new float[M][P];
+  FP(*c_back)[P] = new FP[M][P];
 
   for (i = 0; i < M; i++)
     for (j = 0; j < N; j++)
-      a_host[i][j] = 1.f / N;
+      a_host[i][j] = (FP)1.0 / N;
 
   srand(123);
   for (i = 0; i < N; i++)
@@ -38,7 +48,7 @@ int main() {
       b_host[i][j] = rand() % 256;
 
   for (j = 0; j < P; j++) { 
-    float sum = 0;
+    FP sum = 0;
     for (i = 0; i < N; i++)
       sum += b_host[i][j];
     for (i = 0; i < N; i++)
@@ -48,8 +58,8 @@ int main() {
   // Initialize the device queue with the default selector. The device queue is
   // used to enqueue kernels. It encapsulates all states needed for execution.
 
-  cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
-       << ") * b(" << N << "," << P << ")\n";
+  std::cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
+            << ") * b(" << N << "," << P << ")\n";
 
   #pragma omp target data map(to: a_host[0:M][0:N], b_host[0:N][0:P])\
                           map(from : c_back[0:M][0:P]) 
@@ -58,13 +68,13 @@ int main() {
       #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
       for (int i = 0; i < M; i++) {
         for (int j = 0; j < P; j++) {
-          float sum = 0.0f;
+          FP sum = (FP)0.0;
           for (int k = 0; k < N; k++) {
-            sum += sqrtf(a_host[i][k] * b_host[k][j]);
+            sum += SQRT(a_host[i][k] * b_host[k][j]);
           }
-          const float value = 1.f - sum;
-          const float gate = (!signbit(value));
-          c_back[i][j] = sqrtf(gate * value);
+          const FP value = (FP)1.0 - sum;
+          const FP gate = (!std::signbit(value));
+          c_back[i][j] = SQRT(gate * value);
         }
       }
     }

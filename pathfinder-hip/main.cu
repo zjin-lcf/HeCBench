@@ -40,14 +40,14 @@ double get_time() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
-  __global__ void
-pathfinder (const int* gpuWall, 
-    const int* gpuSrc, 
-    int* gpuResult, 
-    int* outputBuffer, 
-    const int iteration, 
+__global__ void pathfinder (
+    const int*__restrict__ gpuWall,
+    const int*__restrict__ gpuSrc,
+          int*__restrict__ gpuResult,
+          int*__restrict__ outputBuffer,
+    const int iteration,
     const int theHalo,
-    const int borderCols, 
+    const int borderCols,
     const int cols,
     const int t)
 {
@@ -207,13 +207,12 @@ int main(int argc, char** argv)
      pyramid_height, cols, borderCols, NUMBER_THREADS, blockCols, smallBlockCol); */
 
   int size = rows * cols; // the size (global work size) is a multiple of lws 
-
   // running the opencl application shows lws=4000 (cpu) and lws=250 (gpu)
   int lws = 250;
-  int* outputBuffer = (int*)calloc(16384, sizeof(int));
   int theHalo = HALO;
 
   double offload_start = get_time();
+  int* outputBuffer = (int*)calloc(16384, sizeof(int));
 
   int* d_gpuWall;
   hipMalloc((void**)&d_gpuWall, sizeof(int)*(size-cols));
@@ -254,9 +253,6 @@ int main(int argc, char** argv)
   hipFree(d_gpuWall);
   hipFree(d_outputBuffer);
 
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
-
   // add a null terminator at the end of the string.
   outputBuffer[16383] = '\0';
 
@@ -274,6 +270,9 @@ int main(int argc, char** argv)
   delete[] wall;
   delete[] result;
   free(outputBuffer);
+
+  double offload_end = get_time();
+  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
   return EXIT_SUCCESS;
 }

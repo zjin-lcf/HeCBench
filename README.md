@@ -289,6 +289,9 @@ Early results are shown [here](results/README.md)
 ### frna (cuda)
   Accelerate the fill step in predicting the lowest free energy structure and a set of suboptimal structures (http://rna.urmc.rochester.edu/Text/Fold-cuda.html)
 
+### fsm (cuda)
+  A GPU-accelerated implementation of a genetic algorithm for finding well-performing finite-state machines for predicting binary sequences (https://userweb.cs.txstate.edu/~burtscher/research/FSM_GA/)
+
 ### fwt (cuda)
   Fast Walsh transformation (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
@@ -801,6 +804,9 @@ Early results are shown [here](results/README.md)
 
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
+
+### wse (cuda)
+  Water snow estimation (https://github.com/gpgpu-sim/ispass2009-benchmarks)
 
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)

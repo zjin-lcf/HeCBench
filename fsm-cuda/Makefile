@@ -7,8 +7,6 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-VERIFY    = yes
-FP64      = no
 
 #===============================================================================
 # Program name & source code list
@@ -32,22 +30,13 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
-endif
-
-ifeq ($(FP64),yes)
-  CFLAGS += -DDOUBLE_PRECISION
-endif
-
-ifeq ($(VERIFY),yes)
-  CFLAGS += -DVERIFY
 endif
 #===============================================================================
 # Targets to Build
@@ -56,11 +45,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu verify.h Makefile
+%.o: %.cu kernels.h parameters.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 65536
