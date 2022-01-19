@@ -1,11 +1,20 @@
 #include <iostream>
-#include <limits>
+#include <new>
 #include <cmath>
 #include "common.h"
 
-using namespace std;
-
 #define BLOCK_SIZE 16
+
+#ifdef DOUBLE_PRECISION
+  #define SQRT sqrt
+  #define FABS fabs
+  #define FP double
+#else
+  #define SQRT sqrtf
+  #define FABS fabsf
+  #define FP float
+#endif
+
 /**
  * Each element of the product matrix c[i][j] is computed from a unique row and
  * column of the factor matrices, a[i][k] and b[k][j]
@@ -17,22 +26,24 @@ constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
 
-#include "verify.cpp"
+#ifdef VERIFY
+#include "verify.h"
+#endif
 
 int main() {
   int i, j;
 
   // 2D arrays on host side.
-  float(*a_host)[N] = new float[M][N];
-  float(*b_host)[P] = new float[N][P];
+  FP(*a_host)[N] = new FP[M][N];
+  FP(*b_host)[P] = new FP[N][P];
   // host-side cpu result
-  float(*c_host)[P] = new float[M][P];
+  FP(*c_host)[P] = new FP[M][P];
   // host-side gpu result
-  float(*c_back)[P] = new float[M][P];
+  FP(*c_back)[P] = new FP[M][P];
 
   for (i = 0; i < M; i++)
     for (j = 0; j < N; j++)
-      a_host[i][j] = 1.f / N;
+      a_host[i][j] = (FP)1.0 / N;
 
   srand(123);
   for (i = 0; i < N; i++)
@@ -40,7 +51,7 @@ int main() {
       b_host[i][j] = rand() % 256;
 
   for (j = 0; j < P; j++) { 
-    float sum = 0;
+    FP sum = 0;
     for (i = 0; i < N; i++)
       sum += b_host[i][j];
     for (i = 0; i < N; i++)
@@ -58,12 +69,12 @@ int main() {
     sycl::queue q(dev_sel);
 
     // Create buffers for matrices, buffer c is bound with host memory c_back
-    buffer<float, 1> a(reinterpret_cast<float*>(a_host), range<1>(M*N));
-    buffer<float, 1> b(reinterpret_cast<float*>(b_host), range<1>(N*P));
-    buffer<float, 1> c(reinterpret_cast<float*>(c_back), range<1>(M*P));
+    buffer<FP, 1> a(reinterpret_cast<FP*>(a_host), range<1>(M*N));
+    buffer<FP, 1> b(reinterpret_cast<FP*>(b_host), range<1>(N*P));
+    buffer<FP, 1> c(reinterpret_cast<FP*>(c_back), range<1>(M*P));
 
-    cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
-         << ") * b(" << N << "," << P << ")\n";
+    std::cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
+              << ") * b(" << N << "," << P << ")\n";
 
     auto grid_rows = (M + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
     auto grid_cols = (P + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
@@ -79,12 +90,12 @@ int main() {
           int row = index.get_global_id(0);
           int col = index.get_global_id(1);
           if( col < P && row < M) {
-            float sum = 0;
+            FP sum = (FP)0.0;
             for (int i = 0; i < N; i++) {
               sum += sycl::sqrt(A[row * N + i] * B[i * P + col]);
             }
-            const float value = 1.f - sum;
-            const float gate = (!sycl::signbit(value));
+            const FP value = (FP)1.0 - sum;
+            const FP gate = (!sycl::signbit(value));
             C[row * P + col] = sycl::sqrt(gate * value);
           }
         });

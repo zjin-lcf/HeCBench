@@ -505,11 +505,9 @@ int main(int argc, char **argv) {
   }
 
   unsigned char* cpu_in_out = (unsigned char *)malloc(in_size);
-  unsigned char* gpu_in_out = (unsigned char *)malloc(in_size);
 
   unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
-
 
   unsigned char* d_in_out;
   hipMalloc((void**)&d_in_out, sizeof(unsigned char)*in_size);
@@ -527,11 +525,8 @@ int main(int argc, char **argv) {
 
       for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
 
-        // Next frame
-        memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
-
-        // Copy to Device
-        hipMemcpy(d_in_out, gpu_in_out, in_size, hipMemcpyHostToDevice);
+        // Copy next frame to device
+        hipMemcpy(d_in_out, all_gray_frames[task_id], in_size, hipMemcpyHostToDevice);
      
         int threads = p.n_gpu_threads;
         dim3 grid ((cols-2)/threads, (rows-2)/threads);
@@ -553,9 +548,7 @@ int main(int argc, char **argv) {
         //hipDeviceSynchronize();
 
         // Copy from Device
-        hipMemcpy(gpu_in_out, d_in_out, in_size, hipMemcpyDeviceToHost);
-
-        memcpy(all_out_frames[task_id], gpu_in_out, in_size);
+        hipMemcpy(all_out_frames[task_id], d_in_out, in_size, hipMemcpyDeviceToHost);
       }
 
       for(int task_id = cpu_first(&partitioner); cpu_more(&partitioner); task_id = cpu_next(&partitioner)) {
@@ -598,7 +591,6 @@ int main(int argc, char **argv) {
   hipFree(d_interm_gpu_proxy);
   hipFree(d_theta_gpu_proxy);
 
-  free(gpu_in_out);
   free(cpu_in_out);
   free(h_interm_cpu_proxy);
   free(h_theta_cpu_proxy);

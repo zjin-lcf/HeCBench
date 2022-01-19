@@ -3,12 +3,16 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
-VERIFY    = yes
-FP64      = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -16,51 +20,57 @@ FP64      = no
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++17 -Wall -I../include -I../fsm-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(FP64),yes)
-  CFLAGS += -DDOUBLE_PRECISION
-endif
-
-ifeq ($(VERIFY),yes)
-  CFLAGS += -DVERIFY
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu verify.h Makefile
+%.o: %.cpp kernels.h ../fsm-cuda/parameters.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 65536

@@ -1,9 +1,9 @@
 __global__ void kernel_adjust_weights (
-    const float* ly, 
-    float *w, 
-    const float* delta, 
-    float* oldw, 
-    const int hid)
+  const float*__restrict__ ly, 
+       float *__restrict__ w, 
+  const float*__restrict__ delta, 
+        float*__restrict__ oldw, 
+  const int hid)
 {
   int by = blockIdx.y; 
   int tx = threadIdx.x; 
@@ -22,6 +22,5 @@ __global__ void kernel_adjust_weights (
     w[index_x] += ((ETA * delta[index_x]) + (MOMENTUM * oldw[index_x]));
     oldw[index_x] = ((ETA * delta[index_x]) + (MOMENTUM * oldw[index_x]));
   }
-
 }
 

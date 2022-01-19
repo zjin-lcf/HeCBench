@@ -1,32 +1,34 @@
 #ifdef VERIFY
+#include <limits>
+
 /**
  * Perform matrix multiplication on host to verify results from device.
  */
-bool ValueSame(float a, float b) {
-  return fabsf(a - b) < numeric_limits<float>::epsilon();
+bool ValueSame(FP a, FP b) {
+  return FABS(a - b) < std::numeric_limits<FP>::epsilon();
 }
 
-void VerifyResult(float (*a_host)[N], float (*b_host)[P], 
-                  float (*c_host)[P], float (*c_back)[P]) {
+void VerifyResult(FP (*a_host)[N], FP (*b_host)[P], 
+                  FP (*c_host)[P], FP (*c_back)[P]) {
   // Check that the results are correct by comparing with host computing.
   int i, j, k;
 
   // c_host is initialized to zero.
   for (i = 0; i < M; i++)
-    for (j = 0; j < P; j++) c_host[i][j] = 0.0f;
+    for (j = 0; j < P; j++) c_host[i][j] = (FP)0.0;
 
   for (i = 0; i < M; i++) {
     for (k = 0; k < N; k++) {
       for (j = 0; j < P; j++) {
-        c_host[i][j] += sqrtf(a_host[i][k] * b_host[k][j]);
+        c_host[i][j] += SQRT(a_host[i][k] * b_host[k][j]);
       }
     }
   }
   for (i = 0; i < M; i++) {
     for (j = 0; j < P; j++) {
-      float value = (1 - c_host[i][j]);
-      float gate = (!signbit(value));
-      c_host[i][j] = sqrtf(gate * value);
+      FP value = ((FP)1.0 - c_host[i][j]);
+      FP gate = (!std::signbit(value));  // std::signbit is a host function
+      c_host[i][j] = SQRT(gate * value);
     }
   }
 
@@ -39,7 +41,7 @@ void VerifyResult(float (*a_host)[N], float (*b_host)[P],
   for (i = 0; i < M; i++) {
     for (j = 0; j < P; j++) {
       if (!ValueSame(c_back[i][j], c_host[i][j])) {
-        cout << "Fail - The result is incorrect for element: [" << i << ", "
+        std::cout << "Fail - The result is incorrect for element: [" << i << ", "
              << j << "], expected: " << c_host[i][j]
              << ", but found: " << c_back[i][j] << "\n";
         mismatch_found = true;
@@ -52,9 +54,9 @@ void VerifyResult(float (*a_host)[N], float (*b_host)[P],
   }
 
   if (!mismatch_found) {
-    cout << "PASS\n";
+    std::cout << "PASS\n";
   } else {
-    cout << "FAIL\n";
+    std::cout << "FAIL\n";
   }
 }
 #endif

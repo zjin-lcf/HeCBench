@@ -1,5 +1,5 @@
 #include <cstdio>
-#include <time.h>
+#include <chrono>
 #include "common.h"
 
 #define USE_MNIST_LOADER
@@ -38,7 +38,7 @@ void snrm2(queue &q, const int n, buffer<float, 1> &x, float &result) {
 }
 
 // Forward propagation of a single row in dataset
-static double forward_pass(
+void forward_pass(
   queue &q,
   Layer &l_input,
   Layer &l_c1,
@@ -57,9 +57,6 @@ static double forward_pass(
   l_c1.clear(q);
   l_s1.clear(q);
   l_f.clear(q);
-
-  clock_t start, end;
-  start = clock();
 
   l_input.setOutput(q, (float *)input);
 
@@ -163,24 +160,16 @@ static double forward_pass(
       apply_step_function(item, p.get_pointer(), o.get_pointer(), l_f_O);
     });
   });
-
-  q.wait();
-  end = clock();
-  return ((double) (end - start)) / CLOCKS_PER_SEC;
 }
 
 // Back propagation to update weights
-static double back_pass(
+void back_pass(
   queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
   Layer &l_f)
 {
-  clock_t start, end;
-
-  start = clock();
-
   range<1> gws (64 * 64);
   range<1> lws (64);
 
@@ -329,11 +318,6 @@ static double back_pass(
       apply_grad(item, w.get_pointer(), dw.get_pointer(), l_c1_mn); 
     });
   });
-
-  q.wait();
-
-  end = clock();
-  return ((double) (end - start)) / CLOCKS_PER_SEC;
 }
 
 static void learn(
@@ -345,9 +329,6 @@ static void learn(
   int iter)
 {
   float err;
-
-  double time_taken = 0.0;
-
   fprintf(stdout ,"Learning\n");
 
   while (iter < 0 || iter-- > 0) {
@@ -356,7 +337,7 @@ static void learn(
     for (unsigned int i = 0; i < train_cnt; ++i) {
       float tmp_err;
 
-      time_taken += forward_pass(q, l_input, l_c1, l_s1, l_f, train_set[i].data);
+      forward_pass(q, l_input, l_c1, l_s1, l_f, train_set[i].data);
 
       l_f.bp_clear(q);
       l_s1.bp_clear(q);
@@ -378,19 +359,17 @@ static void learn(
       snrm2(q, 10, l_f.d_preact, tmp_err);
       err += tmp_err;
 
-      time_taken += back_pass(q, l_input, l_c1, l_s1, l_f);
+      back_pass(q, l_input, l_c1, l_s1, l_f);
     }
 
     err /= train_cnt;
-    fprintf(stdout, "error: %e, time_on_gpu: %lf\n", err, time_taken);
+    fprintf(stdout, "error: %e\n", err);
 
     if (err < threshold) {
       fprintf(stdout, "Training complete, error less than threshold\n\n");
       break;
     }
   }
-
-  fprintf(stdout, "\n Time - %lf\n", time_taken);
 }
 
 
@@ -467,7 +446,11 @@ int main(int argc, const  char **argv)
   Layer l_s1 (q, 4*4, 1, 6*6*6);
   Layer l_f (q, 6*6*6, 10, 10);
 
+  auto t1 = std::chrono::high_resolution_clock::now();
   learn(q, l_input, l_c1, l_s1, l_f, iter);
   test(q, l_input, l_c1, l_s1, l_f);
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time (learn + test) %lf secs \n", total_time / 1.0e6);
   return 0;
 }

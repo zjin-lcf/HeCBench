@@ -3,12 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
-VERIFY    = yes
-FP64      = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -16,16 +14,16 @@ FP64      = no
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall -I../fsm-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -42,25 +40,23 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(FP64),yes)
-  CFLAGS += -DDOUBLE_PRECISION
-endif
-
-ifeq ($(VERIFY),yes)
-  CFLAGS += -DVERIFY
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu verify.h Makefile
+%.o: %.cpp kernels.h ../fsm-cuda/parameters.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 65536

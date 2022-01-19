@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 VERIFY    = yes
+FP64      = no
 
 #===============================================================================
 # Program name & source code list
@@ -35,10 +36,17 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
+endif
+
+ifeq ($(FP64),yes)
+  CFLAGS += -DDOUBLE_PRECISION
+endif
+
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
 endif
 
 ifeq ($(DEVICE),gpu)
@@ -47,9 +55,6 @@ else
   CFLAGS +=-qopenmp
 endif
 
-ifeq ($(VERIFY),yes)
-  CFLAGS += -DVERIFY
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -57,7 +62,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../hellinger-cuda/verify.cpp 
+%.o: %.cpp ../hellinger-cuda/verify.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -65,4 +70,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

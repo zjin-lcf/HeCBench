@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <chrono>
 #include <cuda.h>
 
 #include "kernel.h"
@@ -505,11 +506,11 @@ int main(int argc, char **argv) {
   }
 
   unsigned char* cpu_in_out = (unsigned char *)malloc(in_size);
-  unsigned char* gpu_in_out = (unsigned char *)malloc(in_size);
 
   unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
 
+  auto t1 = std::chrono::high_resolution_clock::now();
 
   unsigned char* d_in_out;
   cudaMalloc((void**)&d_in_out, sizeof(unsigned char)*in_size);
@@ -527,11 +528,8 @@ int main(int argc, char **argv) {
 
       for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
 
-        // Next frame
-        memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
-
-        // Copy to Device
-        cudaMemcpy(d_in_out, gpu_in_out, in_size, cudaMemcpyHostToDevice);
+        // Copy next frame to device
+        cudaMemcpy(d_in_out, all_gray_frames[task_id], in_size, cudaMemcpyHostToDevice);
      
         int threads = p.n_gpu_threads;
         dim3 grid ((cols-2)/threads, (rows-2)/threads);
@@ -550,12 +548,8 @@ int main(int argc, char **argv) {
         // call HYSTERESIS KERNEL
         hyst_kernel<<<grid, block, smem_size>>>(d_interm_gpu_proxy, d_in_out, rows, cols);
 
-        //cudaDeviceSynchronize();
-
         // Copy from Device
-        cudaMemcpy(gpu_in_out, d_in_out, in_size, cudaMemcpyDeviceToHost);
-
-        memcpy(all_out_frames[task_id], gpu_in_out, in_size);
+        cudaMemcpy(all_out_frames[task_id], d_in_out, in_size, cudaMemcpyDeviceToHost);
       }
 
       for(int task_id = cpu_first(&partitioner); cpu_more(&partitioner); task_id = cpu_next(&partitioner)) {
@@ -573,6 +567,10 @@ int main(int argc, char **argv) {
       }
   }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
+
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time %lf secs \n", total_time / 1.0e6);
 
 
 #ifdef CHAI_OPENCV
@@ -598,7 +596,6 @@ int main(int argc, char **argv) {
   cudaFree(d_interm_gpu_proxy);
   cudaFree(d_theta_gpu_proxy);
 
-  free(gpu_in_out);
   free(cpu_in_out);
   free(h_interm_cpu_proxy);
   free(h_theta_cpu_proxy);

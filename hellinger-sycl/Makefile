@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = yes
+FP64      = no
 
 GPU       = yes
 CUDA      = no
@@ -61,6 +62,10 @@ ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
 
+ifeq ($(FP64),yes)
+  CFLAGS += -DDOUBLE_PRECISION
+endif
+
 ifeq ($(VERIFY),yes)
   CFLAGS += -DVERIFY
 endif
@@ -71,7 +76,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../hellinger-cuda/verify.cpp
+%.o: %.cpp ../hellinger-cuda/verify.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
