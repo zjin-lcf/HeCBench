@@ -685,6 +685,9 @@ Early results are shown [here](results/README.md)
 ### secp256k1 (cuda)
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
+### seam-carving (cuda)
+  Seam carving (https://github.com/pauty/CUDA_seam_carving)
+
 ### sheath (cuda)
   Plasma sheath simulation with the particle-in-cell method (https://www.particleincell.com/2016/cuda-pic/)
 
@@ -805,8 +808,8 @@ Early results are shown [here](results/README.md)
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
-### wse (cuda)
-  Water snow estimation (https://github.com/gpgpu-sim/ispass2009-benchmarks)
+### wsm5 (cuda)
+  WRF Single Moment 5-tracer (https://github.com/gpgpu-sim/ispass2009-benchmarks)
 
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)
