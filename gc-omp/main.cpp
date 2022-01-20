@@ -41,8 +41,10 @@ February 2020.
 */
 
 
+#include <cstdio>
+#include <cstdlib>
 #include <algorithm>
-#include <sys/time.h>
+#include <chrono>
 #include "graph.h"
 
 static const int BPI = 32;  // bits per int
@@ -294,15 +296,6 @@ void runSmall(
   } while (again);
 }
 
-
-struct CPUTimer
-{
-  timeval beg, end;
-  void start() {gettimeofday(&beg, NULL);}
-  float stop() {gettimeofday(&end, NULL); return end.tv_sec - beg.tv_sec + (end.tv_usec - beg.tv_usec) * 0.000001f;}
-};
-
-
 int main(int argc, char* argv[])
 {
   printf("ECL-GC OpenMP v1.2 (%s)\n", __FILE__);
@@ -325,9 +318,7 @@ int main(int argc, char* argv[])
   int* const posscol2 = new int [g.edges / BPI + 1];
   int* const wl = new int [g.nodes];
 
-  CPUTimer timer;
-  timer.start();
-
+  double runtime;
   const int* nindex = g.nindex;
   const int* nlist = g.nlist;
   
@@ -341,26 +332,45 @@ int main(int argc, char* argv[])
                                    nlist[0:g.edges])
   {
 #endif
-    const int wlsize = init(g.nodes, g.edges, nindex, nlist, nlist2, posscol, posscol2, color, wl, threads);
-    runLarge(nindex, nlist2, posscol, posscol2, color, wl, wlsize, threads);
-    runSmall(g.nodes, nindex, nlist, posscol, color, threads);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int n = 0; n < 100; n++) {
+      const int wlsize = init(g.nodes, g.edges, nindex, nlist, nlist2, posscol, posscol2, color, wl, threads);
+      runLarge(nindex, nlist2, posscol, posscol2, color, wl, wlsize, threads);
+      runSmall(g.nodes, nindex, nlist, posscol, color, threads);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    runtime = elapsed_seconds.count() / 100;
+
 #ifdef OMP_TARGET
   }
 #endif
 
-  const float runtime = timer.stop();
-
-  printf("runtime:    %.6f s\n", runtime);
+  printf("average runtime (100 runs):    %.6f s\n", runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
+  bool ok = true;
   for (int v = 0; v < g.nodes; v++) {
-    if (color[v] < 0) {printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n", v, g.nindex[v + 1] - g.nindex[v]);  exit(-1);}
+    if (color[v] < 0) {
+       printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n",
+              v, g.nindex[v + 1] - g.nindex[v]);
+       ok = false;
+       break;
+    }
     for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
-      if (color[g.nlist[i]] == color[v]) {printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n", color[v], v, g.nlist[i]);  exit(-1);}
+      if (color[g.nlist[i]] == color[v]) {
+        printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n",
+               color[v], v, g.nlist[i]);
+        ok = false;
+        break;
+      }
     }
   }
-  printf("result verification passed\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   const int vals = 16;
   int c[vals];
@@ -371,12 +381,12 @@ int main(int argc, char* argv[])
     if (color[v] < vals) c[color[v]]++;
   }
   cols++;
-  printf("colors used: %d\n", cols);
+  printf("Number of distinct colors used: %d\n", cols);
 
   int sum = 0;
   for (int i = 0; i < std::min(vals, cols); i++) {
     sum += c[i];
-    printf("col %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
   }
 
   delete [] color;

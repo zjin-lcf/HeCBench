@@ -373,9 +373,9 @@ int main(int argc, char* argv[])
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  double runtime = elapsed_seconds.count() / 100;
+  float runtime = elapsed_seconds.count() / 100;
 
-  printf("average runtime:    %.6f s\n", runtime);
+  printf("average runtime (100 runs):    %.6f s\n", runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
@@ -410,7 +410,6 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-#ifdef DEBUG
   const int vals = 16;
   int c[vals];
   for (int i = 0; i < vals; i++) c[i] = 0;
@@ -420,14 +419,13 @@ int main(int argc, char* argv[])
     if (color[v] < vals) c[color[v]]++;
   }
   cols++;
-  printf("colors used: %d\n", cols);
+  printf("Number of distinct colors used: %d\n", cols);
 
   int sum = 0;
   for (int i = 0; i < std::min(vals, cols); i++) {
     sum += c[i];
-    printf("col %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
   }
-#endif
 
   delete [] color;
   freeECLgraph(g);
