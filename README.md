@@ -417,6 +417,9 @@ Early results are shown [here](results/README.md)
 ### laplace (cuda)
   A Laplace solver using red-black Gaussian Seidel with SOR solver (https://github.com/kyleniemeyer/laplace_gpu)
 
+### laplace3d (cuda)
+  Solve Laplace equation on a regular 3D grid (https://github.com/gpgpu-sim/ispass2009-benchmarks)
+
 ### lavaMD (opencl)
   LavaMD in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
