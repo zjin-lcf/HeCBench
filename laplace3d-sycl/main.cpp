@@ -66,7 +66,6 @@ int main(int argc, char **argv){
     }
   }
 
-  { // sycl scope
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -75,15 +74,15 @@ int main(int argc, char **argv){
   queue q(dev_sel);
 
   buffer<float, 1> d_u1 (h_u1, grid3D_size);
-  buffer<float, 1> d_u2 (grid3D_size);
+  d_u1.set_final_data(nullptr);
 
-  d_u1.set_final_data(h_u2);
+  buffer<float, 1> d_u2 (grid3D_size);
 
   // Set up the execution configuration
   const int bx = 1 + (NX-1)/BLOCK_X;
   const int by = 1 + (NY-1)/BLOCK_Y;
 
-  range<2> lws (by, bx);
+  range<2> lws (BLOCK_Y, BLOCK_X);
   range<2> gws (by * BLOCK_Y, bx * BLOCK_X);
 
   printf("\n globalSize  = %d %d %d \n", bx * BLOCK_X, by * BLOCK_Y, 1);
@@ -103,7 +102,10 @@ int main(int argc, char **argv){
     std::swap(d_u1, d_u2);
   }
 
-  } // sycl scope
+  q.submit([&] (handler &cgh) {
+    auto acc = d_u1.get_access<sycl_read>(cgh);
+    cgh.copy(acc, h_u2);
+  }).wait();
 
   if (verify) {
     // Reference
