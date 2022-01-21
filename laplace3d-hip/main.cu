@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <hip/hip_runtime.h>
+#include <algorithm>
 #include "kernel.h"
 #include "reference.h"
 
@@ -20,16 +21,6 @@ void printHelp(void);
 
 int main(int argc, char **argv){
 
-  // 'h_' prefix - CPU (host) memory space
-
-  int    NX, NY, NZ, REPEAT, bx, by, i, j, k, ind, pitch;
-  int    verify;
-  float  *h_u1, *h_u2, *h_u3, *h_tmp, err;
-
-  // 'd_' prefix - GPU (device) memory space
-
-  float  *d_u1, *d_u2, *d_tmp;
-
   // check command line inputs
 
   if(argc != 6) {
@@ -37,13 +28,14 @@ int main(int argc, char **argv){
     return 1;
   }
 
-  NX = atoi(argv[1]);
-  NY = atoi(argv[2]);
-  NZ = atoi(argv[3]);
-  REPEAT = atoi(argv[4]);
-  verify = atoi(argv[5]);
+  const int NX = atoi(argv[1]);
+  const int NY = atoi(argv[2]);
+  const int NZ = atoi(argv[3]);
+  const int REPEAT = atoi(argv[4]);
+  const int verify = atoi(argv[5]);
 
-  if (NX <= 0 || NY <= 0 || NZ <= 0 || REPEAT <= 0) return 1;
+  // NX is a multiple of 32
+  if (NX <= 0 || NX % 32 != 0 || NY <= 0 || NZ <= 0 || REPEAT <= 0) return 1;
 
   printf("\nGrid dimensions: %d x %d x %d\n", NX, NY, NZ);
   printf("Result verification %s \n", verify ? "enabled" : "disabled");
@@ -52,22 +44,24 @@ int main(int argc, char **argv){
 
   const size_t grid3D_size = NX * NY * NZ ;
   const size_t grid3D_bytes = grid3D_size * sizeof(float);
-  size_t pitch_bytes;
 
-  h_u1 = (float *) malloc (grid3D_bytes);
-  h_u2 = (float *) malloc (grid3D_bytes);
-  h_u3 = (float *) malloc (grid3D_bytes);
-  hipMallocPitch((void **)&d_u1, &pitch_bytes, sizeof(float)*NX, NY*NZ);
-  hipMallocPitch((void **)&d_u2, &pitch_bytes, sizeof(float)*NX, NY*NZ);
-  pitch = pitch_bytes/sizeof(float);
+  float *h_u1 = (float *) malloc (grid3D_bytes);
+  float *h_u2 = (float *) malloc (grid3D_bytes);
+  float *h_u3 = (float *) malloc (grid3D_bytes);
+
+  float *d_u1, *d_u2;
+  hipMalloc((void **)&d_u1, grid3D_bytes);
+  hipMalloc((void **)&d_u2, grid3D_bytes);
+
+  const int pitch = NX;
 
   // initialise u1
+  int i, j, k;
     
   for (k=0; k<NZ; k++) {
     for (j=0; j<NY; j++) {
       for (i=0; i<NX; i++) {
-        ind = i + j*NX + k*NX*NY;
-
+        int ind = i + j*NX + k*NX*NY;
         if (i==0 || i==NX-1 || j==0 || j==NY-1|| k==0 || k==NZ-1)
           h_u1[ind] = 1.0f;           // Dirichlet b.c.'s
         else
@@ -77,13 +71,11 @@ int main(int argc, char **argv){
   }
 
   // copy u1 to device
-  hipMemcpy2D(d_u1, pitch_bytes, h_u1, 
-               sizeof(float)*NX, sizeof(float)*NX,
-               NY*NZ, hipMemcpyHostToDevice);
+  hipMemcpy(d_u1, h_u1, grid3D_bytes, hipMemcpyHostToDevice);
 
   // Set up the execution configuration
-  bx = 1 + (NX-1)/BLOCK_X;
-  by = 1 + (NY-1)/BLOCK_Y;
+  const int bx = 1 + (NX-1)/BLOCK_X;
+  const int by = 1 + (NY-1)/BLOCK_Y;
 
   dim3 dimGrid(bx,by);
   dim3 dimBlock(BLOCK_X,BLOCK_Y);
@@ -94,31 +86,30 @@ int main(int argc, char **argv){
   // Execute GPU kernel
   for (i = 1; i <= REPEAT; ++i) {
     hipLaunchKernelGGL(laplace3d, dimGrid, dimBlock, 0, 0, NX, NY, NZ, pitch, d_u1, d_u2);
-    d_tmp = d_u1; d_u1 = d_u2; d_u2 = d_tmp;   // swap d_u1 and d_u3
+    std::swap(d_u1, d_u2);
   }
 
   // Read back GPU results
-  hipMemcpy2D(h_u2, sizeof(float)*NX, d_u1, pitch_bytes,
-               sizeof(float)*NX, NY*NZ, hipMemcpyDeviceToHost);
+  hipMemcpy(h_u2,  d_u1, grid3D_bytes, hipMemcpyDeviceToHost);
 
   if (verify) {
     // Reference
     for (i = 1; i <= REPEAT; ++i) {
       reference(NX, NY, NZ, h_u1, h_u3);
-      h_tmp = h_u1; h_u1 = h_u3; h_u3 = h_tmp;   // swap h_u1 and h_u3
+      std::swap(h_u1, h_u3);
     }
 
     // verify (may take long for large grid sizes)
-    err = 0.0;
+    float err = 0.f;
     for (k=0; k<NZ; k++) {
       for (j=0; j<NY; j++) {
         for (i=0; i<NX; i++) {
-          ind = i + j*NX + k*NX*NY;
+          int ind = i + j*NX + k*NX*NY;
           err += (h_u1[ind]-h_u2[ind])*(h_u1[ind]-h_u2[ind]);
         }
       }
     }
-    printf("\n rms error = %f \n",sqrtf(err/ (float)(NX*NY*NZ)));
+    printf("\n rms error = %f \n",sqrtf(err/ NX*NY*NZ));
   }
 
  // Release GPU and CPU memory
