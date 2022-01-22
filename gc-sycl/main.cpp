@@ -53,7 +53,7 @@ static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
-inline int __ffs(int x) {
+inline int ffs(int x) {
   return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
 }
 
@@ -82,12 +82,10 @@ void init(const int nodes,
   const int lane = item.get_local_id(0) % WS;
   const int thread = item.get_global_id(0);
   const int threads = item.get_group_range(0) * ThreadsPerBlock;
+  auto sg = item.get_sub_group();
 
   int maxrange = -1;
-  for (int v = thread; sycl::any_of_group(
-           item.get_sub_group(),
-           (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
-               v < nodes);
+  for (int v = thread; sycl::any_of_group(sg, (Warp & (0x1 << sg.get_local_linear_id())) && v < nodes);
        v += threads) {
     bool cond = false;
     int beg, end, pos, degv, active;
@@ -104,7 +102,8 @@ void init(const int nodes,
         for (int i = beg; i < end; i++) {
           const int nei = nlist[i];
           const int degn = nidx[nei + 1] - nidx[nei];
-          if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
+          if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || 
+             ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
             active |= (unsigned int)MSB >> (i - beg);
             pos++;
           }
@@ -112,40 +111,31 @@ void init(const int nodes,
       }
     }
 
-    int bal = sycl::reduce_over_group(
-        item.get_sub_group(),
-        (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) && cond
-            ? (0x1 << item.get_sub_group().get_local_linear_id())
-            : 0,
-        sycl::ext::oneapi::plus<>());
+    int bal = sycl::reduce_over_group(sg,
+        (Warp & (0x1 << sg.get_local_linear_id())) && cond
+            ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
     while (bal != 0) {
-      const int who = __ffs(bal) - 1;
+      const int who = ffs(bal) - 1;
       bal &= bal - 1;
-      const int wv = sycl::select_from_group(item.get_sub_group(), v, who);
-      const int wbeg = sycl::select_from_group(item.get_sub_group(), beg, who);
-      const int wend = sycl::select_from_group(item.get_sub_group(), end, who);
+      const int wv = sycl::select_from_group(sg, v, who);
+      const int wbeg = sycl::select_from_group(sg, beg, who);
+      const int wend = sycl::select_from_group(sg, end, who);
       const int wdegv = wend - wbeg;
       int wpos = wbeg;
-      for (int i = wbeg + lane; sycl::any_of_group(
-               item.get_sub_group(),
-               (Warp &
-                (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                   i < wend);
+      for (int i = wbeg + lane; sycl::any_of_group( sg,
+               (Warp & (0x1 << sg.get_local_linear_id())) && i < wend);
            i += WS) {
         int wnei;
         bool prio = false;
         if (i < wend) {
           wnei = nlist[i];
           const int wdegn = nidx[wnei + 1] - nidx[wnei];
-          prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
+          prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || 
+                 ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
         }
-        const int b = sycl::reduce_over_group(
-            item.get_sub_group(),
-            (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                    prio
-                ? (0x1 << item.get_sub_group().get_local_linear_id())
-                : 0,
-            sycl::ext::oneapi::plus<>());
+        const int b = sycl::reduce_over_group( sg,
+            (Warp & (0x1 << sg.get_local_linear_id())) && prio
+                ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
         const int offs = sycl::popcount(b & ((1 << lane) - 1));
         if (prio) nlist2[wpos + offs] = wnei;
         wpos += sycl::popcount(b);
@@ -180,14 +170,12 @@ void runLarge(const int nodes,
     const int lane = item.get_local_id(0) % WS;
     const int thread = item.get_global_id(0);
     const int threads = item.get_group_range(0) * ThreadsPerBlock;
+    auto sg = item.get_sub_group();
     bool again;
     do {
       again = false;
-      for (int w = thread; sycl::any_of_group(
-               item.get_sub_group(),
-               (Warp &
-                (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                   w < stop);
+      for (int w = thread; sycl::any_of_group(sg,
+               (Warp & (0x1 << sg.get_local_linear_id())) && w < stop);
            w += threads) {
         bool shortcut, done, cond = false;
         int v, data, range, beg, pcol;
@@ -202,32 +190,25 @@ void runLarge(const int nodes,
           }
         }
 
-        int bal = sycl::reduce_over_group(
-            item.get_sub_group(),
-            (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                    cond
-                ? (0x1 << item.get_sub_group().get_local_linear_id())
-                : 0,
-            sycl::ext::oneapi::plus<>());
+        int bal = sycl::reduce_over_group(sg,
+            (Warp & (0x1 << sg.get_local_linear_id())) && cond
+                ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
         while (bal != 0) {
-          const int who = __ffs(bal) - 1;
+          const int who = ffs(bal) - 1;
           bal &= bal - 1;
-          const int wdata = sycl::select_from_group(item.get_sub_group(), data, who);
+          const int wdata = sycl::select_from_group(sg, data, who);
           const int wrange = wdata >> (WS / 2);
-          const int wbeg = sycl::select_from_group(item.get_sub_group(), beg, who);
+          const int wbeg = sycl::select_from_group(sg, beg, who);
           const int wmincol = wdata & Mask;
           const int wmaxcol = wmincol + wrange;
           const int wend = wbeg + wmaxcol;
           const int woffs = wbeg / WS;
-          int wpcol = sycl::select_from_group(item.get_sub_group(), pcol, who);
+          int wpcol = sycl::select_from_group(sg, pcol, who);
 
           bool wshortcut = true;
           bool wdone = true;
-          for (int i = wbeg + lane; sycl::any_of_group(
-                   item.get_sub_group(),
-                   (Warp &
-                    (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                       i < wend);
+          for (int i = wbeg + lane; sycl::any_of_group(sg,
+                   (Warp & (0x1 << sg.get_local_linear_id())) && i < wend);
                i += WS) {
             int nei, neidata, neirange;
             if (i < wend) {
@@ -255,21 +236,13 @@ void runLarge(const int nodes,
               }
             }
           }
-          wshortcut = sycl::all_of_group(
-              item.get_sub_group(),
-              (~Warp &
-               (0x1 << item.get_sub_group().get_local_linear_id())) ||
-                  wshortcut);
-          wdone = sycl::all_of_group(
-              item.get_sub_group(),
-              (~Warp &
-               (0x1 << item.get_sub_group().get_local_linear_id())) ||
-                  wdone);
-          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 1);
-          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 2);
-          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 4);
-          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 8);
-          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 16);
+          wshortcut = sycl::all_of_group(sg, (~Warp & (0x1 << sg.get_local_linear_id())) || wshortcut);
+          wdone = sycl::all_of_group(sg, (~Warp & (0x1 << sg.get_local_linear_id())) || wdone);
+          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 1);
+          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 2);
+          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 4);
+          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 8);
+          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 16);
           if (who == lane) pcol = wpcol;
           if (who == lane) done = wdone;
           if (who == lane) shortcut = wshortcut;
@@ -299,10 +272,7 @@ void runLarge(const int nodes,
           }
         }
       }
-    } while (sycl::any_of_group(
-        item.get_sub_group(),
-        (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
-            again));
+    } while (sycl::any_of_group(sg, (Warp & (0x1 << sg.get_local_linear_id())) && again));
   }
 }
 
@@ -402,7 +372,7 @@ int main(int argc, char *argv[]) {
   buffer<int, 1> color_d (nodes);
   buffer<int, 1> wl_d (nodes);
   buffer<int, 1> wlsize_d (1);
-  const int blocks = 48;
+  const int blocks = 24;
 
   q.wait();
 
