@@ -48,19 +48,13 @@ February 2020.
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
+static const unsigned int Warp = 0xffffffff;
 static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
-// https://github.com/intel/llvm/discussions/4441
-inline unsigned int ballot(sycl::sub_group sg, int predicate) {
-  size_t id = sg.get_local_linear_id();
-  unsigned int local_val = (predicate ? 1u : 0u) << id;
-  return sycl::reduce_over_group(sg, local_val, sycl::plus<>());
-}
-
-inline int ffs(int x) {
-  return (x == 0) ? 0 : sycl::intel::ctz(x) + 1;
+inline int __ffs(int x) {
+  return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
@@ -71,27 +65,130 @@ static unsigned int hash(unsigned int val)
   return (val >> 16) ^ val;
 }
 
-void kernel_runLarge(
-    nd_item<1> &item,
-    const int nodes, 
-    const int* const __restrict__ nidx,
-    const int* const __restrict__ nlist,
-    volatile int* const __restrict__ posscol,
-             int* const __restrict__ posscol2,
-    volatile int* const __restrict__ color,
-    const int* const __restrict__ wl,
-    const int* __restrict__ wlsize)
+
+void init(const int nodes,
+    const int edges, 
+    const int* const __restrict nidx,
+    const int* const __restrict nlist,
+    int* const __restrict nlist2,
+    int* const __restrict posscol,
+    int* const __restrict posscol2,
+    int* const __restrict color,
+    int* const __restrict wl,
+    int* __restrict wlsize,
+    sycl::nd_item<1> &item,
+    const sycl::stream &out)
 {
-  const int stop = wlsize[0];
+  const int lane = item.get_local_id(0) % WS;
+  const int thread = item.get_global_id(0);
+  const int threads = item.get_group_range(0) * ThreadsPerBlock;
+
+  int maxrange = -1;
+  for (int v = thread; sycl::any_of_group(
+           item.get_sub_group(),
+           (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
+               v < nodes);
+       v += threads) {
+    bool cond = false;
+    int beg, end, pos, degv, active;
+    if (v < nodes) {
+      beg = nidx[v];
+      end = nidx[v + 1];
+      degv = end - beg;
+      cond = (degv >= WS);
+      if (cond) {
+        wl[sycl::atomic<int>(sycl::global_ptr<int>(wlsize)).fetch_add(1)] = v;
+      } else {
+        active = 0;
+        pos = beg;
+        for (int i = beg; i < end; i++) {
+          const int nei = nlist[i];
+          const int degn = nidx[nei + 1] - nidx[nei];
+          if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
+            active |= (unsigned int)MSB >> (i - beg);
+            pos++;
+          }
+        }
+      }
+    }
+
+    int bal = sycl::reduce_over_group(
+        item.get_sub_group(),
+        (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) && cond
+            ? (0x1 << item.get_sub_group().get_local_linear_id())
+            : 0,
+        sycl::ext::oneapi::plus<>());
+    while (bal != 0) {
+      const int who = __ffs(bal) - 1;
+      bal &= bal - 1;
+      const int wv = sycl::select_from_group(item.get_sub_group(), v, who);
+      const int wbeg = sycl::select_from_group(item.get_sub_group(), beg, who);
+      const int wend = sycl::select_from_group(item.get_sub_group(), end, who);
+      const int wdegv = wend - wbeg;
+      int wpos = wbeg;
+      for (int i = wbeg + lane; sycl::any_of_group(
+               item.get_sub_group(),
+               (Warp &
+                (0x1 << item.get_sub_group().get_local_linear_id())) &&
+                   i < wend);
+           i += WS) {
+        int wnei;
+        bool prio = false;
+        if (i < wend) {
+          wnei = nlist[i];
+          const int wdegn = nidx[wnei + 1] - nidx[wnei];
+          prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
+        }
+        const int b = sycl::reduce_over_group(
+            item.get_sub_group(),
+            (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
+                    prio
+                ? (0x1 << item.get_sub_group().get_local_linear_id())
+                : 0,
+            sycl::ext::oneapi::plus<>());
+        const int offs = sycl::popcount(b & ((1 << lane) - 1));
+        if (prio) nlist2[wpos + offs] = wnei;
+        wpos += sycl::popcount(b);
+      }
+      if (who == lane) pos = wpos;
+    }
+
+    if (v < nodes) {
+      const int range = pos - beg;
+      maxrange = sycl::max(maxrange, range);
+      color[v] = (cond || (range == 0)) ? (range << (WS / 2)) : active;
+      posscol[v] = (range >= WS) ? -1 : (MSB >> range);
+    }
+  }
+  if (maxrange >= Mask) out << "too many active neighbors\n";
+
+  for (int i = thread; i < edges / WS + 1; i += threads) posscol2[i] = -1;
+}
+
+void runLarge(const int nodes, 
+    const int* const __restrict nidx,
+    const int* const __restrict nlist,
+    int* const __restrict posscol,
+    int* const __restrict posscol2,
+    volatile int* const __restrict color,
+    const int* const __restrict wl,
+    const int* __restrict wlsize,
+    sycl::nd_item<1> &item)
+{
+  const int stop = *wlsize;
   if (stop != 0) {
     const int lane = item.get_local_id(0) % WS;
     const int thread = item.get_global_id(0);
     const int threads = item.get_group_range(0) * ThreadsPerBlock;
     bool again;
-    auto sg = item.get_sub_group();
     do {
       again = false;
-      for (int w = thread; ext::oneapi::any_of(item.get_group(), w < stop); w += threads) {
+      for (int w = thread; sycl::any_of_group(
+               item.get_sub_group(),
+               (Warp &
+                (0x1 << item.get_sub_group().get_local_linear_id())) &&
+                   w < stop);
+           w += threads) {
         bool shortcut, done, cond = false;
         int v, data, range, beg, pcol;
         if (w < stop) {
@@ -105,22 +202,33 @@ void kernel_runLarge(
           }
         }
 
-        int bal = ballot(sg, cond);
+        int bal = sycl::reduce_over_group(
+            item.get_sub_group(),
+            (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
+                    cond
+                ? (0x1 << item.get_sub_group().get_local_linear_id())
+                : 0,
+            sycl::ext::oneapi::plus<>());
         while (bal != 0) {
-          const int who = ffs(bal) - 1;
+          const int who = __ffs(bal) - 1;
           bal &= bal - 1;
-          const int wdata = sg.shuffle(data, who);
+          const int wdata = sycl::select_from_group(item.get_sub_group(), data, who);
           const int wrange = wdata >> (WS / 2);
-          const int wbeg = sg.shuffle(beg, who);
+          const int wbeg = sycl::select_from_group(item.get_sub_group(), beg, who);
           const int wmincol = wdata & Mask;
           const int wmaxcol = wmincol + wrange;
           const int wend = wbeg + wmaxcol;
           const int woffs = wbeg / WS;
-          int wpcol = sg.shuffle(pcol, who);
+          int wpcol = sycl::select_from_group(item.get_sub_group(), pcol, who);
 
           bool wshortcut = true;
           bool wdone = true;
-          for (int i = wbeg + lane; ext::oneapi::any_of(item.get_group(), i < wend); i += WS) {
+          for (int i = wbeg + lane; sycl::any_of_group(
+                   item.get_sub_group(),
+                   (Warp &
+                    (0x1 << item.get_sub_group().get_local_linear_id())) &&
+                       i < wend);
+               i += WS) {
             int nei, neidata, neirange;
             if (i < wend) {
               nei = nlist[i];
@@ -134,13 +242,10 @@ void kernel_runLarge(
                   wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
                 } else {
                   if ((wmincol <= neicol) && (neicol < wmaxcol) && ((posscol2[woffs + neicol / WS] << (neicol % WS)) < 0)) {
-
-                    //atomic_fetch_and(posscol2[woffs + neicol / WS], (int)(~((unsigned int)MSB >> (neicol % WS))));
-                    auto ao = ext::oneapi::atomic_ref<int, 
-                         ext::oneapi::memory_order::relaxed,
-                         ext::oneapi::memory_scope::device,
-                         access::address_space::global_space> (posscol2[woffs + neicol / WS]);
-                    ao &= (int)(~((unsigned int)MSB >> (neicol % WS)));
+                    sycl::atomic<int>(
+                        sycl::global_ptr<int>(
+                            (int *)(int *)&posscol2[woffs + neicol / WS]))
+                        .fetch_and(~((unsigned int)MSB >> (neicol % WS)));
                   }
                 }
               } else {
@@ -150,13 +255,21 @@ void kernel_runLarge(
               }
             }
           }
-          wshortcut = ext::oneapi::all_of(item.get_group(), wshortcut);
-          wdone = ext::oneapi::all_of(item.get_group(), wdone);
-          wpcol &= sg.shuffle_xor(wpcol, 1);
-          wpcol &= sg.shuffle_xor(wpcol, 2);
-          wpcol &= sg.shuffle_xor(wpcol, 4);
-          wpcol &= sg.shuffle_xor(wpcol, 8);
-          wpcol &= sg.shuffle_xor(wpcol, 16);
+          wshortcut = sycl::all_of_group(
+              item.get_sub_group(),
+              (~Warp &
+               (0x1 << item.get_sub_group().get_local_linear_id())) ||
+                  wshortcut);
+          wdone = sycl::all_of_group(
+              item.get_sub_group(),
+              (~Warp &
+               (0x1 << item.get_sub_group().get_local_linear_id())) ||
+                  wdone);
+          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 1);
+          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 2);
+          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 4);
+          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 8);
+          wpcol &= sycl::permute_group_by_xor(item.get_sub_group(), wpcol, 16);
           if (who == lane) pcol = wpcol;
           if (who == lane) done = wdone;
           if (who == lane) shortcut = wshortcut;
@@ -168,7 +281,7 @@ void kernel_runLarge(
             int val = pcol, mc = 0;
             if (pcol == 0) {
               const int offs = beg / WS;
-              mc = sycl::max(1, mincol / WS);
+              mc = sycl::max(1, (int)(mincol / WS));
               while ((val = posscol2[offs + mc]) == 0) mc++;
             }
             int newmincol = mc * WS + sycl::clz(val);
@@ -186,12 +299,67 @@ void kernel_runLarge(
           }
         }
       }
-    } while (ext::oneapi::any_of(item.get_group(), again));
+    } while (sycl::any_of_group(
+        item.get_sub_group(),
+        (Warp & (0x1 << item.get_sub_group().get_local_linear_id())) &&
+            again));
   }
 }
 
-int main(int argc, char* argv[])
+  
+void runSmall(const int nodes,
+    const int* const __restrict nidx,
+    const int* const __restrict nlist,
+    volatile int* const __restrict posscol,
+    int* const __restrict color,
+    sycl::nd_item<1> &item)
 {
+  const int thread = item.get_global_id(0);
+  const int threads = item.get_group_range(0) * ThreadsPerBlock;
+
+  bool again;
+  do {
+    again = false;
+    for (int v = thread; v < nodes; v += threads) {
+      int pcol = posscol[v];
+      if (sycl::popcount(pcol) > 1) {
+        const int beg = nidx[v];
+        int active = color[v];
+        int allnei = 0;
+        int keep = active;
+        do {
+          const int old = active;
+          active &= active - 1;
+          const int curr = old ^ active;
+          const int i = beg + sycl::clz((int)curr);
+          const int nei = nlist[i];
+          const int neipcol = posscol[nei];
+          allnei |= neipcol;
+          if ((pcol & neipcol) == 0) {
+            pcol &= pcol - 1;
+            keep ^= curr;
+          } else if (sycl::popcount(neipcol) == 1) {
+            pcol ^= neipcol;
+            keep ^= curr;
+          }
+        } while (active != 0);
+        if (keep != 0) {
+          const int best = (unsigned int)MSB >> sycl::clz(pcol);
+          if ((best & ~allnei) != 0) {
+            pcol = best;
+            keep = 0;
+          }
+        }
+        again |= keep;
+        if (keep == 0) keep = sycl::clz(pcol);
+        color[v] = keep;
+        posscol[v] = pcol;
+      }
+    }
+  } while (again);
+}
+
+int main(int argc, char *argv[]) {
   printf("ECL-GC v1.2 (%s)\n", __FILE__);
   printf("Copyright 2020 Texas State University\n\n");
 
@@ -207,8 +375,8 @@ int main(int argc, char* argv[])
     exit(-1);
   }
 
-  ECLgraph g = readECLgraph(argv[1]);
   printf("input: %s\n", argv[1]);
+  ECLgraph g = readECLgraph(argv[1]);
 
   const int nodes = g.nodes;
   const int edges = g.edges;
@@ -234,25 +402,23 @@ int main(int argc, char* argv[])
   buffer<int, 1> color_d (nodes);
   buffer<int, 1> wl_d (nodes);
   buffer<int, 1> wlsize_d (1);
-
-  const int blocks = 24;
+  const int blocks = 48;
 
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
 
-
   range<1> gws (blocks * ThreadsPerBlock);
   range<1> lws (ThreadsPerBlock);
 
-  for (int n = 0; n < 1; n++) {
+  for (int n = 0; n < 100; n++) {
     q.submit([&] (handler &cgh) {
       auto wlsize = wlsize_d.get_access<sycl_write>(cgh);
       cgh.fill(wlsize, 0);
     });
-   
+
     q.submit([&] (handler &cgh) {
-      stream out(1024, 256, cgh);
+      stream out(64*1024, 256, cgh);
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
       auto nlist2 = nlist2_d.get_access<sycl_write>(cgh);
@@ -260,96 +426,29 @@ int main(int argc, char* argv[])
       auto posscol2 = posscol2_d.get_access<sycl_write>(cgh);
       auto color = color_d.get_access<sycl_write>(cgh);
       auto wl = wl_d.get_access<sycl_write>(cgh);
-      auto wlsize = wlsize_d.get_access<sycl_atomic>(cgh);
-      cgh.parallel_for<class init>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-
-        const int lane = item.get_local_id(0) % WS;
-        const int thread = item.get_global_id(0);
-        const int threads = item.get_group_range(0) * ThreadsPerBlock;
-        auto sg = item.get_sub_group();
-
-        int maxrange = -1;
-        for (int v = thread; ext::oneapi::any_of(item.get_group(), v < nodes); v += threads) {
-          bool cond = false;
-          int beg, end, pos, degv, active;
-          if (v < nodes) {
-            beg = nidx[v];
-            end = nidx[v + 1];
-            degv = end - beg;
-            cond = (degv >= WS);
-            if (cond) {
-              wl[atomic_fetch_add(wlsize[0], 1)] = v;
-            } else {
-              active = 0;
-              pos = beg;
-              for (int i = beg; i < end; i++) {
-                const int nei = nlist[i];
-                const int degn = nidx[nei + 1] - nidx[nei];
-                if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
-                  active |= (unsigned int)MSB >> (i - beg);
-                  pos++;
-                }
-              }
-            }
-          }
-
-          int bal = ballot(sg, cond);
-          while (bal != 0) {
-            const int who = ffs(bal) - 1;
-            bal &= bal - 1;
-            const int wv = sg.shuffle(v, who);
-            const int wbeg = sg.shuffle(beg, who);
-            const int wend = sg.shuffle(end, who);
-            const int wdegv = wend - wbeg;
-            int wpos = wbeg;
-            for (int i = wbeg + lane; ext::oneapi::any_of(item.get_group(), i < wend); i += WS) {
-              int wnei;
-              bool prio = false;
-              if (i < wend) {
-                wnei = nlist[i];
-                const int wdegn = nidx[wnei + 1] - nidx[wnei];
-                prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
-              }
-              const int b = ballot(sg, prio);
-              const int offs = sycl::popcount(b & ((1 << lane) - 1));
-              if (prio) nlist2[wpos + offs] = wnei;
-              wpos += sycl::popcount(b);
-            }
-            if (who == lane) pos = wpos;
-          }
-
-          if (v < nodes) {
-            const int range = pos - beg;
-            maxrange = sycl::max(maxrange, range);
-            color[v] = (cond || (range == 0)) ? (range << (WS / 2)) : active;
-            posscol[v] = (range >= WS) ? -1 : (MSB >> range);
-          }
-        }
-        if (maxrange >= Mask) out << "too many active neighbors\n";
-
-        for (int i = thread; i < edges / WS + 1; i += threads) posscol2[i] = -1;
+      auto wlsize = wlsize_d.get_access<sycl_read_write>(cgh);
+      cgh.parallel_for<class init_kernel>(nd_range<1>(gws, lws),
+        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+        init(nodes, edges, nidx.get_pointer(), nlist.get_pointer(), nlist2.get_pointer(),
+             posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
+             wl.get_pointer(), wlsize.get_pointer(), item, out);
       });
     });
 
     q.submit([&] (handler &cgh) {
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist2_d.get_access<sycl_read>(cgh);
+      auto nlist2 = nlist2_d.get_access<sycl_read>(cgh);
       auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
       auto posscol2 = posscol2_d.get_access<sycl_read_write>(cgh);
       auto color = color_d.get_access<sycl_read_write>(cgh);
       auto wl = wl_d.get_access<sycl_read>(cgh);
       auto wlsize = wlsize_d.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class runLarge>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        kernel_runLarge(item, nodes, 
-                        nidx.get_pointer(),
-                        nlist.get_pointer(),
-                        posscol.get_pointer(), 
-                        posscol2.get_pointer(), 
-                        color.get_pointer(), 
-                        wl.get_pointer(), 
-                        wlsize.get_pointer());
-
-      });
+      cgh.parallel_for<class runLarge_kernel>(nd_range<1>(gws, lws),
+        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+        runLarge(nodes, nidx.get_pointer(), nlist2.get_pointer(),
+                 posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
+                 wl.get_pointer(), wlsize.get_pointer(), item);
+        });
     });
 
     q.submit([&] (handler &cgh) {
@@ -357,62 +456,23 @@ int main(int argc, char* argv[])
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
       auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
       auto color = color_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class runSmall>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        const int thread = item.get_global_id(0);
-        const int threads = item.get_group_range(0) * ThreadsPerBlock;
-
-        bool again;
-        do {
-          again = false;
-          for (int v = thread; v < nodes; v += threads) {
-            int pcol = posscol[v];
-            if (sycl::popcount(pcol) > 1) {
-              const int beg = nidx[v];
-              int active = color[v];
-              int allnei = 0;
-              int keep = active;
-              do {
-                const int old = active;
-                active &= active - 1;
-                const int curr = old ^ active;
-                const int i = beg + sycl::clz(curr);
-                const int nei = nlist[i];
-                const int neipcol = posscol[nei];
-                allnei |= neipcol;
-                if ((pcol & neipcol) == 0) {
-                  pcol &= pcol - 1;
-                  keep ^= curr;
-                } else if (sycl::popcount(neipcol) == 1) {
-                  pcol ^= neipcol;
-                  keep ^= curr;
-                }
-              } while (active != 0);
-              if (keep != 0) {
-                const int best = (unsigned int)MSB >> sycl::clz(pcol);
-                if ((best & ~allnei) != 0) {
-                  pcol = best;
-                  keep = 0;
-                }
-              }
-              again |= keep;
-              if (keep == 0) keep = sycl::clz(pcol);
-              color[v] = keep;
-              posscol[v] = pcol;
-            }
-          }
-        } while (again);
+      cgh.parallel_for<class runSmall_kernel>(nd_range<1>(gws, lws), 
+        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+        runSmall(nodes, nidx.get_pointer(), nlist.get_pointer(), 
+                 posscol.get_pointer(), color.get_pointer(), item);
       });
     });
   }
+
   q.wait();
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = elapsed_seconds.count() / 100;
+  double runtime = elapsed_seconds.count() / 100;
 
-  printf("average runtime (100 runs):    %.6f s\n", runtime);
-  printf("throughput: %.6f Mnodes/s\n", nodes * 0.000001 / runtime);
-  printf("throughput: %.6f Medges/s\n", edges * 0.000001 / runtime);
+  printf("average runtime:    %.6f s\n", runtime);
+  printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
+  printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
   q.submit([&] (handler &cgh) {
     auto acc = color_d.get_access<sycl_read>(cgh);
@@ -442,7 +502,7 @@ int main(int argc, char* argv[])
   int c[vals];
   for (int i = 0; i < vals; i++) c[i] = 0;
   int cols = -1;
-  for (int v = 0; v < nodes; v++) {
+  for (int v = 0; v < g.nodes; v++) {
     cols = std::max(cols, color[v]);
     if (color[v] < vals) c[color[v]]++;
   }
@@ -452,7 +512,7 @@ int main(int argc, char* argv[])
   int sum = 0;
   for (int i = 0; i < std::min(vals, cols); i++) {
     sum += c[i];
-    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / nodes);
+    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
   }
 
   delete [] color;
