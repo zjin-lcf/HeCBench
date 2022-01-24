@@ -51,7 +51,6 @@ static const int BPI = 32;  // bits per int
 static const int MSB = 1 << (BPI - 1);
 static const int Mask = (1 << (BPI / 2)) - 1;
 
-// source of hash function: https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
 #ifdef OMP_TARGET
 #pragma omp declare target
 #endif
@@ -60,6 +59,7 @@ static const int Mask = (1 << (BPI / 2)) - 1;
 #define popcount(x)  __builtin_popcount(x)
 #define clz(x)  __builtin_clz(x)
 
+// source of hash function: https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
 static unsigned int hash(unsigned int val)
 {
   val = ((val >> 16) ^ val) * 0x45d9f3b;
