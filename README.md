@@ -609,6 +609,9 @@ Early results are shown [here](results/README.md)
 ### phmm (cuda)
   Pair hidden Markov model (https://github.com/lienliang/Pair_HMM_forward_GPU)
 
+### pnpoly (cuda)
+  Solve the point-in-polygon problem using the crossing number algorithm (https://github.com/benvanwerkhoven/kernel_tuner)
+
 ### pointwise (cuda)
   Fused point-wise operations (https://developer.nvidia.com/blog/optimizing-recurrent-neural-networks-cudnn-5/)
 
