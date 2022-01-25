@@ -240,6 +240,9 @@ Early results are shown [here](results/README.md)
 ### ert (cuda)
   Modified microkernel in the empirical roofline tool (https://bitbucket.org/berkeleylab/cs-roofline-toolkit/src/master/)
    
+### expdist (cuda)
+  Computing the Bhattacharya cost function (https://github.com/benvanwerkhoven/kernel_tuner)
+
 ### extend2 (c)
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
 
