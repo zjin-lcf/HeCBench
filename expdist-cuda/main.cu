@@ -60,7 +60,7 @@ void test() {
 
   for (int i = 0; i < 100; i++) {
     distance<FP><<<grids, blocks>>>(d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost);  
-    reduce_cross_term<FP><<<1, 256>>>(d_output, d_cost, size, size, nblocks);  
+    reduce_cross_term<FP><<<1, reduce_block_size>>>(d_output, d_cost, size, size, nblocks);  
   }
 
   cudaMemcpy(&output, d_output, sizeof(FP), cudaMemcpyDeviceToHost);
