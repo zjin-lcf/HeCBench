@@ -46,7 +46,7 @@ void distance_tiled(
   int m, int n, 
   const T *__restrict__ scale_A,
   const T *__restrict__ scale_B,
-  T *__restrict__ d_cross_term)
+  T *__restrict__ cross_term)
 {
   int tx = threadIdx.x;
   int ty = threadIdx.y;
@@ -69,7 +69,7 @@ void distance_tiled(
   fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_scale_A, scale_A, tx, i);
   fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j);
 
-  T cross_term = 0.0;
+  T s_cross_term = 0.0;
   #pragma unroll
   for (int ti=0; ti<tile_size_x; ti++) {
     #pragma unroll
@@ -84,17 +84,17 @@ void distance_tiled(
           dist_ij += (sh_A[d][tx+ti*block_size_x]-sh_B[d][ty+tj*block_size_y])*
                      (sh_A[d][tx+ti*block_size_x]-sh_B[d][ty+tj*block_size_y]);
         }
-        cross_term += exp(-dist_ij/(sh_scale_A[tx+ti*block_size_x] + sh_scale_B[ty+tj*block_size_y]));
+        s_cross_term += exp(-dist_ij/(sh_scale_A[tx+ti*block_size_x] + sh_scale_B[ty+tj*block_size_y]));
       }
     }
   }
 
-  atomicAdd(&sum, cross_term);
+  atomicAdd(&sum, s_cross_term);
   __syncthreads();
 
   //write back the per-thread block partial cross term
   if (tx == 0 && ty == 0) {
-    d_cross_term[blockIdx.y*gridDim.x+blockIdx.x] = sum;
+    cross_term[blockIdx.y*gridDim.x+blockIdx.x] = sum;
   }
 }
 
@@ -125,7 +125,7 @@ template<typename T>
 __global__
 void reduce_cross_term(
         T *__restrict__ output,
-  const T *__restrict__ d_cross_term,
+  const T *__restrict__ cross_term,
   int m, int n, int nblocks)
 {
   int tx = threadIdx.x;
@@ -135,11 +135,11 @@ void reduce_cross_term(
   if (tx == 0) sum = 0;
   __syncthreads();
 
-  T cross_term = 0;
+  T s_cross_term = 0;
   for (int i=tx; i<nblocks; i+=reduce_block_size)
-    cross_term += d_cross_term[i];
+    s_cross_term += cross_term[i];
 
-  atomicAdd(&sum, cross_term);
+  atomicAdd(&sum, s_cross_term);
 
   __syncthreads();
 
