@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <random>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "kernel.h"
 
 template <typename FP>
@@ -27,6 +27,7 @@ void test(const int size) {
     if (scaleB[i] < (FP)0.0) scaleB[i] = -scaleB[i];
   }
 
+  FP *cost = (FP*) malloc (sizeof(FP) * max_blocks);
   FP output;
 
   FP *d_A;
@@ -36,17 +37,17 @@ void test(const int size) {
   FP *d_cost;
   FP *d_output;
 
-  cudaMalloc((void**)&d_A, sizeof(FP) * size * 2);
-  cudaMalloc((void**)&d_B, sizeof(FP) * size * 2);
-  cudaMalloc((void**)&d_scaleA, sizeof(FP) * size);
-  cudaMalloc((void**)&d_scaleB, sizeof(FP) * size);
-  cudaMalloc((void**)&d_cost, sizeof(FP) * max_blocks);
-  cudaMalloc((void**)&d_output, sizeof(FP));
+  hipMalloc((void**)&d_A, sizeof(FP) * size * 2);
+  hipMalloc((void**)&d_B, sizeof(FP) * size * 2);
+  hipMalloc((void**)&d_scaleA, sizeof(FP) * size);
+  hipMalloc((void**)&d_scaleB, sizeof(FP) * size);
+  hipMalloc((void**)&d_cost, sizeof(FP) * max_blocks);
+  hipMalloc((void**)&d_output, sizeof(FP));
 
-  cudaMemcpy(d_A, A, sizeof(FP) * size * 2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_B, B, sizeof(FP) * size * 2, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_scaleA, scaleA, sizeof(FP) * size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_scaleB, scaleB, sizeof(FP) * size, cudaMemcpyHostToDevice);
+  hipMemcpy(d_A, A, sizeof(FP) * size * 2, hipMemcpyHostToDevice);
+  hipMemcpy(d_B, B, sizeof(FP) * size * 2, hipMemcpyHostToDevice);
+  hipMemcpy(d_scaleA, scaleA, sizeof(FP) * size, hipMemcpyHostToDevice);
+  hipMemcpy(d_scaleB, scaleB, sizeof(FP) * size, hipMemcpyHostToDevice);
 
   dim3 grids (size / (block_size_x * tile_size_x), 
               size / (block_size_y * tile_size_y));
@@ -56,24 +57,25 @@ void test(const int size) {
                       ceilf(size / (block_size_y * tile_size_y));
 
   for (int i = 0; i < 100; i++) {
-    distance<FP><<<grids, blocks>>>(d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost);  
-    reduce_cross_term<FP><<<1, reduce_block_size>>>(d_output, d_cost, size, size, nblocks);  
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(distance<FP>), grids, blocks, 0, 0, d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost);  
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(reduce_cross_term<FP>), 1, reduce_block_size, 0, 0, d_output, d_cost, size, size, nblocks);  
   }
 
-  cudaMemcpy(&output, d_output, sizeof(FP), cudaMemcpyDeviceToHost);
+  hipMemcpy(&output, d_output, sizeof(FP), hipMemcpyDeviceToHost);
   printf("output value: %lf\n", output);
 
-  cudaFree(d_A);
-  cudaFree(d_B);
-  cudaFree(d_scaleA);
-  cudaFree(d_scaleB);
-  cudaFree(d_output);
-  cudaFree(d_cost);
+  hipFree(d_A);
+  hipFree(d_B);
+  hipFree(d_scaleA);
+  hipFree(d_scaleB);
+  hipFree(d_output);
+  hipFree(d_cost);
 
   free(A);
   free(B);
   free(scaleA);
   free(scaleB);
+  free(cost);
 } 
 
 int main(int argc, char* argv[]) {
