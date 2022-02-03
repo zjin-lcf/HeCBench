@@ -1,13 +1,4 @@
-#===============================================================================
-# User Options
-#===============================================================================
-
-# Compiler can be set below, or via environment variable
-CC        = dpcpp
-OPTIMIZE  = yes
-DEBUG     = no
-DEVICE    = gpu
-
+include ../makefile_sycl_include.mk
 #===============================================================================
 # Program name & source code list
 #===============================================================================
@@ -17,32 +8,6 @@ program = AMGMk
 source = csr_matrix.cpp  csr_matvec.cpp  hypre_error.cpp  hypre_memory.cpp  laplace.cpp  main.cpp  vector.cpp
 
 obj = $(source:.cpp=.o)
-
-#===============================================================================
-# Sets Flags
-#===============================================================================
-
-# Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
-
-# Linker Flags
-LDFLAGS = 
-
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
-endif
-
-
-# Optimization Flags
-ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
-endif
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DUSE_GPU
-endif
 
 #===============================================================================
 # Targets to Build

@@ -1,19 +1,4 @@
-#===============================================================================
-# User Options
-#===============================================================================
-
-# Compiler can be set below, or via environment variable
-CC        = clang++
-OPTIMIZE  = yes
-DEBUG     = no
-
-GPU       = yes
-CUDA      = no
-CUDA_ARCH = sm_70
-HIP       = no
-HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-
+include ../makefile_sycl_include.mk
 #===============================================================================
 # Program name & source code list
 #===============================================================================
@@ -24,42 +9,6 @@ source = su3_nn_bench.cpp
 
 obj = $(source:.cpp=.o)
 
-#===============================================================================
-# Sets Flags
-#===============================================================================
-
-# Standard Flags
-CFLAGS := -DUSE_WORKAROUND -DMILC_COMPLEX \
-          -std=c++17 -Wall -I../include -fsycl
-
-# Linker Flags
-LDFLAGS = 
-
-ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
-endif
-
-ifeq ($(HIP), yes)
-  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
-endif
-
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS  += -g -DDEBUG
-  LDFLAGS += -g
-endif
-
-# Optimization Flags
-ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
-endif
-
-ifeq ($(GPU),yes)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -74,5 +23,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -i 100 -l 32 -t 128 -v 3 -w 1
+	./$(program) -i $(NUM_PASSES) -l 32 -t 128 -v 3 -w 1
 
