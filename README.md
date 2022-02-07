@@ -219,6 +219,9 @@ Early results are shown [here](results/README.md)
 ### dp (opencl)
   Dot product (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### dpid (cuda)
+  Detail-preserving image downscaling (https://github.com/mergian/dpid)
+
 ### dslash (sycl)
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
