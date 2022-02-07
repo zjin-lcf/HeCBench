@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   uchar3 *hOutput  = (uchar3*) malloc (sizeof(uchar3) * p.oWidth * p.oHeight);
 
   uint64_t seed = 123;
-  for (int i = 0; i < p.iWidth * p.iHeight; i++) {
+  for (uint32_t i = 0; i < p.iWidth * p.iHeight; i++) {
     hInput[i].x = (unsigned char)(256*LCG_random_double(&seed));
     hInput[i].y = (unsigned char)(256*LCG_random_double(&seed));
     hInput[i].z = (unsigned char)(256*LCG_random_double(&seed));
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   run(p, hInput, hOutput);
 
   int x = 0, y = 0, z = 0;
-  for (int i = 0; i < p.oWidth * p.oHeight; i++) {
+  for (uint32_t i = 0; i < p.oWidth * p.oHeight; i++) {
     x += hOutput[i].x;
     y += hOutput[i].y;
     z += hOutput[i].z;
