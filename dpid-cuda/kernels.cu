@@ -74,9 +74,9 @@ struct Local {
 
   __device__ __forceinline__ Local(const Params& p) {
     sx      = fmaxf( PX    * p.pWidth, 0.f);
-    ex      = fminf((PX+1) * p.pWidth, p.iWidth);
+    ex      = fminf((PX+1) * p.pWidth, (float)p.iWidth);
     sy      = fmaxf( PY    * p.pHeight, 0.f);
-    ey      = fminf((PY+1) * p.pHeight, p.iHeight);
+    ey      = fminf((PY+1) * p.pHeight, (float)p.iHeight);
 
     sxr      = (uint32_t)floorf(sx);
     syr      = (uint32_t)floorf(sy);
@@ -133,7 +133,7 @@ void kernelGuidance(const uchar3* __restrict__ input,
 
   // init
   const Local l(p);
-  float4 color = {0};
+  float4 color = make_float4(0.f, 0.f, 0.f, 0.f);
 
   // iterate pixels
   for(uint32_t i = WTHREAD; i < l.pixelCount; i += WSIZE) {
@@ -163,7 +163,7 @@ float4 calcAverage(const Params& p, const uchar3* __restrict__ patches) {
   const float center = 4.0;
 
   // calculate average color
-  float4 avg = {0};
+  float4 avg = make_float4(0.f, 0.f, 0.f, 0.f);
 
   // TOP
   if(PY > 0) {
@@ -216,7 +216,7 @@ void kernelDownsampling(const uchar3* __restrict__ input,
   const Local l(p);
   const float4 avg = calcAverage(p, patches);
 
-  float4 color = {0};
+  float4 color = make_float4(0.f, 0.f, 0.f, 0.f);
 
   // iterate pixels
   for(uint32_t i = WTHREAD; i < l.pixelCount; i += WSIZE) {
