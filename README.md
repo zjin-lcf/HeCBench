@@ -141,6 +141,9 @@ Early results are shown [here](results/README.md)
 ### b+tree (opencl)
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### car (cuda)
+  Content adaptive resampling (https://github.com/sunwj/CAR)
+
 ### cbsfil (cuda)
   Cubic b-spline filtering (https://github.com/DannyRuijters/CubicInterpolationCUDA)
 
