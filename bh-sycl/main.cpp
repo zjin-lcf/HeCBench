@@ -863,7 +863,7 @@ int main(int argc, char* argv[])
   runtime = (endtime.tv_sec + endtime.tv_usec/1000000.0 - 
              starttime.tv_sec - starttime.tv_usec/1000000.0);
 
-  printf("Kernel execution time: %.4lf s\n", runtime);
+  printf("Total kernel execution time: %.4lf s\n", runtime);
 
   // transfer final results back to a host
   q.submit([&] (handler &cgh) {
@@ -883,7 +883,7 @@ int main(int argc, char* argv[])
 
   q.wait();
 
-#ifdef DUMP
+#ifdef DEBUG
   // print output for verification
   for (i = 0; i < nbodies; i++) {
     printf("%d: %.2e %.2e %.2e\n", i, posMass[i].x(), posMass[i].y(), posMass[i].z());

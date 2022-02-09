@@ -67,7 +67,7 @@ Emerald Edition, pp. 75-92. January 2011.
 //
 // compute center and radius
 //
-  __global__
+__global__
 void BoundingBoxKernel(
     const int nnodesd,
     const int nbodiesd,
@@ -181,7 +181,7 @@ void BoundingBoxKernel(
 //
 // build tree
 //
-  __global__
+__global__
 void ClearKernel1(const int nnodesd, const int nbodiesd, int* const __restrict__ childd)
 {
   int top = 8 * nnodesd;
@@ -198,7 +198,7 @@ void ClearKernel1(const int nnodesd, const int nbodiesd, int* const __restrict__
 }
 
 
-  __global__
+__global__
 void TreeBuildingKernel(
     const int nnodesd,
     const int nbodiesd,
@@ -317,7 +317,7 @@ void TreeBuildingKernel(
 }
 
 
-  __global__
+__global__
 void ClearKernel2(
     const int nnodesd, 
     int* const __restrict__ startd, 
@@ -344,7 +344,7 @@ void ClearKernel2(
 // compute center of mass
 //
 
-  __global__
+__global__
 void SummarizationKernel(
     const int nnodesd, 
     const int nbodiesd,
@@ -491,7 +491,7 @@ void SummarizationKernel(
 //
 // sort bodies
 //
-  __global__
+__global__
 void SortKernel(
     const int nnodesd,
     const int nbodiesd, 
@@ -541,7 +541,7 @@ void SortKernel(
 //
 // compute force
 //
-  __global__
+__global__
 void ForceCalculationKernel(
     const int nnodesd, 
     const int nbodiesd,
@@ -663,7 +663,7 @@ void ForceCalculationKernel(
 //
 // advance bodies
 //
-  __global__
+__global__
 void IntegrationKernel(
      const int nbodiesd,
      const float dtimed,
@@ -704,7 +704,7 @@ void IntegrationKernel(
   }
 }
 
-  __global__
+__global__
 void InitializationKernel(int *step, unsigned int *blkcnt)
 {
   *step = -1;
@@ -926,7 +926,7 @@ int main(int argc, char* argv[])
   runtime = (endtime.tv_sec + endtime.tv_usec/1000000.0 - 
              starttime.tv_sec - starttime.tv_usec/1000000.0);
 
-  printf("Kernel execution time: %.4lf s\n", runtime);
+  printf("Total kernel execution time: %.4lf s\n", runtime);
 
   // transfer final results back to a host
   if (hipSuccess != hipMemcpy(accVel, d_accVel, sizeof(float4) * nbodies, hipMemcpyDeviceToHost))
@@ -938,7 +938,7 @@ int main(int argc, char* argv[])
   if (hipSuccess != hipMemcpy(posMass, d_posMass, sizeof(float4) * nbodies, hipMemcpyDeviceToHost))
     fprintf(stderr, "copying of posMass from device failed\n");
 
-#ifdef DUMP
+#ifdef DEBUG
   // print output for verification
   for (i = 0; i < nbodies; i++) {
     printf("%d: %.2e %.2e %.2e\n", i, posMass[i].x, posMass[i].y, posMass[i].z);
