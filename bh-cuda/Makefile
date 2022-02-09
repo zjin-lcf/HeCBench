@@ -6,7 +6,6 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = no
 ARCH      = sm_60
 
 #===============================================================================
@@ -30,13 +29,8 @@ CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 LDFLAGS = 
 
 # Debug Flags
-ifeq ($(DUMP),yes)
-  CFLAGS += -DDUMP
-endif
-
-# Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -G
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
@@ -60,4 +54,3 @@ clean:
 
 run: $(program)
 	./$(program) 100000 100
-
