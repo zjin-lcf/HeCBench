@@ -198,6 +198,9 @@ Early results are shown [here](results/README.md)
 ### d2q9_bgk (sycl)
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
+### damage (opencl)
+  The continuum level damage in a peridynamic body (https://github.com/alan-turing-institute/PeriPy)
+
 ### dct8x8 (opencl)
   Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
