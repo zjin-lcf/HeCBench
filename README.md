@@ -147,6 +147,9 @@ Early results are shown [here](results/README.md)
 ### cbsfil (cuda)
   Cubic b-spline filtering (https://github.com/DannyRuijters/CubicInterpolationCUDA)
 
+### cc (cuda)
+  Connected components (https://userweb.cs.txstate.edu/~burtscher/research/ECL-CC/)
+
 ### ccs (cuda)
   Condition-dependent Correlation Subgroups (https://github.com/abhatta3/Condition-dependent-Correlation-Subgroups-CCS)
 
