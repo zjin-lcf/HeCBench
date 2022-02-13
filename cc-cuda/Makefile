@@ -54,4 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) internet.egr
+	ulimit -s unlimited	
+	./$(program) ../mis-cuda/internet.egr 
