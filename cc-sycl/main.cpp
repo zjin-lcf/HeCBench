@@ -48,7 +48,10 @@ June 2018.
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
-static const int warpsize = 32;
+
+#ifndef WARPSIZE
+#define WARPSIZE 32
+#endif
 
 template <typename T, access::address_space 
           addressSpace = access::address_space::global_space>
@@ -183,7 +186,7 @@ void compute2(nd_item<1> &item,
               const int *const __restrict topL,
                     int *const __restrict posL)
 {
-  const int lane = item.get_local_id(0) % warpsize;
+  const int lane = item.get_local_id(0) % WARPSIZE;
 
   int idx;
   if (lane == 0) idx = sycl::atomic<int>(sycl::global_ptr<int>(posL)).fetch_add(1);
@@ -191,7 +194,7 @@ void compute2(nd_item<1> &item,
   while (idx < *topL) {
     const int v = wl[idx];
     int vstat = representative(v, nstat);
-    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += warpsize) {
+    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += WARPSIZE) {
       const int nli = nlist[i];
       if (v > nli) {
         int ostat = representative(nli, nstat);
@@ -314,8 +317,11 @@ static void computeCC(const int nodes, const int edges,
   queue q(dev_sel);
 
   const int SMs = q.get_device().get_info<info::device::max_compute_units>();
-  const int mTSM = q.get_device().get_info<info::device::max_work_group_size>();
+  // not supported by SYCL yet
+  const int mTSM = 2048;
   const int blocks = SMs * mTSM / ThreadsPerBlock;
+  printf("Number of multiprocessor = %d\n", SMs);
+  printf("Max threads per multiprocessor = %d\n", mTSM);
   printf("Number of thread blocks in a grid = %d\n", blocks);
 
   buffer<int, 1> topL_d (1);
@@ -372,7 +378,7 @@ static void computeCC(const int nodes, const int edges,
       auto topL = topL_d.get_access<sycl_read>(cgh);
       auto posL = posL_d.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class compute_med>(nd_range<1>(gws, lws), [=] (nd_item<1> item)
-          [[intel::reqd_sub_group_size(32)]] {
+          [[intel::reqd_sub_group_size(WARPSIZE)]] {
         compute2(item, nodes, nidx.get_pointer(), nlist.get_pointer(),
                  nstat.get_pointer(), wl.get_pointer(),
                  topL.get_pointer(), posL.get_pointer());
@@ -388,7 +394,7 @@ static void computeCC(const int nodes, const int edges,
       auto posH = posH_d.get_access<sycl_read_write>(cgh);
       accessor<int, 1, sycl_read_write, access::target::local> vB (1, cgh);
       cgh.parallel_for<class compute_high>(nd_range<1>(gws, lws), [=] (nd_item<1> item)
-          [[intel::reqd_sub_group_size(32)]] {
+          [[intel::reqd_sub_group_size(WARPSIZE)]] {
         compute3(item, nodes, nidx.get_pointer(), nlist.get_pointer(),
                  nstat.get_pointer(), wl.get_pointer(),
                  topH.get_pointer(), posH.get_pointer(), vB.get_pointer());

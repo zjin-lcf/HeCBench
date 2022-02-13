@@ -43,19 +43,19 @@ June 2018.
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <set>
 #include <chrono>
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
-static const int warpsize = 32;
+static const int warpsize = 64;
 
 static __device__ int topL, posL, topH, posH;
 
 /* initialize with first smaller neighbor ID */
 
-static __global__ __launch_bounds__(ThreadsPerBlock, 2048 / ThreadsPerBlock)
+static __global__ __launch_bounds__(ThreadsPerBlock, 2560 / ThreadsPerBlock)
 void init(const int nodes,
           const int* const __restrict__ nidx,
           const int* const __restrict__ nlist,
@@ -97,7 +97,7 @@ static inline __device__ int representative(const int idx, int* const __restrict
 
 /* process low-degree vertices at thread granularity and fill worklists */
 
-static __global__ __launch_bounds__(ThreadsPerBlock, 2048 / ThreadsPerBlock)
+static __global__ __launch_bounds__(ThreadsPerBlock, 2560 / ThreadsPerBlock)
 void compute1(const int nodes,
               const int* const __restrict__ nidx,
               const int* const __restrict__ nlist,
@@ -165,7 +165,7 @@ void compute2(const int nodes,
 
   int idx;
   if (lane == 0) idx = atomicAdd(&posL, 1);
-  idx = __shfl_sync(0xffffffff, idx, 0);
+  idx = __shfl(idx, 0);
   while (idx < topL) {
     const int v = wl[idx];
     int vstat = representative(v, nstat);
@@ -194,7 +194,7 @@ void compute2(const int nodes,
       }
     }
     if (lane == 0) idx = atomicAdd(&posL, 1);
-    idx = __shfl_sync(0xffffffff, idx, 0);
+    idx = __shfl(idx, 0);
   }
 }
 
@@ -275,8 +275,8 @@ static void computeCC(const int nodes, const int edges,
                       const int* const __restrict__ nlist,
                             int* const __restrict__ nstat)
 {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, 0);
+  hipDeviceProp_t deviceProp;
+  hipGetDeviceProperties(&deviceProp, 0);
   const int SMs = deviceProp.multiProcessorCount;
   const int mTSM = deviceProp.maxThreadsPerMultiProcessor;
   const int blocks = SMs * mTSM / ThreadsPerBlock;
@@ -289,36 +289,36 @@ static void computeCC(const int nodes, const int edges,
   int* nstat_d;
   int* wl_d;
 
-  if (cudaSuccess != cudaMalloc((void **)&nidx_d, (nodes + 1) * sizeof(int))) 
+  if (hipSuccess != hipMalloc((void **)&nidx_d, (nodes + 1) * sizeof(int))) 
     fprintf(stderr, "ERROR: could not allocate nidx_d\n\n");
 
-  if (cudaSuccess != cudaMalloc((void **)&nlist_d, edges * sizeof(int)))
+  if (hipSuccess != hipMalloc((void **)&nlist_d, edges * sizeof(int)))
     fprintf(stderr, "ERROR: could not allocate nlist_d\n\n");
 
-  if (cudaSuccess != cudaMalloc((void **)&nstat_d, nodes * sizeof(int))) 
+  if (hipSuccess != hipMalloc((void **)&nstat_d, nodes * sizeof(int))) 
     fprintf(stderr, "ERROR: could not allocate nstat_d,\n\n");
 
-  if (cudaSuccess != cudaMalloc((void **)&wl_d, nodes * sizeof(int))) 
+  if (hipSuccess != hipMalloc((void **)&wl_d, nodes * sizeof(int))) 
     fprintf(stderr, "ERROR: could not allocate wl_d,\n\n");
 
-  if (cudaSuccess != cudaMemcpy(nidx_d, nidx, (nodes + 1) * sizeof(int), cudaMemcpyHostToDevice)) 
+  if (hipSuccess != hipMemcpy(nidx_d, nidx, (nodes + 1) * sizeof(int), hipMemcpyHostToDevice)) 
     fprintf(stderr, "ERROR: copying nidx to device failed\n\n");
 
-  if (cudaSuccess != cudaMemcpy(nlist_d, nlist, edges * sizeof(int), cudaMemcpyHostToDevice))
+  if (hipSuccess != hipMemcpy(nlist_d, nlist, edges * sizeof(int), hipMemcpyHostToDevice))
     fprintf(stderr, "ERROR: copying nlist to device failed\n\n");
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   auto start = std::chrono::high_resolution_clock::now();
 
   for (int n = 0; n < 100; n++) {
-    init<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d);
-    compute1<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d, wl_d);
-    compute2<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d, wl_d);
-    compute3<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d, wl_d);
-    flatten<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d);
+    hipLaunchKernelGGL(init, blocks, ThreadsPerBlock, 0, 0, nodes, nidx_d, nlist_d, nstat_d);
+    hipLaunchKernelGGL(compute1, blocks, ThreadsPerBlock, 0, 0, nodes, nidx_d, nlist_d, nstat_d, wl_d);
+    hipLaunchKernelGGL(compute2, blocks, ThreadsPerBlock, 0, 0, nodes, nidx_d, nlist_d, nstat_d, wl_d);
+    hipLaunchKernelGGL(compute3, blocks, ThreadsPerBlock, 0, 0, nodes, nidx_d, nlist_d, nstat_d, wl_d);
+    hipLaunchKernelGGL(flatten, blocks, ThreadsPerBlock, 0, 0, nodes, nidx_d, nlist_d, nstat_d);
   }
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
@@ -328,13 +328,13 @@ static void computeCC(const int nodes, const int edges,
   printf("throughput: %.3f Mnodes/s\n", nodes * 0.000001 / runtime);
   printf("throughput: %.3f Medges/s\n", edges * 0.000001 / runtime);
 
-  if (cudaSuccess != cudaMemcpy(nstat, nstat_d, nodes * sizeof(int), cudaMemcpyDeviceToHost)) 
+  if (hipSuccess != hipMemcpy(nstat, nstat_d, nodes * sizeof(int), hipMemcpyDeviceToHost)) 
     fprintf(stderr, "ERROR: copying nstat from device failed\n\n");
 
-  cudaFree(wl_d);
-  cudaFree(nstat_d);
-  cudaFree(nlist_d);
-  cudaFree(nidx_d);
+  hipFree(wl_d);
+  hipFree(nstat_d);
+  hipFree(nlist_d);
+  hipFree(nidx_d);
 }
 
 static void verify(const int v, const int id, const int* const __restrict__ nidx, 
@@ -364,7 +364,7 @@ int main(int argc, char* argv[])
   ECLgraph g = readECLgraph(argv[1]);
 
   int* nodestatus = NULL;
-  cudaHostAlloc(&nodestatus, g.nodes * sizeof(int), cudaHostAllocDefault);
+  hipHostAlloc((void**)&nodestatus, g.nodes * sizeof(int), hipHostMallocDefault);
   if (nodestatus == NULL) {
     fprintf(stderr, "ERROR: nodestatus - host memory allocation failed\n\n");
     exit(-1);
@@ -428,7 +428,7 @@ int main(int argc, char* argv[])
   }
 
   printf("%s\n", ok ? "PASS" : "FAIL");
-  cudaFreeHost(nodestatus);
+  hipHostFree(nodestatus);
   freeECLgraph(g);
 
   return 0;
