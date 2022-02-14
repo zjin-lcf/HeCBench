@@ -177,6 +177,9 @@ Early results are shown [here](results/README.md)
 ### clink (c)
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
 
+### cm (cuda)
+  Gene expression connectivity mapping (https://pubmed.ncbi.nlm.nih.gov/24112435/)
+
 ### cmp (cuda)
   Seismic processing using the classic common midpoint (CMP) method (https://github.com/hpg-cepetro/IPDPS-CRS-CMP-code)
 
