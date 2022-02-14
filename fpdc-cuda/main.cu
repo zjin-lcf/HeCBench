@@ -320,7 +320,7 @@ static void VerifySystemParameters()
   int val = 1;
   assert(1 == *((char *)&val));
    
-  if ((WARPSIZE <= 0) || (WARPSIZE & (WARPSIZE-1) != 0)) {
+  if ((WARPSIZE <= 0) || ((WARPSIZE & (WARPSIZE-1)) != 0)) {
     fprintf(stderr, "Warp size must be greater than zero and a power of two\n");
     exit(-1);
   }
