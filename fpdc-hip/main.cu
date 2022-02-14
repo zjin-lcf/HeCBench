@@ -130,22 +130,6 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
   if (hipSuccess != hipMalloc((void **)&offl, sizeof(int) * blocks * warpsperblock))
     fprintf(stderr, "could not allocate offd\n");
 
-  // copy buffer starting addresses (pointers) and values to constant memory
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(dimensionalityd), &dimensionality, sizeof(int)))
-    fprintf(stderr, "copying of dimensionality to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(cbufd), &cbufl, sizeof(void *)))
-    fprintf(stderr, "copying of cbufl to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(dbufd), &dbufl, sizeof(void *)))
-    fprintf(stderr, "copying of dbufl to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(cutd), &cutl, sizeof(void *)))
-    fprintf(stderr, "copying of cutl to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(offd), &offl, sizeof(void *)))
-    fprintf(stderr, "copying of offl to device failed\n");
-
   // copy CPU buffer contents to GPU
   if (hipSuccess != hipMemcpy(cbufl, cbuf, sizeof(ull) * doubles, hipMemcpyHostToDevice))
     fprintf(stderr, "copying of cbuf to device failed\n");
@@ -154,7 +138,8 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
     fprintf(stderr, "copying of cut to device failed\n");
 
   for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(CompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0);
+    hipLaunchKernelGGL(CompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0, 
+      dimensionality, cbufl, dbufl, cutl, offl);
   CheckTest("compression kernel launch failed");
 
   // transfer offsets back to CPU
@@ -274,19 +259,6 @@ static void Decompress(int blocks, int warpsperblock, int dimensionality, int do
   if (hipSuccess != hipMalloc((void **)&cutl, sizeof(int) * blocks * warpsperblock))
     fprintf(stderr, "could not allocate cutd\n");
 
-  // copy buffer starting addresses (pointers) and values to constant memory
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(dimensionalityd), &dimensionality, sizeof(int))) 
-    fprintf(stderr, "copying of dimensionality to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(dbufd), &dbufl, sizeof(void *)))
-    fprintf(stderr, "copying of dbufl to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(fbufd), &fbufl, sizeof(void *)))
-    fprintf(stderr, "copying of fbufl to device failed\n");
-
-  if (hipSuccess != hipMemcpyToSymbol(HIP_SYMBOL(cutd), &cutl, sizeof(void *)))
-    fprintf(stderr, "copying of cutl to device failed\n");
-
 #ifdef DEBUG
   printf("[Decompress] read in input data and divide into chunks\n");
 #endif
@@ -309,7 +281,8 @@ static void Decompress(int blocks, int warpsperblock, int dimensionality, int do
   printf("[Decompress] run the kernel for 100 iterations\n");
 #endif
   for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(DecompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0);
+    hipLaunchKernelGGL(DecompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0, 
+      dimensionality, dbufl, fbufl, cutl);
   CheckTest("decompression kernel launch failed");
 
   // transfer result back to CPU
@@ -327,6 +300,9 @@ static void Decompress(int blocks, int warpsperblock, int dimensionality, int do
   free(cut);
 
   if(hipSuccess != hipFree(dbufl))
+    fprintf(stderr, "could not deallocate dbufd\n");
+
+  if(hipSuccess != hipFree(fbufl))
     fprintf(stderr, "could not deallocate dbufd\n");
 
   if(hipSuccess != hipFree(cutl))
