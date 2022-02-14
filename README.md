@@ -294,13 +294,13 @@ Early results are shown [here](results/README.md)
 ### fluidSim (opencl)
   2D Fluid Simulation using the Lattice-Boltzman method (https://github.com/OpenCL/AMD_APP_samples)
 
-### fpdc (cuda)
-  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
-  
 388). ACM.)
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
+
+### fpdc (cuda)
+  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
 
 ### fresnel (c)
   Fresnel integral (http://www.mymathlib.com/functions/fresnel_sin_cos_integrals.html)
