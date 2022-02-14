@@ -2,12 +2,6 @@
 #define MAX (64*1024*1024)
 #define WARPSIZE 32
 
-__constant__ int dimensionalityd; // dimensionality parameter
-__constant__ ull *cbufd; // ptr to uncompressed data
-__constant__ unsigned char *dbufd; // ptr to compressed data
-__constant__ ull *fbufd; // ptr to decompressed data
-__constant__ int *cutd; // ptr to chunk boundaries
-__constant__ int *offd; // ptr to chunk offsets after compression
 
 /************************************************************************************/
 
@@ -28,7 +22,12 @@ The compressed data, in dbufd
 Compressed chunk offsets for offset table, in offd
 */
 
-__global__ void CompressionKernel()
+__global__ void CompressionKernel(
+  const int dimensionalityd,
+  const ull *__restrict__ cbufd,
+  char *__restrict__ dbufd,
+  const int *__restrict__ cutd,
+  int *__restrict__ offd)
 {
   register int offset, code, bcount, tmp, off, beg, end, lane, warp, iindex, lastidx, start, term;
   register ull diff, prev;
@@ -128,7 +127,11 @@ Output
 The decompressed data in fbufd
 */
 
-__global__ void DecompressionKernel()
+__global__ void DecompressionKernel(
+ const int dimensionalityd,
+ const char *__restrict__ dbufd,
+ ull *__restrict__ fbufd,
+ const int *__restrict__ cutd)
 {
   register int offset, code, bcount, off, beg, end, lane, warp, iindex, lastidx, start, term;
   register ull diff, prev;
