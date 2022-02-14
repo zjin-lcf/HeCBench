@@ -294,6 +294,10 @@ Early results are shown [here](results/README.md)
 ### fluidSim (opencl)
   2D Fluid Simulation using the Lattice-Boltzman method (https://github.com/OpenCL/AMD_APP_samples)
 
+### fpdc (cuda)
+  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
+  
+388). ACM.)
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
@@ -848,4 +852,5 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 ## Acknowledgement
 Anton Gorshkov, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
-The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
+The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
+
