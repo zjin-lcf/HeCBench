@@ -72,7 +72,7 @@ void CompressionKernel(
     }
 
     // count leading zeros in positive delta
-    bcount = 8 - (sycl::clz((long long)diff) >> 3);
+    bcount = 8 - (sycl::clz(diff) >> 3);
     if (bcount == 2) bcount = 3; // encode 6 lead-zero bytes as 5
 
     // prefix sum to determine start positions of non-zero delta bytes
