@@ -815,6 +815,9 @@ Early results are shown [here](results/README.md)
 ### tonemapping (opencl)
   Tone mapping (https://github.com/OpenCL/AMD_APP_samples)
 
+### tpacf (cuda)
+  The 2-point correlation function (https://users.ncsa.illinois.edu/kindr/projects/hpca/index.html)
+
 ### transpose (cuda)
   Tensor transposition (https://github.com/Jokeren/GPA-Benchmark/tree/master/ExaTENSOR)
 
