@@ -38,10 +38,10 @@ double *init_bins(int bins_per_dec, float min_angle, float max_angle, int angle_
 void calculatejkSizes(int njk, int ndPoints, int** jkSizes);
 void write_results(long long **DD, long long **RRS, long long **DRS, int njk, int nbins, int bins_per_dec, float min_angle, int random_count, char *fname);
 
-extern void writeBoundaries(double *binbs);
-extern void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int randomSize, int njk, int* jkSizes, int nBins,
+void writeBoundaries(double *binbs);
+void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int randomSize, int njk, int* jkSizes, int nBins,
     int zeroBin, long long** DDs, long long** DRs, long long** RRs);
-extern void compileHistograms(long long* DDs, long long* DRs, long long* RRs, long long*** DD, long long*** DR, long long*** RR, options *args);
+void compileHistograms(long long* DDs, long long* DRs, long long* RRs, long long*** DD, long long*** DR, long long*** RR, options *args);
 
 int main(int argc, char* argv[])
 {

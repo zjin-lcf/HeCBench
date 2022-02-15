@@ -52,9 +52,9 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c args.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -x cu $(CFLAGS) -c $< -o $@
 
-compute.o: args.h compute.cu model_io.cu ACF_kernel.cu histogram_kernel.cu Makefile
+compute.o: compute.cu model_io.cu ACF_kernel.cu histogram_kernel.cu args.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
