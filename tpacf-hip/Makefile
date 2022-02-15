@@ -1,0 +1,67 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = hipcc
+OPTIMIZE  = yes
+DEBUG     = no
+
+POINTS    = 97178
+DATAPARS  = -d ../tpacf-cuda/data/small/Datapnts.1 -p $(POINTS)
+RANDPARS  = -r ../tpacf-cuda/data/small/Randompnts -n 100 -q $(POINTS)
+ANALPARS  = -b 5 -l 1 -u 10000 -a -j 10
+OUTFILE   = ./small_results_test_g200.dat
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = main.c args.c compute.cu
+
+obj = main.o args.o compute.o
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Wall -I../tpacf-cuda
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -DDEBUG
+  LDFLAGS  += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+main.o: ../tpacf-cuda/main.c ../tpacf-cuda/args.h Makefile
+	$(CC) -x hip $(CFLAGS) -c $< -o $@
+
+args.o: ../tpacf-cuda/args.c ../tpacf-cuda/args.h Makefile
+	$(CC) -x hip $(CFLAGS) -c $< -o $@
+
+compute.o: compute.cu ../tpacf-cuda/args.h ../tpacf-cuda/model_io.cu \
+           ACF_kernel.cu histogram_kernel.cu Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj) $(OUTFILE)
+
+run: $(program)
+	./$(program) $(DATAPARS) $(RANDPARS) $(ANALPARS) -o $(OUTFILE)
