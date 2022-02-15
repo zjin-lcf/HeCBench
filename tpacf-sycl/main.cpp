@@ -107,6 +107,8 @@ int main(int argc, char* argv[])
   if(args.njk == 1) args.njk = 0; // # of jackknives should only be 1 if jackknife resampling is not to be used.
 
   write_results(DD, RR, DR, args.njk, tempnbins, args.bins_per_dec, args.min_angle, args.random_count, args.output_name);
+
+  return 0;
 }
 
 void calculatejkSizes(int njk, int ndPoints, int** jkSizes) {
