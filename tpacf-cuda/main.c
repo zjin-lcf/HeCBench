@@ -38,7 +38,6 @@ double *init_bins(int bins_per_dec, float min_angle, float max_angle, int angle_
 void calculatejkSizes(int njk, int ndPoints, int** jkSizes);
 void write_results(long long **DD, long long **RRS, long long **DRS, int njk, int nbins, int bins_per_dec, float min_angle, int random_count, char *fname);
 
-extern void cudaDeviceInit();
 extern void writeBoundaries(double *binbs);
 extern void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int randomSize, int njk, int* jkSizes, int nBins,
     int zeroBin, long long** DDs, long long** DRs, long long** RRs);
@@ -107,6 +106,8 @@ int main(int argc, char* argv[])
   if(args.njk == 1) args.njk = 0; // # of jackknives should only be 1 if jackknife resampling is not to be used.
 
   write_results(DD, RR, DR, args.njk, tempnbins, args.bins_per_dec, args.min_angle, args.random_count, args.output_name);
+
+  return 0;
 }
 
 void calculatejkSizes(int njk, int ndPoints, int** jkSizes) {
