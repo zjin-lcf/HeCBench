@@ -52,7 +52,7 @@ struct timeval t1, t0;
 float t_Compute = 0.0f;
 
 // Writes bin boundaries to GPU constant memory.
-extern "C" void writeBoundaries(double *binbs) {
+void writeBoundaries(double *binbs) {
   cudaMemcpyToSymbol(binbounds, (void*)binbs, (NUMBINS-1)*sizeof(double));
 }
 
@@ -180,7 +180,7 @@ void tileCompute(int dataSize, int randomSize, int njk, int* jkSizes, int nBins,
 // nBins: Number of histogram bins.
 // zeroBin: Index of bin which contains 0.0f: Necessary to correct for padding
 // DDs, DRs, RRs: Output subhistogram lists.
-extern "C" void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int randomSize, int njk, int* jkSizes, 
+void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int randomSize, int njk, int* jkSizes, 
     int nBins, int zeroBin, long long** DDs, long long** DRs, long long** RRs) {
   // DDs, DRs, RRs are not assumed to be allocated or cleared.
   *DDs = (long long*)malloc(nBins*njk*sizeof(long long));
@@ -343,7 +343,7 @@ extern "C" void doComputeGPU(char* dataName, char* randomNames, int nr, int data
   printf("================================================\n");  
 }
 
-extern "C" void compileHistograms(long long* DDs, long long* DRs, long long* RRs, long long*** DD, long long*** DR, 
+void compileHistograms(long long* DDs, long long* DRs, long long* RRs, long long*** DD, long long*** DR, 
     long long*** RR, options *args) {
   *DD = (long long**)malloc(((*args).njk+1)*sizeof(long long*));
   *DR = (long long**)malloc(((*args).njk+1)*sizeof(long long*));
