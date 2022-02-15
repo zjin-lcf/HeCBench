@@ -352,6 +352,9 @@ Early results are shown [here](results/README.md)
 ### haccmk (c)
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
+### haversine (cuda)
+  Haversine distance  (https://github.com/rapidsai/cuspatial)
+
 ### heartwall (opencl)
   Heart Wall in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
