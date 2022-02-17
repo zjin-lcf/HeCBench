@@ -94,15 +94,15 @@ void lbm (
     u.y() = (sycl::dot(f1234, y1234) + sycl::dot(f5678, y5678)) / rho;
 
     // Compute f with respect to space and time
-    e0        = ced(rho, weight[0], (double2)(0), u);
-    e1234.x() = ced(rho, weight[1], (double2)(dirX.s0(), dirY.s0()), u);
-    e1234.y() = ced(rho, weight[2], (double2)(dirX.s1(), dirY.s1()), u);
-    e1234.z() = ced(rho, weight[3], (double2)(dirX.s2(), dirY.s2()), u);
-    e1234.w() = ced(rho, weight[4], (double2)(dirX.s3(), dirY.s3()), u);
-    e5678.x() = ced(rho, weight[5], (double2)(dirX.s4(), dirY.s4()), u);
-    e5678.y() = ced(rho, weight[6], (double2)(dirX.s5(), dirY.s5()), u);
-    e5678.z() = ced(rho, weight[7], (double2)(dirX.s6(), dirY.s6()), u);
-    e5678.w() = ced(rho, weight[8], (double2)(dirX.s7(), dirY.s7()), u);
+    e0        = ced(rho, weight[0], {0, 0}, u);
+    e1234.x() = ced(rho, weight[1], {dirX.s0(), dirY.s0()}, u);
+    e1234.y() = ced(rho, weight[2], {dirX.s1(), dirY.s1()}, u);
+    e1234.z() = ced(rho, weight[3], {dirX.s2(), dirY.s2()}, u);
+    e1234.w() = ced(rho, weight[4], {dirX.s3(), dirY.s3()}, u);
+    e5678.x() = ced(rho, weight[5], {dirX.s4(), dirY.s4()}, u);
+    e5678.y() = ced(rho, weight[6], {dirX.s5(), dirY.s5()}, u);
+    e5678.z() = ced(rho, weight[7], {dirX.s6(), dirY.s6()}, u);
+    e5678.w() = ced(rho, weight[8], {dirX.s7(), dirY.s7()}, u);
 
     e0    = (1.0 - omega) * f0    + omega * e0;
     e1234 = (1.0 - omega) * f1234 + omega * e1234;
