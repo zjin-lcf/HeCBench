@@ -141,8 +141,14 @@ Early results are shown [here](results/README.md)
 ### b+tree (opencl)
   B+Tree in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### car (cuda)
+  Content adaptive resampling (https://github.com/sunwj/CAR)
+
 ### cbsfil (cuda)
   Cubic b-spline filtering (https://github.com/DannyRuijters/CubicInterpolationCUDA)
+
+### cc (cuda)
+  Connected components (https://userweb.cs.txstate.edu/~burtscher/research/ECL-CC/)
 
 ### ccs (cuda)
   Condition-dependent Correlation Subgroups (https://github.com/abhatta3/Condition-dependent-Correlation-Subgroups-CCS)
@@ -171,6 +177,9 @@ Early results are shown [here](results/README.md)
 ### clink (c)
   Compact LSTM inference kernel (http://github.com/UCLA-VAST/CLINK)
 
+### cm (cuda)
+  Gene expression connectivity mapping (https://pubmed.ncbi.nlm.nih.gov/24112435/)
+
 ### cmp (cuda)
   Seismic processing using the classic common midpoint (CMP) method (https://github.com/hpg-cepetro/IPDPS-CRS-CMP-code)
 
@@ -194,6 +203,9 @@ Early results are shown [here](results/README.md)
 
 ### d2q9_bgk (sycl)
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
+
+### damage (opencl)
+  The continuum level damage in a peridynamic body (https://github.com/alan-turing-institute/PeriPy)
 
 ### dct8x8 (opencl)
   Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
@@ -219,6 +231,9 @@ Early results are shown [here](results/README.md)
 ### dp (opencl)
   Dot product (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### dpid (cuda)
+  Detail-preserving image downscaling (https://github.com/mergian/dpid)
+
 ### dslash (sycl)
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
@@ -241,7 +256,7 @@ Early results are shown [here](results/README.md)
   Modified microkernel in the empirical roofline tool (https://bitbucket.org/berkeleylab/cs-roofline-toolkit/src/master/)
    
 ### expdist (cuda)
-  Computing the Bhattacharya cost function (https://github.com/benvanwerkhoven/kernel_tuner)
+  Compute the Bhattacharya cost function (https://github.com/benvanwerkhoven/kernel_tuner)
 
 ### extend2 (c)
   Smith-Waterman (SW) extension in Burrow-wheeler aligner for short-read alignment (https://github.com/lh3/bwa)
@@ -282,9 +297,13 @@ Early results are shown [here](results/README.md)
 ### fluidSim (opencl)
   2D Fluid Simulation using the Lattice-Boltzman method (https://github.com/OpenCL/AMD_APP_samples)
 
+388). ACM.)
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377-
 388). ACM.)
+
+### fpdc (cuda)
+  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
 
 ### fresnel (c)
   Fresnel integral (http://www.mymathlib.com/functions/fresnel_sin_cos_integrals.html)
@@ -332,6 +351,9 @@ Early results are shown [here](results/README.md)
 
 ### haccmk (c)
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
+
+### haversine (cuda)
+  Haversine distance  (https://github.com/rapidsai/cuspatial)
 
 ### heartwall (opencl)
   Heart Wall in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
@@ -836,4 +858,5 @@ Authored and maintained by Zheming Jin (https://github.com/zjin-lcf)
 ## Acknowledgement
 Anton Gorshkov, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Rodrigo Vimieiro, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
 
-The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.	
+The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
+

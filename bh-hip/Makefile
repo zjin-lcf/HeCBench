@@ -6,7 +6,6 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = no
 
 #===============================================================================
 # Program name & source code list
@@ -29,13 +28,9 @@ CFLAGS := -std=c++14 -Wall
 LDFLAGS = 
 
 # Debug Flags
-ifeq ($(DUMP),yes)
-  CFLAGS += -DDUMP
-endif
-
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -O0 -ggdb
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 
