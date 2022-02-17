@@ -68,7 +68,7 @@ void verify(graph g, const std::vector<float> bc_cpu, const std::vector<float> b
   double max_error = 0;
   for(int i=0; i<g.n; i++)
   {
-    double current_error = abs(bc_cpu[i] - bc_gpu[i]);
+    double current_error = fabs(bc_cpu[i] - bc_gpu[i]);
     error += current_error*current_error;
     if(current_error > max_error)
     {
