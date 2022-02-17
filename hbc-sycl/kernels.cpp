@@ -585,6 +585,7 @@ std::vector<float> bc_gpu(
   return bc_gpu_v;
 }
 
+// query the properties of a single device for simplicity
 void query_device(sycl::queue &q, int &max_threads_per_block, int &number_of_SMs, program_options op)
 {
   auto dev = q.get_device();
@@ -593,7 +594,7 @@ void query_device(sycl::queue &q, int &max_threads_per_block, int &number_of_SMs
   max_threads_per_block = dev.get_info<info::device::max_work_group_size>();
   number_of_SMs = dev.get_info<info::device::max_compute_units>();
 
-  std::cout << "Number of Streaming Multiprocessors: " << number_of_SMs << std::endl;
+  std::cout << "Number of Multiprocessors: " << number_of_SMs << std::endl;
   std::cout << "Size of Global Memory: "
             << dev.get_info<info::device::global_mem_size>() / (float)(1024 * 1024 * 1024) << " GB"
             << std::endl << std::endl;
