@@ -9,7 +9,7 @@ export LD_LIBRARY_PATH=$ComputeCpp_DIR/lib:$Oclgrind_DIR/lib:$LD_LIBRARY_PATH
 export PATH=$ComputeCpp_DIR/bin:$PATH
 #for verbose logging with ComputeCpp:
 echo "verbose_output=true" > computecpp.conf
-
+export NUM_PASSES=1
 #DPC++ installed with:
 # git clone https://github.com/intel/llvm -b sycl
 # python $HOME/Downloads/llvm/buildbot/configure.py -o build_dpc++_opencl
@@ -19,23 +19,14 @@ echo "verbose_output=true" > computecpp.conf
 # For SYCL
 #export SYCL_BE=PI_OPENCL
 
-for dir in ace-sycl
-#for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cuda|omp|hip')
+for dir in $(find . -mindepth 1 -maxdepth 1 -type d | grep -Ev '.\.git|include|cuda|omp|hip')
 do
   cd "${dir}"
   echo "Benchmark: ${dir} Passes: ${NUM_PASSES}"
   rm -f aiwc_*.csv report*.txt
   make clean
   make VENDOR=$VENDOR GPU=no
-  OCL_ICD_VENDORS=/home/9bj/.oclgrind/lib OCL_ICD_FILENAMES=liboclgrind-rt-icd.so OCLGRIND_WORKLOAD_CHARACTERISATION=1 COMPUTECPP_CONFIGURATION_FILE=computecpp.conf NUM_PASSES=1 make run
-  break
-  #echo "${dir} results:"
-  #for (( i = 0; i < 10; i = i + 1 ))
-  #do
-  #  #cliloader -q -h -d make run &> report${i}.txt
-  #done
-  #grep -H "Total" report*.txt
-  #make clean
+  OCL_ICD_VENDORS=/home/9bj/.oclgrind/lib OCL_ICD_FILENAMES=liboclgrind-rt-icd.so OCLGRIND_WORKLOAD_CHARACTERISATION=1 COMPUTECPP_CONFIGURATION_FILE=computecpp.conf make run
   cd ..
 done
 
