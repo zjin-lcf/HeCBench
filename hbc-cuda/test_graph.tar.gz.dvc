@@ -1,0 +1,5 @@
+outs:
+- md5: 150f618aa33568b1b8c1c857b6e8a3ac
+  size: 848186
+  hash: md5
+  path: test_graph.tar.gz
