@@ -100,28 +100,16 @@ __global__ void bc_kernel(
   float *delta_row = (float*)((char*)delta + blockIdx.x*pitch_delta);
   if(j == 0)
   {
-    if(approx)
-    {
-      ind = blockIdx.x + start;
-      i = source_vertices[ind];
-      Q_row = (int*)((char*)Q + blockIdx.x*pitch_Q);
-      Q2_row = (int*)((char*)Q2 + blockIdx.x*pitch_Q2);
-      S_row = (int*)((char*)S + blockIdx.x*pitch_S);
-      endpoints_row = (int*)((char*)endpoints + blockIdx.x*pitch_endpoints);
-      *jia = 0;
-    }
-    else
-    {
-      ind = blockIdx.x + start;
-      i = ind;
-      Q_row = (int*)((char*)Q + blockIdx.x*pitch_Q);
-      Q2_row = (int*)((char*)Q2 + blockIdx.x*pitch_Q2);
-      S_row = (int*)((char*)S + blockIdx.x*pitch_S);
-      endpoints_row = (int*)((char*)endpoints + blockIdx.x*pitch_endpoints);
-      *jia = 0;
-    }
+    ind = blockIdx.x + start;
+    i = approx ? source_vertices[ind] : ind;
+    Q_row = (int*)((char*)Q + blockIdx.x*pitch_Q);
+    Q2_row = (int*)((char*)Q2 + blockIdx.x*pitch_Q2);
+    S_row = (int*)((char*)S + blockIdx.x*pitch_S);
+    endpoints_row = (int*)((char*)endpoints + blockIdx.x*pitch_endpoints);
+    *jia = 0;
   }
   __syncthreads();
+
   if((ind==0) && (j < DIAMETER_SAMPLES))
   {
     diameters[j] = INT_MAX;
