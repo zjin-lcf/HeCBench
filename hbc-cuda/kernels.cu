@@ -14,7 +14,8 @@ inline void __checkCudaErrors(cudaError_t err, const char *file, const int line)
 {   
   if (cudaSuccess != err)
   {   
-    std::cerr << "CUDA Error = " << err << ": " << cudaGetErrorString(err) << " from file " << file  << ", line " << line << std::endl;
+    std::cerr << "CUDA Error = " << err << ": " << cudaGetErrorString(err) << " from file "
+              << file  << ", line " << line << std::endl;
   }
 }
 #endif
@@ -512,6 +513,7 @@ std::vector<float> bc_gpu(
   return bc_gpu_v;
 }
 
+// query the properties of a single device for simplicity
 void query_device(int &max_threads_per_block, int &number_of_SMs, program_options op)
 {
   op.device = 0;
@@ -520,7 +522,7 @@ void query_device(int &max_threads_per_block, int &number_of_SMs, program_option
   checkCudaErrors(cudaGetDeviceProperties(&prop, op.device));
 
   std::cout << "Chosen Device: " << prop.name << std::endl;
-  std::cout << "Number of Streaming Multiprocessors: " << prop.multiProcessorCount << std::endl;
+  std::cout << "Number of Multiprocessors: " << prop.multiProcessorCount << std::endl;
   std::cout << "Size of Global Memory: " << prop.totalGlobalMem/(float)(1024*1024*1024)
             << " GB" << std::endl << std::endl;
 
