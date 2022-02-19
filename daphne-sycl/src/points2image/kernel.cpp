@@ -125,7 +125,7 @@ void  parsePointCloud(queue &q, std::ifstream& input_file, PointCloud2* pointclo
   printf("PointCloud: height=%d width=%d point_step=%d\n",
           pointcloud2->height , pointcloud2->width , pointcloud2->point_step);
 #endif
-  pointcloud2->data = sycl::malloc_shared<float>(
+  pointcloud2->data = (float*) sycl::malloc_shared(
       pointcloud2->height * pointcloud2->width * pointcloud2->point_step, q);
   input_file.read((char*)pointcloud2->data, pointcloud2->height * pointcloud2->width * pointcloud2->point_step);
 }
