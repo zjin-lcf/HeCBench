@@ -204,6 +204,9 @@ Early results are shown [here](results/README.md)
 ### d2q9_bgk (sycl)
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
+### daphne (cuda)
+  The Darmstadt automotive parallel heterogeneous benchmark suite (https://github.com/esa-tu-darmstadt/daphne-benchmark)
+
 ### damage (opencl)
   The continuum level damage in a peridynamic body (https://github.com/alan-turing-institute/PeriPy)
 
