@@ -495,9 +495,9 @@ void points2image::run(queue &q, int p) {
     pause_func();
     // compare with the reference data
     check_next_outputs(count);
-
-    sycl::free(result_buffer, q);
   }
+
+  sycl::free(result_buffer, q);
 }
 
 void points2image::check_next_outputs(int count)
