@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp kernels.cu util.cpp parse.cpp sequential.cpp
+source = main.cpp kernels.cpp util.cpp parse.cpp sequential.cpp
 
 obj = main.o kernels.o util.o parse.o sequential.o
 
@@ -37,12 +37,14 @@ LDFLAGS =
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            --gcc-toolchain=$(GCC_TOOLCHAIN) \
+            -DSYCL_USE_NATIVE_FP_ATOMICS
 endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            -DSYCL_USE_NATIVE_FP_ATOMICS
 endif
 
 
