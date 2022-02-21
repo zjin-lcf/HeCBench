@@ -335,8 +335,11 @@ Early results are shown [here](results/README.md)
 ### gd (c++)
   Gradient descent (https://github.com/CGudapati/BinaryClassification)
 
-### geodesic (opencl)
+##a geodesic (opencl)
   Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
+
+### ge-spmm (cuda)
+  General-purposed sparse matrix-matrix multiplication on GPUs for graph neural networks (https://github.com/hgyhungry/ge-spmm)
 
 ### gmm (cuda)
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
