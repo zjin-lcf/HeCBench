@@ -595,10 +595,10 @@ Early results are shown [here](results/README.md)
 ### myocte (opencl)
   Myocte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
-## nbnxm (sycl)
+### nbnxm (sycl)
   Computing non-bonded pair interactions (https://manual.gromacs.org/current/doxygen/html-full/page_nbnxm.xhtml)
 
-## nbody (opencl)
+### nbody (opencl)
   Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
 
 ### ne (cuda)
