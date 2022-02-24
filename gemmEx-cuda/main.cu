@@ -35,7 +35,9 @@ int cublas_gemm_ex(
     S *alpha, S *beta, int algo)
 {
   cudaDataType_t AType, BType, CType, ComputeType;
-  if (std::is_same<T, float>::value) {
+  if (std::is_same<T, double>::value) {
+    AType = BType = CType = ComputeType = CUDA_R_64F;
+  } else if (std::is_same<T, float>::value) {
     AType = BType = CType = ComputeType = CUDA_R_32F;
   } else if (std::is_same<T, __half>::value) {
     AType = BType = CType = ComputeType = CUDA_R_16F;
@@ -46,6 +48,7 @@ int cublas_gemm_ex(
     printf("Not supported data type.");
     return -1;
   }
+
   cublasStatus_t status;
   status = cublasGemmEx(
       handle,
@@ -114,27 +117,39 @@ int main() {
   int end_algo = CUBLAS_GEMM_DEFAULT;
   int iteration = 100;
 
-  float *fA, *fB, *fC;
-  __half *hA, *hB, *hC;
-  int8_t *iA, *iB; int32_t *iC;
+  double d_alpha = 1, d_beta = 0;
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
+
+  double *dA, *dB, *dC;
+  float *fA, *fB, *fC;
+  __half *hA, *hB, *hC;
+  int8_t *iA, *iB; int32_t *iC;
+
+  allocate_memory(m, n, k, &dA, &dB, &dC);
   allocate_memory(m, n, k, &fA, &fB, &fC);
   allocate_memory(m, n, k, &hA, &hB, &hC);
   allocate_memory(m, n, k, &iA, &iB, &iC);
+
   for (int i = 0; i < m * k; ++i) {
+    dA[i] = double(i % 255 - 127) / 127;
     fA[i] = float(i % 255 - 127) / 127;
     hA[i] = __float2half_rn(fA[i]);
     iA[i] = float2int8(fA[i], 127);
   } 
   for (int i = 0; i < k * n; ++i) {
+    dB[i] = double(i % 255 - 127) / 127;
     fB[i] = float(i % 255 - 127) / 127;
     hB[i] = __float2half_rn(fB[i]);
     iB[i] = float2int8(fB[i], 127);
   }
   cublasHandle_t handle;
   cublasCreate(&handle);
+
+  printf(">>>>>>>>>>>>>>>>> test fp64 >>>>>>>>>>>>>>>>>\n");
+  for (int algo = start_algo; algo <= end_algo; ++algo)
+    test_gemm(handle, m, n, k, dA, dB, dC, &d_alpha, &d_beta, algo, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
@@ -149,19 +164,26 @@ int main() {
     test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, algo, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
+  printf("fp64: ");
+  for (int i = 0; i < 10; ++i)
+    printf("%.5lf%c", fC[i], " \n"[i==9]);
+
   printf("fp32: ");
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", fC[i], " \n"[i==9]);
+
   printf("fp16: ");
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", float(hC[i]), " \n"[i==9]);
+
   printf("int8: ");
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", float(iC[i])/127/127, " \n"[i==9]);
 
-  free_memory(iA, iB, iC);
+  free_memory(dA, dB, dC);
   free_memory(fA, fB, fC);
   free_memory(hA, hB, hC);
+  free_memory(iA, iB, iC);
   return 0;
 }
 
