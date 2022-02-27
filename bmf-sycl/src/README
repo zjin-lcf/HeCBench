@@ -1,0 +1,1 @@
+All OpenMP headers and function calls are commented for the SYCL compiler without OMP enabled

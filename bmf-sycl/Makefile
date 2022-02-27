@@ -40,8 +40,7 @@ headers = \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -fopenmp \
-          -DWARPSPERBLOCK=8
+CFLAGS := -std=c++17 -Wall -I../include -I../bmf-cuda/ -fsycl -DWARPSPERBLOCK=8 #-fopenmp
 
 # Linker Flags
 LDFLAGS = 
@@ -84,5 +83,6 @@ main.o: src/main.cpp $(headers)
 clean:
 	rm -rf $(program) $(obj)
 
+# The dataset are available at https://github.com/Funatiq/cuBool 
 run: $(program)
 	./$(program) ../bmf-cuda/data/MNIST.in -r 8 -l 112 -i 10000 --seed 123 --stuck 10000

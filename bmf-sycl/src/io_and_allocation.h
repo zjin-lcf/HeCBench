@@ -12,7 +12,8 @@
 #include <numeric>
 #include <random>
 #include <cmath> // log2
-#include <omp.h>
+
+//#include <omp.h>
 
 #include "config.h"
 #include "helper/rngpu.h"
@@ -132,19 +133,6 @@ void generate_random_matrix(const int height, const int width, const uint8_t fac
       B[j * factorDim + k] = (mask >> k) & 1 ? 1 : 0;
   }
 
-  // float threshold = 1.0f;
-  // for(int kiss = 0; kiss < num_kiss; ++kiss)
-  //     threshold /= 2.0f;
-
-  // for(int i=0; i < height * factorDim; ++i) {
-  //     float random = (float) fast_kiss32(state) / UINT32_MAX;
-  //     A[i] = random < threshold ? 1.0f : 0.0f;
-  // }
-  // for(int j=0; j < width * factorDim; ++j) {
-  //     float random = (float) fast_kiss32(state) / UINT32_MAX;
-  //     B[i] = random < threshold ? 1.0f : 0.0f;
-  // }
-
   // Malloc for C0b
   size_t padded_height_32 = SDIV(height, 32);
   size_t sizeCb = padded_height_32 * width;
@@ -238,7 +226,8 @@ void initFactorRowwise(vector<uint32_t> &Ab,
     // int counter = 0;
     #pragma omp parallel //reduce(+:counter)
     {
-      fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+      //fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+      fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed);
 
       #pragma omp for
       for (int i = 0; i < height; i++) {
@@ -267,7 +256,8 @@ void initFactorBitwise(vector<uint32_t> &Ab,
   // int counter = 0;
   #pragma omp parallel //reduce(+:counter)
   {
-    fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+    //fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+    fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed);
 
     #pragma omp for
     for (int i = 0; i < height; i++) {
@@ -294,7 +284,8 @@ void initFactorBitwise( vector<float> &A,
   // int counter = 0;
   #pragma omp parallel //reduce(+:counter)
   {
-    fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+    //fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed + omp_get_thread_num());
+    fast_kiss_state32_t state = get_initial_fast_kiss_state32(seed);
 
     #pragma omp for
     for (int i = 0; i < height; i++) {
@@ -343,7 +334,6 @@ void writeFactorsToFiles(const string& filename,
   using std::ofstream;
 
   time_t now = time(0);
-  // char* dt = ctime(&now);
   tm *ltm = localtime(&now);
 
   stringstream date;
@@ -357,7 +347,7 @@ void writeFactorsToFiles(const string& filename,
   size_t height = Ab.size();
 
   int nonzeroelements = 0;
-  for (int i = 0; i < height; i++){
+  for (size_t i = 0; i < height; i++){
     bitset<32> row(Ab[i]);
     nonzeroelements += row.count();
   }
@@ -380,7 +370,7 @@ void writeFactorsToFiles(const string& filename,
   size_t width = Bb.size();
 
   nonzeroelements = 0;
-  for (int j = 0; j < width; j++){
+  for (size_t j = 0; j < width; j++){
     bitset<32> col(Bb[j]);
     nonzeroelements += col.count();
   }
@@ -423,7 +413,7 @@ void writeDistancesToFile(const string& filename,
 
   ofstream os(filename_d.str());
   if (os.good()){
-    for (int i = 0; i < distances.size(); i++){
+    for (size_t i = 0; i < distances.size(); i++){
       if(i>0) os << "\n";
       os << distances[i];
     }

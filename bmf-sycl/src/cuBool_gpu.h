@@ -6,7 +6,8 @@
 #include <sstream>
 #include <limits>
 #include <type_traits>
-#include <omp.h>
+
+//#include <omp.h>
 
 #include "helper/rngpu.h"
 #include "helper/helpers.h"
@@ -66,7 +67,7 @@ class cuBool
       else if(std::is_same<factor_t, float>::value)
         lineSize_padded_ = 32;
 
-      omp_set_num_threads(numActiveExperriments);
+      //omp_set_num_threads(numActiveExperriments);
       activeExperiments.resize(numActiveExperriments);
       bestFactors = {};
 
@@ -131,7 +132,7 @@ class cuBool
       index_t height_C = SDIV(height_, 32);
       width_C_padded_ = SDIV(width_, 32) * 32;
 
-      for (int i = 0; i < height_C; i++) {
+      for (unsigned int i = 0; i < height_C; i++) {
         q.memcpy(d_C + i * width_C_padded_, C.data() + i * width_,
                  sizeof(bit_vector_t) * width_);
       }
@@ -381,7 +382,8 @@ class cuBool
 
       #pragma omp parallel for schedule(dynamic,1) shared(state)
       for(size_t i=0; i<numExperiments; ++i) {
-        unsigned id = omp_get_thread_num();
+        //unsigned id = omp_get_thread_num();
+        unsigned id = 0;
         auto config_i = config;
         uint32_t seed;
         #pragma omp critical(kiss)
@@ -582,13 +584,13 @@ class cuBool
 
           size_t lineBytes = sizeof(factor_t) * handler.lineSize_;
  
-          for (int i = 0; i < height_; i++) {
+          for (unsigned int i = 0; i < height_; i++) {
             q.memcpy(bestFactors.d_A + i*handler.lineSize_,
                      handler.d_A + i*lineSize_padded_,
                      lineBytes);
           }
 
-          for (int i = 0; i < width_; i++) {
+          for (unsigned int i = 0; i < width_; i++) {
             q.memcpy(bestFactors.d_B + i*handler.lineSize_,
                      handler.d_B + i*lineSize_padded_,
                      lineBytes);
