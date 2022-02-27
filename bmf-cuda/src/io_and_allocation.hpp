@@ -357,7 +357,7 @@ void writeFactorsToFiles(const string& filename,
   size_t height = Ab.size();
 
   int nonzeroelements = 0;
-  for (int i = 0; i < height; i++){
+  for (unsigned int i = 0; i < height; i++){
     bitset<32> row(Ab[i]);
     nonzeroelements += row.count();
   }
@@ -365,7 +365,7 @@ void writeFactorsToFiles(const string& filename,
   ofstream os_A(filename_A.str());
   if (os_A.good()){
     os_A << height << " " << int(factorDim) << " " << nonzeroelements << "\n";
-    for (int i = 0; i < height; i++){
+    for (unsigned int i = 0; i < height; i++){
       // bitset<32> row(Ab[i] >> (32 - factorDim));
       // os_A << row << "\n";
       for(int k=0; k < factorDim; ++k)
@@ -380,7 +380,7 @@ void writeFactorsToFiles(const string& filename,
   size_t width = Bb.size();
 
   nonzeroelements = 0;
-  for (int j = 0; j < width; j++){
+  for (unsigned int j = 0; j < width; j++){
     bitset<32> col(Bb[j]);
     nonzeroelements += col.count();
   }
@@ -388,7 +388,7 @@ void writeFactorsToFiles(const string& filename,
   ofstream os_B(filename_B.str());
   if(os_B.good()){
     os_B  << width << " " << int(factorDim) << " " << nonzeroelements << "\n";
-    for (int j = 0; j < width; j++){
+    for (unsigned int j = 0; j < width; j++){
       // bitset<32> col(Bb[j] >> (32 - factorDim));
       // os_B << col << "\n";
       for(int k=0; k < factorDim; ++k)
@@ -423,7 +423,7 @@ void writeDistancesToFile(const string& filename,
 
   ofstream os(filename_d.str());
   if (os.good()){
-    for (int i = 0; i < distances.size(); i++){
+    for (size_t i = 0; i < distances.size(); i++){
       if(i>0) os << "\n";
       os << distances[i];
     }

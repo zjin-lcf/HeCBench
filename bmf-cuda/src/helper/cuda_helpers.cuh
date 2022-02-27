@@ -47,31 +47,5 @@
 
 #define FULLMASK 0xffffffff
 
-#ifdef __CUDACC__
-    template<typename T>
-    __inline__ __device__
-    T warpReduceSum(T val, const unsigned width = warpSize) {
-        for (int offset = width / 2; offset > 0; offset /= 2)
-            val += __shfl_down_sync(FULLMASK, val, offset);
-        return val;
-    }
-
-    template<typename T>
-    __inline__ __device__
-    T blockReduceSum(T val, T* reductionArray) {
-        const int lane = threadIdx.x % warpSize;
-        const int wid = threadIdx.x / warpSize;
-        val = warpReduceSum(val);
-        if (lane == 0) reductionArray[wid] = val;
-        __syncthreads();
-        if (wid == 0) {
-            // val = (threadIdx.x < blockDim.x / warpSize) ? reductionArray[lane] : 0;
-            val = (threadIdx.x < WARPSPERBLOCK) ? reductionArray[lane] : 0;
-            val = warpReduceSum(val, WARPSPERBLOCK);
-        }
-        return val;
-    }
-#endif
-
 
 #endif

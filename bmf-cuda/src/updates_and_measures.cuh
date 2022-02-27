@@ -9,7 +9,7 @@ __inline__ HOST_DEVICE_QUALIFIER
 uint32_t get_flip_mask_many(const uint8_t factorDim, fast_kiss_state32_t state, const uint32_t rand_depth) {
   uint32_t bit_flip_mask = FULLMASK >> (32-factorDim);
   #pragma unroll
-  for(int i = 0; i < rand_depth; ++i) {
+  for(unsigned int i = 0; i < rand_depth; ++i) {
     bit_flip_mask &= fast_kiss32(state);
   }
   // bit_flip_mask &= FULLMASK >> (32-factorDim);
