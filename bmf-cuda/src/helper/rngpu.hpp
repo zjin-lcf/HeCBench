@@ -250,40 +250,6 @@ double uniform_double(rng_t rng, state_t * state) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// meta functions for uniform sampling in [0, 1)
-//////////////////////////////////////////////////////////////////////////////
-
-template <class rng_t,
-          class state_t> INLINE_QUALIFIERS
-double gaussian_float(rng_t rng, state_t * state) {
-
-    float x, y, r;
-
-    do {
-        x = 2.0f * uniform_float(rng, state) - 1.0f;
-        y = 2.0f * uniform_float(rng, state) - 1.0f;
-        r = x*x + y*y;
-    } while (r == 0.0f || r >= 1.0f);
-
-    return x * sqrtf((-2.0 * logf(r)) / r);
-}
-
-template <class rng_t,
-          class state_t> INLINE_QUALIFIERS
-double gaussian_double(rng_t rng, state_t * state) {
-
-    double x, y, r;
-
-    do {
-        x = 2.0 * uniform_double(rng, state) - 1.0;
-        y = 2.0 * uniform_double(rng, state) - 1.0;
-        r = x*x + y*y;
-    } while (r == 0.0 || r >= 1.0);
-
-    return x * sqrt((-2.0 * log(r)) / r);
-}
-
-//////////////////////////////////////////////////////////////////////////////
 // shuffle functions for arrays
 //////////////////////////////////////////////////////////////////////////////
 

@@ -138,7 +138,7 @@ class cuBool
       // from C.data() to d_C
       // destination pitch and source pitch are the widths in memory in bytes of the 2D arrays
       
-      for (int i = 0; i < height_C; i++) {
+      for (unsigned int i = 0; i < height_C; i++) {
         cudaMemcpy(d_C + i * width_C_padded_, C.data() + i * width_,
                    sizeof(bit_vector_t) * width_, cudaMemcpyHostToDevice);
         CUERR;
@@ -306,7 +306,6 @@ class cuBool
       }
 
       size_t lineBytes = sizeof(factor_t) * handler.lineSize_;
-      size_t lineBytes_padded = sizeof(factor_t) * lineSize_padded_;
 
       A.resize(height_);
 
@@ -551,9 +550,8 @@ class cuBool
           bestFactors.factorDim_ = handler.factorDim_;
 
           size_t lineBytes = sizeof(factor_t) * handler.lineSize_;
-          size_t lineBytes_padded = sizeof(factor_t) * lineSize_padded_;
  
-          for (int i = 0; i < height_; i++) {
+          for (unsigned int i = 0; i < height_; i++) {
             cudaMemcpyAsync(bestFactors.d_A + i*handler.lineSize_,
                             handler.d_A + i*lineSize_padded_,
                             lineBytes,
@@ -561,7 +559,7 @@ class cuBool
                             stream);
           }
 
-          for (int i = 0; i < width_; i++) {
+          for (unsigned int i = 0; i < width_; i++) {
             cudaMemcpyAsync(bestFactors.d_B + i*handler.lineSize_,
                             handler.d_B + i*lineSize_padded_,
                             lineBytes,
