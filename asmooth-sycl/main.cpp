@@ -127,9 +127,9 @@ int main(int argc, char* argv[]) {
           for (int ii = -s; ii < s+1; ii++)
             for (int jj = -s; jj < s+1; jj++)
               if (ksum != 0) {
-                auto atomic_obj_ref = ONEAPI::atomic_ref<float, 
-                  ONEAPI::memory_order::relaxed,
-                  ONEAPI::memory_scope::device,
+                auto atomic_obj_ref = sycl::atomic_ref<float, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
                   access::address_space::global_space> (Norm[gtid + ii*Lx + jj]);
                 atomic_obj_ref.fetch_add(sycl::native::divide(1.f, (float)ksum));
               }
