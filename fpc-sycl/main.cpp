@@ -116,61 +116,61 @@ void fpc (queue &q, const ulong* values, unsigned *cmp_size_hw, const int values
   *cmp_size_hw = 0;
   buffer<ulong, 1> d_values (values, values_size);
   buffer<unsigned, 1> d_cmp_size (cmp_size_hw, 1);
-  range<1> global_work_size (values_size);
-  range<1> local_work_size (wgs);
+  range<1> gws (values_size);
+  range<1> lws (wgs);
 
   q.submit([&](handler &h) {
-      auto values = d_values.get_access<sycl_read>(h);
-      auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
-      accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+    auto values = d_values.get_access<sycl_read>(h);
+    auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
+    accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
+    h.parallel_for<class test1>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
 
-          int gid = item.get_global_id(0);
-          int lid = item.get_local_id(0);
-          int WGS = item.get_local_range(0);
+      int gid = item.get_global_id(0);
+      int lid = item.get_local_id(0);
+      int WGS = item.get_local_range(0);
 
-          ulong value = values[gid];
-          unsigned inc;
+      ulong value = values[gid];
+      unsigned inc;
 
-          // 000
-          if (value == 0){
-            inc = 1;
-          }
-          // 001 010
-          else if ((my_abs((int)(value)) <= 0xFF)) {
-            inc = 1;
-          }
-          // 011
-          else if ((my_abs((int)(value)) <= 0xFFFF)) {
-            inc = 2;
-          }
-          //100  
-          else if ((((value) & 0xFFFF) == 0 )) {
-            inc = 2;
-          }
-          //101
-          else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
-              && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
-            inc = 2;
-          }
-          //110
-          else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
-              (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
-              (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
-            inc = 1;
-          } else { 
-            inc = 4;
-          }
+      // 000
+      if (value == 0){
+        inc = 1;
+      }
+      // 001 010
+      else if ((my_abs((int)(value)) <= 0xFF)) {
+        inc = 1;
+      }
+      // 011
+      else if ((my_abs((int)(value)) <= 0xFFFF)) {
+        inc = 2;
+      }
+      //100  
+      else if ((((value) & 0xFFFF) == 0 )) {
+        inc = 2;
+      }
+      //101
+      else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
+          && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
+        inc = 2;
+      }
+      //110
+      else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
+          (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
+          (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
+        inc = 1;
+      } else { 
+        inc = 4;
+      }
 
-          if (lid == 0) compressable[0].store(0);
-          item.barrier(access::fence_space::local_space);
+      if (lid == 0) compressable[0].store(0);
+      item.barrier(access::fence_space::local_space);
 
-          atomic_fetch_add(compressable[0], inc);
-          item.barrier(access::fence_space::local_space);
-          if (lid == WGS-1) {
-            atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
-          }
-      });
+      atomic_fetch_add(compressable[0], inc);
+      item.barrier(access::fence_space::local_space);
+      if (lid == WGS-1) {
+        atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
+      }
+    });
   });
 }
 
@@ -181,61 +181,61 @@ void fpc2 (queue &q, const ulong* values, unsigned *cmp_size_hw, const int value
   buffer<ulong, 1> d_values (values, values_size);
   buffer<unsigned, 1> d_cmp_size (cmp_size_hw, 1);
 
-  range<1> global_work_size (values_size);
-  range<1> local_work_size (wgs);
+  range<1> gws (values_size);
+  range<1> lws (wgs);
 
   q.submit([&](handler &h) {
-      auto values = d_values.get_access<sycl_read>(h);
-      auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
-      accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+    auto values = d_values.get_access<sycl_read>(h);
+    auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
+    accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
+    h.parallel_for<class test2>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
 
-          int gid = item.get_global_id(0);
-          int lid = item.get_local_id(0);
-          int WGS = item.get_local_range(0);
-          unsigned inc;
+      int gid = item.get_global_id(0);
+      int lid = item.get_local_id(0);
+      int WGS = item.get_local_range(0);
+      unsigned inc;
 
-          bool m1 = 0;
-          bool m2 = 0;
-          bool m3 = 0;
-          bool m4 = 0;
-          bool m5 = 0;
-          bool m6 = 0;
-          bool m7 = 0;
+      bool m1 = 0;
+      bool m2 = 0;
+      bool m3 = 0;
+      bool m4 = 0;
+      bool m5 = 0;
+      bool m6 = 0;
+      bool m7 = 0;
 
-          ulong value = values[gid];
-          unsigned inc1 = f1(value, &m1);
-          unsigned inc2 = f2(value, &m2);
-          unsigned inc3 = f3(value, &m3);
-          unsigned inc4 = f4(value, &m4);
-          unsigned inc5 = f5(value, &m5);
-          unsigned inc6 = f6(value, &m6);
-          unsigned inc7 = f7(value, &m7);
+      ulong value = values[gid];
+      unsigned inc1 = f1(value, &m1);
+      unsigned inc2 = f2(value, &m2);
+      unsigned inc3 = f3(value, &m3);
+      unsigned inc4 = f4(value, &m4);
+      unsigned inc5 = f5(value, &m5);
+      unsigned inc6 = f6(value, &m6);
+      unsigned inc7 = f7(value, &m7);
 
-          if (m1)
-            inc = inc1;
-          else if (m2)
-            inc = inc2;
-          else if (m3)
-            inc = inc3;
-          else if (m4)
-            inc = inc4;
-          else if (m5)
-            inc = inc5;
-          else if (m6)
-            inc = inc6;
-          else
-            inc = inc7;
+      if (m1)
+        inc = inc1;
+      else if (m2)
+        inc = inc2;
+      else if (m3)
+        inc = inc3;
+      else if (m4)
+        inc = inc4;
+      else if (m5)
+        inc = inc5;
+      else if (m6)
+        inc = inc6;
+      else
+        inc = inc7;
 
-          if (lid == 0) compressable[0].store(0);
-          item.barrier(access::fence_space::local_space);
+      if (lid == 0) compressable[0].store(0);
+      item.barrier(access::fence_space::local_space);
 
-          atomic_fetch_add(compressable[0], inc);
-          item.barrier(access::fence_space::local_space);
-          if (lid == WGS-1) {
-            atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
-          }
-      });
+      atomic_fetch_add(compressable[0], inc);
+      item.barrier(access::fence_space::local_space);
+      if (lid == WGS-1) {
+        atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
+      }
+    });
   });
 }
 
