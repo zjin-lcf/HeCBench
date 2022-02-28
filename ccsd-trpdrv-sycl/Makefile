@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = main.cpp ccsd_trpdrv.cpp ccsd_tengy.cpp
 
 obj = $(source:.cpp=.o)
 
