@@ -386,7 +386,7 @@ int main( int argc, char** argv )
         }).wait();
 
 #ifdef DEBUG
-        for (int i = 0; i < v_size); i++) printf("vo %d %f\n", i, vo[i]);
+        for (int i = 0; i < v_size; i++) printf("vo %d %f\n", i, vo[i]);
 #endif
       }
     } // step
