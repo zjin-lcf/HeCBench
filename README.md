@@ -625,6 +625,9 @@ Early results are shown [here](results/README.md)
 ### openmp (cuda)
   Multi-threading over a single device (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### overlay (cuda)
+  Overlay grid in the DetectNet (https://github.com/dusty-nv/jetson-inference)
+
 ### page-rank (opencl)
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
 
