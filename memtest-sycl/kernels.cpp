@@ -3,10 +3,10 @@
 #define BLOCKSIZE (1024*1024)
 
 #define RECORD_ERR(err, p, expect, current) do{ \
-    auto atomic_obj_ref = sycl::ONEAPI::atomic_ref<unsigned int, \
-      sycl::ONEAPI::memory_order::relaxed, \
-      sycl::ONEAPI::memory_scope::device, \
-      access::address_space::global_space> (err[0]); \
+    auto atomic_obj_ref = sycl::atomic_ref<unsigned int, \
+      sycl::memory_order::relaxed, \
+      sycl::memory_scope::device, \
+      sycl::access::address_space::global_space> (err[0]); \
     unsigned int idx = atomic_obj_ref.fetch_add(1u); \
     idx = idx % MAX_ERR_RECORD_COUNT; \
     err_addr[idx] = (unsigned long)p; \
