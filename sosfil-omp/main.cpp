@@ -176,8 +176,8 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
               } else {
                 x_in[ty * n_samples + ( n + unload_size )] = temp;
               }
-              #pragma omp barrier 
             }
+            #pragma omp barrier 
           }
         }
       }

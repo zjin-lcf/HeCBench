@@ -132,8 +132,8 @@ __global__ void sosfilt(
         } else {
           x_in[ty * n_samples + ( n + unload_size )] = temp;
         }
-        __syncthreads( );
       }
+      __syncthreads( );
     }
   }
 }
