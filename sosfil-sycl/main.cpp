@@ -175,8 +175,8 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
               } else {
                 x_in[ty * n_samples + ( n + unload_size )] = temp;
               }
-              item.barrier(access::fence_space::local_space);
             }
+            item.barrier(access::fence_space::local_space);
           }
         }
       });
