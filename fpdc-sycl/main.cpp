@@ -106,14 +106,14 @@ static void Compress(queue &q, int blocks, int warpsperblock, int dimensionality
   range<1> gws (blocks * WARPSIZE * warpsperblock);
   range<1> lws (WARPSIZE * warpsperblock);
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < 1; i++)
     q.submit([&](handler &cgh) {
       auto cbuf = cbufd.get_access<sycl_read>(cgh);
       auto dbuf = dbufd.get_access<sycl_write>(cgh);
       auto cut = cutd.get_access<sycl_read>(cgh);
       auto off = offd.get_access<sycl_write>(cgh);
       accessor<int, 1, sycl_read_write, access::target::local> ibufs (32 * (3 * WARPSIZE / 2), cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) [[sycl::reqd_sub_group_size(WARPSIZE)]] {
         CompressionKernel(item, dimensionality,
                           cbuf.get_pointer(), dbuf.get_pointer(), cut.get_pointer(),
                           off.get_pointer(), ibufs.get_pointer());
@@ -256,7 +256,7 @@ static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionali
       auto fbuf = fbufd.get_access<sycl_read_write>(cgh);
       auto cut = cutd.get_access<sycl_read>(cgh);
       accessor<int, 1, sycl_read_write, access::target::local> ibufs (32 * (3 * WARPSIZE / 2), cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) [[sycl::reqd_sub_group_size(WARPSIZE)]] {
         DecompressionKernel(item, dimensionality,
                             dbuf.get_pointer(), fbuf.get_pointer(), cut.get_pointer(),
                             ibufs.get_pointer());
