@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <random>
 #include <chrono>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 // Uncomment to use chars as the data type, otherwise use int
 // #define CHAR_DATA_TYPE
@@ -43,7 +43,7 @@ const int n_threads = kmin(n,64);    // Number of threads used in small kernels 
 const int n_threads_reduction = kmin(n, 256); // Number of threads used in the redution kernels in step 1 and 6 (256)
 const int n_blocks_reduction = kmin(n, 256);  // Number of blocks used in the redution kernels in step 1 and 6 (256)
 const int n_threads_full = kmin(n, 256);      // Number of threads used the largest grids sizes (typically grid size equal to n*n)
-// Used in steps 2 and 6 (512)
+// Used in steps 2 and 6 (256)
 const int seed = 45345; // Initialization for the random number generator
 
 #else
@@ -550,12 +550,12 @@ void check(bool val, const char *str){
   }
 }
 
-// Convenience function for checking CUDA runtime API results
+// Convenience function for checking HIP runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
-inline cudaError_t check(cudaError_t result)
+inline hipError_t check(hipError_t result)
 {
-  if (result != cudaSuccess) {
-    printf("CUDA Runtime Error: %s\n", cudaGetErrorString(result));
+  if (result != hipSuccess) {
+    printf("HIP Runtime Error: %s\n", hipGetErrorString(result));
   }
   return result;
 };
@@ -565,8 +565,8 @@ inline cudaError_t check(cudaError_t result)
 
 #define call_kernel_s(k, n_blocks, n_threads, shared)  \
 { \
-  k <<< n_blocks, n_threads,  shared>>> (); \
-  check(cudaDeviceSynchronize()); \
+  hipLaunchKernelGGL(k, n_blocks, n_threads, shared, 0); \
+  check(hipDeviceSynchronize()); \
 }
 
 // Hungarian_Algorithm
@@ -687,19 +687,19 @@ int main(int argc, char* argv[])
 #endif
 
     // Copy vectors from host memory to device memory
-    cudaMemcpyToSymbol(slack, h_cost, sizeof(data)*nrows*ncols); 
+    hipMemcpyToSymbol(HIP_SYMBOL(slack), h_cost, sizeof(data)*nrows*ncols); 
 
     // Invoke kernels
     time_t start_time = clock();
 
     Hungarian_Algorithm();
-    check(cudaDeviceSynchronize());
+    check(hipDeviceSynchronize());
 
     time_t stop_time = clock();
     fflush(file);
 
     // Copy assignments from Device to Host and calculate the total Cost
-    cudaMemcpyFromSymbol(h_column_of_star_at_row, column_of_star_at_row, nrows * sizeof(int));
+    hipMemcpyFromSymbol(h_column_of_star_at_row, HIP_SYMBOL(column_of_star_at_row), nrows * sizeof(int));
 
     int total_cost = 0;
     for (int r = 0; r < nrows; r++) {
