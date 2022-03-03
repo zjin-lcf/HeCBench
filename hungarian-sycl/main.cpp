@@ -921,7 +921,7 @@ int main(int argc, char* argv[])
       //call_kernel_s(min_reduce_kernel1, n_blocks_reduction, n_threads_reduction, n_threads_reduction*sizeof(int));
       q.submit([&] (handler &cgh) {
         accessor<int, 1, sycl_read_write, access::target::local> sm (n_threads_reduction, cgh);
-        cgh.parallel_for<class min_reduce>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class s6_min_reduce>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
           min_reduce_kernel1(item, slack, 
               cover_row,
               cover_column,
@@ -931,9 +931,11 @@ int main(int argc, char* argv[])
       }).wait();
 
       //call_kernel_s(min_reduce_kernel2, 1, n_blocks_reduction / 2, (n_blocks_reduction / 2) * sizeof(int));
+      range<1> gws5 (n_blocks_reduction / 2);
+      range<1> lws5 (n_blocks_reduction / 2);
       q.submit([&] (handler &cgh) {
          accessor<int, 1, sycl_read_write, access::target::local> sm (n_blocks_reduction/2, cgh);
-        cgh.parallel_for<class min_reduce2>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        cgh.parallel_for<class s6_min_reduce2>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
           min_reduce_kernel2(item,
               d_min_in_mat_vect,
               d_min_in_mat,
