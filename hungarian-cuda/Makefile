@@ -49,8 +49,8 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program)
+	./$(program) output.txt
 
