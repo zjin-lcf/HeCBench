@@ -170,7 +170,7 @@ __global__ void calc_min_in_rows()
   sdata[tid] = thread_min;
 
   __syncthreads();
-  if (n_threads_reduction >= 1024 && n_rows_per_block < 1024) { if (tid < 512) { sdata[tid] = min(sdata[tid], sdata[tid + 512]); } __syncthreads(); }
+  if (n_threads_reduction >= 1024 && n_rows_per_block < 1024) {if (tid < 512) { sdata[tid] = min(sdata[tid], sdata[tid + 512]); } __syncthreads(); }
   if (n_threads_reduction >= 512 && n_rows_per_block < 512) { if (tid < 256) { sdata[tid] = min(sdata[tid], sdata[tid + 256]); } __syncthreads(); }
   if (n_threads_reduction >= 256 && n_rows_per_block < 256) { if (tid < 128) { sdata[tid] = min(sdata[tid], sdata[tid + 128]); } __syncthreads(); }
   if (n_threads_reduction >= 128 && n_rows_per_block < 128) { if (tid <  64) { sdata[tid] = min(sdata[tid], sdata[tid + 64]); } __syncthreads(); }
@@ -542,6 +542,14 @@ __global__ void min_reduce_kernel2() {
 // Host code
 // -------------------------------------------------------------------------------------
 
+// Used to make sure some constants are properly set
+void check(bool val, const char *str){
+  if (!val) {
+    printf("Check failed: %s!\n", str);
+    exit(-1);
+  }
+}
+
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
 inline cudaError_t check(cudaError_t result)
@@ -579,7 +587,6 @@ void Hungarian_Algorithm()
   // Step 2 kernels
   do {
     repeat_kernel = false;
-    check(cudaDeviceSynchronize());
     call_kernel(step_2, n_blocks_step_4, (n_blocks_step_4 > 1 || zeros_size > max_threads_per_block) ? max_threads_per_block : zeros_size);
     // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
   } while (repeat_kernel);
@@ -599,7 +606,6 @@ void Hungarian_Algorithm()
     {
       do {  // step 4 loop
         goto_5 = false; repeat_kernel = false; 
-        check(cudaDeviceSynchronize());
 
         call_kernel(step_4, n_blocks_step_4, (n_blocks_step_4 > 1 || zeros_size > max_threads_per_block) ? max_threads_per_block : zeros_size);
         // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
@@ -622,41 +628,37 @@ void Hungarian_Algorithm()
     call_kernel(step_5b, n_blocks, n_threads);
 
   }  // repeat steps 3 to 6
-
 }
 
-// Used to make sure some constants are properly set
-void check(bool val, const char *str){
-  if (!val) {
-    printf("Check failed: %s!\n", str);
-    getchar();
-    exit(-1);
-  }
-}
-
-int main()
+int main(int argc, char* argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <output file>\n", argv[0]);
+    return 1;
+  }
+
   // Constant checks:
   check(n == (1 << log2_n), "Incorrect log2_n!");
   check(n_threads*n_blocks == n, "n_threads*n_blocks != n\n");
   // step 1
   check(n_blocks_reduction <= n, "Step 1: Should have several lines per block!");
   check(n % n_blocks_reduction == 0, "Step 1: Number of lines per block should be integer!");
-  check((n_blocks_reduction*n_threads_reduction) % n == 0, "Step 1: The grid size must be a multiple of the line size!");
-  check(n_threads_reduction*n_blocks_reduction <= n*n, "Step 1: The grid size is bigger than the matrix size!");
+  check((n_blocks_reduction*n_threads_reduction) % n == 0,
+        "Step 1: The grid size must be a multiple of the line size!");
+  check(n_threads_reduction*n_blocks_reduction <= n*n,
+        "Step 1: The grid size is bigger than the matrix size!");
   // step 6
-  check(n_threads_full*n_blocks_full <= n*n, "Step 6: The grid size is bigger than the matrix size!");
-  check(columns_per_block_step_4*n == (1 << log2_data_block_size), "Columns per block of step 4 is not a power of two!");
-
-  printf("Running. See out.txt for output.\n");
+  check(n_threads_full*n_blocks_full <= n*n,
+        "Step 6: The grid size is bigger than the matrix size!");
+  check(columns_per_block_step_4*n == (1 << log2_data_block_size),
+        "Columns per block of step 4 is not a power of two!");
 
   // Open text file
-  FILE *file = freopen("out.txt", "w", stdout);
+  FILE *file = freopen(argv[1], "w", stdout);
   if (file == NULL)
   {
     perror("Error opening the output file!\n");
-    getchar();
-    exit(1);
+    return 1; 
   };
 
   // Prints the current time
@@ -691,7 +693,7 @@ int main()
     time_t start_time = clock();
 
     Hungarian_Algorithm();
-    checkCuda(cudaDeviceSynchronize());
+    check(cudaDeviceSynchronize());
 
     time_t stop_time = clock();
     fflush(file);
