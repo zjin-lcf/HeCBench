@@ -1,6 +1,5 @@
-Fast Block Distributed CUDA Implementation of the Hungarian Algorithm
+Reference
 
-Annex to the paper:
 Paulo A. C. Lopes, Satyendra Singh Yadav, Aleksandar Ilic, Sarat Kumar Patra , 
 "Fast Block Distributed CUDA Implementation of the Hungarian Algorithm",
 Journal Parallel Distributed Computing
