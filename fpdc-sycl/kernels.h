@@ -34,7 +34,7 @@ void CompressionKernel(
   char *__restrict dbufd,
   const int *__restrict cutd,
   int *__restrict offd,
-  int *__restrict ibufs)
+  volatile int *__restrict ibufs)
 {
   int offset, code, bcount, tmp, off, beg, end, lane, warp, iindex, lastidx, start, term;
   ull diff, prev;
@@ -149,7 +149,7 @@ void DecompressionKernel(
  const char *__restrict dbufd,
  ull *__restrict fbufd,
  const int *__restrict cutd,
- int *__restrict ibufs)
+ volatile int *__restrict ibufs)
 {
   int offset, code, bcount, off, beg, end, lane, warp, iindex, lastidx, start, term;
   ull diff, prev;
