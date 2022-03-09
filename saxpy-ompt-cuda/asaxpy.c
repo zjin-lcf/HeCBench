@@ -20,9 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#ifdef _OPENMP
 #include <omp.h>
-#endif
 #include <cuda_runtime.h>
 #include "cublas_v2.h"
 #include "wtcalc.h"
@@ -147,8 +145,8 @@ for (int i = 0; i < m; ++i) {
 {
   clock_gettime(CLOCK_REALTIME, rt + 0);
 #pragma omp target teams distribute parallel for device(0) \
-num_teams(65536) thread_limit(512) dist_schedule(static, 512) \
-collapse(2) shared(a, x, y)
+  num_teams(65536) thread_limit(512) dist_schedule(static, 512) \
+  collapse(2) shared(a, x, y)
 for (int j = 0; j < 65536; ++j) {
   for (int i = 0; i < 512; ++i) { /* 2x i-loop unrolling */
     y[j * 1024 + i      ] += a * x[j * 1024 + i      ];

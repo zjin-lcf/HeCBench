@@ -25,9 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef _OPENMP
 #include <omp.h>
-#endif
 #include "hsaxpy.h"
 #include "asaxpy.h"
 #include "check1ns.h"
