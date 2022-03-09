@@ -691,6 +691,9 @@ Early results are shown [here](results/README.md)
 ### recursiveGaussian (opencl)
   2-dimensional Gaussian Blur Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### resnet-kernels (cuda)
+  ResNet kernels for inference (https://github.com/xuqiantong/CUDA-Winograd)
+
 ### reverse (cuda)
   Reverse an input array of size 256 using shared memory
 
