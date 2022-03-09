@@ -743,6 +743,9 @@ Early results are shown [here](results/README.md)
 ### seam-carving (cuda)
   Seam carving (https://github.com/pauty/CUDA_seam_carving)
 
+### segsort (cuda)
+  Fast segmented sort on a GPU (https://github.com/Funatiq/bb_segsort)
+
 ### sheath (cuda)
   Plasma sheath simulation with the particle-in-cell method (https://www.particleincell.com/2016/cuda-pic/)
 
