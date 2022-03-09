@@ -728,6 +728,9 @@ Early results are shown [here](results/README.md)
 ### sampling (cuda)
   Shapley sampling values explanation method (https://github.com/rapidsai/cuml)
 
+### saxpy-ompt (openmp)
+  Perform the SAXPY operation on host and device (https://github.com/pc2/OMP-Offloading)
+
 ### scan (cuda)
   A block-level scan (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
 
