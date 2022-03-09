@@ -21,8 +21,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <omp.h>
-#include <cuda_runtime.h>
-#include "cublas_v2.h"
+#include <CL/sycl.hpp>
+#include "oneapi/mkl/blas.hpp"
 #include "wtcalc.h"
 #include "asaxpy.h"
 
@@ -32,10 +32,13 @@ void asaxpy(const int n,
                   float *y,
             const int ial)
 {
-  cublasHandle_t handle;
-  float alfa = a,
-        *x_dev = NULL,
-        *y_dev = NULL;
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel);
+
   struct timespec rt[2];
   int m = (n >> 4);
 
@@ -160,49 +163,20 @@ for (int j = 0; j < 65536; ++j) {
     default:
 
 /*
- * cublasSaxpy in CUBLAS
+ * axpy in MKL
  */
-  if (CUBLAS_STATUS_SUCCESS != cublasCreate(&handle)) {
-    printf("error: initialization (CUBLAS)\n");
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
-  }
-  if (cudaSuccess != cudaMalloc((void **) &x_dev, sizeof(*x) * n) ||
-      cudaSuccess != cudaMalloc((void **) &y_dev, sizeof(*y) * n)) {
-    printf("error: memory allocation (CUDA)\n");
-    cudaFree(x_dev); cudaFree(y_dev);
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
-  }
-  if (CUBLAS_STATUS_SUCCESS != cublasSetVector(n, sizeof(*x), x, 1, x_dev, 1) ||
-      CUBLAS_STATUS_SUCCESS != cublasSetVector(n, sizeof(*y), y, 1, y_dev, 1)) {
-    printf("error: host --> accl (CUBLAS)\n");
-    cudaFree(x_dev); cudaFree(y_dev);
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
-  }
+  sycl::buffer<float, 1> x_dev(x, n);
+  sycl::buffer<float, 1> y_dev(y, n);
   clock_gettime(CLOCK_REALTIME, rt + 0);
-  if (CUBLAS_STATUS_SUCCESS != cublasSaxpy(handle, n, &alfa, x_dev, 1, y_dev, 1)) {
-    printf("error: cublasSaxpy (CUBLAS)\n");
-    cudaFree(x_dev); cudaFree(y_dev);
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
+  try {
+    oneapi::mkl::blas::axpy(q, n, a, x_dev, 1, y_dev, 1);
+    q.wait();
   }
-  if (cudaSuccess != cudaDeviceSynchronize()) {
-    printf("error: device synchronization (CUDA)\n");
-    cudaFree(x_dev); cudaFree(y_dev);
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
+  catch(sycl::exception const& e) {
+    std::cout << "\t\tCaught synchronous SYCL exception during AXPY:\n"
+                  << e.what() << std::endl;
   }
   clock_gettime(CLOCK_REALTIME, rt + 1);
-  if (CUBLAS_STATUS_SUCCESS != cublasGetVector(n, sizeof(*y), y_dev, 1, y, 1)) {
-    printf("error: accl --> host (CUBLAS)\n");
-    cudaFree(x_dev); cudaFree(y_dev);
-    cublasDestroy(handle);
-    exit(EXIT_FAILURE);
-  }
-  cudaFree(x_dev); cudaFree(y_dev);
-  cublasDestroy(handle);
       break;
   } /* end switch (ial) */
 

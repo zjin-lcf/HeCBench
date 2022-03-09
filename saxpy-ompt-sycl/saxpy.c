@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
      * 2: <<<2^15, 2^7 >>>, manual scheduling, 16x loop unrolling (2^15*2^7*16==2^26)
      * 3: <<<2^12, 2^7 >>>, auto   scheduling, 16x loop unrolling
      * 4: de-linearize the vector and then collapse the ji-loop.
-     * otherwise: cublasSaxpy in CUBLAS
+     * otherwise: axpy in MKL
      */
     memcpy(yaccl, y, nbytes);
     wtcalc = -1.0;
