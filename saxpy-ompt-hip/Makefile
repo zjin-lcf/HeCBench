@@ -1,0 +1,65 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+DEVICE    = gpu
+ARCH      = gfx906
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = saxpy.c hsaxpy.c asaxpy.c check1ns.c wtcalc.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -Wall -D__HIP_PLATFORM_AMD__ -I/opt/rocm/hipblas/include
+
+# Linker Flags
+LDFLAGS = -L/opt/rocm/hipblas/lib -lhipblas -lamdhip64
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g 
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=$(ARCH)
+else
+  CFLAGS +=
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c asaxpy.h check1ns.h hsaxpy.h wtcalc.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program)
