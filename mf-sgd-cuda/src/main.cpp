@@ -218,7 +218,7 @@ Argument parse_argument(int argc, char **argv)
 //save the p & q model into file.
 int save_model(mf_model const *model, char const *path)
 {
-  printf("save_model() is called\n");
+  printf("save_model ...\n");
 
   char command[1024];
   sprintf(command, "rm -f %s", path);

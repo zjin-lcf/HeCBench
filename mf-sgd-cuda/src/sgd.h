@@ -143,6 +143,19 @@ struct mf_model
 mf_problem read_problem(string path);
 mf_model* sgd_train(mf_problem*, mf_problem*, Parameter);
 
+#define gpuErr(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+  if (code != cudaSuccess) 
+  {
+    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if (abort) exit(code);
+  }
+}
+
+
+void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float scale);
+
 #endif
 
 
