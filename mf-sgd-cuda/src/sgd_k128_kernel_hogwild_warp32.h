@@ -3,7 +3,7 @@ __global__ void sgd_k128_kernel_hogwild_warp32_lrate(
     long long nnz,
     half *__restrict__ p,
     half *__restrict__ q,
-    curandState *state,
+    unsigned int *state,
     const float *__restrict__ dynamic_rate,
     long long u_seg,
     long long v_seg,
@@ -35,7 +35,7 @@ __global__ void sgd_k128_kernel_hogwild_warp32_lrate(
       long long start_id = 0;
       if(lane_id == 0)
       {
-        long long origin = (long long)(curand_uniform(&state[wid])*nnz);
+        long long origin = (long long)(LCG_random(state+wid)*nnz);
         start_id = origin%nnz;
       }
       start_id = __shfl(start_id, 0);
