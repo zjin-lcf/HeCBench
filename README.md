@@ -344,6 +344,9 @@ Early results are shown [here](results/README.md)
 ### ge-spmm (cuda)
   General-purposed sparse matrix-matrix multiplication on GPUs for graph neural networks (https://github.com/hgyhungry/ge-spmm)
 
+### gemmEx (cuda)
+  General matrix-matrix multiplication on GPUs (https://godweiyang.com/2021/08/24/gemm/)
+
 ### gmm (cuda)
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
 
