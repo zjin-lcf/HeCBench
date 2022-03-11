@@ -1,18 +1,55 @@
+#===============================================================================
+# User Options
+#===============================================================================
 
-CU_FLAG=-gencode arch=compute_35,code=compute_35 \
-	-gencode arch=compute_37,code=compute_37 \
-        -gencode arch=compute_50,code=compute_50 \
-        -gencode arch=compute_60,code=compute_60 \
-	-O3
+# Compiler can be set below, or via environment variable
+CC        = nvcc
+OPTIMIZE  = yes
+DEBUG     = no
+ARCH      = sm_60
 
-mf_sgd:main.o sgd.o
-	nvcc $(CU_FLAG) main.o sgd.o -o mf_sgd -Xcompiler -fopenmp -DUSEOMP
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-main.o:main.cpp sgd.h 
-	nvcc $(CU_FLAG) -c main.cpp -std=c++11 -DUSEOMP -Xcompiler -fopenmp
+program = main
 
-sgd.o:sgd.cu sgd.h
-	nvcc $(CU_FLAG) -c sgd.cu -o sgd.o -std=c++11 -Xcompiler -fopenmp -DUSEOMP
+source = main.cpp sgd.cu 
+
+obj = main.o sgd.o
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+
+# Linker Flags
+LDFLAGS = 
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -DDEBUG
+  LDFLAGS  += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+main.o: main.cpp sgd.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+sgd.o: sgd.cu sgd.h sgd_k128_kernel_hogwild_warp32.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f mf_sgd *.o
+	rm -rf $(program) $(obj)
