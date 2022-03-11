@@ -3,16 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-
-GPU       = yes
-CUDA      = no
-CUDA_ARCH = sm_70
-HIP       = no
-HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -20,56 +13,41 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp  sgd.cpp  
+source = main.cpp sgd.cu 
 
-obj = $(source:.cpp=.o)
+obj = main.o sgd.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSEOMP -std=c++17 -Wall -fsycl
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
-LDFLAGS = -lpthread
-
-ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
-endif
-
-ifeq ($(HIP), yes)
-  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
-endif
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS  += -g -DDEBUG
-  LDFLAGS += -g
+  CFLAGS += -g -DDEBUG
+  LDFLAGS  += -g
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
-ifeq ($(GPU),yes)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp sgd.h 
+main.o: main.cpp sgd.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-sgd.o: sgd.cpp sgd.h sgd_k128_kernel_hogwild_warp32.h
+sgd.o: sgd.cu sgd.h sgd_k128_kernel_hogwild_warp32.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
