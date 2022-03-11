@@ -550,6 +550,9 @@ Early results are shown [here](results/README.md)
 ### metropolis (cuda)
    Simulation of an ensemble of replicas with Metropolis–Hastings computation in the trial run (https://github.com/crinavar/trueke) 
 
+### mf-sgd (cuda)
+   Matrix factorization with stochastic gradient descent (https://github.com/cuMF/cumf_sgd)
+
 ### miniFE (omp)
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
 
