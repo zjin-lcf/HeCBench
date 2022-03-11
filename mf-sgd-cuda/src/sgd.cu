@@ -1,9 +1,4 @@
 #include <unistd.h>  // access, F_OK
-
-#if defined USEOMP
-#include <omp.h>
-#endif
-
 #include "sgd.h"
 
 using namespace std;
@@ -1055,7 +1050,6 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
           }   
         }
       }
-
       cudaDeviceSynchronize();
     }
     cudaDeviceSynchronize();
