@@ -1,15 +1,3 @@
-#include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <cstring>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <vector>
 #include "sgd.h"
 
 using namespace std;

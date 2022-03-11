@@ -262,8 +262,8 @@ int main(int argc, char**argv)
   }
 
   int deviceCount = 0;
-  cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
-  cudaSetDevice(arg.param.gpu%deviceCount);
+  hipError_t error_id = hipGetDeviceCount(&deviceCount);
+  hipSetDevice(arg.param.gpu%deviceCount);
 
   mf_problem tr,va;
 
@@ -279,11 +279,11 @@ int main(int argc, char**argv)
 
   save_model(model, arg.model_path.c_str());
 
-  cudaFreeHost(model->floatp);
-  cudaFreeHost(model->floatq);
-  cudaFreeHost(model->halfp);
-  cudaFreeHost(model->halfq);
-  cudaFreeHost(tr.R);
+  hipHostFree(model->floatp);
+  hipHostFree(model->floatq);
+  hipHostFree(model->halfp);
+  hipHostFree(model->halfq);
+  hipHostFree(tr.R);
 
   printf("\ntraining application finished...\n\n\n");
 

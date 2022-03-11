@@ -194,7 +194,7 @@ mf_problem read_problem(string path)
     printf("prob.nnz = %lld\n", prob.nnz);
 
     mf_node *R;
-    cudaMallocHost((void**)&R,sizeof(mf_node)*prob.nnz); 
+    hipMallocHost((void**)&R,sizeof(mf_node)*prob.nnz); 
 
     rewind(fptr);
 
@@ -253,7 +253,7 @@ mf_problem read_problem(string path)
 
     //malloc
     mf_node *R;
-    cudaMallocHost((void**)&R,sizeof(mf_node)*prob.nnz); 
+    hipMallocHost((void**)&R,sizeof(mf_node)*prob.nnz); 
     prob.R = R;
 
     //launch
@@ -412,14 +412,14 @@ void init_feature(short *feature_vec, int grid, long long seg, int k)
   float scale = (float)sqrt(1.0/k);
 
   half *gpu_vec;
-  cudaMalloc((void**)&gpu_vec, seg*k*sizeof(half));
+  hipMalloc((void**)&gpu_vec, seg*k*sizeof(half));
 
   int state_size = (seg/256 + 1)*256;
   printf("state_size (a multiple of 256):%d\n", state_size);
   unsigned int* d_state;
-  cudaMalloc((void**)&d_state, sizeof(unsigned int)*state_size);
+  hipMalloc((void**)&d_state, sizeof(unsigned int)*state_size);
 
-  init_rand_state<<<state_size/256, 256>>>(5551212, d_state);
+  hipLaunchKernelGGL(init_rand_state, state_size/256, 256, 0, 0, 5551212, d_state);
 
   const int blockSize = 256;
   const int blockNum = (seg*k + 255)/256;
@@ -429,12 +429,12 @@ void init_feature(short *feature_vec, int grid, long long seg, int k)
   for(int i = 0;i < grid; i++)
   {
     printf("grid:%d\n",i);
-    random_init<<<blockNum, blockSize>>>(d_state, state_size, gpu_vec, seg*k, k, scale);
-    cudaMemcpy(feature_vec + i*seg*k,gpu_vec,sizeof(half)*seg*k, cudaMemcpyDeviceToHost);
+    hipLaunchKernelGGL(random_init, blockNum, blockSize, 0, 0, d_state, state_size, gpu_vec, seg*k, k, scale);
+    hipMemcpy(feature_vec + i*seg*k,gpu_vec,sizeof(half)*seg*k, hipMemcpyDeviceToHost);
   }
 
-  cudaFree(d_state);
-  cudaFree(gpu_vec);
+  hipFree(d_state);
+  hipFree(gpu_vec);
 }
 
 mf_model* init_model(mf_problem*prob, int k, float ave)
@@ -464,13 +464,13 @@ mf_model* init_model(mf_problem*prob, int k, float ave)
   model->b = ave;
 
   //allocate memory
-  cudaMallocHost((void**)&model->floatp, sizeof(float)*model->ux*model->u_seg*k);
-  cudaMallocHost((void**)&model->floatq, sizeof(float)*model->vy*model->v_seg*k);
+  hipMallocHost((void**)&model->floatp, sizeof(float)*model->ux*model->u_seg*k);
+  hipMallocHost((void**)&model->floatq, sizeof(float)*model->vy*model->v_seg*k);
 
-  cudaMallocHost((void**)&model->halfp, sizeof(short)*model->ux*model->u_seg*k);
-  cudaMallocHost((void**)&model->halfq, sizeof(short)*model->vy*model->v_seg*k);
+  hipMallocHost((void**)&model->halfp, sizeof(short)*model->ux*model->u_seg*k);
+  hipMallocHost((void**)&model->halfq, sizeof(short)*model->vy*model->v_seg*k);
 
-  gpuErr(cudaPeekAtLastError());
+  gpuErr(hipPeekAtLastError());
 
   //random init
   init_feature(model->halfp, model->ux, model->u_seg, k);
@@ -510,28 +510,28 @@ void transform_feature_vector(short *half_feature, float *float_feature, int m, 
   half *gpu_half_feature;
   float *gpu_float_feature;
 
-  cudaMalloc((void**)&gpu_half_feature, sizeof(half)*seg*k);
-  cudaMalloc((void**)&gpu_float_feature, sizeof(float)*seg*k);
-  gpuErr(cudaPeekAtLastError());
+  hipMalloc((void**)&gpu_half_feature, sizeof(half)*seg*k);
+  hipMalloc((void**)&gpu_float_feature, sizeof(float)*seg*k);
+  gpuErr(hipPeekAtLastError());
 
   for(int i = 0;i < grid;i++)
   {
-    cudaMemcpy(gpu_half_feature, half_feature + i*seg*k, sizeof(half)*seg*k, cudaMemcpyHostToDevice);
-    gpuErr(cudaPeekAtLastError());
+    hipMemcpy(gpu_half_feature, half_feature + i*seg*k, sizeof(half)*seg*k, hipMemcpyHostToDevice);
+    gpuErr(hipPeekAtLastError());
 
     int num_blocks = (seg*k+255)/256;
     if(num_blocks > 8*24)num_blocks = 8*24;
 
-    transform_half<<<num_blocks,256>>>(gpu_half_feature, gpu_float_feature, seg*k);
+    hipLaunchKernelGGL(transform_half, num_blocks, 256, 0, 0, gpu_half_feature, gpu_float_feature, seg*k);
 
-    gpuErr(cudaPeekAtLastError());
-    cudaMemcpy(float_feature + i*seg*k, gpu_float_feature, sizeof(float)*seg*k, cudaMemcpyDeviceToHost);
-    gpuErr(cudaPeekAtLastError());
+    gpuErr(hipPeekAtLastError());
+    hipMemcpy(float_feature + i*seg*k, gpu_float_feature, sizeof(float)*seg*k, hipMemcpyDeviceToHost);
+    gpuErr(hipPeekAtLastError());
   }
 
-  cudaFree(gpu_half_feature);
-  cudaFree(gpu_float_feature);
-  gpuErr(cudaPeekAtLastError());
+  hipFree(gpu_half_feature);
+  hipFree(gpu_float_feature);
+  gpuErr(hipPeekAtLastError());
 }
 
 void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float scale)
@@ -544,11 +544,11 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
 
   //generate the random state for the hogwild scheduling policy.
   unsigned int *rand_state;
-  cudaMalloc((void**)&rand_state, sizeof(unsigned int)*para.num_workers);
-  gpuErr(cudaPeekAtLastError());
+  hipMalloc((void**)&rand_state, sizeof(unsigned int)*para.num_workers);
+  gpuErr(hipPeekAtLastError());
 
   init_rand_state<<<((para.num_workers+255)/256),256>>>(5551212, rand_state, para.num_workers);
-  gpuErr(cudaPeekAtLastError());
+  gpuErr(hipPeekAtLastError());
 
   //generate the dynamic learning rate
   float dynamic_rate[1024];
@@ -562,22 +562,22 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
     dynamic_rate[i] = tmp_rate;
   }
   float *gpu_dynamic_rate;
-  cudaMalloc((void**)&gpu_dynamic_rate, sizeof(float)*1024);
-  gpuErr(cudaPeekAtLastError());
-  cudaMemcpy(gpu_dynamic_rate, dynamic_rate, sizeof(float)*1024, cudaMemcpyHostToDevice);
-  gpuErr(cudaPeekAtLastError());
+  hipMalloc((void**)&gpu_dynamic_rate, sizeof(float)*1024);
+  gpuErr(hipPeekAtLastError());
+  hipMemcpy(gpu_dynamic_rate, dynamic_rate, sizeof(float)*1024, hipMemcpyHostToDevice);
+  gpuErr(hipPeekAtLastError());
 
   //malloc a problem grid on GPU
   if(prob->x_grid*prob->y_grid == 1)
   {
-    cudaMalloc((void**)&(prob->gpuR), sizeof(mf_node)*prob->maxGridSize);
+    hipMalloc((void**)&(prob->gpuR), sizeof(mf_node)*prob->maxGridSize);
     prob->cur_u_id = -1;
     prob->cur_v_id = -1;
   }
   else
   {
-    cudaMalloc((void**)&(prob->gpuRptrs[0]), sizeof(mf_node)*prob->maxGridSize);
-    cudaMalloc((void**)&(prob->gpuRptrs[1]), sizeof(mf_node)*prob->maxGridSize);
+    hipMalloc((void**)&(prob->gpuRptrs[0]), sizeof(mf_node)*prob->maxGridSize);
+    hipMalloc((void**)&(prob->gpuRptrs[1]), sizeof(mf_node)*prob->maxGridSize);
     prob->cur_global_x_id[0] = -1;
     prob->cur_global_x_id[1] = -1;
     prob->cur_global_y_id[0] = -1;
@@ -587,17 +587,17 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
   //malloc feature vectors on GPU
   if(prob->x_grid*prob->y_grid == 1)
   {
-    cudaMalloc((void**)&model->gpuHalfp, sizeof(half)*model->u_seg*model->k);
-    cudaMalloc((void**)&model->gpuHalfq, sizeof(half)*model->v_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfp, sizeof(half)*model->u_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfq, sizeof(half)*model->v_seg*model->k);
     model->cur_u_id = -1;
     model->cur_v_id = -1;
   }
   else
   {
-    cudaMalloc((void**)&model->gpuHalfPptrs[0], sizeof(half)*model->u_seg*model->k);
-    cudaMalloc((void**)&model->gpuHalfPptrs[1], sizeof(half)*model->u_seg*model->k);
-    cudaMalloc((void**)&model->gpuHalfQptrs[0], sizeof(half)*model->v_seg*model->k);
-    cudaMalloc((void**)&model->gpuHalfQptrs[1], sizeof(half)*model->v_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfPptrs[0], sizeof(half)*model->u_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfPptrs[1], sizeof(half)*model->u_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfQptrs[0], sizeof(half)*model->v_seg*model->k);
+    hipMalloc((void**)&model->gpuHalfQptrs[1], sizeof(half)*model->v_seg*model->k);
 
     model->cur_global_x_id[0] = -1;
     model->cur_global_x_id[1] = -1;
@@ -625,11 +625,11 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
   //run the update kernel
   if(prob->u_grid*prob->v_grid == 1)
   {
-    cudaMemcpy(prob->gpuR, prob->R2D[0], sizeof(mf_node)*prob->gridSize[0], cudaMemcpyHostToDevice);
-    cudaMemcpy(model->gpuHalfp, model->halfp, sizeof(half)*model->u_seg*model->k, cudaMemcpyHostToDevice);
-    cudaMemcpy(model->gpuHalfq, model->halfq, sizeof(half)*model->v_seg*model->k, cudaMemcpyHostToDevice);
+    hipMemcpy(prob->gpuR, prob->R2D[0], sizeof(mf_node)*prob->gridSize[0], hipMemcpyHostToDevice);
+    hipMemcpy(model->gpuHalfp, model->halfp, sizeof(half)*model->u_seg*model->k, hipMemcpyHostToDevice);
+    hipMemcpy(model->gpuHalfq, model->halfq, sizeof(half)*model->v_seg*model->k, hipMemcpyHostToDevice);
 
-    sgd_k128_kernel_hogwild_warp32_lrate<<<para.num_workers/4,128>>>(
+    hipLaunchKernelGGL(sgd_k128_kernel_hogwild_warp32_lrate, para.num_workers/4, 128, 0, 0, 
         prob->gpuR,
         prob->gridSize[0],
         model->gpuHalfp,
@@ -650,8 +650,8 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
         prob->v_grid,
         0,
         0);
-    cudaMemcpy(model->halfp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, cudaMemcpyDeviceToHost);
-    cudaMemcpy(model->halfq, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, cudaMemcpyDeviceToHost);
+    hipMemcpy(model->halfp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, hipMemcpyDeviceToHost);
+    hipMemcpy(model->halfq, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, hipMemcpyDeviceToHost);
   }
   else if(prob->x_grid*prob->y_grid == 1)
   {
@@ -677,9 +677,9 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
           //transfer problem grid to gpu.
           if(prob->cur_u_id != cur_u_id || prob->cur_v_id != cur_v_id)
           {
-            cudaMemcpy(prob->gpuR, prob->R2D[cur_grid_id], sizeof(mf_node)*prob->gridSize[cur_grid_id], cudaMemcpyHostToDevice);
+            hipMemcpy(prob->gpuR, prob->R2D[cur_grid_id], sizeof(mf_node)*prob->gridSize[cur_grid_id], hipMemcpyHostToDevice);
           }
-          gpuErr(cudaPeekAtLastError());
+          gpuErr(hipPeekAtLastError());
           prob->cur_u_id = cur_u_id;
           prob->cur_v_id = cur_v_id;
 
@@ -687,44 +687,44 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
           if(model->cur_u_id == -1)
           {
             short *p_tmp = model->halfp + model->u_seg*model->k*cur_u_id; 
-            cudaMemcpy(model->gpuHalfp, p_tmp, sizeof(half)*model->u_seg*model->k, cudaMemcpyHostToDevice);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(model->gpuHalfp, p_tmp, sizeof(half)*model->u_seg*model->k, hipMemcpyHostToDevice);
+            gpuErr(hipPeekAtLastError());
           }
           else if(model->cur_u_id != cur_u_id)
           {
             short *p_tmp = model->halfp + model->u_seg*model->k*model->cur_u_id;
-            cudaMemcpy(p_tmp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, cudaMemcpyDeviceToHost);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(p_tmp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, hipMemcpyDeviceToHost);
+            gpuErr(hipPeekAtLastError());
 
             p_tmp = model->halfp + model->u_seg*model->k*cur_u_id;
-            cudaMemcpy(model->gpuHalfp, p_tmp, sizeof(half)*model->u_seg*model->k, cudaMemcpyHostToDevice);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(model->gpuHalfp, p_tmp, sizeof(half)*model->u_seg*model->k, hipMemcpyHostToDevice);
+            gpuErr(hipPeekAtLastError());
           }
           model->cur_u_id = cur_u_id;
-          gpuErr(cudaPeekAtLastError());
+          gpuErr(hipPeekAtLastError());
 
           //transfer q grid to gpu
           if(model->cur_v_id == -1)
           {
             short *q_tmp = model->halfq + model->v_seg*model->k*cur_v_id;
-            cudaMemcpy(model->gpuHalfq, q_tmp, sizeof(half)*model->v_seg*model->k, cudaMemcpyHostToDevice);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(model->gpuHalfq, q_tmp, sizeof(half)*model->v_seg*model->k, hipMemcpyHostToDevice);
+            gpuErr(hipPeekAtLastError());
           }
           else if(model->cur_v_id != cur_v_id)
           {
             short *q_tmp = model->halfq + model->v_seg*model->k*model->cur_v_id;
-            cudaMemcpy(q_tmp, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, cudaMemcpyDeviceToHost);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(q_tmp, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, hipMemcpyDeviceToHost);
+            gpuErr(hipPeekAtLastError());
 
             q_tmp = model->halfq + model->v_seg*model->k*cur_v_id;
-            cudaMemcpy(model->gpuHalfq, q_tmp, sizeof(half)*model->v_seg*model->k, cudaMemcpyHostToDevice);
-            gpuErr(cudaPeekAtLastError());
+            hipMemcpy(model->gpuHalfq, q_tmp, sizeof(half)*model->v_seg*model->k, hipMemcpyHostToDevice);
+            gpuErr(hipPeekAtLastError());
           }
           model->cur_v_id = cur_v_id;
-          gpuErr(cudaPeekAtLastError());
+          gpuErr(hipPeekAtLastError());
 
           //call the kernel
-          sgd_k128_kernel_hogwild_warp32_lrate<<<para.num_workers/4,128>>>(
+          hipLaunchKernelGGL(sgd_k128_kernel_hogwild_warp32_lrate, para.num_workers/4, 128, 0, 0, 
               prob->gpuR,
               prob->gridSize[cur_grid_id],
               model->gpuHalfp,
@@ -745,13 +745,13 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
               prob->v_grid,
               cur_u_id,
               cur_v_id);
-          gpuErr(cudaPeekAtLastError());
+          gpuErr(hipPeekAtLastError());
         }
       }
-      cudaDeviceSynchronize();
+      hipDeviceSynchronize();
 
     }
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
 
     //printf("%d,%d\n", model->cur_u_id, model->cur_v_id);
 
@@ -759,15 +759,15 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
     if(model->cur_u_id >= 0)
     {
       short *p_tmp = model->halfp + model->u_seg*model->k*model->cur_u_id;
-      cudaMemcpy(p_tmp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, cudaMemcpyDeviceToHost);
-      gpuErr(cudaPeekAtLastError());
+      hipMemcpy(p_tmp, model->gpuHalfp, sizeof(half)*model->u_seg*model->k, hipMemcpyDeviceToHost);
+      gpuErr(hipPeekAtLastError());
     }
     //transfer q back to CPU
     if(model->cur_v_id >= 0)
     {
       short *q_tmp = model->halfq + model->v_seg*model->k*model->cur_v_id;
-      cudaMemcpy(q_tmp, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, cudaMemcpyDeviceToHost);
-      gpuErr(cudaPeekAtLastError());
+      hipMemcpy(q_tmp, model->gpuHalfq, sizeof(half)*model->v_seg*model->k, hipMemcpyDeviceToHost);
+      gpuErr(hipPeekAtLastError());
     }
   }
   else
@@ -778,10 +778,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
     int *global_id_list = new int[prob->x_grid*prob->y_grid];
 
     //create stream
-    cudaStream_t stream_com, stream_mem_d2h, stream_mem_h2d;
-    cudaStreamCreate(&stream_com);
-    cudaStreamCreate(&stream_mem_d2h);
-    cudaStreamCreate(&stream_mem_h2d);
+    hipStream_t stream_com, stream_mem_d2h, stream_mem_h2d;
+    hipStreamCreate(&stream_com);
+    hipStreamCreate(&stream_mem_d2h);
+    hipStreamCreate(&stream_mem_h2d);
 
     //random shuffle
     vector<int> u_id_vec(prob->u_grid, 0);
@@ -851,7 +851,7 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
             if(i >= 0)
             {
 
-              sgd_k128_kernel_hogwild_warp32_lrate<<<para.num_workers/4,128, 0, stream_com>>>(
+              hipLaunchKernelGGL(sgd_k128_kernel_hogwild_warp32_lrate, para.num_workers/4, 128, 0, stream_com, 
                   prob->gpuRptrs[i%2],
                   prob->gridSize[global_id_list[i]],
                   model->gpuHalfPptrs[i%2],
@@ -884,10 +884,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
               //transfer problem grid to gpu
               if(prob->cur_global_x_id[(i+1)%2] !=  next_global_x || prob->cur_global_y_id[(i+1)%2] != next_global_y)
               {
-                cudaMemcpyAsync(prob->gpuRptrs[(i+1)%2], 
+                hipMemcpyAsync(prob->gpuRptrs[(i+1)%2], 
                     prob->R2D[next_global_id], 
                     sizeof(mf_node)*prob->gridSize[next_global_id],
-                    cudaMemcpyHostToDevice,
+                    hipMemcpyHostToDevice,
                     stream_mem_h2d);
               }
 
@@ -906,10 +906,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
                 else
                 {
                   short *p_tmp = model->halfp + model->u_seg*model->k*next_global_x;
-                  cudaMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
                       p_tmp,    
                       sizeof(half)*model->u_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
                   model->cur_global_x_id[(i+1)%2] = next_global_x;
                 }
@@ -930,10 +930,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
 
                   //transfer
                   short *p_tmp_trans = model->halfp + model->u_seg*model->k*next_global_x;
-                  cudaMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
                       p_tmp_trans,    
                       sizeof(half)*model->u_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
                   model->cur_global_x_id[(i+1)%2] = next_global_x;
                 }
@@ -952,17 +952,17 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
                 else
                 {
                   short *p_tmp = model->halfp + model->u_seg*model->k*model->cur_global_x_id[(i+1)%2];
-                  cudaMemcpyAsync(p_tmp,
+                  hipMemcpyAsync(p_tmp,
                       model->gpuHalfPptrs[(i+1)%2],
                       sizeof(half)*model->u_seg*model->k,
-                      cudaMemcpyDeviceToHost,
+                      hipMemcpyDeviceToHost,
                       stream_mem_d2h);
 
                   p_tmp = model->halfp + model->u_seg*model->k*next_global_x;
-                  cudaMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfPptrs[(i+1)%2],
                       p_tmp,
                       sizeof(half)*model->u_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
 
                   model->cur_global_x_id[(i+1)%2] = next_global_x;
@@ -984,10 +984,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
                 else
                 {
                   short *q_tmp = model->halfq + model->v_seg*model->k*next_global_y;
-                  cudaMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
                       q_tmp,
                       sizeof(half)*model->v_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
                   model->cur_global_y_id[(i+1)%2] = next_global_y;
                 }
@@ -1007,10 +1007,10 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
                   model->gpuHalfQptrs[(i+2)%2] = q_tmp;
 
                   short *q_tmp_trans = model->halfq + model->v_seg*model->k*next_global_y;
-                  cudaMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
                       q_tmp_trans,
                       sizeof(half)*model->v_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
                   model->cur_global_y_id[(i+1)%2] = next_global_y;
                 }
@@ -1029,80 +1029,80 @@ void sgd_update_k128(Parameter para, mf_model *model, mf_problem *prob, float sc
                 else
                 {
                   short *q_tmp = model->halfq + model->v_seg*model->k*model->cur_global_y_id[(i+1)%2];
-                  cudaMemcpyAsync(q_tmp,
+                  hipMemcpyAsync(q_tmp,
                       model->gpuHalfQptrs[(i+1)%2],
                       sizeof(half)*model->v_seg*model->k,
-                      cudaMemcpyDeviceToHost,
+                      hipMemcpyDeviceToHost,
                       stream_mem_d2h);
 
                   q_tmp = model->halfq + model->v_seg*model->k*next_global_y;
-                  cudaMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
+                  hipMemcpyAsync(model->gpuHalfQptrs[(i+1)%2],
                       q_tmp,
                       sizeof(half)*model->v_seg*model->k,
-                      cudaMemcpyHostToDevice,
+                      hipMemcpyHostToDevice,
                       stream_mem_h2d);
                   model->cur_global_y_id[(i+1)%2] = next_global_y;
                 }
               }
             }
-            cudaDeviceSynchronize();
+            hipDeviceSynchronize();
           }   
         }
       }
-      cudaDeviceSynchronize();
+      hipDeviceSynchronize();
     }
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
 
     //transfer p back
     if(model->cur_global_x_id[0] != -1)
     {
       short *p_tmp = model->halfp + model->u_seg*model->k*model->cur_global_x_id[0];
-      cudaMemcpy(p_tmp, model->gpuHalfPptrs[0], sizeof(half)*model->u_seg*model->k, cudaMemcpyDeviceToHost);
+      hipMemcpy(p_tmp, model->gpuHalfPptrs[0], sizeof(half)*model->u_seg*model->k, hipMemcpyDeviceToHost);
     }
     if(model->cur_global_x_id[1] != -1)
     {
       short *p_tmp = model->halfp + model->u_seg*model->k*model->cur_global_x_id[1];
-      cudaMemcpy(p_tmp, model->gpuHalfPptrs[1], sizeof(half)*model->u_seg*model->k, cudaMemcpyDeviceToHost);
+      hipMemcpy(p_tmp, model->gpuHalfPptrs[1], sizeof(half)*model->u_seg*model->k, hipMemcpyDeviceToHost);
     }
 
     //transfer q back
     if(model->cur_global_y_id[0] != -1)
     {
       short *q_tmp = model->halfq + model->v_seg*model->k*model->cur_global_y_id[0];
-      cudaMemcpy(q_tmp, model->gpuHalfQptrs[0], sizeof(half)*model->v_seg*model->k, cudaMemcpyDeviceToHost);
+      hipMemcpy(q_tmp, model->gpuHalfQptrs[0], sizeof(half)*model->v_seg*model->k, hipMemcpyDeviceToHost);
     }
     if(model->cur_global_y_id[1] != -1)
     {
       short *q_tmp = model->halfq + model->v_seg*model->k*model->cur_global_y_id[1];
-      cudaMemcpy(q_tmp, model->gpuHalfQptrs[1], sizeof(half)*model->v_seg*model->k, cudaMemcpyDeviceToHost);
+      hipMemcpy(q_tmp, model->gpuHalfQptrs[1], sizeof(half)*model->v_seg*model->k, hipMemcpyDeviceToHost);
     }
   }   
 
   if(prob->x_grid*prob->y_grid == 1)
   {
-    cudaFree(model->gpuHalfp);
-    cudaFree(model->gpuHalfq);
-    cudaFree(prob->gpuR);
+    hipFree(model->gpuHalfp);
+    hipFree(model->gpuHalfq);
+    hipFree(prob->gpuR);
   }
   else
   {
-    cudaFree(model->gpuHalfPptrs[0]);
-    cudaFree(model->gpuHalfPptrs[1]);
-    cudaFree(model->gpuHalfQptrs[0]);
-    cudaFree(model->gpuHalfQptrs[1]);
-    cudaFree(prob->gpuRptrs[0]);
-    cudaFree(prob->gpuRptrs[1]);
+    hipFree(model->gpuHalfPptrs[0]);
+    hipFree(model->gpuHalfPptrs[1]);
+    hipFree(model->gpuHalfQptrs[0]);
+    hipFree(model->gpuHalfQptrs[1]);
+    hipFree(prob->gpuRptrs[0]);
+    hipFree(prob->gpuRptrs[1]);
   }
 
-  gpuErr(cudaPeekAtLastError());
+  gpuErr(hipPeekAtLastError());
 
   //transform halfp & halfq to floatp & floatq.
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   transform_feature_vector(model->halfp, model->floatp, model->m, model->ux, model->u_seg, model->k);
   transform_feature_vector(model->halfq, model->floatq, model->n, model->vy, model->v_seg, model->k);
 
-  cudaFree(gpu_dynamic_rate);
-  cudaFree(rand_state);
+  hipFree(gpu_dynamic_rate);
+  hipFree(rand_state);
 
   clock_gettime(CLOCK_MONOTONIC, &end);
   elapsed = end.tv_sec - begin.tv_sec;
