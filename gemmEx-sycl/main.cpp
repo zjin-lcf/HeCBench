@@ -110,8 +110,10 @@ int mkl_gemm_bias(
 }
 
 template <typename T, typename S>
-void test_gemm(queue &q, int m, int n, int k, T *A, T *B, S *C,
-    S alpha, S beta, int iteration)
+void test_gemm(queue &q,
+  const int m, const int n, const int k,
+  T *A, T *B, S *C,
+  const S alpha, const S beta, int iteration)
 {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -142,8 +144,10 @@ void test_gemm(queue &q, int m, int n, int k, T *A, T *B, S *C,
 }
 
 template <typename T, typename S>
-void test_gemm_bias(queue &q, int m, int n, int k, T *A, T *B, S *C,
-    S alpha, S beta, int iteration)
+void test_gemm_bias(queue &q,
+  const int m, const int n, const int k,
+  T *A, T *B, S *C,
+  const S alpha, const S beta, int iteration)
 {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {

@@ -29,10 +29,10 @@ void free_memory(T *A, T *B, S *C) {
 template <typename T, typename S>
 int cublas_gemm_ex(
     cublasHandle_t handle, cublasOperation_t transA, cublasOperation_t transB,
-    int m, int n, int k,
+    const int m, const int n, const int k,
     T *A, T *B, S *C,
     int lda, int ldb, int ldc,
-    S *alpha, S *beta, int algo)
+    const S *alpha, const S *beta, int algo)
 {
   cudaDataType_t AType, BType, CType, ComputeType;
   if (std::is_same<T, double>::value) {
@@ -78,8 +78,10 @@ int cublas_gemm_ex(
 }
 
 template <typename T, typename S>
-void test_gemm(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
-    S *alpha, S *beta, int algo, int iteration)
+void test_gemm(cublasHandle_t handle,
+  const int m,  const int n,  const int k,
+  T *A, T *B, S *C,
+  const S *alpha, const S *beta, int algo, const int iteration)
 {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
