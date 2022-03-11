@@ -78,7 +78,7 @@ int mkl_gemm_bias(
   event status;
   T ao = 0;
   T bo = 0;
-  S co = 0;
+  S co[1] = {0};
   try {
     status = oneapi::mkl::blas::column_major::gemm_bias(
       q,
@@ -98,7 +98,7 @@ int mkl_gemm_bias(
       beta,
       C,
       ldc,
-      &co,
+      co,
       gemm_deps);
   } catch(sycl::exception const& e) {
     std::cout << "\t\tCaught synchronous SYCL exception during GEMM:\n"
@@ -173,7 +173,12 @@ void test_gemm_bias(queue &q, int m, int n, int k, T *A, T *B, S *C,
     printf("%.3f ms\n", total_time / (iteration - 1));
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  const int iteration = atoi(argv[1]);
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -182,18 +187,17 @@ int main() {
 #endif
   queue q(dev_sel);
 
-  int m = 4096, n = 8192, k = 1024;
+  const int m = 4096, n = 8192, k = 1024;
   printf("shape: (%d, %d) x (%d, %d)\n", m, k, k, n);
-  int iteration = 100;
 
-  double d_alpha = 1, d_beta = 0;
-  float f_alpha = 1, f_beta = 0;
-  sycl::half h_alpha = sycl::vec<float, 1>{1.0}
+  const double d_alpha = 1.0, d_beta = 0.0;
+  const float f_alpha = 1.f, f_beta = 0.f;
+  sycl::half h_alpha = sycl::vec<float, 1>{1.f}
                            .convert<sycl::half, sycl::rounding_mode::rte>()[0],
-             h_beta = sycl::vec<float, 1>{0.0}
+             h_beta = sycl::vec<float, 1>{0.f}
                           .convert<sycl::half, sycl::rounding_mode::rte>()[0];
 
-  int32_t i_alpha = 1, i_beta = 0;
+  const int32_t i_alpha = 1, i_beta = 0;
 
   double *dA, *dB, *dC;
   float *fA, *fB, *fC;
