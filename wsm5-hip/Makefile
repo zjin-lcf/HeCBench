@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DMKX=4 -std=c++14 -Wall -I../wsm-cuda
+CFLAGS := -DMKX=4 -std=c++14 -Wall -I../wsm5-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -44,7 +44,9 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../wsm-cuda/kernel.h ../wsm-cuda/spt.h ../wsm-cuda/constants.h utils.h Makefile
+%.o: %.cu ../wsm5-cuda/kernel.h \
+          ../wsm5-cuda/spt.h \
+          ../wsm5-cuda/constants.h utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
