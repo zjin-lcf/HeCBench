@@ -11,6 +11,7 @@
 using namespace std;
 
 #define WARP_SIZE 32
+#define MASK 0xffffffff
 
 /// A simple pair type for CUDA device usage
 template <typename K, typename V>
@@ -76,14 +77,14 @@ struct LessThan {
 template <typename T>
 __device__ __forceinline__ T
 shfl_xor(const T val, int laneMask, int width = WARP_SIZE) {
-  return __shfl_xor(val, laneMask, width);
+  return __shfl_xor_sync(MASK, val, laneMask, width);
 }
 
 template <typename K, typename V>
 __device__ __forceinline__ Pair<K, V>
 shfl_xor(const Pair<K, V>& p, int laneMask, int width = WARP_SIZE) {
-  return Pair<K, V>(__shfl_xor(p.k, laneMask, width),
-                    __shfl_xor(p.v, laneMask, width));
+  return Pair<K, V>(__shfl_xor_sync(MASK, p.k, laneMask, width),
+                    __shfl_xor_sync(MASK, p.v, laneMask, width));
 }
 
 template <typename T, typename Comparator>
@@ -140,12 +141,12 @@ __device__ __forceinline__ bool warpHasCollision(T val) {
   // -if any lane as a difference of 0, there is a duplicate
   //  (excepting the first lane)
   val = warpBitonicSort<T, LessThan<T>>(val);
-  const T lower = __shfl_up(val, 1);
+  const T lower = __shfl_up_sync(MASK, val, 1);
 
   // Shuffle for lane 0 will present its same value, so only
   // subsequent lanes will detect duplicates
   const bool dup = (lower == val) && (getLaneId() != 0);
-  return (__any(dup) != 0);
+  return (__any_sync(MASK, dup) != 0);
 }
 
 /// Determine if two warp threads have the same value (a collision),
@@ -171,14 +172,14 @@ __device__ __forceinline__ unsigned int warpCollisionMask(T val) {
   // duplicated. All except for lane 0, since shfl will present its
   // own value (and if lane 0's value is duplicated, lane 1 will pick
   // that up)
-  const unsigned long lower = __shfl_up(pVal.k, 1);
+  const unsigned long lower = __shfl_up_sync(MASK, pVal.k, 1);
   Pair<int, bool> dup(pVal.v, (lower == pVal.k) && (getLaneId() != 0));
 
   // Sort back based on lane ID so each thread originally knows
   // whether or not it duplicated
   dup = warpBitonicSort<Pair<int, bool>,
                         LessThan<Pair<int, bool> > >(dup);
-  return __ballot(dup.v);
+  return __ballot_sync(MASK, dup.v);
 }
 
 __device__ int hasDuplicate[32];
