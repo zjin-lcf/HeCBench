@@ -189,6 +189,9 @@ Early results are shown [here](results/README.md)
 ### columnarSolver (cuda)
   Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
 
+### collision (cuda)
+  Check collision of duplicate values (https://github.com/facebookarchive/fbcuda)
+
 ### compute-score (opencl)
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
