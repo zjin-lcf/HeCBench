@@ -85,12 +85,12 @@ void initialize_grid(nd_item<1> &item, uint32* mt, int* g_places, int nsquare2, 
 
 void run_trajectory(nd_item<1> &item, 
                     uint32* mt,
-                    int* g_places, int N, int max_steps) 
+                    int* g_places, int n, int max_steps) 
 {
-  int step, NSQUARE2, val;
+  int step, nsquare2, val;
 
   step = 0;
-  NSQUARE2 = (N+N)*N;
+  nsquare2 = (n+n)*n;
 	
   int threadIdx_x = item.get_local_id(0);
 
@@ -99,25 +99,25 @@ void run_trajectory(nd_item<1> &item,
       BRandom(item, mt); // select the next MERS_N (624) transitions
 
       // process 256 transitions
-      val = mt[threadIdx_x]%NSQUARE2;
-      fire_transition(item, (char*)g_places, g_places+(NSQUARE2>>2), 
-		      val/N, val%N, step+7, N, BLOCK_SIZE);
+      val = mt[threadIdx_x]%nsquare2;
+      fire_transition(item, (char*)g_places, g_places+(nsquare2>>2), 
+		      val/n, val%n, step+7, n, BLOCK_SIZE);
       
       // process 256 transitions
-      val = mt[threadIdx_x+BLOCK_SIZE]%NSQUARE2;
-      fire_transition(item, (char*)g_places, g_places+(NSQUARE2>>2), 
-		      val/N, val%N, step+11, N, BLOCK_SIZE);
+      val = mt[threadIdx_x+BLOCK_SIZE]%nsquare2;
+      fire_transition(item, (char*)g_places, g_places+(nsquare2>>2), 
+		      val/n, val%n, step+11, n, BLOCK_SIZE);
 		                
       // process 112 transitions
       if (  threadIdx_x < MERS_N-(BLOCK_SIZE<<1)  ) 
-	{
-	  val = mt[threadIdx_x+(BLOCK_SIZE<<1)]%NSQUARE2;
-	}
-      fire_transition(item, (char*)g_places, g_places+(NSQUARE2>>2), 
-		      val/N, val%N, step+13, N, MERS_N-(BLOCK_SIZE<<1));
+	      {
+	        val = mt[threadIdx_x+(BLOCK_SIZE<<1)]%nsquare2;
+	      }
+      fire_transition(item, (char*)g_places, g_places+(nsquare2>>2), 
+		      val/n, val%n, step+13, n, MERS_N-(BLOCK_SIZE<<1));
 
       step += MERS_N>>1; 
-      // experiments show that for N>2000 and max_step<20000, 
+      // experiments show that for n>2000 and max_step<20000, 
       // the step increase is larger than 320
     }
 }
@@ -128,18 +128,18 @@ void compute_reward_stat(nd_item<1> &item,
                          int* __restrict g_places,
                          float* __restrict g_vars,
                          int* __restrict g_maxs, 
-			 int NSQUARE2) 
+                         int nsquare2) 
 {
   float sum = 0;
   int i;
   int max = 0;
   int temp, data; 
-  int loop_num = NSQUARE2 >> (BLOCK_SIZE_BITS+2);
+  int loop_num = nsquare2 >> (BLOCK_SIZE_BITS+2);
   int threadIdx_x = item.get_local_id(0);
   int blockIdx_x = item.get_group(0);
 
   for (i=0; i<=loop_num-1; i++) 
-    {  // a bug. i<loop_num should be changed to i<=loop_num-1
+    { 
       data = g_places[threadIdx_x+(i<<BLOCK_SIZE_BITS)];
 	    
       temp = data & 0x0FF;
@@ -156,7 +156,7 @@ void compute_reward_stat(nd_item<1> &item,
       max = max<temp? temp: max;
     }
 
-  i = NSQUARE2>>2;
+  i = nsquare2>>2;
   i &= 0x0FF;
   loop_num *= BLOCK_SIZE; 
   // I do not know why loop_num<<=BLOCK_SIZE_BITS does not work
@@ -195,7 +195,7 @@ void compute_reward_stat(nd_item<1> &item,
 		
   if (threadIdx_x==0) 
     {
-      g_vars[blockIdx_x] = (((float*)mt)[0])/NSQUARE2-1; 
+      g_vars[blockIdx_x] = (((float*)mt)[0])/nsquare2-1; 
       // D(X)=E(X^2)-E(X)^2, E(X)=1
       g_maxs[blockIdx_x] = (int)mt[BLOCK_SIZE];
     }

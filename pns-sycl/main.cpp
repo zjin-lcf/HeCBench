@@ -45,7 +45,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 #include "rand_gen.cpp"
 #include "petri_kernel.cpp"
 
-static int N, s, t, N2, NSQUARE2;
+static int N, S, T, NSQUARE2;
 uint32 host_mt[MERS_N];
 
 void PetrinetOnDevice(queue &q);
@@ -75,19 +75,18 @@ int main(int argc, char** argv)
   N = atoi(argv[1]);
   if (N<1)
     return -1;
-  s = atoi(argv[2]);
-  if (s<1)
+  S = atoi(argv[2]);
+  if (S<1)
     return -1;
 
-  t = atoi(argv[3]);
-  if (t<1)
+  T = atoi(argv[3]);
+  if (T<1)
     return -1;
 
-  N2 = N+N;
-  NSQUARE2 = N*N2;
+  NSQUARE2 = N*(N+N);
   
-  h_vars = (float*)malloc(t*sizeof(float));
-  h_maxs = (int*)malloc(t*sizeof(int));
+  h_vars = (float*)malloc(T*sizeof(float));
+  h_maxs = (int*)malloc(T*sizeof(int));
   
   // compute the simulation on the GPU
 #ifdef USE_GPU
@@ -109,7 +108,7 @@ int main(int argc, char** argv)
   free(h_vars);
   free(h_maxs);
     
-  printf("petri N=%d s=%d t=%d\n", N, s, t);
+  printf("petri N=%d S=%d T=%d\n", N, S, T);
   printf("mean_vars: %f    var_vars: %f\n", results[0], results[1]);
   printf("mean_maxs: %f    var_maxs: %f\n", results[2], results[3]);
 
@@ -123,17 +122,17 @@ void compute_statistics()
   float sum_max = 0;
   float sum_max_vars = 0;
   int i;
-  for (i=0; i<t; i++) 
+  for (i=0; i<T; i++) 
     {
       sum += h_vars[i];
       sum_vars += h_vars[i]*h_vars[i];
       sum_max += h_maxs[i];
       sum_max_vars += h_maxs[i]*h_maxs[i];
     }
-  results[0] = sum/t;
-  results[1] = sum_vars/t - results[0]*results[0];
-  results[2] = sum_max/t;
-  results[3] = sum_max_vars/t - results[2]*results[2];
+  results[0] = sum/T;
+  results[1] = sum_vars/T - results[0]*results[0];
+  results[2] = sum_max/T;
+  results[3] = sum_max_vars/T - results[2]*results[2];
 }
 
 void PetrinetOnDevice(queue &q)
@@ -158,11 +157,11 @@ void PetrinetOnDevice(queue &q)
   int *p_hmaxs = h_maxs;
   float *p_hvars = h_vars;
 
-  int Nt = N;
-  int st = s;
+  const int n = N;
+  const int s = S;
 
   // Launch the device computation threads!
-  for (i = 0; i<t-block_num; i+=block_num) 
+  for (i = 0; i<T-block_num; i+=block_num) 
     {
       q.submit([&] (handler &cgh) {
         auto p = g_places.get_access<sycl_read_write>(cgh);
@@ -170,12 +169,13 @@ void PetrinetOnDevice(queue &q)
         auto m = g_maxs.get_access<sycl_write>(cgh);
         accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
         cgh.parallel_for<class pn_loop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          PetrinetKernel(item, 
-	                 mt.get_pointer(),
-	                 p.get_pointer(),
-                         v.get_pointer(),
-                         m.get_pointer(),
-                         Nt, st, 5489*(i+1));
+          PetrinetKernel(
+            item, 
+            mt.get_pointer(),
+            p.get_pointer(),
+            v.get_pointer(),
+            m.get_pointer(),
+            n, s, 5489*(i+1));
         });
       });
 
@@ -189,38 +189,35 @@ void PetrinetOnDevice(queue &q)
         cgh.copy(acc, p_hvars);
       });
 
-      q.wait();
-
       p_hmaxs += block_num;
       p_hvars += block_num;
     }
 	
-  range<1> gws1 (256*(t-i));
+  range<1> gws1 (256*(T-i));
   q.submit([&] (handler &cgh) {
     auto p = g_places.get_access<sycl_read_write>(cgh);
     auto v = g_vars.get_access<sycl_write>(cgh);
     auto m = g_maxs.get_access<sycl_write>(cgh);
     accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
     cgh.parallel_for<class pn_final>(nd_range<1>(gws1, lws), [=] (nd_item<1> item) {
-      PetrinetKernel(item, 
-	             mt.get_pointer(),
-                     p.get_pointer(),
-                     v.get_pointer(),
-                     m.get_pointer(),
-                     Nt, st, 5489*(i+1));
+      PetrinetKernel(
+        item, 
+        mt.get_pointer(),
+        p.get_pointer(),
+        v.get_pointer(),
+        m.get_pointer(),
+        n, s, 5489*(i+1));
     });
   });
 
   // Read result from the device
   q.submit([&] (handler &cgh) {
-    auto acc = g_maxs.get_access<sycl_read>(cgh, range<1>(t-i));
+    auto acc = g_maxs.get_access<sycl_read>(cgh, range<1>(T-i));
     cgh.copy(acc, p_hmaxs);
   });
 
   q.submit([&] (handler &cgh) {
-    auto acc = g_vars.get_access<sycl_read>(cgh, range<1>(t-i));
+    auto acc = g_vars.get_access<sycl_read>(cgh, range<1>(T-i));
     cgh.copy(acc, p_hvars);
   });
-
-  q.wait();
 }
