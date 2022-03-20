@@ -83,7 +83,8 @@ int main(int argc, char** argv)
     return -1;
 
   NSQUARE2 = N*(N+N);
-  
+
+  // T >= block_num
   h_vars = (float*)malloc(T*sizeof(float));
   h_maxs = (int*)malloc(T*sizeof(int));
   
@@ -139,11 +140,16 @@ void PetrinetOnDevice()
 
   const int places_size_byte = (unit_size - sizeof(float) - sizeof(int))*block_num / sizeof(int);
   const int places_size_word =  places_size_byte / sizeof(int);
-  int* h_places = (int*) malloc (places_size_byte);
+  int* g_places = (int*) malloc (places_size_byte);
+  float* g_vars = (float*) malloc (block_num*sizeof(float));
+  int* g_maxs = (int*) malloc (block_num*sizeof(int));
+
+  int *p_hmaxs = h_maxs;
+  float *p_hvars = h_vars;
   
-  #pragma omp target data map (alloc: h_vars[0:block_num], \
-                                      h_maxs[0:block_num], \
-                                      h_places[0:places_size_word])
+  #pragma omp target data map (alloc: g_vars[0:block_num], \
+                                      g_maxs[0:block_num], \
+                                      g_places[0:places_size_word])
   {
     // Launch the device computation threads!
     for (i = 0; i<T-block_num; i+=block_num) {
@@ -152,12 +158,17 @@ void PetrinetOnDevice()
         uint32 mt [MERS_N];
         #pragma omp parallel 
         {
-          PetrinetKernel(mt, h_places, h_vars, h_maxs, N, S, 5489*(i+1));
+          PetrinetKernel(mt, g_places, g_vars, g_maxs, N, S, 5489*(i+1));
         }
       }
 
-      #pragma omp target update to (h_maxs[i:i+block_num])
-      #pragma omp target update to (h_vars[i:i+block_num])
+      #pragma omp target update to (g_maxs[0:block_num])
+      #pragma omp target update to (g_vars[0:block_num])
+      memcpy(p_hmaxs, g_maxs, block_num*sizeof(int));
+      memcpy(p_hvars, g_vars, block_num*sizeof(float));
+
+      p_hmaxs += block_num;
+      p_hvars += block_num;
     }
           
     #pragma omp target teams num_teams(T-i) thread_limit(256)
@@ -165,13 +176,17 @@ void PetrinetOnDevice()
       uint32 mt [MERS_N];
       #pragma omp parallel 
       {
-        PetrinetKernel(mt, h_places, h_vars, h_maxs, N, S, 5489*(i+1));
+        PetrinetKernel(mt, g_places, g_vars, g_maxs, N, S, 5489*(i+1));
       }
     }
 
-    #pragma omp target update to (h_maxs[i:i+T-i])
-    #pragma omp target update to (h_vars[i:i+T-i])
+    #pragma omp target update to (g_maxs[0:T-i])
+    #pragma omp target update to (g_vars[0:T-i])
+    memcpy(p_hmaxs, g_maxs, (T-i)*sizeof(int));
+    memcpy(p_hvars, g_vars, (T-i)*sizeof(float));
   }
 
-  free(h_places);
+  free(g_places);
+  free(g_vars);
+  free(g_maxs);
 }

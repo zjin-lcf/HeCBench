@@ -31,7 +31,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -gline-tables-only
   LDFLAGS  += -g
 endif
 
