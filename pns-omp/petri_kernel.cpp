@@ -13,6 +13,7 @@
 #define BLOCK_SIZE 256
 #define BLOCK_SIZE_BITS 8
 
+#pragma omp declare target
 void fire_transition(char* g_places, int* conflict_array, int tr, 
     int tc, int step, int N, int thd_thrd) 
 {
@@ -198,6 +199,7 @@ void compute_reward_stat(
     g_maxs[blockIdx_x] = (int)mt[BLOCK_SIZE];
   }
 }
+#pragma omp end declare target
 
 // Kernel function for simulating Petri Net for a defined grid
 // n: the grid has 2nX2n places and transitions together
