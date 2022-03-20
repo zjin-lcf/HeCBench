@@ -1,0 +1,177 @@
+/***************************************************************************
+ *
+ *            (C) Copyright 2007 The Board of Trustees of the
+ *                        University of Illinois
+ *                         All Rights Reserved
+ *
+ ***************************************************************************/
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <sys/time.h>
+#include <omp.h>
+
+
+/*
+// Place and Transition are implicitly included in the code
+// as the grid is a fixed one
+typedef struct {
+        float mark;
+} Place;
+
+typedef struct {
+        int from1, from2;
+        int to1, to2;
+} Transition;
+
+// this starts from row 0 and col 0
+P(r,c)    -> T(r,c)   -> P(r,c+1)  ->
+  |            |            |
+ \/           \/           \/
+T(r+1,c-1)-> P(r+1,c) -> T(r+1,c)  ->
+  |            |            |
+ \/           \/           \/
+P(r+2,c)  -> T(r+2,c) -> P(r+2,c+1)->
+  |            |            |
+ \/           \/           \/
+T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
+  |            |            |
+ \/           \/           \/
+
+*/
+
+#include "rand_gen.cpp"
+#include "petri_kernel.cpp"
+
+static int N, S, T, NSQUARE2;
+uint32 host_mt[MERS_N];
+
+void PetrinetOnDevice();
+void compute_statistics();
+
+float results[4];
+float* h_vars;
+int* h_maxs;
+
+long long get_time() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (tv.tv_sec * 1000000) + tv.tv_usec;
+}
+
+int main(int argc, char** argv) 
+{
+  if (argc<4) 
+    {
+      printf("Usage: petri n s t\n"
+	     "n: the place-transition grid is 2nX2n\n"
+	     "s: the maximum steps in a trajectory\n"
+	     "t: number of trajectories\n");
+      return -1;
+    }
+
+  N = atoi(argv[1]);
+  if (N<1)
+    return -1;
+  S = atoi(argv[2]);
+  if (S<1)
+    return -1;
+
+  T = atoi(argv[3]);
+  if (T<1)
+    return -1;
+
+  NSQUARE2 = N*(N+N);
+  
+  h_vars = (float*)malloc(T*sizeof(float));
+  h_maxs = (int*)malloc(T*sizeof(int));
+  
+  // compute the simulation on the GPU
+
+  auto start = get_time();
+
+  PetrinetOnDevice();
+
+  auto end = get_time();
+  printf("Total device execution time: %.2f s\n", (end - start) / 1e6f);
+
+  compute_statistics();
+
+  free(h_vars);
+  free(h_maxs);
+    
+  printf("petri N=%d S=%d T=%d\n", N, S, T);
+  printf("mean_vars: %f    var_vars: %f\n", results[0], results[1]);
+  printf("mean_maxs: %f    var_maxs: %f\n", results[2], results[3]);
+
+  return 0;
+}
+
+void compute_statistics() 
+{
+  float sum = 0;
+  float sum_vars = 0;
+  float sum_max = 0;
+  float sum_max_vars = 0;
+  int i;
+  for (i=0; i<T; i++) 
+    {
+      sum += h_vars[i];
+      sum_vars += h_vars[i]*h_vars[i];
+      sum_max += h_maxs[i];
+      sum_max_vars += h_maxs[i]*h_maxs[i];
+    }
+  results[0] = sum/T;
+  results[1] = sum_vars/T - results[0]*results[0];
+  results[2] = sum_max/T;
+  results[3] = sum_max_vars/T - results[2]*results[2];
+}
+
+void PetrinetOnDevice()
+{
+  // Allocate memory
+  int i;
+  int unit_size = NSQUARE2*(sizeof(int)+sizeof(char))+sizeof(float)+sizeof(int);
+  int block_num = MAX_DEVICE_MEM/unit_size;
+
+  printf("Number of thread blocks: %d\n", block_num);
+
+  const int places_size_byte = (unit_size - sizeof(float) - sizeof(int))*block_num / sizeof(int);
+  const int places_size_word =  places_size_byte / sizeof(int);
+  int* h_places = (int*) malloc (places_size_byte);
+  
+  #pragma omp target data map (alloc: h_vars[0:block_num], \
+                                      h_maxs[0:block_num], \
+                                      h_places[0:places_size_word])
+  {
+    // Launch the device computation threads!
+    for (i = 0; i<T-block_num; i+=block_num) {
+      #pragma omp target teams num_teams(block_num) thread_limit(256)
+      {
+        uint32 mt [MERS_N];
+        #pragma omp parallel 
+        {
+          PetrinetKernel(mt, h_places, h_vars, h_maxs, N, S, 5489*(i+1));
+        }
+      }
+
+      #pragma omp target update to (h_maxs[i:i+block_num])
+      #pragma omp target update to (h_vars[i:i+block_num])
+    }
+          
+    #pragma omp target teams num_teams(T-i) thread_limit(256)
+    {
+      uint32 mt [MERS_N];
+      #pragma omp parallel 
+      {
+        PetrinetKernel(mt, h_places, h_vars, h_maxs, N, S, 5489*(i+1));
+      }
+    }
+
+    #pragma omp target update to (h_maxs[i:i+T-i])
+    #pragma omp target update to (h_vars[i:i+T-i])
+  }
+
+  free(h_places);
+}
