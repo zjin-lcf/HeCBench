@@ -878,6 +878,9 @@ Early results are shown [here](results/README.md)
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
+### vote (cuda)
+  Demonstrate the usage of the vote intrinsics (https://github.com/NVIDIA/cuda-samples/)
+
 ### wsm5 (cuda)
   WRF Single Moment 5-tracer (https://www2.mmm.ucar.edu/wrf/WG2/GPU/WSM5.htm)
 
