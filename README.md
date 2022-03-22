@@ -664,6 +664,9 @@ Early results are shown [here](results/README.md)
 ### pnpoly (cuda)
   Solve the point-in-polygon problem using the crossing number algorithm (https://github.com/benvanwerkhoven/kernel_tuner)
 
+### pns (cuda)
+  Petri-net simulation (https://github.com/abduld/Parboil/)
+
 ### pointwise (cuda)
   Fused point-wise operations (https://developer.nvidia.com/blog/optimizing-recurrent-neural-networks-cudnn-5/)
 
