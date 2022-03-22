@@ -186,11 +186,11 @@ Early results are shown [here](results/README.md)
 ### cobahh (opencl)
   Simulation of Random Network of Hodgkin and Huxley Neurons with Exponential Synaptic Conductances (https://dl.acm.org/doi/10.1145/3307339.3343460)
 
-### columnarSolver (cuda)
-  Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
-
 ### collision (cuda)
   Check collision of duplicate values (https://github.com/facebookarchive/fbcuda)
+
+### columnarSolver (cuda)
+  Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
 
 ### compute-score (opencl)
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
@@ -875,11 +875,11 @@ Early results are shown [here](results/README.md)
 ### vmc (cuda)
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
-### winograd (cuda)
-  Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
-
 ### vote (cuda)
   Demonstrate the usage of the vote intrinsics (https://github.com/NVIDIA/cuda-samples/)
+
+### winograd (cuda)
+  Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
 ### wsm5 (cuda)
   WRF Single Moment 5-tracer (https://www2.mmm.ucar.edu/wrf/WG2/GPU/WSM5.htm)
