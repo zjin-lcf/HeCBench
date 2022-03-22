@@ -70,14 +70,14 @@ struct LessThan {
 
 template <typename T>
 inline T shfl_xor(const T val, int laneMask, sycl::nd_item<1> &item,
-                           int width = WARP_SIZE) {
+                  int width = WARP_SIZE) {
   return sycl::permute_group_by_xor(item.get_sub_group(), val, laneMask);
 }
 
 template <typename K, typename V>
 inline Pair<K, V> shfl_xor(const Pair<K, V> &p, int laneMask,
-                                    sycl::nd_item<1> &item,
-                                    int width = WARP_SIZE) {
+                           sycl::nd_item<1> &item,
+                           int width = WARP_SIZE) {
   return Pair<K, V>(
       sycl::permute_group_by_xor(item.get_sub_group(), p.k, laneMask),
       sycl::permute_group_by_xor(item.get_sub_group(), p.v, laneMask));
@@ -101,32 +101,22 @@ template <typename T, typename Comparator>
 T warpBitonicSort(T val, sycl::nd_item<1> &item) {
   const int laneId = getLaneId(item);
   // 2
-  val = shflSwap<T, Comparator>(
-      val, 0x01, getBit(laneId, 1) ^ getBit(laneId, 0), item);
+  val = shflSwap<T, Comparator>(val, 0x01, getBit(laneId, 1) ^ getBit(laneId, 0), item);
 
   // 4
-  val = shflSwap<T, Comparator>(
-      val, 0x02, getBit(laneId, 2) ^ getBit(laneId, 1), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x01, getBit(laneId, 2) ^ getBit(laneId, 0), item);
+  val = shflSwap<T, Comparator>(val, 0x02, getBit(laneId, 2) ^ getBit(laneId, 1), item);
+  val = shflSwap<T, Comparator>(val, 0x01, getBit(laneId, 2) ^ getBit(laneId, 0), item);
 
   // 8
-  val = shflSwap<T, Comparator>(
-      val, 0x04, getBit(laneId, 3) ^ getBit(laneId, 2), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x02, getBit(laneId, 3) ^ getBit(laneId, 1), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x01, getBit(laneId, 3) ^ getBit(laneId, 0), item);
+  val = shflSwap<T, Comparator>(val, 0x04, getBit(laneId, 3) ^ getBit(laneId, 2), item);
+  val = shflSwap<T, Comparator>(val, 0x02, getBit(laneId, 3) ^ getBit(laneId, 1), item);
+  val = shflSwap<T, Comparator>(val, 0x01, getBit(laneId, 3) ^ getBit(laneId, 0), item);
 
   // 16
-  val = shflSwap<T, Comparator>(
-      val, 0x08, getBit(laneId, 4) ^ getBit(laneId, 3), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x04, getBit(laneId, 4) ^ getBit(laneId, 2), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x02, getBit(laneId, 4) ^ getBit(laneId, 1), item);
-  val = shflSwap<T, Comparator>(
-      val, 0x01, getBit(laneId, 4) ^ getBit(laneId, 0), item);
+  val = shflSwap<T, Comparator>(val, 0x08, getBit(laneId, 4) ^ getBit(laneId, 3), item);
+  val = shflSwap<T, Comparator>(val, 0x04, getBit(laneId, 4) ^ getBit(laneId, 2), item);
+  val = shflSwap<T, Comparator>(val, 0x02, getBit(laneId, 4) ^ getBit(laneId, 1), item);
+  val = shflSwap<T, Comparator>(val, 0x01, getBit(laneId, 4) ^ getBit(laneId, 0), item);
 
   // 32
   val = shflSwap<T, Comparator>(val, 0x10, getBit(laneId, 4), item);
@@ -172,29 +162,35 @@ inline unsigned int warpCollisionMask(T val, sycl::nd_item<1> &item) {
   // -shuffle sort (originating lane, dup) pairs back to the original
   //  lane and report
   Pair<T, int> pVal(val, getLaneId(item));
+
   pVal = warpBitonicSort<Pair<T, int>, LessThan<Pair<T, int>>>(pVal, item);
 
   // If our neighbor is the same as us, we know our thread's value is
   // duplicated. All except for lane 0, since shfl will present its
   // own value (and if lane 0's value is duplicated, lane 1 will pick
   // that up)
-  const unsigned long lower = sycl::shift_group_right(item.get_sub_group(), pVal.k, 1);
+  const T lower = sycl::shift_group_right(item.get_sub_group(), pVal.k, 1);
   Pair<int, bool> dup(pVal.v, (lower == pVal.k) && (getLaneId(item) != 0));
 
   // Sort back based on lane ID so each thread originally knows
   // whether or not it duplicated
   dup = warpBitonicSort<Pair<int, bool>, LessThan<Pair<int, bool>>>(dup, item);
+
   auto sg = item.get_sub_group();
   return sycl::reduce_over_group(sg, dup.v ? (0x1 << sg.get_local_linear_id()) : 0,
-                                 sycl::ext::oneapi::plus<>());
+                                 sycl::plus<>());
 }
 
-void checkDuplicates(int num, int* v, sycl::nd_item<1> &item, int *hasDuplicate) {
+void checkDuplicates(sycl::nd_item<1> &item,
+                     int num, const int* __restrict v,
+                     int * __restrict hasDuplicate) {
   int lid = item.get_local_id(0);
   hasDuplicate[lid] = (int)warpHasCollision(v[lid], item);
 }
 
-void checkDuplicateMask(int num, int* v, sycl::nd_item<1> &item, unsigned int *duplicateMask) {
+void checkDuplicateMask(sycl::nd_item<1> &item,
+                        int num, const int *__restrict v, 
+                        unsigned int *__restrict duplicateMask) {
   int lid = item.get_local_id(0);
   unsigned int mask = warpCollisionMask(v[lid], item);
   if (lid == 0) {
@@ -202,7 +198,7 @@ void checkDuplicateMask(int num, int* v, sycl::nd_item<1> &item, unsigned int *d
   }
 }
 
-vector<int> hostCheckDuplicates(sycl::queue &q, const vector<int> &v) {
+vector<int> checkDuplicates(sycl::queue &q, const vector<int> &v) {
   unsigned int v_size = v.size();
   sycl::buffer<int, 1> d_set (v.data(), v_size);
   sycl::buffer<int, 1> d_hasDuplicate (32);
@@ -214,7 +210,7 @@ vector<int> hostCheckDuplicates(sycl::queue &q, const vector<int> &v) {
     auto d = d_hasDuplicate.get_access<sycl_write>(cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws),
         [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-      checkDuplicates(v_size, s.get_pointer(), item, d.get_pointer());
+      checkDuplicates(item, v_size, s.get_pointer(), d.get_pointer());
     });
   });
 
@@ -227,7 +223,7 @@ vector<int> hostCheckDuplicates(sycl::queue &q, const vector<int> &v) {
   return hasDuplicates;
 }
 
-unsigned int hostCheckDuplicateMask(sycl::queue &q, const vector<int> &v) {
+unsigned int checkDuplicateMask(sycl::queue &q, const vector<int> &v) {
   unsigned int v_size = v.size();
   sycl::buffer<int, 1> d_set (v.data(), v_size);
   sycl::buffer<unsigned int, 1> d_duplicateMask (1);
@@ -239,7 +235,7 @@ unsigned int hostCheckDuplicateMask(sycl::queue &q, const vector<int> &v) {
     auto d = d_duplicateMask.get_access<sycl_write>(cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws),
         [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-      checkDuplicateMask(v_size, s.get_pointer(), item, d.get_pointer());
+      checkDuplicateMask(item, v_size, s.get_pointer(), d.get_pointer());
     });
   });
 
@@ -283,7 +279,7 @@ void test_collision(sycl::queue &q, const int ND) {
     }
 
     assert(ND == v.size());
-    auto dupCheck = hostCheckDuplicates(q, v);
+    auto dupCheck = checkDuplicates(q, v);
 
     for (auto dup : dupCheck) {
       assert((numDups > 0) == dup);
@@ -322,9 +318,13 @@ void test_collisionMask(sycl::queue &q, const int ND) {
 
     assert (ND == v.size());
 
-    auto mask = hostCheckDuplicateMask(q, v);
+    auto mask = checkDuplicateMask(q, v);
     auto expected = numDups > 0 ? 0xffffffffU << (ND - numDups) : 0;
-    assert (expected == mask);
+    if (expected != mask) {
+      printf("Error: numDups=%d expected=%x mask=%x\n", numDups, expected, mask);
+      break;
+    }
+    if (numDups == 1) break;
   }
 }
 

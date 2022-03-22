@@ -166,6 +166,7 @@ __device__ __forceinline__ unsigned int warpCollisionMask(T val) {
   // -shuffle sort (originating lane, dup) pairs back to the original
   //  lane and report
   Pair<T, int> pVal(val, getLaneId());
+
   pVal = warpBitonicSort<Pair<T, int>, LessThan<Pair<T, int> > >(pVal);
 
   // If our neighbor is the same as us, we know our thread's value is
@@ -184,20 +185,20 @@ __device__ __forceinline__ unsigned int warpCollisionMask(T val) {
 
 __device__ int hasDuplicate[32];
 
-__global__ void checkDuplicates(int num, int* v) {
+__global__ void checkDuplicates(int num, const int* v) {
   hasDuplicate[threadIdx.x] = (int) warpHasCollision(v[threadIdx.x]);
 }
 
 __device__ unsigned int duplicateMask;
 
-__global__ void checkDuplicateMask(int num, int* v) {
+__global__ void checkDuplicateMask(int num, const int* v) {
   unsigned int mask = warpCollisionMask(v[threadIdx.x]);
   if (threadIdx.x == 0) {
     duplicateMask = mask;
   }
 }
 
-vector<int> hostCheckDuplicates(const vector<int>& v) {
+vector<int> checkDuplicates(const vector<int>& v) {
   int* devSet = NULL;
   cudaMalloc(&devSet, v.size() * sizeof(int));
   cudaMemcpy(devSet, v.data(), v.size() * sizeof(int), cudaMemcpyHostToDevice);
@@ -213,7 +214,7 @@ vector<int> hostCheckDuplicates(const vector<int>& v) {
   return hasDuplicates;
 }
 
-unsigned int hostCheckDuplicateMask(const vector<int>& v) {
+unsigned int checkDuplicateMask(const vector<int>& v) {
   int* devSet = NULL;
   cudaMalloc(&devSet, v.size() * sizeof(int));
   cudaMemcpy(devSet, v.data(), v.size() * sizeof(int),
@@ -222,6 +223,8 @@ unsigned int hostCheckDuplicateMask(const vector<int>& v) {
   checkDuplicateMask<<<1, 32>>>(v.size(), devSet);
 
   unsigned int mask = 0;
+  cudaDeviceSynchronize();
+
   cudaMemcpyFromSymbol(&mask,
                        duplicateMask, sizeof(unsigned int), 0,
                        cudaMemcpyDeviceToHost);
@@ -261,7 +264,7 @@ void test_collision(const int ND) {
     }
 
     assert(ND == v.size());
-    auto dupCheck = hostCheckDuplicates(v);
+    auto dupCheck = checkDuplicates(v);
 
     for (auto dup : dupCheck) {
       assert((numDups > 0) == dup);
@@ -300,9 +303,12 @@ void test_collisionMask(const int ND) {
 
     assert (ND == v.size());
 
-    auto mask = hostCheckDuplicateMask(v);
+    auto mask = checkDuplicateMask(v);
     auto expected = numDups > 0 ? 0xffffffffU << (ND - numDups) : 0;
-    assert (expected == mask);
+    if (expected != mask) {
+      printf("Error: numDups=%d expected=%x mask=%x\n", numDups, expected, mask);
+      break;
+    }
   }
 }
 
