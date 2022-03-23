@@ -120,17 +120,9 @@ int main(int argc, char **argv) {
     cudaEventCreateWithFlags(&(kernelEvent[i]), cudaEventDisableTiming);
   }
 
-  //////////////////////////////////////////////////////////////////////
   // time execution with nkernels streams
   long total_clocks = 0;
-#if defined(__arm__) || defined(__aarch64__)
-  // the kernel takes more time than the channel reset time on arm archs, so to
-  // prevent hangs reduce time_clocks.
-  long time_clocks = (long)(kernel_time * (deviceProp.clockRate / 100));
-#else
   long time_clocks = (long)(kernel_time * deviceProp.clockRate);
-#endif
-
   printf("time clocks = %ld\n", time_clocks);
 
   // queue nkernels in separate streams and record when they are done
