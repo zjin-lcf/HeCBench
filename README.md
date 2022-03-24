@@ -252,6 +252,9 @@ Early results are shown [here](results/README.md)
 ### easyWave (cuda)
   Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
 
+### ecdh (c++)
+  Elliptic curve Diffie-Hellman key exchange (https://github.com/jaw566/ECDH)
+
 ### eigenvalue (opencl)
   Calculate the eigenvalues of a tridiagonal symmetric matrix (https://github.com/OpenCL/AMD_APP_samples)
 
