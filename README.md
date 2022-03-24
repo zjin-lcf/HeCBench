@@ -195,6 +195,9 @@ Early results are shown [here](results/README.md)
 ### compute-score (opencl)
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
+### concurrentKernels (cuda)
+  Demonstrate the use of streams for concurrent execution of several kernels with dependency on a device (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/concurrentKernels)
+
 ### contract (cuda)
   Second-order tensor aggregation with an adjacency matrix (https://github.com/HyTruongSon/GraphFlow)
 
