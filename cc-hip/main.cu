@@ -364,7 +364,7 @@ int main(int argc, char* argv[])
   ECLgraph g = readECLgraph(argv[1]);
 
   int* nodestatus = NULL;
-  hipHostAlloc((void**)&nodestatus, g.nodes * sizeof(int), hipHostMallocDefault);
+  hipHostMalloc((void**)&nodestatus, g.nodes * sizeof(int), hipHostMallocDefault);
   if (nodestatus == NULL) {
     fprintf(stderr, "ERROR: nodestatus - host memory allocation failed\n\n");
     exit(-1);
