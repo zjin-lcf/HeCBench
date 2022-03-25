@@ -16,7 +16,9 @@ int main (int argc, char* argv[]){
     printf("Usage: %s <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+
+  // repeat at least once
+  const int repeat = max(1, atoi(argv[1]));
 
   bool ok = true;
   cudaError_t cudaStat;
@@ -28,17 +30,24 @@ int main (int argc, char* argv[]){
     printf ("CUBLAS initialization failed\n");
   }
 
+  // store the nrm2 results
+  float* result = (float*) malloc (repeat * sizeof(float));
+  if (!result) {
+    printf ("result memory allocation failed");
+    return 1;
+  }
+
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
-    float* a = (float *)malloc (size);
+    float* a = (float *) malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
       break;
     }
 
     // reference
-    double gold = 0.0;  // double is required
+    double gold = 0.0;  // double is required to match host and device results 
     for (i = 0; i < n; i++) {
       a[i] = (float)((i+1) % 7);
       gold += a[i]*a[i];
@@ -58,14 +67,13 @@ int main (int argc, char* argv[]){
       printf ("device memory copy failed");
     }
 
-    float result;
-    for (j = 0; j < repeat; j++)
-      cublasStat = cublasSnrm2(handle, n, d_a, 1, &result);
-
-    if (cublasStat != CUBLAS_STATUS_SUCCESS) {
-      printf ("CUBLAS Snrm2 failed\n");
+    for (j = 0; j < repeat; j++) {
+      cublasStat = cublasSnrm2(handle, n, d_a, 1, result+j);
+      if (cublasStat != CUBLAS_STATUS_SUCCESS) {
+        printf ("CUBLAS Snrm2 failed\n");
+      }
     }
-    
+
     cudaStat = cudaFree(d_a);
     if (cudaStat != cudaSuccess) {
       printf ("device memory deallocation failed");
@@ -77,13 +85,17 @@ int main (int argc, char* argv[]){
 
     if (a != NULL) free(a);
 
-    if (fabsf((float)gold - result) > 1e-3f) {
-      printf("FAIL: %f %f #elements = %d\n", gold, result, i);
-      ok = false;
-      break;
-    }
+    // snrm2 results match across all iterations
+    for (j = 0; j < repeat; j++) 
+     if (fabsf((float)gold - result[j]) > 1e-3f) {
+       printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
+              j, (float)gold, result[j], i);
+       ok = false;
+       break;
+     }
   }
 
+  free(result);
   cublasDestroy(handle);
 
   if (ok) printf("PASS\n");
