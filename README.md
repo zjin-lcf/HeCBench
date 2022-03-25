@@ -629,6 +629,9 @@ Early results are shown [here](results/README.md)
 ### nn (opencl)
   Nearest neighbor in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### norm2 (cuda)
+  Compute the Euclidean norm of a vector (https://docs.nvidia.com/cuda/cublas)
+
 ### nqueen (cuda)
   N-Queens (https://github.com/tcarneirop/ChOp)
 
