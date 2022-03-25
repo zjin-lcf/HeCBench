@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
+#include <vector>
+#include <oneapi/mkl.hpp>
+#include "common.h"
 
 long get_time() {
   struct timeval tv;
@@ -11,7 +12,7 @@ long get_time() {
   return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
-int main (int argc, char* argv[]){
+int main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("Usage: %s <repeat>\n", argv[0]);
     return 1;
@@ -21,14 +22,13 @@ int main (int argc, char* argv[]){
   const int repeat = max(1, atoi(argv[1]));
 
   bool ok = true;
-  cudaError_t cudaStat;
-  cublasStatus_t cublasStat;
-  cublasHandle_t handle;
 
-  cublasStat = cublasCreate(&handle);
-  if (cublasStat != CUBLAS_STATUS_SUCCESS) {
-    printf ("CUBLAS initialization failed\n");
-  }
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel);
 
   // store the nrm2 results
   float* result = (float*) malloc (repeat * sizeof(float));
@@ -37,10 +37,13 @@ int main (int argc, char* argv[]){
     return 1;
   }
 
+  // store the mkl nrm2 status
+  std::vector<sycl::event> status (repeat);
+
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
-    float* a = (float *) malloc (size);
+    float* a = (float *)malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
       break;
@@ -56,28 +59,22 @@ int main (int argc, char* argv[]){
 
     long start = get_time();
 
-    float* d_a;
-    cudaStat = cudaMalloc ((void**)&d_a, size);
-    if (cudaStat != cudaSuccess) {
-      printf ("device memory allocation failed");
-    }
+    float* d_a = (float *)sycl::malloc_device(size, q);
 
-    cudaStat = cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
-    if (cudaStat != cudaSuccess) {
-      printf ("device memory copy failed");
-    }
+    q.memcpy(d_a, a, size).wait();
 
-    for (j = 0; j < repeat; j++) {
-      cublasStat = cublasSnrm2(handle, n, d_a, 1, result+j);
-      if (cublasStat != CUBLAS_STATUS_SUCCESS) {
-        printf ("CUBLAS Snrm2 failed\n");
+    try {
+      for (j = 0; j < repeat; j++) {
+        status[j] = oneapi::mkl::blas::column_major::nrm2(q, n, d_a, 1, result+j);
       }
+    } catch(sycl::exception const& e) {
+      std::cout << "\t\tCaught synchronous SYCL exception during NRM2:\n"
+                << e.what() << std::endl;
     }
 
-    cudaStat = cudaFree(d_a);
-    if (cudaStat != cudaSuccess) {
-      printf ("device memory deallocation failed");
-    }
+    for (j = 0; j < repeat; j++) status[j].wait();
+
+    sycl::free(d_a, q);
 
     long end = get_time();
     printf("#elements = %.2f M, measured time = %.3f s\n", 
@@ -96,7 +93,6 @@ int main (int argc, char* argv[]){
   }
 
   free(result);
-  cublasDestroy(handle);
 
   if (ok) printf("PASS\n");
   return 0;

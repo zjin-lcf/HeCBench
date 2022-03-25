@@ -1,0 +1,84 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = clang++
+OPTIMIZE  = yes
+DEBUG     = no
+
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
+# path to oneMKL with cublas support
+ONEMKL    = /path/to/oneMKL
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = main.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -Wall -fsycl -I../include -I$(ONEMKL)/include \
+          -I${MKLROOT}/include -DMKL_ILP64 
+
+# Linker Flags
+LDFLAGS = ${MKLROOT}/lib/intel64/libmkl_sycl.a -fsycl-device-code-split=per_kernel \
+          -Wl,-export-dynamic -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
+          ${MKLROOT}/lib/intel64/libmkl_tbb_thread.a \
+          ${MKLROOT}/lib/intel64/libmkl_core.a \
+          -Wl,--end-group -ltbb -lsycl -lOpenCL -lpthread -lm -ldl 
+
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+endif
+
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
+endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) 100
