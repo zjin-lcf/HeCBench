@@ -115,9 +115,9 @@ float* meshToGPU_managed(const trimesh::TriMesh *mesh) {
   Timer t; t.start();
   size_t n_floats = sizeof(float) * 9 * (mesh->faces.size());
   float* device_triangles;
-  printf("[Mesh] Allocating %s of CUDA-managed UNIFIED memory for triangle data \n", (readableSize(n_floats)).c_str());
-  checkCudaErrors(cudaMallocManaged((void**) &device_triangles, n_floats));
-  printf("[Mesh] Copy %zu triangles to CUDA-managed UNIFIED memory \n", (size_t)(mesh->faces.size()));
+  printf("[Mesh] Allocating %s of HIP-managed UNIFIED memory for triangle data \n", (readableSize(n_floats)).c_str());
+  checkHipErrors(hipMallocManaged((void**) &device_triangles, n_floats));
+  printf("[Mesh] Copy %zu triangles to HIP-managed UNIFIED memory \n", (size_t)(mesh->faces.size()));
   for (size_t i = 0; i < mesh->faces.size(); i++) {
     glm::vec3 v0 = trimesh_to_glm<trimesh::point>(mesh->vertices[mesh->faces[i][0]]);
     glm::vec3 v1 = trimesh_to_glm<trimesh::point>(mesh->vertices[mesh->faces[i][1]]);
@@ -176,8 +176,8 @@ int main(int argc, char* argv[]) {
   // Adopt the unified memory model
   float* device_triangles = meshToGPU_managed(themesh);
 
-  printf("[Voxel Grid] Allocating %s of CUDA-managed UNIFIED memory for Voxel Grid\n", readableSize(vtable_size).c_str());
-  checkCudaErrors(cudaMallocManaged((void**)&vtable, vtable_size));
+  printf("[Voxel Grid] Allocating %s of HIP-managed UNIFIED memory for Voxel Grid\n", readableSize(vtable_size).c_str());
+  checkHipErrors(hipMallocManaged((void**)&vtable, vtable_size));
 
   if (solidVoxelization)
     voxelize_solid(voxelization_info, device_triangles, vtable, (outputformat == OutputFormat::output_morton));
@@ -218,8 +218,8 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  cudaFree(vtable);
-  cudaFree(device_triangles);
+  hipFree(vtable);
+  hipFree(device_triangles);
 #else
   free(vtable);
 #endif
