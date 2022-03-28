@@ -39,8 +39,8 @@ class GpuBTreeMap {
  private:
   static constexpr uint32_t EMPTY_KEY = 0xFFFFFFFF;
   static constexpr uint32_t DELETED_KEY = 0xFFFFFFFF;
-  static constexpr uint32_t BLOCKSIZE_BUILD_ = 128;
-  static constexpr uint32_t BLOCKSIZE_SEARCH_ = 1024;
+  static constexpr uint32_t BLOCKSIZE_BUILD_ = 256;
+  static constexpr uint32_t BLOCKSIZE_SEARCH_ = 256;
 
   SizeT _num_keys;
   int _device_id;

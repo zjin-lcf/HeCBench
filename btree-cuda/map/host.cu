@@ -90,7 +90,7 @@ cudaError_t GpuBTreeMap<KeyT, ValueT, SizeT, AllocatorT>::rangeQuery(
     SizeT& count,
     SizeT& range_lenght,
     cudaStream_t stream_id) {
-  const uint32_t block_size = 512;
+  const uint32_t block_size = 256;
   const uint32_t num_blocks = (count + block_size - 1) / block_size;
   const uint32_t shared_bytes = 0;
   kernels::range_b_tree<<<num_blocks, block_size, shared_bytes, stream_id>>>(
