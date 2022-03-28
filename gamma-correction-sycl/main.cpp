@@ -32,16 +32,16 @@ int main() {
 	// fill image with created fractal
 	int index = 0;
 	image.fill([&index, width, &fractal](ImgPixel& pixel) {
-          int x = index % width;
-          int y = index / width;
-          
-          auto fractal_pixel = fractal(x, y);
-          if (fractal_pixel < 0) fractal_pixel = 0;
-          if (fractal_pixel > 255) fractal_pixel = 255;
-          pixel.set(fractal_pixel, fractal_pixel, fractal_pixel, fractal_pixel);
-          
-          ++index;
-        });
+    int x = index % width;
+    int y = index / width;
+    
+    auto fractal_pixel = fractal(x, y);
+    if (fractal_pixel < 0) fractal_pixel = 0;
+    if (fractal_pixel > 255) fractal_pixel = 255;
+    pixel.set(fractal_pixel, fractal_pixel, fractal_pixel, fractal_pixel);
+    
+    ++index;
+  });
 
 	Img<ImgFormat::BMP> image2 = image;
 #ifdef DEBUG
@@ -53,30 +53,30 @@ int main() {
 #ifdef DEBUG
 	image.write("fractal_gamma_serial.bmp");
 #endif
-	{
-        #ifdef USE_GPU
-        gpu_selector dev_sel;
-        #else
-        cpu_selector dev_sel;
-        #endif
-        queue q(dev_sel);
-        
-        const property_list props = property::buffer::use_host_ptr();
-	buffer<ImgPixel, 1> d_image (image2.data(), image2.width() * image2.height(), props);
 
-        q.submit([&](handler& cgh) { 
-          auto pixel = d_image.get_access<sycl_read_write>(cgh);
-          cgh.parallel_for<class gamma_correction>( 
-            nd_range<1>(range<1>(width*height), range<1>(BLOCK_SIZE)), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0); 
-            // Lambda to process image with gamma = 2
-            const float v = (0.3f * pixel[i].r + 0.59f * pixel[i].g + 0.11f * pixel[i].b) / 255.0;
-            std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
-            if (gamma_pixel > 255) gamma_pixel = 255;
-            pixel[i].set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
-	  });
-	});
+  {
+#ifdef USE_GPU
+    gpu_selector dev_sel;
+#else
+    cpu_selector dev_sel;
+#endif
+    queue q(dev_sel);
 
+    const property_list props = property::buffer::use_host_ptr();
+    buffer<ImgPixel, 1> d_image (image2.data(), image2.width() * image2.height(), props);
+
+    q.submit([&](handler& cgh) { 
+      auto pixel = d_image.get_access<sycl_read_write>(cgh);
+      cgh.parallel_for<class gamma_correction>( 
+        nd_range<1>(range<1>(width*height), range<1>(BLOCK_SIZE)), [=] (nd_item<1> item) {
+        int i = item.get_global_id(0); 
+        // Lambda to process image with gamma = 2
+        const float v = (0.3f * pixel[i].r + 0.59f * pixel[i].g + 0.11f * pixel[i].b) / 255.f;
+        std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
+        if (gamma_pixel > 255) gamma_pixel = 255;
+        pixel[i].set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
+      });
+    });
 	}
 
 	// check correctness
