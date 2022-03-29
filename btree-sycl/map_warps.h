@@ -117,14 +117,11 @@ insert_into_node(bool isIntermediate, uint32_t next, uint32_t src_key,
   src_unit_data &= 0x7FFFFFFF;
   src_key = src_key & 0x7FFFFFFF;
 
+  auto sg = item.get_sub_group();
   uint32_t insertion_location =
       sycl::reduce_over_group(
-          item.get_sub_group(),
-          (WARP_MASK &
-           (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                  (src_key > src_unit_data) && (src_unit_data != 0)
-              ? (0x1 << item.get_sub_group().get_local_linear_id())
-              : 0,
+          sg, (src_key > src_unit_data) && (src_unit_data != 0)
+              ? (0x1 << sg.get_local_linear_id()) : 0,
           sycl::ext::oneapi::plus<>()) &
       KEY_PIVOT_MASK;
   int dest_lane_pivot = __ffs(insertion_location) - 1;
@@ -136,8 +133,7 @@ insert_into_node(bool isIntermediate, uint32_t next, uint32_t src_key,
   uint32_t lane_mask = (1 << lane_id(item));
 
   uint32_t my_new_data =
-      sycl::shift_group_left(item.get_sub_group(), src_unit_data,
-                             2); // move everything up two spaces
+      sycl::shift_group_left(sg, src_unit_data, 2); // move everything up two spaces
 
   to_move = to_move & 0xfffffffc;  // ignore links
 
@@ -153,11 +149,7 @@ insert_into_node(bool isIntermediate, uint32_t next, uint32_t src_key,
     my_new_data = src_value;
 
   int valid_location = sycl::reduce_over_group(
-      item.get_sub_group(),
-      (WARP_MASK & (0x1 << item.get_sub_group().get_local_linear_id())) &&
-              src_unit_data != 0
-          ? (0x1 << item.get_sub_group().get_local_linear_id())
-          : 0,
+      sg, src_unit_data != 0 ? (0x1 << sg.get_local_linear_id()) : 0,
       sycl::ext::oneapi::plus<>());
   valid_location = valid_location >> 2;
   if (isIntermediate && (valid_location & lane_mask & KEY_PIVOT_MASK)) {
@@ -175,23 +167,21 @@ inline bool split_node1(uint32_t myParent, uint32_t src_key,
                                  uint32_t &nodeIdx, uint32_t &mydata,
                                  uint32_t *d_pool, uint32_t *d_count,
                                  sycl::nd_item<1> &item) {
-  uint32_t rightData = sycl::shift_group_right(item.get_sub_group(), mydata, 16);
+  auto sg = item.get_sub_group(); 
+  uint32_t rightData = sycl::shift_group_right(sg, mydata, 16);
 
   if (lane_id(item) < 18)
     rightData = 0;  // destroy all data except link
   if (lane_id(item) < 2)
     rightData = mydata;
 
-  uint32_t rightDataMin =
-      sycl::select_from_group(item.get_sub_group(), rightData, 31) &
-      0x7FFFFFFF;
+  uint32_t rightDataMin = sycl::select_from_group(sg, rightData, 31) & 0x7FFFFFFF;
 
   acquire_lock(getAddressPtr(myParent), item);
 
   uint32_t parent_data = volatileNodeReadR(getAddressPtr(myParent), item);
 
-  uint32_t parent_last_key = sycl::select_from_group(
-      item.get_sub_group(), parent_data, 3); // get last key
+  uint32_t parent_last_key = sycl::select_from_group(sg, parent_data, 3); // get last key
 
   if (parent_last_key)  // parent is full
   {
@@ -203,12 +193,8 @@ inline bool split_node1(uint32_t myParent, uint32_t src_key,
 
   uint32_t isItMyParent =
       sycl::reduce_over_group(
-          item.get_sub_group(),
-          (WARP_MASK &
-           (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                  (parent_data & 0x7FFFFFFF) == nodeIdx
-              ? (0x1 << item.get_sub_group().get_local_linear_id())
-              : 0,
+          sg, (parent_data & 0x7FFFFFFF) == nodeIdx
+              ? (0x1 << sg.get_local_linear_id()) : 0,
           sycl::ext::oneapi::plus<>()) &
       PIVOT_KEY_MASK;
   if (isItMyParent == 0)  // not my parent
@@ -224,7 +210,7 @@ inline bool split_node1(uint32_t myParent, uint32_t src_key,
     rightIdx = allocate();
   }
 
-  rightIdx = sycl::select_from_group(item.get_sub_group(), rightIdx, 0);
+  rightIdx = sycl::select_from_group(sg, rightIdx, 0);
   acquire_lock(getAddressPtr(rightIdx), item);
 
   // update parent
@@ -278,16 +264,16 @@ inline void split_root_node(uint32_t src_key, uint32_t &nodeIdx,
     rightIdx = allocate();
   }
 
-  leftIdx = sycl::select_from_group(item.get_sub_group(), leftIdx, 0);
-  rightIdx = sycl::select_from_group(item.get_sub_group(), rightIdx, 0);
+  auto sg = item.get_sub_group();
+  leftIdx = sycl::select_from_group(sg, leftIdx, 0);
+  rightIdx = sycl::select_from_group(sg, rightIdx, 0);
 
   acquire_lock(getAddressPtr(leftIdx), item);
   acquire_lock(getAddressPtr(rightIdx), item);
 
   // update root
   uint32_t rootData;
-  rootData = sycl::select_from_group(item.get_sub_group(), mydata, 15) |
-             0x80000000;
+  rootData = sycl::select_from_group(sg, mydata, 15) | 0x80000000;
   if (LANEID_REVERSED(lane_id(item)) == 0)
     rootData = mydata | 0x80000000;
   else if (LANEID_REVERSED(lane_id(item)) == 1)
@@ -302,9 +288,7 @@ inline void split_root_node(uint32_t src_key, uint32_t &nodeIdx,
   volatileWrite(getAddressPtr(nodeIdx) + LANEID_REVERSED(lane_id(item)), rootData);
   release_lock(getAddressPtr(nodeIdx), item);
 
-  uint32_t rightDataMin =
-      sycl::select_from_group(item.get_sub_group(), rootData, 29) &
-      0x7fffffff;
+  uint32_t rightDataMin = sycl::select_from_group(sg, rootData, 29) & 0x7fffffff;
 
   uint32_t leftData = mydata;
   if (lane_id(item) < 16) // left node
@@ -334,13 +318,13 @@ inline void split_root_node(uint32_t src_key, uint32_t &nodeIdx,
   if (LANEID_REVERSED(lane_id(item)) == 2 && src_key < rootData)
     goRight = false;
 
-  goRight = sycl::select_from_group(item.get_sub_group(), goRight, 29);
+  goRight = sycl::select_from_group(sg, goRight, 29);
 
   // now shuffle
   if (goRight) {
     release_lock(getAddressPtr(leftIdx), item);
 
-    mydata = sycl::shift_group_right(item.get_sub_group(), mydata, 16);
+    mydata = sycl::shift_group_right(sg, mydata, 16);
     if (lane_id(item) < 16)
       mydata = 0;
     nodeIdx = rightIdx;
@@ -362,44 +346,32 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
   uint32_t rootAddress = *d_root;
   uint32_t parent = rootAddress;
   uint32_t next = rootAddress;
+  auto sg = item.get_sub_group();
 
   while ((work_queue = sycl::reduce_over_group(
-              item.get_sub_group(),
-              (WARP_MASK &
-               (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                      to_be_inserted
-                  ? (0x1 << item.get_sub_group().get_local_linear_id())
-                  : 0,
+              sg, to_be_inserted ? (0x1 << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>()))) {
     char FullLeafLinkRoot = 0;
-    uint32_t src_key = sycl::select_from_group(item.get_sub_group(), myKey,
-                                               __ffs(work_queue) - 1);
+    uint32_t src_key = sycl::select_from_group(sg, myKey, __ffs(work_queue) - 1);
 
     if (last_work_queue != work_queue) {
       next = rootAddress;
       parent = rootAddress;
     }
 
-    uint32_t src_unit_data =
-        volatileNodeReadR(getAddressPtr(next), item);
+    uint32_t src_unit_data = volatileNodeReadR(getAddressPtr(next), item);
 
-    uint32_t link_min =
-        sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-        0x7FFFFFFF; // get link min
+    uint32_t link_min = sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
 
     while (link_min && src_key >= link_min)  // traverse to right
     {
-      next = sycl::select_from_group(item.get_sub_group(), src_unit_data, 0) &
-          0x7FFFFFFF; // get link min
-      src_unit_data =
-          volatileNodeReadR(getAddressPtr(next), item);
-      link_min = sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-          0x7FFFFFFF; // get link min
+      next = sycl::select_from_group(sg, src_unit_data, 0) & 0x7FFFFFFF; // get link min
+      src_unit_data = volatileNodeReadR(getAddressPtr(next), item);
+      link_min = sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
       FullLeafLinkRoot |= 0x2;
     }
 
-    uint32_t first_key = sycl::select_from_group(
-        item.get_sub_group(), src_unit_data, 31); // get first key
+    uint32_t first_key = sycl::select_from_group(sg, src_unit_data, 31); // get first key
     FullLeafLinkRoot =
         ((first_key & 0x80000000) == 0) ? FullLeafLinkRoot | 0x4 : FullLeafLinkRoot & 0x3;
 
@@ -409,16 +381,13 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
         next = parent;
         continue;
       }
-      src_unit_data =
-          volatileNodeReadR(getAddressPtr(next), item);
+      src_unit_data = volatileNodeReadR(getAddressPtr(next), item);
 
-      first_key = sycl::select_from_group(item.get_sub_group(),
-                                          src_unit_data, 31); // still a leaf?
+      first_key = sycl::select_from_group(sg, src_unit_data, 31); // still a leaf?
       FullLeafLinkRoot = ((first_key & 0x80000000) == 0) ? FullLeafLinkRoot | 0x4
                                                          : FullLeafLinkRoot & 0x3;
 
-      link_min = sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-          0x7FFFFFFF; // get link min
+      link_min = sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
 
       if ((parent == rootAddress) && link_min && src_key >= link_min) {
         release_lock(getAddressPtr(next), item);
@@ -434,22 +403,20 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
       while (link_min && src_key >= link_min) {
         if (FullLeafLinkRoot & 0x4)
           release_lock(getAddressPtr(next), item);
-        next = sycl::select_from_group(item.get_sub_group(), src_unit_data,
-                                       0) & 0x7FFFFFFF; // get link min
+        next = sycl::select_from_group(sg, src_unit_data, 0) & 0x7FFFFFFF; // get link min
         if (FullLeafLinkRoot & 0x4)
           acquire_lock(getAddressPtr(next), item);
 
         src_unit_data = volatileNodeReadR(getAddressPtr(next), item);
 
-        first_key = sycl::select_from_group(item.get_sub_group(),
-                                            src_unit_data, 31); // still a leaf?
+        first_key = sycl::select_from_group(sg, src_unit_data, 31); // still a leaf?
         FullLeafLinkRoot = ((first_key & 0x80000000) == 0) ? FullLeafLinkRoot | 0x4
                                                            : FullLeafLinkRoot & 0x3;
 
         if (!(FullLeafLinkRoot & 0x4))  // no, release the lock, traverse if needed
           release_lock(getAddressPtr(next), item);
 
-        link_min = sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
+        link_min = sycl::select_from_group(sg, src_unit_data, 1) &
                    0x7FFFFFFF; // get link min
                                // link_used = true;
         FullLeafLinkRoot |= 0x2;
@@ -457,8 +424,7 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
     }
 
     // parent info is correct
-    FullLeafLinkRoot =
-        sycl::select_from_group(item.get_sub_group(), src_unit_data, 3)
+    FullLeafLinkRoot = sycl::select_from_group(sg, src_unit_data, 3)
             ? FullLeafLinkRoot | 0x8
             : FullLeafLinkRoot & 0x7;
     if ((FullLeafLinkRoot & 0x2) && (FullLeafLinkRoot & 0x8)) {
@@ -483,15 +449,14 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
             volatileNodeReadR(getAddressPtr(next), item);
 
         FullLeafLinkRoot =
-            sycl::select_from_group(item.get_sub_group(), src_unit_data, 3)
+            sycl::select_from_group(sg, src_unit_data, 3)
                 ? FullLeafLinkRoot | 0x8
                 : FullLeafLinkRoot & 0x7;
 
         if (FullLeafLinkRoot & 0x8)  // not full anymore?
         {
           link_min =
-              sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-              0x7FFFFFFF;                       // get link min
+              sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
           if (link_min && src_key >= link_min)  // traverse to right?
           {
             release_lock(getAddressPtr(next), item);
@@ -502,15 +467,12 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
         } else {
           release_lock(getAddressPtr(next), item);
 
-          link_min = sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-              0x7FFFFFFF;                          // get link min
+          link_min = sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
           while (link_min && src_key >= link_min)  // traverse to right
           {
-            next = sycl::select_from_group(item.get_sub_group(), src_unit_data, 0) &
-                   0x7FFFFFFF; // get link min
+            next = sycl::select_from_group(sg, src_unit_data, 0) & 0x7FFFFFFF; // get link min
             src_unit_data = volatileNodeReadR(getAddressPtr(next), item);
-            link_min = sycl::select_from_group(item.get_sub_group(), src_unit_data, 1) &
-                       0x7FFFFFFF; // get link min
+            link_min = sycl::select_from_group(sg, src_unit_data, 1) & 0x7FFFFFFF; // get link min
             FullLeafLinkRoot |= 0x2;
           }
         }
@@ -542,15 +504,11 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
     parent = (FullLeafLinkRoot & 0x1) ? rootAddress : next;
     if (FullLeafLinkRoot & 0x4) {
       uint32_t src_lane1 = __ffs(work_queue) - 1;
-      uint32_t src_value = sycl::select_from_group(item.get_sub_group(), myValue, src_lane1);
+      uint32_t src_value = sycl::select_from_group(sg, myValue, src_lane1);
       bool key_exist =
           sycl::reduce_over_group(
-              item.get_sub_group(),
-              (WARP_MASK &
-               (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                      src_key == src_unit_data
-                  ? (0x1 << item.get_sub_group().get_local_linear_id())
-                  : 0,
+              sg, src_key == src_unit_data
+                  ? (0x1 << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>()) &
           KEY_PIVOT_MASK;
       if (!key_exist)
@@ -564,19 +522,15 @@ void insertion_unit(bool &to_be_inserted, KeyT &myKey,
       uint32_t src_unit_key = src_unit_data & 0x7FFFFFFF;
 
       next = sycl::reduce_over_group(
-                 item.get_sub_group(),
-                 (WARP_MASK &
-                  (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                         src_key >= (src_unit_key)
-                     ? (0x1 << item.get_sub_group().get_local_linear_id())
-                     : 0,
+                 sg, src_key >= (src_unit_key)
+                     ? (0x1 << sg.get_local_linear_id()) : 0,
                  sycl::ext::oneapi::plus<>()) &
              KEY_PIVOT_MASK;
       next = __ffs(next);
       if (next == 0)
-        next = sycl::select_from_group(item.get_sub_group(), src_unit_key, 30);
+        next = sycl::select_from_group(sg, src_unit_key, 30);
       else
-        next = sycl::select_from_group(item.get_sub_group(), src_unit_key, next - 2);
+        next = sycl::select_from_group(sg, src_unit_key, next - 2);
     }
     last_work_queue = work_queue;
   }
@@ -597,18 +551,13 @@ void search_unit(bool &to_be_searched, uint32_t &laneId,
   uint32_t work_queue = 0;
   uint32_t last_work_queue = 0;
   uint32_t next = rootAddress;  // starts from the root
+  auto sg = item.get_sub_group();
 
   while ((work_queue = sycl::reduce_over_group(
-              item.get_sub_group(),
-              (WARP_MASK &
-               (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                      to_be_searched
-                  ? (0x1 << item.get_sub_group().get_local_linear_id())
-                  : 0,
+              sg, to_be_searched ? (0x1 << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>()))) {
     uint32_t src_lane = __ffs(work_queue) - 1;
-    uint32_t src_key =
-        sycl::select_from_group(item.get_sub_group(), myKey, src_lane);
+    uint32_t src_key = sycl::select_from_group(sg, myKey, src_lane);
 
     bool found = false;
     next = (last_work_queue != work_queue)
@@ -618,8 +567,7 @@ void search_unit(bool &to_be_searched, uint32_t &laneId,
     uint32_t src_unit_data = *(getAddressPtr(next) + landId_reversed);
 
     bool isLeaf = ((src_unit_data & 0x80000000) == 0);  // only even lanes are valid
-    isLeaf =
-        sycl::select_from_group(item.get_sub_group(), isLeaf, 31); 
+    isLeaf = sycl::select_from_group(sg, isLeaf, 31); 
                          // some pairs are invalid -- either pass all pairs in
                          // same level as leaves or just use the first element
                          // leaf status -- 31 because reversed order
@@ -633,12 +581,8 @@ void search_unit(bool &to_be_searched, uint32_t &laneId,
     // looking for the right pivot, only valid at intermediate nodes
     uint32_t isFoundPivot_bmp =
         sycl::reduce_over_group(
-            item.get_sub_group(),
-            (WARP_MASK &
-             (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                    src_key >= src_unit_key
-                ? (0x1 << item.get_sub_group().get_local_linear_id())
-                : 0,
+            sg, src_key >= src_unit_key
+                ? (0x1 << sg.get_local_linear_id()) : 0,
             sycl::ext::oneapi::plus<>()) &
         KEY_PIVOT_MASK;
     int dest_lane_pivot = __ffs(isFoundPivot_bmp) - 1;
@@ -651,11 +595,9 @@ void search_unit(bool &to_be_searched, uint32_t &laneId,
     } else {
       // either we are at a leaf node and have found a match
       // or, we are at an intermediate node and should go the next level
-      next = sycl::select_from_group(item.get_sub_group(), src_unit_data,
-                                     dest_lane_pivot - 1);
+      next = sycl::select_from_group(sg, src_unit_data, dest_lane_pivot - 1);
       found = (isLeaf && src_unit_data == src_key);
-      found = sycl::select_from_group(item.get_sub_group(), found,
-                                      dest_lane_pivot);
+      found = sycl::select_from_group(sg, found, dest_lane_pivot);
 
       if (found && (laneId == src_lane)) {  // leaf and found
         myResult = next;
@@ -679,16 +621,17 @@ void delete_unit_bulk(uint32_t &laneId, KeyT &myKey,
                       sycl::nd_item<1> &item) {
   int dest_lane_pivot;
   uint32_t rootAddress = *d_root;
+  auto sg = item.get_sub_group();
 
 #pragma unroll
   for (int src_lane = 0; src_lane < WARP_WIDTH; src_lane++) {
-    KeyT src_key = sycl::select_from_group(item.get_sub_group(), myKey, src_lane);
+    KeyT src_key = sycl::select_from_group(sg, myKey, src_lane);
     KeyT next = rootAddress;
     bool isIntermediate = true;
     do {
       KeyT src_unit_data = *(getAddressPtr(next) + laneId);
       isIntermediate = !((src_unit_data & 0x80000000) == 0);  // only even lanes are valid
-      isIntermediate = sycl::select_from_group(item.get_sub_group(), isIntermediate, 0);
+      isIntermediate = sycl::select_from_group(sg, isIntermediate, 0);
       if (!isIntermediate) {
         acquire_lock(getAddressPtr(next), item);
         src_unit_data = volatileNodeRead(getAddressPtr(next), item);
@@ -696,29 +639,20 @@ void delete_unit_bulk(uint32_t &laneId, KeyT &myKey,
       KeyT src_unit_key = src_unit_data & 0x7FFFFFFF;
       bool hit = (src_key >= src_unit_key) && src_unit_key;
       bool key_exist = sycl::reduce_over_group(
-          item.get_sub_group(),
-          (WARP_MASK &
-           (0x1 << item.get_sub_group().get_local_linear_id())) &&
-           (src_key == src_unit_key) & KEY_PIVOT_MASK_R
-              ? (0x1 << item.get_sub_group().get_local_linear_id())
-              : 0,
+          sg, (src_key == src_unit_key) & KEY_PIVOT_MASK_R
+              ? (0x1 << sg.get_local_linear_id()) : 0,
           sycl::ext::oneapi::plus<>());
              
       uint32_t isFoundPivot_bmp = sycl::reduce_over_group(
-          item.get_sub_group(),
-          (WARP_MASK &
-           (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                  hit
-              ? (0x1 << item.get_sub_group().get_local_linear_id())
-              : 0,
+          sg, hit ? (0x1 << sg.get_local_linear_id()) : 0,
           sycl::ext::oneapi::plus<>());
       dest_lane_pivot = __ffs(~isFoundPivot_bmp & KEY_PIVOT_MASK_R);
       if (isIntermediate) {
         dest_lane_pivot = dest_lane_pivot ? dest_lane_pivot - 2 : 29;
-        next = sycl::select_from_group(item.get_sub_group(), src_unit_data, dest_lane_pivot);
+        next = sycl::select_from_group(sg, src_unit_data, dest_lane_pivot);
       } else {
         if (key_exist) {
-          uint32_t newNodeData = sycl::shift_group_left(item.get_sub_group(), src_unit_key, 2);
+          uint32_t newNodeData = sycl::shift_group_left(sg, src_unit_key, 2);
           isFoundPivot_bmp &= KEY_PIVOT_MASK_R;
           isFoundPivot_bmp |= (isFoundPivot_bmp << 1);  // mark values
           isFoundPivot_bmp >>= 2;                       // remove mask for src_key
@@ -742,18 +676,14 @@ void range_unit(uint32_t &laneId, bool &to_search,
                 sycl::nd_item<1> &item) {
   int dest_lane_pivot;
   uint32_t rootAddress = *d_root;
+  auto sg = item.get_sub_group();
 
   while (auto work_queue = sycl::reduce_over_group(
-             item.get_sub_group(),
-             (WARP_MASK &
-              (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                     to_search
-                 ? (0x1 << item.get_sub_group().get_local_linear_id())
-                 : 0,
+             sg, to_search ? (0x1 << sg.get_local_linear_id()) : 0,
              sycl::ext::oneapi::plus<>())) {
     auto src_lane = __ffs(work_queue) - 1;
-    KeyT src_key_lower = sycl::select_from_group(item.get_sub_group(), lower_bound, src_lane);
-    KeyT src_key_upper = sycl::select_from_group(item.get_sub_group(), upper_bound, src_lane);
+    KeyT src_key_lower = sycl::select_from_group(sg, lower_bound, src_lane);
+    KeyT src_key_upper = sycl::select_from_group(sg, upper_bound, src_lane);
     KeyT next = rootAddress;
     bool is_intermediate = true;
     if (laneId == src_lane)
@@ -761,23 +691,17 @@ void range_unit(uint32_t &laneId, bool &to_search,
     do {
       uint32_t src_unit_data = *(getAddressPtr(next) + laneId);
       is_intermediate = !((src_unit_data & 0x80000000) == 0);
-      is_intermediate = sycl::select_from_group(item.get_sub_group(), is_intermediate, 0);
+      is_intermediate = sycl::select_from_group(sg, is_intermediate, 0);
 
       uint32_t src_unit_key = src_unit_data & 0x7FFFFFFF;
       bool hit = (src_key_lower >= src_unit_key) && src_unit_key;
       uint32_t isFoundPivot_bmp = sycl::reduce_over_group(
-          item.get_sub_group(),
-          (WARP_MASK &
-           (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                  hit
-              ? (0x1 << item.get_sub_group().get_local_linear_id())
-              : 0,
+          sg, hit ? (0x1 << sg.get_local_linear_id()) : 0,
           sycl::ext::oneapi::plus<>());
       dest_lane_pivot = __ffs(~isFoundPivot_bmp & KEY_PIVOT_MASK_R);
       if (is_intermediate) {
         dest_lane_pivot = dest_lane_pivot ? dest_lane_pivot - 2 : 29;
-        next = sycl::select_from_group(item.get_sub_group(), src_unit_data,
-                                       dest_lane_pivot);
+        next = sycl::select_from_group(sg, src_unit_data, dest_lane_pivot);
       } else {
         uint32_t tid = item.get_global_id(0);
         tid /= 32;
@@ -788,11 +712,7 @@ void range_unit(uint32_t &laneId, bool &to_search,
           hit = ((src_key_lower <= src_unit_key && src_key_upper >= src_unit_key) &&
                  src_unit_key);
           isFoundPivot_bmp = sycl::reduce_over_group(
-              item.get_sub_group(),
-              (WARP_MASK &
-               (0x1 << item.get_sub_group().get_local_linear_id())) &&
-                      hit ? (0x1 << item.get_sub_group().get_local_linear_id())
-                  : 0,
+              sg, hit ? (0x1 << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>());
           isFoundPivot_bmp &= KEY_PIVOT_MASK_R;
           dest_lane_pivot = __ffs(isFoundPivot_bmp);
@@ -800,18 +720,15 @@ void range_unit(uint32_t &laneId, bool &to_search,
           dest_lane_pivot--;
           isFoundPivot_bmp >>= dest_lane_pivot;
           uint32_t link_min =
-              sycl::select_from_group(item.get_sub_group(), src_unit_key,
-                                      30) & 0x7FFFFFFF; // get link min
-          src_unit_key = sycl::shift_group_left(item.get_sub_group(),
-                                                src_unit_key, dest_lane_pivot);
+              sycl::select_from_group(sg, src_unit_key, 30) & 0x7FFFFFFF; // get link min
+          src_unit_key = sycl::shift_group_left(sg, src_unit_key, dest_lane_pivot);
           uint32_t counter = sycl::popcount(isFoundPivot_bmp) * 2;
           if (laneId < counter)
             range_results[offset + laneId] = src_unit_key - 2;
           if (!link_min || src_key_upper < link_min)
             break;            // done
           offset += counter;  // load next node
-          next = sycl::select_from_group(item.get_sub_group(), src_unit_key, 31) &
-                 0x7FFFFFFF;
+          next = sycl::select_from_group(sg, src_unit_key, 31) & 0x7FFFFFFF;
           src_unit_key = *(getAddressPtr(next) + laneId);
         }
       }
