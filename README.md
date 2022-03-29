@@ -527,6 +527,9 @@ Early results are shown [here](results/README.md)
 ### matrix-rotate (openmp)
   In-place matrix rotation
 
+### matrixT (cuda)
+  Matrix transposition (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
 ### maxpool3d (opencl)
   3D Maxpooling (https://github.com/nachiket/papaa-opencl)
 
