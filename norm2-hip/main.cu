@@ -37,12 +37,16 @@ int main (int argc, char* argv[]){
     return 1;
   }
 
+  float *a = NULL;
+  float *d_a = NULL;
+
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
-    float* a = (float *) malloc (size);
+    a = (float *) malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
+      if (d_a) hipFree(d_a);
       break;
     }
 
@@ -56,10 +60,11 @@ int main (int argc, char* argv[]){
 
     long start = get_time();
 
-    float* d_a;
-    hipStat = hipMalloc ((void**)&d_a, size);
+    hipStat = hipMalloc((void**)&d_a, size);
     if (hipStat != hipSuccess) {
       printf ("device memory allocation failed");
+      if (a) free(a);
+      break;
     }
 
     hipStat = hipMemcpy(d_a, a, size, hipMemcpyHostToDevice);
@@ -67,6 +72,13 @@ int main (int argc, char* argv[]){
       printf ("device memory copy failed");
     }
 
+    //-------------------------------------------------------------------
+    // handle |        | input | handle to the cuBLAS library context.
+    //      n |        | input | number of elements in the vector x.
+    //      x | device | input |<type> vector with n elements.
+    //   incx |        | input | stride between consecutive elements of x.
+    // result | host or device | output | the resulting norm, which is 0.0 if n,incx<=0.
+    //-------------------------------------------------------------------
     for (j = 0; j < repeat; j++) {
       hipblasStat = hipblasSnrm2(handle, n, d_a, 1, result+j);
       if (hipblasStat != HIPBLAS_STATUS_SUCCESS) {
@@ -80,19 +92,20 @@ int main (int argc, char* argv[]){
     }
 
     long end = get_time();
+
     printf("#elements = %.2f M, measured time = %.3f s\n", 
             n / (1024.f*1024.f), (end-start) / 1e6f);
 
-    if (a != NULL) free(a);
-
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 
-     if (fabsf((float)gold - result[j]) > 1e-3f) {
-       printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
-              j, (float)gold, result[j], i);
-       ok = false;
-       break;
-     }
+      if (fabsf((float)gold - result[j]) > 1e-3f) {
+        printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
+               j, (float)gold, result[j], i);
+        ok = false;
+        break;
+      }
+
+    free(a);
   }
 
   free(result);
