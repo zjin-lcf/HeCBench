@@ -48,7 +48,7 @@ February 2020.
 #include <cuda.h>
 #include "graph.h"
 
-static const int ThreadsPerBlock = 256;
+static const int ThreadsPerBlock = 512;
 static const unsigned int Warp = 0xffffffff;
 static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
@@ -136,7 +136,7 @@ void init(const int nodes,
       posscol[v] = (range >= WS) ? -1 : (MSB >> range);
     }
   }
-  if (maxrange >= Mask) printf("too many active neighbors\n");
+  //if (maxrange >= Mask) printf("too many active neighbors\n");
 
   for (int i = thread; i < edges / WS + 1; i += threads) posscol2[i] = -1;
 }
@@ -356,7 +356,17 @@ int main(int argc, char* argv[])
   if (cudaSuccess != cudaMemcpy(nlist_d, g.nlist, g.edges * sizeof(int), cudaMemcpyHostToDevice)) 
     printf("ERROR: copying nlist to device failed\n\n");
 
-  const int blocks = 24;
+  cudaDeviceProp deviceProp;
+  cudaGetDeviceProperties(&deviceProp, 0);
+  const int SMs = deviceProp.multiProcessorCount;
+  const int mTpSM = deviceProp.maxThreadsPerMultiProcessor;
+  const int blocks = SMs * mTpSM / ThreadsPerBlock;
+  printf("Number of thread blocks in a grid: %d\n", blocks);
+
+  cudaFuncSetCacheConfig(init, cudaFuncCachePreferL1);
+  cudaFuncSetCacheConfig(runLarge, cudaFuncCachePreferL1);
+  cudaFuncSetCacheConfig(runSmall, cudaFuncCachePreferL1);
+
 
   cudaDeviceSynchronize();
 
@@ -395,14 +405,14 @@ int main(int argc, char* argv[])
   for (int v = 0; v < g.nodes; v++) {
     if (color[v] < 0) {
       printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n",
-          v, g.nindex[v + 1] - g.nindex[v]);
+             v, g.nindex[v + 1] - g.nindex[v]);
       ok = false;
       break;
     }
     for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
       if (color[g.nlist[i]] == color[v]) {
         printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n",
-            color[v], v, g.nlist[i]);
+               color[v], v, g.nlist[i]);
         ok = false;
         break;
       }
@@ -410,21 +420,23 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  const int vals = 16;
-  int c[vals];
-  for (int i = 0; i < vals; i++) c[i] = 0;
-  int cols = -1;
-  for (int v = 0; v < g.nodes; v++) {
-    cols = std::max(cols, color[v]);
-    if (color[v] < vals) c[color[v]]++;
-  }
-  cols++;
-  printf("Number of distinct colors used: %d\n", cols);
+  if (ok) {
+    const int vals = 16;
+    int c[vals];
+    for (int i = 0; i < vals; i++) c[i] = 0;
+    int cols = -1;
+    for (int v = 0; v < g.nodes; v++) {
+      cols = std::max(cols, color[v]);
+      if (color[v] < vals) c[color[v]]++;
+    }
+    cols++;
+    printf("Number of distinct colors used: %d\n", cols);
 
-  int sum = 0;
-  for (int i = 0; i < std::min(vals, cols); i++) {
-    sum += c[i];
-    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    int sum = 0;
+    for (int i = 0; i < std::min(vals, cols); i++) {
+      sum += c[i];
+      printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    }
   }
 
   delete [] color;
