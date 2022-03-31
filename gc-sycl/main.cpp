@@ -47,14 +47,13 @@ February 2020.
 #include "common.h"
 #include "graph.h"
 
-static const int ThreadsPerBlock = 256;
-static const unsigned int Warp = 0xffffffff;
+static const int ThreadsPerBlock = 512;
 static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
 inline int ffs(int x) {
-  return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
+  return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
@@ -76,8 +75,11 @@ void init(const int nodes,
     int* const __restrict color,
     int* const __restrict wl,
     int* __restrict wlsize,
-    sycl::nd_item<1> &item,
-    const sycl::stream &out)
+    sycl::nd_item<1> &item
+#ifdef SYCL_STREAM
+    , const sycl::stream &out
+#endif
+    )
 {
   const int lane = item.get_local_id(0) % WS;
   const int thread = item.get_global_id(0);
@@ -85,7 +87,7 @@ void init(const int nodes,
   auto sg = item.get_sub_group();
 
   int maxrange = -1;
-  for (int v = thread; sycl::any_of_group(sg, (Warp & (0x1 << sg.get_local_linear_id())) && v < nodes);
+  for (int v = thread; sycl::any_of_group(sg, v < nodes);
        v += threads) {
     bool cond = false;
     int beg, end, pos, degv, active;
@@ -112,8 +114,7 @@ void init(const int nodes,
     }
 
     int bal = sycl::reduce_over_group(sg,
-        (Warp & (0x1 << sg.get_local_linear_id())) && cond
-            ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
+        cond ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
     while (bal != 0) {
       const int who = ffs(bal) - 1;
       bal &= bal - 1;
@@ -122,9 +123,7 @@ void init(const int nodes,
       const int wend = sycl::select_from_group(sg, end, who);
       const int wdegv = wend - wbeg;
       int wpos = wbeg;
-      for (int i = wbeg + lane; sycl::any_of_group( sg,
-               (Warp & (0x1 << sg.get_local_linear_id())) && i < wend);
-           i += WS) {
+      for (int i = wbeg + lane; sycl::any_of_group(sg, i < wend); i += WS) {
         int wnei;
         bool prio = false;
         if (i < wend) {
@@ -133,9 +132,8 @@ void init(const int nodes,
           prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || 
                  ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
         }
-        const int b = sycl::reduce_over_group( sg,
-            (Warp & (0x1 << sg.get_local_linear_id())) && prio
-                ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
+        const int b = sycl::reduce_over_group( sg, 
+                  prio ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
         const int offs = sycl::popcount(b & ((1 << lane) - 1));
         if (prio) nlist2[wpos + offs] = wnei;
         wpos += sycl::popcount(b);
@@ -150,7 +148,9 @@ void init(const int nodes,
       posscol[v] = (range >= WS) ? -1 : (MSB >> range);
     }
   }
+#ifdef SYCL_STREAM
   if (maxrange >= Mask) out << "too many active neighbors\n";
+#endif
 
   for (int i = thread; i < edges / WS + 1; i += threads) posscol2[i] = -1;
 }
@@ -174,9 +174,7 @@ void runLarge(const int nodes,
     bool again;
     do {
       again = false;
-      for (int w = thread; sycl::any_of_group(sg,
-               (Warp & (0x1 << sg.get_local_linear_id())) && w < stop);
-           w += threads) {
+      for (int w = thread; sycl::any_of_group(sg, w < stop); w += threads) {
         bool shortcut, done, cond = false;
         int v, data, range, beg, pcol;
         if (w < stop) {
@@ -191,8 +189,7 @@ void runLarge(const int nodes,
         }
 
         int bal = sycl::reduce_over_group(sg,
-            (Warp & (0x1 << sg.get_local_linear_id())) && cond
-                ? (0x1 << sg.get_local_linear_id()) : 0, sycl::ext::oneapi::plus<>());
+            cond ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
         while (bal != 0) {
           const int who = ffs(bal) - 1;
           bal &= bal - 1;
@@ -207,9 +204,7 @@ void runLarge(const int nodes,
 
           bool wshortcut = true;
           bool wdone = true;
-          for (int i = wbeg + lane; sycl::any_of_group(sg,
-                   (Warp & (0x1 << sg.get_local_linear_id())) && i < wend);
-               i += WS) {
+          for (int i = wbeg + lane; sycl::any_of_group(sg, i < wend); i += WS) {
             int nei, neidata, neirange;
             if (i < wend) {
               nei = nlist[i];
@@ -223,9 +218,8 @@ void runLarge(const int nodes,
                   wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
                 } else {
                   if ((wmincol <= neicol) && (neicol < wmaxcol) && ((posscol2[woffs + neicol / WS] << (neicol % WS)) < 0)) {
-                    sycl::atomic<int>(
-                        sycl::global_ptr<int>(
-                            (int *)(int *)&posscol2[woffs + neicol / WS]))
+                    sycl::atomic<int>(sycl::global_ptr<int>(
+                            (int *)&posscol2[woffs + neicol / WS]))
                         .fetch_and(~((unsigned int)MSB >> (neicol % WS)));
                   }
                 }
@@ -236,8 +230,8 @@ void runLarge(const int nodes,
               }
             }
           }
-          wshortcut = sycl::all_of_group(sg, (~Warp & (0x1 << sg.get_local_linear_id())) || wshortcut);
-          wdone = sycl::all_of_group(sg, (~Warp & (0x1 << sg.get_local_linear_id())) || wdone);
+          wshortcut = sycl::all_of_group(sg, wshortcut);
+          wdone = sycl::all_of_group(sg, wdone);
           wpcol &= sycl::permute_group_by_xor(sg, wpcol, 1);
           wpcol &= sycl::permute_group_by_xor(sg, wpcol, 2);
           wpcol &= sycl::permute_group_by_xor(sg, wpcol, 4);
@@ -272,7 +266,7 @@ void runLarge(const int nodes,
           }
         }
       }
-    } while (sycl::any_of_group(sg, (Warp & (0x1 << sg.get_local_linear_id())) && again));
+    } while (sycl::any_of_group(sg, again));
   }
 }
 
@@ -372,7 +366,7 @@ int main(int argc, char *argv[]) {
   buffer<int, 1> color_d (nodes);
   buffer<int, 1> wl_d (nodes);
   buffer<int, 1> wlsize_d (1);
-  const int blocks = 24;
+  const int blocks = 320;
 
   q.wait();
 
@@ -388,7 +382,9 @@ int main(int argc, char *argv[]) {
     });
 
     q.submit([&] (handler &cgh) {
+#ifdef SYCL_STREAM
       stream out(64*1024, 256, cgh);
+#endif
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
       auto nlist2 = nlist2_d.get_access<sycl_write>(cgh);
@@ -401,7 +397,11 @@ int main(int argc, char *argv[]) {
         [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
         init(nodes, edges, nidx.get_pointer(), nlist.get_pointer(), nlist2.get_pointer(),
              posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
-             wl.get_pointer(), wlsize.get_pointer(), item, out);
+             wl.get_pointer(), wlsize.get_pointer(), item
+#ifdef SYCL_STREAM
+             , out
+#endif
+             );
       });
     });
 
@@ -468,21 +468,23 @@ int main(int argc, char *argv[]) {
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  const int vals = 16;
-  int c[vals];
-  for (int i = 0; i < vals; i++) c[i] = 0;
-  int cols = -1;
-  for (int v = 0; v < g.nodes; v++) {
-    cols = std::max(cols, color[v]);
-    if (color[v] < vals) c[color[v]]++;
-  }
-  cols++;
-  printf("Number of distinct colors used: %d\n", cols);
+  if (ok) {
+    const int vals = 16;
+    int c[vals];
+    for (int i = 0; i < vals; i++) c[i] = 0;
+    int cols = -1;
+    for (int v = 0; v < g.nodes; v++) {
+      cols = std::max(cols, color[v]);
+      if (color[v] < vals) c[color[v]]++;
+    }
+    cols++;
+    printf("Number of distinct colors used: %d\n", cols);
 
-  int sum = 0;
-  for (int i = 0; i < std::min(vals, cols); i++) {
-    sum += c[i];
-    printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    int sum = 0;
+    for (int i = 0; i < std::min(vals, cols); i++) {
+      sum += c[i];
+      printf("color %2d: %10d (%5.1f%%)\n", i, c[i], 100.0 * sum / g.nodes);
+    }
   }
 
   delete [] color;
