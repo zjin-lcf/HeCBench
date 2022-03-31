@@ -33,14 +33,10 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := -std=c++17 -Wall -fsycl -I../include -I$(ONEMKL)/include \
-          -I${MKLROOT}/include -DMKL_ILP64 
+          -I${MKLROOT} -DMKL_ILP64 -qmkl=parallel
 
 # Linker Flags
-LDFLAGS = ${MKLROOT}/lib/intel64/libmkl_sycl.a -fsycl-device-code-split=per_kernel \
-          -Wl,-export-dynamic -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
-          ${MKLROOT}/lib/intel64/libmkl_tbb_thread.a \
-          ${MKLROOT}/lib/intel64/libmkl_core.a \
-          -Wl,--end-group -ltbb -lsycl -lOpenCL -lpthread -lm -ldl 
+LDFLAGS =
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
