@@ -31,14 +31,14 @@ int main(int argc, char *argv[]) {
   sycl::queue q(dev_sel);
 
   // store the nrm2 results
-  float* h_result = (float*) sycl::malloc_host (repeat * sizeof(float));
-  if (h_result == nullptr)
+  float* h_result = (float*) sycl::malloc_host (repeat * sizeof(float), q);
+  if (h_result == nullptr) {
     printf ("output on host allocation failed");
     return 1;
   }
 
-  float* d_result = (float*) sycl::malloc_device (repeat * sizeof(float));
-  if (d_result == nullptr)
+  float* d_result = (float*) sycl::malloc_device (repeat * sizeof(float), q);
+  if (d_result == nullptr) {
     printf ("output on device allocation failed");
     return 1;
   }
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
-    float* a = (float *)malloc (size);
+    a = (float*) malloc (size);
     if (a == nullptr) {
       printf ("input on host allocation failed");
       if (d_a != nullptr) sycl::free(d_a, q);
