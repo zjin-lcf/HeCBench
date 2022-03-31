@@ -67,6 +67,13 @@ int main (int argc, char* argv[]){
       printf ("device memory copy failed");
     }
 
+    //-------------------------------------------------------------------
+    // handle |        | input | handle to the cuBLAS library context.
+    //      n |        | input | number of elements in the vector x.
+    //      x | device | input |<type> vector with n elements.
+    //   incx |        | input | stride between consecutive elements of x.
+    // result | host or device | output | the resulting norm, which is 0.0 if n,incx<=0.
+    //-------------------------------------------------------------------
     for (j = 0; j < repeat; j++) {
       cublasStat = cublasSnrm2(handle, n, d_a, 1, result+j);
       if (cublasStat != CUBLAS_STATUS_SUCCESS) {
