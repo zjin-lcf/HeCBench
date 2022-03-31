@@ -31,21 +31,31 @@ int main(int argc, char *argv[]) {
   sycl::queue q(dev_sel);
 
   // store the nrm2 results
-  float* result = (float*) malloc (repeat * sizeof(float));
-  if (!result) {
-    printf ("result memory allocation failed");
+  float* h_result = (float*) sycl::malloc_host (repeat * sizeof(float));
+  if (h_result == nullptr)
+    printf ("output on host allocation failed");
+    return 1;
+  }
+
+  float* d_result = (float*) sycl::malloc_device (repeat * sizeof(float));
+  if (d_result == nullptr)
+    printf ("output on device allocation failed");
     return 1;
   }
 
   // store the mkl nrm2 status
   std::vector<sycl::event> status (repeat);
 
+  float *a = nullptr;
+  float *d_a = nullptr;
+
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
     float* a = (float *)malloc (size);
-    if (!a) {
-      printf ("host memory allocation failed");
+    if (a == nullptr) {
+      printf ("input on host allocation failed");
+      if (d_a != nullptr) sycl::free(d_a, q);
       break;
     }
 
@@ -60,39 +70,44 @@ int main(int argc, char *argv[]) {
     long start = get_time();
 
     float* d_a = (float *)sycl::malloc_device(size, q);
+    if (d_a == nullptr) {
+      printf ("input on device allocation failed");
+      if (a != nullptr) free(a);
+      break;
+    }
 
     q.memcpy(d_a, a, size).wait();
 
     try {
       for (j = 0; j < repeat; j++) {
-        status[j] = oneapi::mkl::blas::column_major::nrm2(q, n, d_a, 1, result+j);
+        status[j] = oneapi::mkl::blas::column_major::nrm2(q, n, d_a, 1, d_result+j);
       }
     } catch(sycl::exception const& e) {
       std::cout << "\t\tCaught synchronous SYCL exception during NRM2:\n"
                 << e.what() << std::endl;
     }
 
-    for (j = 0; j < repeat; j++) status[j].wait();
-
-    sycl::free(d_a, q);
+    q.memcpy(h_result, d_result, repeat * sizeof(float), status).wait();
 
     long end = get_time();
     printf("#elements = %.2f M, measured time = %.3f s\n", 
             n / (1024.f*1024.f), (end-start) / 1e6f);
 
-    if (!a) free(a);
-
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 
-     if (fabsf((float)gold - result[j]) > 1e-3f) {
+     if (fabsf((float)gold - h_result[j]) > 1e-3f) {
        printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
-              j, (float)gold, result[j], i);
+              j, (float)gold, h_result[j], i);
        ok = false;
        break;
      }
+
+    sycl::free(d_a, q);
+    free(a);
   }
 
-  free(result);
+  sycl::free(h_result, q);
+  sycl::free(d_result, q);
 
   if (ok) printf("PASS\n");
   return 0;
