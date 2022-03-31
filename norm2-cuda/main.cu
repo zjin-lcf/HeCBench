@@ -37,12 +37,16 @@ int main (int argc, char* argv[]){
     return 1;
   }
 
+  float *a = NULL;
+  float *d_a = NULL;
+
   for (int n = 512*1024; n <= 1024*1024*512; n = n * 2) {
     int i, j;
     size_t size = n * sizeof(float);
-    float* a = (float *) malloc (size);
+    a = (float *) malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
+      if (d_a) cudaFree(d_a);
       break;
     }
 
@@ -56,10 +60,11 @@ int main (int argc, char* argv[]){
 
     long start = get_time();
 
-    float* d_a;
-    cudaStat = cudaMalloc ((void**)&d_a, size);
+    cudaStat = cudaMalloc((void**)&d_a, size);
     if (cudaStat != cudaSuccess) {
       printf ("device memory allocation failed");
+      if (a) free(a);
+      break;
     }
 
     cudaStat = cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
@@ -87,19 +92,20 @@ int main (int argc, char* argv[]){
     }
 
     long end = get_time();
+
     printf("#elements = %.2f M, measured time = %.3f s\n", 
             n / (1024.f*1024.f), (end-start) / 1e6f);
 
-    if (!a) free(a);
-
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 
-     if (fabsf((float)gold - result[j]) > 1e-3f) {
-       printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
-              j, (float)gold, result[j], i);
-       ok = false;
-       break;
-     }
+      if (fabsf((float)gold - result[j]) > 1e-3f) {
+        printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
+               j, (float)gold, result[j], i);
+        ok = false;
+        break;
+      }
+
+    free(a);
   }
 
   free(result);
