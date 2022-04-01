@@ -59,15 +59,15 @@ void Layer::setOutput(float *data)
 // Reset GPU memory between iterations
 void Layer::clear()
 {
-  hipMemset(output, 0x00, sizeof(float) * O);
-  hipMemset(preact, 0x00, sizeof(float) * O);
+  hipMemsetAsync(output, 0x00, sizeof(float) * O);
+  hipMemsetAsync(preact, 0x00, sizeof(float) * O);
 }
 
 void Layer::bp_clear()
 {
-  hipMemset(d_output, 0x00, sizeof(float) * O);
-  hipMemset(d_preact, 0x00, sizeof(float) * O);
-  hipMemset(d_weight, 0x00, sizeof(float) * M * N);
+  hipMemsetAsync(d_output, 0x00, sizeof(float) * O);
+  hipMemsetAsync(d_preact, 0x00, sizeof(float) * O);
+  hipMemsetAsync(d_weight, 0x00, sizeof(float) * M * N);
 }
 
 

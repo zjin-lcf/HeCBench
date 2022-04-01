@@ -66,18 +66,17 @@ int main(int argc, const  char **argv)
 // Forward propagation of a single row in dataset
 void forward_pass(double data[28][28])
 {
-  float input[28][28];
+  l_input.clear();
+  l_c1.clear();
+  l_s1.clear();
+  l_f.clear();
 
+  float input[28][28];
   for (int i = 0; i < 28; ++i) {
     for (int j = 0; j < 28; ++j) {
       input[i][j] = data[i][j];
     }
   }
-
-  l_input.clear();
-  l_c1.clear();
-  l_s1.clear();
-  l_f.clear();
 
   l_input.setOutput((float *)input);
 
@@ -175,6 +174,8 @@ static unsigned int classify(double data[28][28])
 // Perform forward propagation of test data
 static void test()
 {
+  fprintf(stdout ,"Testing\n");
+
   int error = 0;
 
   for (unsigned int i = 0; i < test_cnt; ++i) {

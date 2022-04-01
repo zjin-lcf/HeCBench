@@ -46,18 +46,17 @@ void forward_pass(
   Layer &l_f,
   double data[28][28])
 {
+  l_input.clear(q);
+  l_c1.clear(q);
+  l_s1.clear(q);
+  l_f.clear(q);
+
   float input[28][28];
   for (int i = 0; i < 28; ++i) {
     for (int j = 0; j < 28; ++j) {
       input[i][j] = data[i][j];
     }
   }
-
-  l_input.clear(q);
-  l_c1.clear(q);
-  l_s1.clear(q);
-  l_f.clear(q);
-
   l_input.setOutput(q, (float *)input);
 
   range<1> gws (64 * 64);
@@ -410,6 +409,8 @@ static void test(
   Layer &l_s1,
   Layer &l_f)
 {
+  fprintf(stdout ,"Testing\n");
+
   int error = 0;
 
   for (unsigned int i = 0; i < test_cnt; ++i) {
