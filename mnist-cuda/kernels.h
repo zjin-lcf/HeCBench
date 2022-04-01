@@ -59,15 +59,15 @@ void Layer::setOutput(float *data)
 // Reset GPU memory between iterations
 void Layer::clear()
 {
-  cudaMemset(output, 0x00, sizeof(float) * O);
-  cudaMemset(preact, 0x00, sizeof(float) * O);
+  cudaMemsetAsync(output, 0x00, sizeof(float) * O);
+  cudaMemsetAsync(preact, 0x00, sizeof(float) * O);
 }
 
 void Layer::bp_clear()
 {
-  cudaMemset(d_output, 0x00, sizeof(float) * O);
-  cudaMemset(d_preact, 0x00, sizeof(float) * O);
-  cudaMemset(d_weight, 0x00, sizeof(float) * M * N);
+  cudaMemsetAsync(d_output, 0x00, sizeof(float) * O);
+  cudaMemsetAsync(d_preact, 0x00, sizeof(float) * O);
+  cudaMemsetAsync(d_weight, 0x00, sizeof(float) * M * N);
 }
 
 
