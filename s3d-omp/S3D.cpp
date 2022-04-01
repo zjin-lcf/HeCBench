@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #include <string>
 #include <sstream>
 #include "OptionParser.h"
@@ -58,11 +59,20 @@ addBenchmarkSpecOptions(OptionParser &op)
 void RunBenchmark(OptionParser &op)
 {
   // Always run the single precision test
+  auto t1 = std::chrono::high_resolution_clock::now();
   RunTest<float>("S3D-SP", op);
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time %lf secs \n", total_time / 1.0e6);
+
+  t1 = std::chrono::high_resolution_clock::now();
   RunTest<float>("S3D-DP", op);
+  t2 = std::chrono::high_resolution_clock::now();
+  total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time %lf secs \n", total_time / 1.0e6);
 }
 
-  template <class real>
+template <class real>
 void RunTest(string testName, OptionParser &op)
 {
   // Number of grid points (specified in header file)
