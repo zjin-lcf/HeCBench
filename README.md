@@ -500,6 +500,9 @@ Early results are shown [here](results/README.md)
 ### linearprobing (cuda)
   A simple lock-free hash table (https://github.com/nosferalatu/SimpleGPUHashTable)
 
+### log2 (c)
+  Approximate the log2 math function (https://adacenter.org/sites/default/files/milspec/Transcendentals.zip)
+
 ### lombscargle (cuda)
   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
 
