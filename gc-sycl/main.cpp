@@ -47,6 +47,7 @@ February 2020.
 #include "common.h"
 #include "graph.h"
 
+// the maximum work-group size depends on the target device
 static const int ThreadsPerBlock = 512;
 static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
@@ -366,6 +367,8 @@ int main(int argc, char *argv[]) {
   buffer<int, 1> color_d (nodes);
   buffer<int, 1> wl_d (nodes);
   buffer<int, 1> wlsize_d (1);
+
+  // note the number of blocks is computed at runtime in the CUDA program
   const int blocks = 320;
 
   q.wait();
