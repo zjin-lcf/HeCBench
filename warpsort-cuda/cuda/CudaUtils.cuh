@@ -25,16 +25,14 @@ __host__ __device__ __forceinline__ constexpr T floor(T a, T b) {
    Returns the current thread's warp ID
 */
 __device__ __forceinline__ int getWarpId() {
-  return (threadIdx.z * blockDim.y * blockDim.x +
-          threadIdx.y * blockDim.x +
-          threadIdx.x) / warpSize;
+  return threadIdx.x / warpSize;
 }
 
 /**
    Returns the number of threads in the current block (linearized).
 */
 __device__ __forceinline__ int getThreadsInBlock() {
-  return (blockDim.x * blockDim.y * blockDim.z);
+  return blockDim.x;
 }
 
 /**
