@@ -2,6 +2,7 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 //
 
+#include <CL/sycl.hpp>
 #include <algorithm>
 #include <random>
 #include <unordered_set>
@@ -10,11 +11,11 @@
 namespace facebook { namespace cuda {
 
 // test the warp-wide sort code
-std::vector<float> sort(const std::vector<float>& data);
+std::vector<float> sort(sycl::queue &q, const std::vector<float>& data);
 
 // test the warp-wide sort with indices code
 std::vector<std::pair<float, int> >
-sortWithIndices(const std::vector<float>& data);
+sortWithIndices(sycl::queue &q, const std::vector<float>& data);
 
 } } // namespace
 
@@ -42,7 +43,7 @@ void addSpecialFloats(std::vector<float>& vals) {
 }
 
 
-bool test_sort() {
+bool test_sort(sycl::queue &q) {
   std::vector<float> vals;
   addSpecialFloats(vals);
 
@@ -52,7 +53,7 @@ bool test_sort() {
   bool ok = true;
   for (int i = 0; i < 3; ++i) {
     std::shuffle(vals.begin(), vals.end(), std::random_device());
-    auto out = facebook::cuda::sort(vals);
+    auto out = facebook::cuda::sort(q, vals);
 
     if (sorted.size() != out.size()) {
       ok = false;
@@ -70,7 +71,7 @@ bool test_sort() {
   return ok;
 }
 
-bool test_sortInRegisters() {
+bool test_sortInRegisters(sycl::queue &q) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
   bool ok = true;
@@ -87,7 +88,7 @@ bool test_sortInRegisters() {
 
     for (int i = 0; i < 3; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sort(vals);
+      auto out = facebook::cuda::sort(q, vals);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -106,7 +107,7 @@ bool test_sortInRegisters() {
   return ok;
 }
 
-bool test_sortIndicesInRegisters() {
+bool test_sortIndicesInRegisters(sycl::queue &q) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
 
@@ -123,7 +124,7 @@ bool test_sortIndicesInRegisters() {
 
     for (int i = 0; i < 3; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sortWithIndices(vals);
+      auto out = facebook::cuda::sortWithIndices(q, vals);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -159,14 +160,21 @@ bool test_sortIndicesInRegisters() {
 }
 
 int main(int argc, char** argv) {
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel);
+
   bool ok;
-  ok = test_sort();
+  ok = test_sort(q);
   printf("%s: test_sort\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortInRegisters();
+  ok = test_sortInRegisters(q);
   printf("%s: test_sortInRegisters\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortIndicesInRegisters();
+  ok = test_sortIndicesInRegisters(q);
   printf("%s: test_sortIndicesInRegisters\n", ok ? "PASS" : "FAIL");
 
   return 0;
