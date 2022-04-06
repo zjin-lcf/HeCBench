@@ -159,19 +159,15 @@ bool test_sortIndicesInRegisters() {
 }
 
 int main(int argc, char** argv) {
-  bool ok1, ok2, ok3;
-  ok1 = test_sort();
-  ok2 = test_sortInRegisters();
-  ok3 = test_sortIndicesInRegisters();
+  bool ok;
+  ok = test_sort();
+  printf("%s: test_sort\n", ok ? "PASS" : "FAIL");
 
-  if (ok1 && ok2 && ok3)
-    printf("PASS\n");
-  else if (!ok1)
-    printf("FAIL: test_sort\n");
-  else if (!ok2)
-    printf("FAIL: test_sortInRegisters\n");
-  else 
-    printf("FAIL: test_sortIndicesInRegisters\n");
+  ok = test_sortInRegisters();
+  printf("%s: test_sortInRegisters\n", ok ? "PASS" : "FAIL");
+
+  ok = test_sortIndicesInRegisters();
+  printf("%s: test_sortIndicesInRegisters\n", ok ? "PASS" : "FAIL");
 
   return 0;
 }
