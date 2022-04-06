@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -24,7 +23,7 @@ obj = main.o warpsort.o
 
 # Standard Flags
 CFLAGS := -DWARP_SIZE=32 -DHALF_WARP_SIZE=16 \
-          -std=c++14 -I. -Xcompiler -Wall -arch=$(ARCH)
+          -std=c++14 -I. -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -49,15 +48,15 @@ $(program): $(obj) Makefile
 main.o: main.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-warpsort.o: warpsort.cu cuda/CudaUtils.cuh \
-                        cuda/Comparators.cuh \
-                        cuda/DeviceTensor.cuh \
-                        cuda/DeviceTensor-inl.cuh \
-                        cuda/NumericLimits.cuh \
-                        cuda/Pair.cuh \
-                        cuda/RegisterUtils.cuh \
-                        cuda/ShuffleTypes.cuh \
-                        cuda/WarpBitonicSort.cuh \
+warpsort.o: warpsort.cu ../warpsort-cuda/cuda/CudaUtils.cuh \
+                        ../warpsort-cuda/cuda/Comparators.cuh \
+                        ../warpsort-cuda/cuda/DeviceTensor.cuh \
+                        ../warpsort-cuda/cuda/DeviceTensor-inl.cuh \
+                        ../warpsort-cuda/cuda/NumericLimits.cuh \
+                        ../warpsort-cuda/cuda/Pair.cuh \
+                        ../warpsort-cuda/cuda/RegisterUtils.cuh \
+                        ../warpsort-cuda/cuda/ShuffleTypes.cuh \
+                        ../warpsort-cuda/cuda/WarpBitonicSort.cuh \
                         Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
