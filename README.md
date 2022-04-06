@@ -894,6 +894,9 @@ Early results are shown [here](results/README.md)
 ### vote (cuda)
   Demonstrate the usage of the vote intrinsics (https://github.com/NVIDIA/cuda-samples/)
 
+### warpsort (cuda)
+  Sort small numbers (https://github.com/facebookarchive/fbcuda)
+
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
