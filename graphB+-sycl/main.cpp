@@ -169,9 +169,7 @@ int main(int argc, char* argv[])
     init(g.edges, g.nodes, d_g.nlist, d_g.eweight, d_inCC, d_einfo,
          d_inTree, d_negCnt, item);
     });
-  });
-
-  q.wait();
+  }).wait();
 
   int min_d = INT_MAX;
   int max_d = INT_MIN;
@@ -202,7 +200,7 @@ int main(int argc, char* argv[])
                                d_einfo, d_parent, d_queue, level, d_tail,
                                border_level_cur, border_level_nxt,
                                item);
-          });
+        });
       });
 
       q.memcpy(&tail, d_tail, sizeof(int)).wait();
@@ -428,7 +426,6 @@ int main(int argc, char* argv[])
   sycl::free(d_ws2, q);
   sycl::free(d_wSize, q);
   sycl::free(d_minus, q);
-  sycl::free(d_ws1, q);
   sycl::free(d_hi, q);
 
   return 0;
