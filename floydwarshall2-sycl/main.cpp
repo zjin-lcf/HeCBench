@@ -44,7 +44,7 @@ using mtype = int;
 
 static const int ws = 32; // warp size
 static const int tile = 64; // tile size
-static const int ThreadsPerBlock = ws * ws; // threads per block is fixed at 1024
+static const int TPB = ws * ws; // threads per block is fixed at 1024
 
 // initialize adj matrix
 static void init1(const int nodes, mtype* const __restrict AdjMat, const int upper,
@@ -460,6 +460,12 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
 #endif
   sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
+  const int wgs = q.get_device().get_info<sycl::info::device::max_work_group_size>();
+  if (wgs < TPB) {
+    printf("The max work group size supported is less than %d required for the program\n", TPB);
+    return;
+  }
+
   // copy graph to GPU
   ECLgraph d_g = g;
   d_g.nindex = sycl::malloc_device<int>((g.nodes + 1), q);
@@ -486,8 +492,8 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
   timeval start, end;
   gettimeofday(&start, NULL);
 
-  sycl::range<1> init_gws ((upper*upper+ThreadsPerBlock-1)/ThreadsPerBlock*ThreadsPerBlock);
-  sycl::range<1> lws (ThreadsPerBlock);
+  sycl::range<1> init_gws ((upper*upper+TPB-1)/TPB*TPB);
+  sycl::range<1> lws (TPB);
 
   // run GPU init code
   q.submit([&] (sycl::handler &cgh) {
@@ -496,7 +502,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
     });
   });
 
-  sycl::range<1> init2_gws ((g.nodes+ThreadsPerBlock-1)/ThreadsPerBlock*ThreadsPerBlock);
+  sycl::range<1> init2_gws ((g.nodes+TPB-1)/TPB*TPB);
 
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for(sycl::nd_range<1>(init2_gws, lws), [=](sycl::nd_item<1> item) {
@@ -527,8 +533,8 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
   });
 
   if (sub > 1) {
-    sycl::range<1> fw64_gws (2 * subm1 * ThreadsPerBlock);
-    sycl::range<1> fw64r_gws (subm1 * subm1 * ThreadsPerBlock);
+    sycl::range<1> fw64_gws (2 * subm1 * TPB);
+    sycl::range<1> fw64r_gws (subm1 * subm1 * TPB);
 
     for (int x = 0; x < sub; x++) {
       q.submit([&](sycl::handler &cgh) {
@@ -624,7 +630,7 @@ int main(int argc, char* argv[])
     fprintf(stderr, "USAGE: %s input_graph_name\n\n", argv[0]);
     return 1;
   }
-  if (ThreadsPerBlock != 1024) {
+  if (TPB != 1024) {
     fprintf(stderr, "Work-group size must be 1024\n\n");
     return 1;
   }
