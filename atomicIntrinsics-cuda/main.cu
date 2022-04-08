@@ -13,149 +13,54 @@
  * device functions (atomic*() functions).
  */
 
-// includes, system
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 
-// Includes CUDA
 #include <cuda.h>
+#include "kernel.h"
+#include "reference.h"
 
-// Includes, kernels
-#include "simpleAtomicIntrinsics_kernel.cuh"
-
-
-#define min(a,b) (a) < (b) ? (a) : (b)
-#define max(a,b) (a) > (b) ? (a) : (b)
-
-
-////////////////////////////////////////////////////////////////////////////////
-//! Compute reference data set
-//! Each element is multiplied with the number of threads / array length
-//! @param reference  reference data, computed but preallocated
-//! @param idata      input data as provided to device
-//! @param len        number of elements in reference / idata
-////////////////////////////////////////////////////////////////////////////////
-void
-computeGold(int *gpuData, const int len)
+template <class T>
+void testcase(const int repeat)
 {
-    int val = 0;
+  unsigned int len = 1 << 27;
+  unsigned int numThreads = 256;
+  unsigned int numBlocks = (len + numThreads - 1) / numThreads;
+  unsigned int numData = 7;
+  unsigned int memSize = sizeof(T) * numData;
+  T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255};
 
-    for (int i = 0; i < len; ++i)
-    {
-        val += 10;
-    }
+  // allocate device memory for result
+  T *dOData;
+  cudaMalloc((void **) &dOData, memSize);
 
-    if (val != gpuData[0])
-    {
-        printf("Add failed %d %d\n", val, gpuData[0]);
-    }
+  for (int i = 0; i < repeat; i++) {
+    // copy host memory to device to initialize to zero
+    cudaMemcpy(dOData, gpuData, memSize, cudaMemcpyHostToDevice);
 
-    val = 0;
+    // execute the kernel
+    testKernel<T><<<numBlocks, numThreads>>>(dOData);
+  }
 
-    for (int i = 0; i < len; ++i)
-    {
-        val -= 10;
-    }
+  //Copy result from device to host
+  cudaMemcpy(gpuData, dOData, memSize, cudaMemcpyDeviceToHost);
 
-    if (val != gpuData[1])
-    {
-        printf("Sub failed: %d %d\n", val, gpuData[1]);
-    }
+  computeGold<T>(gpuData, numThreads * numBlocks);
 
-    val = -(1<<8);
-
-    for (int i = 0; i < len; ++i)
-    {
-        val = max(val, i);
-    }
-
-    if (val != gpuData[2])
-    {
-        printf("Max failed: %d %d\n", val, gpuData[2]);
-    }
-
-    val = 1 << 8;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val = min(val, i);
-    }
-
-    if (val != gpuData[3])
-    {
-        printf("Min failed: %d %d\n", val, gpuData[3]);
-    }
-
-    val = 0xff;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val &= (2 * i + 7);
-    }
-
-    if (val != gpuData[4])
-    {
-        printf("And failed: %d %d\n", val, gpuData[4]);
-    }
-
-    val = 0;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val |= (1 << i);
-    }
-
-    if (val != gpuData[5])
-    {
-        printf("Or failed: %d %d\n", val, gpuData[5]);
-    }
-
-    val = 0xff;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val ^= i;
-    }
-
-    if (val != gpuData[6])
-    {
-        printf("Xor failed %d %d\n", val, gpuData[6]);
-    }
-
-    printf("PASS\n");
+  cudaFree(dOData);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
-    unsigned int len = 1 << 27;
-    unsigned int numThreads = 256;
-    unsigned int numBlocks = (len + numThreads - 1) / numThreads;
-    unsigned int numData = 7;
-    unsigned int memSize = sizeof(int) * numData;
-    int gpuData[] = {0, 0, -(1<<8), 1<<8, 0xff, 0, 0xff};
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
 
-    // allocate device memory for result
-    int *dOData;
-    cudaMalloc((void **) &dOData, memSize);
-
-    for (int i = 0; i < 1; i++) {
-      // copy host memory to device to initialize to zero
-      cudaMemcpy(dOData, gpuData, memSize, cudaMemcpyHostToDevice);
-
-      // execute the kernel
-      testKernel<<<numBlocks, numThreads>>>(dOData);
-    }
-
-    //Copy result from device to host
-    cudaMemcpy(gpuData, dOData, memSize, cudaMemcpyDeviceToHost);
-
-    computeGold(gpuData, numThreads * numBlocks);
-
-    cudaFree(dOData);
-    return 0;
+  const int repeat = atoi(argv[1]);
+  testcase<int>(repeat);
+  testcase<unsigned int>(repeat);
+  return 0;
 }

@@ -70,7 +70,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) output
 
 run: $(program)
 	./$(program) ../graphB+-cuda/graph.csv 10000 output

@@ -19,122 +19,62 @@
 #include <string.h>
 #include <math.h>
 #include "common.h"
+#include "reference.h"
 
+template <typename T>
+class test_atomics;
 
-
-#define min(a,b) (a) < (b) ? (a) : (b)
-#define max(a,b) (a) > (b) ? (a) : (b)
-
-
-////////////////////////////////////////////////////////////////////////////////
-//! Compute reference data set
-//! Each element is multiplied with the number of threads / array length
-//! @param reference  reference data, computed but preallocated
-//! @param idata      input data as provided to device
-//! @param len        number of elements in reference / idata
-////////////////////////////////////////////////////////////////////////////////
-void
-computeGold(int *gpuData, const int len)
-{
-    int val = 0;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val += 10;
-    }
-
-    if (val != gpuData[0])
-    {
-        printf("Add failed %d %d\n", val, gpuData[0]);
-    }
-
-    val = 0;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val -= 10;
-    }
-
-    if (val != gpuData[1])
-    {
-        printf("Sub failed: %d %d\n", val, gpuData[1]);
-    }
-
-    val = -(1<<8);
-
-    for (int i = 0; i < len; ++i)
-    {
-        // fourth element should be len-1
-        val = max(val, i);
-    }
-
-    if (val != gpuData[2])
-    {
-        printf("Max failed: %d %d\n", val, gpuData[2]);
-    }
-
-    val = 1 << 8;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val = min(val, i);
-    }
-
-    if (val != gpuData[3])
-    {
-        printf("Min failed: %d %d\n", val, gpuData[3]);
-    }
-
-    val = 0xff;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val &= (2 * i + 7);
-    }
-
-    if (val != gpuData[4])
-    {
-        printf("And failed: %d %d\n", val, gpuData[4]);
-    }
-
-    val = 0;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val |= (1 << i);
-    }
-
-    if (val != gpuData[5])
-    {
-        printf("Or failed: %d %d\n", val, gpuData[5]);
-    }
-
-    val = 0xff;
-
-    for (int i = 0; i < len; ++i)
-    {
-        val ^= i;
-    }
-
-    if (val != gpuData[6])
-    {
-        printf("Xor failed %d %d\n", val, gpuData[6]);
-    }
-
-    printf("PASS\n");
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char **argv)
+template <class T>
+void testcase(queue &q, const int repeat)
 {
   unsigned int len = 1 << 27;
   unsigned int localWorkSize = 256;
   unsigned int globalWorkSize = (len + localWorkSize - 1) /
                                 localWorkSize * localWorkSize;
   unsigned int numData = 7;
-  int gpuData[] = {0, 0, -(1<<8), 1<<8, 0xff, 0, 0xff};
+  T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255};
+
+  // allocate device memory for result
+  buffer<T, 1> dOData(numData);
+
+  range<1> gws (globalWorkSize);
+  range<1> lws (localWorkSize);
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](handler &h) {
+      auto d = dOData.template get_access<sycl_discard_write>(h);
+      h.copy(gpuData, d);
+    });
+
+    q.submit([&](handler &h) {
+      auto gpuData = dOData.template get_access<sycl_atomic>(h);
+      h.parallel_for<class test_atomics<T>>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        int i = item.get_global_id(0);
+        atomic_fetch_add(gpuData[0], (T)10);
+        atomic_fetch_sub(gpuData[1], (T)10);
+        atomic_fetch_max(gpuData[2], (T)i);
+        atomic_fetch_min(gpuData[3], (T)i);
+        atomic_fetch_and(gpuData[4], (T)(2*i+7));
+        atomic_fetch_or (gpuData[5], (T)(1<<i));
+        atomic_fetch_xor(gpuData[6], (T)i);
+      });
+    });
+  }
+
+  q.submit([&](handler &h) {
+    auto d = dOData.template get_access<sycl_read>(h);
+    h.copy(d, gpuData);
+  }).wait();
+
+  computeGold<T>(gpuData, globalWorkSize);
+}
+
+int main(int argc, char **argv)
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
 
 #ifdef USE_GPU 
   gpu_selector dev_sel;
@@ -143,38 +83,8 @@ int main(int argc, char **argv)
 #endif
   queue q(dev_sel);
 
-  // allocate device memory for result
-  buffer<int, 1> dOData(numData);
-
-  range<1> gws (globalWorkSize);
-  range<1> lws (localWorkSize);
-
-  for (int i = 0; i < 1; i++) {
-    q.submit([&](handler &h) {
-      auto d = dOData.get_access<sycl_discard_write>(h);
-      h.copy(gpuData, d);
-    });
-
-    q.submit([&](handler &h) {
-      auto gpuData = dOData.get_access<sycl_atomic>(h);
-      h.parallel_for<class test_atomics>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        int i = item.get_global_id(0);
-        atomic_fetch_add(gpuData[0], 10);
-        atomic_fetch_sub(gpuData[1], 10);
-        atomic_fetch_max(gpuData[2], i);
-        atomic_fetch_min(gpuData[3], i);
-        atomic_fetch_and(gpuData[4], 2*i+7);
-        atomic_fetch_or (gpuData[5], 1<<i);
-        atomic_fetch_xor(gpuData[6], i);
-      });
-    });
-  }
-
-  q.submit([&](handler &h) {
-    auto d = dOData.get_access<sycl_read>(h);
-    h.copy(d, gpuData);
-  }).wait();
-
-  computeGold(gpuData, globalWorkSize);
+  const int repeat = atoi(argv[1]);
+  testcase<int>(q, repeat);
+  testcase<unsigned int>(q, repeat);
   return 0;
 }
