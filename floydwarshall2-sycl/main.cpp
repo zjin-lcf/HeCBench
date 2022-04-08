@@ -75,7 +75,7 @@ static void init2(const ECLgraph g, mtype* const __restrict AdjMat, const int up
 static 
 void FW0_64(mtype* const __restrict AdjMat, const int upper, 
             mtype* const __restrict krows, mtype* const __restrict kcols,
-            sycl::nd_item<1> &item, mtype *temp, mtype *krow)
+            sycl::nd_item<1> &item, mtype *__restrict temp, mtype *__restrict krow)
 {
   const int warp_a = item.get_local_id(0) / ws; // i: 0-31, upper half
   const int warp_b = warp_a + ws; // i: 32-63, lower half
@@ -161,7 +161,7 @@ void FWrowcol_64(mtype* const __restrict AdjMat, const int upper,
     mtype* const __restrict krows,
     mtype* const __restrict kcols,
     const int x, const int subm1,
-    sycl::nd_item<1> &item, mtype *temp, mtype *krow)
+    sycl::nd_item<1> &item, mtype *__restrict temp, mtype *__restrict krow)
 {
 
   const int warp_a = item.get_local_id(0) / ws; // i: 0-31, upper half
@@ -319,7 +319,7 @@ static
 void FWrem_64(mtype* const __restrict AdjMat,
     const int upper, mtype* const __restrict krows,
     mtype* const __restrict kcols, const int x, const int subm1,
-    sycl::nd_item<1> &item, mtype *s_kj, mtype *s_ik)
+    sycl::nd_item<1> &item, mtype *__restrict s_kj, mtype *__restrict s_ik)
 {
   int y = item.get_group(0) / subm1;
   int z = item.get_group(0) % subm1;
@@ -500,7 +500,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
 
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for(sycl::nd_range<1>(init2_gws, lws), [=](sycl::nd_item<1> item) {
-        init2(d_g, d_AdjMat, upper, item);
+      init2(d_g, d_AdjMat, upper, item);
     });
   });
 
@@ -520,7 +520,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
                    sycl::access::target::local> krow(tile * tile, cgh);
 
     cgh.parallel_for(sycl::nd_range<1>(lws, lws),
-        [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+        [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
           FW0_64(d_AdjMat, upper, d_krows, d_kcols, item,
                  temp.get_pointer(), krow.get_pointer());
     });
@@ -529,6 +529,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
   if (sub > 1) {
     sycl::range<1> fw64_gws (2 * subm1 * ThreadsPerBlock);
     sycl::range<1> fw64r_gws (subm1 * subm1 * ThreadsPerBlock);
+
     for (int x = 0; x < sub; x++) {
       q.submit([&](sycl::handler &cgh) {
         sycl::accessor<mtype, 1, sycl::access_mode::read_write,
@@ -537,7 +538,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
                    sycl::access::target::local> krow(tile * tile, cgh);
 
         cgh.parallel_for(sycl::nd_range<1>(fw64_gws, lws),
-            [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
               FWrowcol_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
                           temp.get_pointer(),
                           krow.get_pointer());
@@ -552,7 +553,7 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
 
         cgh.parallel_for(
             sycl::nd_range<1>(fw64r_gws, lws),
-            [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
               FWrem_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
                        s_kj.get_pointer(), s_ik.get_pointer());
         });
@@ -628,6 +629,15 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  // allocation of matrices may fail on a host
+  mtype* AdjMat1 = NULL;
+  mtype* AdjMat2 = NULL;
+
+  // declare them before the goto statement
+  int upper_64;
+  int diffcount;
+  int gn;
+
   // read input
   ECLgraph g = readECLgraph(argv[1]);
   printf("input: %s\n", argv[1]);
@@ -635,6 +645,7 @@ int main(int argc, char* argv[])
   printf("edges: %d\n", g.edges);
   if (g.eweight == NULL) {
     fprintf(stderr, "ERROR: input graph has no edge weights\n\n");
+    goto DONE;
   }
 
   // make all weights positive to avoid negative cycles
@@ -645,17 +656,27 @@ int main(int argc, char* argv[])
   }
 
   // run on device
-  const int upper_64 = ((g.nodes + tile - 1) / tile) * tile;  // round up
-  mtype* const AdjMat1 = new mtype [upper_64 * upper_64];
+  upper_64 = ((g.nodes + tile - 1) / tile) * tile;  // round up
+  AdjMat1 = (mtype*) malloc (sizeof(mtype) * upper_64 * upper_64);
+  if (AdjMat1 == NULL) {
+    fprintf(stderr, "ERROR: memory allocation (AdjMat1) fails\n\n");
+    goto DONE;
+  }
+
   FW_gpu_64(g, AdjMat1);
 
   // run on host
-  mtype* const AdjMat2 = new mtype [g.nodes * g.nodes];
+  AdjMat2 = (mtype*) malloc (sizeof(mtype) * g.nodes * g.nodes);
+  if (AdjMat2 == NULL) {
+    fprintf(stderr, "ERROR: memory allocation (AdjMat2) fails\n\n");
+    goto DONE;
+  }
+
   FW_cpu(g, AdjMat2);
 
   // compare results
-  int diffcount = 0;
-  const int gn = g.nodes;
+  diffcount = 0;
+  gn = g.nodes;
   for (int i = 0; i < gn; ++i) {
     for (int j = 0; j < gn; ++j) {
       if (AdjMat1[i * upper_64 + j] != AdjMat2[i * g.nodes + j]) {
@@ -670,9 +691,10 @@ int main(int argc, char* argv[])
     printf("results match\n");
   }
 
+  DONE:
   // clean up
-  delete [] AdjMat1;
-  delete [] AdjMat2;
+  if (AdjMat1) free(AdjMat1);
+  if (AdjMat2) free(AdjMat2);
   freeECLgraph(g);
   return 0;
 }
