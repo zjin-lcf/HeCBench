@@ -14,37 +14,32 @@
 #ifndef _SIMPLEATOMICS_KERNEL_H_
 #define _SIMPLEATOMICS_KERNEL_H_
 
-////////////////////////////////////////////////////////////////////////////////
-//! Simple test kernel for atomic instructions
-//! @param g_idata  input data in global memory
-//! @param g_odata  output data in global memory
-////////////////////////////////////////////////////////////////////////////////
-__global__ void
-testKernel(int *g_odata)
+template <class T>
+__global__ void testKernel(T *g_odata)
 {
     // access thread id
-    const unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     // Atomic addition
-    atomicAdd(&g_odata[0], 10);
+    atomicAdd(&g_odata[0], (T)10);
 
     // Atomic subtraction (final should be 0)
-    atomicSub(&g_odata[1], 10);
+    atomicSub(&g_odata[1], (T)10);
 
     // Atomic maximum
-    atomicMax(&g_odata[2], tid);
+    atomicMax(&g_odata[2], (T)tid);
 
     // Atomic minimum
-    atomicMin(&g_odata[3], tid);
+    atomicMin(&g_odata[3], (T)tid);
 
     // Atomic AND
-    atomicAnd(&g_odata[4], 2*tid+7);
+    atomicAnd(&g_odata[4], (T)(2*tid+7));
 
     // Atomic OR
-    atomicOr(&g_odata[5], 1 << tid);
+    atomicOr(&g_odata[5], (T)(1 << tid));
 
     // Atomic XOR
-    atomicXor(&g_odata[6], tid);
+    atomicXor(&g_odata[6], (T)tid);
 }
 
 #endif // #ifndef _SIMPLEATOMICS_KERNEL_H_
