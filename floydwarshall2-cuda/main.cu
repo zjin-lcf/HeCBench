@@ -577,6 +577,15 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  // allocation of matrices may fail on a host
+  mtype* AdjMat1 = NULL;
+  mtype* AdjMat2 = NULL;
+
+  // declare them before the goto statement
+  int upper_64;
+  int diffcount;
+  int gn;
+
   // read input
   ECLgraph g = readECLgraph(argv[1]);
   printf("input: %s\n", argv[1]);
@@ -584,6 +593,7 @@ int main(int argc, char* argv[])
   printf("edges: %d\n", g.edges);
   if (g.eweight == NULL) {
     fprintf(stderr, "ERROR: input graph has no edge weights\n\n");
+    goto DONE;
   }
 
   // make all weights positive to avoid negative cycles
@@ -594,17 +604,27 @@ int main(int argc, char* argv[])
   }
 
   // run on device
-  const int upper_64 = ((g.nodes + tile - 1) / tile) * tile;  // round up
-  mtype* const AdjMat1 = new mtype [upper_64 * upper_64];
+  upper_64 = ((g.nodes + tile - 1) / tile) * tile;  // round up
+  AdjMat1 = (mtype*) malloc (sizeof(mtype) * upper_64 * upper_64);
+  if (AdjMat1 == NULL) {
+    fprintf(stderr, "ERROR: memory allocation (AdjMat1) fails\n\n");
+    goto DONE;
+  }
+    
   FW_gpu_64(g, AdjMat1);
 
   // run on host
-  mtype* const AdjMat2 = new mtype [g.nodes * g.nodes];
+  AdjMat2 = (mtype*) malloc (sizeof(mtype) * g.nodes * g.nodes);
+  if (AdjMat2 == NULL) {
+    fprintf(stderr, "ERROR: memory allocation (AdjMat2) fails\n\n");
+    goto DONE;
+  }
+
   FW_cpu(g, AdjMat2);
 
   // compare results
-  int diffcount = 0;
-  const int gn = g.nodes;
+  diffcount = 0;
+  gn = g.nodes;
   for (int i = 0; i < gn; ++i) {
     for (int j = 0; j < gn; ++j) {
       if (AdjMat1[i * upper_64 + j] != AdjMat2[i * g.nodes + j]) {
@@ -619,9 +639,10 @@ int main(int argc, char* argv[])
     printf("results match\n");
   }
 
+  DONE:
   // clean up
-  delete [] AdjMat1;
-  delete [] AdjMat2;
+  if (AdjMat1) free(AdjMat1);
+  if (AdjMat2) free(AdjMat2);
   freeECLgraph(g);
   return 0;
 }

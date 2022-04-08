@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -I../mis-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -73,4 +73,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../mis-cuda/internet.egr
+	./$(program) CollegeMsg.egr
+	#./$(program) soc-sign-bitcoin-alpha.egr
