@@ -40,11 +40,12 @@ of the IEEE International Conference on Cluster Computing, pp. 381-389.
 September 2015.
 */
 
-
 #include <cstdio>
 #include <cassert>
 #include <string>
 #include <sys/time.h>
+#include "utils.h"
+
 using std::string;
 
 #define TPB 1024  /* do not change */
@@ -350,20 +351,6 @@ void MPCdecompress(
   }
 }
 
-static long* readFile(const char name[], int &length)
-{
-  FILE *f = fopen(name, "rb");  assert(f != NULL);
-  fseek(f, 0, SEEK_END);
-  long long size = ftell(f);  assert(size > 0);
-  assert(size <= 2082408380);
-  assert((size % sizeof(long)) == 0);
-  size /= sizeof(long);
-  long* input = new long[size];
-  fseek(f, 0, SEEK_SET);
-  length = fread(input, sizeof(long), size, f);  assert(length == size);
-  fclose(f);
-  return input;
-}
 
 int main(int argc, char *argv[])
 {
@@ -383,7 +370,9 @@ int main(int argc, char *argv[])
   cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
   int dim, insize, outsize;
-  long* const input = readFile(argv[1], insize);
+
+  string name = argv[1];
+  long* const input = readFile(name.c_str(), insize);
 
   if (argc == 3) {
     dim = atoi(argv[2]);
@@ -396,8 +385,8 @@ int main(int argc, char *argv[])
   assert(0 < dim);  assert(dim <= 32);
   long* const output = new long[outsize];
 
-  long* d_in, * d_out;
-  int* d_offs;
+  long *d_in, *d_out;
+  int *d_offs;
   cudaMalloc(&d_in, insize * sizeof(long));
   cudaMalloc(&d_out, outsize * sizeof(long));
   cudaMalloc(&d_offs, blocks * sizeof(int));
@@ -422,12 +411,10 @@ int main(int argc, char *argv[])
     cudaMemcpy(output, d_out, outsize * sizeof(long), cudaMemcpyDeviceToHost);
     output[0] = (((long)insize) << 32) + (0x43504d00 - 1) + dim;
 
-    string name = argv[1];
     name += ".mpc";
-    FILE *f = fopen(name.c_str(), "wb");  assert(f != NULL);
-    int length = fwrite(output, sizeof(long), outsize, f);  assert(length == outsize);
-    fclose(f);
+
   } else {
+
     gettimeofday(&start, NULL);
     cudaMemset(d_offs, -1, blocks * sizeof(int));
     MPCdecompress<<<blocks, TPB>>>(d_in, d_out, d_offs);
@@ -440,12 +427,10 @@ int main(int argc, char *argv[])
     printf("decompression time: %.2f ms\n", 1000.0 * dtime);
     printf("decompression throughput: %.3f GB/s\n\n", 0.000000001 * sizeof(long) * outsize / dtime);
 
-    string name = argv[1];
     name += ".org";
-    FILE *f = fopen(name.c_str(), "wb");  assert(f != NULL);
-    int length = fwrite(output, sizeof(long), outsize, f);  assert(length == outsize);
-    fclose(f);
   }
+
+  writeFile(name.c_str(), output, outsize);
 
   delete [] output;
   delete [] input;
