@@ -37,9 +37,15 @@ int main(int argc, char* argv[])
 {
   unsigned long length = atol(argv[1]);
   unsigned long *data = NULL;
-  int* result = NULL;
-  posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
-  posix_memalign((void**)&result, 1024, length*sizeof(int));
+  int *result = NULL;
+  int s1 = posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
+  int s2 = posix_memalign((void**)&result, 1024, length*sizeof(int));
+  if (s1 != 0 || s2 != 0) {
+    printf("Error: posix_memalign fails\n");
+    if (s1 == 0) free(data);
+    if (s2 == 0) free(result);
+    return 1;
+  }
 
   // initialize input
   srand(2);
@@ -59,14 +65,14 @@ int main(int argc, char* argv[])
   buffer<unsigned long, 1> d_data (data, length);
   buffer<int, 1> d_result (length);
 
-  range<1> global_work_size ((length+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-  range<1> local_work_size (BLOCK_SIZE);
+  range<1> gws ((length+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  range<1> lws (BLOCK_SIZE);
 
   for (int n = 0; n < 100; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc1>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc1>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -83,8 +89,7 @@ int main(int argc, char* argv[])
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
   //========================================================================================
 
@@ -92,7 +97,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc2>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc2>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -106,8 +111,7 @@ int main(int argc, char* argv[])
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
   //========================================================================================
 
@@ -115,7 +119,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc3>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc3>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         char count;
@@ -128,8 +132,7 @@ int main(int argc, char* argv[])
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
   //========================================================================================
 
@@ -137,7 +140,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc4>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc4>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -154,8 +157,7 @@ int main(int argc, char* argv[])
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
   //========================================================================================
 
@@ -163,7 +165,7 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc5>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc5>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
         unsigned long x = data[i];
@@ -187,8 +189,7 @@ int main(int argc, char* argv[])
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
   //========================================================================================
 
@@ -197,18 +198,17 @@ int main(int argc, char* argv[])
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class pc6>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      h.parallel_for<class pc6>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i >= length) return;
-        r[i] = cl::sycl::popcount(data[i]);
+        r[i] = sycl::popcount(data[i]);
       });
     });
   }
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
-  });
-  q.wait();
+  }).wait();
   checkResults(data, result, length);
 
   free(data);

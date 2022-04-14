@@ -36,9 +36,15 @@ int main(int argc, char* argv[])
 {
   unsigned long length = atol(argv[1]);
   unsigned long *data = NULL;
-  int* result = NULL;
-  posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
-  posix_memalign((void**)&result, 1024, length*sizeof(int));
+  int *result = NULL;
+  int s1 = posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
+  int s2 = posix_memalign((void**)&result, 1024, length*sizeof(int));
+  if (s1 != 0 || s2 != 0) {
+    printf("Error: posix_memalign fails\n");
+    if (s1 == 0) free(data);
+    if (s2 == 0) free(result);
+    return 1;
+  }
 
   // initialize input
   srand(2);
