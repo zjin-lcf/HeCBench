@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <random>
 
+#include <cuda.h>
 #include "src/bb_segsort.cuh"
 #include "src/bb_segsort_keys.cuh"
 
