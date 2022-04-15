@@ -110,7 +110,7 @@ void FW0_64(
   mtype ij_ba = AdjMat[idx0_ba];
   mtype ij_bb = AdjMat[idx0_bb];
 
-  # pragma unroll 64
+  #pragma unroll 64
   for (int k = 0; k < tile; k++) {
     if (warp_a == k) krow[idx2_a] = ij_aa;
     if (warp_a == k) krow[idx2_b] = ij_ab;
@@ -501,6 +501,7 @@ static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
 
   // compute 64*64 tile
   FW0_64<<<1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols);
+
   if (sub > 1) {
     for (int x = 0; x < sub; x++) {
       FWrowcol_64<<<2 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
