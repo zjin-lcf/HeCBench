@@ -49,6 +49,7 @@ int word_count(const std::vector<char> &input)
   if (input.empty()) return 0;
 
   // compute the number characters that start a new word
+  // https://github.com/oneapi-src/oneDPL/issues/570
   int wc = oneapi::dpl::transform_reduce(
            oneapi::dpl::execution::dpcpp_default,
            input.cbegin(), input.cend() - 1, // sequence of left characters
