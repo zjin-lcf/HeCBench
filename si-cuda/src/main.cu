@@ -70,7 +70,6 @@ int main(int argc, char** argv) {
         d->universe++;
         partition = std::min(d->cardinality, partition);
 
-
         d->offsets = new unsigned int[d->cardinality];
 
         // calculate offsets
@@ -104,7 +103,6 @@ int main(int argc, char** argv) {
             fmt::print("Error not enough GPU memory ({})!\nExiting...", formatBytes(freeDeviceMemory));
             return 1;
         }
-
 
         std::vector<float> counts(runs.size() * combinations);
         float* hostInput = new float[d->universe * partition];
@@ -178,6 +176,11 @@ int main(int argc, char** argv) {
             writeResult<float, true>(runs, partition, counts, output);
             fmt::print("Finished\n");
         }
+
+        delete [] hostInput; 
+        delete [] hostInvInput; 
+        delete [] d->offsets; 
+
     } catch (const cxxopts::OptionException& e) {
         fmt::print("{}\n", e.what());
         return 1;
