@@ -900,6 +900,9 @@ Early results are shown [here](results/README.md)
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
+### wordcount (cuda)
+  Count the number of words in a text (https://github.com/NVIDIA/thrust/blob/main/examples/)
+
 ### wsm5 (cuda)
   WRF Single Moment 5-tracer (https://www2.mmm.ucar.edu/wrf/WG2/GPU/WSM5.htm)
 
