@@ -780,6 +780,9 @@ Early results are shown [here](results/README.md)
 ### shuffle (hip)
   Shuffle instructions with subgroup sizes of 8, 16, and 32 (https://github.com/cpc/hipcl/tree/master/samples/4_shfl)
 
+### si (cuda)
+  Set intersection with matrix multiply (https://github.com/chribell/set_intersection)
+
 ### simplemoc (opencl)
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
 
