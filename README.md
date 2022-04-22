@@ -554,6 +554,9 @@ Early results are shown [here](results/README.md)
 ### medianfilter (opencl)
   Two-dimensional 3x3 median filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
+### merkle (sycl)
+  Merkle tree construction using rescue prime hash (https://github.com/itzmeanjan/ff-gpu)
+  
 ### memcpy (cuda)
   A benchmark for memory copy from a host to a device
 
