@@ -611,6 +611,9 @@ Early results are shown [here](results/README.md)
 ### mr (c)
   The Miller-Rabin primality test (https://github.com/wizykowski/miller-rabin)
 
+### mriQ (cuda)
+  Computation of a matrix Q used in a 3D magnetic resonance image reconstruction (https://github.com/abduld/Parboil/blob/master/benchmarks/mri-q/DESCRIPTION)
+
 ### mt (opencl)
   Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
