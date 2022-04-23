@@ -303,7 +303,7 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
 __global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
 {
 
-  __device__ __shared__ float s_fluxQ[p_Nfields*p_Nfp*p_Nfaces];
+  __shared__ float s_fluxQ[p_Nfields*p_Nfp*p_Nfaces];
 
   const int n = threadIdx.x;
   const int k = blockIdx.x;
