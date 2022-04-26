@@ -1,7 +1,9 @@
 
 #include "fem.h"
 
-void StartUp3d(Mesh *mesh){
+void BuildMaps3d(Mesh *mesh);
+
+void StartUp3d(Mesh *mesh) {
 
 #if p_N==1
 #include "data3dN01.h"
@@ -117,7 +119,5 @@ void StartUp3d(Mesh *mesh){
   }
   
   /* build node-node connectivity maps */
-  void BuildMaps3d(Mesh *mesh);
   BuildMaps3d(mesh);
-
 }
