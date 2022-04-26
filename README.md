@@ -458,6 +458,9 @@ Early results are shown [here](results/README.md)
 ### knn (cuda)
   K-nearest neighbor (https://github.com/OSU-STARLAB/UVM_benchmark/blob/master/non_UVM_benchmarks)
 
+### kurtosis (cuda)
+  Compute the kurtosis of two variables (https://github.com/d-d-j/ddj_store)
+
 ### lanczos (cuda)
   Lanczos tridiagonalization (https://github.com/linhr/15618)
 
