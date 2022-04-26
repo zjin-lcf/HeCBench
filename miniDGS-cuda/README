@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------
-# see the copyright information for MIDG in license.midg
+# see the copyright information for MIDG in LICENSE
 # MIDG: a MIni Discontinuous Galerkin solver for CPUs or GPUS with MPI parallelism
 # Copyright (c) 2008, Tim Warburton
 # http://www.nudg.org
