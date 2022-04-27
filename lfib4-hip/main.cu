@@ -68,7 +68,6 @@ __global__ void colYGPU(uint32_t *y, int s) {
   y[2 * P4 + myid] = cy[2 * P4 + myid];
   y[P4 + myid] = cy[P4 + myid];
   y[myid] = cy[myid];
-  __syncthreads();
 }
 
 __global__ void lastEntGPU(uint32_t *__restrict__ x, uint32_t *__restrict__ y, int s, int r) {
@@ -225,36 +224,35 @@ int main(int argc, char**argv) {
 
   srand(1234);
   uint32_t *x = (uint32_t*) malloc(n * sizeof(uint32_t));
+  uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
+
   for (uint32_t k = 0; k < P4; k++)
-    x[k] = rand();
+    x[k] = z[k] = rand();
 
   printf("Timing results (without 2x hipMemcpy()):\n");
 
-  double t0 = omp_get_wtime();
+  double host_time = omp_get_wtime();
 
   LFIB4(n, x);
 
-  t0 = omp_get_wtime() - t0;
+  host_time = omp_get_wtime() - host_time;
 
-  printf("vectorized Marsa-LFIB4 on the host, time= %lf\n", t0);
+  printf("vectorized Marsa-LFIB4 on the host, time = %lf\n", host_time);
 
   uint32_t *x_d;
   hipMalloc((void **) &x_d, sizeof(uint32_t) * r * s);
 
-  srand(1234);
-  uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
-  for (uint32_t k = 0; k < P4; k++) z[k] = rand();
-
-  double t = omp_get_wtime();
+  double device_time = omp_get_wtime();
 
   gLFIB4(n, x_d, s, r, z);
 
-  t = omp_get_wtime() - t;
+  device_time = omp_get_wtime() - device_time;
 
+  printf("parallel Marsa-LFIB4 on the device, time = %lf\n", device_time);
+  printf("speedup = %6.2lf\n", host_time / device_time);
+
+  // Verify
   hipMemcpy(z, x_d, sizeof(uint32_t) * n, hipMemcpyDeviceToHost);
-
-  printf("parallel Marsa-LFIB4 on the device, time= %lf\n", t);
-  printf("speedup= %6.2lf\n", t0/t);
 
   bool ok = true;
   for (uint32_t i = 0; i < n; i++) {
@@ -266,8 +264,8 @@ int main(int argc, char**argv) {
   printf("%s\n", ok ? "PASS" : "FAIL");
 
   hipFree(x_d);
-  free(z);
   free(x);
+  free(z);
 
   return 0;
 }
