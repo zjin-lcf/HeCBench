@@ -39,6 +39,9 @@ Early results are shown [here](results/README.md)
 ### affine (opencl)
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
 
+### agsg (cuda)
+  Accelerated gSLIC for superpixel generation used in object segmentation (https://vgg.fiit.stuba.sk/2015-10/accelerated-gslic-for-superpixel-generation-used-in-object-segmentation/)
+
 ### aidw (cuda)
   Adaptive inverse distance weighting (Mei, G., Xu, N. & Xu, L. Improving GPU-accelerated adaptive IDW interpolation algorithm using fast kNN search. SpringerPlus 5, 1389 (2016))
 
