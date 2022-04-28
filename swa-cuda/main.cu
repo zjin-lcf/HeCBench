@@ -25,7 +25,7 @@
 
 __global__ void atomicKernel(int *atom_arr)
 {
-  unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
   for (int i=0; i < LOOP_NUM; i++)
   {
