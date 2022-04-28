@@ -1,0 +1,4 @@
+Limitation
+
+The device supports a work-group size of 512; otherwise invalid workgroup size will be reported by the runtime.
+The problem size may need to be adjusted to avoid invalid memory allocation.
