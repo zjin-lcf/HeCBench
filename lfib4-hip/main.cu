@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <omp.h>
 #include <hip/hip_runtime.h>
+#include <chrono>
 
 #define P1 55
 #define P2 119
@@ -13,7 +13,6 @@
 typedef unsigned int uint32_t;
 
 void LFIB4(uint32_t n, uint32_t *x) {
-  #pragma omp simd safelen(32)
   for (uint32_t k = P4; k < n; k++) {
     x[k] = x[k - P1] + x[k - P2] + x[k - P3] + x[k - P4];
   }
@@ -205,67 +204,66 @@ void gLFIB4(uint32_t n, uint32_t *x, int s, int r, uint32_t *seed) {
 }
 
 int main(int argc, char**argv) {
-  if (argc < 4) {
-    printf("Usage: ./main <n> <s> <r>\n");
+
+  if (argc < 1) {
+    printf("Usage: ./main <n>\n");
     return 1;
   }
 
   uint32_t n = atoi(argv[1]);
-  uint32_t s = atoi(argv[2]);
-  uint32_t r = atoi(argv[3]);
-
-  if (s == 0) {
-    s = n / r;
-    s -= (s % 256 == 0 ? 0 : s % 256);
-    while (s * r < n) r++;
-  }
-
-  printf("n=%d r=%d s=%d\n", n, r, s);
 
   srand(1234);
   uint32_t *x = (uint32_t*) malloc(n * sizeof(uint32_t));
-  uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
 
-  for (uint32_t k = 0; k < P4; k++)
-    x[k] = z[k] = rand();
+  for (uint32_t r = 16; r <= 4096; r = r * 2) {
 
-  printf("Timing results (without 2x hipMemcpy()):\n");
+    uint32_t s = 0;
 
-  double host_time = omp_get_wtime();
-
-  LFIB4(n, x);
-
-  host_time = omp_get_wtime() - host_time;
-
-  printf("vectorized Marsa-LFIB4 on the host, time = %lf\n", host_time);
-
-  uint32_t *x_d;
-  hipMalloc((void **) &x_d, sizeof(uint32_t) * r * s);
-
-  double device_time = omp_get_wtime();
-
-  gLFIB4(n, x_d, s, r, z);
-
-  device_time = omp_get_wtime() - device_time;
-
-  printf("parallel Marsa-LFIB4 on the device, time = %lf\n", device_time);
-  printf("speedup = %6.2lf\n", host_time / device_time);
-
-  // Verify
-  hipMemcpy(z, x_d, sizeof(uint32_t) * n, hipMemcpyDeviceToHost);
-
-  bool ok = true;
-  for (uint32_t i = 0; i < n; i++) {
-    if (x[i] != z[i]) {
-      ok = false;
-      break;
+    if (s == 0) {
+      s = n / r;
+      s -= (s % 256 == 0 ? 0 : s % 256);
+      while (s * r < n) r++;
     }
+
+    printf("n=%d r=%d s=%d\n", n, r, s);
+
+    uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
+
+    for (uint32_t k = 0; k < P4; k++) x[k] = z[k] = rand();
+
+    // compute on the host
+    auto start = std::chrono::steady_clock::now();
+    LFIB4(n, x);
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> host_time = end - start;
+
+    // compute on the device
+    uint32_t *x_d;
+    hipMalloc((void **) &x_d, sizeof(uint32_t) * r * s);
+
+    start = std::chrono::steady_clock::now();
+    gLFIB4(n, x_d, s, r, z);
+    end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> device_time = end - start;
+    printf("r = %d | host time = %lf | device time = %lf | speedup = %.1f ",
+        r, host_time.count(), device_time.count(), host_time.count() / device_time.count());
+
+    // Verify
+    hipMemcpy(z, x_d, sizeof(uint32_t) * n, hipMemcpyDeviceToHost);
+
+    bool ok = true;
+    for (uint32_t i = 0; i < n; i++) {
+      if (x[i] != z[i]) {
+        ok = false;
+        break;
+      }
+    }
+    printf("check = %s\n", ok ? "PASS" : "FAIL");
+
+    free(z);
+    hipFree(x_d);
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
 
-  hipFree(x_d);
   free(x);
-  free(z);
-
   return 0;
 }

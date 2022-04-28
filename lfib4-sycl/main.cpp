@@ -288,8 +288,8 @@ int main(int argc, char **argv) {
     gLFIB4(q, n, x_d, s, r, z);
     end = std::chrono::steady_clock::now();
     std::chrono::duration<float> device_time = end - start;
-    printf("r = %d time = %lf speedup = %.1f ",
-      r, device_time.count(), host_time.count() / device_time.count());
+    printf("r = %d | host time = %lf | device time = %lf | speedup = %.1f ",
+      r, host_time.count(), device_time.count(), host_time.count() / device_time.count());
 
     // verify
     q.memcpy(z, x_d, sizeof(uint32_t) * n).wait();
