@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <omp.h>
+#include <stdlib.h>
 #include <CL/sycl.hpp>
 
 #define P1 55
@@ -249,63 +249,64 @@ int main(int argc, char **argv) {
 #endif
   sycl::queue q(dev_sel);
 
-  if (argc < 4) {
-    printf("Usage: ./main <n> <s> <r>\n");
+  if (argc < 1) {
+    printf("Usage: ./main <n>\n");
     return 1;
   }
 
   uint32_t n = atoi(argv[1]);
-  uint32_t s = atoi(argv[2]);
-  uint32_t r = atoi(argv[3]);
-
-  if (s == 0) {
-    s = n / r;
-    s -= (s % 256 == 0 ? 0 : s % 256);
-    while (s * r < n) r++;
-  }
-
-  printf("n=%d r=%d s=%d\n", n, r, s);
 
   srand(1234);
   uint32_t *x = (uint32_t*) malloc(n * sizeof(uint32_t));
-  uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
-  for (uint32_t k = 0; k < P4; k++)
-    x[k] = z[k] = rand();
 
-  printf("Timing results (without 2x cudaMemcpy()):\n");
+  for (uint32_t r = 16; r <= 4096; r = r * 2) {
 
-  double host_time = omp_get_wtime();
+    uint32_t s = 0;
 
-  LFIB4(n, x);
-
-  host_time = omp_get_wtime() - host_time;
-
-  printf("vectorized Marsa-LFIB4 on the host, time = %lf\n", host_time);
-
-  uint32_t *x_d = sycl::malloc_device<uint32_t>(r * s, q);
-
-  double device_time = omp_get_wtime();
-
-  gLFIB4(q, n, x_d, s, r, z);
-
-  device_time = omp_get_wtime() - device_time;
-
-  q.memcpy(z, x_d, sizeof(uint32_t) * n).wait();
-
-  printf("parallel Marsa-LFIB4 on the device, time = %lf\n", device_time);
-  printf("speedup = %6.2lf\n", host_time / device_time);
-
-  bool ok = true;
-  for (uint32_t i = 0; i < n; i++) {
-    if (x[i] != z[i]) {
-      ok = false;
-      break;
+    if (s == 0) {
+      s = n / r;
+      s -= (s % 256 == 0 ? 0 : s % 256);
+      while (s * r < n) r++;
     }
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
 
-  sycl::free(x_d, q);
+    printf("n=%d r=%d s=%d\n", n, r, s);
+
+    uint32_t *z = (uint32_t*) malloc(r * s * sizeof(uint32_t));
+
+    for (uint32_t k = 0; k < P4; k++) x[k] = z[k] = rand();
+
+    // compute on the host
+    auto start = std::chrono::steady_clock::now();
+    LFIB4(n, x);
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> host_time = end - start;
+
+    // compute on the device
+    uint32_t *x_d = sycl::malloc_device<uint32_t>(r * s, q);
+
+    start = std::chrono::steady_clock::now();
+    gLFIB4(q, n, x_d, s, r, z);
+    end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> device_time = end - start;
+    printf("r = %d time = %lf speedup = %.1f ",
+      r, device_time.count(), host_time.count() / device_time.count());
+
+    // verify
+    q.memcpy(z, x_d, sizeof(uint32_t) * n).wait();
+
+    bool ok = true;
+    for (uint32_t i = 0; i < n; i++) {
+      if (x[i] != z[i]) {
+        ok = false;
+        break;
+      }
+    }
+    printf("check = %s\n", ok ? "PASS" : "FAIL");
+
+    free(z);
+    sycl::free(x_d, q);
+  }
+
   free(x);
-  free(z);
   return 0;
 }
