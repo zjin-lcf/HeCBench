@@ -494,6 +494,9 @@ Early results are shown [here](results/README.md)
 ### leukocyte  (opencl)
   Leukocyte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### lfib4 (cuda)
+  Marsa-LFIB4 pseudorandom number generator (https://bitbucket.org/przemstp/gpu-marsa-lfib4/src/master/)
+
 ### libor (cuda)
   A LIBOR market model Monte Carlo application (https://people.maths.ox.ac.uk/~gilesm/cuda_old.html)
 
