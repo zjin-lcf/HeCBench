@@ -551,6 +551,9 @@ Early results are shown [here](results/README.md)
 ### mcmd (cuda)
   Monte Carlo and Molecular Dynamics Simulation Package (https://github.com/khavernathy/mcmd)
 
+### mcpr (cuda)
+  Multi-category probit regression (https://github.com/berkeley-scf/gpu-workshop-2016)
+
 ### md (opencl)
   Molecular dynamics function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
