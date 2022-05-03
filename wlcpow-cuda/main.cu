@@ -162,7 +162,7 @@ int main(int argc, char* argv[]) {
   float3 period = {0.5f, 0.5f, 0.5f};
   int padding = 1;
   int n_type = 32;
-  int n = 100;  // problem size
+  int n = 1e6;  // problem size
 
   float4 *coord_merged = resize<float4>(n+1);
   float4 *veloc = resize<float4>(n+1);
@@ -199,22 +199,15 @@ int main(int argc, char* argv[]) {
 
   for (i = 0; i < n + 1; i++) {
     nbond[i] = dist_i32(g);
-  }
-
-  for (i = 0; i < n + 1; i++) {
     coord_merged[i] = {dist_r32(g), dist_r32(g), dist_r32(g), 0};
     r32 vx = dist_r32(g), vy = dist_r32(g), vz = dist_r32(g);
     veloc[i] = {vx, vy, vz, sqrtf(vx*vx+vy*vy+vz*vz)};
-
     bond_l0[i] = dist_r32(g);
     gamt[i] = dist_r32(g);
     gamc[i] = ((dist_i32(g) % 4) + 4) * gamt[i]; // gamt[i] <= 3.0*gamc[i]
     temp[i] = dist_r32(g);
     mu_targ[i] = dist_r32(g);
     qp[i] = dist_r32(g);
-  }
-
-  for (i = 0; i < n + 1; i++) {
     sigc[i] = sqrt(2.0*temp[i]*(3.0*gamc[i]-gamt[i]));
     sigt[i] = 2.0*sqrt(gamt[i]*temp[i]);
   }
@@ -255,7 +248,7 @@ int main(int argc, char* argv[]) {
   upload (dev_sigc, sigc, n+1);
   upload (dev_sigt, sigt, n+1);
 
-  dim3 grids (ceil(n/128));
+  dim3 grids ((n+127)/128);
   dim3 blocks (128);
 
   const int sm_size = (n_type+1) * 8 * sizeof(r32);
