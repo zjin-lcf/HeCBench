@@ -921,6 +921,9 @@ Early results are shown [here](results/README.md)
 ### winograd (cuda)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
+### wlcpow (cuda)
+  Compute spring forces in a worm-like chain model with a power function (https://github.com/AnselGitAccount/USERMESO-2.0)
+
 ### wordcount (cuda)
   Count the number of words in a text (https://github.com/NVIDIA/thrust/blob/main/examples/)
 
