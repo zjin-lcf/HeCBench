@@ -61,6 +61,7 @@ void bond_wlcpowallvisc(
 
       for( int i = blockIdx_x * blocks + threadIdx_x;
                i < n_local ; i += teams * blocks ) {
+
         int n = nbond[i];
         float4 coord1 = coord_merged[i];
         float4 veloc1 = veloc[i];
@@ -200,9 +201,6 @@ int main(int argc, char* argv[]) {
     temp[i] = dist_r32(g);
     mu_targ[i] = dist_r32(g);
     qp[i] = dist_r32(g);
-  }
-
-  for (i = 0; i < n + 1; i++) {
     sigc[i] = sqrt(2.0*temp[i]*(3.0*gamc[i]-gamt[i]));
     sigt[i] = 2.0*sqrt(gamt[i]*temp[i]);
   }
@@ -213,7 +211,8 @@ int main(int argc, char* argv[]) {
            nbond[0:n+1], \
            bonds[0:n+n+1], \
            bond_r0[0:n+n+1], \
-           bond_l0[0:n+n+1], \
+           bond_l0[0:n+1], \
+           temp[0:n+1], \
            mu_targ[0:n+1], \
            qp[0:n+1], \
            gamc[0:n+1], \
