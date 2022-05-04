@@ -565,19 +565,6 @@ void RCBForceTree<TDPTS>::printStats(double buildTime)
   unsigned long localMaxPPN = maxPPN;
   double localBuildTime = buildTime;
 
-  /*
-  double globalParticleCount;
-  double globalTreeSize;
-  double globalTreeCapacity;
-  double globalLeaves;
-  double globalEmptyLeaves;
-  double globalMeanPPN;
-  unsigned long globalMaxPPN;
-  double globalBuildTime;
-
-  bool printHere = true;
-  */
-
   if ( Partition::getMyProc() == 0 ) {
     printf("\ttree post-build statistics (local for rank 0):\n");
     printf("\t\tparticles: %.2f\n", localParticleCount);
@@ -588,10 +575,45 @@ void RCBForceTree<TDPTS>::printStats(double buildTime)
   }
 }
 
+void cm( ID_T count,
+    const POSVEL_T *xx, 
+    const POSVEL_T *yy,
+    const POSVEL_T *zz,
+    const POSVEL_T *mass,
+    POSVEL_T *xmin,
+    POSVEL_T *xmax,
+    POSVEL_T *xc)
+{
+  // xmin/xmax are currently set to the whole bounding box, but this is too conservative, so we'll
+  // set them based on the actual particle content.
 
-extern "C" void cm(ID_T count, const POSVEL_T*  xx, const POSVEL_T*  yy,
-        const POSVEL_T*  zz, const POSVEL_T*  mass,
-        POSVEL_T*  xmin, POSVEL_T*  xmax, POSVEL_T*  xc);
+  double x = 0, y = 0, z = 0, m = 0;
+
+  for (ID_T i = 0; i < count; ++i) {
+    if (i == 0) {
+      xmin[0] = xmax[0] = xx[0];
+      xmin[1] = xmax[1] = yy[0];
+      xmin[2] = xmax[2] = zz[0];
+    } else {
+      xmin[0] = fminf(xmin[0], xx[i]);
+      xmax[0] = fmaxf(xmax[0], xx[i]);
+      xmin[1] = fminf(xmin[1], yy[i]);
+      xmax[1] = fmaxf(xmax[1], yy[i]);
+      xmin[2] = fminf(xmin[2], zz[i]);
+      xmax[2] = fmaxf(xmax[2], zz[i]);
+    }
+
+    POSVEL_T w = mass[i];
+    x += w*xx[i];
+    y += w*yy[i];
+    z += w*zz[i];
+    m += w;
+  }
+
+  xc[0] = (POSVEL_T) (x/m);
+  xc[1] = (POSVEL_T) (y/m);
+  xc[2] = (POSVEL_T) (z/m);
+}
 
 static inline POSVEL_T pptdr(const POSVEL_T*  xmin, const POSVEL_T*  xmax, const POSVEL_T*  xc)
 {
@@ -787,14 +809,14 @@ inline void applyForce(int i, int bounds, POSVEL_T fcoeff,
 //Tell the compiler how many blocks we expect to be active.
 //This gives the compiler a better idea of how many registers to use.  The second number is tunable.
 
-void Step10_cuda_kernel(int count, int count1,
-                        const POSVEL_T*__restrict  xx, const POSVEL_T* __restrict yy,
-                        const POSVEL_T*__restrict  zz, const POSVEL_T* __restrict mass,
-                        const POSVEL_T*__restrict  xx1, const POSVEL_T*__restrict  yy1,
-                        const POSVEL_T*__restrict  zz1, const POSVEL_T*__restrict  mass1,
-                        POSVEL_T*__restrict  vx, POSVEL_T*__restrict  vy, POSVEL_T*__restrict  vz,
-                        POSVEL_T fsrrmax2, POSVEL_T mp_rsm2, POSVEL_T fcoeff,
-                        sycl::nd_item<2> &item)
+void Step10_kernel(int count, int count1,
+                   const POSVEL_T*__restrict  xx, const POSVEL_T* __restrict yy,
+                   const POSVEL_T*__restrict  zz, const POSVEL_T* __restrict mass,
+                   const POSVEL_T*__restrict  xx1, const POSVEL_T*__restrict  yy1,
+                   const POSVEL_T*__restrict  zz1, const POSVEL_T*__restrict  mass1,
+                   POSVEL_T*__restrict  vx, POSVEL_T*__restrict  vy, POSVEL_T*__restrict  vz,
+                   POSVEL_T fsrrmax2, POSVEL_T mp_rsm2, POSVEL_T fcoeff,
+                   sycl::nd_item<2> &item)
 {
   const POSVEL_T ma0 = 0.269327, ma1 = -0.0750978, ma2 = 0.0114808, ma3 = -0.00109313, ma4 = 0.0000605491, ma5 = -0.00000147177;
 
@@ -939,14 +961,13 @@ static inline void nbody1(ID_T count, ID_T count1, const POSVEL_T *xx,
   int blocksX = (count1 + threads[1] - 1) / threads[1];
   int blocksY = (count + threads[0] - 1) / threads[0];
   sycl::range<2> blocks(std::min(blocksY, MAXY), std::min(blocksX, MAXX));
-
   sycl::range<2> gws (blocks * threads);
 
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for(sycl::nd_range<2>(gws, threads),
       [=](sycl::nd_item<2> item) [[sycl::reqd_sub_group_size(32)]] {
-        Step10_cuda_kernel(count, count1, xx, yy, zz, mass, xx1, yy1, zz1,
-                           mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff, item);
+        Step10_kernel(count, count1, xx, yy, zz, mass, xx1, yy1, zz1,
+                      mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff, item);
     });
   }).wait();
 
