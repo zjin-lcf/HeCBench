@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <random>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "utils.h"
 
 __global__ 
@@ -128,23 +128,23 @@ T* resize (int n) {
 template <typename T>
 T* grow (int n) {
   T* p;
-  cudaMalloc((void**)&p, sizeof(T) * n);
+  hipMalloc((void**)&p, sizeof(T) * n);
   return p;
 }
 
 template <typename T>
 void upload(T* d, T* h, int n) {
-  cudaMemcpy(d, h, sizeof(T) * n, cudaMemcpyHostToDevice); 
+  hipMemcpy(d, h, sizeof(T) * n, hipMemcpyHostToDevice); 
 }
 
 template <typename T>
 void reset(T* d, int n) {
-  cudaMemset(d, (T)0, sizeof(T) * n);
+  hipMemset(d, (T)0, sizeof(T) * n);
 }
 
 template <typename T>
 void download(T* h, T* d, int n) {
-  cudaMemcpy(h, d, sizeof(T) * n, cudaMemcpyDeviceToHost); 
+  hipMemcpy(h, d, sizeof(T) * n, hipMemcpyDeviceToHost); 
 }
 
 int main(int argc, char* argv[]) {
@@ -255,7 +255,7 @@ int main(int argc, char* argv[]) {
 
   // note the outputs are not reset for each run
   for (i = 0; i < repeat; i++) {
-    bond_wlcpowallvisc <<<grids, blocks, sm_size, 0>>> (
+    hipLaunchKernelGGL(bond_wlcpowallvisc, grids, blocks, sm_size, 0, 
       dev_force_x,
       dev_force_y,
       dev_force_z,
@@ -321,21 +321,21 @@ int main(int argc, char* argv[]) {
   free(sigc);
   free(sigt);
 
-  cudaFree(dev_coord_merged);
-  cudaFree(dev_veloc);
-  cudaFree(dev_force_x);
-  cudaFree(dev_force_y);
-  cudaFree(dev_force_z);
-  cudaFree(dev_nbond);
-  cudaFree(dev_bonds);
-  cudaFree(dev_bond_r0);
-  cudaFree(dev_bond_l0);
-  cudaFree(dev_temp);
-  cudaFree(dev_mu_targ);
-  cudaFree(dev_qp);
-  cudaFree(dev_gamc);
-  cudaFree(dev_gamt);
-  cudaFree(dev_sigc);
-  cudaFree(dev_sigt);
+  hipFree(dev_coord_merged);
+  hipFree(dev_veloc);
+  hipFree(dev_force_x);
+  hipFree(dev_force_y);
+  hipFree(dev_force_z);
+  hipFree(dev_nbond);
+  hipFree(dev_bonds);
+  hipFree(dev_bond_r0);
+  hipFree(dev_bond_l0);
+  hipFree(dev_temp);
+  hipFree(dev_mu_targ);
+  hipFree(dev_qp);
+  hipFree(dev_gamc);
+  hipFree(dev_gamt);
+  hipFree(dev_sigc);
+  hipFree(dev_sigt);
   return 0;
 }
