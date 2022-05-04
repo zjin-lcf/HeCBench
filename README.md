@@ -69,6 +69,9 @@ Early results are shown [here](results/README.md)
 ### asta (cuda)
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
 
+### atomicAggreate (cuda)
+  Atomic aggregate (https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/) 
+
 ### atomicIntrinsics (cuda)
   Atomic add, subtract, min, max, AND, OR, XOR (http://docs.nvidia.com/cuda/cuda-samples/index.html)
 
