@@ -804,7 +804,7 @@ void applyForce(int i, int bounds,POSVEL_T fcoeff,
   //This gives the compiler a better idea of how many registers to use.  The second number is tunable.
 __launch_bounds__(BLOCKX*BLOCKY,7)
 __global__
-void Step10_cuda_kernel(int count, int count1,
+void Step10_kernel(int count, int count1,
                         const POSVEL_T*  xx, const POSVEL_T*  yy,
                         const POSVEL_T*  zz, const POSVEL_T*  mass,
                         const POSVEL_T*  xx1, const POSVEL_T*  yy1,
@@ -952,7 +952,8 @@ static inline void nbody1(ID_T count, ID_T count1, const POSVEL_T*  xx, const PO
   cudaCheckError();
 
   //call kernel
-  Step10_cuda_kernel <<< dim3(blocks), dim3(threads), 0, stream >>> (count,count1,xx,yy,zz,mass,xx1,yy1,zz1,mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff);
+  Step10_kernel <<< dim3(blocks), dim3(threads), 0, stream >>> (
+    count,count1,xx,yy,zz,mass,xx1,yy1,zz1,mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff);
   cudaCheckError();
 
   cudaStreamSynchronize(stream);

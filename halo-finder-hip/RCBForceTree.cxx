@@ -804,13 +804,13 @@ void applyForce(int i, int bounds,POSVEL_T fcoeff,
   //This gives the compiler a better idea of how many registers to use.  The second number is tunable.
 __launch_bounds__(BLOCKX*BLOCKY,7)
 __global__
-void Step10_hip_kernel(int count, int count1,
-                        const POSVEL_T*  xx, const POSVEL_T*  yy,
-                        const POSVEL_T*  zz, const POSVEL_T*  mass,
-                        const POSVEL_T*  xx1, const POSVEL_T*  yy1,
-                        const POSVEL_T*  zz1, const POSVEL_T*  mass1,
-                        POSVEL_T*  vx, POSVEL_T*  vy,
-                        POSVEL_T*  vz, POSVEL_T fsrrmax2, POSVEL_T mp_rsm2, POSVEL_T fcoeff)
+void Step10_kernel(int count, int count1,
+                   const POSVEL_T*  xx, const POSVEL_T*  yy,
+                   const POSVEL_T*  zz, const POSVEL_T*  mass,
+                   const POSVEL_T*  xx1, const POSVEL_T*  yy1,
+                   const POSVEL_T*  zz1, const POSVEL_T*  mass1,
+                   POSVEL_T*  vx, POSVEL_T*  vy,
+                   POSVEL_T*  vz, POSVEL_T fsrrmax2, POSVEL_T mp_rsm2, POSVEL_T fcoeff)
 {
   const POSVEL_T ma0 = 0.269327, ma1 = -0.0750978, ma2 = 0.0114808, ma3 = -0.00109313, ma4 = 0.0000605491, ma5 = -0.00000147177;
 
@@ -952,7 +952,8 @@ static inline void nbody1(ID_T count, ID_T count1, const POSVEL_T*  xx, const PO
   hipCheckError();
 
   //call kernel
-  hipLaunchKernelGGL(Step10_hip_kernel, dim3(blocks), dim3(threads), 0, stream, count,count1,xx,yy,zz,mass,xx1,yy1,zz1,mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff);
+  hipLaunchKernelGGL(Step10_kernel, dim3(blocks), dim3(threads), 0, stream, 
+                     count,count1,xx,yy,zz,mass,xx1,yy1,zz1,mass1, vx, vy, vz, fsrrmax2, rsm2, fcoeff);
   hipCheckError();
 
   hipStreamSynchronize(stream);
