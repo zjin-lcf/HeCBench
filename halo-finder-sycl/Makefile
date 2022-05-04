@@ -12,20 +12,20 @@ HACC_PLATFORM=sycl
 HACC_OBJDIR=${HACC_PLATFORM}
 
 HACC_CFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_CC=${SYCL_BIN}/clang
+HACC_CC=${SYCL_BIN}/dpcpp
 
 HACC_CXXFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_CXX=${SYCL_BIN}/clang++
+HACC_CXX=${SYCL_BIN}/dpcpp
 
 HACC_LDFLAGS=-lm -lrt
 
 HACC_NUM_CUDA_DEV="1"
 HACC_MPI_CFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_MPI_CC=${SYCL_BIN}/clang
+HACC_MPI_CC=${SYCL_BIN}/dpcpp
 
 HACC_MPI_CXXFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_MPI_CXX=${SYCL_BIN}/clang++
-HACC_MPI_LD=${SYCL_BIN}/clang++
+HACC_MPI_CXX=${SYCL_BIN}/dpcpp
+HACC_MPI_LD=${SYCL_BIN}/dpcpp
 
 HACC_MPI_LDFLAGS=-lm -lrt
 
@@ -149,7 +149,6 @@ FORCE_SOURCES += BHForceTree.cxx
 FORCE_SOURCES += RCOForceTree.cxx
 FORCE_SOURCES += RCBForceTree.cxx
 FORCE_SOURCES_C += BGQStep16.c
-FORCE_SOURCES_C += BGQCM.c
 FORCE_OBJLIST = $(FORCE_SOURCES:.cxx=.o)
 FORCE_OBJLIST_C = $(FORCE_SOURCES_C:.c=.o)
 FORCE_OBJECTS := $(addprefix $(OBJDIR)/,$(FORCE_OBJLIST) $(FORCE_OBJLIST_C))
@@ -160,7 +159,7 @@ $(OBJDIR)/libbigchunk.a: $(OBJDIR)/libbigchunk.a($(OBJDIR)/bigchunk.o)
 	#ranlib $@
 
 clean:
-	rm -rf cuda
+	rm -rf sycl
 
 run: progs
-	./cuda/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb
+	./sycl/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb
