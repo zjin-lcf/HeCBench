@@ -146,9 +146,7 @@ boost::dynamic_bitset<> generateBitset(unsigned int universe,
 {
     boost::dynamic_bitset<> bitset(universe);
 
-    std::random_device rd{};
-    std::mt19937_64 gen{rd()};
-
+    std::mt19937_64 gen(19937);
 
     if (distribution == "uniform") {
         std::uniform_int_distribution<> ud(1, universe);
@@ -199,4 +197,3 @@ std::vector<unsigned int> bitsetToVector(boost::dynamic_bitset<>& bitset)
     }
     return set;
 }
-
