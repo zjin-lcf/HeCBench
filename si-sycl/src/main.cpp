@@ -5,7 +5,6 @@
 #include <cxxopts.hpp>
 #include <fmt/core.h>
 #include "io.hpp"
-#include "helpers.cuh"
 #include "util.hpp"
 #include "host_timer.hpp"
 
@@ -30,17 +29,16 @@ int main(int argc, char **argv) {
         "└{0:─^{1}}┘\n", "", 51, "GPU Matrix multiplication set intersection"
         );
 
-
     int multiprocessorCount =
-       q.get_device().get_info<info::device::max_compute_units>();
+       q.get_device().get_info<sycl::info::device::max_compute_units>();
 
     int maxThreadsPerBlock =
-       q.get_device().get_info<info::device::max_work_group_size>();
+       q.get_device().get_info<sycl::info::device::max_work_group_size>();
 
     size_t totalDeviceMemory = 
-       q.get_device().get_info<info::device::global_mem_size>();
+       q.get_device().get_info<sycl::info::device::global_mem_size>();
 
-    size_t freeDeviceMemory = 0.5f * totalDeviceMemory;
+    size_t freeDeviceMemory = 0.75f * totalDeviceMemory;
 
     // arguments
     std::string input;
@@ -127,9 +125,9 @@ int main(int argc, char **argv) {
     HostTimer hostTimer;
     Interval* device_offload = hostTimer.add("Device offload");
 
-    float* devInput = sycl::malloc_device<float>(d->universe * partition);
-    float* devInvInput = sycl::malloc_device<float>(d->universe * partition);
-    float* devOutput = sycl::malloc_device<float>(combinations);
+    float* devInput = sycl::malloc_device<float>(d->universe * partition, q);
+    float* devInvInput = sycl::malloc_device<float>(d->universe * partition, q);
+    float* devOutput = sycl::malloc_device<float>(combinations, q);
 
     oneapi::mkl::transpose transA = oneapi::mkl::transpose::nontrans;
     oneapi::mkl::transpose transB = oneapi::mkl::transpose::nontrans;
@@ -142,8 +140,7 @@ int main(int argc, char **argv) {
 
       populateBinaryMatrix(hostInput, d, A.start, A.end);
 
-      auto copyA = q.mmcpy(devInput, hostInput, d->universe * partition * sizeof(float));
-      gemm_dependencies.push_back(e);
+      auto copyA = q.memcpy(devInput, hostInput, d->universe * partition * sizeof(float));
 
       for (unsigned int j = i; j < tiles.size(); ++j) {
         tile& B = tiles[j];

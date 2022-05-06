@@ -6,10 +6,10 @@ We cover and adapt techniques initially proposed for graph analytics, while we i
 We experiment when both a single pair of two large sets are processed and all pairs in a dataset are examined.
 
 
-## Compile
+## Compile (Intel DevCloud)
 
 ```
 mkdir release && cd release
-cmake -DCMAKE_BUILD_TYPE=Release -DMKL_DIR=/opt/intel/oneapi/mkl/latest/lib/cmake/mkl/ -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx .. 
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=dpcpp ..
 make -j
 ```

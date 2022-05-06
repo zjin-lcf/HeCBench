@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 project(set_intersection_eval)
-find_package(MKL CONFIG REQUIRED)
 
 include(FetchContent)
 
@@ -46,6 +45,8 @@ target_link_libraries(generate_dataset PRIVATE cxxopts fmt::fmt)
 
 # Optimized binary search binary using matrix multiplication
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE cxxopts fmt::fmt -qmkl=parallel)
-target_include_directories(main PRIVATE include PUBLIC ${MKLROOT})
-target_compile_options(main PUBLIC -fsycl -DMKL_ILP64)
+target_link_libraries(main PRIVATE cxxopts fmt::fmt -L${MKLROOT}/lib/intel64 -lmkl_sycl -lmkl_intel_ilp64 -lmkl_tbb_thread -lmkl_core -lsycl -lOpenCL -ltbb -lpthread -ldl -lm)
+target_include_directories(main PRIVATE include PUBLIC ${MKLROOT}/include)
+
+# kernel execution on a GPU by default
+target_compile_options(main PUBLIC -DUSE_GPU -fsycl -DMKL_ILP64 -DNANORANGE_NO_STD_FORWARD_DECLARATIONS)
