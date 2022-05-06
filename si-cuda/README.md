@@ -13,3 +13,11 @@ mkdir release && cd release
 cmake .. -DCMAKE_BUILD_TYPE=Release -DSM_ARCH=61 # for Compute Capability 6.1
 make -j
 ```
+
+## Run
+
+```
+./generate_dataset --iterations 100 --universe 1000 -k 1000
+./main --input out_asc_uniform_1000_1000_100.bin
+./main --input out_desc_uniform_1000_1000_100.bin
+```
