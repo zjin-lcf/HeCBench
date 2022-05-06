@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include <cuda.h>
+#include <omp.h>
 #include "reference.h"
 
-__global__ 
 void vanGenuchten(
   const double *__restrict__ Ksat,
   const double *__restrict__ psi,
@@ -14,11 +13,11 @@ void vanGenuchten(
         double *__restrict__ K,
   const int size)
 {
-  double Se, _theta, _psi, lambda, m;
+  #pragma omp target teams distribute parallel for thread_limit(256)
+  for (int i = 0; i < size; i++) {
 
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
-  if (i < size)
-  {
+    double Se, _theta, _psi, lambda, m;
+
     lambda = n - 1.0;
     m = lambda/n;
 
@@ -60,7 +59,6 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[4]);
 
   const int size = dimX * dimY * dimZ;
-  const int size_byte = size * sizeof(double);
 
   double *Ksat, *psi, *C, *theta, *K;
   double *C_ref, *theta_ref, *K_ref;
@@ -84,35 +82,18 @@ int main(int argc, char* argv[])
   // for verification
   reference(Ksat, psi, C_ref, theta_ref, K_ref, size);
 
-  double *d_Ksat, *d_psi, *d_C, *d_theta, *d_K;
-  cudaMalloc((void**)&d_Ksat, size_byte); 
-  cudaMalloc((void**)&d_psi, size_byte); 
-  cudaMalloc((void**)&d_C, size_byte); 
-  cudaMalloc((void**)&d_theta, size_byte); 
-  cudaMalloc((void**)&d_K, size_byte); 
+  #pragma omp target data map(to: Ksat[0:size], psi[0:size]) \
+                          map(from: C[0:size], theta[0:size], K[0:size])
+  {
+    auto start = std::chrono::steady_clock::now();
 
-  cudaMemcpy(d_Ksat, Ksat, size_byte, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_psi, psi, size_byte, cudaMemcpyHostToDevice);
+    for (int i = 0; i < repeat; i++)
+      vanGenuchten(Ksat, psi, C, theta, K, size);
 
-  dim3 grids ((size+255)/256);
-  dim3 blocks (256);
-
-  cudaDeviceSynchronize();
-
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < repeat; i++)
-    vanGenuchten <<< grids, blocks >>> (d_Ksat, d_psi, d_C, d_theta, d_K, size);
-
-  cudaDeviceSynchronize();
-
-  auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  printf("Total kernel time : %f (s)\n", time.count());
-
-  cudaMemcpy(C, d_C, size_byte, cudaMemcpyDeviceToHost);
-  cudaMemcpy(theta, d_theta, size_byte, cudaMemcpyDeviceToHost);
-  cudaMemcpy(K, d_K, size_byte, cudaMemcpyDeviceToHost);
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> time = end - start;
+    printf("Total kernel time : %f (s)\n", time.count());
+  }
 
   bool ok = true;
   for (int i = 0; i < size; i++) {
@@ -124,12 +105,6 @@ int main(int argc, char* argv[])
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-
-  cudaFree(d_Ksat);
-  cudaFree(d_psi);
-  cudaFree(d_C);
-  cudaFree(d_theta);
-  cudaFree(d_K);
 
   delete(Ksat);
   delete(psi);

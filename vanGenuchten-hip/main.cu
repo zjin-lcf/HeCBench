@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "reference.h"
 
 __global__ 
@@ -85,34 +85,34 @@ int main(int argc, char* argv[])
   reference(Ksat, psi, C_ref, theta_ref, K_ref, size);
 
   double *d_Ksat, *d_psi, *d_C, *d_theta, *d_K;
-  cudaMalloc((void**)&d_Ksat, size_byte); 
-  cudaMalloc((void**)&d_psi, size_byte); 
-  cudaMalloc((void**)&d_C, size_byte); 
-  cudaMalloc((void**)&d_theta, size_byte); 
-  cudaMalloc((void**)&d_K, size_byte); 
+  hipMalloc((void**)&d_Ksat, size_byte); 
+  hipMalloc((void**)&d_psi, size_byte); 
+  hipMalloc((void**)&d_C, size_byte); 
+  hipMalloc((void**)&d_theta, size_byte); 
+  hipMalloc((void**)&d_K, size_byte); 
 
-  cudaMemcpy(d_Ksat, Ksat, size_byte, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_psi, psi, size_byte, cudaMemcpyHostToDevice);
+  hipMemcpy(d_Ksat, Ksat, size_byte, hipMemcpyHostToDevice);
+  hipMemcpy(d_psi, psi, size_byte, hipMemcpyHostToDevice);
 
   dim3 grids ((size+255)/256);
   dim3 blocks (256);
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    vanGenuchten <<< grids, blocks >>> (d_Ksat, d_psi, d_C, d_theta, d_K, size);
+    hipLaunchKernelGGL(vanGenuchten, grids, blocks , 0, 0, d_Ksat, d_psi, d_C, d_theta, d_K, size);
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
 
   auto end = std::chrono::steady_clock::now();
   std::chrono::duration<float> time = end - start;
   printf("Total kernel time : %f (s)\n", time.count());
 
-  cudaMemcpy(C, d_C, size_byte, cudaMemcpyDeviceToHost);
-  cudaMemcpy(theta, d_theta, size_byte, cudaMemcpyDeviceToHost);
-  cudaMemcpy(K, d_K, size_byte, cudaMemcpyDeviceToHost);
+  hipMemcpy(C, d_C, size_byte, hipMemcpyDeviceToHost);
+  hipMemcpy(theta, d_theta, size_byte, hipMemcpyDeviceToHost);
+  hipMemcpy(K, d_K, size_byte, hipMemcpyDeviceToHost);
 
   bool ok = true;
   for (int i = 0; i < size; i++) {
@@ -125,11 +125,11 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  cudaFree(d_Ksat);
-  cudaFree(d_psi);
-  cudaFree(d_C);
-  cudaFree(d_theta);
-  cudaFree(d_K);
+  hipFree(d_Ksat);
+  hipFree(d_psi);
+  hipFree(d_C);
+  hipFree(d_theta);
+  hipFree(d_K);
 
   delete(Ksat);
   delete(psi);
