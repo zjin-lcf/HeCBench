@@ -924,7 +924,7 @@ Early results are shown [here](results/README.md)
 ### warpsort (cuda)
   Sort small numbers (https://github.com/facebookarchive/fbcuda)
 
-### winograd (cuda)
+### winograd (opencl)
   Winograd convolution (https://github.com/ChenyangZhang-cs/iMLBench)
 
 ### wlcpow (cuda)
