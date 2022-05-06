@@ -1,12 +1,12 @@
 #include <cxxopts.hpp>
 #include <fmt/core.h>
-#include <cuda.h>
-#include <cublas_v2.h>
+#include <hip/hip_runtime.h>
+#include <hipblas.h>
 #include <thrust/scan.h>
 #include "io.hpp"
-#include "helpers.cuh"
 #include "util.hpp"
 #include "host_timer.hpp"
+#include "helpers.h"
 
 void populateBinaryMatrix(float* input, Dataset* dataset, unsigned int start, unsigned int end);
 void populateBinaryTransposeMatrix(float* input, Dataset* dataset, unsigned int partition, unsigned int start, unsigned int end);
@@ -22,12 +22,12 @@ int main(int argc, char** argv) {
         int multiprocessorCount;
         int maxThreadsPerBlock;
 
-        cudaDeviceGetAttribute(&multiprocessorCount, cudaDevAttrMultiProcessorCount, 0);
-        cudaDeviceGetAttribute(&maxThreadsPerBlock, cudaDevAttrMaxThreadsPerBlock, 0);
+        hipDeviceGetAttribute(&multiprocessorCount, hipDeviceAttributeMultiprocessorCount, 0);
+        hipDeviceGetAttribute(&maxThreadsPerBlock, hipDeviceAttributeMaxThreadsPerBlock, 0);
 
         size_t freeDeviceMemory, totalDeviceMemory;
 
-        cudaMemGetInfo(&freeDeviceMemory, &totalDeviceMemory);
+        hipMemGetInfo(&freeDeviceMemory, &totalDeviceMemory);
 
         // arguments
         std::string input;
@@ -104,6 +104,7 @@ int main(int argc, char** argv) {
             return 1;
         }
 
+
         std::vector<float> counts(runs.size() * combinations);
         float* hostInput = new float[d->universe * partition];
         float* hostInvInput = new float[d->universe * partition];
@@ -118,12 +119,12 @@ int main(int argc, char** argv) {
         float* devInvInput;
         float* devOutput;
 
-        errorCheck(cudaMalloc((void**) &devInput, d->universe * partition * sizeof(float)))
-        errorCheck(cudaMalloc((void**) &devInvInput, d->universe * partition * sizeof(float)))
-        errorCheck(cudaMalloc((void**) &devOutput, combinations * sizeof(float)))
+        errorCheck(hipMalloc((void**) &devInput, d->universe * partition * sizeof(float)))
+        errorCheck(hipMalloc((void**) &devInvInput, d->universe * partition * sizeof(float)))
+        errorCheck(hipMalloc((void**) &devOutput, combinations * sizeof(float)))
 
-        cublasHandle_t handle;
-        cublasCreate_v2(&handle);
+        hipblasHandle_t handle;
+        hipblasCreate(&handle);
 
         float alpha = 1.f;
         float beta = 0.f;
@@ -134,23 +135,23 @@ int main(int argc, char** argv) {
 
             populateBinaryMatrix(hostInput, d, A.start, A.end);
 
-            errorCheck(cudaMemcpy(devInput, hostInput, d->universe * partition * sizeof(float), cudaMemcpyHostToDevice))
+            errorCheck(hipMemcpy(devInput, hostInput, d->universe * partition * sizeof(float), hipMemcpyHostToDevice))
 
             for (unsigned int j = i; j < tiles.size(); ++j) {
                 tile& B = tiles[j];
                 populateBinaryTransposeMatrix(hostInvInput, d, partition, B.start, B.end);
 
-                errorCheck(cudaMemcpy(devInvInput, hostInvInput, d->universe * partition * sizeof(float), cudaMemcpyHostToDevice))
+                errorCheck(hipMemcpy(devInvInput, hostInvInput, d->universe * partition * sizeof(float), hipMemcpyHostToDevice))
 
-                auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                          B.length, A.length, d->universe,
-                                          &alpha, devInvInput, B.length,
-                                          devInput, d->universe,
-                                          &beta, devOutput, B.length);
+                auto status = hipblasSgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
+                                           B.length, A.length, d->universe,
+                                           &alpha, devInvInput, B.length,
+                                           devInput, d->universe,
+                                           &beta, devOutput, B.length);
 
                 // transfer result back to host
-                errorCheck(cudaMemcpy(&counts[0] + (iter * combinations), devOutput, sizeof(float) * combinations,
-                                      cudaMemcpyDeviceToHost))
+                errorCheck(hipMemcpy(&counts[0] + (iter * combinations), devOutput, sizeof(float) * combinations,
+                                      hipMemcpyDeviceToHost))
 
                 // clear binary matrix to ensure correctness
                 memset(hostInvInput, 0, d->universe * partition * sizeof(float));
@@ -161,12 +162,12 @@ int main(int argc, char** argv) {
             memset(hostInput, 0, d->universe * partition * sizeof(float));
         }
 
-        errorCheck(cudaFree(devInput))
-        errorCheck(cudaFree(devInvInput))
-        errorCheck(cudaFree(devOutput))
-        cublasDestroy_v2(handle);
+        errorCheck(hipFree(devInput))
+        errorCheck(hipFree(devInvInput))
+        errorCheck(hipFree(devOutput))
+        hipblasDestroy(handle);
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
 
         HostTimer::finish(device_offload);
         hostTimer.print();
@@ -176,11 +177,6 @@ int main(int argc, char** argv) {
             writeResult<float, true>(runs, partition, counts, output);
             fmt::print("Finished\n");
         }
-
-        delete [] hostInput; 
-        delete [] hostInvInput; 
-        delete [] d->offsets; 
-
     } catch (const cxxopts::OptionException& e) {
         fmt::print("{}\n", e.what());
         return 1;
