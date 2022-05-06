@@ -1,11 +1,11 @@
 /**
  * @brief       Genuchten conversion of soil moisture - pressure
  *
+ * @param      Ksat   Saturated hydraulic conductivity in soil [L/T]
+ * @param      psi    Pressure head [L]
  * @param      C      Specific soil moisture capacity [1/L]
  * @param      theta  Soil moisture [-]
- * @param      Ksat   Saturated hydraulic conductivity in soil [L/T]
  * @param      K      Hydraulic conductivity in soil at moisture theta [L/T]
- * @param      psi    Pressure head [L]
  * @param[in]  size   Size of the domain
  */
 const double alpha   = 0.02;
