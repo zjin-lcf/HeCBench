@@ -1,5 +1,6 @@
-#include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>   // std::transform_reduce
 #include <CL/sycl.hpp>
 #include <algorithm>
 #include <chrono>
