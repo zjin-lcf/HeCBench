@@ -54,6 +54,7 @@ int main(int argc, char** argv)
             return 1;
         }
 
+
         unsigned long universe = result["universe"].as<unsigned long>();
 
         if (!result.count("output")) {
