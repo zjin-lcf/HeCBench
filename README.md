@@ -912,6 +912,9 @@ Early results are shown [here](results/README.md)
 ### urng (opencl)
   Uniform random noise generator (https://github.com/OpenCL/AMD_APP_samples)
   
+### vanGenuchten (cuda)
+  Genuchten conversion of soil moisture and pressure
+
 ### vmc (cuda)
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
