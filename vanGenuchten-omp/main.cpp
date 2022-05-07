@@ -75,8 +75,8 @@ int main(int argc, char* argv[])
 
   // arbitrary numbers
   for (int i = 0; i < size; i++) {
-    Ksat[i] = -0.1 + 0.2 * i / size; 
-    psi[i] = -0.01 + 0.02 * i / size;
+    Ksat[i] = 1e-6 +  (1.0 - 1e-6) * i / size; 
+    psi[i] = -100.0 + 101.0 * i / size;
   }
 
   // for verification
@@ -117,4 +117,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-  
