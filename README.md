@@ -913,7 +913,7 @@ Early results are shown [here](results/README.md)
   Uniform random noise generator (https://github.com/OpenCL/AMD_APP_samples)
   
 ### vanGenuchten (cuda)
-  Genuchten conversion of soil moisture and pressure
+  Genuchten conversion of soil moisture and pressure (https://github.com/HydroComplexity/Dhara)
 
 ### vmc (cuda)
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
