@@ -37,7 +37,7 @@ long long get_time() {
   return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
-/* Add two vectors on the GPU */
+// Add two vectors on the GPU
 void vectorAddGPU(float *__restrict a,
                   float *__restrict b,
                   float *__restrict c,
@@ -67,7 +67,7 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
     printf("> Using Aligned Allocated Shared Memory (aligned_alloc_shared)\n");
   }
 
-  /* Allocate mapped CPU memory. */
+  // Allocate mapped CPU memory.
 
   for (nelem = 1024*1024; nelem <= (1024*1024*128); nelem = nelem*2) {
     bytes = nelem * sizeof(float);
@@ -79,8 +79,8 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
       b_UA = (float *)malloc_shared(bytes + MEMORY_ALIGNMENT, q);
       c_UA = (float *)malloc_shared(bytes + MEMORY_ALIGNMENT, q);
 
-      // We need to ensure memory is aligned to 4K (so we will need to padd memory
-      // accordingly)
+      // We need to ensure memory is aligned to 4K,
+      // so we will need to pad memory accordingly
       a = (float *)ALIGN_UP(a_UA, MEMORY_ALIGNMENT);
       b = (float *)ALIGN_UP(b_UA, MEMORY_ALIGNMENT);
       c = (float *)ALIGN_UP(c_UA, MEMORY_ALIGNMENT);
@@ -90,14 +90,13 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
       c = (float *)sycl::aligned_alloc_shared(MEMORY_ALIGNMENT, bytes, q);
     }
 
-    /* Initialize the vectors. */
+    // Initialize the vectors
     for (n = 0; n < nelem; n++) {
       a[n] = rand() / (float)RAND_MAX;
       b[n] = rand() / (float)RAND_MAX;
     }
 
-    /* Call the GPU kernel using the pointers residing in shared memory.
-     */
+    // Call the GPU kernel using the pointers residing in shared memory.
     sycl::range<1> lws (256);
     sycl::range<1> gws (256 * (unsigned int)ceil(nelem / 256.f));
 
@@ -105,7 +104,7 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
       vectorAddGPU(a, b, c, nelem, item);
     }).wait();
 
-    /* Compare the results */
+    // Compare the results
 
     errorNorm = 0.f;
     refNorm = 0.f;
@@ -122,7 +121,7 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
 
     printf("%s ", (errorNorm / refNorm < 1.e-6f) ? "SUCCESS" : "FAILURE");
 
-    /* Memory clean up */
+    // Memory clean up
 
     if (bGenericSharedMemory) {
       sycl::free(a_UA, q);
@@ -135,7 +134,8 @@ void eval(sycl::queue &q, bool bGenericSharedMemory) {
     }
 
     auto end = get_time();
-    printf("Total elapsed time: %.2f s\n", (end - start) / 1e6f);
+    printf("Total elapsed time (vector length = %d): %.2f s\n", 
+           nelem, (end - start) / 1e6f);
   }
 }
 

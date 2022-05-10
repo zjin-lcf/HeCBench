@@ -37,7 +37,7 @@ long long get_time() {
   return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
-/* Add two vectors on the GPU */
+// Add two vectors on the GPU
 __global__ void vectorAddGPU(float *__restrict__ a,
                              float *__restrict__ b,
                              float *__restrict__ c,
@@ -74,7 +74,7 @@ void eval (bool bPinGenericMemory) {
     printf("> Using Host Allocated (hipHostMalloc)\n");
   }
 
-  /* Allocate mapped CPU memory. */
+  // Allocate mapped CPU memory
 
   for (nelem = 1024*1024; nelem <= (1024*1024*128); nelem = nelem*2) {
     bytes = nelem * sizeof(float);
@@ -88,8 +88,8 @@ void eval (bool bPinGenericMemory) {
       b_UA = (float *)malloc(bytes + MEMORY_ALIGNMENT);
       c_UA = (float *)malloc(bytes + MEMORY_ALIGNMENT);
 
-      // We need to ensure memory is aligned to 4K (so we will need to padd memory
-      // accordingly)
+      // We need to ensure memory is aligned to 4K,
+      // so we will need to pad memory accordingly
       a = (float *)ALIGN_UP(a_UA, MEMORY_ALIGNMENT);
       b = (float *)ALIGN_UP(b_UA, MEMORY_ALIGNMENT);
       c = (float *)ALIGN_UP(c_UA, MEMORY_ALIGNMENT);
@@ -104,26 +104,25 @@ void eval (bool bPinGenericMemory) {
       hipHostMalloc((void **)&c, bytes, flags);
     }
 
-    /* Initialize the vectors. */
+    // Initialize the vectors
     for (n = 0; n < nelem; n++) {
       a[n] = rand() / (float)RAND_MAX;
       b[n] = rand() / (float)RAND_MAX;
     }
 
-    /* Get the device pointers for the pinned CPU memory mapped into the GPU
-       memory space. */
+    // Get the device pointers for the pinned CPU memory mapped into the GPU
+    // memory space.
     hipHostGetDevicePointer((void **)&d_a, (void *)a, 0);
     hipHostGetDevicePointer((void **)&d_b, (void *)b, 0);
     hipHostGetDevicePointer((void **)&d_c, (void *)c, 0);
 
-    /* Call the GPU kernel using the pointers residing in CPU mapped memory.
-     */
+    // Call the GPU kernel using the pointers residing in CPU mapped memory.
     dim3 block(256);
     dim3 grid((unsigned int)ceil(nelem / (float)block.x));
     hipLaunchKernelGGL(vectorAddGPU, grid, block, 0, 0, d_a, d_b, d_c, nelem);
     hipDeviceSynchronize();
 
-    /* Compare the results */
+    // Compare the results
 
     errorNorm = 0.f;
     refNorm = 0.f;
@@ -140,8 +139,7 @@ void eval (bool bPinGenericMemory) {
 
     printf("%s ", (errorNorm / refNorm < 1.e-6f) ? "SUCCESS" : "FAILURE");
 
-    /* Memory clean up */
-
+    // Memory clean up
 
     if (bPinGenericMemory) {
       hipHostUnregister(a);
@@ -157,7 +155,8 @@ void eval (bool bPinGenericMemory) {
     }
 
     auto end = get_time();
-    printf("Total elapsed time: %.2f s\n", (end - start) / 1e6f);
+    printf("Total elapsed time (vector length = %d): %.2f s\n", 
+           nelem, (end - start) / 1e6f);
   }
 }
 
