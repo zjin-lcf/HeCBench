@@ -84,7 +84,7 @@ bool runTest(int argc, char **argv)
   if (error == hipErrorAssert)
   {
     printf("Device assert failed as expected, "
-           "CUDA error message is: %s\n\n",
+           "HIP error message is: %s\n\n",
            hipGetErrorString(error));
   }
 
