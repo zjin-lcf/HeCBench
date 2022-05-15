@@ -1,51 +1,54 @@
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/find.h>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/algorithm>
+#include <CL/sycl.hpp>
 
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <vector>
 
-void mtf(std::vector<char> &word, bool output)
+void mtf(sycl::queue &q, std::vector<char> &word, bool output)
 {
-  thrust::device_vector<char> d_list(256);
-  thrust::host_vector<char> list(256);
-  thrust::device_vector<char> d_word(word.size());
+  auto policy = oneapi::dpl::execution::make_device_policy(q);
+
+  std::vector<char> d_list(256);
+
+  std::vector<char> list(256);
+  
+  std::vector<char> d_word (word.size());
 
   size_t counter;
-  thrust::device_vector<char>::iterator iter, count;
-  thrust::host_vector<char> h_word(word.size());
+  std::vector<char> h_word(word.size());
   h_word = word;
   d_word = h_word;
 
   for (counter = 0; counter < word.size(); counter++)
   {
-    thrust::copy(list.begin(), list.end(), d_list.begin());
+    std::copy(policy, list.begin(), list.end(), d_list.begin());
 
     h_word[0] = d_word[counter];
-    iter = thrust::find(d_list.begin(), d_list.end(), d_word[counter]);
+
+    auto iter = std::find(policy, d_list.begin(), d_list.end(), d_word[counter]);
 
     if (d_list[0] != h_word[0])
     {
-      thrust::copy(d_list.begin(), iter, list.begin()+1);
+      std::copy(policy, d_list.begin(), iter, list.begin() + 1);
       list[0] = h_word[0];
     }
   }
 
-  thrust::copy(list.begin(), list.end(), d_list.begin());
-  thrust::copy(word.begin(), word.end(), d_word.begin());
+  std::copy(policy, list.begin(), list.end(), d_list.begin());
+  std::copy(policy, word.begin(), word.end(), d_word.begin());
   for (counter = 0; counter < list.size(); counter++)
   {
-    iter = thrust::find(d_word.begin(), d_word.end(), d_list[counter]);
+    auto iter = std::find(policy, d_word.begin(), d_word.end(), d_list[counter]);
     while (iter != d_word.end())
     {
       *iter = counter;
-      iter = thrust::find(d_word.begin(), d_word.end(), d_list[counter]);
+      iter = std::find(policy, d_word.begin(), d_word.end(), d_list[counter]);
     }
   }
-  thrust::copy(d_word.begin(), d_word.end(), h_word.begin());
+  std::copy(policy, d_word.begin(), d_word.end(), h_word.begin());
 
   if (output) {
     for (counter = 0; counter < word.size(); counter++)
@@ -67,13 +70,20 @@ int main(int argc, char *argv[])
 
   const int repeat = atoi(argv[2]);
 
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel);
+
   // output MTF result
-  mtf(word, true);
+  mtf(q, word, true);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    mtf(word, false);
+    mtf(q, word, false);
 
   auto end = std::chrono::steady_clock::now();
   std::chrono::duration<float> time = end - start;

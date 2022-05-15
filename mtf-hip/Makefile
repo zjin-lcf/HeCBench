@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -14,16 +13,16 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu
+source = ../mtf-cuda/main.cu
 
-obj = $(source:.cu=.o)
+obj = main.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -45,7 +44,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+main.o: ../mtf-cuda/main.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
