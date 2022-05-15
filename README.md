@@ -632,6 +632,9 @@ Early results are shown [here](results/README.md)
 ### mt (opencl)
   Mersenne Twister (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### mtf (thrust)
+  Move-to-front transform (https://github.com/bzip2-cuda/bzip2-cuda)
+
 ### multimaterial (sycl)
   Multi-material simulations (https://github.com/reguly/multimaterial)
 
