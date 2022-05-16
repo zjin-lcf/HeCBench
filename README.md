@@ -237,6 +237,9 @@ Early results are shown [here](results/README.md)
 ### degrid (cuda)
   Radio astronomy degridding (https://github.com/NVIDIA/SKA-gpu-degrid)
   
+### depixel (cuda)
+  Check connectivity and remove crosses in depixelization of pixel art (https://github.com/yzhwang/depixelization) 
+  
 ### deredundancy (sycl)
   Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
   
