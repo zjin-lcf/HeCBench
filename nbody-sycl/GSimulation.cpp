@@ -81,10 +81,8 @@ void GSimulation::InitMass() {
 void GSimulation::Start() {
   RealType dt = get_tstep();
   int n = get_npart();
-  // RealType* energy = new RealType[n];
   std::vector<RealType> energy(n, 0.f);
   // allocate particles
-  // particles_ = new Particle[n];
   particles_.resize(n);
 
   InitPos();
@@ -140,7 +138,7 @@ void GSimulation::Start() {
 
            distance_sqr =
                dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-           distance_inv = 1.0f / cl::sycl::sqrt(distance_sqr);       // 1div+1sqrt
+           distance_inv = 1.0f / sycl::sqrt(distance_sqr);       // 1div+1sqrt
 
            acc0 += dx * kG * p[j].mass * distance_inv * distance_inv *
                    distance_inv;  // 6flops

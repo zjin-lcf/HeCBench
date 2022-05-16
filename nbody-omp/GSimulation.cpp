@@ -80,10 +80,8 @@ void GSimulation::InitMass() {
 void GSimulation::Start() {
   RealType dt = get_tstep();
   int n = get_npart();
-  // RealType* energy = new RealType[n];
   std::vector<RealType> energy(n, 0.f);
   // allocate particles
-  // particles_ = new Particle[n];
   particles_.resize(n);
 
   InitPos();
@@ -108,13 +106,13 @@ void GSimulation::Start() {
   TimeInterval t0;
   int nsteps = get_nsteps();
 
-#pragma omp target data map (to: p[0:n]) map(alloc: e[0:n])
+  #pragma omp target data map (to: p[0:n]) map(alloc: e[0:n])
   {
     // Looping across integration steps
     for (int s = 1; s <= nsteps; ++s) {
       TimeInterval ts0;
       // computes acceleration of all particles
-#pragma omp target teams distribute parallel for thread_limit(256)
+      #pragma omp target teams distribute parallel for thread_limit(256)
       for (int i = 0; i < n; i++) {
         RealType acc0 = p[i].acc[0];
         RealType acc1 = p[i].acc[1];
@@ -145,7 +143,7 @@ void GSimulation::Start() {
       }
 
       // Second kernel updates the velocity and position for all particles
-#pragma omp target teams distribute parallel for thread_limit(256)
+      #pragma omp target teams distribute parallel for thread_limit(256)
       for (int i = 0; i < n; i++) {
         p[i].vel[0] += p[i].acc[0] * dt;  // 2flops
         p[i].vel[1] += p[i].acc[1] * dt;  // 2flops
@@ -164,10 +162,10 @@ void GSimulation::Start() {
            p[i].vel[2] * p[i].vel[2]);  // 7flops
       }
       // Third kernel accumulates the energy of this Nbody system
-#pragma omp target 
+      #pragma omp target 
       for (int i = 1; i < n; i++) e[0] += e[i];
 
-#pragma omp target update from (e[0:1])
+      #pragma omp target update from (e[0:1])
       kenergy_ = 0.5 * e[0];
       e[0] = 0;
       double elapsed_seconds = ts0.Elapsed();
@@ -196,8 +194,7 @@ void GSimulation::Start() {
   std::cout << "\n";
   std::cout << "# Total Time (s)     : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
-  std::cout << "==============================="
-    << "\n";
+  std::cout << "===============================" << "\n";
 }
 
 /* Print the headers for the output */

@@ -82,10 +82,8 @@ void GSimulation::InitMass() {
 void GSimulation::Start() {
   RealType dt = get_tstep();
   int n = get_npart();
-  // RealType* energy = new RealType[n];
   std::vector<RealType> energy(n, 0.f);
   // allocate particles
-  // particles_ = new Particle[n];
   particles_.resize(n);
 
   InitPos();
@@ -103,8 +101,6 @@ void GSimulation::Start() {
   double gflops = 1e-9 * ((11. + 18.) * n * n + n * 19.);
   int nf = 0;
   double av = 0.0, dev = 0.0;
-  // Create a queue to the selected device and enabled asynchronous exception
-  // handling for that queue
 
   //buffer<Particle, 1> pbuf(particles_.data(), r, {property::buffer::use_host_ptr()});
   Particle *p;

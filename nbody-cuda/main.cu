@@ -5,7 +5,6 @@
 // =============================================================
 
 #include <iostream>
-
 #include "GSimulation.hpp"
 
 int main(int argc, char** argv) {
@@ -13,11 +12,6 @@ int main(int argc, char** argv) {
   int nstep;  // number ot integration steps
 
   GSimulation sim;
-
-#ifdef DEBUG
-  char* env = std::getenv("SYCL_BE");
-  std::cout << "[ENV] SYCL_BE = " << (env ? env : "<not set>") << "\n";
-#endif
 
   if (argc > 1) {
     n = std::atoi(argv[1]);
