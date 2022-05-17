@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../affine-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,12 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../affine-cuda/kernel.h ../affine-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj) result.raw
 
 run: $(program)
-	./$(program) data/CT-MONO2-16-brain.raw result.raw
-
+	./$(program) data/CT-MONO2-16-brain.raw result.raw 100
