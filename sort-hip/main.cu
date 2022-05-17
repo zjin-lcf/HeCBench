@@ -71,8 +71,6 @@ int main(int argc, char** argv)
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
 
-  auto start = std::chrono::steady_clock::now();
-
   // Number of local work items per group
   const size_t local_wsize  = 256;
   // Number of global work items
@@ -97,6 +95,8 @@ int main(int argc, char** argv)
   T* d_in;
   T* d_out;
 
+  auto start = std::chrono::steady_clock::now();
+
   for (int k = 0; k < passes; k++)
   {
     // Assuming an 8 bit byte.
@@ -120,16 +120,15 @@ int main(int argc, char** argv)
     hipDeviceSynchronize();
   }  // passes
 
+  auto end = std::chrono::steady_clock::now();
+  auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  double second = t / 1.e9 / passes; // Convert to seconds
+  printf("Average elapsed time per pass %.3f (s)\n", second);
+
   hipMemcpy(h_odata, d_out, size * sizeof(T), hipMemcpyDeviceToHost);
   hipFree(d_idata);
   hipFree(d_odata);
   hipFree(d_isums);
-
-
-  auto end = std::chrono::steady_clock::now();
-  auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  double second = t / 1.e9; // Convert to seconds
-  printf("Total elapsed time %.3f (s)\n", second);
 
   verifySort(h_odata, size);
 

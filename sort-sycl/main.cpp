@@ -65,8 +65,6 @@ int main(int argc, char** argv)
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
 
-  auto start = std::chrono::steady_clock::now();
-
   { // sycl scope
 
 #ifdef USE_GPU
@@ -95,6 +93,12 @@ int main(int argc, char** argv)
     d_odata.set_final_data( h_odata );
     buffer<T, 1> d_isums (num_work_groups * num_digits);
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    range<1> gws (global_wsize);
+    range<1> lws (local_wsize);
+
     for (int k = 0; k < passes; k++)
     {
       // Assuming an 8 bit byte.
@@ -112,44 +116,43 @@ int main(int argc, char** argv)
         bool even = ((shift / radix_width) % 2 == 0) ? true : false;
 
         q.submit([&](handler& cgh) {
-            auto in = even ? d_idata.get_access<sycl_read>(cgh) : d_odata.get_access<sycl_read>(cgh);
-            auto isums = d_isums.get_access<sycl_write>(cgh);
-            accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize, cgh);
-            cgh.parallel_for<class reduce>(nd_range<1>(range<1>(global_wsize), range<1>(local_wsize)), [=] (nd_item<1> item) {
-#include "sort_reduce.sycl"
-                });
-            });
+          auto in = even ? d_idata.get_access<sycl_read>(cgh) : d_odata.get_access<sycl_read>(cgh);
+          auto isums = d_isums.get_access<sycl_write>(cgh);
+          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize, cgh);
+            cgh.parallel_for<class reduce>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+              #include "sort_reduce.sycl"
+          });
+        });
 
         q.submit([&](handler& cgh) {
-            auto isums = d_isums.get_access<sycl_read_write>(cgh);
-            accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
-            accessor <T, 1, sycl_read_write, access::target::local> s_seed (1, cgh);
-            cgh.parallel_for<class top_scan>(nd_range<1>(range<1>(local_wsize), range<1>(local_wsize)), [=] (nd_item<1> item) {
-#include "sort_top_scan.sycl"
-                });
-            });
+          auto isums = d_isums.get_access<sycl_read_write>(cgh);
+          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
+          accessor <T, 1, sycl_read_write, access::target::local> s_seed (1, cgh);
+          cgh.parallel_for<class top_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+            #include "sort_top_scan.sycl"
+          });
+        });
 
         q.submit([&](handler& cgh) {
-            auto in = even ? d_idata.get_access<sycl_read_write>(cgh) : d_odata.get_access<sycl_read_write>(cgh);
-            auto isums = d_isums.get_access<sycl_read_write>(cgh);
-            auto out = even ? d_odata.get_access<sycl_read_write>(cgh) : d_idata.get_access<sycl_read_write>(cgh) ;
-            accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
-            accessor <T, 1, sycl_read_write, access::target::local> l_scanned_seeds (16, cgh);
-            accessor <T, 1, sycl_read_write, access::target::local> l_block_counts (16, cgh);
-            cgh.parallel_for<class bottom_scan>(nd_range<1>(range<1>(global_wsize), range<1>(local_wsize)), [=] (nd_item<1> item) {
-#include "sort_bottom_scan.sycl"
-                });
-            });
+          auto in = even ? d_idata.get_access<sycl_read_write>(cgh) : d_odata.get_access<sycl_read_write>(cgh);
+          auto isums = d_isums.get_access<sycl_read_write>(cgh);
+          auto out = even ? d_odata.get_access<sycl_read_write>(cgh) : d_idata.get_access<sycl_read_write>(cgh) ;
+          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
+          accessor <T, 1, sycl_read_write, access::target::local> l_scanned_seeds (16, cgh);
+          accessor <T, 1, sycl_read_write, access::target::local> l_block_counts (16, cgh);
+          cgh.parallel_for<class bottom_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+            #include "sort_bottom_scan.sycl"
+          });
+        });
       }
       q.wait();
     }  // passes
 
+    auto end = std::chrono::steady_clock::now();
+    auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    double second = t / 1.e9 / passes; // Convert to seconds
+    printf("Average elapsed time per pass %.3f (s)\n", second);
   } // sycl scope
-
-  auto end = std::chrono::steady_clock::now();
-  auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  double second = t / 1.e9; // Convert to seconds
-  printf("Total elapsed time %.3f (s)\n", second);
 
   verifySort(h_odata, size);
 
