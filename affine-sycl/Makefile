@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -I../affine-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -74,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj) result.raw
 
 run: $(program)
-	./$(program) data/CT-MONO2-16-brain.raw result.raw
+	./$(program) data/CT-MONO2-16-brain.raw result.raw 100
