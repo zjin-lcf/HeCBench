@@ -166,10 +166,10 @@ int main(int argc, char** argv)
   ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
-  auto start = std::chrono::steady_clock::now();
-
   #pragma omp target data map (tofrom: source[0:N])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for (int k=0; k<passes; k++) {
 
       #pragma omp target teams num_teams(n_ffts) thread_limit(64)
@@ -329,11 +329,11 @@ int main(int argc, char** argv)
         }
       }
     }
-  }
 
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average time " << (time * 1e-9f) / passes << " (s)\n";
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
+  }
 
   // Verification
   bool error = false;

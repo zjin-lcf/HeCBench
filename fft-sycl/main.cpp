@@ -12,11 +12,11 @@ using namespace std;
 
 #ifdef SINGLE_PRECISION
 #define T float 
-#define T2 cl::sycl::float2
+#define T2 sycl::float2
 #define EPISON 1e-4
 #else
 #define T double
-#define T2 cl::sycl::double2
+#define T2 sycl::double2
 #define EPISON 1e-6
 #endif
 
@@ -34,7 +34,7 @@ using namespace std;
 #define iexp_3_8   (T2){ -1, 1 }//requires post-multiply by 1/sqrt(2)
 
 inline T2 exp_i( T phi ) {
-  return (T2){ cl::sycl::cos(phi), cl::sycl::sin(phi) };
+  return (T2){ sycl::cos(phi), sycl::sin(phi) };
 }
 
 
@@ -149,8 +149,6 @@ int main(int argc, char** argv)
   ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
-  auto start = std::chrono::steady_clock::now();
-
   { // sycl scope
 
 #ifdef USE_GPU
@@ -159,7 +157,7 @@ int main(int argc, char** argv)
     cpu_selector dev_sel;
 #endif
 
-    cl::sycl::queue q(dev_sel);
+    queue q(dev_sel);
 
     const property_list props = property::buffer::use_host_ptr();
 
@@ -169,31 +167,33 @@ int main(int argc, char** argv)
     size_t localsz = 64;
     size_t globalsz = localsz * n_ffts; 
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     for (int k=0; k<passes; k++) {
 
       q.submit([&](handler& cgh) {
-          auto work = d_work.get_access<sycl_read_write>(cgh) ;
-          accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-          cgh.parallel_for<class fftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-#include "fft1D_512.sycl"
-              });
-          });
-
+        auto work = d_work.get_access<sycl_read_write>(cgh) ;
+        accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
+        cgh.parallel_for<class fftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
+          #include "fft1D_512.sycl"
+        });
+      });
 
       q.submit([&](handler& cgh) {
-          auto work = d_work.get_access<sycl_read_write>(cgh) ;
-          accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-          cgh.parallel_for<class ifftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-#include "ifft1D_512.sycl"
-              });
-          });
+        auto work = d_work.get_access<sycl_read_write>(cgh) ;
+        accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
+        cgh.parallel_for<class ifftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
+          #include "ifft1D_512.sycl"
+        });
+      });
     }
-    q.wait();
-  }
 
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average time " << (time * 1e-9f) / passes << " (s)\n";
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
+  }
 
   // Verification
   bool error = false;
