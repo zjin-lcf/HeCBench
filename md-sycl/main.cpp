@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -140,6 +141,8 @@ int main(int argc, char** argv)
 
   checkResults<FPTYPE, FORCEVECTYPE, POSVECTYPE>(force, position, neighborList, nAtom);
 
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iteration; i++)
   {
     q.submit([&](handler& cgh) {
@@ -159,7 +162,11 @@ int main(int argc, char** argv)
       });
     });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iteration << " (s)\n";
 
   free(position);
   free(force);
