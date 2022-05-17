@@ -108,12 +108,17 @@ T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
   IFFT4( &a[4], &a[5], &a[6], &a[7] );                        \
 }
 
-// CUDA kernels
+// HIP kernels
 #include "fft1D_512.h"
 #include "ifft1D_512.h"
 
 int main(int argc, char** argv)
 {
+  if (argc != 3) {
+    printf("Usage: %s <problem size> <number of passes>\n", argv[0]);
+    printf("Problem size [0-3]: 0=1M, 1=8M, 2=96M, 3=256M\n");
+    return 1;
+  }
 
   srand(2);
   int i;
@@ -123,8 +128,7 @@ int main(int argc, char** argv)
 
   // Convert to MB
   int probSizes[4] = { 1, 8, 96, 256 };
-  unsigned long bytes = 0;
-  bytes = probSizes[select];
+  unsigned long bytes = probSizes[select];
   bytes *= 1024 * 1024;
 
   // now determine how much available memory will be used
@@ -141,7 +145,6 @@ int main(int argc, char** argv)
 
   T2 *reference = (T2*) malloc (used_bytes);
 
-
   // init host memory...
   for (i = 0; i < half_n_cmplx; i++) {
     source[i].x = (rand()/(float)RAND_MAX)*2-1;
@@ -156,6 +159,12 @@ int main(int argc, char** argv)
   stringstream ss;
   ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
+
+  int devCount = 0;
+  hipGetDeviceCount(&devCount);
+
+  for (int i = 1; i < devCount; i++) {
+    hipSetDevice(i);
 
   auto start = std::chrono::steady_clock::now();
 
@@ -191,6 +200,8 @@ int main(int argc, char** argv)
     }
   }
   std::cout << (error ? "FAIL" : "PASS")  << std::endl;
+  }
+
   free(reference);
   free(source);
 }
