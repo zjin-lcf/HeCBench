@@ -67,6 +67,7 @@ int main(int argc, char** argv)
   printf("   Reading RAW Image\n");
   size_t items_read = fread(input_image, sizeof(input_image), 1, input_file);
   printf("   Bytes read = %d\n\n", (int)(items_read * sizeof(input_image)));
+  fclose(input_file);
 
   const int iterations = atoi(argv[3]);
 
@@ -200,5 +201,7 @@ int main(int argc, char** argv)
   }
   size_t items_written = fwrite(output_image, sizeof(output_image), 1, output_file);
   printf("   Bytes written = %d\n\n", (int)(items_written * sizeof(output_image)));
+  fclose(output_file);
+
   return 0 ;
 }
