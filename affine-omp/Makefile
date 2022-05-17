@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I../affine-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -59,5 +59,4 @@ clean:
 	rm -rf $(program) $(obj) result.raw
 
 run: $(program)
-	./$(program) data/CT-MONO2-16-brain.raw result.raw
-
+	./$(program) data/CT-MONO2-16-brain.raw result.raw 100
