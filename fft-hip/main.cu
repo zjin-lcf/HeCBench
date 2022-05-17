@@ -160,30 +160,25 @@ int main(int argc, char** argv)
   ss << "N=" << N;
   sizeStr = strdup(ss.str().c_str());
 
-  int devCount = 0;
-  hipGetDeviceCount(&devCount);
-
-  for (int i = 1; i < devCount; i++) {
-    hipSetDevice(i);
-
-  auto start = std::chrono::steady_clock::now();
-
   T2 *d_source;
   hipMalloc((void**)&d_source, N * sizeof(T2));
   hipMemcpy(d_source, source, N * sizeof(T2), hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int k=0; k<passes; k++) {
     hipLaunchKernelGGL(fft1D_512, n_ffts, 64, 0, 0, d_source);
     hipLaunchKernelGGL(ifft1D_512, n_ffts, 64, 0, 0, d_source);
   }
 
-  hipMemcpy(source, d_source, N * sizeof(T2), hipMemcpyDeviceToHost);
-  hipFree(d_source);
-
+  hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average time " << (time * 1e-9f) / passes << " (s)\n";
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
+
+  hipMemcpy(source, d_source, N * sizeof(T2), hipMemcpyDeviceToHost);
+  hipFree(d_source);
 
   // Verification
   bool error = false;
@@ -200,7 +195,6 @@ int main(int argc, char** argv)
     }
   }
   std::cout << (error ? "FAIL" : "PASS")  << std::endl;
-  }
 
   free(reference);
   free(source);
