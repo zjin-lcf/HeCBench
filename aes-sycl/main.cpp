@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include "common.h"
+
 #include "SDKBitMap.h"
 #include "aes.h"
 #include "kernels.cpp"
@@ -10,6 +12,12 @@
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <iterations> <0 or 1> <path to bitmap image file>\n", argv[0]);
+    printf("0=encrypt, 1=decrypt\n");
+    return 1;
+  }
+
   const unsigned int keySizeBits = 128;
   const unsigned int rounds = 10;
   const unsigned int seed = 123;
@@ -81,6 +89,10 @@ int main(int argc, char * argv[])
 
   range<2> gws (height, width/4);
   range<2> lws (4, 1);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   auto outputBuffer_re = outputBuffer.reinterpret<uchar4>(range<1>(width*height/4));
   auto inputBuffer_re = inputBuffer.reinterpret<uchar4>(range<1>(width*height/4));
   auto rKeyBuffer_re = rKeyBuffer.reinterpret<uchar4>(range<1>(explandedKeySize/4));
@@ -124,13 +136,17 @@ int main(int argc, char * argv[])
               width, rounds, item);
         });
       });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = outputBuffer.get_access<sycl_read>(cgh);
-      cgh.copy(acc, output);
-    });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  q.submit([&] (handler &cgh) {
+    auto acc = outputBuffer.get_access<sycl_read>(cgh);
+    cgh.copy(acc, output);
+  }).wait();
 
   // Verify
   unsigned char *verificationOutput = (unsigned char *) malloc(width*height*sizeof(unsigned char));
@@ -140,9 +156,9 @@ int main(int argc, char * argv[])
 
   /* compare the results and see if they match */
   if(memcmp(output, verificationOutput, height*width*sizeof(unsigned char)) == 0)
-    std::cout<<"Passed!\n";
+    std::cout<<"Pass\n";
   else
-    std::cout<<"Failed\n";
+    std::cout<<"Fail\n";
 
   /* release program resources (input memory etc.) */
   if(input) free(input);

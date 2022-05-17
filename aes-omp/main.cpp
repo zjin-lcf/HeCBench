@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <omp.h>
+#include <chrono>
+
 #include "SDKBitMap.h"
 #include "aes.h"
 #include "kernels.cpp"
@@ -10,6 +12,12 @@
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <iterations> <0 or 1> <path to bitmap image file>\n", argv[0]);
+    printf("0=encrypt, 1=decrypt\n");
+    return 1;
+  }
+
   const unsigned int keySizeBits = 128;
   const unsigned int rounds = 10;
   const unsigned int seed = 123;
@@ -72,6 +80,8 @@ int main(int argc, char * argv[])
                                  rsbox[0:256]) \
                         map(alloc: output[0:sizeBytes])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     if (decrypt) 
@@ -88,9 +98,13 @@ int main(int argc, char * argv[])
         (uchar4*)roundKey,
         sbox,
         width, height, rounds);
-
-    #pragma omp target update from (output[0:sizeBytes])
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  #pragma omp target update from (output[0:sizeBytes])
 }
 
   // Verify
@@ -101,9 +115,9 @@ int main(int argc, char * argv[])
 
   /* compare the results and see if they match */
   if(memcmp(output, verificationOutput, height*width*sizeof(uchar)) == 0)
-    std::cout<<"Passed!\n";
+    std::cout<<"Pass\n";
   else
-    std::cout<<"Failed\n";
+    std::cout<<"Fail\n";
 
   /* release program resources (input memory etc.) */
   if(input) free(input);

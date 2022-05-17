@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <cuda.h>
+
 #include "SDKBitMap.h"
 #include "aes.h"
 #include "kernels.cu"
@@ -10,6 +12,12 @@
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <iterations> <0 or 1> <path to bitmap image file>\n", argv[0]);
+    printf("0=encrypt, 1=decrypt\n");
+    return 1;
+  }
+
   const unsigned int keySizeBits = 128;
   const unsigned int rounds = 10;
   const unsigned int seed = 123;
@@ -88,6 +96,9 @@ int main(int argc, char * argv[])
   dim3 grid (width/4, height/4);
   dim3 block (1, 4);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     if (decrypt) 
@@ -105,8 +116,14 @@ int main(int argc, char * argv[])
         sBoxBuffer,
         width, rounds);
 
-    cudaMemcpy(output, outputBuffer, width * height, cudaMemcpyDeviceToHost);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  cudaMemcpy(output, outputBuffer, width * height, cudaMemcpyDeviceToHost);
 
   // Verify
   uchar *verificationOutput = (uchar *) malloc(width*height*sizeof(uchar));
@@ -116,9 +133,9 @@ int main(int argc, char * argv[])
 
   /* compare the results and see if they match */
   if(memcmp(output, verificationOutput, height*width*sizeof(uchar)) == 0)
-    std::cout<<"Passed!\n";
+    std::cout<<"Pass\n";
   else
-    std::cout<<"Failed\n";
+    std::cout<<"Fail\n";
 
   /* release program resources (input memory etc.) */
   cudaFree(inputBuffer);
