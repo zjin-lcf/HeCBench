@@ -119,6 +119,11 @@ inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
 
 int main(int argc, char** argv)
 {
+  if (argc != 3) {
+    printf("Usage: %s <problem size> <number of passes>\n", argv[0]);
+    printf("Problem size [0-3]: 0=1M, 1=8M, 2=96M, 3=256M\n");
+    return 1;
+  }
 
   srand(2);
   int i;
@@ -128,8 +133,7 @@ int main(int argc, char** argv)
 
   // Convert to MB
   int probSizes[4] = { 1, 8, 96, 256 };
-  unsigned long bytes = 0;
-  bytes = probSizes[select];
+  unsigned long bytes = probSizes[select];
   bytes *= 1024 * 1024;
 
   // now determine how much available memory will be used
@@ -157,7 +161,6 @@ int main(int argc, char** argv)
 
   memcpy(reference, source, used_bytes);
 
-
   const char *sizeStr;
   stringstream ss;
   ss << "N=" << N;
@@ -165,7 +168,7 @@ int main(int argc, char** argv)
 
   auto start = std::chrono::steady_clock::now();
 
-#pragma omp target data map (tofrom: source[0:N])
+  #pragma omp target data map (tofrom: source[0:N])
   {
     for (int k=0; k<passes; k++) {
 
@@ -215,19 +218,19 @@ int main(int argc, char** argv)
           FFT8( data );
 
           //twiddle8( data, hi, 64 );
-#ifdef UNROLL
-  data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
-  data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
-  data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
-  data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
-  data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
-  data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
-  data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
-#else
-  for( int j = 1; j < 8; j++ ){                                       
-      data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) ); 
-  }                                                                   
-#endif
+          #ifdef UNROLL
+            data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
+            data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
+            data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
+            data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
+            data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
+            data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
+            data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
+          #else
+            for( int j = 1; j < 8; j++ ){                                       
+                data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) ); 
+            }                                                                   
+          #endif
 
           //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
@@ -245,7 +248,6 @@ int main(int argc, char** argv)
             source[blockIdx+i*64] = data[reversed[i]];
         }
       }
-
 
       #pragma omp target teams num_teams(n_ffts) thread_limit(64)
       {
@@ -265,18 +267,18 @@ int main(int argc, char** argv)
           IFFT8( data );
 
           //itwiddle8( data, tid, 512 );
-#ifdef UNROLL
-  data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
-  data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
-  data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
-  data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
-  data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
-  data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
-  data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
-#else
-  for( int j = 1; j < 8; j++ )
-      data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)512)*(tid)) );
-#endif
+          #ifdef UNROLL
+            data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
+            data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
+            data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
+            data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
+            data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
+            data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
+            data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
+          #else
+            for( int j = 1; j < 8; j++ )
+                data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)512)*(tid)) );
+          #endif
 
           //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
@@ -291,19 +293,18 @@ int main(int argc, char** argv)
           IFFT8( data );
 
           //itwiddle8( data, hi, 64 );
-#ifdef UNROLL
-  data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
-  data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
-  data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
-  data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
-  data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
-  data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
-  data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
-#else
-  for( int j = 1; j < 8; j++ )
-      data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)64)*hi) );
-#endif
-
+          #ifdef UNROLL
+            data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
+            data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
+            data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
+            data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
+            data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
+            data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
+            data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
+          #else
+            for( int j = 1; j < 8; j++ )
+                data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)64)*hi) );
+          #endif
 
           //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
           for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
@@ -352,4 +353,3 @@ int main(int argc, char** argv)
   free(reference);
   free(source);
 }
-
