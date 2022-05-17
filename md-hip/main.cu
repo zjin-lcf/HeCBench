@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -119,12 +120,18 @@ int main(int argc, char** argv)
 
   checkResults<FPTYPE, FORCEVECTYPE, POSVECTYPE>(h_force, position, neighborList, nAtom);
 
+  auto start = std::chrono::steady_clock::now();
+
   for (int j = 0; j < iteration; j++)
   {
     hipLaunchKernelGGL(md, grids, block, 0, 0, d_position, d_force, d_neighborList,
       nAtom, maxNeighbors, lj1, lj2, cutsq);
   }
+
   hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iteration << " (s)\n";
 
   hipFree(d_position);
   hipFree(d_force);
