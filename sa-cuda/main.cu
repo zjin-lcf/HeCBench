@@ -153,15 +153,10 @@ void suffixArray(thrust::device_vector<int>& s,
   Init_d_s12 <<<numBlocks, numThreads>>> (pd_s12, n02);
 
   // radix sort - using SA12 to store keys
-  keybits <<<numBlocks, numThreads>>> (pd_SA12, pd_s12, pd_s, n02, 2);
-
-  thrust::sort_by_key(d_SA12.begin(), d_SA12.begin() + n02, d_s12.begin());
-
-  keybits <<<numBlocks, numThreads>>> (pd_SA12, pd_s12, pd_s, n02, 1);
-  thrust::sort_by_key(d_SA12.begin(), d_SA12.begin() + n02, d_s12.begin());
-
-  keybits <<<numBlocks, numThreads>>> (pd_SA12, pd_s12, pd_s, n02, 0);
-  thrust::sort_by_key(d_SA12.begin(), d_SA12.begin() + n02, d_s12.begin());
+  for (int i = 2; i >= 0; i--) {
+    keybits <<<numBlocks, numThreads>>> (pd_SA12, pd_s12, pd_s, n02, i);
+    thrust::sort_by_key(d_SA12.begin(), d_SA12.begin() + n02, d_s12.begin());
+  }
 
   d_SA12 = d_s12;
 
