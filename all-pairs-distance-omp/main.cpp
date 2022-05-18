@@ -42,6 +42,13 @@ void CPU(int * data, int * distance) {
 
 int main(int argc, char **argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  
+  const int iterations = atoi(argv[1]);
+
   /* host data */
   int *data; 
   char *data_char;
@@ -55,8 +62,6 @@ int main(int argc, char **argv) {
   struct timezone tzp;
   /* verification result */ 
   int status;
-  /* output file for timing results */
-  FILE *out = fopen("timing.txt","a");
 
   /* seed RNG */
   srand(2);
@@ -83,14 +88,13 @@ int main(int argc, char **argv) {
   gettimeofday(&tp, &tzp);
   stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
   elapsedTime = stop_cpu - start_cpu;
-  fprintf(out,"%.2f ",elapsedTime);
+  printf("CPU time: %f (us)\n",elapsedTime);
 
 #pragma omp target data map(to: data_char[0:INSTANCES * ATTRIBUTES]) \
                         map(alloc: gpu_distance[0:INSTANCES * INSTANCES ])
 {
-
-  /* run the register-based kernel 10 times */
-  for (int n = 0; n < 10; n++) {
+  for (int n = 0; n < iterations; n++) {
+    /* register-based kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -130,17 +134,17 @@ int main(int argc, char **argv) {
     #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime = stop_gpu - start_gpu;
-    fprintf(out,"%.2f ",elapsedTime);
-
+    elapsedTime += stop_gpu - start_gpu;
   }
-  /* check CPU and GPU results */
+
+  printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 
-  /* run the shared-based kernel 10 times */
-  for (int n = 0; n < 10; n++) {
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
+    /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -202,18 +206,17 @@ int main(int argc, char **argv) {
       }
     }
     #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
-  gettimeofday(&tp, &tzp);
-  stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-  elapsedTime = stop_gpu - start_gpu;
-  fprintf(out,"%.2f ",elapsedTime);
+    gettimeofday(&tp, &tzp);
+    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
+    elapsedTime += stop_gpu - start_gpu;
   }
-  /* check CPU and GPU results */
+
+  printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 }
 
-  fclose(out);
   free(cpu_distance);
   free(gpu_distance);
   free(data_char);
