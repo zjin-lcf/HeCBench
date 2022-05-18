@@ -13,7 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = main.cpp
+source = main.cu
 
 obj = $(source:.cpp=.o)
 
@@ -46,12 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
-
+	./$(program) 100

@@ -41,6 +41,13 @@ void CPU(int * data, int * distance) {
 
 int main(int argc, char **argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  
+  const int iterations = atoi(argv[1]);
+
   /* host data */
   int *data; 
   char *data_char;
@@ -55,9 +62,6 @@ int main(int argc, char **argv) {
   struct timezone tzp;
   /* verification result */ 
   int status;
-
-  /* output file for timing results */
-  FILE *out = fopen("timing.txt","a");
 
   /* seed RNG */
   srand(2);
@@ -98,159 +102,158 @@ int main(int argc, char **argv) {
   gettimeofday(&tp, &tzp);
   stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
   elapsedTime = stop_cpu - start_cpu;
-  fprintf(out,"%f ",elapsedTime);
+  printf("CPU time: %f (us)\n",elapsedTime);
 
-  for (int n = 0; n < 10; n++) {
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (handler &h) {
-        auto distance_acc = distance_device.get_access<sycl_write>(h);
-        h.copy(gpu_distance, distance_acc);
-        });
+      auto distance_acc = distance_device.get_access<sycl_write>(h);
+      h.copy(gpu_distance, distance_acc);
+    });
 
     q.submit([&] (handler &h) {
-        auto data = data_char_device.get_access<sycl_read>(h);
-        auto distance = distance_device.get_access<sycl_atomic>(h);
-        h.parallel_for<class GPUregister>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
-            int idx = item.get_local_id(1); //threadIdx.x;
-            int gx = item.get_group(1); //blockIdx.x;
-            int gy = item.get_group(0); //blockIdx.y;
+      auto data = data_char_device.get_access<sycl_read>(h);
+      auto distance = distance_device.get_access<sycl_atomic>(h);
+      h.parallel_for<class GPUregister>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
+        int idx = item.get_local_id(1); //threadIdx.x;
+        int gx = item.get_group(1); //blockIdx.x;
+        int gy = item.get_group(0); //blockIdx.y;
 
-            vec<char, 4> j, k;
-            for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-              j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-              k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+        vec<char, 4> j, k;
+        for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
+          j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
+          k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
 
-            /* use a local variable (stored in register) to hold intermediate
-               values. This reduces writes to global memory */
-              int count = 0;
+        /* use a local variable (stored in register) to hold intermediate
+           values. This reduces writes to global memory */
+          int count = 0;
 
-              if(j.x() ^ k.x()) 
-                count++; 
-              if(j.y() ^ k.y())
-                count++;
-              if(j.z() ^ k.z())
-                count++;
-              if(j.w() ^ k.w())
-                count++;
+          if(j.x() ^ k.x()) 
+            count++; 
+          if(j.y() ^ k.y())
+            count++;
+          if(j.z() ^ k.z())
+            count++;
+          if(j.w() ^ k.w())
+            count++;
 
-              /* Only one atomic write to global memory */
-              atomic_fetch_add(distance[INSTANCES*gx + gy], count);
-            }
-        });
+          /* Only one atomic write to global memory */
+          atomic_fetch_add(distance[INSTANCES*gx + gy], count);
+        }
+      });
     });
     q.submit([&] (handler &h) {
-        auto distance_acc = distance_device.get_access<sycl_read>(h);
-        h.copy(distance_acc, gpu_distance);
-        });
-    q.wait();
+      auto distance_acc = distance_device.get_access<sycl_read>(h);
+      h.copy(distance_acc, gpu_distance);
+    }).wait();
 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime = stop_gpu - start_gpu;
-    fprintf(out,"%f ",elapsedTime);
+    elapsedTime += stop_gpu - start_gpu;
   }
 
+  printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 
-  for (int n = 0; n < 10; n++) {
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (handler &h) {
-        auto distance_acc = distance_device.get_access<sycl_write>(h);
-        h.copy(gpu_distance, distance_acc);
-        });
+      auto distance_acc = distance_device.get_access<sycl_write>(h);
+      h.copy(gpu_distance, distance_acc);
+    });
 
     /*  coalesced GPU implementation of the all-pairs kernel using
         character data types, registers, and shared memory */
     q.submit([&] (handler &h) {
-        auto data = data_char_device.get_access<sycl_read>(h);
-        auto distance = distance_device.get_access<sycl_read_write>(h);
-        accessor<int, 1, sycl_read_write, access::target::local> dist(THREADS, h); 
-        h.parallel_for<class GPUshared>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
-            int idx = item.get_local_id(1); //threadIdx.x;
-            int gx = item.get_group(1); //blockIdx.x;
-            int gy = item.get_group(0); //blockIdx.y;
+      auto data = data_char_device.get_access<sycl_read>(h);
+      auto distance = distance_device.get_access<sycl_read_write>(h);
+      accessor<int, 1, sycl_read_write, access::target::local> dist(THREADS, h); 
+      h.parallel_for<class GPUshared>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
+        int idx = item.get_local_id(1); //threadIdx.x;
+        int gx = item.get_group(1); //blockIdx.x;
+        int gy = item.get_group(0); //blockIdx.y;
 
-            /* each thread initializes its own location of the shared array */ 
-            dist[idx] = 0;
+        /* each thread initializes its own location of the shared array */ 
+        dist[idx] = 0;
 
-            /* At this point, the threads must be synchronized to ensure that
-               the shared array is fully initialized. */
-            item.barrier(access::fence_space::local_space);
+        /* At this point, the threads must be synchronized to ensure that
+           the shared array is fully initialized. */
+        item.barrier(access::fence_space::local_space);
 
-            vec<char, 4> j, k;
-            for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-              j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-              k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+        vec<char, 4> j, k;
+        for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
+          j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
+          k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
 
-            /* use a local variable (stored in register) to hold intermediate
-               values. This reduces writes to global memory */
-              char count = 0;
-              if(j.x() ^ k.x()) 
-                count++; 
-              if(j.y() ^ k.y())
-                count++;
-              if(j.z() ^ k.z())
-                count++;
-              if(j.w() ^ k.w())
-                count++;
+        /* use a local variable (stored in register) to hold intermediate
+           values. This reduces writes to global memory */
+          char count = 0;
+          if(j.x() ^ k.x()) 
+            count++; 
+          if(j.y() ^ k.y())
+            count++;
+          if(j.z() ^ k.z())
+            count++;
+          if(j.w() ^ k.w())
+            count++;
 
-              /* Increment shared array */
-              dist[idx] += count;
-            }
+          /* Increment shared array */
+          dist[idx] += count;
+        }
 
-            /* Synchronize threads to make sure all have completed their updates
-               of the shared array. Since the distances for each thread are read
-               by thread 0 below, this must be ensured. Above, it was not
-               necessary because each thread was accessing its own memory
-               */
-            item.barrier(access::fence_space::local_space);
+        /* Synchronize threads to make sure all have completed their updates
+           of the shared array. Since the distances for each thread are read
+           by thread 0 below, this must be ensured. Above, it was not
+           necessary because each thread was accessing its own memory
+           */
+        item.barrier(access::fence_space::local_space);
 
-            /* Reduction: Thread 0 will add the value of all other threads to
-               its own */ 
-            if(idx == 0) {
-              for(int i = 1; i < THREADS; i++) {
-                dist[0] += dist[i];
-              }
+        /* Reduction: Thread 0 will add the value of all other threads to
+           its own */ 
+        if(idx == 0) {
+          for(int i = 1; i < THREADS; i++) {
+            dist[0] += dist[i];
+          }
 
-              /* Thread 0 will then write the output to global memory. Note that
-                 this does not need to be performed atomically, because only one
-                 thread per block is writing to global memory, and each block
-                 corresponds to a unique memory address. 
-                 */
-              distance[INSTANCES*gy + gx] = dist[0];
-            }
-        });
+          /* Thread 0 will then write the output to global memory. Note that
+             this does not need to be performed atomically, because only one
+             thread per block is writing to global memory, and each block
+             corresponds to a unique memory address. 
+             */
+          distance[INSTANCES*gy + gx] = dist[0];
+        }
+      });
     });
     q.submit([&] (handler &h) {
-        auto distance_acc = distance_device.get_access<sycl_read>(h);
-        h.copy(distance_acc, gpu_distance);
-        });
-    q.wait();
+      auto distance_acc = distance_device.get_access<sycl_read>(h);
+      h.copy(distance_acc, gpu_distance);
+    }).wait();
+
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime = stop_gpu - start_gpu;
-    fprintf(out,"%f ",elapsedTime);
+    elapsedTime += stop_gpu - start_gpu;
   }
+
+  printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 
-  fclose(out);
   free(cpu_distance);
   free(gpu_distance);
   free(data);
 
   return status;
 }
-
-

@@ -134,6 +134,13 @@ __global__ void GPUshared(const char *data, int *distance) {
 
 int main(int argc, char **argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  
+  const int iterations = atoi(argv[1]);
+
   /* host data */
   int *data; 
   char *data_char;
@@ -156,9 +163,6 @@ int main(int argc, char **argv) {
   struct timezone tzp;
   /* verification result */ 
   int status;
-
-  /* output file for timing results */
-  FILE *out = fopen("timing.txt","a");
 
   /* seed RNG */
   srand(2);
@@ -203,9 +207,10 @@ int main(int argc, char **argv) {
   gettimeofday(&tp, &tzp);
   stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
   elapsedTime = stop_cpu - start_cpu;
-  fprintf(out,"%f ",elapsedTime);
+  printf("CPU time: %f (us)\n",elapsedTime);
 
-  for (int n = 0; n < 10; n++) {
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
@@ -218,15 +223,16 @@ int main(int argc, char **argv) {
         cudaMemcpyDeviceToHost); 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime = stop_gpu - start_gpu;
-    fprintf(out,"%f ",elapsedTime);
+    elapsedTime += stop_gpu - start_gpu;
   }
 
+  printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 
-  for (int n = 0; n < 10; n++) {
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
@@ -239,14 +245,14 @@ int main(int argc, char **argv) {
         cudaMemcpyDeviceToHost); 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime = stop_gpu - start_gpu;
-    fprintf(out,"%f ",elapsedTime);
+    elapsedTime += stop_gpu - start_gpu;
   }
+
+  printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
 
-  fclose(out);
   free(cpu_distance);
   free(gpu_distance);
   free(data);
