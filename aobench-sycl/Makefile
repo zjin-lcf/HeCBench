@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = ao.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -70,8 +70,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) ao.ppm
 
 run: $(program)
-	./$(program) 
-
+	./$(program) 100
