@@ -58,36 +58,32 @@ int main() {
       cudaMemset(maskBuffer,0,imgSize*sizeof(int));
       cudaMemset(sliccCenterList,0,nMaxSegs*sizeof(SLICClusterCenter));
 
+      cudaDeviceSynchronize();
       auto start = std::chrono::steady_clock::now();
+
       cudaMemcpy(rgbBuffer,imgPixels,imgSize*sizeof(uchar4),cudaMemcpyHostToDevice);
 
       switch (method)
       {
         case 1:
-
-          Rgb2CIELab(rgbBuffer,floatBuffer,width,height);
-          SLICImgSeg(maskBuffer,floatBuffer,width,height,nSeg,nIt,sliccCenterList,weight);
-          break;
+          Rgb2CIELab(rgbBuffer,floatBuffer,width,height); break;
 
         case 2:
-
-          Rgb2XYZ(rgbBuffer,floatBuffer,width,height);
-          SLICImgSeg(maskBuffer,floatBuffer,width,height,nSeg,nIt,sliccCenterList,weight);
-          break;  
+          Rgb2XYZ(rgbBuffer,floatBuffer,width,height); break;
 
         case 3:
-
-          Uchar4ToFloat4(rgbBuffer,floatBuffer,width,height);
-          SLICImgSeg(maskBuffer,floatBuffer,width,height,nSeg,nIt,sliccCenterList,weight);
-          break;
+          Uchar4ToFloat4(rgbBuffer,floatBuffer,width,height); break;
       }
+
+      SLICImgSeg(maskBuffer,floatBuffer,width,height,nSeg,nIt,sliccCenterList,weight);
+
       cudaMemcpy(maskPixels,maskBuffer,imgSize*sizeof(int),cudaMemcpyDeviceToHost);
 
       auto end = std::chrono::steady_clock::now();
       std::chrono::duration<float> time = end - start;
 
       printf("%s: ", SPSV == 1 ? "gSLIC-base" : "gSLIC-improved");   
-      printf("device offload time is %f\n", time.count());
+      printf("device offload time is %f (s)\n", time.count());
 
       long checkSum = 0;
       for (int i = 0; i < imgSize; i++) {
