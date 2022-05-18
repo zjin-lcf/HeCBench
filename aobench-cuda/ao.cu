@@ -11,7 +11,6 @@
 #define NSUBSAMPLES  2
 #define NAO_SAMPLES  8
 #define BLOCK_SIZE   16
-#define LOOPMAX 10
 
 typedef struct _vec
 {
@@ -375,35 +374,36 @@ void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* sph
   cudaFree(d_spheres);
 }
 
-
-void callRender( const Sphere *spheres, const Plane &plane )
-{
-  unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
-  render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
-  saveppm( "ao.ppm", WIDTH, HEIGHT, img );
-  free( img );
-}
-
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  const int LOOPMAX = atoi(argv[1]);
+
   // three spheres in the image
   Sphere spheres[3];
   Plane plane;
 
   init_scene(spheres, plane);
 
+  unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
+
   clock_t start;
   start = clock();
   for( int i = 0; i < LOOPMAX; ++i ){
-    callRender(spheres, plane);
+    render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
   }
   clock_t end = clock();
   float delta = ( float )end - ( float )start;
   float msec = delta * 1000.0 / ( float )CLOCKS_PER_SEC;
 
-  printf( "total time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
-  printf( "average render time:%f sec.\n", msec / 1000.0 / (float)LOOPMAX );
+  printf( "Total render time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
+  printf( "Average render time: %f sec.\n", msec / 1000.0 / (float)LOOPMAX );
 
+  saveppm( "ao.ppm", WIDTH, HEIGHT, img );
+  free( img );
 
   return 0;
 }
