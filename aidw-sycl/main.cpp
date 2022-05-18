@@ -23,6 +23,7 @@
 #include <cstdlib>     
 #include <vector>
 #include <cmath>
+#include <chrono>
 #include "common.h"
 #include "reference.h"
 
@@ -146,8 +147,16 @@ void AIDW_Kernel_Tiled(
 
 int main(int argc, char *argv[])
 {
-  const int numk = atoi(argv[1]);    // number of points (unit: 1K)
-  const int check = atoi(argv[2]);  // do check for small problem sizes
+  if (argc != 4) {
+    printf("Usage: %s <pts> <check> <iterations>\n", argv[0]);
+    printf("pts: number of points (unit: 1K)\n");
+    printf("check: enable verification when the value is 1\n");
+    return 1;
+  }
+
+  const int numk = atoi(argv[1]); // number of points (unit: 1K)
+  const int check = atoi(argv[2]); // do check for small problem sizes
+  const int iterations = atoi(argv[3]); // repeat kernel execution
 
   const int dnum = numk * 1024;
   const int inum = dnum;
@@ -211,32 +220,29 @@ int main(int argc, char *argv[])
   range<1> lws (BLOCK_SIZE);
 
   // Weighted Interpolate using AIDW
-
-  for (int i = 0; i < 100; i++) {
-    q.submit([&] (handler &cgh) {
-      auto dx = d_dx.get_access<sycl_read>(cgh);
-      auto dy = d_dy.get_access<sycl_read>(cgh);
-      auto dz = d_dz.get_access<sycl_read>(cgh);
-      auto ix = d_ix.get_access<sycl_read>(cgh);
-      auto iy = d_iy.get_access<sycl_read>(cgh);
-      auto iz = d_iz.get_access<sycl_discard_write>(cgh);
-      auto avg_dist = d_avg_dist.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class aidw>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        AIDW_Kernel(dx.get_pointer(), 
-                    dy.get_pointer(),
-                    dz.get_pointer(),
-                    dnum,
-                    ix.get_pointer(),
-                    iy.get_pointer(),
-                    iz.get_pointer(),
-                    inum,
-                    area,
-                    avg_dist.get_pointer(),
-                    item);
-      });
+  q.submit([&] (handler &cgh) {
+    auto dx = d_dx.get_access<sycl_read>(cgh);
+    auto dy = d_dy.get_access<sycl_read>(cgh);
+    auto dz = d_dz.get_access<sycl_read>(cgh);
+    auto ix = d_ix.get_access<sycl_read>(cgh);
+    auto iy = d_iy.get_access<sycl_read>(cgh);
+    auto iz = d_iz.get_access<sycl_discard_write>(cgh);
+    auto avg_dist = d_avg_dist.get_access<sycl_read>(cgh);
+    cgh.parallel_for<class aidw>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      AIDW_Kernel(dx.get_pointer(), 
+                  dy.get_pointer(),
+                  dz.get_pointer(),
+                  dnum,
+                  ix.get_pointer(),
+                  iy.get_pointer(),
+                  iz.get_pointer(),
+                  inum,
+                  area,
+                  avg_dist.get_pointer(),
+                  item);
     });
-  }
-
+  });
+  
   q.submit([&] (handler &cgh) {
     auto acc = d_iz.get_access<sycl_read>(cgh);
     cgh.copy(acc, iz.data());
@@ -247,7 +253,9 @@ int main(int argc, char *argv[])
     printf("%s\n", ok ? "PASS" : "FAIL");
   }
 
-  for (int i = 0; i < 100; i++) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iterations; i++) {
     q.submit([&] (handler &cgh) {
       auto dx = d_dx.get_access<sycl_read>(cgh);
       auto dy = d_dy.get_access<sycl_read>(cgh);
@@ -278,15 +286,10 @@ int main(int argc, char *argv[])
     });
   }
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_iz.get_access<sycl_read>(cgh);
-    cgh.copy(acc, iz.data());
-  }).wait();
-
-  if (check) {
-    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
-    printf("%s\n", ok ? "PASS" : "FAIL");
-  }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
   return 0;
 }

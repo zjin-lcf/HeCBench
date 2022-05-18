@@ -1,7 +1,7 @@
 /*
  * GPU-accelerated AIDW interpolation algorithm 
  *
- * Implemented with / without CUDA Shared Memory
+ * Implemented with / without Shared Memory
  *
  * By Dr.Gang Mei
  *
@@ -23,6 +23,7 @@
 #include <cstdlib>     
 #include <vector>
 #include <cmath>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "reference.h"
 
@@ -148,8 +149,16 @@ void AIDW_Kernel_Tiled(
 
 int main(int argc, char *argv[])
 {
-  const int numk = atoi(argv[1]);    // number of points (unit: 1K)
-  const int check = atoi(argv[2]);  // do check for small problem sizes
+  if (argc != 4) {
+    printf("Usage: %s <pts> <check> <iterations>\n", argv[0]);
+    printf("pts: number of points (unit: 1K)\n");
+    printf("check: enable verification when the value is 1\n");
+    return 1;
+  }
+
+  const int numk = atoi(argv[1]); // number of points (unit: 1K)
+  const int check = atoi(argv[2]); // do check for small problem sizes
+  const int iterations = atoi(argv[3]); // repeat kernel execution
 
   const int dnum = numk * 1024;
   const int inum = dnum;
@@ -220,8 +229,7 @@ int main(int argc, char *argv[])
 
   // Weighted Interpolate using AIDW
 
-  for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(AIDW_Kernel, blocksPerGrid, threadsPerBlock, 0, 0, 
+  hipLaunchKernelGGL(AIDW_Kernel, blocksPerGrid, threadsPerBlock, 0, 0, 
       d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
   hipMemcpy(iz.data(), d_iz, inum_size, hipMemcpyDeviceToHost); 
 
@@ -230,16 +238,16 @@ int main(int argc, char *argv[])
     printf("%s\n", ok ? "PASS" : "FAIL");
   }
 
-  for (int i = 0; i < 100; i++)
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iterations; i++)
     hipLaunchKernelGGL(AIDW_Kernel_Tiled, blocksPerGrid, threadsPerBlock, 0, 0, 
       d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
 
-  hipMemcpy(iz.data(), d_iz, inum_size, hipMemcpyDeviceToHost); 
-
-  if (check) {
-    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
-    printf("%s\n", ok ? "PASS" : "FAIL");
-  }
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
   hipFree(d_dx);
   hipFree(d_dy);
