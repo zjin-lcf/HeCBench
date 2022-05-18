@@ -9,6 +9,7 @@
  *****************************************************************************/
 
 #include <cassert>
+#include <chrono>
 #include <random>
 #include <algorithm>
 #include <iostream>
@@ -44,11 +45,13 @@ void run(long int input_size) {
 #endif
   queue q(dev_sel);
 
+  auto start = std::chrono::steady_clock::now();
+
   for(float lambda = 0.1f; lambda < 2.5f; lambda += 0.16) {
 
     // vectors to record timings
     std::cout << std::left << std::setw(5) << lambda << std::setfill(' ');
-
+kk
     // generate random, exponentially distributed data
     auto dist = ANSTableGenerator::generate_distribution(
         SEED, NUM_SYMBOLS, NUM_STATES,
@@ -155,6 +158,10 @@ void run(long int input_size) {
 
     free(h_sequence_synced);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Total elapsed time " << time * 1e-9f << " (s)\n";
 }
 
 int main(int argc, char **argv) {
