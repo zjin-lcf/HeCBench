@@ -80,7 +80,9 @@ void Compute_SA_From_UniqueRank(const int*__restrict__ s12,
 }
 
 __global__
-void InitScan2(int* SA12, int* scan, int n0, int n02)
+void InitScan2(const int*__restrict__ SA12,
+                     int*__restrict__ scan,
+               int n0, int n02)
 {
   int index = blockIdx.x*blockDim.x + threadIdx.x;
   if (index >= n02)
