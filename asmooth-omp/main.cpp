@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #include "reference.cpp"
@@ -39,6 +40,8 @@ int main(int argc, char* argv[]) {
     norm[i] = box[i] = out[i] = 0;
   }
 
+  double time = 0;
+
   #pragma omp target data map(alloc: img[0:size], norm[0:size], box[0:size]) \
                           map(to: out[0:size]) 
   {
@@ -47,6 +50,8 @@ int main(int argc, char* argv[]) {
       #pragma omp target update to(img[0:size])
       // reset norm
       #pragma omp target update to(norm[0:size])
+
+      auto start = std::chrono::steady_clock::now();
 
       // launch three kernels
       #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
@@ -108,7 +113,11 @@ int main(int argc, char* argv[]) {
           if (ksum != 0) out[x*Ly+y] = sum / (float)ksum;
         }
       }
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
+
+    printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
     #pragma omp target update from(out[0:size])
     #pragma omp target update from(box[0:size])
