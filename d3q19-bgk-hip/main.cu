@@ -26,7 +26,6 @@
 
 #include <stdio.h>
 #include <time.h>
-#include <assert.h>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
 
@@ -36,7 +35,7 @@
 inline void handleError(hipError_t code, const char *file, int line)
 {
   if (code != hipSuccess) {
-    fprintf(stderr, "HIP assert: %s %s %d\n", hipGetErrorString(code), file, line);
+    fprintf(stderr, "HIP error: %s %s %d\n", hipGetErrorString(code), file, line);
   }
 }
 
@@ -107,6 +106,22 @@ void init_and_allocate_data(BoxCU &domain, lbm_vars *h_vars, lbm_vars *d_vars){
 
   HANDLE_KERNEL_ERROR(find_wall<D3Q19><<<dim3(1, domain.ny, domain.nz), domain.nx>>>(
     d_vars->boundary_flag, d_vars->boundary_dirs, d_vars->boundary_values, domain, 0));
+}
+
+void deallocate_data(lbm_vars *h_vars, lbm_vars *d_vars) {
+  free(h_vars->u.u0);
+  free(h_vars->u_star.u0);
+  free(h_vars->g.u0);
+  free(h_vars->f0);
+  free(h_vars->f1);
+  HANDLE_ERROR(hipFree(d_vars->u_star.u0));
+  HANDLE_ERROR(hipFree(d_vars->g.u0));
+  HANDLE_ERROR(hipFree(d_vars->f0));
+  HANDLE_ERROR(hipFree(d_vars->f1));
+  HANDLE_ERROR(hipFree(d_vars->boundary_flag));
+  HANDLE_ERROR(hipFree(d_vars->boundary_values));
+  HANDLE_ERROR(hipFree(d_vars->boundary_dirs));
+  HANDLE_ERROR(hipFree(d_vars->r));
 }
 
 double run_benchmark(BoxCU &domain, lbm_vars h_vars, lbm_vars d_vars) {
@@ -223,6 +238,9 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < 10; ++i) {
     mlups[i] = run_benchmark(domain, h_vars, d_vars);
   }
+
+  deallocate_data(&h_vars, &d_vars);
+
   printf("\nPerformance: MLUPS\n");
   for (int i = 0; i < 10; ++i) {
     printf("%.4f\n", mlups[i]);
