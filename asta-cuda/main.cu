@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <vector>
 #include <algorithm>  // for_each
+#include <chrono>
 #include <cuda.h>
 
 #include "support/common.h"
@@ -47,9 +48,9 @@
 __global__ void PTTWAC_soa_asta(const int A, 
                                 const int B, 
                                 const int b, 
-                                  T *input, 
-                                int *finished, 
-                                int *head) 
+                                  T *__restrict__ input, 
+                                int *__restrict__ finished, 
+                                int *__restrict__ head) 
 {
   __shared__ int lmem[2];
 
@@ -223,7 +224,7 @@ int main(int argc, char **argv) {
   int threads = p.n_gpu_threads;
   const int max_gpu_threads = 256;
   assert(threads <= max_gpu_threads && 
-          "The thread block size is greater than the maximum thread block size that can be used on this device");
+         "The thread block size is at most 256");
 
   // Allocate
   int tiled_n       = divceil(p.n, p.s);
@@ -251,18 +252,30 @@ int main(int argc, char **argv) {
   h_head[0] = 0;
   memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
 
-  // Loop over the CPU or GPU kernel
+  double time = 0;
+
+  // Loop over the kernel on a device
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
     cudaMemcpyAsync(d_in_out, h_in_backup, in_size * sizeof(T), cudaMemcpyHostToDevice, 0);
     cudaMemcpyAsync(d_finished, h_finished, sizeof(int) * finished_size, cudaMemcpyHostToDevice, 0);
     cudaMemcpyAsync(d_head, h_head, sizeof(int), cudaMemcpyHostToDevice, 0);
 
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     PTTWAC_soa_asta<<<dimGrid, dimBlock>>>(p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    if (rep >= p.n_warmup) 
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     cudaMemcpyAsync(h_in_out, d_in_out, in_size * sizeof(T), cudaMemcpyDeviceToHost, 0);
   }
   cudaDeviceSynchronize();
+
+  printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 
   // Verify
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
