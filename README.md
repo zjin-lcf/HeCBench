@@ -219,6 +219,9 @@ Early results are shown [here](results/README.md)
 ### d2q9_bgk (sycl)
   A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
 
+### d3q19_bgk (cuda)
+  Lattice Boltzmann simulation framework based on C++ parallel algorithms (https://gitlab.com/unigehpfs/stlbm)
+
 ### daphne (cuda)
   The Darmstadt automotive parallel heterogeneous benchmark suite (https://github.com/esa-tu-darmstadt/daphne-benchmark)
 
