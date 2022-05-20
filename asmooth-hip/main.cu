@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "reference.cpp"
@@ -8,9 +9,9 @@
 __global__ void smoothingFilter(
     int Lx, int Ly, 
     int Threshold, int MaxRad, 
-    const float*__restrict Img,
-            int*__restrict Box,
-          float*__restrict Norm)
+    const float*__restrict__ Img,
+            int*__restrict__ Box,
+          float*__restrict__ Norm)
 {
   int tid = threadIdx.x;
   int tjd = threadIdx.y;
@@ -67,7 +68,10 @@ __global__ void smoothingFilter(
   }
 }
 
-__global__ void normalizeFilter(int Lx, int Ly, float*__restrict Img, const float*__restrict Norm)
+__global__ void normalizeFilter(
+    int Lx, int Ly,
+          float*__restrict__ Img,
+    const float*__restrict__ Norm)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -80,9 +84,9 @@ __global__ void normalizeFilter(int Lx, int Ly, float*__restrict Img, const floa
 
 __global__ void outFilter( 
     int Lx, int Ly,
-    const float*__restrict Img,
-    const   int*__restrict Box,
-          float*__restrict Out )
+    const float*__restrict__ Img,
+    const   int*__restrict__ Box,
+          float*__restrict__ Out )
 {
   int tid = threadIdx.x;
   int tjd = threadIdx.y;
@@ -171,16 +175,28 @@ int main(int argc, char* argv[]) {
   // reset output
   hipMemcpy(d_out, out, sizeof(float) * size, hipMemcpyHostToDevice);
 
+  double time = 0;
+
   for (int i = 0; i < repeat; i++) {
     // restore input image
     hipMemcpy(d_img, img, sizeof(float) * size, hipMemcpyHostToDevice);
     // reset norm
     hipMemcpy(d_norm, norm, sizeof(float) * size, hipMemcpyHostToDevice);
+
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     // launch three kernels
     hipLaunchKernelGGL(smoothingFilter, grids, blocks, 0, 0, Lx, Ly, Threshold, MaxRad, d_img, d_box, d_norm);
     hipLaunchKernelGGL(normalizeFilter, grids, blocks, 0, 0, Lx, Ly, d_img, d_norm);
     hipLaunchKernelGGL(outFilter, grids, blocks, 0, 0, Lx, Ly, d_img, d_box, d_out);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
   hipMemcpy(out, d_out, sizeof(float) * size, hipMemcpyDeviceToHost);
   hipMemcpy(box, d_box, sizeof(int) * size, hipMemcpyDeviceToHost);

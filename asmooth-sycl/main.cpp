@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 #include "reference.cpp"
@@ -55,6 +56,8 @@ int main(int argc, char* argv[]) {
   range<2> gws ((Ly+15)/16*16, (Lx+15)/16*16);
   range<2> lws (16, 16);
 
+  double time = 0;
+
   for (int i = 0; i < repeat; i++) {
     // restore input image
     q.submit([&] (handler &cgh) {
@@ -67,6 +70,9 @@ int main(int argc, char* argv[]) {
       auto acc = d_norm.get_access<sycl_discard_write>(cgh);
       cgh.copy(norm, acc); 
     });
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     // launch three kernels
     q.submit([&] (handler &cgh) {
@@ -191,7 +197,13 @@ int main(int argc, char* argv[]) {
         }
       });
     });
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_out.get_access<sycl_read>(cgh);
