@@ -36,10 +36,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
-#include <thread>
-#include <atomic>
 #include <vector>
 #include <algorithm>  // for_each
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "support/common.h"
@@ -47,52 +46,50 @@
 
 // GPU kernel 
 __global__ void PTTWAC_soa_asta(const int A, 
-    const int B, 
-    const int b, 
-    T *input, 
-    int *finished, 
-    int *head) 
+                                const int B, 
+                                const int b, 
+                                  T *__restrict__ input, 
+                                int *__restrict__ finished, 
+                                int *__restrict__ head) 
 {
-  __shared__ int l_mem[2];
-  int* done = l_mem;
-  int* gid_ = &done[1];
+  __shared__ int lmem[2];
 
   const int tid = threadIdx.x;
   int       m   = A * B - 1;
 
   if(tid == 0) // Dynamic fetch
-    gid_[0] = atomicAdd(&head[0], 1);
+    lmem[1] = atomicAdd(&head[0], 1);
   __syncthreads();
 
-  while(gid_[0] < m) {
-    int next_in_cycle = (gid_[0] * A) - m * (gid_[0] / B);
-    if(next_in_cycle == gid_[0]) {
+  while(lmem[1] < m) {
+    int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
+    if(next_in_cycle == lmem[1]) {
       if(tid == 0) // Dynamic fetch
-        gid_[0] = atomicAdd(&head[0], 1);
+        lmem[1] = atomicAdd(&head[0], 1);
       __syncthreads();
       continue;
     }
     T   data1, data2, data3, data4;
     int i = tid;
     if(i < b)
-      data1 = input[gid_[0] * b + i];
+      data1 = input[lmem[1] * b + i];
     i += blockDim.x;
     if(i < b)
-      data2 = input[gid_[0] * b + i];
+      data2 = input[lmem[1] * b + i];
     i += blockDim.x;
     if(i < b)
-      data3 = input[gid_[0] * b + i];
+      data3 = input[lmem[1] * b + i];
     i += blockDim.x;
     if(i < b)
-      data4 = input[gid_[0] * b + i];
+      data4 = input[lmem[1] * b + i];
 
     if(tid == 0) {
       //make sure the read is not cached
-      done[0] = atomicAdd(&finished[gid_[0]], 0);
+      lmem[0] = atomicAdd(&finished[lmem[1]], 0);
     }
     __syncthreads();
 
-    for(; done[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
+    for(; lmem[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
       T backup1, backup2, backup3, backup4;
       i = tid;
       if(i < b)
@@ -108,11 +105,11 @@ __global__ void PTTWAC_soa_asta(const int A,
         backup4 = input[next_in_cycle * b + i];
 
       if(tid == 0) {
-        done[0] = atomicExch(&finished[next_in_cycle], (int)1);
+        lmem[0] = atomicExch(&finished[next_in_cycle], (int)1);
       }
       __syncthreads();
 
-      if(!done[0]) {
+      if(!lmem[0]) {
         i = tid;
         if(i < b)
           input[next_in_cycle * b + i] = data1;
@@ -141,7 +138,7 @@ __global__ void PTTWAC_soa_asta(const int A,
     }
 
     if(tid == 0) // Dynamic fetch
-      gid_[0] = atomicAdd(&head[0], 1);
+      lmem[1] = atomicAdd(&head[0], 1);
     __syncthreads();
   }
 }
@@ -153,7 +150,6 @@ struct Params {
   int device;
   int n_gpu_threads;
   int n_gpu_blocks;
-  int n_threads;
   int n_warmup;
   int n_reps;
   int m;
@@ -162,24 +158,22 @@ struct Params {
 
   Params(int argc, char **argv) {
     device        = 0;
-    n_gpu_threads  = 64;
-    n_gpu_blocks = 16;
-    n_threads     = 0;
+    n_gpu_threads = 64;
+    n_gpu_blocks  = 16;
     n_warmup      = 10;
     n_reps        = 100;
     m             = 197;
     n             = 35588;
     s             = 32;
     int opt;
-    while((opt = getopt(argc, argv, "hd:i:g:t:w:r:m:n:s:")) >= 0) {
+    while((opt = getopt(argc, argv, "hd:i:g:w:r:m:n:s:")) >= 0) {
       switch(opt) {
         case 'h':
           usage();
           exit(0);
           break;
-        case 'i': n_gpu_threads  = atoi(optarg); break;
-        case 'g': n_gpu_blocks = atoi(optarg); break;
-        case 't': n_threads     = atoi(optarg); break;
+        case 'i': n_gpu_threads = atoi(optarg); break;
+        case 'g': n_gpu_blocks  = atoi(optarg); break;
         case 'w': n_warmup      = atoi(optarg); break;
         case 'r': n_reps        = atoi(optarg); break;
         case 'm': m             = atoi(optarg); break;
@@ -191,8 +185,6 @@ struct Params {
             exit(0);
       }
     }
-    assert(((n_gpu_threads > 0 && n_gpu_blocks > 0) ^ (n_threads > 0))
-        && "TRNS only runs on CPU-only or GPU-only: './trns -g 0' or './trns -t 0'");
   }
 
   void usage() {
@@ -203,12 +195,8 @@ struct Params {
         "\n    -h        help"
         "\n    -i <I>    # of device threads per block (default=64)"
         "\n    -g <G>    # of device blocks (default=16)"
-        "\n    -t <T>    # of host threads (default=0)"
         "\n    -w <W>    # of untimed warmup iterations (default=10)"
         "\n    -r <R>    # of timed repetition iterations (default=100)"
-        "\n"
-        "\nData-partitioning-specific options:"
-        "\n    TRNS only supports CPU-only or GPU-only execution"
         "\n"
         "\nBenchmark-specific options:"
         "\n    -m <M>    matrix height (default=197)"
@@ -232,18 +220,23 @@ void read_input(T *x_vector, const Params &p) {
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
+  int blocks = p.n_gpu_blocks;
+  int threads = p.n_gpu_threads;
+  const int max_gpu_threads = 256;
+  assert(threads <= max_gpu_threads && 
+         "The thread block size is at most 256");
 
   // Allocate
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
   T *h_in_out = (T *)malloc(in_size * sizeof(T));
-  std::atomic_int *h_finished =
-    (std::atomic_int *)malloc(sizeof(std::atomic_int) * finished_size);
-  std::atomic_int *h_head = (std::atomic_int *)malloc(sizeof(std::atomic_int));
+  int *h_finished = (int *)malloc(sizeof(int) * finished_size);
+  int *h_head = (int *)malloc(sizeof(int));
 
-  int blocks = p.n_gpu_blocks;
-  int threads = p.n_gpu_threads;
+
+  dim3 dimGrid(blocks);
+  dim3 dimBlock(threads);
 
   T * d_in_out;
   int * d_finished;
@@ -254,35 +247,35 @@ int main(int argc, char **argv) {
   T *h_in_backup = (T *)malloc(in_size * sizeof(T));
 
   // Initialize
-  const int max_gpu_threads = 256;
   read_input(h_in_out, p);
-  memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
-  h_head[0].store(0);
+  memset((void *)h_finished, 0, sizeof(int) * finished_size);
+  h_head[0] = 0;
   memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
 
-  // Loop over the CPU or GPU kernel
-  for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
+  double time = 0;
 
-    // Reset
-    memcpy(h_in_out, h_in_backup, in_size * sizeof(T));
-    memset((void *)h_finished, 0, sizeof(std::atomic_int) * finished_size);
-    h_head[0].store(0);
+  // Loop over the kernel on a device
+  for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
     hipMemcpyAsync(d_in_out, h_in_backup, in_size * sizeof(T), hipMemcpyHostToDevice, 0);
     hipMemcpyAsync(d_finished, h_finished, sizeof(int) * finished_size, hipMemcpyHostToDevice, 0);
     hipMemcpyAsync(d_head, h_head, sizeof(int), hipMemcpyHostToDevice, 0);
 
-    // Launch GPU threads
-    assert(p.n_gpu_threads <= max_gpu_threads && 
-        "The thread block size is greater than the maximum thread block size that can be used on this device");
-    dim3 dimGrid(blocks);
-    dim3 dimBlock(threads);
-    hipLaunchKernelGGL(PTTWAC_soa_asta, dim3(dimGrid), dim3(dimBlock), 0, 0, p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
 
+    hipLaunchKernelGGL(PTTWAC_soa_asta, dimGrid, dimBlock, 0, 0, p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    if (rep >= p.n_warmup) 
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    hipMemcpyAsync(h_in_out, d_in_out, in_size * sizeof(T), hipMemcpyDeviceToHost, 0);
   }
+  hipDeviceSynchronize();
 
-  // Copy back
-  hipMemcpy(h_in_out, d_in_out, in_size * sizeof(T), hipMemcpyDeviceToHost);
+  printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 
   // Verify
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);

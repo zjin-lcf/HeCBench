@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <vector>
 #include <algorithm>  // for_each
+#include <chrono>
 #include "common.h"
 
 #include "support/common.h"
@@ -124,7 +125,7 @@ int main(int argc, char **argv) {
   int threads = p.n_gpu_threads;
   const int max_gpu_threads = 256;
   assert(threads <= max_gpu_threads && 
-          "The thread block size is greater than the maximum thread block size that can be used on this device");
+         "The thread block size is at most 256");
 
   // Allocate
   int tiled_n       = divceil(p.n, p.s);
@@ -163,7 +164,9 @@ int main(int argc, char **argv) {
   const int B = tiled_n;
   const int b = p.s;
 
-  // Loop over the GPU kernel
+  double time = 0; 
+
+  // Loop over the kernel on a device
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
     q.submit([&] (handler &cgh) {
@@ -181,6 +184,8 @@ int main(int argc, char **argv) {
       cgh.copy(h_head, d_acc);
     });
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto input = d_in_out.template get_access<sycl_read_write>(cgh);
@@ -280,13 +285,19 @@ int main(int argc, char **argv) {
       });
     });
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    if (rep >= p.n_warmup) 
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     q.submit([&] (handler &cgh) {
       auto d_acc = d_in_out.template get_access<sycl_read>(cgh);
       cgh.copy(d_acc, h_in_out);
     });
   }
-
   q.wait();
+
+  printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 
   // Verify
   int status = verify(h_in_out, h_in_backup, tiled_n * p.s, p.m, p.s);
