@@ -10,151 +10,64 @@
 #include <stdio.h>
 #include <limits.h>
 #include <float.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
+#include "kernels.h"
 
 #define NUM_BLOCKS 1024
 #define BLOCK_SIZE 256
 
-// int64 atomic_min
-__device__ __forceinline__
-long long atomic_min(long long *address, long long val)
-{
-  long long ret = *address;
-  while(val < ret)
-  {
-    long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, (unsigned long long)old, (unsigned long long)val)) == old)
-      break;
+template <typename T>
+void testMin (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMinDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
-  return ret;
+  hipDeviceSynchronize();
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic min for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
 }
-
-// uint64 atomic_min
-__device__ __forceinline__
-unsigned long long atomic_min(unsigned long long *address, unsigned long long val)
-{
-  unsigned long long ret = *address;
-  while(val < ret)
-  {
-    unsigned long long old = ret;
-    if((ret = atomicCAS(address, old, val)) == old)
-      break;
-  }
-  return ret;
-}
-
-// int64 atomic add
-__device__ __forceinline__
-long long atomic_add(long long *address, long long val)
-{
-  long long old, newdbl, ret = *address;
-  do {
-    old = ret;
-    newdbl = old+val;
-  } while((ret = (long long)atomicCAS((unsigned long long*)address, (unsigned long long)old, (unsigned long long)newdbl)) != old);
-  return ret;
-}
-
-// int64 atomic_max
-__device__ __forceinline__
-long long atomic_max(long long *address, long long val)
-{
-  long long ret = *address;
-  while(val > ret)
-  {
-    long long old = ret;
-    if((ret = (long long)atomicCAS((unsigned long long *)address, (unsigned long long)old, (unsigned long long)val)) == old)
-      break;
-  }
-  return ret;
-}
-
-// uint64 atomic_max
-__device__ __forceinline__
-unsigned long long atomic_max(unsigned long long *address, unsigned long long val)
-{
-  unsigned long long ret = *address;
-  while(val > ret)
-  {
-    unsigned long long old = ret;
-    if((ret = atomicCAS(address, old, val)) == old)
-      break;
-  }
-  return ret;
-}
-
-// uint64 atomic add
-__device__ __forceinline__
-unsigned long long atomic_add(unsigned long long *address, unsigned long long val)
-{
-  unsigned long long old, newdbl, ret = *address;
-  do {
-    old = ret;
-    newdbl = old+val;
-  } while((ret = atomicCAS(address, old, newdbl)) != old);
-  return ret;
-}
-
-// For all double atomics:
-//      Must do the compare with integers, not floating point,
-//      since NaN is never equal to any other NaN
-
-// double atomic_min
-__device__ __forceinline__
-double atomic_min(double *address, double val)
-{
-  unsigned long long ret = __double_as_longlong(*address);
-  while(val < __longlong_as_double(ret))
-  {
-    unsigned long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, old, __double_as_longlong(val))) == old)
-      break;
-  }
-  return __longlong_as_double(ret);
-}
-
-// double atomic_max
-__device__ __forceinline__
-double atomic_max(double *address, double val)
-{
-  unsigned long long ret = __double_as_longlong(*address);
-  while(val > __longlong_as_double(ret))
-  {
-    unsigned long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, old, __double_as_longlong(val))) == old)
-      break;
-  }
-  return __longlong_as_double(ret);
-}
-
-// Double-precision floating point atomic add
-__device__ __forceinline__
-double atomic_add(double *address, double val)
-{
-  // Doing it all as longlongs cuts one __longlong_as_double from the inner loop
-  unsigned long long *ptr = (unsigned long long *)address;
-  unsigned long long old, newdbl, ret = *ptr;
-  do {
-    old = ret;
-    newdbl = __double_as_longlong(__longlong_as_double(old)+val);
-  } while((ret = atomicCAS(ptr, old, newdbl)) != old);
-  return __longlong_as_double(ret);
-}
-
 
 template <typename T>
-__global__ 
-void atomicDerived (T *__restrict res)
-{
-  int i = threadIdx.x + blockIdx.x * blockDim.x + 1;
-  atomic_min(res, (T)i);
-  atomic_max(res+1, (T)i);
-  atomic_add(res+2, (T)i);
+void testMax (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMaxDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
+  }
+  hipDeviceSynchronize();
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic max for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
 }
 
+template <typename T>
+void testAdd (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicAddDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
+  }
+  hipDeviceSynchronize();
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic add for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+}
 
 int main(int argc, char** argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
   const int repeat = atoi(argv[1]);
 
   unsigned long long res_u64[3] = {ULONG_MAX,0,0};
@@ -169,20 +82,18 @@ int main(int argc, char** argv) {
   hipMalloc((void**)&d_res_s64, 3*sizeof(long long));
   hipMalloc((void**)&d_res_f64, 3*sizeof(double));
 
-  // the min/max kernels would take almost the same execution time for many iterations
-  // the add kernels are very slow compared to min/max kernels
-  for (int n = 0; n < repeat; n++) {
-    hipMemcpy(d_res_u64, res_u64, 3*sizeof(unsigned long long), hipMemcpyHostToDevice);
-    hipMemcpy(d_res_s64, res_s64, 3*sizeof(long long), hipMemcpyHostToDevice);
-    hipMemcpy(d_res_f64, res_f64, 3*sizeof(double), hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<unsigned long long>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_u64);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<long long>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_s64);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicDerived<double>), dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, d_res_f64);
-  }
+  testMin<unsigned long long>(res_u64, d_res_u64, repeat, "U64");
+  testMin<long long>(res_s64, d_res_s64, repeat, "S64");
+  testMin<double>(res_f64, d_res_f64, repeat, "F64");
 
-  hipMemcpy(&res_u64, d_res_u64, 3*sizeof(unsigned long long), hipMemcpyDeviceToHost);
-  hipMemcpy(&res_s64, d_res_s64, 3*sizeof(long long), hipMemcpyDeviceToHost);
-  hipMemcpy(&res_f64, d_res_f64, 3*sizeof(double), hipMemcpyDeviceToHost);
+  testMax<unsigned long long>(res_u64+1, d_res_u64+1, repeat, "U64");
+  testMax<long long>(res_s64+1, d_res_s64+1, repeat, "S64");
+  testMax<double>(res_f64+1, d_res_f64+1, repeat, "F64");
+
+  // the add kernels are slow
+  testAdd<unsigned long long>(res_u64+2, d_res_u64+2, 1, "U64");
+  testAdd<long long>(res_s64+2, d_res_s64+2, 1, "S64");
+  testAdd<double>(res_f64+2, d_res_f64+2, 1, "F64");
 
   unsigned long long bound = NUM_BLOCKS*BLOCK_SIZE;
   unsigned long long sum = 0; 
