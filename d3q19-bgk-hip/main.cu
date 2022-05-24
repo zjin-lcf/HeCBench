@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+#include <math.h>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
 
