@@ -315,6 +315,13 @@ int main(int argc, char **argv){
     maxDiff = (maxDiff<diff) ? diff:maxDiff;
   }
   std::cout << "Correctness check: maxError = " << maxDiff << "\n";
+  free(ggeo);
+  free(q);
+  free(Aq);
+  free(lambda);
+  free(rV);
+  free(wV);
+  free(DrV);
 
   // print statistics
   const dfloat GDOFPerSecond = Ndim*POLYNOMIAL_DEGREE*POLYNOMIAL_DEGREE*POLYNOMIAL_DEGREE*Nelements/elapsed;
