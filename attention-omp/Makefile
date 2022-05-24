@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := -std=c++14 -Wall -I../attention-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -49,10 +49,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp ../attention-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -60,4 +60,3 @@ clean:
 
 run: $(program)
 	./$(program) 65536 2048 100
-
