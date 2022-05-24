@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "reference.h"
 
 template<int R>
 void bilateralFilter(
-    const float *__restrict__ in,
-    float *__restrict__ out,
+    const float *__restrict in,
+    float *__restrict out,
     int w, 
     int h, 
     float a_square,
@@ -69,6 +70,12 @@ void bilateralFilter(
 //
 int main(int argc, char *argv[]) {
 
+  if (argc != 6) {
+    printf("Usage: %s <image width> <image height> <intensity> <spatial> <repeat>\n",
+            argv[0]);
+    return 1;
+  }
+
   // image dimensions
   int w = atoi(argv[1]);
   int h = atoi(argv[2]);
@@ -86,6 +93,8 @@ int main(int argc, char *argv[]) {
   // square of the height of the curve peak
   float a_square = 0.5f / (variance_I * (float)M_PI);
 
+  int repeat = atoi(argv[5]);
+
   float *h_src = (float*) malloc (img_size * sizeof(float));
   // host and device results
   float *h_dst = (float*) malloc (img_size * sizeof(float));
@@ -98,9 +107,15 @@ int main(int argc, char *argv[]) {
   #pragma omp target data map(to: h_src[0:img_size]) \
                           map(alloc: h_dst[0:img_size])
   {
+    auto start = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < repeat; i++)
       bilateralFilter<3>(h_src, h_dst, w, h, a_square, variance_I, variance_spatial);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+
     #pragma omp target update from (h_dst[0:img_size])
 
     // verify
@@ -113,8 +128,15 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    for (int i = 0; i < 100; i++)
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       bilateralFilter<6>(h_src, h_dst, w, h, a_square, variance_I, variance_spatial);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+
     #pragma omp target update from (h_dst[0:img_size])
 
     reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
@@ -125,8 +147,15 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    for (int i = 0; i < 100; i++)
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       bilateralFilter<9>(h_src, h_dst, w, h, a_square, variance_I, variance_spatial);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+
     #pragma omp target update from (h_dst[0:img_size])
 
     reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
@@ -137,8 +166,8 @@ int main(int argc, char *argv[]) {
       }
     }
     printf("%s\n", ok ? "PASS" : "FAIL");
-
   }
+
   free(h_dst);
   free(r_dst);
   free(h_src);

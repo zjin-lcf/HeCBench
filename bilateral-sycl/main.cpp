@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "reference.h"
 
@@ -70,6 +71,12 @@ void bilateralFilter(
 //
 int main(int argc, char *argv[]) {
 
+  if (argc != 6) {
+    printf("Usage: %s <image width> <image height> <intensity> <spatial> <repeat>\n",
+            argv[0]);
+    return 1;
+  }
+
   // image dimensions
   int w = atoi(argv[1]);
   int h = atoi(argv[2]);
@@ -83,6 +90,8 @@ int main(int argc, char *argv[]) {
 
    // As the spatial parameter increases, the larger features get smoothened.
   float variance_spatial = atof(argv[4]);
+
+  int repeat = atoi(argv[5]);
 
   // square of the height of the curve peak
   float a_square = 0.5f / (variance_I * (float)M_PI);
@@ -109,7 +118,10 @@ int main(int argc, char *argv[]) {
   range<2> lws (16, 16);
   range<2> gws ((h+15)/16*16, (w+15)/16*16);
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto src = d_src.get_access<sycl_read>(cgh);
       auto dst = d_dst.get_access<sycl_discard_write>(cgh);
@@ -118,6 +130,11 @@ int main(int argc, char *argv[]) {
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_dst.get_access<sycl_read>(cgh);
@@ -134,7 +151,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto src = d_src.get_access<sycl_read>(cgh);
       auto dst = d_dst.get_access<sycl_discard_write>(cgh);
@@ -143,6 +163,11 @@ int main(int argc, char *argv[]) {
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_dst.get_access<sycl_read>(cgh);
@@ -157,7 +182,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto src = d_src.get_access<sycl_read>(cgh);
       auto dst = d_dst.get_access<sycl_discard_write>(cgh);
@@ -166,6 +194,11 @@ int main(int argc, char *argv[]) {
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_dst.get_access<sycl_read>(cgh);
