@@ -1,42 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
-
-float* attention_host(const float* key, const float* value, const float* query,
-                      const int n, const int d) 
-{
-  // intermediate
-  float* dot_product = (float*) malloc (n * sizeof(float));
-  float* score = (float*) malloc (n * sizeof(float));
-  // result
-  float* output = (float*) malloc (d * sizeof(float));
-
-  for (int i = 0; i < n; i++) {
-    float sum = 0;
-    for (int j = 0; j < d; j++)
-      sum += key[i * d + j] * query[j];
-    dot_product[i] = sum;
-  }
-
-  float sum = 0;
-  for (int i = 0; i < n; i++)
-    sum += expf(dot_product[i]);
-
-  for (int i = 0; i < n; i++)
-    score[i] = expf(dot_product[i]) / sum;
-
-  for (int j = 0; j < d; j++) {
-    float sum = 0;
-    for (int i = 0; i < n; i++)
-      sum += score[i] * value[i * d + j];
-    output[j] = sum;
-  }
-
-  free(dot_product);
-  free(score);
-  return output;
-}
+#include "reference.h"
 
 float* attention_device(const float* key, const float* value, const float* query,
                         const int n, const int d, const int repeat) 
@@ -130,6 +97,10 @@ float* attention_device(const float* key, const float* value, const float* query
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <rows> <columns> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int n = atoi(argv[1]);
   const int d = atoi(argv[2]);
   const int r = atoi(argv[3]);
@@ -150,7 +121,14 @@ int main(int argc, char* argv[]) {
   }
 
   float* hout = attention_host(key, value, query, n, d);
+
+  auto start = std::chrono::steady_clock::now();
+
   float* dout = attention_device(key, value, query, n, d, r);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device offload time %f (s)\n", (time * 1e-9f));
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 
