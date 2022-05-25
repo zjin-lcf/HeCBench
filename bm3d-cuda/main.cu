@@ -17,7 +17,6 @@
 // The maximum thread block size is 32 * MAX_NUM_WARPS
 #define MAX_NUM_WARPS 16u
 
-
 using namespace cimg_library;
 
 int main(int argc, char** argv)
@@ -136,7 +135,6 @@ int main(int argc, char** argv)
   cuda_error_check( cudaMalloc((void**)&d_kaiser_window, 
         sizeof(float) * k * k) );
 
-
   //image dimensions
   const uint2 image_dim = make_uint2(width, height);
 
@@ -253,7 +251,7 @@ int main(int argc, char** argv)
           num_threads_bm,        // Threads in block 
           num_blocks_bm,         // Blocks in grid
           lmem_size_bm           // Shared memory size
-          );
+      );
 
       //cuda_error_check( cudaGetLastError() );
       //cuda_error_check( cudaDeviceSynchronize() );
@@ -272,17 +270,15 @@ int main(int argc, char** argv)
             h_hard_params,           // IN: Denoising parameters
             num_threads,             // Threads in block
             num_blocks               // Blocks in grid
-               );
+        );
 
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
 
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
-
-
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
 
         // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
         //      3D group of a batch to complete the 3D transform.
@@ -301,7 +297,7 @@ int main(int argc, char** argv)
             num_threads,           // Threads in block
             num_blocks,            // Blocks in grid
             s_size_t               // Shared memory size
-            );
+        );
 
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
@@ -327,12 +323,12 @@ int main(int argc, char** argv)
             h_hard_params,         // IN: Denoising parameters
             num_threads,           // Threads in block
             num_blocks             // Blocks in grid
-            );
+        );
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
       }
     }
-  }  
+  }
 
   //Divide numerator by denominator and save the result in output image
   for (uint channel = 0; channel < channels; ++channel)
@@ -344,7 +340,7 @@ int main(int argc, char** argv)
         d_denoised_image[channel], // OUT: Image estimate
         num_threads_f,             // Threads in block
         num_blocks_f               // Blocks in grid
-        );
+    );
     //cuda_error_check( cudaGetLastError() );
     //cuda_error_check( cudaDeviceSynchronize() );
     cuda_error_check( cudaMemcpy(
@@ -359,8 +355,7 @@ int main(int argc, char** argv)
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   double gpuTime = (double)elapsed_seconds.count();
-  std::cout << "Total time (s):" << gpuTime << std::endl;
-
+  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();

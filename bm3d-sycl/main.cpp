@@ -123,7 +123,6 @@ int main(int argc, char** argv)
   //Weights for aggregation
   buffer<float, 1> d_w_P (h_batch_size.x() * h_batch_size.y());
 
-
   //image dimensions
   const uint2 image_dim (width, height);
 
@@ -242,7 +241,7 @@ int main(int argc, char** argv)
           lws_bm,                // Local work size
           gws_bm,                // Global work size
           lmem_size_bm           // Shared memory size in bytes
-          );
+      );
 
       for (uint channel = 0; channel < channels; ++channel)
       {
@@ -259,7 +258,7 @@ int main(int argc, char** argv)
             h_hard_params,           // IN: Denoising parameters
             lws,                     // Local work size
             gws                      // Global work size
-               );
+        );
 
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size, 
@@ -280,10 +279,10 @@ int main(int argc, char** argv)
             stacks_dim,            // IN: Dimensions limiting addresses of reference patches
             h_hard_params,         // IN: Denoising parameters
             sigma2[channel],       // IN: sigma
-            lws,           // Threads in block
-            gws,            // Blocks in grid
+            lws,                   // Threads in block
+            gws,                   // Blocks in grid
             s_size_t               // Shared memory size
-            );
+        );
 
         //Apply inverse 2D DCT transform to each layer of 3D group
         run_IDCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size, lws_tr, gws_tr);
@@ -302,9 +301,9 @@ int main(int argc, char** argv)
             image_dim,             // IN: Image dimensions
             stacks_dim,            // IN: Dimensions limiting addresses of reference patches
             h_hard_params,         // IN: Denoising parameters
-            lws,           // Threads in block
-            gws             // Blocks in grid
-            );
+            lws,                   // Threads in block
+            gws                    // Blocks in grid
+        );
       }
     }
   }
@@ -318,25 +317,23 @@ int main(int argc, char** argv)
         d_denominator[channel],    // IN: Denominator aggregation buffer
         image_dim,                 // IN: Image dimensions
         d_denoised_image[channel], // OUT: Image estimate
-        lws_f,             // Threads in block
-        gws_f               // Blocks in grid
-        );
+        lws_f,                     // Threads in block
+        gws_f                      // Blocks in grid
+    );
 
 
     q.submit([&](handler &cgh) {
       auto acc = d_denoised_image[channel].get_access<sycl_read>(cgh);
       cgh.copy(acc, dst_image.data() + channel * image_size); 
-    });
+    }).wait();
   }
-  q.wait();
 
   } // REPEAT
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   double gpuTime = (double)elapsed_seconds.count();
-  std::cout << "Total time (s):" << gpuTime << std::endl;
-
+  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();

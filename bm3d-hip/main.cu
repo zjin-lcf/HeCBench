@@ -17,7 +17,6 @@
 // The maximum thread block size is 32 * MAX_NUM_WARPS
 #define MAX_NUM_WARPS 16u
 
-
 using namespace cimg_library;
 
 int main(int argc, char** argv)
@@ -110,32 +109,31 @@ int main(int argc, char** argv)
   d_denominator.resize(channels);
 
   for(auto & it : d_noisy_image)
-    cuda_error_check( hipMalloc((void**)&it, sizeof(uchar) * image_size) );
+    hip_error_check( hipMalloc((void**)&it, sizeof(uchar) * image_size) );
 
   for(auto & it : d_denoised_image)
-    cuda_error_check( hipMalloc((void**)&it, sizeof(uchar) * image_size) );
+    hip_error_check( hipMalloc((void**)&it, sizeof(uchar) * image_size) );
 
   for(auto & it : d_numerator) 
-    cuda_error_check( hipMalloc((void**)&it, sizeof(float) * image_size) );
+    hip_error_check( hipMalloc((void**)&it, sizeof(float) * image_size) );
 
   for(auto & it : d_denominator)
-    cuda_error_check( hipMalloc((void**)&it, sizeof(float) * image_size) );
+    hip_error_check( hipMalloc((void**)&it, sizeof(float) * image_size) );
 
-  cuda_error_check( hipMalloc((void**)&d_stacks, 
+  hip_error_check( hipMalloc((void**)&d_stacks, 
         sizeof(ushort) * h_batch_size.x * h_batch_size.y * N) );
 
-  cuda_error_check( hipMalloc((void**)&d_num_patches_in_stack, 
+  hip_error_check( hipMalloc((void**)&d_num_patches_in_stack, 
         sizeof(uint) * h_batch_size.x * h_batch_size.y ) );
 
-  cuda_error_check( hipMalloc((void**)&d_gathered_stacks, 
+  hip_error_check( hipMalloc((void**)&d_gathered_stacks, 
         sizeof(float) * (N+1) * k * k * h_batch_size.x * h_batch_size.y) );
 
-  cuda_error_check( hipMalloc((void**)&d_w_P,
+  hip_error_check( hipMalloc((void**)&d_w_P,
         sizeof(float) * h_batch_size.x * h_batch_size.y) );
 
-  cuda_error_check( hipMalloc((void**)&d_kaiser_window, 
+  hip_error_check( hipMalloc((void**)&d_kaiser_window, 
         sizeof(float) * k * k) );
-
 
   //image dimensions
   const uint2 image_dim = make_uint2(width, height);
@@ -215,10 +213,10 @@ int main(int argc, char** argv)
 
   // Copy images to device
   for(uint i = 0; i < channels; ++i) 
-    cuda_error_check( hipMemcpy(d_noisy_image[i],
+    hip_error_check( hipMemcpy(d_noisy_image[i],
           image.data()+i*image_size,image_size*sizeof(uchar), hipMemcpyHostToDevice));
 
-  cuda_error_check( hipMemcpy(d_kaiser_window, &kaiserWindow[0],
+  hip_error_check( hipMemcpy(d_kaiser_window, &kaiserWindow[0],
     k*k*sizeof(float), hipMemcpyHostToDevice));
 
   // start measuring the total time
@@ -228,10 +226,10 @@ int main(int argc, char** argv)
   for (int n = 0; n < REPEAT; n++) {
 
   for(auto & it : d_numerator) 
-    cuda_error_check( hipMemset(it, 0, image_size * sizeof(float)) );
+    hip_error_check( hipMemset(it, 0, image_size * sizeof(float)) );
 
   for(auto & it : d_denominator)
-    cuda_error_check( hipMemset(it, 0, image_size * sizeof(float)) );
+    hip_error_check( hipMemset(it, 0, image_size * sizeof(float)) );
 
   //Batch processing: in each iteration only the batch_size reference patches are processed. 
   uint2 start_point;
@@ -253,10 +251,10 @@ int main(int argc, char** argv)
           num_threads_bm,        // Threads in block 
           num_blocks_bm,         // Blocks in grid
           lmem_size_bm           // Shared memory size
-          );
+      );
 
-      //cuda_error_check( hipGetLastError() );
-      //cuda_error_check( hipDeviceSynchronize() );
+      //hip_error_check( hipGetLastError() );
+      //hip_error_check( hipDeviceSynchronize() );
 
       for (uint channel = 0; channel < channels; ++channel)
       {
@@ -272,17 +270,15 @@ int main(int argc, char** argv)
             h_hard_params,           // IN: Denoising parameters
             num_threads,             // Threads in block
             num_blocks               // Blocks in grid
-               );
+        );
 
-        //cuda_error_check( hipGetLastError() );
-        //cuda_error_check( hipDeviceSynchronize() );
+        //hip_error_check( hipGetLastError() );
+        //hip_error_check( hipDeviceSynchronize() );
 
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
-        cuda_error_check( hipGetLastError() );
-        cuda_error_check( hipDeviceSynchronize() );
-
-
+        //hip_error_check( hipGetLastError() );
+        //hip_error_check( hipDeviceSynchronize() );
 
         // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
         //      3D group of a batch to complete the 3D transform.
@@ -301,16 +297,16 @@ int main(int argc, char** argv)
             num_threads,           // Threads in block
             num_blocks,            // Blocks in grid
             s_size_t               // Shared memory size
-            );
+        );
 
-        //cuda_error_check( hipGetLastError() );
-        //cuda_error_check( hipDeviceSynchronize() );
+        //hip_error_check( hipGetLastError() );
+        //hip_error_check( hipDeviceSynchronize() );
 
         //Apply inverse 2D DCT transform to each layer of 3D group
         run_IDCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
 
-        //cuda_error_check( hipGetLastError() );
-        //cuda_error_check( hipDeviceSynchronize() );
+        //hip_error_check( hipGetLastError() );
+        //hip_error_check( hipDeviceSynchronize() );
 
         //Aggregates filtered patches of all 3D groups of a batch into numerator and denominator buffers
         run_aggregate_block(
@@ -327,9 +323,9 @@ int main(int argc, char** argv)
             h_hard_params,         // IN: Denoising parameters
             num_threads,           // Threads in block
             num_blocks             // Blocks in grid
-            );
-        //cuda_error_check( hipGetLastError() );
-        //cuda_error_check( hipDeviceSynchronize() );
+        );
+        //hip_error_check( hipGetLastError() );
+        //hip_error_check( hipDeviceSynchronize() );
       }
     }
   }  
@@ -344,10 +340,10 @@ int main(int argc, char** argv)
         d_denoised_image[channel], // OUT: Image estimate
         num_threads_f,             // Threads in block
         num_blocks_f               // Blocks in grid
-        );
-    //cuda_error_check( hipGetLastError() );
-    //cuda_error_check( hipDeviceSynchronize() );
-    cuda_error_check( hipMemcpy(
+    );
+    //hip_error_check( hipGetLastError() );
+    //hip_error_check( hipDeviceSynchronize() );
+    hip_error_check( hipMemcpy(
           dst_image.data()+channel*image_size,
           d_denoised_image[channel],
           image_size*sizeof(uchar), 
@@ -359,8 +355,7 @@ int main(int argc, char** argv)
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   double gpuTime = (double)elapsed_seconds.count();
-  std::cout << "Total time (s):" << gpuTime << std::endl;
-
+  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
@@ -375,26 +370,26 @@ int main(int argc, char** argv)
     std::cout << "PSNR:" << reference_image.PSNR(dst_image) << std::endl;
   }
 
-  cuda_error_check( hipFree(d_stacks) );
-  cuda_error_check( hipFree(d_num_patches_in_stack) );
-  cuda_error_check( hipFree(d_gathered_stacks) );
-  cuda_error_check( hipFree(d_w_P) );
-  cuda_error_check( hipFree(d_kaiser_window) );
+  hip_error_check( hipFree(d_stacks) );
+  hip_error_check( hipFree(d_num_patches_in_stack) );
+  hip_error_check( hipFree(d_gathered_stacks) );
+  hip_error_check( hipFree(d_w_P) );
+  hip_error_check( hipFree(d_kaiser_window) );
 
   for (auto & it : d_noisy_image)
-    cuda_error_check( hipFree(it) );
+    hip_error_check( hipFree(it) );
   d_noisy_image.clear();
 
   for (auto & it : d_denoised_image)
-    cuda_error_check( hipFree(it) );
+    hip_error_check( hipFree(it) );
   d_denoised_image.clear();
 
   for(auto & it : d_numerator)
-    cuda_error_check( hipFree(it) );
+    hip_error_check( hipFree(it) );
   d_numerator.clear();
 
   for(auto & it : d_denominator)
-    cuda_error_check( hipFree(it) );
+    hip_error_check( hipFree(it) );
   d_denominator.clear();
 
   return 0;
