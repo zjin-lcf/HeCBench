@@ -109,8 +109,15 @@ int main() {
 
     T minValue;
     int numBitsAct;
+
+    auto start = std::chrono::steady_clock::now();
+
     runBitPackingOnGPU(
         inputHost, outputHost, numBits, n, &numBitsAct, &minValue);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Size = %10zu litpacking time = %f (s) ", n, time * 1e-9f);
 
     assert(numBitsAct <= numBits);
 
@@ -135,7 +142,7 @@ int main() {
         break;
       }
     }
-    printf("n = %zu: %s\n", n, ok ? "PASS" : "FAILED");  
+    printf("%s\n", ok ? "PASS" : "FAIL");  
   }
 
   free(inputHost);
