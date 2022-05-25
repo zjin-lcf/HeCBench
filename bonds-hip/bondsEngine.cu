@@ -13,7 +13,6 @@
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 
-
 int monthLengthCpu(int month, bool leapYear) 
 {
   int MonthLength[] = {
@@ -26,7 +25,6 @@ int monthLengthCpu(int month, bool leapYear)
 
   return (leapYear? MonthLeapLength[month-1] : MonthLength[month-1]);
 }
-
 
 int monthOffsetCpu(int m, bool leapYear) 
 {
@@ -44,7 +42,6 @@ int monthOffsetCpu(int m, bool leapYear)
 
   return (leapYear? MonthLeapOffset[m-1] : MonthOffset[m-1]);
 }
-
 
 int yearOffsetCpu(int y)
 {
@@ -118,7 +115,6 @@ int yearOffsetCpu(int y)
   return YearOffset[y-1900];
 }
 
-
 bool isLeapCpu(int y) 
 {
   bool YearIsLeap[] = {
@@ -191,7 +187,6 @@ bool isLeapCpu(int y)
   return YearIsLeap[y-1900];
 }
 
-
 bondsDateStruct intializeDateCpu(int d, int m, int y) 
 {
   bondsDateStruct currDate;
@@ -207,8 +202,6 @@ bondsDateStruct intializeDateCpu(int d, int m, int y)
 
   return currDate;
 }
-
-
 
 void runBoundsEngine() 
 {
@@ -300,14 +293,13 @@ void runBoundsEngine()
     resultsStruct resultsFromGpu;
 
     resultsHost.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
-
+    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
     resultsFromGpu.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
 
     bondsYieldTermStruct* discountCurveGpu;
     bondsYieldTermStruct* repoCurveGpu;
@@ -316,12 +308,10 @@ void runBoundsEngine()
     dataType* bondCleanPriceGpu;
     bondStruct* bondGpu;
     dataType* dummyStrikeGpu;
-
     dataType* dirtyPriceGpu;
     dataType* accruedAmountCurrDateGpu;
     dataType* cleanPriceGpu;
     dataType* bondForwardValGpu;
-
 
     hipMalloc((void**)&discountCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
     hipMalloc((void**)&repoCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
@@ -330,12 +320,10 @@ void runBoundsEngine()
     hipMalloc((void**)&bondCleanPriceGpu, numBonds*sizeof(dataType));
     hipMalloc((void**)&bondGpu, numBonds*sizeof(bondStruct));
     hipMalloc((void**)&dummyStrikeGpu, numBonds*sizeof(dataType));
-
     hipMalloc((void**)&dirtyPriceGpu, numBonds*sizeof(dataType));
     hipMalloc((void**)&accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
     hipMalloc((void**)&cleanPriceGpu, numBonds*sizeof(dataType));
     hipMalloc((void**)&bondForwardValGpu, numBonds*sizeof(dataType));
-
 
     hipMemcpy(discountCurveGpu, inArgsHost.discountCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
     hipMemcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
@@ -345,7 +333,6 @@ void runBoundsEngine()
     hipMemcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct), hipMemcpyHostToDevice);
     hipMemcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType), hipMemcpyHostToDevice);
 
-
     long seconds, useconds;    
     float mtimeCpu;
     float mtimeGpu;
@@ -354,22 +341,22 @@ void runBoundsEngine()
     struct timeval end;
 
     inArgsStruct inArgs;
-    inArgs.discountCurve    = discountCurveGpu;
-    inArgs.repoCurve        = repoCurveGpu;
-    inArgs.currDate   = currDateGpu;
-    inArgs.maturityDate     = maturityDateGpu;
-    inArgs.bondCleanPrice   = bondCleanPriceGpu;
-    inArgs.bond             = bondGpu;
-    inArgs.dummyStrike      = dummyStrikeGpu;
+    inArgs.discountCurve  = discountCurveGpu;
+    inArgs.repoCurve      = repoCurveGpu;
+    inArgs.currDate       = currDateGpu;
+    inArgs.maturityDate   = maturityDateGpu;
+    inArgs.bondCleanPrice = bondCleanPriceGpu;
+    inArgs.bond           = bondGpu;
+    inArgs.dummyStrike    = dummyStrikeGpu;
 
     resultsStruct results;
-    results.dirtyPrice                = dirtyPriceGpu;
-    results.accruedAmountCurrDate  = accruedAmountCurrDateGpu;
-    results.cleanPrice                = cleanPriceGpu;
-    results.bondForwardVal         = bondForwardValGpu;
+    results.dirtyPrice            = dirtyPriceGpu;
+    results.accruedAmountCurrDate = accruedAmountCurrDateGpu;
+    results.cleanPrice            = cleanPriceGpu;
+    results.bondForwardVal        = bondForwardValGpu;
 
     gettimeofday(&start, NULL);
-    dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
+    dim3  grid((numBonds+255)/256, 1, 1);
     dim3  threads(256, 1, 1);
     hipLaunchKernelGGL(getBondsResultsGpu, dim3(grid), dim3(threads), 0, 0, inArgs, results, numBonds);
     hipDeviceSynchronize();
@@ -386,8 +373,7 @@ void runBoundsEngine()
 
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Processing time on GPU: %f (ms)  \n\n", mtimeGpu);
-
+    printf("Processing time on GPU: %f (ms)\n\n", mtimeGpu);
 
     double totPrice = 0.0;
     int numBond1;
@@ -396,7 +382,6 @@ void runBoundsEngine()
       totPrice += resultsFromGpu.dirtyPrice[numBond1];
     }
 
-
     printf("Sum of output dirty prices on GPU: %f\n", totPrice);
     printf("Outputs on GPU for bond with index %d: \n", numBonds/2);
     printf("Dirty Price: %f\n", resultsFromGpu.dirtyPrice[numBonds/2]);
@@ -404,20 +389,18 @@ void runBoundsEngine()
     printf("Clean Price: %f\n", resultsFromGpu.cleanPrice[numBonds/2]);
     printf("Bond Forward Val: %f\n\n", resultsFromGpu.bondForwardVal[numBonds/2]);
 
-
     gettimeofday(&start, NULL);
 
     getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
 
     gettimeofday(&end, NULL);
 
-
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
     mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on CPU\n");
-    printf("Processing time on CPU: %f (ms)  \n\n", mtimeCpu);
+    printf("Processing time on CPU: %f (ms)\n\n", mtimeCpu);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -433,7 +416,6 @@ void runBoundsEngine()
 
     printf("Speedup using GPU: %f\n", mtimeCpu/mtimeGpu);
 
-
     hipFree(discountCurveGpu);
     hipFree(repoCurveGpu);
     hipFree(currDateGpu);
@@ -441,22 +423,19 @@ void runBoundsEngine()
     hipFree(bondCleanPriceGpu);
     hipFree(bondGpu);
     hipFree(dummyStrikeGpu);
-
     hipFree(dirtyPriceGpu);
     hipFree(accruedAmountCurrDateGpu);
     hipFree(cleanPriceGpu);
     hipFree(bondForwardValGpu);
 
     free(resultsHost.dirtyPrice);
-    free(resultsHost.accruedAmountCurrDate);;
-    free(resultsHost.cleanPrice);;
-    free(resultsHost.bondForwardVal);;
-
+    free(resultsHost.accruedAmountCurrDate);
+    free(resultsHost.cleanPrice);
+    free(resultsHost.bondForwardVal);
     free(resultsFromGpu.dirtyPrice);
-    free(resultsFromGpu.accruedAmountCurrDate);;
-    free(resultsFromGpu.cleanPrice);;
+    free(resultsFromGpu.accruedAmountCurrDate);
+    free(resultsFromGpu.cleanPrice);
     free(resultsFromGpu.bondForwardVal);
-
     free(inArgsHost.discountCurve);
     free(inArgsHost.repoCurve);
     free(inArgsHost.currDate);
@@ -467,9 +446,6 @@ void runBoundsEngine()
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv) 
 {
   runBoundsEngine();
