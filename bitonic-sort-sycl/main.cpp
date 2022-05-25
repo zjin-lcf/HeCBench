@@ -35,11 +35,10 @@
 // data to the kernel. The kernel swaps the elements accordingly in parallel.
 //
 #include <math.h>
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <common.h>
-
-using namespace std;
 
 #define BLOCK_SIZE 256
 
@@ -106,7 +105,6 @@ void ParallelBitonicSort(int data_gpu[], int n, cl::sycl::queue &q) {
           }
         });
       });
-      q.wait();
     }  // end stage
   }    // end step
 }
@@ -221,7 +219,13 @@ int main(int argc, char *argv[]) {
   DisplayArray(data_gpu, size);
 #endif
 
+  auto start = std::chrono::steady_clock::now();
+
   ParallelBitonicSort(data_gpu, n, q);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Parallel bitonic time " << (time * 1e-9f) << " (s)\n";
 
 #if DEBUG
   std::cout << "\ndata after sorting using parallel bitonic sort:\n";

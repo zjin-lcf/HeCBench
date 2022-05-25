@@ -35,11 +35,10 @@
 // data to the kernel. The kernel swaps the elements accordingly in parallel.
 //
 #include <math.h>
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <hip/hip_runtime.h>
-
-using namespace std;
 
 #define BLOCK_SIZE 256
 
@@ -84,7 +83,6 @@ void ParallelBitonicSort(int data_gpu[], int n) {
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
 
-  // SYCL buffer allocated for device 
   int *a;
   hipMalloc((void**)&a, sizeof(int) * size);
   hipMemcpy(a, data_gpu, sizeof(int) * size, hipMemcpyHostToDevice);
@@ -106,9 +104,8 @@ void ParallelBitonicSort(int data_gpu[], int n) {
       // Constant used in the kernel: 2**(step-stage).
       int two_power = 1 << (step - stage);
       hipLaunchKernelGGL(bs, dim3(dim3(size/BLOCK_SIZE)), dim3(dim3(BLOCK_SIZE) ), 0, 0, seq_len, two_power, a);
-      hipDeviceSynchronize();
     }  // end stage
-  }    // end step
+  } // end step
   hipMemcpy(data_gpu, a, sizeof(int) * size, hipMemcpyDeviceToHost);
   hipFree( a );
 }
@@ -214,8 +211,13 @@ int main(int argc, char *argv[]) {
   DisplayArray(data_gpu, size);
 #endif
 
-  // Start timer
+  auto start = std::chrono::steady_clock::now();
+
   ParallelBitonicSort(data_gpu, n);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Parallel bitonic time " << (time * 1e-9f) << " (s)\n";
 
 #if DEBUG
   std::cout << "\ndata after sorting using parallel bitonic sort:\n";
