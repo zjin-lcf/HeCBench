@@ -2,6 +2,12 @@
 //Scott Grauer-Gray
 //Functions for running black scholes using the analytic engine (from Quantlib) on the GPU
 
+#include <stdio.h>
+#include <math.h>
+#include <sys/time.h>
+#include <time.h>
+#include <hip/hip_runtime.h>
+
 //needed for optionInputStruct
 #include "blackScholesAnalyticEngineStructs.cuh"
 
@@ -9,13 +15,6 @@
 #include "blackScholesAnalyticEngineKernels.cu"
 
 #include "blackScholesAnalyticEngineKernelsCpu.cu"
-
-
-#include <stdio.h>
-#include <math.h>
-#include <sys/time.h>
-#include <time.h>
-#include <hip/hip_runtime.h>
 
 #define NUM_DIFF_SETTINGS 37
 
@@ -217,8 +216,6 @@ void runBlackScholesAnalyticEngine()
       }
     }
 
-
-
     // Run GPU code
 
     //initialize the arrays
@@ -231,7 +228,6 @@ void runBlackScholesAnalyticEngine()
     float mtimeCpu, mtimeGpu;
     struct timeval start;
     gettimeofday(&start, NULL);
-
 
     //declare the data on the GPU
     optionInputStruct* optionsGpu;
@@ -275,11 +271,9 @@ void runBlackScholesAnalyticEngine()
     printf("Summation of output prices on GPU: %f\n", totResult);
     printf("Output price at index %d on GPU: %f\n\n", numVals/2, outputVals[numVals/2]);
 
-
-
     //run on CPU
     gettimeofday(&start, NULL);
-    for (size_t numOption=0; numOption < numVals; numOption++)
+    for (int numOption=0; numOption < numVals; numOption++)
     {
       getOutValOptionCpu(values, outputVals, numOption, numVals);  
     }
@@ -299,7 +293,7 @@ void runBlackScholesAnalyticEngine()
     }
 
     printf("Summation of output prices on CPU: %f\n", totResult);
-    printf("Output price at index %d on CPU:: %f\n\n", numVals/2, outputVals[numVals/2]);
+    printf("Output price at index %d on CPU: %f\n\n", numVals/2, outputVals[numVals/2]);
 
     printf("Speedup on GPU: %f\n", mtimeCpu / mtimeGpu);
 
@@ -308,11 +302,7 @@ void runBlackScholesAnalyticEngine()
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
-  int
-main( int argc, char** argv) 
+int main( int argc, char** argv) 
 {
   runBlackScholesAnalyticEngine();
   return 0;

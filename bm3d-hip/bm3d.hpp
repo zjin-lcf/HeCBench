@@ -114,8 +114,8 @@ extern "C" void run_wiener_filtering(
 );
 
 // error handling
-#define cuda_error_check(ans) { display_cuda_error((ans),__FILE__, __LINE__); }
-void display_cuda_error(hipError_t code, const char *file, int line)
+#define hip_error_check(ans) { display_hip_error((ans),__FILE__, __LINE__); }
+void display_hip_error(hipError_t code, const char *file, int line)
 {
   if(code != hipSuccess)
   {

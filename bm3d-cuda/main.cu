@@ -8,6 +8,14 @@
 
 #define REPEAT 100
 
+// Adjust the size of the total shared local memory for different GPUs
+// e.g. 48KB on P100
+#define TOTAL_SLM     48*1024
+
+// Adjust the thread block size of the block matching kernel for different GPUs.
+// The maximum thread block size is 32 * MAX_NUM_WARPS
+#define MAX_NUM_WARPS 16u
+
 using namespace cimg_library;
 
 int main(int argc, char** argv)
@@ -17,7 +25,7 @@ int main(int argc, char** argv)
     std::cerr << "Usage: " << argv[0]
       << " NosiyImage DenoisedImage sigma [color] [ReferenceImage]\n"
       << "   color - color image denoising (experimental only)\n"
-      << "   ReferenceImage - if provided, computes and prints PSNR " 
+      << "   ReferenceImage - if provided, computes and prints PSNR "
       << "between the reference image and denoised image\n";
     return 1;
   }
@@ -57,7 +65,7 @@ int main(int argc, char** argv)
   std::cout << std::endl;
 
   // Check for invalid input
-  if(! image.data() )              
+  if(! image.data() )
   {
     std::cerr << "Could not open or find the image" << std::endl;
     return 1;
@@ -72,7 +80,7 @@ int main(int argc, char** argv)
   std::vector<uchar*> d_noisy_image;
   std::vector<uchar*> d_denoised_image;
   //Numerator and denominator used for aggregation
-  std::vector<float*> d_numerator;  
+  std::vector<float*> d_numerator;
   std::vector<float*> d_denominator;
 
   ushort* d_stacks;              //Addresses of similar patches to each reference patch of a batch
@@ -105,27 +113,26 @@ int main(int argc, char** argv)
   for(auto & it : d_denoised_image)
     cuda_error_check( cudaMalloc((void**)&it, sizeof(uchar) * image_size) );
 
-  for(auto & it : d_numerator) 
+  for(auto & it : d_numerator)
     cuda_error_check( cudaMalloc((void**)&it, sizeof(float) * image_size) );
 
   for(auto & it : d_denominator)
     cuda_error_check( cudaMalloc((void**)&it, sizeof(float) * image_size) );
 
-  cuda_error_check( cudaMalloc((void**)&d_stacks, 
+  cuda_error_check( cudaMalloc((void**)&d_stacks,
         sizeof(ushort) * h_batch_size.x * h_batch_size.y * N) );
 
-  cuda_error_check( cudaMalloc((void**)&d_num_patches_in_stack, 
+  cuda_error_check( cudaMalloc((void**)&d_num_patches_in_stack,
         sizeof(uint) * h_batch_size.x * h_batch_size.y ) );
 
-  cuda_error_check( cudaMalloc((void**)&d_gathered_stacks, 
+  cuda_error_check( cudaMalloc((void**)&d_gathered_stacks,
         sizeof(float) * (N+1) * k * k * h_batch_size.x * h_batch_size.y) );
 
   cuda_error_check( cudaMalloc((void**)&d_w_P,
         sizeof(float) * h_batch_size.x * h_batch_size.y) );
 
-  cuda_error_check( cudaMalloc((void**)&d_kaiser_window, 
+  cuda_error_check( cudaMalloc((void**)&d_kaiser_window,
         sizeof(float) * k * k) );
-
 
   //image dimensions
   const uint2 image_dim = make_uint2(width, height);
@@ -147,10 +154,10 @@ int main(int argc, char** argv)
   const uint s_patches_in_stack_size = warpSize * sizeof(uchar);
   const uint s_patch_stacks_size = N * warpSize * sizeof(uint);
 
-  const uint num_warps = std::min(shared_mem_available / 
+  const uint num_warps = std::min(shared_mem_available /
     (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), 16u);
-  uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) + 
-    s_image_p_size;    
+  uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) +
+    s_image_p_size;
 
   //Determine launch parameteres for the block match kernel
   dim3 num_threads_bm = dim3(warpSize*num_warps, 1);
@@ -175,7 +182,7 @@ int main(int argc, char** argv)
   std::vector<float> kaiserWindow(k*k);
   if (k == 8) {
     // First quarter of the matrix
-    kaiserWindow[0 + k * 0] = 0.1924f; 
+    kaiserWindow[0 + k * 0] = 0.1924f;
     kaiserWindow[0 + k * 1] = 0.2989f;
     kaiserWindow[0 + k * 2] = 0.3846f;
     kaiserWindow[0 + k * 3] = 0.4325f;
@@ -189,7 +196,7 @@ int main(int argc, char** argv)
     kaiserWindow[2 + k * 3] = 0.8644f;
     kaiserWindow[3 + k * 0] = 0.4325f;
     kaiserWindow[3 + k * 1] = 0.6717f;
-    kaiserWindow[3 + k * 2] = 0.8644f; 
+    kaiserWindow[3 + k * 2] = 0.8644f;
     kaiserWindow[3 + k * 3] = 0.9718f;
 
     // Fill the rest of the matrix by symmetry
@@ -206,7 +213,7 @@ int main(int argc, char** argv)
       kaiserWindow[i] = 1.0f;
 
   // Copy images to device
-  for(uint i = 0; i < channels; ++i) 
+  for(uint i = 0; i < channels; ++i)
     cuda_error_check( cudaMemcpy(d_noisy_image[i],
           image.data()+i*image_size,image_size*sizeof(uchar), cudaMemcpyHostToDevice));
 
@@ -219,33 +226,33 @@ int main(int argc, char** argv)
   // repeat the execution of kernels
   for (int n = 0; n < REPEAT; n++) {
 
-  for(auto & it : d_numerator) 
+  for(auto & it : d_numerator)
     cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
   for(auto & it : d_denominator)
     cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
-  //Batch processing: in each iteration only the batch_size reference patches are processed. 
+  //Batch processing: in each iteration only the batch_size reference patches are processed.
   uint2 start_point;
-  for(start_point.y = 0; start_point.y < stacks_dim.y + p - 1; 
+  for(start_point.y = 0; start_point.y < stacks_dim.y + p - 1;
       start_point.y += (h_batch_size.y*p))
   {
-    for(start_point.x = 0; start_point.x < stacks_dim.x + p - 1; 
+    for(start_point.x = 0; start_point.x < stacks_dim.x + p - 1;
         start_point.x += (h_batch_size.x*p))
     {
       //Finds similar patches for each reference patch of a batch and stores them in d_stacks array
       run_block_matching(
-          d_noisy_image[0],      // IN: Image  
+          d_noisy_image[0],      // IN: Image
           d_stacks,              // OUT: Array of adresses of similar patches
           d_num_patches_in_stack,// OUT: Array containing numbers of these addresses
           image_dim,             // IN: Image dimensions
           stacks_dim,            // IN: Dimensions limiting addresses of reference patches
-          h_hard_params,         // IN: Denoising parameters 
+          h_hard_params,         // IN: Denoising parameters
           start_point,           // IN: Address of the top-left reference patch of a batch
-          num_threads_bm,        // Threads in block 
+          num_threads_bm,        // Threads in block
           num_blocks_bm,         // Blocks in grid
           lmem_size_bm           // Shared memory size
-          );
+      );
 
       //cuda_error_check( cudaGetLastError() );
       //cuda_error_check( cudaDeviceSynchronize() );
@@ -264,19 +271,17 @@ int main(int argc, char** argv)
             h_hard_params,           // IN: Denoising parameters
             num_threads,             // Threads in block
             num_blocks               // Blocks in grid
-               );
+        );
 
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
 
         //Apply the 2D DCT transform to each layer of 3D group
         run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
-        cuda_error_check( cudaGetLastError() );
-        cuda_error_check( cudaDeviceSynchronize() );
+        //cuda_error_check( cudaGetLastError() );
+        //cuda_error_check( cudaDeviceSynchronize() );
 
-
-
-        // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
+        // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each
         //      3D group of a batch to complete the 3D transform.
         // 2) Hard thresholding
         // 3) Inverse 1D Walsh-Hadamard trannsform.
@@ -293,7 +298,7 @@ int main(int argc, char** argv)
             num_threads,           // Threads in block
             num_blocks,            // Blocks in grid
             s_size_t               // Shared memory size
-            );
+        );
 
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
@@ -319,12 +324,12 @@ int main(int argc, char** argv)
             h_hard_params,         // IN: Denoising parameters
             num_threads,           // Threads in block
             num_blocks             // Blocks in grid
-            );
+        );
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
       }
     }
-  }  
+  }
 
   //Divide numerator by denominator and save the result in output image
   for (uint channel = 0; channel < channels; ++channel)
@@ -336,13 +341,13 @@ int main(int argc, char** argv)
         d_denoised_image[channel], // OUT: Image estimate
         num_threads_f,             // Threads in block
         num_blocks_f               // Blocks in grid
-        );
+    );
     //cuda_error_check( cudaGetLastError() );
     //cuda_error_check( cudaDeviceSynchronize() );
     cuda_error_check( cudaMemcpy(
           dst_image.data()+channel*image_size,
           d_denoised_image[channel],
-          image_size*sizeof(uchar), 
+          image_size*sizeof(uchar),
           cudaMemcpyDeviceToHost) );
   }
 
@@ -351,10 +356,9 @@ int main(int argc, char** argv)
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   double gpuTime = (double)elapsed_seconds.count();
-  std::cout << "Total time (s):" << gpuTime << std::endl;
+  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
 
-
-  if (channels == 3) 
+  if (channels == 3)
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
   else
     dst_image = dst_image.get_channel(0);

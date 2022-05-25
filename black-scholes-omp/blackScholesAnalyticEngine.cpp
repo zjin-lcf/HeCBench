@@ -215,8 +215,6 @@ void runBlackScholesAnalyticEngine()
       }
     }
 
-
-
     // Run GPU code
 
     //initialize the arrays
@@ -230,9 +228,9 @@ void runBlackScholesAnalyticEngine()
     struct timeval start;
     gettimeofday(&start, NULL);
 
-#pragma omp target map(to: values[0:numVals]) map(from: outputVals[0:numVals])
+    #pragma omp target map(to: values[0:numVals]) map(from: outputVals[0:numVals])
     {
-#pragma omp teams distribute parallel for simd thread_limit(THREAD_BLOCK_SIZE)
+      #pragma omp teams distribute parallel for simd thread_limit(THREAD_BLOCK_SIZE)
       for (int optionNum = 0; optionNum < numVals; optionNum++) {
         optionInputStruct threadOption = values[optionNum];
 
@@ -303,10 +301,9 @@ void runBlackScholesAnalyticEngine()
     printf("Summation of output prices on GPU: %f\n", totResult);
     printf("Output price at index %d on GPU: %f\n\n", numVals/2, outputVals[numVals/2]);
 
-
     //run on CPU
     gettimeofday(&start, NULL);
-    for (size_t numOption=0; numOption < numVals; numOption++)
+    for (int numOption=0; numOption < numVals; numOption++)
     {
       getOutValOptionCpu(values, outputVals, numOption, numVals);  
     }
@@ -323,7 +320,7 @@ void runBlackScholesAnalyticEngine()
     }
 
     printf("Summation of output prices on CPU: %f\n", totResult);
-    printf("Output price at index %d on CPU:: %f\n\n", numVals/2, outputVals[numVals/2]);
+    printf("Output price at index %d on CPU: %f\n\n", numVals/2, outputVals[numVals/2]);
 
     printf("Speedup on GPU: %f\n", mtimeCpu / mtimeGpu);
 
@@ -332,11 +329,7 @@ void runBlackScholesAnalyticEngine()
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
-  int
-main( int argc, char** argv) 
+int main( int argc, char** argv) 
 {
   runBlackScholesAnalyticEngine();
   return 0;
