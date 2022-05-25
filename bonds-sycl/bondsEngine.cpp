@@ -13,7 +13,6 @@
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 
-
 int monthLengthCpu(int month, bool leapYear) 
 {
   int MonthLength[] = {
@@ -26,7 +25,6 @@ int monthLengthCpu(int month, bool leapYear)
 
   return (leapYear? MonthLeapLength[month-1] : MonthLength[month-1]);
 }
-
 
 int monthOffsetCpu(int m, bool leapYear) 
 {
@@ -44,7 +42,6 @@ int monthOffsetCpu(int m, bool leapYear)
 
   return (leapYear? MonthLeapOffset[m-1] : MonthOffset[m-1]);
 }
-
 
 int yearOffsetCpu(int y)
 {
@@ -118,7 +115,6 @@ int yearOffsetCpu(int y)
   return YearOffset[y-1900];
 }
 
-
 bool isLeapCpu(int y) 
 {
   bool YearIsLeap[] = {
@@ -191,7 +187,6 @@ bool isLeapCpu(int y)
   return YearIsLeap[y-1900];
 }
 
-
 bondsDateStruct intializeDateCpu(int d, int m, int y) 
 {
   bondsDateStruct currDate;
@@ -207,7 +202,6 @@ bondsDateStruct intializeDateCpu(int d, int m, int y)
 
   return currDate;
 }
-
 
 void runBoundsEngine() 
 {
@@ -299,14 +293,14 @@ void runBoundsEngine()
     resultsStruct resultsFromGpu;
 
     resultsHost.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
 
     resultsFromGpu.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
-    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
 
     long seconds, useconds;    
     float mtimeCpu;
@@ -314,7 +308,6 @@ void runBoundsEngine()
 
     struct timeval start;
     struct timeval end;
-
 
     { // sycl scope
 #ifdef USE_GPU
@@ -380,8 +373,7 @@ void runBoundsEngine()
 
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Processing time on GPU: %f (ms)  \n\n", mtimeGpu);
-
+    printf("Processing time on GPU: %f (ms)\n\n", mtimeGpu);
 
     double totPrice = 0.0;
     int numBond1;
@@ -397,7 +389,6 @@ void runBoundsEngine()
     printf("Clean Price: %f\n", resultsFromGpu.cleanPrice[numBonds/2]);
     printf("Bond Forward Val: %f\n\n", resultsFromGpu.bondForwardVal[numBonds/2]);
 
-
     gettimeofday(&start, NULL);
 
     getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
@@ -409,7 +400,7 @@ void runBoundsEngine()
 
     mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on CPU\n");
-    printf("Processing time on CPU: %f (ms)  \n\n", mtimeCpu);
+    printf("Processing time on CPU: %f (ms)\n\n", mtimeCpu);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -426,15 +417,13 @@ void runBoundsEngine()
     printf("Speedup using GPU: %f\n", mtimeCpu/mtimeGpu);
 
     free(resultsHost.dirtyPrice);
-    free(resultsHost.accruedAmountCurrDate);;
-    free(resultsHost.cleanPrice);;
-    free(resultsHost.bondForwardVal);;
-
+    free(resultsHost.accruedAmountCurrDate);
+    free(resultsHost.cleanPrice);
+    free(resultsHost.bondForwardVal);
     free(resultsFromGpu.dirtyPrice);
-    free(resultsFromGpu.accruedAmountCurrDate);;
-    free(resultsFromGpu.cleanPrice);;
+    free(resultsFromGpu.accruedAmountCurrDate);
+    free(resultsFromGpu.cleanPrice);
     free(resultsFromGpu.bondForwardVal);
-
     free(inArgsHost.discountCurve);
     free(inArgsHost.repoCurve);
     free(inArgsHost.currDate);
@@ -445,9 +434,6 @@ void runBoundsEngine()
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv) 
 {
   runBoundsEngine();
