@@ -44,14 +44,12 @@ void Pre_logGamma();
 int findindex(int *arr, int size);
 int C(int n, int a);
 
-FILE *fpout;
-
 int main(int argc, char** argv) {
 
   // save output in a file
-  fpout = fopen(argv[1], "w");
+  FILE *fpout = fopen(argv[1], "w");
   if (fpout == NULL) {
-    printf("Usage: ./%s <output file>\n", argv[0]);
+    printf("Usage: ./%s <path to output file>\n", argv[0]);
     return -1;
   }
 
