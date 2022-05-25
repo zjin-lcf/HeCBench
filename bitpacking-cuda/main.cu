@@ -49,7 +49,6 @@ void runBitPackingOnGPU(
   unsigned char* numBitsDevice;
   CUDA_RT_CALL(cudaMalloc((void**)&numBitsDevice, sizeof(*numBitsDevice)));
 
-
   void* workspace;
   size_t workspaceBytes = requiredWorkspaceSize(n, TypeOf<T>());
   CUDA_RT_CALL(cudaMalloc(&workspace, workspaceBytes));
@@ -109,8 +108,15 @@ int main() {
 
     T minValue;
     int numBitsAct;
+
+    auto start = std::chrono::steady_clock::now();
+
     runBitPackingOnGPU(
         inputHost, outputHost, numBits, n, &numBitsAct, &minValue);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Size = %10zu Bitpacking time = %f (s) ", n, time * 1e-9f);
 
     assert(numBitsAct <= numBits);
 
@@ -135,7 +141,7 @@ int main() {
         break;
       }
     }
-    printf("n = %zu: %s\n", n, ok ? "PASS" : "FAILED");  
+    printf("%s\n", ok ? "PASS" : "FAIL");  
   }
 
   free(inputHost);
