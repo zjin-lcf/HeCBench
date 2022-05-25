@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -12,9 +12,9 @@ DEVICE    = gpu
 # Program name & source code list
 #===============================================================================
 
-program = bitonic-sort
+program = main
 
-source = bitonic-sort.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -41,7 +41,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -61,4 +61,3 @@ clean:
 
 run: $(program)
 	./$(program) 25 2
-

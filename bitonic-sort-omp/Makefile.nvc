@@ -13,9 +13,9 @@ SM        = cc70
 # Program name & source code list
 #===============================================================================
 
-program = bitonic-sort
+program = main
 
-source = bitonic-sort.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -62,4 +62,3 @@ clean:
 
 run: $(program)
 	./$(program) 25 2
-

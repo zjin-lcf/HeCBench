@@ -35,10 +35,10 @@
 // data to the kernel. The kernel swaps the elements accordingly in parallel.
 //
 #include <math.h>
+#include <chrono>
 #include <iostream>
 #include <limits>
-
-using namespace std;
+#include <omp.h>
 
 void ParallelBitonicSort(int data_gpu[], int n) {
 
@@ -66,39 +66,39 @@ void ParallelBitonicSort(int data_gpu[], int n) {
       // Offload the work to kernel.
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int i = 0; i < size; i++) {
-          // Assign the bitonic sequence number.
-          int seq_num = i / seq_len;
+        // Assign the bitonic sequence number.
+        int seq_num = i / seq_len;
 
-          // Variable used to identified the swapped element.
-          int swapped_ele = -1;
+        // Variable used to identified the swapped element.
+        int swapped_ele = -1;
 
-          // Because the elements in the first half in the bitonic
-          // sequence may swap with elements in the second half,
-          // only the first half of elements in each sequence is
-          // required (seq_len/2).
-          int h_len = seq_len / 2;
+        // Because the elements in the first half in the bitonic
+        // sequence may swap with elements in the second half,
+        // only the first half of elements in each sequence is
+        // required (seq_len/2).
+        int h_len = seq_len / 2;
 
-          if (i < (seq_len * seq_num) + h_len) swapped_ele = i + h_len;
+        if (i < (seq_len * seq_num) + h_len) swapped_ele = i + h_len;
 
-          // Check whether increasing or decreasing order.
-          int odd = seq_num / two_power;
+        // Check whether increasing or decreasing order.
+        int odd = seq_num / two_power;
 
-          // Boolean variable used to determine "increasing" or
-          // "decreasing" order.
-          bool increasing = ((odd % 2) == 0);
+        // Boolean variable used to determine "increasing" or
+        // "decreasing" order.
+        bool increasing = ((odd % 2) == 0);
 
-          // Swap the elements in the bitonic sequence if needed
-          if (swapped_ele != -1) {
-            if (((data_gpu[i] > data_gpu[swapped_ele]) && increasing) ||
-                ((data_gpu[i] < data_gpu[swapped_ele]) && !increasing)) {
-              int temp = data_gpu[i];
-              data_gpu[i] = data_gpu[swapped_ele];
-              data_gpu[swapped_ele] = temp;
-            }
+        // Swap the elements in the bitonic sequence if needed
+        if (swapped_ele != -1) {
+          if (((data_gpu[i] > data_gpu[swapped_ele]) && increasing) ||
+              ((data_gpu[i] < data_gpu[swapped_ele]) && !increasing)) {
+            int temp = data_gpu[i];
+            data_gpu[i] = data_gpu[swapped_ele];
+            data_gpu[swapped_ele] = temp;
           }
         }
+      }
     }  // end stage
-  }    // end step
+  } // end step
 }
 
 // Loop over the bitonic sequences at each stage in serial.
@@ -202,7 +202,13 @@ int main(int argc, char *argv[]) {
   DisplayArray(data_gpu, size);
 #endif
 
+  auto start = std::chrono::steady_clock::now();
+
   ParallelBitonicSort(data_gpu, n);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Parallel bitonic time " << (time * 1e-9f) << " (s)\n";
 
 #if DEBUG
   std::cout << "\ndata after sorting using parallel bitonic sort:\n";
