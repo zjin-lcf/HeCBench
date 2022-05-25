@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include <memory>
 #include <iostream>
 #include "common.h"
@@ -26,12 +27,10 @@ inline uint DivUp(const uint a, const uint b){
     return (a % b != 0) ? (a / b + 1) : (a / b);
 }
 
-
 // Helper function to convert float[4] rgba color to 32-bit unsigned integer
-//*****************************************************************
-cl::sycl::float4 rgbaUintToFloat4(const unsigned int c)
+sycl::float4 rgbaUintToFloat4(const unsigned int c)
 {
-    cl::sycl::float4 rgba;
+    sycl::float4 rgba;
     rgba.x() = c & 0xff;
     rgba.y() = (c >> 8) & 0xff;
     rgba.z() = (c >> 16) & 0xff;
@@ -40,8 +39,7 @@ cl::sycl::float4 rgbaUintToFloat4(const unsigned int c)
 }
 
 // Inline device function to convert floating point rgba color to 32-bit unsigned integer
-//*****************************************************************
-unsigned int rgbaFloat4ToUint(const cl::sycl::float4 rgba, const float fScale)
+unsigned int rgbaFloat4ToUint(const sycl::float4 rgba, const float fScale)
 {
     unsigned int uiPackedPix = 0U;
     uiPackedPix |= 0x000000FF & (unsigned int)(rgba.x() * fScale);
@@ -51,9 +49,8 @@ unsigned int rgbaFloat4ToUint(const cl::sycl::float4 rgba, const float fScale)
     return uiPackedPix;
 }
 
-
 void BoxFilterGPU ( queue &q, 
-                    buffer<cl::sycl::uchar4, 1> &cmBufIn,
+                    buffer<sycl::uchar4, 1> &cmBufIn,
                     buffer<unsigned int, 1> &cmBufTmp,
                     buffer<unsigned int, 1> &cmBufOut,
                     const unsigned int uiWidth, 
@@ -75,7 +72,7 @@ void BoxFilterGPU ( queue &q,
     q.submit([&] (handler &cgh) {
     auto ucSource = cmBufIn.get_access<sycl_read>(cgh);
     auto uiDest = cmBufTmp.get_access<sycl_discard_write>(cgh);
-    accessor<cl::sycl::uchar4, 1, sycl_read_write, access::target::local> 
+    accessor<sycl::uchar4, 1, sycl_read_write, access::target::local> 
       uc4LocalData(iRadiusAligned + uiNumOutputPix + iRadius, cgh);
     cgh.parallel_for<class row_kernel>(nd_range<2>(row_gws, row_lws), [=] (nd_item<2> item) {
         int lid = item.get_local_id(1);
@@ -100,7 +97,7 @@ void BoxFilterGPU ( queue &q,
            (lid < (iRadiusAligned + (int)uiNumOutputPix)))
         {
             // Init summation registers to zero
-            cl::sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
+            sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
 
             // Do summation, using inline function to break up uint value from LMEM into independent RGBA values
             int iOffsetX = lid - iRadius;
@@ -113,7 +110,7 @@ void BoxFilterGPU ( queue &q,
                 f4Sum.w() += uc4LocalData[iOffsetX].w(); 
             }
 
-            // Use inline function to scale and convert registers to packed RGBA values in a cl::sycl::uchar4, 
+            // Use inline function to scale and convert registers to packed RGBA values in a sycl::uchar4, 
             // and write back out to GMEM
             uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
         }
@@ -134,8 +131,8 @@ void BoxFilterGPU ( queue &q,
       auto uiOutputImage = uiDest.get_pointer() + globalPosX;
 
       // do left edge
-      cl::sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
-      cl::sycl::float4 f4Sum = rgbaUintToFloat4(uiInputImage[0]) * radius ;
+      sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
+      sycl::float4 f4Sum = rgbaUintToFloat4(uiInputImage[0]) * radius ;
       for (int y = 0; y < iRadius + 1; y++) 
       {
           f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
@@ -169,86 +166,95 @@ void BoxFilterGPU ( queue &q,
 
 int main(int argc, char** argv)
 {
-    unsigned int uiImageWidth = 0;      // Image width
-    unsigned int uiImageHeight = 0;     // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiDevOutput = NULL;      
-    unsigned int* uiHostOutput = NULL;      
+  if (argc != 3) {
+    printf("Usage %s <PPM image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  unsigned int uiImageWidth = 0;     // Image width
+  unsigned int uiImageHeight = 0;    // Image height
+  unsigned int* uiInput = NULL;      // Host buffer to hold input image data
+  unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiDevOutput = NULL;      
+  unsigned int* uiHostOutput = NULL;      
 
-    shrLoadPPM4ub(argv[1], (uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
-    printf("Using Local Memory for Row Processing\n\n");
+  shrLoadPPM4ub(argv[1], (uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
+  printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
+  printf("Using Local Memory for Row Processing\n\n");
 
-    size_t szBuff= uiImageWidth * uiImageHeight;
-    size_t szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff= uiImageWidth * uiImageHeight;
+  size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
-    // Allocate intermediate and output host image buffers
-    uiTmp = (unsigned int*)malloc(szBuffBytes);
-    uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-    uiHostOutput = (unsigned int*)malloc(szBuffBytes);
+  // Allocate intermediate and output host image buffers
+  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiDevOutput = (unsigned int*)malloc(szBuffBytes);
+  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    buffer<cl::sycl::uchar4, 1> cmDevBufIn(szBuff);
-    buffer<unsigned int, 1> cmDevBufTmp(szBuff);
-    buffer<unsigned int, 1> cmDevBufOut(szBuff);
+  buffer<sycl::uchar4, 1> cmDevBufIn(szBuff);
+  buffer<unsigned int, 1> cmDevBufTmp(szBuff);
+  buffer<unsigned int, 1> cmDevBufOut(szBuff);
 
-    // Copy input data from host to device 
-    q.submit([&] (handler &cgh) {
-      auto input = cmDevBufIn.get_access<sycl_write>(cgh);
-      cgh.copy((cl::sycl::uchar4*)uiInput, input);
-    });
+  // Copy input data from host to device 
+  q.submit([&] (handler &cgh) {
+    auto input = cmDevBufIn.get_access<sycl_write>(cgh);
+    cgh.copy((sycl::uchar4*)uiInput, input);
+  });
 
-    // Warmup
+  // Warmup
+  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut,
+                uiImageWidth, uiImageHeight, RADIUS, SCALE);
+  q.wait();
+
+  const int iCycles = atoi(argv[2]);
+  printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iCycles; i++)
+  {
     BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-                  uiImageWidth, uiImageHeight, RADIUS, SCALE);
-    q.wait();
+        uiImageWidth, uiImageHeight, RADIUS, SCALE);
+  }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average device execution time %f (s)\n", (time * 1e-9f) / iCycles);
 
-    const int iCycles = 1000;
-    printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
-    for (int i = 0; i < iCycles; i++)
-    {
-        BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-                      uiImageWidth, uiImageHeight, RADIUS, SCALE);
+  // Copy output from device to host
+  q.submit([&] (handler &cgh) {
+    auto output = cmDevBufOut.get_access<sycl_read>(cgh);
+    cgh.copy(output, uiDevOutput);
+  }).wait();
+
+  // Do filtering on the host
+  BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
+
+  // Verification 
+  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
+  int error = 0;
+  for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
+  {
+    if (uiDevOutput[i] != uiHostOutput[i]) {
+      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      error = 1;
+      break;
     }
+  }
+  if (error) 
+    printf("FAIL\n");
+  else
+    printf("PASS\n");
 
-    // Copy output from device to host
-    q.submit([&] (handler &cgh) {
-      auto output = cmDevBufOut.get_access<sycl_read>(cgh);
-      cgh.copy(output, uiDevOutput);
-    });
-    q.wait();
-
-    // Do filtering on the host
-    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
-
-    // Verification 
-    // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
-    int error = 0;
-    for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-    {
-      if (uiDevOutput[i] != uiHostOutput[i]) {
-        printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
-        error = 1;
-        break;
-      }
-    }
-    if (error) 
-      printf("FAIL\n");
-    else
-      printf("PASS\n");
-
-    free(uiInput);
-    free(uiTmp);
-    free(uiDevOutput);
-    free(uiHostOutput);
-    return 0;
+  free(uiInput);
+  free(uiTmp);
+  free(uiDevOutput);
+  free(uiHostOutput);
+  return 0;
 }
-

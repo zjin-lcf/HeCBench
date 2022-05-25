@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include <memory>
 #include <iostream>
 #include <hip/hip_runtime.h>
@@ -18,16 +19,14 @@ extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage,
                           unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale );
 
 
-const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
+const unsigned int RADIUS = 10;                   // initial radius of 2D box filter mask
 const float SCALE = 1.0f/(2.0f * RADIUS + 1.0f);  // precalculated GV rescaling value
 
 inline uint DivUp(const uint a, const uint b){
   return (a % b != 0) ? (a / b + 1) : (a / b);
 }
 
-
 // Helper function to convert float[4] rgba color to 32-bit unsigned integer
-//*****************************************************************
 __device__
 float4 rgbaUintToFloat4(const unsigned int c)
 {
@@ -40,7 +39,6 @@ float4 rgbaUintToFloat4(const unsigned int c)
 }
 
 // Inline device function to convert floating point rgba color to 32-bit unsigned integer
-//*****************************************************************
 __device__
 unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
 {
@@ -53,8 +51,8 @@ unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
 }
 
 __global__ void row_kernel (
-    const uchar4* ucSource, 
-    uint* uiDest,
+    const uchar4* __restrict__ ucSource, 
+            uint* __restrict__ uiDest,
     const unsigned int uiWidth, 
     const unsigned int uiHeight,
     const int iRadius,
@@ -63,7 +61,7 @@ __global__ void row_kernel (
     const unsigned int uiNumOutputPix)
 {
 
-  HIP_DYNAMIC_SHARED( uchar4, uc4LocalData)
+  HIP_DYNAMIC_SHARED(uchar4, uc4LocalData)
 
   int lid = threadIdx.x;
   int gidx = blockIdx.x;
@@ -107,8 +105,8 @@ __global__ void row_kernel (
 }
 
 __global__ void col_kernel (
-    const uint* uiSource, 
-    uint* uiDest, 
+    const uint* __restrict__ uiSource, 
+          uint* __restrict__ uiDest, 
     const unsigned int uiWidth, 
     const unsigned int uiHeight, 
     const int iRadius, 
@@ -183,9 +181,13 @@ void BoxFilterGPU (uchar4* cmBufIn,
 
 int main(int argc, char** argv)
 {
-  unsigned int uiImageWidth = 0;      // Image width
-  unsigned int uiImageHeight = 0;     // Image height
-  unsigned int* uiInput = NULL;       // Host buffer to hold input image data
+  if (argc != 3) {
+    printf("Usage %s <PPM image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  unsigned int uiImageWidth = 0;     // Image width
+  unsigned int uiImageHeight = 0;    // Image height
+  unsigned int* uiInput = NULL;      // Host buffer to hold input image data
   unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
   unsigned int* uiDevOutput = NULL;      
   unsigned int* uiHostOutput = NULL;      
@@ -220,13 +222,21 @@ int main(int argc, char** argv)
 
   hipDeviceSynchronize();
 
-  const int iCycles = 1000;
+  const int iCycles = atoi(argv[2]);
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
+
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iCycles; i++)
   {
     BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
         uiImageWidth, uiImageHeight, RADIUS, SCALE);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average device execution time %f (s)\n", (time * 1e-9f) / iCycles);
 
   // Copy output from device to host
   hipMemcpy(uiDevOutput, cmDevBufOut, szBuffBytes, hipMemcpyDeviceToHost);
@@ -260,4 +270,3 @@ int main(int argc, char** argv)
   free(uiHostOutput);
   return 0;
 }
-

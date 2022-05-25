@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include <memory>
 #include <iostream>
 #include <omp.h>
@@ -42,7 +43,6 @@ inline uint DivUp(uint a, uint b){
     return (a % b != 0) ? (a / b + 1) : (a / b);
 }
 
-
 #pragma omp declare target
 // Helper function to convert float[4] rgba color to 32-bit unsigned integer
 //*****************************************************************
@@ -67,7 +67,6 @@ uchar4 rgbaUintToUchar4(unsigned int c)
 }
 
 // Inline device function to convert floating point rgba color to 32-bit unsigned integer
-//*****************************************************************
 unsigned int rgbaFloat4ToUint(float4 rgba, float fScale)
 {
     unsigned int uiPackedPix = 0U;
@@ -208,67 +207,76 @@ void BoxFilterGPU ( unsigned int *uiInput,
 
 int main(int argc, char** argv)
 {
-    unsigned int uiImageWidth = 0;      // Image width
-    unsigned int uiImageHeight = 0;     // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiDevOutput = NULL;      
-    unsigned int* uiHostOutput = NULL;      
+  if (argc != 3) {
+    printf("Usage %s <PPM image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  unsigned int uiImageWidth = 0;     // Image width
+  unsigned int uiImageHeight = 0;    // Image height
+  unsigned int* uiInput = NULL;      // Host buffer to hold input image data
+  unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiDevOutput = NULL;      
+  unsigned int* uiHostOutput = NULL;      
 
-    shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-           uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
-    printf("Using Local Memory for Row Processing\n\n");
+  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
+  printf("Using Local Memory for Row Processing\n\n");
 
-    size_t szBuff= uiImageWidth * uiImageHeight;
-    size_t szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff= uiImageWidth * uiImageHeight;
+  size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
-    // Allocate intermediate and output host image buffers
-    uiTmp = (unsigned int*)malloc(szBuffBytes);
-    uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-    uiHostOutput = (unsigned int*)malloc(szBuffBytes);
+  // Allocate intermediate and output host image buffers
+  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiDevOutput = (unsigned int*)malloc(szBuffBytes);
+  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
-#pragma omp target data map(to: uiInput[0:szBuff]) \
-                        map(alloc: uiTmp[0:szBuff]) \
-                        map(from: uiDevOutput[0:szBuff])
-{
-
+  #pragma omp target data map(to: uiInput[0:szBuff]) \
+                          map(alloc: uiTmp[0:szBuff]) \
+                          map(from: uiDevOutput[0:szBuff])
+  {
     // Warmup
     BoxFilterGPU (uiInput, uiTmp, uiDevOutput, 
                   uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
-    const int iCycles = 1000;
+    const int iCycles = atoi(argv[2]);
     printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
+
+    auto start = std::chrono::steady_clock::now();
+
     for (int i = 0; i < iCycles; i++)
     {
-        BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
-                      uiImageWidth, uiImageHeight, RADIUS, SCALE);
+      BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
+                    uiImageWidth, uiImageHeight, RADIUS, SCALE);
     }
-}
 
-    // Do filtering on the host
-    BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average device execution time %f (s)\n", (time * 1e-9f) / iCycles);
+  }
 
-    // Verification 
-    // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
-    int error = 0;
-    for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-    {
-      if (uiDevOutput[i] != uiHostOutput[i]) {
-        printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
-        error = 1;
-        break;
-      }
+  // Do filtering on the host
+  BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
+
+  // Verification 
+  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
+  int error = 0;
+  for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
+  {
+    if (uiDevOutput[i] != uiHostOutput[i]) {
+      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      error = 1;
+      break;
     }
-    if (error) 
-      printf("FAIL\n");
-    else
-      printf("PASS\n");
+  }
+  if (error) 
+    printf("FAIL\n");
+  else
+    printf("PASS\n");
 
-    free(uiInput);
-    free(uiTmp);
-    free(uiDevOutput);
-    free(uiHostOutput);
-    return 0;
+  free(uiInput);
+  free(uiTmp);
+  free(uiDevOutput);
+  free(uiHostOutput);
+  return 0;
 }
-
