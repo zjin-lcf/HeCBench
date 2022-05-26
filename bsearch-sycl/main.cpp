@@ -1,12 +1,11 @@
+#include <cstdlib>
+#include <chrono>
 #include <iostream>
 #include "common.h"
-
 
 #ifndef Real_t 
 #define Real_t float
 #endif
-
-#define RPTS 10  // repeat the kernel execution
 
 //#define DEBUG // verify the results of kernel execution
 
@@ -186,6 +185,7 @@ void bs4 (queue &q,
   q.wait();
 }
 
+#ifdef DEBUG
 void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
 {
     for (size_t i = 0; i < zSize; ++i)
@@ -202,11 +202,19 @@ void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
         r[i] = 0xFFFFFFFF;
     }
 }
+#endif
 
 int main(int argc, char* argv[])
 {
-  srand(2);
+  if (argc != 3) {
+    std::cout << "Usage ./main <number of elements> <repeat>\n";
+    return 1;
+  }
+
   size_t numElem = atol(argv[1]);
+  uint repeat = atoi(argv[2]);
+
+  srand(2);
   size_t aSize = numElem;
   size_t zSize = 2*aSize;
   Real_t *a = NULL;
@@ -234,37 +242,53 @@ int main(int argc, char* argv[])
 
   queue q(dev_sel);
 
-
-  // bs1
-  for(uint k = 0; k < RPTS; k++) {
+  auto start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs(q, aSize, zSize, a, z, r, N);  
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs1");
 #endif
 
-  // bs2
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs2(q, aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs2");
 #endif
 
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs3(q, aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs3");
 #endif
 
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs4(q, aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs4");
 #endif
-
 
   free(a);
   free(z);
