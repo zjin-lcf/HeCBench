@@ -190,17 +190,108 @@ double atomic_add(double *address, double val)
 }
 
 template <typename T>
-void atomicDerived (nd_item<1> &item, T *__restrict res)
+void atomicMinDerived (nd_item<1> &item, T *__restrict res)
 {
   int i = item.get_global_id(0) + 1;
   atomic_min(res, (T)i);
-  atomic_max(res+1, (T)i);
-  atomic_add(res+2, (T)i);
+}
+
+template <typename T>
+void atomicMaxDerived (nd_item<1> &item, T *__restrict res)
+{
+  int i = item.get_global_id(0) + 1;
+  atomic_max(res, (T)i);
+}
+
+template <typename T>
+void atomicAddDerived (nd_item<1> &item, T *__restrict res)
+{
+  int i = item.get_global_id(0) + 1;
+  atomic_add(res, (T)i);
+}
+
+template <typename T>
+class k_atomic_min;
+
+template <typename T>
+class k_atomic_max;
+
+template <typename T>
+class k_atomic_add;
+
+template <typename T>
+void testMin (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
+  range<1> lws (BLOCK_SIZE);
+
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    q.memcpy(d_ptr, h_ptr, sizeof(T));
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k_atomic_min<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        atomicMinDerived<T>(item, d_ptr);
+      });
+    });
+  }
+  q.wait();
+  q.memcpy(h_ptr, d_ptr, sizeof(T));
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic min for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+}
+
+template <typename T>
+void testMax (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
+  range<1> lws (BLOCK_SIZE);
+
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    q.memcpy(d_ptr, h_ptr, sizeof(T));
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k_atomic_max<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        atomicMaxDerived<T>(item, d_ptr);
+      });
+    });
+  }
+  q.wait();
+  q.memcpy(h_ptr, d_ptr, sizeof(T));
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic max for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+}
+
+template <typename T>
+void testAdd (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
+  range<1> lws (BLOCK_SIZE);
+
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
+    q.memcpy(d_ptr, h_ptr, sizeof(T));
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k_atomic_add<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        atomicAddDerived<T>(item, d_ptr);
+      });
+    });
+  }
+  q.wait();
+  q.memcpy(h_ptr, d_ptr, sizeof(T));
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Atomic add for data type %s | ", name);
+  printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
 }
 
 
 int main(int argc, char** argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
   const int repeat = atoi(argv[1]);
 
   unsigned long long res_u64[3] = {ULONG_MAX,0,0};
@@ -214,69 +305,22 @@ int main(int argc, char** argv) {
 #endif
   queue q(dev_sel);
 
-  buffer<unsigned long long, 1> d_res_u64 (3);   
-  buffer<long long, 1> d_res_s64 (3);   
-  buffer<double, 1> d_res_f64 (3);   
+  unsigned long long *d_res_u64 = sycl::malloc_device<unsigned long long>(3, q);
+  long long *d_res_s64 = sycl::malloc_device<long long>(3, q);
+  double *d_res_f64 = sycl::malloc_device<double>(3, q);
 
-  range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  testMin<unsigned long long>(q, res_u64, d_res_u64, repeat, "U64");
+  testMin<long long>(q, res_s64, d_res_s64, repeat, "S64");
+  testMin<double>(q, res_f64, d_res_f64, repeat, "F64");
 
-  // the first two kernels should take almost the same execution time
-  // the add kernels are very slow compared to min/max kernels
-  for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_u64.get_access<sycl_write>(cgh);
-      cgh.copy(res_u64, acc);
-    });
+  testMax<unsigned long long>(q, res_u64+1, d_res_u64+1, repeat, "U64");
+  testMax<long long>(q, res_s64+1, d_res_s64+1, repeat, "S64");
+  testMax<double>(q, res_f64+1, d_res_f64+1, repeat, "F64");
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_s64.get_access<sycl_write>(cgh);
-      cgh.copy(res_s64, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_f64.get_access<sycl_write>(cgh);
-      cgh.copy(res_f64, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_u64.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k_ull>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        atomicDerived<unsigned long long>(item, acc.get_pointer());
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_s64.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k_ll>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        atomicDerived<long long>(item, acc.get_pointer());
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_res_f64.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k_double>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        atomicDerived<double>(item, acc.get_pointer());
-      });
-    });
-  }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_res_u64.get_access<sycl_read>(cgh);
-    cgh.copy(acc, res_u64);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_res_s64.get_access<sycl_read>(cgh);
-    cgh.copy(acc, res_s64);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_res_f64.get_access<sycl_read>(cgh);
-    cgh.copy(acc, res_f64);
-  });
-
-  q.wait();
+  // the add kernels are slow
+  testAdd<unsigned long long>(q, res_u64+2, d_res_u64+2, 1, "U64");
+  testAdd<long long>(q, res_s64+2, d_res_s64+2, 1, "S64");
+  testAdd<double>(q, res_f64+2, d_res_f64+2, 1, "F64");
 
   unsigned long long sum = 0; 
   unsigned long long bound = NUM_BLOCKS*BLOCK_SIZE;
@@ -296,6 +340,10 @@ int main(int argc, char** argv) {
     printf("atomic add results: %llu %lld %lf\n", res_u64[2], res_s64[2], res_f64[2]);
   }
   printf("%s\n", error ? "FAIL" : "PASS");
+
+  sycl::free(d_res_u64, q);
+  sycl::free(d_res_s64, q);
+  sycl::free(d_res_f64, q);
 
   return 0;
 }

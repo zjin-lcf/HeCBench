@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <vector>
 #include <algorithm>  // for_each
+#include <chrono>
 #include <omp.h>
 
 #include "support/common.h"
@@ -148,6 +149,8 @@ int main(int argc, char **argv) {
                                    h_finished[0:finished_size], \
                                    h_head[0:1])
   {
+    double time = 0;
+
     for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
       memcpy(h_in_out, h_in_backup, in_size * sizeof(FP));
@@ -157,6 +160,8 @@ int main(int argc, char **argv) {
 #pragma omp target update to(h_in_out[0:in_size]) // nowait
 #pragma omp target update to(h_finished[0:finished_size]) // nowait
 #pragma omp target update to(h_head[0:1]) // nowait
+
+     auto start = std::chrono::steady_clock::now();
 
 #pragma omp target teams num_teams(blocks) thread_limit(threads) 
       {
@@ -262,9 +267,16 @@ int main(int argc, char **argv) {
           }
         }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      if (rep >= p.n_warmup) 
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     // Copy back 
 #pragma omp target update from(h_in_out[0:in_size]) //nowait
     }
+
+    printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
   }
 
   // Verify
@@ -277,6 +289,5 @@ int main(int argc, char **argv) {
   free(h_head);
   free(h_in_backup);
 
-  if (status == 0) printf("Test Passed\n");
   return 0;
 }

@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -I../attention-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -68,7 +68,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../attention-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -76,4 +76,3 @@ clean:
 
 run: $(program)
 	./$(program) 65536 2048 100
-
