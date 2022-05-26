@@ -1,14 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
+#include "reference.h"
 
 __global__ 
 void kernel1 (
-    const float*__restrict key, 
-    const float*__restrict query, 
-    float*__restrict dot_product, 
-    float*__restrict exp_sum, 
+    const float*__restrict__ key, 
+    const float*__restrict__ query, 
+    float*__restrict__ dot_product, 
+    float*__restrict__ exp_sum, 
     const int n,
     const int d) 
 {
@@ -25,9 +27,9 @@ void kernel1 (
 
 __global__ 
 void kernel2 (
-    const float*__restrict exp_sum, 
-    const float*__restrict dot_product, 
-    float*__restrict score, 
+    const float*__restrict__ exp_sum, 
+    const float*__restrict__ dot_product, 
+    float*__restrict__ score, 
     const int n)
 {
 
@@ -38,9 +40,9 @@ void kernel2 (
 
 __global__ 
 void kernel3 (
-    const float*__restrict score, 
-    const float*__restrict value, 
-    float*__restrict output, 
+    const float*__restrict__ score, 
+    const float*__restrict__ value, 
+    float*__restrict__ output, 
     const int n,
     const int d) 
 {
@@ -51,41 +53,6 @@ void kernel3 (
       sum += score[i] * value[i * d + j];
     output[j] = sum;
   }
-}
-
-float* attention_host(const float* key, const float* value, const float* query,
-    const int n, const int d) 
-{
-  // intermediate
-  float* dot_product = (float*) malloc (n * sizeof(float));
-  float* score = (float*) malloc (n * sizeof(float));
-  // result
-  float* output = (float*) malloc (d * sizeof(float));
-
-  for (int i = 0; i < n; i++) {
-    float sum = 0;
-    for (int j = 0; j < d; j++)
-      sum += key[i * d + j] * query[j];
-    dot_product[i] = sum;
-  }
-
-  float sum = 0;
-  for (int i = 0; i < n; i++)
-    sum += expf(dot_product[i]);
-
-  for (int i = 0; i < n; i++)
-    score[i] = expf(dot_product[i]) / sum;
-
-  for (int j = 0; j < d; j++) {
-    float sum = 0;
-    for (int i = 0; i < n; i++)
-      sum += score[i] * value[i * d + j];
-    output[j] = sum;
-  }
-
-  free(dot_product);
-  free(score);
-  return output;
 }
 
 float* attention_device(const float* key, const float* value, const float* query,
@@ -124,14 +91,15 @@ float* attention_device(const float* key, const float* value, const float* query
   dim3 d_grid((d+255)/256);
   dim3 d_block(256);
 
+
   for (int k = 0; k < repeat; k++) {
     hipMemset(d_exp_sum, 0, 4);
 
-    hipLaunchKernelGGL(kernel1, dim3(n_grid), dim3(n_block), 0, 0, d_key, d_query, d_dot_product, d_exp_sum, n, d);
+    hipLaunchKernelGGL(kernel1, n_grid, n_block, 0, 0, d_key, d_query, d_dot_product, d_exp_sum, n, d);
 
-    hipLaunchKernelGGL(kernel2, dim3(n_grid), dim3(n_block), 0, 0, d_exp_sum, d_dot_product, d_score, n);
+    hipLaunchKernelGGL(kernel2, n_grid, n_block, 0, 0, d_exp_sum, d_dot_product, d_score, n);
 
-    hipLaunchKernelGGL(kernel3, dim3(d_grid), dim3(d_block), 0, 0, d_score, d_value, d_output, n, d);
+    hipLaunchKernelGGL(kernel3, d_grid, d_block, 0, 0, d_score, d_value, d_output, n, d);
   }
 
   hipMemcpy(output, d_output, d * sizeof(float), hipMemcpyDeviceToHost);
@@ -145,6 +113,10 @@ float* attention_device(const float* key, const float* value, const float* query
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <rows> <columns> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int n = atoi(argv[1]);
   const int d = atoi(argv[2]);
   const int r = atoi(argv[3]);
@@ -165,7 +137,14 @@ int main(int argc, char* argv[]) {
   }
 
   float* hout = attention_host(key, value, query, n, d);
+
+  auto start = std::chrono::steady_clock::now();
+
   float* dout = attention_device(key, value, query, n, d, r);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device offload time %f (s)\n", (time * 1e-9f));
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 

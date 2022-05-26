@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
+#include <chrono>
 #include "reference.h"
 
 template<int R>
@@ -69,6 +70,12 @@ __global__ void bilateralFilter(
 //
 int main(int argc, char *argv[]) {
 
+  if (argc != 6) {
+    printf("Usage: %s <image width> <image height> <intensity> <spatial> <repeat>\n",
+            argv[0]);
+    return 1;
+  }
+
   // image dimensions
   int w = atoi(argv[1]);
   int h = atoi(argv[2]);
@@ -85,6 +92,8 @@ int main(int argc, char *argv[]) {
 
   // square of the height of the curve peak
   float a_square = 0.5f / (variance_I * (float)M_PI);
+
+  int repeat = atoi(argv[5]);
 
   float *d_src, *d_dst;
   cudaMalloc((void**)&d_dst, img_size * sizeof(float));
@@ -104,9 +113,18 @@ int main(int argc, char *argv[]) {
   dim3 threads (16, 16);
   dim3 blocks ((w+15)/16, (h+15)/16);
 
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     bilateralFilter<3><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
   // verify
@@ -119,9 +137,18 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     bilateralFilter<6><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
   reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
@@ -132,9 +159,18 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     bilateralFilter<9><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
   reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);

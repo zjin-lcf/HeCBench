@@ -1,6 +1,7 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 #include "reference.cpp"
@@ -8,9 +9,9 @@
 __global__ void smoothingFilter(
     int Lx, int Ly, 
     int Threshold, int MaxRad, 
-    const float*__restrict Img,
-            int*__restrict Box,
-          float*__restrict Norm)
+    const float*__restrict__ Img,
+            int*__restrict__ Box,
+          float*__restrict__ Norm)
 {
   int tid = threadIdx.x;
   int tjd = threadIdx.y;
@@ -67,7 +68,10 @@ __global__ void smoothingFilter(
   }
 }
 
-__global__ void normalizeFilter(int Lx, int Ly, float*__restrict Img, const float*__restrict Norm)
+__global__ void normalizeFilter(
+    int Lx, int Ly, 
+          float*__restrict__ Img,
+    const float*__restrict__ Norm)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -80,9 +84,9 @@ __global__ void normalizeFilter(int Lx, int Ly, float*__restrict Img, const floa
 
 __global__ void outFilter( 
     int Lx, int Ly,
-    const float*__restrict Img,
-    const   int*__restrict Box,
-          float*__restrict Out )
+    const float*__restrict__ Img,
+    const   int*__restrict__ Box,
+          float*__restrict__ Out )
 {
   int tid = threadIdx.x;
   int tjd = threadIdx.y;
@@ -171,16 +175,28 @@ int main(int argc, char* argv[]) {
   // reset output
   cudaMemcpy(d_out, out, sizeof(float) * size, cudaMemcpyHostToDevice);
 
+  double time = 0;
+
   for (int i = 0; i < repeat; i++) {
     // restore input image
     cudaMemcpy(d_img, img, sizeof(float) * size, cudaMemcpyHostToDevice);
     // reset norm
     cudaMemcpy(d_norm, norm, sizeof(float) * size, cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     // launch three kernels
     smoothingFilter<<<grids, blocks>>>(Lx, Ly, Threshold, MaxRad, d_img, d_box, d_norm);
     normalizeFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_norm);
     outFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_box, d_out);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
   cudaMemcpy(out, d_out, sizeof(float) * size, cudaMemcpyDeviceToHost);
   cudaMemcpy(box, d_box, sizeof(int) * size, cudaMemcpyDeviceToHost);
