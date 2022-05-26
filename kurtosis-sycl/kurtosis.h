@@ -5,22 +5,10 @@ struct kurtosisResult {
   float m3;
   float m4;
 
-  #ifndef __SYCL_DEVICE_ONLY__
-
   kurtosisResult() : count(0),mean(0),m2(0),m3(0),m4(0) {}
 
   kurtosisResult(int count, float mean, float M2, float M3, float M4) :
     count(count),mean(mean),m2(M2),m3(M3),m4(M4){}
-
-  kurtosisResult(const kurtosisResult& result) {
-    count = result.count;
-    mean = result.mean;
-    m2 = result.m2;
-    m3 = result.m3;
-    m4 = result.m4;
-  }
-
-  #endif
 };
 
 template <typename T>
