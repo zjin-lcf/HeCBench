@@ -11,15 +11,6 @@ struct kurtosisResult {
   HOST DEVICE
   kurtosisResult(int count, float mean, float M2, float M3, float M4) :
     count(count),mean(mean),m2(M2),m3(M3),m4(M4){}
-
-  HOST DEVICE
-  kurtosisResult(const kurtosisResult& result) {
-    count = result.count;
-    mean = result.mean;
-    m2 = result.m2;
-    m3 = result.m3;
-    m4 = result.m4;
-  }
 };
 
 template <typename T>
