@@ -1,12 +1,11 @@
+#include <cstdlib>
+#include <chrono>
 #include <iostream>
 #include <omp.h>
-
 
 #ifndef Real_t 
 #define Real_t float
 #endif
-
-#define RPTS 10  // repeat the kernel execution
 
 //#define DEBUG // verify the results of kernel execution
 
@@ -96,12 +95,12 @@ void bs4 ( const size_t aSize,
     size_t *acc_r,  // T
     const size_t n )
 {
-#pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
+  #pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
   {
-#pragma omp target teams num_teams(zSize/256)  thread_limit(256)
+    #pragma omp target teams num_teams(zSize/256)  thread_limit(256)
     {
       size_t k;
-#pragma omp parallel
+      #pragma omp parallel
       {
         size_t lid = omp_get_thread_num();
         size_t gid = omp_get_team_num()*omp_get_num_threads()+lid;
@@ -110,7 +109,7 @@ void bs4 ( const size_t aSize,
           while (n >> nbits) nbits++;
           k = 1ULL << (nbits - 1);
         }
-#pragma omp barrier
+        #pragma omp barrier
 
         size_t p = k;
         T z = acc_z[gid];
@@ -128,6 +127,7 @@ void bs4 ( const size_t aSize,
   }
 }
 
+#ifdef DEBUG
 void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
 {
   for (size_t i = 0; i < zSize; ++i)
@@ -144,11 +144,19 @@ void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
     r[i] = 0xFFFFFFFF;
   }
 }
+#endif
 
 int main(int argc, char* argv[])
 {
-  srand(2);
+  if (argc != 3) {
+    std::cout << "Usage ./main <number of elements> <repeat>\n";
+    return 1;
+  }
+
   size_t numElem = atol(argv[1]);
+  uint repeat = atoi(argv[2]);
+
+  srand(2);
   size_t aSize = numElem;
   size_t zSize = 2*aSize;
   Real_t *a = NULL;
@@ -168,34 +176,53 @@ int main(int argc, char* argv[])
     z[i] = rand() % N;
   }
 
-  for(uint k = 0; k < RPTS; k++) {
+  auto start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs(aSize, zSize, a, z, r, N);  
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs1");
 #endif
 
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs2(aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs2");
 #endif
 
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs3(aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs3");
 #endif
 
-  for(uint k = 0; k < RPTS; k++) {
+  start = std::chrono::steady_clock::now();
+  for(uint k = 0; k < repeat; k++) {
     bs4(aSize, zSize, a, z, r, N);  
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
+
 #ifdef DEBUG
   verify(a, z, r, aSize, zSize, "bs4");
 #endif
-
 
   free(a);
   free(z);
