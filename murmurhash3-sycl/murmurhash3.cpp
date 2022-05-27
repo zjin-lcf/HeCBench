@@ -1,14 +1,19 @@
+//-------------------------------------------------------------------------
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
+//-------------------------------------------------------------------------
+
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <cassert>
+#include <chrono>
 #include "common.h"
 
 #define BLOCK_SIZE 256
 
 #define  FORCE_INLINE inline __attribute__((always_inline))
-
 
 inline uint64_t rotl64 ( uint64_t x, int8_t r )
 {
@@ -17,11 +22,8 @@ inline uint64_t rotl64 ( uint64_t x, int8_t r )
 
 #define BIG_CONSTANT(x) (x##LU)
 
-
-//-----------------------------------------------------------------------------
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
-
 FORCE_INLINE uint64_t getblock64 ( const uint8_t * p, uint32_t i )
 {
   uint64_t s = 0;
@@ -40,13 +42,11 @@ FORCE_INLINE uint64_t fmix64 ( uint64_t k )
   k ^= k >> 33;
   k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
   k ^= k >> 33;
-
   return k;
 }
 
-
-void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
-    const uint32_t seed, void * out )
+void MurmurHash3_x64_128 (const void * key, const uint32_t len,
+                          const uint32_t seed, void * out)
 {
   const uint8_t * data = (const uint8_t*)key;
   const uint32_t nblocks = len / 16;
@@ -56,9 +56,6 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
 
   const uint64_t c1 = BIG_CONSTANT(0x87c37b91114253d5);
   const uint64_t c2 = BIG_CONSTANT(0x4cf5ad432745937f);
-
-  //----------
-  // body
 
   for(uint32_t i = 0; i < nblocks; i++)
   {
@@ -73,9 +70,6 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
 
     h2 = rotl64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
   }
-
-  //----------
-  // tail
 
   const uint8_t * tail = (const uint8_t*)(data + nblocks*16);
 
@@ -104,9 +98,6 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
        k1 *= c1; k1  = rotl64(k1,31); k1 *= c2; h1 ^= k1;
   };
 
-  //----------
-  // finalization
-
   h1 ^= len; h2 ^= len;
 
   h1 += h2;
@@ -124,9 +115,15 @@ void MurmurHash3_x64_128 ( const void * key, const uint32_t len,
 
 int main(int argc, char** argv) 
 {
+  if (argc != 3) {
+    printf("Usage: %s <number of keys> <repeat>\n", argv[0]);
+    return 1;
+  } 
+  uint32_t numKeys = atoi(argv[1]);
+  uint32_t repeat = atoi(argv[2]);
+
   srand(3);
   uint32_t i;
-  int32_t numKeys = atoi(argv[1]);
   // length of each key
   uint32_t* length = (uint32_t*) malloc (sizeof(uint32_t) * numKeys);
   // pointer to each key
@@ -147,9 +144,7 @@ int main(int argc, char** argv)
 #endif
   }
 
-  //
   // create the 1D data arrays for device offloading  
-  //
   uint64_t* d_out = (uint64_t*) malloc (sizeof(uint64_t) * 2 * numKeys);
   uint32_t* d_length = (uint32_t*) malloc (sizeof(uint32_t) * (numKeys+1));
 
@@ -189,7 +184,9 @@ int main(int argc, char** argv)
   range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
   range<1> local_work_size (BLOCK_SIZE);
 
-  for (uint32_t n = 0; n < 100; n++)  
+  auto start = std::chrono::steady_clock::now();
+
+  for (uint32_t n = 0; n < repeat; n++)
     q.submit([&](handler &h) {
       auto d_keys = dev_keys.get_access<sycl_read>(h);
       auto d_length = dev_length.get_access<sycl_read>(h);
@@ -201,6 +198,11 @@ int main(int argc, char** argv)
           MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
         });
     });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   } // sycl scope
 
