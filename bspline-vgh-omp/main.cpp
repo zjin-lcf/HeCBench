@@ -1,16 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <math.h>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdint>
 #include <omp.h>
-
-#define restrict __restrict
 
 #define max(a,b) ((a<b)?b:a)
 #define min(a,b) ((a<b)?a:b)
 
-
-const int WSIZE = 12000;           // Walker
+const int WSIZE = 12000;          // Walker
 const int NSIZE = 2003;           // Values
 const int MSIZE = NSIZE*3+3;      // Gradient vectors
 const int OSIZE = NSIZE*9+9;      // Hessian Matrices 
@@ -18,27 +16,78 @@ const int OSIZE = NSIZE*9+9;      // Hessian Matrices
 const int NSIZE_round = NSIZE%16 ? NSIZE+16-NSIZE%16: NSIZE;
 const size_t SSIZE = (size_t)NSIZE_round*48*48*48;  //Coefs size 
 
+void eval_abc(const float *Af, float tx, float *a) {
+
+  a[0] = ( ( Af[0]  * tx + Af[1] ) * tx + Af[2] ) * tx + Af[3];
+  a[1] = ( ( Af[4]  * tx + Af[5] ) * tx + Af[6] ) * tx + Af[7];
+  a[2] = ( ( Af[8]  * tx + Af[9] ) * tx + Af[10] ) * tx + Af[11];
+  a[3] = ( ( Af[12] * tx + Af[13] ) * tx + Af[14] ) * tx + Af[15];
+}
 
 #pragma omp declare target
+
 #pragma omp declare simd // simdlen(32)
 static inline void eval_UBspline_3d_s_vgh (
-    const float * restrict coefs_init,
+    const float * __restrict coefs_init,
     const intptr_t xs,
     const intptr_t ys,
     const intptr_t zs,
-    float * restrict vals,
-    float * restrict grads,
-    float * restrict hess,
+    float * __restrict vals,
+    float * __restrict grads,
+    float * __restrict hess,
     const float *   a, const float *   b, const float *   c,
     const float *  da, const float *  db, const float *  dc,
     const float * d2a, const float * d2b, const float * d2c,
-    const float dxInv, const float dyInv, const float dzInv);
+    const float dxInv, const float dyInv, const float dzInv)
+{
+  float h[9];
+  float v0 = 0.0f;
+  for (int i = 0; i < 9; ++i) h[i] = 0.0f;
+
+  for (int i=0; i<4; i++)
+    for (int j=0; j<4; j++) {
+      float pre20 = d2a[i]*  b[j];
+      float pre10 =  da[i]*  b[j];
+      float pre00 =   a[i]*  b[j];
+      float pre11 =  da[i]* db[j];
+      float pre01 =   a[i]* db[j];
+      float pre02 =   a[i]*d2b[j];
+
+      const float *coefs = coefs_init + i*xs + j*ys;
+
+      float sum0 =   c[0] * coefs[0] +   c[1] * coefs[zs] +   c[2] * coefs[zs*2] +   c[3] * coefs[zs*3];
+      float sum1 =  dc[0] * coefs[0] +  dc[1] * coefs[zs] +  dc[2] * coefs[zs*2] +  dc[3] * coefs[zs*3];
+      float sum2 = d2c[0] * coefs[0] + d2c[1] * coefs[zs] + d2c[2] * coefs[zs*2] + d2c[3] * coefs[zs*3];
+
+      h[0]  += pre20 * sum0;
+      h[1]  += pre11 * sum0;
+      h[2]  += pre10 * sum1;
+      h[4]  += pre02 * sum0;
+      h[5]  += pre01 * sum1;
+      h[8]  += pre00 * sum2;
+      h[3]  += pre10 * sum0;
+      h[6]  += pre01 * sum0;
+      h[7]  += pre00 * sum1;
+      v0    += pre00 * sum0;
+    }
+  vals[0] = v0;
+  grads[0]  = h[3] * dxInv;
+  grads[1]  = h[6] * dyInv;
+  grads[2]  = h[7] * dzInv;
+
+  hess [0] = h[0]*dxInv*dxInv;
+  hess [1] = h[1]*dxInv*dyInv;
+  hess [2] = h[2]*dxInv*dzInv;
+  hess [3] = h[1]*dxInv*dyInv; // Copy hessian elements into lower half of 3x3 matrix
+  hess [4] = h[4]*dyInv*dyInv;
+  hess [5] = h[5]*dyInv*dzInv;
+  hess [6] = h[2]*dxInv*dzInv; // Copy hessian elements into lower half of 3x3 matrix
+  hess [7] = h[5]*dyInv*dzInv; //Copy hessian elements into lower half of 3x3 matrix
+  hess [8] = h[8]*dzInv*dzInv;
+}
 #pragma omp end declare target
 
-void  eval_abc(const float * restrict Af, float tx, float * restrict a);
-
-
-int main(int argc, char ** argv){
+int main(int argc, char ** argv) {
 
   float *Af = (float*) malloc (sizeof(float)*16);
   float *dAf = (float*) malloc (sizeof(float)*16);
@@ -76,7 +125,6 @@ int main(int argc, char ** argv){
   dAf[13]=0.500000; d2Af[13]=0.000000;
   dAf[14]=0.000000; d2Af[14]=1.000000;
   dAf[15]=0.000000; d2Af[15]=0.000000;
-
 
   float x=0.822387;  
   float y=0.989919;  
@@ -120,60 +168,70 @@ int main(int argc, char ** argv){
                                     walkers_hess[0:WSIZE*OSIZE])\
                           map(to: spline_coefs[0:SSIZE]) \
                           map(alloc: a[0:4], b[0:4], c[0:4], \
-                          da[0:4], db[0:4], dc[0:4], \
-                          d2a[0:4], d2b[0:4], d2c[0:4])
-  for(int i=0; i<WSIZE; i++){
-    float x = walkers_x[i], y = walkers_y[i], z = walkers_z[i];
+                                     da[0:4], db[0:4], dc[0:4], \
+                                     d2a[0:4], d2b[0:4], d2c[0:4])
+  {
+    double total_time = 0.0;
 
-    float * restrict vals  = &walkers_vals[i*NSIZE];
-    float * restrict grads = &walkers_grads[i*MSIZE];
-    float * restrict hess  = &walkers_hess[i*OSIZE];
-    float ux = x*spline_x_grid_delta_inv;
-    float uy = y*spline_y_grid_delta_inv;
-    float uz = z*spline_z_grid_delta_inv;
-    float ipartx, iparty, ipartz, tx, ty, tz;
-    intptr_t xs = spline_x_stride;
-    intptr_t ys = spline_y_stride;
-    intptr_t zs = spline_z_stride;
+    for(int i=0; i<WSIZE; i++) {
+      float x = walkers_x[i], y = walkers_y[i], z = walkers_z[i];
 
-    x -= spline_x_grid_start;
-    y -= spline_y_grid_start;
-    z -= spline_z_grid_start;
-    ipartx = (int) ux; tx = ux-ipartx;    int ix = min(max(0,(int) ipartx),spline_x_grid_num-1);
-    iparty = (int) uy; ty = uy-iparty;    int iy = min(max(0,(int) iparty),spline_y_grid_num-1);
-    ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
+      float *vals  = &walkers_vals[i*NSIZE];
+      float *grads = &walkers_grads[i*MSIZE];
+      float *hess  = &walkers_hess[i*OSIZE];
+      float ux = x*spline_x_grid_delta_inv;
+      float uy = y*spline_y_grid_delta_inv;
+      float uz = z*spline_z_grid_delta_inv;
+      float ipartx, iparty, ipartz, tx, ty, tz;
+      intptr_t xs = spline_x_stride;
+      intptr_t ys = spline_y_stride;
+      intptr_t zs = spline_z_stride;
 
-    eval_abc(Af,tx,&a[0]);
-    eval_abc(Af,ty,&b[0]);
-    eval_abc(Af,tz,&c[0]);
-    eval_abc(dAf,tx,&da[0]);
-    eval_abc(dAf,ty,&db[0]);
-    eval_abc(dAf,tz,&dc[0]);
-    eval_abc(d2Af,tx,&d2a[0]);
-    eval_abc(d2Af,ty,&d2b[0]);
-    eval_abc(d2Af,tz,&d2c[0]);              
+      x -= spline_x_grid_start;
+      y -= spline_y_grid_start;
+      z -= spline_z_grid_start;
+      ipartx = (int) ux; tx = ux-ipartx;    int ix = min(max(0,(int) ipartx),spline_x_grid_num-1);
+      iparty = (int) uy; ty = uy-iparty;    int iy = min(max(0,(int) iparty),spline_y_grid_num-1);
+      ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
-    #pragma omp target update to(a[0:4])
-    #pragma omp target update to(b[0:4])
-    #pragma omp target update to(c[0:4])
-    #pragma omp target update to(da[0:4])
-    #pragma omp target update to(db[0:4])
-    #pragma omp target update to(dc[0:4])
-    #pragma omp target update to(d2a[0:4])
-    #pragma omp target update to(d2b[0:4])
-    #pragma omp target update to(d2c[0:4])
+      eval_abc(Af,tx,&a[0]);
+      eval_abc(Af,ty,&b[0]);
+      eval_abc(Af,tz,&c[0]);
+      eval_abc(dAf,tx,&da[0]);
+      eval_abc(dAf,ty,&db[0]);
+      eval_abc(dAf,tz,&dc[0]);
+      eval_abc(d2Af,tx,&d2a[0]);
+      eval_abc(d2Af,ty,&d2b[0]);
+      eval_abc(d2Af,tz,&d2c[0]);              
 
-    const float * restrict coefs_init = spline_coefs + ix*xs + iy*ys + iz*zs;
+      #pragma omp target update to(a[0:4])
+      #pragma omp target update to(b[0:4])
+      #pragma omp target update to(c[0:4])
+      #pragma omp target update to(da[0:4])
+      #pragma omp target update to(db[0:4])
+      #pragma omp target update to(dc[0:4])
+      #pragma omp target update to(d2a[0:4])
+      #pragma omp target update to(d2b[0:4])
+      #pragma omp target update to(d2c[0:4])
 
-    #pragma omp target teams distribute parallel for thread_limit(256)
-    for (int n = 0; n < spline_num_splines; n++)
-      eval_UBspline_3d_s_vgh ( coefs_init+n,
-          xs, ys, zs, vals+n, grads+n*3, hess+n*9,
-          a, b, c, da, db, dc, d2a, d2b, d2c,
-          spline_x_grid_delta_inv,
-          spline_y_grid_delta_inv,
-          spline_z_grid_delta_inv );
+      auto start = std::chrono::steady_clock::now();
 
+      #pragma omp target teams distribute parallel for thread_limit(256)
+      for (int n = 0; n < spline_num_splines; n++) {
+        eval_UBspline_3d_s_vgh ( spline_coefs + ix*xs + iy*ys + iz*zs + n,
+            xs, ys, zs, vals+n, grads+n*3, hess+n*9,
+            a, b, c, da, db, dc, d2a, d2b, d2c,
+            spline_x_grid_delta_inv,
+            spline_y_grid_delta_inv,
+            spline_z_grid_delta_inv );
+      }
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
+    }
+
+    printf("Total kernel execution time %lf (s)\n", total_time * 1e-9);
   }
 
   // collect results for the first walker
@@ -185,7 +243,7 @@ int main(int argc, char ** argv){
   for( int i = 0; i < MSIZE; i++ ) resGrad = resGrad + walkers_grads[i];
   for( int i = 0; i < OSIZE; i++ ) resHess = resHess + walkers_hess[i];
   printf("walkers[0]->collect([resVal resGrad resHess]) = [%e %e %e]\n",
-      resVal,resGrad, resHess);  
+         resVal,resGrad, resHess);  
 
   free(Af);
   free(dAf);
@@ -200,78 +258,3 @@ int main(int argc, char ** argv){
 
   return 0;
 }
-
-
-
-void  eval_abc(const float * restrict Af, float tx, float * restrict a){
-
-  a[0] = ( ( Af[0]  * tx + Af[1] ) * tx + Af[2] ) * tx + Af[3];
-  a[1] = ( ( Af[4]  * tx + Af[5] ) * tx + Af[6] ) * tx + Af[7];
-  a[2] = ( ( Af[8]  * tx + Af[9] ) * tx + Af[10] ) * tx + Af[11];
-  a[3] = ( ( Af[12] * tx + Af[13] ) * tx + Af[14] ) * tx + Af[15];
-}
-
-
-#pragma omp declare target
-
-#pragma omp declare simd // simdlen(32)
-static inline void eval_UBspline_3d_s_vgh (
-    const float * restrict coefs_init,
-    const intptr_t xs,
-    const intptr_t ys,
-    const intptr_t zs,
-    float * restrict vals,
-    float * restrict grads,
-    float * restrict hess,
-    const float *   a, const float *   b, const float *   c,
-    const float *  da, const float *  db, const float *  dc,
-    const float * d2a, const float * d2b, const float * d2c,
-    const float dxInv, const float dyInv, const float dzInv)
-{
-  float h[9];
-  float v0 = 0.0f;
-  for (int i = 0; i < 9; ++i) h[i] = 0.0f;
-
-  for (int i=0; i<4; i++)
-    for (int j=0; j<4; j++){
-      float pre20 = d2a[i]*  b[j];
-      float pre10 =  da[i]*  b[j];
-      float pre00 =   a[i]*  b[j];
-      float pre11 =  da[i]* db[j];
-      float pre01 =   a[i]* db[j];
-      float pre02 =   a[i]*d2b[j];
-
-      const float * restrict coefs = coefs_init + i*xs + j*ys;
-
-      float sum0 =   c[0] * coefs[0] +   c[1] * coefs[zs] +   c[2] * coefs[zs*2] +   c[3] * coefs[zs*3];
-      float sum1 =  dc[0] * coefs[0] +  dc[1] * coefs[zs] +  dc[2] * coefs[zs*2] +  dc[3] * coefs[zs*3];
-      float sum2 = d2c[0] * coefs[0] + d2c[1] * coefs[zs] + d2c[2] * coefs[zs*2] + d2c[3] * coefs[zs*3];
-
-      h[0]  += pre20 * sum0;
-      h[1]  += pre11 * sum0;
-      h[2]  += pre10 * sum1;
-      h[4]  += pre02 * sum0;
-      h[5]  += pre01 * sum1;
-      h[8]  += pre00 * sum2;
-      h[3]  += pre10 * sum0;
-      h[6]  += pre01 * sum0;
-      h[7]  += pre00 * sum1;
-      v0    += pre00 * sum0;
-    }
-  vals[0] = v0;
-  grads[0]  = h[3] * dxInv;
-  grads[1]  = h[6] * dyInv;
-  grads[2]  = h[7] * dzInv;
-
-  hess [0] = h[0]*dxInv*dxInv;
-  hess [1] = h[1]*dxInv*dyInv;
-  hess [2] = h[2]*dxInv*dzInv;
-  hess [3] = h[1]*dxInv*dyInv; // Copy hessian elements into lower half of 3x3 matrix
-  hess [4] = h[4]*dyInv*dyInv;
-  hess [5] = h[5]*dyInv*dzInv;
-  hess [6] = h[2]*dxInv*dzInv; // Copy hessian elements into lower half of 3x3 matrix
-  hess [7] = h[5]*dyInv*dzInv; //Copy hessian elements into lower half of 3x3 matrix
-  hess [8] = h[8]*dzInv*dzInv;
-}
-#pragma omp end declare target
-
