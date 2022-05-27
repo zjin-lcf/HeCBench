@@ -1,6 +1,8 @@
 #include "kernel.hpp"
 
-inline short warpReduceMax_with_index(short val, short& myIndex, short& myIndex2, int lengthSeqB, bool inverse, nd_item<1> &item)
+inline short
+warpReduceMax_with_index(short val, short& myIndex, short& myIndex2,
+                         int lengthSeqB, bool inverse, nd_item<1> &item)
 {
   short myMax    = val;
   short newInd   = 0;
@@ -67,7 +69,6 @@ inline short warpReduceMax_with_index(short val, short& myIndex, short& myIndex2
   return val;
 }
 
-
 short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2, int lengthSeqB, 
     short* locTots, short* locInds, short* locInds2, bool inverse, nd_item<1> &item)
 {
@@ -89,7 +90,6 @@ short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2
   if(laneId == 0)
     locInds2[warpId] = myInd2;
 
-  //item.barrier(access::fence_space::local_space);
   group_barrier(gp);
 
   // number of subgroups in a work-group
@@ -107,7 +107,6 @@ short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2
     myInd  = -1;
     myInd2 = -1;
   }
-  //item.barrier(access::fence_space::local_space);
   group_barrier(gp);
 
   if(warpId == 0)
@@ -232,7 +231,7 @@ void sequence_aa_kernel(
     }
   }
 
-  //item.barrier(access::fence_space::local_space); // this is required here so that complete sequence has been copied to shared memory
+  // this is required here so that complete sequence has been copied to shared memory
   group_barrier(gp);
 
   int   i            = 1;
@@ -256,7 +255,7 @@ void sequence_aa_kernel(
     sh_aa_encoding[p] = encoding_matrix[p];
   }
 
-  //item.barrier(access::fence_space::local_space); // to make sure all shmem allocations have been initialized
+  // to make sure all shmem allocations have been initialized
   group_barrier(gp);
 
   for(int diag = 0; diag < lengthSeqA + lengthSeqB - 1; diag++)
@@ -297,7 +296,7 @@ void sequence_aa_kernel(
       local_spill_prev_prev_H[thread_Id] = _prev_prev_H;
     }
 
-    //item.barrier(access::fence_space::local_space); // this is needed so that all the shmem writes are completed.
+    // this is needed so that all the shmem writes are completed.
     group_barrier(gp);
 
     if(is_valid[thread_Id] && thread_Id < minSize)
@@ -366,7 +365,6 @@ void sequence_aa_kernel(
       short testShufll = sg.shuffle(_prev_prev_H, laneId);
     }
 
-    //item.barrier(access::fence_space::local_space);
     group_barrier(gp);
   }
 
