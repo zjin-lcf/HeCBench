@@ -1,111 +1,10 @@
-/*
-   MIT License
-
-   Copyright (c) 2020 Soumya Sen
-
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
-
-#define idx(i,j)   (i)*y_points+(j)
-
-__global__ 
-void core (
-    double *__restrict__ u_new,
-    double *__restrict__ v_new,
-    const double *__restrict__ u,
-    const double *__restrict__ v,
-    const int x_points,
-    const int y_points,
-    const double nu,
-    const double del_t,
-    const double del_x,
-    const double del_y)
-{
-  int i = blockIdx.y * blockDim.y + threadIdx.y + 1;
-  int j = blockIdx.x * blockDim.x + threadIdx.x + 1;
-  if (j < x_points - 1 && i < y_points - 1) {
-    u_new[idx(i,j)] = u[idx(i,j)] + 
-      (nu*del_t/(del_x*del_x)) * (u[idx(i,j+1)] + u[idx(i,j-1)] - 2 * u[idx(i,j)]) + 
-      (nu*del_t/(del_y*del_y)) * (u[idx(i+1,j)] + u[idx(i-1,j)] - 2 * u[idx(i,j)]) - 
-      (del_t/del_x)*u[idx(i,j)] * (u[idx(i,j)] - u[idx(i,j-1)]) - 
-      (del_t/del_y)*v[idx(i,j)] * (u[idx(i,j)] - u[idx(i-1,j)]);
-
-    v_new[idx(i,j)] = v[idx(i,j)] +
-      (nu*del_t/(del_x*del_x)) * (v[idx(i,j+1)] + v[idx(i,j-1)] - 2 * v[idx(i,j)]) + 
-      (nu*del_t/(del_y*del_y)) * (v[idx(i+1,j)] + v[idx(i-1,j)] - 2 * v[idx(i,j)]) -
-      (del_t/del_x)*u[idx(i,j)] * (v[idx(i,j)] - v[idx(i,j-1)]) - 
-      (del_t/del_y)*v[idx(i,j)] * (v[idx(i,j)] - v[idx(i-1,j)]);
-  }
-}
-
-__global__ 
-void bound_h (
-    double *__restrict__ u_new,
-    double *__restrict__ v_new,
-    const int x_points,
-    const int y_points)
-{
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < x_points) {
-    u_new[idx(0,i)] = 1.0;
-    v_new[idx(0,i)] = 1.0;
-    u_new[idx(y_points-1,i)] = 1.0;
-    v_new[idx(y_points-1,i)] = 1.0;
-  }
-}
-
-__global__ 
-void bound_v (
-    double *__restrict__ u_new,
-    double *__restrict__ v_new,
-    const int x_points,
-    const int y_points)
-{
-  int j = blockIdx.x * blockDim.x + threadIdx.x;
-  if (j < y_points) {
-    u_new[idx(j,0)] = 1.0;
-    v_new[idx(j,0)] = 1.0;
-    u_new[idx(j,x_points-1)] = 1.0;
-    v_new[idx(j,x_points-1)] = 1.0;
-  }
-}
-
-__global__ 
-void update (
-    double *__restrict__ u,
-    double *__restrict__ v,
-    const double *__restrict__ u_new,
-    const double *__restrict__ v_new,
-    const int n)
-{
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < n) {
-    u[i] = u_new[i];
-    v[i] = v_new[i];
-  }
-}
+#include "kernels.h"
 
 int main(int argc, char* argv[])
 {
@@ -191,6 +90,9 @@ int main(int argc, char* argv[])
   dim3 grid4 ((grid_elems+255)/256);
   dim3 block4 (256);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int itr = 0; itr < num_itrs; itr++){
 
     core<<<grid, block>>>(d_u_new, d_v_new, d_u, d_v, x_points, y_points, nu, del_t, del_x, del_y);
@@ -203,6 +105,11 @@ int main(int argc, char* argv[])
     // Updating older values to newer ones
     update<<<grid4, block4>>>(d_u, d_v, d_u_new, d_v_new, grid_elems);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
   cudaMemcpy(du, d_u, grid_size, cudaMemcpyDeviceToHost);
   cudaMemcpy(dv, d_v, grid_size, cudaMemcpyDeviceToHost);
