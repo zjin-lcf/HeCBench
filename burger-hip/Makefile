@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../burger-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../burger-cuda/kernels.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -54,4 +54,3 @@ clean:
 
 run: $(program)
 	./$(program) 8193 8193
-
