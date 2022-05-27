@@ -1,14 +1,13 @@
-#include <stdio.h>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
-#include <vector>
 #include "common.h"
-
-#define restrict __restrict
 
 #define max(a,b) ((a<b)?b:a)
 #define min(a,b) ((a<b)?a:b)
 
-const int WSIZE = 12000;           // Walker
+const int WSIZE = 12000;          // Walker
 const int NSIZE = 2003;           // Values
 const int MSIZE = NSIZE*3+3;      // Gradient vectors
 const int OSIZE = NSIZE*9+9;      // Hessian Matrices 
@@ -16,23 +15,74 @@ const int OSIZE = NSIZE*9+9;      // Hessian Matrices
 const int NSIZE_round = NSIZE%16 ? NSIZE+16-NSIZE%16: NSIZE;
 const size_t SSIZE = (size_t)NSIZE_round*48*48*48;  //Coefs size 
 
-static inline void eval_UBspline_3d_s_vgh ( 
-    const float * restrict coefs_init,
+void eval_abc(const float *Af, float tx, float *a) {
+
+  a[0] = ( ( Af[0]  * tx + Af[1] ) * tx + Af[2] ) * tx + Af[3];
+  a[1] = ( ( Af[4]  * tx + Af[5] ) * tx + Af[6] ) * tx + Af[7];
+  a[2] = ( ( Af[8]  * tx + Af[9] ) * tx + Af[10] ) * tx + Af[11];
+  a[3] = ( ( Af[12] * tx + Af[13] ) * tx + Af[14] ) * tx + Af[15];
+}
+
+static inline void eval_UBspline_3d_s_vgh (
+    const float * __restrict coefs_init,
     const intptr_t xs,
     const intptr_t ys,
     const intptr_t zs,
-    float * restrict vals,
-    float * restrict grads,
-    float * restrict hess,
+    float * __restrict vals,
+    float * __restrict grads,
+    float * __restrict hess,
     const float *   a, const float *   b, const float *   c,
     const float *  da, const float *  db, const float *  dc,
     const float * d2a, const float * d2b, const float * d2c,
-    const float dxInv, const float dyInv, const float dzInv);
+    const float dxInv, const float dyInv, const float dzInv)
+{
+  float h[9];
+  float v0 = 0.0f;
+  for (int i = 0; i < 9; ++i) h[i] = 0.0f;
 
-void  eval_abc(const float * restrict Af, float tx, float * restrict a);
+  for (int i=0; i<4; i++)
+    for (int j=0; j<4; j++) {
+      float pre20 = d2a[i]*  b[j];
+      float pre10 =  da[i]*  b[j];
+      float pre00 =   a[i]*  b[j];
+      float pre11 =  da[i]* db[j];
+      float pre01 =   a[i]* db[j];
+      float pre02 =   a[i]*d2b[j];
 
+      const float *coefs = coefs_init + i*xs + j*ys;
 
-int main(int argc, char ** argv){
+      float sum0 =   c[0] * coefs[0] +   c[1] * coefs[zs] +   c[2] * coefs[zs*2] +   c[3] * coefs[zs*3];
+      float sum1 =  dc[0] * coefs[0] +  dc[1] * coefs[zs] +  dc[2] * coefs[zs*2] +  dc[3] * coefs[zs*3];
+      float sum2 = d2c[0] * coefs[0] + d2c[1] * coefs[zs] + d2c[2] * coefs[zs*2] + d2c[3] * coefs[zs*3];
+
+      h[0]  += pre20 * sum0;
+      h[1]  += pre11 * sum0;
+      h[2]  += pre10 * sum1;
+      h[4]  += pre02 * sum0;
+      h[5]  += pre01 * sum1;
+      h[8]  += pre00 * sum2;
+      h[3]  += pre10 * sum0;
+      h[6]  += pre01 * sum0;
+      h[7]  += pre00 * sum1;
+      v0    += pre00 * sum0;
+    }
+  vals[0] = v0;
+  grads[0]  = h[3] * dxInv;
+  grads[1]  = h[6] * dyInv;
+  grads[2]  = h[7] * dzInv;
+
+  hess [0] = h[0]*dxInv*dxInv;
+  hess [1] = h[1]*dxInv*dyInv;
+  hess [2] = h[2]*dxInv*dzInv;
+  hess [3] = h[1]*dxInv*dyInv; // Copy hessian elements into lower half of 3x3 matrix
+  hess [4] = h[4]*dyInv*dyInv;
+  hess [5] = h[5]*dyInv*dzInv;
+  hess [6] = h[2]*dxInv*dzInv; // Copy hessian elements into lower half of 3x3 matrix
+  hess [7] = h[5]*dyInv*dzInv; //Copy hessian elements into lower half of 3x3 matrix
+  hess [8] = h[8]*dzInv*dzInv;
+}
+
+int main(int argc, char ** argv) {
 
   float *Af = (float*) malloc (sizeof(float)*16);
   float *dAf = (float*) malloc (sizeof(float)*16);
@@ -71,7 +121,6 @@ int main(int argc, char ** argv){
   dAf[14]=0.000000; d2Af[14]=1.000000;
   dAf[15]=0.000000; d2Af[15]=0.000000;
 
-
   float x=0.822387;  
   float y=0.989919;  
   float z=0.104573;
@@ -107,7 +156,6 @@ int main(int argc, char ** argv){
   int spline_y_grid_delta_inv=45;
   int spline_z_grid_delta_inv=45;
 
-
   {
 #ifdef USE_GPU 
   gpu_selector dev_sel;
@@ -130,7 +178,9 @@ int main(int argc, char ** argv){
   buffer<float, 1> d_d2b(4);
   buffer<float, 1> d_d2c(4);
 
-  for(int i=0; i<WSIZE; i++){
+  double total_time = 0.0;
+
+  for(int i=0; i<WSIZE; i++) {
     float x = walkers_x[i], y = walkers_y[i], z = walkers_z[i];
 
     float ux = x*spline_x_grid_delta_inv;
@@ -145,107 +195,115 @@ int main(int argc, char ** argv){
     x -= spline_x_grid_start;
     y -= spline_y_grid_start;
     z -= spline_z_grid_start;
-    ipartx = (int) ux; tx = ux-ipartx;    int ix = min(max(0,(int) ipartx),spline_x_grid_num-1);
-    iparty = (int) uy; ty = uy-iparty;    int iy = min(max(0,(int) iparty),spline_y_grid_num-1);
-    ipartz = (int) uz; tz = uz-ipartz;    int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
+    ipartx = (int) ux; tx = ux-ipartx; int ix = min(max(0,(int) ipartx),spline_x_grid_num-1);
+    iparty = (int) uy; ty = uy-iparty; int iy = min(max(0,(int) iparty),spline_y_grid_num-1);
+    ipartz = (int) uz; tz = uz-ipartz; int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
+
     q.submit([&] (handler &h) {
-        auto d_a_acc = d_a.get_access<sycl_discard_write>(h);
-        h.copy(a, d_a_acc);
-        });
+      auto d_a_acc = d_a.get_access<sycl_discard_write>(h);
+      h.copy(a, d_a_acc);
+    });
 
     eval_abc(Af,ty,&b[0]);
     q.submit([&] (handler &h) {
-        auto d_b_acc = d_b.get_access<sycl_discard_write>(h);
-        h.copy(b, d_b_acc);
-        });
+      auto d_b_acc = d_b.get_access<sycl_discard_write>(h);
+      h.copy(b, d_b_acc);
+    });
 
     eval_abc(Af,tz,&c[0]);
     q.submit([&] (handler &h) {
-        auto d_c_acc = d_c.get_access<sycl_discard_write>(h);
-        h.copy(c, d_c_acc);
-        });
+      auto d_c_acc = d_c.get_access<sycl_discard_write>(h);
+      h.copy(c, d_c_acc);
+    });
 
     eval_abc(dAf,tx,&da[0]);
     q.submit([&] (handler &h) {
-        auto d_da_acc = d_da.get_access<sycl_discard_write>(h);
-        h.copy(da, d_da_acc);
-        });
+      auto d_da_acc = d_da.get_access<sycl_discard_write>(h);
+      h.copy(da, d_da_acc);
+    });
 
     eval_abc(dAf,ty,&db[0]);
     q.submit([&] (handler &h) {
-        auto d_db_acc = d_db.get_access<sycl_discard_write>(h);
-        h.copy(db, d_db_acc);
-        });
+      auto d_db_acc = d_db.get_access<sycl_discard_write>(h);
+      h.copy(db, d_db_acc);
+    });
 
     eval_abc(dAf,tz,&dc[0]);
     q.submit([&] (handler &h) {
-        auto d_dc_acc = d_dc.get_access<sycl_discard_write>(h);
-        h.copy(dc, d_dc_acc);
-        });
+      auto d_dc_acc = d_dc.get_access<sycl_discard_write>(h);
+      h.copy(dc, d_dc_acc);
+    });
 
     eval_abc(d2Af,tx,&d2a[0]);
     q.submit([&] (handler &h) {
-        auto d_d2a_acc = d_d2a.get_access<sycl_discard_write>(h);
-        h.copy(d2a, d_d2a_acc);
-        });
+      auto d_d2a_acc = d_d2a.get_access<sycl_discard_write>(h);
+      h.copy(d2a, d_d2a_acc);
+    });
 
     eval_abc(d2Af,ty,&d2b[0]);
     q.submit([&] (handler &h) {
-        auto d_d2b_acc = d_d2b.get_access<sycl_discard_write>(h);
-        h.copy(d2b, d_d2b_acc);
-        });
+      auto d_d2b_acc = d_d2b.get_access<sycl_discard_write>(h);
+      h.copy(d2b, d_d2b_acc);
+    });
 
     eval_abc(d2Af,tz,&d2c[0]);              
     q.submit([&] (handler &h) {
-        auto d_d2c_acc = d_d2c.get_access<sycl_discard_write>(h);
-        h.copy(d2c, d_d2c_acc);
-        });
+      auto d_d2c_acc = d_d2c.get_access<sycl_discard_write>(h);
+      h.copy(d2c, d_d2c_acc);
+    });
 
     range<1> global_size((spline_num_splines+255)/256*256);
     range<1> local_size(256);
 
-    q.submit([&] (handler &h) {
-        auto walkers_vals = d_walkers_vals.get_access<sycl_discard_write>(h);
-        auto walkers_grads = d_walkers_grads.get_access<sycl_discard_write>(h);
-        auto walkers_hess = d_walkers_hess.get_access<sycl_discard_write>(h);
-        auto a = d_a.get_access<sycl_read>(h);
-        auto b = d_b.get_access<sycl_read>(h);
-        auto c = d_c.get_access<sycl_read>(h);
-        auto da = d_da.get_access<sycl_read>(h);
-        auto db = d_db.get_access<sycl_read>(h);
-        auto dc = d_dc.get_access<sycl_read>(h);
-        auto d2a = d_d2a.get_access<sycl_read>(h);
-        auto d2b = d_d2b.get_access<sycl_read>(h);
-        auto d2c = d_d2c.get_access<sycl_read>(h);
-        auto spline_coefs = d_spline_coefs.get_access<sycl_read>(h);
-
-        h.parallel_for<class vgh_spline>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
-            const int n = item.get_global_id(0);
-	    if (n < spline_num_splines)
-              eval_UBspline_3d_s_vgh ( 
-                spline_coefs.get_pointer()+ix*xs+iy*ys+iz*zs+n,
-                xs, ys, zs, 
-                walkers_vals.get_pointer()+i*NSIZE+n,
-                walkers_grads.get_pointer()+i*MSIZE+n*3,
-                walkers_hess.get_pointer()+i*OSIZE+n*9,
-                a.get_pointer(),
-                b.get_pointer(),
-                c.get_pointer(),
-                da.get_pointer(),
-                db.get_pointer(),
-                dc.get_pointer(),
-                d2a.get_pointer(),
-                d2b.get_pointer(),
-                d2c.get_pointer(),
-                spline_x_grid_delta_inv,
-                spline_y_grid_delta_inv,
-                spline_z_grid_delta_inv );
-            });
-    });
     q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    q.submit([&] (handler &h) {
+      auto walkers_vals = d_walkers_vals.get_access<sycl_discard_write>(h);
+      auto walkers_grads = d_walkers_grads.get_access<sycl_discard_write>(h);
+      auto walkers_hess = d_walkers_hess.get_access<sycl_discard_write>(h);
+      auto a = d_a.get_access<sycl_read>(h);
+      auto b = d_b.get_access<sycl_read>(h);
+      auto c = d_c.get_access<sycl_read>(h);
+      auto da = d_da.get_access<sycl_read>(h);
+      auto db = d_db.get_access<sycl_read>(h);
+      auto dc = d_dc.get_access<sycl_read>(h);
+      auto d2a = d_d2a.get_access<sycl_read>(h);
+      auto d2b = d_d2b.get_access<sycl_read>(h);
+      auto d2c = d_d2c.get_access<sycl_read>(h);
+      auto spline_coefs = d_spline_coefs.get_access<sycl_read>(h);
+
+      h.parallel_for<class vgh_spline>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+        const int n = item.get_global_id(0);
+        if (n < spline_num_splines)
+          eval_UBspline_3d_s_vgh ( 
+            spline_coefs.get_pointer()+ix*xs+iy*ys+iz*zs+n,
+            xs, ys, zs, 
+            walkers_vals.get_pointer()+i*NSIZE+n,
+            walkers_grads.get_pointer()+i*MSIZE+n*3,
+            walkers_hess.get_pointer()+i*OSIZE+n*9,
+            a.get_pointer(),
+            b.get_pointer(),
+            c.get_pointer(),
+            da.get_pointer(),
+            db.get_pointer(),
+            dc.get_pointer(),
+            d2a.get_pointer(),
+            d2b.get_pointer(),
+            d2c.get_pointer(),
+            spline_x_grid_delta_inv,
+            spline_y_grid_delta_inv,
+            spline_z_grid_delta_inv );
+        });
+    }).wait();
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+  printf("Total kernel execution time %lf (s)\n", total_time * 1e-9);
 
   }
 
@@ -277,69 +335,3 @@ int main(int argc, char ** argv){
 
 
 
-void  eval_abc(const float * restrict Af, float tx, float * restrict a){
-
-  a[0] = ( ( Af[0]  * tx + Af[1] ) * tx + Af[2] ) * tx + Af[3];
-  a[1] = ( ( Af[4]  * tx + Af[5] ) * tx + Af[6] ) * tx + Af[7];
-  a[2] = ( ( Af[8]  * tx + Af[9] ) * tx + Af[10] ) * tx + Af[11];
-  a[3] = ( ( Af[12] * tx + Af[13] ) * tx + Af[14] ) * tx + Af[15];
-}
-
-static inline void eval_UBspline_3d_s_vgh (
-    const float * restrict coefs_init,
-    const intptr_t xs,
-    const intptr_t ys,
-    const intptr_t zs,
-    float * restrict vals,
-    float * restrict grads,
-    float * restrict hess,
-    const float *   a, const float *   b, const float *   c,
-    const float *  da, const float *  db, const float *  dc,
-    const float * d2a, const float * d2b, const float * d2c,
-    const float dxInv, const float dyInv, const float dzInv)
-{
-  float h[9];
-  float v0 = 0.0f;
-  for (int i = 0; i < 9; ++i) h[i] = 0.0f;
-
-  for (int i=0; i<4; i++)
-    for (int j=0; j<4; j++){
-      float pre20 = d2a[i]*  b[j];
-      float pre10 =  da[i]*  b[j];
-      float pre00 =   a[i]*  b[j];
-      float pre11 =  da[i]* db[j];
-      float pre01 =   a[i]* db[j];
-      float pre02 =   a[i]*d2b[j];
-
-      const float * restrict coefs = coefs_init + i*xs + j*ys;
-
-      float sum0 =   c[0] * coefs[0] +   c[1] * coefs[zs] +   c[2] * coefs[zs*2] +   c[3] * coefs[zs*3];
-      float sum1 =  dc[0] * coefs[0] +  dc[1] * coefs[zs] +  dc[2] * coefs[zs*2] +  dc[3] * coefs[zs*3];
-      float sum2 = d2c[0] * coefs[0] + d2c[1] * coefs[zs] + d2c[2] * coefs[zs*2] + d2c[3] * coefs[zs*3];
-
-      h[0]  += pre20 * sum0;
-      h[1]  += pre11 * sum0;
-      h[2]  += pre10 * sum1;
-      h[4]  += pre02 * sum0;
-      h[5]  += pre01 * sum1;
-      h[8]  += pre00 * sum2;
-      h[3]  += pre10 * sum0;
-      h[6]  += pre01 * sum0;
-      h[7]  += pre00 * sum1;
-      v0    += pre00 * sum0;
-    }
-  vals[0] = v0;
-  grads[0]  = h[3] * dxInv;
-  grads[1]  = h[6] * dyInv;
-  grads[2]  = h[7] * dzInv;
-
-  hess [0] = h[0]*dxInv*dxInv;
-  hess [1] = h[1]*dxInv*dyInv;
-  hess [2] = h[2]*dxInv*dzInv;
-  hess [3] = h[1]*dxInv*dyInv; // Copy hessian elements into lower half of 3x3 matrix
-  hess [4] = h[4]*dyInv*dyInv;
-  hess [5] = h[5]*dyInv*dzInv;
-  hess [6] = h[2]*dxInv*dzInv; // Copy hessian elements into lower half of 3x3 matrix
-  hess [7] = h[5]*dyInv*dzInv; //Copy hessian elements into lower half of 3x3 matrix
-  hess [8] = h[8]*dzInv*dzInv;
-}
