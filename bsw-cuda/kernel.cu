@@ -1,6 +1,6 @@
 #include "kernel.hpp"
 
-  __inline__ __device__ short
+__inline__ __device__ short
 warpReduceMax_with_index(short val, short& myIndex, short& myIndex2, unsigned lengthSeqB, bool inverse)
 {
   int   warpSize = 32;
@@ -94,7 +94,7 @@ blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2, unsi
   return myVal;
 }
 
-  __device__ __host__ short
+__device__ __host__ short
 findMaxFour(short first, short second, short third, short fourth)
 {
   short maxScore = 0;
@@ -106,7 +106,7 @@ findMaxFour(short first, short second, short third, short fourth)
   return maxScore;
 }
 
-  __global__ void
+__global__ void
 sequence_aa_kernel(
           bool  inverse,
     const char*__restrict__ seqA_array,
@@ -136,7 +136,7 @@ sequence_aa_kernel(
   const char* longer_seq;
 
   extern __shared__ char is_valid_array[]; 
-  char*                  is_valid = &is_valid_array[0];
+  char* is_valid = &is_valid_array[0];
 
   // setting up block local sequences and their lengths.
   if(block_Id == 0)
@@ -365,4 +365,3 @@ sequence_aa_kernel(
     }
   }
 }
-
