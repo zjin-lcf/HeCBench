@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "utils.h"
 #include "reference.h"
@@ -66,7 +67,13 @@ void car (
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   params p = {128, 3, 480, 640, 9, 1024, 1024};
   const int dim_b = p.output_dim_b;
   const int dim_c = p.output_dim_c;
@@ -109,7 +116,9 @@ int main() {
                                    kernel[0:kernel_size]) \
                           map (from: output[0:output_size])
   {
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       car(img,
           kernel,
           offsets_h,
@@ -120,6 +129,10 @@ int main() {
           padding,
           output_size);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
   }
 
   reference (img, kernel, offsets_h, offsets_v, output_ref, p, 1, padding);

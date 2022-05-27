@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "utils.h"
 #include "reference.h"
@@ -65,7 +66,13 @@ void car (
   output(idb,idc,idy,idx) = result;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   params p = {128, 3, 480, 640, 9, 1024, 1024};
   const int dim_b = p.output_dim_b;
   const int dim_c = p.output_dim_c;
@@ -119,7 +126,10 @@ int main() {
   range<1> gws ((output_size + 255) / 256 * 256);
   range<1> lws (256);
 
-  for (int i = 0; i < 100; i++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto img = d_img.get_access<sycl_read>(cgh);
       auto kernel = d_kernel.get_access<sycl_read>(cgh);
@@ -141,9 +151,14 @@ int main() {
     });
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
+
   reference (img, kernel, offsets_h, offsets_v, output_ref, p, 1, padding);
 
-  }
+  } // sycl scope
 
   float rmse = 0;
   for (size_t i = 0; i < output_size; i++)
