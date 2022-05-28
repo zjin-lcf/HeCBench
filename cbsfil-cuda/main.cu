@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <cuda.h>
 #include "kernels.h"
 
@@ -49,22 +50,31 @@ int main(int argc, char* argv[]) {
   dim3 dimBlockY (blocks);
   dim3 dimGridY ((width  + blocks - 1) / blocks);
 
+  double total_time = 0.0;
   for (int i = 0; i < repeat; i++) {
     cudaMemcpy(d_image, image, image_size, cudaMemcpyHostToDevice);
+    auto start = std::chrono::steady_clock::now();
+
     toCoef2DX<<<dimGridX, dimBlockX>>>(d_image, image_pitch, width, height);
     toCoef2DY<<<dimGridY, dimBlockY>>>(d_image, image_pitch, width, height);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+  printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
 
   cudaMemcpy(image, d_image, image_size, cudaMemcpyDeviceToHost);
+  cudaFree(d_image);
 
   float sum = 0.f;
   for (int i = 0; i < numPix; i++) {
     const uchar *t = (const uchar*)(&image[i]);
-    sum += t[0] + t[1] + t[2] + t[3];
+    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
   }
-  printf("Checksum: %f\n", sum);
+  printf("Checksum: %f\n", sum / numPix);
 
-  cudaFree(d_image);
   free(image);
   return 0;
 }
