@@ -62,4 +62,3 @@ run: $(program)
 	rm -rf out;
 	mkdir out
 	./$(program) 1000
-

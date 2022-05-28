@@ -1,193 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda_runtime.h>
-#include <time.h>
+#include <cuda.h>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <fstream>
-
-//define the data set size for a cubic volume
-#define DATAXSIZE 256
-#define DATAYSIZE 256
-#define DATAZSIZE 256
-
-//define the chunk sizes that each threadblock will work on
-#define BLKXSIZE 16
-#define BLKYSIZE 4
-#define BLKZSIZE 4
+#include "kernels.h"
 
 using namespace std;
-
-
-__device__ double Laplacian(const double c[][DATAYSIZE][DATAXSIZE],
-                            double dx, double dy, double dz, int x, int y, int z)
-{
-  int xp, xn, yp, yn, zp, zn;
-
-  int nx = (int)DATAXSIZE - 1;
-  int ny = (int)DATAYSIZE - 1;
-  int nz = (int)DATAZSIZE - 1;
-
-  xp = x+1;
-  xn = x-1;
-  yp = y+1;
-  yn = y-1;
-  zp = z+1;
-  zn = z-1;
-
-  if (xp > nx) xp = 0;
-  if (yp > ny) yp = 0;
-  if (zp > nz) zp = 0;
-  if (xn < 0)  xn = nx;
-  if (yn < 0)  yn = ny;
-  if (zn < 0)  zn = nz;
-
-  double cxx = (c[z][y][xp] + c[z][y][xn] - 2.0*c[z][y][x]) / (dx*dx);
-  double cyy = (c[z][yp][x] + c[z][yn][x] - 2.0*c[z][y][x]) / (dy*dy);
-  double czz = (c[zp][y][x] + c[zn][y][x] - 2.0*c[z][y][x]) / (dz*dz);
-
-  double result = cxx + cyy + czz;
-
-  return result;
-}
-
-__device__ double GradientX(const double phi[][DATAYSIZE][DATAXSIZE], 
-                            double dx, double dy, double dz, int x, int y, int z)
-{
-  int nx = (int)DATAXSIZE - 1;
-  int xp = x+1;
-  int xn = x-1;
-
-  if (xp > nx) xp = 0;
-  if (xn < 0)  xn = nx;
-
-  double phix = (phi[z][y][xp] - phi[z][y][xn]) / (2.0*dx);
-
-  return phix;
-}
-
-__device__ double GradientY(const double phi[][DATAYSIZE][DATAXSIZE], 
-                            double dx, double dy, double dz, int x, int y, int z)
-{
-  int ny = (int)DATAYSIZE - 1;
-  int yp = y+1;
-  int yn = y-1;
-
-  if (yp > ny) yp = 0;
-  if (yn < 0)  yn = ny;
-
-  double phiy = (phi[z][yp][x] - phi[z][yn][x]) / (2.0*dy);
-
-  return phiy;
-}
-
-__device__ double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
-                            double dx, double dy, double dz, int x, int y, int z)
-{
-  int nz = (int)DATAZSIZE - 1;
-  int zp = z+1;
-  int zn = z-1;
-
-  if (zp > nz) zp = 0;
-  if (zn < 0)  zn = nz;
-
-  double phiz = (phi[zp][y][x] - phi[zn][y][x]) / (2.0*dz);
-
-  return phiz;
-}
-
-__global__ void chemicalPotential(
-    const double c[][DATAYSIZE][DATAXSIZE], 
-    double mu[][DATAYSIZE][DATAXSIZE], 
-    double dx,
-    double dy,
-    double dz,
-    double gamma,
-    double e_AA,
-    double e_BB,
-    double e_AB)
-{
-
-  unsigned idx = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned idy = blockIdx.y*blockDim.y + threadIdx.y;
-  unsigned idz = blockIdx.z*blockDim.z + threadIdx.z;
-
-  if ((idx < DATAXSIZE) && (idy < DATAYSIZE) && (idz < DATAZSIZE)) {
-
-    mu[idz][idy][idx] = 4.5 * ( ( c[idz][idy][idx] + 1.0 ) * e_AA + 
-        ( c[idz][idy][idx] - 1 ) * e_BB - 2.0 * c[idz][idy][idx] * e_AB ) + 
-      3.0 * c[idz][idy][idx] + c[idz][idy][idx] * c[idz][idy][idx] * c[idz][idy][idx] - 
-      gamma * Laplacian(c,dx,dy,dz,idx,idy,idz);
-  }
-
-}
-
-__device__ double freeEnergy(double c, double e_AA, double e_BB, double e_AB)
-{
-
-  return (((9.0 / 4.0) * ((c*c+2.0*c+1.0)*e_AA+(c*c-2.0*c+1.0)*e_BB+
-          2.0*(1.0-c*c)*e_AB)) + ((3.0/2.0) * c * c) + ((3.0/12.0) * c * c * c * c));
-
-}
-
-__global__ void localFreeEnergyFunctional(
-    const double c[][DATAYSIZE][DATAXSIZE],
-    double f[][DATAYSIZE][DATAXSIZE], 
-    double dx,
-    double dy,
-    double dz,
-    double gamma,
-    double e_AA,
-    double e_BB,
-    double e_AB)
-{
-
-  unsigned idx = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned idy = blockIdx.y*blockDim.y + threadIdx.y;
-  unsigned idz = blockIdx.z*blockDim.z + threadIdx.z;
-
-  if ((idx < DATAXSIZE) && (idy < DATAYSIZE) && (idz < DATAZSIZE)) {
-
-    f[idz][idy][idx] = freeEnergy(c[idz][idy][idx],e_AA,e_BB,e_AB) + (gamma / 2.0) * (
-        GradientX(c,dx,dy,dz,idx,idy,idz) * GradientX(c,dx,dy,dz,idx,idy,idz) + 
-        GradientY(c,dx,dy,dz,idx,idy,idz) * GradientY(c,dx,dy,dz,idx,idy,idz) + 
-        GradientZ(c,dx,dy,dz,idx,idy,idz) * GradientZ(c,dx,dy,dz,idx,idy,idz));
-  }
-
-}
-
-__global__ void cahnHilliard(
-    double cnew[][DATAYSIZE][DATAXSIZE], 
-    const double cold[][DATAYSIZE][DATAXSIZE], 
-    const double mu[][DATAYSIZE][DATAXSIZE],
-    double D,
-    double dt,
-    double dx,
-    double dy,
-    double dz)
-{
-  unsigned idx = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned idy = blockIdx.y*blockDim.y + threadIdx.y;
-  unsigned idz = blockIdx.z*blockDim.z + threadIdx.z;
-  if ((idx < DATAXSIZE) && (idy < DATAYSIZE) && (idz < DATAZSIZE)) {
-    cnew[idz][idy][idx] = cold[idz][idy][idx] + dt * D * Laplacian(mu,dx,dy,dz,idx,idy,idz);
-  }
-}
-
-__global__ void Swap(double cnew[][DATAYSIZE][DATAXSIZE], double cold[][DATAYSIZE][DATAXSIZE])
-{
-  unsigned idx = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned idy = blockIdx.y*blockDim.y + threadIdx.y;
-  unsigned idz = blockIdx.z*blockDim.z + threadIdx.z;
-  double tmp;    
-
-  if ((idx < DATAXSIZE) && (idy < DATAYSIZE) && (idz < DATAZSIZE)) {
-    tmp = cnew[idz][idy][idx];
-    cnew[idz][idy][idx] = cold[idz][idy][idx];
-    cold[idz][idy][idx] = tmp;
-  }
-
-}
 
 void initialization(double c[][DATAYSIZE][DATAXSIZE])
 {
@@ -282,16 +102,15 @@ int main(int argc, char *argv[])
   double integral_mu = 0.0;
   double integral_f = 0.0;
 
-
   cudaMemcpy(d_cold, c_host, (vol*sizeof(double)), cudaMemcpyHostToDevice);
-
-  double clock_d = double(clock()) / CLOCKS_PER_SEC;
-
 
   const dim3 blockSize(BLKXSIZE, BLKYSIZE, BLKZSIZE);
   const dim3 gridSize((DATAXSIZE+BLKXSIZE-1)/BLKXSIZE, 
                       (DATAYSIZE+BLKYSIZE-1)/BLKYSIZE,
                       (DATAZSIZE+BLKZSIZE-1)/BLKZSIZE);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int t = 0; t < t_f; t++) {
 
@@ -323,8 +142,9 @@ int main(int argc, char *argv[])
   }
 
   cudaDeviceSynchronize();
-  clock_d = double(clock()) / CLOCKS_PER_SEC - clock_d; 
-  printf("Exeuction time on the GPU (%d iterations) = %.3fms\n", t_f, clock_d*1e3);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel exeuction time on the GPU (%d iterations) = %.3f (s)\n", t_f, time * 1e-9f);
 
   free(c_host);
   free(mu_host);

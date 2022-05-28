@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <fstream>
@@ -17,7 +17,6 @@
 #define BLKZSIZE 4
 
 using namespace std;
-
 
 double Laplacian(const double c[][DATAYSIZE][DATAXSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
@@ -46,9 +45,7 @@ double Laplacian(const double c[][DATAYSIZE][DATAXSIZE],
   double cyy = (c[z][yp][x] + c[z][yn][x] - 2.0*c[z][y][x]) / (dy*dy);
   double czz = (c[zp][y][x] + c[zn][y][x] - 2.0*c[z][y][x]) / (dz*dz);
 
-  double result = cxx + cyy + czz;
-
-  return result;
+  return cxx + cyy + czz;
 }
 
 double GradientX(const double phi[][DATAYSIZE][DATAXSIZE], 
@@ -61,9 +58,7 @@ double GradientX(const double phi[][DATAYSIZE][DATAXSIZE],
   if (xp > nx) xp = 0;
   if (xn < 0)  xn = nx;
 
-  double phix = (phi[z][y][xp] - phi[z][y][xn]) / (2.0*dx);
-
-  return phix;
+  return (phi[z][y][xp] - phi[z][y][xn]) / (2.0*dx);
 }
 
 double GradientY(const double phi[][DATAYSIZE][DATAXSIZE], 
@@ -76,9 +71,7 @@ double GradientY(const double phi[][DATAYSIZE][DATAXSIZE],
   if (yp > ny) yp = 0;
   if (yn < 0)  yn = ny;
 
-  double phiy = (phi[z][yp][x] - phi[z][yn][x]) / (2.0*dy);
-
-  return phiy;
+  return (phi[z][yp][x] - phi[z][yn][x]) / (2.0*dy);
 }
 
 double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
@@ -91,9 +84,7 @@ double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
   if (zp > nz) zp = 0;
   if (zn < 0)  zn = nz;
 
-  double phiz = (phi[zp][y][x] - phi[zn][y][x]) / (2.0*dz);
-
-  return phiz;
+  return (phi[zp][y][x] - phi[zn][y][x]) / (2.0*dz);
 }
 
 void chemicalPotential(
@@ -108,7 +99,6 @@ void chemicalPotential(
     double e_BB,
     double e_AB)
 {
-
   unsigned idx = item.get_global_id(2);
   unsigned idy = item.get_global_id(1);
   unsigned idz = item.get_global_id(0);
@@ -120,15 +110,12 @@ void chemicalPotential(
       3.0 * c[idz][idy][idx] + c[idz][idy][idx] * c[idz][idy][idx] * c[idz][idy][idx] - 
       gamma * Laplacian(c,dx,dy,dz,idx,idy,idz);
   }
-
 }
 
 double freeEnergy(double c, double e_AA, double e_BB, double e_AB)
 {
-
   return (((9.0 / 4.0) * ((c*c+2.0*c+1.0)*e_AA+(c*c-2.0*c+1.0)*e_BB+
           2.0*(1.0-c*c)*e_AB)) + ((3.0/2.0) * c * c) + ((3.0/12.0) * c * c * c * c));
-
 }
 
 void localFreeEnergyFunctional(
@@ -143,7 +130,6 @@ void localFreeEnergyFunctional(
     double e_BB,
     double e_AB)
 {
-
   unsigned idx = item.get_global_id(2);
   unsigned idy = item.get_global_id(1);
   unsigned idz = item.get_global_id(0);
@@ -155,7 +141,6 @@ void localFreeEnergyFunctional(
         GradientY(c,dx,dy,dz,idx,idy,idz) * GradientY(c,dx,dy,dz,idx,idy,idz) + 
         GradientZ(c,dx,dy,dz,idx,idy,idz) * GradientZ(c,dx,dy,dz,idx,idy,idz));
   }
-
 }
 
 void cahnHilliard(
@@ -190,7 +175,6 @@ void Swap(nd_item<3> &item, double cnew[][DATAYSIZE][DATAXSIZE], double cold[][D
     cnew[idz][idy][idx] = cold[idz][idy][idx];
     cold[idz][idy][idx] = tmp;
   }
-
 }
 
 void initialization(double c[][DATAYSIZE][DATAXSIZE])
@@ -294,13 +278,13 @@ int main(int argc, char *argv[])
     cgh.copy((double*)c_host, acc);
   });
 
-  double clock_d = double(clock()) / CLOCKS_PER_SEC;
-
-
   range<3> lws (BLKZSIZE, BLKYSIZE, BLKXSIZE);
   range<3> gws ((DATAZSIZE+BLKZSIZE-1)/BLKZSIZE * BLKZSIZE, 
                 (DATAYSIZE+BLKYSIZE-1)/BLKYSIZE * BLKYSIZE,
                 (DATAXSIZE+BLKXSIZE-1)/BLKXSIZE * BLKXSIZE);
+
+  q.wait(); 
+  auto start = std::chrono::steady_clock::now();
 
   auto d_cnew_re = d_cnew.reinterpret<nRarray>(range<1>(DATAZSIZE));
   auto d_cold_re = d_cold.reinterpret<nRarray>(range<1>(DATAZSIZE));
@@ -377,8 +361,9 @@ int main(int argc, char *argv[])
   }
 
   q.wait();
-  clock_d = double(clock()) / CLOCKS_PER_SEC - clock_d; 
-  printf("Exeuction time on the GPU (%d iterations) = %.3fms\n", t_f, clock_d*1e3);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel exeuction time on the GPU (%d iterations) = %.3f (s)\n", t_f, time * 1e-9f);
 
   free(c_host);
   free(mu_host);
