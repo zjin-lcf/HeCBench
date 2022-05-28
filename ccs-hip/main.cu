@@ -1,20 +1,21 @@
-/**************************************************************************
- * Condition-dependent Correlation Subgroups (CCS) 
- * Description: Biclustering has been emerged as a powerful tool for 
+/*
+ Condition-dependent Correlation Subgroups (CCS) 
+ Description: Biclustering has been emerged as a powerful tool for 
  identification of a group of co-expressed genes under a subset 
  of experimental conditions (measurements) present in a gene 
  expression dataset.  In this program we implemented CCS biclustering. 
- * Developer: Dr. Anindya Bhattacharya and Dr. Yan Cui, UTHSC, Memphis, TN, USA
- * Email: anindyamail123@gmail.com; ycui2@uthsc.edu 
 
-Note: The minimum number of genes and the samples per bicluster is 10. 
-User can alter the minimum size by changing the values for 'mingene' 
-and 'minsample' defined in "ccs.h" file for minimum number of genes and samples
-respectively. 
+ Developer: Dr. Anindya Bhattacharya and Dr. Yan Cui, UTHSC, Memphis, TN, USA
+ Email: anindyamail123@gmail.com; ycui2@uthsc.edu 
 
- *****************************************************************************/
+ Note: The minimum number of genes and the samples per bicluster is 10. 
+ User can alter the minimum size by changing the values for 'mingene' 
+ and 'minsample' defined in "ccs.h" file for minimum number of genes and samples
+ respectively. 
+*/
 
-
+#include <chrono>
+#include <hip/hip_runtime.h>
 #include "ccs.h"
 #include "matrixsize.c"
 #include "readgene.c"
@@ -22,7 +23,6 @@ respectively.
 #include "bicluster_pair_score.c"
 #include "merge_bicluster.c"
 #include "print_bicluster.c"
-#include <hip/hip_runtime.h>
 
 // number of samples in the input datamatrix. 
 // Fixed here to make static shared memory on a device
@@ -233,9 +233,9 @@ __global__ void compute_bicluster(
           else
             jcc=1.f; 
 
-          /*   Select bicluster candidate as the largest (maxbc[k].datacount<tmpbc.datacount) 
-               of all condition dependent (jaccard score <0.01) bicluster for k. Minimum number of gene 
-               for a bicluster is set at 10. See the mingene at ccs.h                                */
+          /* Select bicluster candidate as the largest (maxbc[k].datacount<tmpbc.datacount) 
+             of all condition dependent (jaccard score <0.01) bicluster for k. Minimum number of gene 
+             for a bicluster is set at 10. See the mingene at ccs.h */
 
           if(jcc<0.01f && maxbc_datacount[k]<tmpbc_datacount && tmpbc_datacount>mingene)
           {
@@ -262,6 +262,7 @@ int main(int argc, char *argv[])
   int c, errflag;
   int maxbcn=MAXB;
   int print_type=0;
+  int repeat=0;
   int i,n,D;
   extern char *optarg;
   float thr;
@@ -274,7 +275,7 @@ int main(int argc, char *argv[])
   errflag = n = D = 0;
   thr = 0.f;
 
-  while ((c = getopt(argc, argv, "ht:m:i:p:o:g:?")) != -1)
+  while ((c = getopt(argc, argv, "ht:m:r:i:p:o:g:?")) != -1)
   {
     switch(c)
     {
@@ -287,15 +288,15 @@ int main(int argc, char *argv[])
       case 'm': // maximum number of bicluster search
         maxbcn = atoi(optarg);
         break;
-
+      case 'r': // kernel repeat times
+        repeat = atoi(optarg);
+        break;
       case 'g': // output file format
         overlap = atof(optarg);
         break;
-
       case 'p': // output file format
         print_type = atoi(optarg);
         break;
-
       case 'i': // the input expression file
         infile = optarg;
         break;
@@ -363,7 +364,7 @@ int main(int argc, char *argv[])
   Hd = (char **)calloc(D+1,sizeof(char *));
 
   for (i = 0; i < n; i++)
-    gene[i].x = (float *)calloc(D+1,sizeof(float));
+    gene[i].x = ( float *)calloc(D+1,sizeof( float));
 
   bicluster = (struct bicl *)calloc(maxbcn,sizeof(struct bicl));
   for (i = 0; i < maxbcn; i++)
@@ -375,7 +376,7 @@ int main(int argc, char *argv[])
   // initialize the gene data
   readgene(infile,gene,Hd,n,D);  
 
-  clock_t start = clock();
+  auto start = std::chrono::steady_clock::now();
 
   float *d_gene;
   hipMalloc((void**)&d_gene, sizeof(float) * n * (D+1));
@@ -408,8 +409,11 @@ int main(int argc, char *argv[])
   dim3 blocks (1);
   dim3 grids (maxbcn);
 
-  for (i = 0; i < 100; i++) {
-    hipLaunchKernelGGL(compute_bicluster, grids, blocks, 0, 0, 
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+
+  for (i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(compute_bicluster, grids, blocks , 0, 0, 
       d_gene,
       n,maxbcn,D,thr,
       d_bc_sample,
@@ -420,6 +424,11 @@ int main(int argc, char *argv[])
       d_bc_sample_tmp,
       d_bc_data_tmp);
   }
+
+  hipDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+  printf("Average kernel execution time %f (s)\n", ktime * 1e-9f / repeat);
 
   float *bicluster_temp_score = (float *)calloc(maxbcn,sizeof(float));
   hipMemcpy(bicluster_temp_score, d_bc_score, sizeof(float)*maxbcn, hipMemcpyDeviceToHost);
@@ -470,10 +479,10 @@ int main(int argc, char *argv[])
   free(bicluster_temp_samplecount);
   free(bicluster);
 
-  clock_t end = clock() ;
-  float elapsed_time = (end-start)/(float)CLOCKS_PER_SEC ;
-  printf("Elapsed time = %f s\n",elapsed_time);
-  if(print_type==0) fprintf(out,"\n\nElapsed time= %f s\n",elapsed_time);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Elapsed time = %f (s)\n", time * 1e-9f);
+  if (print_type==0) fprintf(out,"\n\nElapsed time = %f s\n", time * 1e-9f);
   if (out) fclose(out);
 
   return 0;
