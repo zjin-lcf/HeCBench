@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../che-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu
+%.o: %.cu ../che-cuda/kernels.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -56,4 +56,3 @@ run: $(program)
 	rm -rf out;
 	mkdir out
 	./$(program) 1000
-

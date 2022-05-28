@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <omp.h>
@@ -46,9 +46,7 @@ double Laplacian(const double c[][DATAYSIZE][DATAXSIZE],
   double cyy = (c[z][yp][x] + c[z][yn][x] - 2.0*c[z][y][x]) / (dy*dy);
   double czz = (c[zp][y][x] + c[zn][y][x] - 2.0*c[z][y][x]) / (dz*dz);
 
-  double result = cxx + cyy + czz;
-
-  return result;
+  return cxx + cyy + czz;
 }
 
 double GradientX(const double phi[][DATAYSIZE][DATAXSIZE], 
@@ -61,9 +59,7 @@ double GradientX(const double phi[][DATAYSIZE][DATAXSIZE],
   if (xp > nx) xp = 0;
   if (xn < 0)  xn = nx;
 
-  double phix = (phi[z][y][xp] - phi[z][y][xn]) / (2.0*dx);
-
-  return phix;
+  return (phi[z][y][xp] - phi[z][y][xn]) / (2.0*dx);
 }
 
 double GradientY(const double phi[][DATAYSIZE][DATAXSIZE], 
@@ -76,9 +72,7 @@ double GradientY(const double phi[][DATAYSIZE][DATAXSIZE],
   if (yp > ny) yp = 0;
   if (yn < 0)  yn = ny;
 
-  double phiy = (phi[z][yp][x] - phi[z][yn][x]) / (2.0*dy);
-
-  return phiy;
+  return (phi[z][yp][x] - phi[z][yn][x]) / (2.0*dy);
 }
 
 double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
@@ -91,17 +85,13 @@ double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
   if (zp > nz) zp = 0;
   if (zn < 0)  zn = nz;
 
-  double phiz = (phi[zp][y][x] - phi[zn][y][x]) / (2.0*dz);
-
-  return phiz;
+  return (phi[zp][y][x] - phi[zn][y][x]) / (2.0*dz);
 }
 
 double freeEnergy(double c, double e_AA, double e_BB, double e_AB)
 {
-
   return (((9.0 / 4.0) * ((c*c+2.0*c+1.0)*e_AA+(c*c-2.0*c+1.0)*e_BB+
           2.0*(1.0-c*c)*e_AB)) + ((3.0/2.0) * c * c) + ((3.0/12.0) * c * c * c * c));
-
 }
 
 #pragma omp end declare target
@@ -117,7 +107,6 @@ void chemicalPotential(
     double e_BB,
     double e_AB)
 {
-
   #pragma omp target teams distribute parallel for collapse(3)
   for (int idz = 0; idz < DATAZSIZE; idz++) {
     for (int idy = 0; idy < DATAYSIZE; idy++) {
@@ -130,7 +119,6 @@ void chemicalPotential(
       }
     }
   }
-
 }
 
 void localFreeEnergyFunctional(
@@ -144,7 +132,6 @@ void localFreeEnergyFunctional(
     double e_BB,
     double e_AB)
 {
-
   #pragma omp target teams distribute parallel for collapse(3)
   for (int idz = 0; idz < DATAZSIZE; idz++) {
     for (int idy = 0; idy < DATAYSIZE; idy++) {
@@ -157,7 +144,6 @@ void localFreeEnergyFunctional(
       }
     }
   }
-
 }
 
 void cahnHilliard(
@@ -290,7 +276,7 @@ int main(int argc, char *argv[])
                         map(alloc: cn[0:vol], mu[0:vol], f[0:vol])
 
 {
-  double clock_d = double(clock()) / CLOCKS_PER_SEC;
+  auto start = std::chrono::steady_clock::now();
   double integral_c = 0.0;
   double integral_mu = 0.0;
   double integral_f = 0.0;
@@ -322,8 +308,9 @@ int main(int argc, char *argv[])
     Swap(cnew, cold);
   }
 
-  clock_d = double(clock()) / CLOCKS_PER_SEC - clock_d; 
-  printf("Exeuction time on the GPU (%d iterations) = %.3fms\n", t_f, clock_d*1e3);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel exeuction time on the GPU (%d iterations) = %.3f (s)\n", t_f, time * 1e-9f);
 }
 
   free(cnew);
