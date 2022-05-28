@@ -1,33 +1,32 @@
-
 #include "common.h"
 
 void ccsd_tengy_gpu(queue &q,
-    const double * __restrict__ f1n,    const double * __restrict__ f1t,
-    const double * __restrict__ f2n,    const double * __restrict__ f2t,
-    const double * __restrict__ f3n,    const double * __restrict__ f3t,
-    const double * __restrict__ f4n,    const double * __restrict__ f4t,
-    const double * __restrict__ dintc1, const double * __restrict__ dintx1, const double * __restrict__ t1v1,
-    const double * __restrict__ dintc2, const double * __restrict__ dintx2, const double * __restrict__ t1v2,
-    const double * __restrict__ eorb,   const double eaijk,
-    double * __restrict__ emp4i, double * __restrict__ emp5i,
-    double * __restrict__ emp4k, double * __restrict__ emp5k,
+    const double * __restrict f1n,    const double * __restrict f1t,
+    const double * __restrict f2n,    const double * __restrict f2t,
+    const double * __restrict f3n,    const double * __restrict f3t,
+    const double * __restrict f4n,    const double * __restrict f4t,
+    const double * __restrict dintc1, const double * __restrict dintx1, const double * __restrict t1v1,
+    const double * __restrict dintc2, const double * __restrict dintx2, const double * __restrict t1v2,
+    const double * __restrict eorb,   const double eaijk,
+    double * __restrict emp4i, double * __restrict emp5i,
+    double * __restrict emp4k, double * __restrict emp5k,
     const int ncor, const int nocc, const int nvir);
 
 void ccsd_trpdrv(queue &q,
-    double * __restrict__ f1n, double * __restrict__ f1t,
-    double * __restrict__ f2n, double * __restrict__ f2t,
-    double * __restrict__ f3n, double * __restrict__ f3t,
-    double * __restrict__ f4n, double * __restrict__ f4t,
-    double * __restrict__ eorb,
-    int    * __restrict__ ncor_, int * __restrict__ nocc_, int * __restrict__ nvir_,
-    double * __restrict__ emp4_, double * __restrict__ emp5_,
-    int    * __restrict__ a_, int * __restrict__ i_, int * __restrict__ j_, int * __restrict__ k_, int * __restrict__ klo_,
-    double * __restrict__ tij, double * __restrict__ tkj, double * __restrict__ tia, double * __restrict__ tka,
-    double * __restrict__ xia, double * __restrict__ xka, double * __restrict__ jia, double * __restrict__ jka,
-    double * __restrict__ kia, double * __restrict__ kka, double * __restrict__ jij, double * __restrict__ jkj,
-    double * __restrict__ kij, double * __restrict__ kkj,
-    double * __restrict__ dintc1, double * __restrict__ dintx1, double * __restrict__ t1v1,
-    double * __restrict__ dintc2, double * __restrict__ dintx2, double * __restrict__ t1v2)
+    double * __restrict f1n, double * __restrict f1t,
+    double * __restrict f2n, double * __restrict f2t,
+    double * __restrict f3n, double * __restrict f3t,
+    double * __restrict f4n, double * __restrict f4t,
+    double * __restrict eorb,
+    int    * __restrict ncor_, int * __restrict nocc_, int * __restrict nvir_,
+    double * __restrict emp4_, double * __restrict emp5_,
+    int    * __restrict a_, int * __restrict i_, int * __restrict j_, int * __restrict k_, int * __restrict klo_,
+    double * __restrict tij, double * __restrict tkj, double * __restrict tia, double * __restrict tka,
+    double * __restrict xia, double * __restrict xka, double * __restrict jia, double * __restrict jka,
+    double * __restrict kia, double * __restrict kka, double * __restrict jij, double * __restrict jkj,
+    double * __restrict kij, double * __restrict kkj,
+    double * __restrict dintc1, double * __restrict dintx1, double * __restrict t1v1,
+    double * __restrict dintc2, double * __restrict dintx2, double * __restrict t1v2)
 {
   double emp4 = *emp4_;
   double emp5 = *emp5_;
@@ -40,9 +39,6 @@ void ccsd_trpdrv(queue &q,
   const int ncor = *ncor_;
   const int nocc = *nocc_;
   const int nvir = *nvir_;
-
-  //const int lnov = nocc * nvir;
-  //const int lnvv = nvir * nvir;
 
   /* convert from Fortran to C offset convention... */
   const int k   = *k_ - 1;

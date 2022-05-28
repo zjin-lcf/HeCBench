@@ -1,8 +1,6 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
 
 /* Do not allow the test to allocate more than MAX_MEM gigabytes. */
 #ifndef MAX_MEM
@@ -12,22 +10,21 @@
 #define MIN(x,y) (x<y ? x : y)
 #define MAX(x,y) (x>y ? x : y)
 
-
 void ccsd_trpdrv(
-    double * __restrict__ f1n, double * __restrict__ f1t,
-    double * __restrict__ f2n, double * __restrict__ f2t,
-    double * __restrict__ f3n, double * __restrict__ f3t,
-    double * __restrict__ f4n, double * __restrict__ f4t,
-    double * __restrict__ eorb,
-    int    * __restrict__ ncor_, int * __restrict__ nocc_, int * __restrict__ nvir_,
-    double * __restrict__ emp4_, double * __restrict__ emp5_,
-    int    * __restrict__ a_, int * __restrict__ i_, int * __restrict__ j_, int * __restrict__ k_, int * __restrict__ klo_,
-    double * __restrict__ tij, double * __restrict__ tkj, double * __restrict__ tia, double * __restrict__ tka,
-    double * __restrict__ xia, double * __restrict__ xka, double * __restrict__ jia, double * __restrict__ jka,
-    double * __restrict__ kia, double * __restrict__ kka, double * __restrict__ jij, double * __restrict__ jkj,
-    double * __restrict__ kij, double * __restrict__ kkj,
-    double * __restrict__ dintc1, double * __restrict__ dintx1, double * __restrict__ t1v1,
-    double * __restrict__ dintc2, double * __restrict__ dintx2, double * __restrict__ t1v2);
+    double * __restrict f1n, double * __restrict f1t,
+    double * __restrict f2n, double * __restrict f2t,
+    double * __restrict f3n, double * __restrict f3t,
+    double * __restrict f4n, double * __restrict f4t,
+    double * __restrict eorb,
+    int    * __restrict ncor_, int * __restrict nocc_, int * __restrict nvir_,
+    double * __restrict emp4_, double * __restrict emp5_,
+    int    * __restrict a_, int * __restrict i_, int * __restrict j_, int * __restrict k_, int * __restrict klo_,
+    double * __restrict tij, double * __restrict tkj, double * __restrict tia, double * __restrict tka,
+    double * __restrict xia, double * __restrict xka, double * __restrict jia, double * __restrict jka,
+    double * __restrict kia, double * __restrict kka, double * __restrict jij, double * __restrict jkj,
+    double * __restrict kij, double * __restrict kkj,
+    double * __restrict dintc1, double * __restrict dintx1, double * __restrict t1v1,
+    double * __restrict dintc2, double * __restrict dintx2, double * __restrict t1v2);
 
 double * make_array(int n)
 {
@@ -88,7 +85,6 @@ int main(int argc, char* argv[])
 
   srand48(2);
   double * eorb = make_array(nbf);
-
   double * f1n = make_array(lnvv);
   double * f2n = make_array(lnvv);
   double * f3n = make_array(lnvv);
@@ -97,37 +93,34 @@ int main(int argc, char* argv[])
   double * f2t = make_array(lnvv);
   double * f3t = make_array(lnvv);
   double * f4t = make_array(lnvv);
-
-  double * Tij  = make_array(lnvv);
-  double * Tkj  = make_array(kchunk*lnvv);
-  double * Tia  = make_array(lnov*nocc);
-  double * Tka  = make_array(kchunk*lnov);
-  double * Xia  = make_array(lnov*nocc);
-  double * Xka  = make_array(kchunk*lnov);
-  double * Jia  = make_array(lnvv);
-  double * Jka  = make_array(kchunk*lnvv);
-  double * Kia  = make_array(lnvv);
-  double * Kka  = make_array(kchunk*lnvv);
-  double * Jij  = make_array(lnov*nocc);
-  double * Jkj  = make_array(kchunk*lnov);
-  double * Kij  = make_array(lnov*nocc);
-  double * Kkj  = make_array(kchunk*lnov);
-  double * Dja  = make_array(lnov);
+  double * Tij = make_array(lnvv);
+  double * Tkj = make_array(kchunk*lnvv);
+  double * Tia = make_array(lnov*nocc);
+  double * Tka = make_array(kchunk*lnov);
+  double * Xia = make_array(lnov*nocc);
+  double * Xka = make_array(kchunk*lnov);
+  double * Jia = make_array(lnvv);
+  double * Jka = make_array(kchunk*lnvv);
+  double * Kia = make_array(lnvv);
+  double * Kka = make_array(kchunk*lnvv);
+  double * Jij = make_array(lnov*nocc);
+  double * Jkj = make_array(kchunk*lnov);
+  double * Kij = make_array(lnov*nocc);
+  double * Kkj = make_array(kchunk*lnov);
+  double * Dja = make_array(lnov);
   double * Djka = make_array(nvir*kchunk);
   double * Djia = make_array(nvir*nocc);
-
   double * dintc1 = make_array(lnvv);
   double * dintc2 = make_array(lnvv);
   double * dintx1 = make_array(lnvv);
   double * dintx2 = make_array(lnvv);
-  double * t1v1   = make_array(lnvv);
-  double * t1v2   = make_array(lnvv);
+  double * t1v1 = make_array(lnvv);
+  double * t1v2 = make_array(lnvv);
 
   int ntimers = MIN(maxiter,nocc*nocc*nocc*nocc);
   double * timers = (double*) calloc(ntimers,sizeof(double));
 
   double emp4=0.0, emp5=0.0;
-  //int a=1, i=1, j=1, k=1, klo=1;
 
   int iter = 0;
 
@@ -161,14 +154,10 @@ int main(int argc, char* argv[])
   }
 
 maxed_out:
-  printf("");
-
-
   double tsum =  0.0;
   double tmax = -1.0e10;
   double tmin =  1.0e10;
   for (int i=0; i<iter; i++) {
-    //printf("timers[%d] = %f\n", i, timers[i]);
     tsum += timers[i];
     tmax  = MAX(tmax,timers[i]);
     tmin  = MIN(tmin,timers[i]);
@@ -184,13 +173,12 @@ maxed_out:
   double tengy_ops = ((1.0*nvir)*nvir)*(86+8);
 
   printf("OPS: dgemm_flops=%10.3e dgemm_mops=%10.3e tengy_ops=%10.3e\n",
-      dgemm_flops, dgemm_mops, tengy_ops);
+         dgemm_flops, dgemm_mops, tengy_ops);
   printf("PERF: GF/s=%10.3e GB/s=%10.3e\n",
-      1.0e-9*(dgemm_flops+tengy_ops)/tavg, 8.0e-9*(dgemm_mops+tengy_ops)/tavg);
+         1.0e-9*(dgemm_flops+tengy_ops)/tavg, 8.0e-9*(dgemm_mops+tengy_ops)/tavg);
 
   printf("These are meaningless but should not vary for a particular input:\n");
   printf("emp4=%f emp5=%f\n", emp4, emp5);
-
   printf("Finished\n");
 
   free(eorb);

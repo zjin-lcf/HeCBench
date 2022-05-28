@@ -3,8 +3,7 @@
 
 #define BLOCK_SIZE 16
 
-
-  __global__ 
+__global__ 
 void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__ f1t,
                  const double * __restrict__ f2n,    const double * __restrict__ f2t,
                  const double * __restrict__ f3n,    const double * __restrict__ f3t,
@@ -16,7 +15,6 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
                  double * __restrict__ emp4k, double * __restrict__ emp5k,
                  const int ncor, const int nocc, const int nvir)
 {
-
   const int b = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -71,16 +69,15 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
                      +(f3tbc+f4nbc+f1tcb)*4)
                      + denom * t1v2b * dintc2c * (f1tbc+f4tbc+f1ncb -(f2tbc+f3tbc+f2ncb)*2));
   }
-
 }
 
 void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restrict__ f1t,
-                    const double * __restrict__  f2n,    const double * __restrict__ f2t,
-                    const double * __restrict__  f3n,    const double * __restrict__ f3t,
-                    const double * __restrict__  f4n,    const double * __restrict__ f4t,
-                    const double * __restrict__  dintc1, const double * __restrict__ dintx1, const double * __restrict__ t1v1,
-                    const double * __restrict__  dintc2, const double * __restrict__ dintx2, const double * __restrict__ t1v2,
-                    const double * __restrict__  eorb,   const double eaijk,
+                    const double * __restrict__ f2n,    const double * __restrict__ f2t,
+                    const double * __restrict__ f3n,    const double * __restrict__ f3t,
+                    const double * __restrict__ f4n,    const double * __restrict__ f4t,
+                    const double * __restrict__ dintc1, const double * __restrict__ dintx1, const double * __restrict__ t1v1,
+                    const double * __restrict__ dintc2, const double * __restrict__ dintx2, const double * __restrict__ t1v2,
+                    const double * __restrict__ eorb,   const double eaijk,
                     double * __restrict__ emp4i_, double * __restrict__ emp5i_,
                     double * __restrict__ emp4k_, double * __restrict__ emp5k_,
                     const int ncor, const int nocc, const int nvir)
@@ -133,10 +130,8 @@ void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restric
   hipMemcpy(d_emp4k, &emp4k, sizeof(double), hipMemcpyHostToDevice);
 
 
-  hipLaunchKernelGGL(ccsd_kernel, 
-        dim3((nvir+BLOCK_SIZE-1) / BLOCK_SIZE, (nvir+BLOCK_SIZE-1) / BLOCK_SIZE), 
-        dim3(BLOCK_SIZE, BLOCK_SIZE) , 0, 0,
-	d_f1n,
+  hipLaunchKernelGGL(ccsd_kernel, dim3( (nvir+BLOCK_SIZE-1) / BLOCK_SIZE, (nvir+BLOCK_SIZE-1) / BLOCK_SIZE ), dim3( BLOCK_SIZE, BLOCK_SIZE ), 0, 0, 
+        d_f1n,
         d_f1t,
         d_f2n,
         d_f2t,
@@ -200,4 +195,3 @@ void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restric
   *emp5i_ = emp5i;
   *emp5k_ = emp5k;
 }
-

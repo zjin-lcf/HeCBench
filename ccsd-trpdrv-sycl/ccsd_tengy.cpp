@@ -3,39 +3,25 @@
 
 #define BLOCK_SIZE 16
 
-inline double atomicAdd(double *addr, double operand)
+inline void atomicAdd(double *val, const double operand)
 {
-  atomic<unsigned long long int, access::address_space::global_space> obj(
-      (multi_ptr<unsigned long long int, access::address_space::global_space>(
-                        reinterpret_cast<unsigned long long int *>(addr))));
-
-  unsigned long long int old_value;
-  double old_double_value;
-
-  do {
-    old_value = obj.load(memory_order::relaxed);
-    old_double_value = *reinterpret_cast<const double *>(&old_value);
-    const double new_double_value = old_double_value + operand;
-    const unsigned long long int new_value =
-      *reinterpret_cast<const unsigned long long int *>(&new_double_value);
-
-    if (obj.compare_exchange_strong(old_value, new_value, memory_order::relaxed))
-      break;
-  } while (true);
-
-  return old_double_value;
+  sycl::ext::oneapi::atomic_ref<double, 
+     sycl::memory_order::relaxed, 
+     sycl::memory_scope::device,
+     sycl::access::address_space::global_space> ref (*val);
+  ref.fetch_add(operand);
 }
 
 void ccsd_tengy_gpu(queue &q,
-    const double * __restrict__ f1n,    const double * __restrict__ f1t,
-    const double * __restrict__  f2n,    const double * __restrict__ f2t,
-    const double * __restrict__  f3n,    const double * __restrict__ f3t,
-    const double * __restrict__  f4n,    const double * __restrict__ f4t,
-    const double * __restrict__  dintc1, const double * __restrict__ dintx1, const double * __restrict__ t1v1,
-    const double * __restrict__  dintc2, const double * __restrict__ dintx2, const double * __restrict__ t1v2,
-    const double * __restrict__  eorb,   const double eaijk,
-    double * __restrict__ emp4i_, double * __restrict__ emp5i_,
-    double * __restrict__ emp4k_, double * __restrict__ emp5k_,
+    const double * __restrict f1n,    const double * __restrict f1t,
+    const double * __restrict f2n,    const double * __restrict f2t,
+    const double * __restrict f3n,    const double * __restrict f3t,
+    const double * __restrict f4n,    const double * __restrict f4t,
+    const double * __restrict dintc1, const double * __restrict dintx1, const double * __restrict t1v1,
+    const double * __restrict dintc2, const double * __restrict dintx2, const double * __restrict t1v2,
+    const double * __restrict eorb,   const double eaijk,
+    double * __restrict emp4i_, double * __restrict emp5i_,
+    double * __restrict emp4k_, double * __restrict emp5k_,
     const int ncor, const int nocc, const int nvir)
 {
   double emp5i = 0.0, emp4i = 0.0, emp5k = 0.0, emp4k = 0.0;
@@ -61,9 +47,9 @@ void ccsd_tengy_gpu(queue &q,
     buffer<double, 1> d_emp5k (&emp5k, 1);
     buffer<double, 1> d_emp4k (&emp4k, 1);
 
-    range<2> global_work_size((nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE, 
-        (nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-    range<2> local_work_size(BLOCK_SIZE, BLOCK_SIZE);
+    range<2> gws((nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE, 
+                 (nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+    range<2> lws(BLOCK_SIZE, BLOCK_SIZE);
 
     q.submit([&] (handler &cgh) {
       auto f1n = d_f1n.get_access<sycl_read>(cgh);
@@ -86,7 +72,7 @@ void ccsd_tengy_gpu(queue &q,
       auto emp4k = d_emp4k.get_access<sycl_read_write>(cgh);
       auto emp5k = d_emp5k.get_access<sycl_read_write>(cgh);
 
-      cgh.parallel_for<class tengy>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
+      cgh.parallel_for<class tengy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         const int b = item.get_global_id(1);
         const int c = item.get_global_id(0); 
 
