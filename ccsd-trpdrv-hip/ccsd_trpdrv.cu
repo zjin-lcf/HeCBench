@@ -1,4 +1,3 @@
-
 void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restrict__ f1t,
                     const double * __restrict__ f2n,    const double * __restrict__ f2t,
                     const double * __restrict__ f3n,    const double * __restrict__ f3t,
@@ -37,9 +36,6 @@ void ccsd_trpdrv(double * __restrict__ f1n, double * __restrict__ f1t,
     const int nocc = *nocc_;
     const int nvir = *nvir_;
 
-    //const int lnov = nocc * nvir;
-    //const int lnvv = nvir * nvir;
-
     /* convert from Fortran to C offset convention... */
     const int k   = *k_ - 1;
     //const int klo = *klo_ - 1;
@@ -67,4 +63,3 @@ void ccsd_trpdrv(double * __restrict__ f1n, double * __restrict__ f1t,
 
     return;
 }
-
