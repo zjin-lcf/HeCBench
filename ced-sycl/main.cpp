@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  cl::sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel);
 
   buffer<unsigned char, 1> d_in_out(in_size);
   buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
               }
             }
 
-            out[pos] = cl::sycl::min(255, cl::sycl::max(0, sum));
+            out[pos] = sycl::min(255, sycl::max(0, sum));
           });
         });
 
@@ -348,17 +348,17 @@ int main(int argc, char **argv) {
             // The output is now the square root of their squares, but they are
             // constrained to 0 <= value <= 255. Note that hypot is a built in function
             // defined as: hypot(x,y) = sqrt(x*x, y*y).
-            out[pos] = cl::sycl::min(255, cl::sycl::max(0, (int)cl::sycl::hypot(sumx, sumy)));
+            out[pos] = sycl::min(255, sycl::max(0, (int)sycl::hypot(sumx, sumy)));
 
             // Compute the direction angle theta in radians
             // atan2 has a range of (-PI, PI) degrees
-            angle = cl::sycl::atan2(sumy, sumx);
+            angle = sycl::atan2(sumy, sumx);
 
             // If the angle is negative,
             // shift the range to (0, 2PI) by adding 2PI to the angle,
             // then perform modulo operation of 2PI
             if(angle < 0) {
-              angle = cl::sycl::fmod((angle + 2 * PI), (2 * PI));
+              angle = sycl::fmod((angle + 2 * PI), (2 * PI));
             }
 
             // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
@@ -599,6 +599,6 @@ int main(int argc, char **argv) {
   free(all_out_frames);
   free(worklist);
 
-  if (status == 0) printf("Test Passed\n");
+  if (status == 0) printf("PASS\n");
   return 0;
 }

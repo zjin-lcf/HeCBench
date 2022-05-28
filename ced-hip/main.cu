@@ -35,77 +35,80 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "kernel.h"
 #include "support/partitioner.h"
 #include "support/verify.h"
 
-__constant__ float gaus[9] = {0.0625f, 0.125f, 0.0625f, 
-                              0.1250f, 0.250f, 0.1250f, 
-                              0.0625f, 0.125f, 0.0625f};
-__constant__ int   sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-__constant__ int   soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+__constant__ float c_gaus[9] = {0.0625f, 0.125f, 0.0625f, 
+                                0.1250f, 0.250f, 0.1250f, 
+                                0.0625f, 0.125f, 0.0625f};
+__constant__ int   c_sobx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+__constant__ int   c_soby[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
 
 // https://github.com/smskelley/canny-opencl
 // Gaussian Kernel
 // data: image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out: image output data (8B1C)
 __global__ void 
-gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols) {
+gaussian_kernel(const unsigned char *__restrict__ data,
+                unsigned char *__restrict__ out,
+                const int rows, const int cols) 
+{
+  extern __shared__ int l_mem[];
+  int* l_data = l_mem;
 
-    HIP_DYNAMIC_SHARED( int, l_mem)
-    int* l_data = l_mem;
+  const int L_SIZE = blockDim.x;
+  int sum         = 0;
+  const int l_row = threadIdx.y + 1;
+  const int l_col = threadIdx.x + 1;
+  const int g_row = blockIdx.y * blockDim.y + l_row;
+  const int g_col = blockIdx.x * blockDim.x + l_col;
 
-    const int L_SIZE = blockDim.x;
-    int sum         = 0;
-    const int l_row = threadIdx.y + 1;
-    const int l_col = threadIdx.x + 1;
-    const int g_row = blockIdx.y * blockDim.y + l_row;
-    const int g_col = blockIdx.x * blockDim.x + l_col;
+  const int pos = g_row * cols + g_col;
 
-    const int pos = g_row * cols + g_col;
+  // copy to local
+  l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
 
-    // copy to local
-    l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
+  // top most row
+  if(l_row == 1) {
+      l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
+      // top left
+      if(l_col == 1)
+          l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
 
-    // top most row
-    if(l_row == 1) {
-        l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
-        // top left
-        if(l_col == 1)
-            l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
+      // top right
+      else if(l_col == L_SIZE)
+          l_data[0 * (L_SIZE + 2) + L_SIZE + 1] = data[pos - cols + 1];
+  }
+  // bottom most row
+  else if(l_row == L_SIZE) {
+      l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
+      // bottom left
+      if(l_col == 1)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
 
-        // top right
-        else if(l_col == L_SIZE)
-            l_data[0 * (L_SIZE + 2) + L_SIZE + 1] = data[pos - cols + 1];
-    }
-    // bottom most row
-    else if(l_row == L_SIZE) {
-        l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
-        // bottom left
-        if(l_col == 1)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
+      // bottom right
+      else if(l_col == L_SIZE)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + L_SIZE + 1] = data[pos + cols + 1];
+  }
 
-        // bottom right
-        else if(l_col == L_SIZE)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + L_SIZE + 1] = data[pos + cols + 1];
-    }
+  if(l_col == 1)
+      l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
+  else if(l_col == L_SIZE)
+      l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = data[pos + 1];
 
-    if(l_col == 1)
-        l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
-    else if(l_col == L_SIZE)
-        l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = data[pos + 1];
+  __syncthreads();
 
-    __syncthreads();
+  for(int i = 0; i < 3; i++) {
+      for(int j = 0; j < 3; j++) {
+          sum += c_gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+      }
+  }
 
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 3; j++) {
-            sum += gaus[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-        }
-    }
-
-    out[pos] = min(255, max(0, sum));
+  out[pos] = min(255, max(0, sum));
 }
 
 // Sobel kernel. Apply sobx and soby separately, then find the sqrt of their
@@ -114,103 +117,106 @@ gaussian_kernel(const unsigned char *data, unsigned char *out, const int rows, c
 // out:   image output data (8B1C)
 // theta: angle output data
 __global__ void 
-sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta, const int rows, const int cols) {
+sobel_kernel(const unsigned char *__restrict__ data,
+             unsigned char *__restrict__ out,
+             unsigned char *__restrict__ theta,
+             const int rows, const int cols)
+{
+  extern __shared__ int l_mem[];
+  int* l_data = l_mem;
 
-    HIP_DYNAMIC_SHARED( int, l_mem)
-    int* l_data = l_mem;
+  // collect sums separately. we're storing them into floats because that
+  // is what hypot and atan2 will expect.
+  const int L_SIZE = blockDim.x;
+  const float PI    = 3.14159265f;
+  const int   l_row = threadIdx.y + 1;
+  const int   l_col = threadIdx.x + 1;
+  const int   g_row = blockIdx.y * blockDim.y + l_row;
+  const int   g_col = blockIdx.x * blockDim.x + l_col;
 
-    // collect sums separately. we're storing them into floats because that
-    // is what hypot and atan2 will expect.
-    const int L_SIZE = blockDim.x;
-    const float PI    = 3.14159265f;
-    const int   l_row = threadIdx.y + 1;
-    const int   l_col = threadIdx.x + 1;
-    const int   g_row = blockIdx.y * blockDim.y + l_row;
-    const int   g_col = blockIdx.x * blockDim.x + l_col;
+  const int pos = g_row * cols + g_col;
 
-    const int pos = g_row * cols + g_col;
+  // copy to local
+  l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
 
-    // copy to local
-    l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
+  // top most row
+  if(l_row == 1) {
+      l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
+      // top left
+      if(l_col == 1)
+          l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
 
-    // top most row
-    if(l_row == 1) {
-        l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
-        // top left
-        if(l_col == 1)
-            l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
+      // top right
+      else if(l_col == L_SIZE)
+          l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
+  }
+  // bottom most row
+  else if(l_row == L_SIZE) {
+      l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
+      // bottom left
+      if(l_col == 1)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
 
-        // top right
-        else if(l_col == L_SIZE)
-            l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
-    }
-    // bottom most row
-    else if(l_row == L_SIZE) {
-        l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
-        // bottom left
-        if(l_col == 1)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
+      // bottom right
+      else if(l_col == L_SIZE)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
+  }
 
-        // bottom right
-        else if(l_col == L_SIZE)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
-    }
+  // left
+  if(l_col == 1)
+      l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
+  // right
+  else if(l_col == L_SIZE)
+      l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-    // left
-    if(l_col == 1)
-        l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
-    // right
-    else if(l_col == L_SIZE)
-        l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
+  __syncthreads();
 
-    __syncthreads();
+  float sumx = 0, sumy = 0, angle = 0;
+  // find x and y derivatives
+  for(int i = 0; i < 3; i++) {
+      for(int j = 0; j < 3; j++) {
+          sumx += c_sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+          sumy += c_soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
+      }
+  }
 
-    float sumx = 0, sumy = 0, angle = 0;
-    // find x and y derivatives
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 3; j++) {
-            sumx += sobx[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-            sumy += soby[i*3+j] * l_data[(i + l_row - 1) * (L_SIZE + 2) + j + l_col - 1];
-        }
-    }
+  // The output is now the square root of their squares, but they are
+  // constrained to 0 <= value <= 255. Note that hypot is a built in function
+  // defined as: hypot(x,y) = sqrt(x*x, y*y).
+  out[pos] = min(255, max(0, (int)hypot(sumx, sumy)));
 
-    // The output is now the square root of their squares, but they are
-    // constrained to 0 <= value <= 255. Note that hypot is a built in function
-    // defined as: hypot(x,y) = sqrt(x*x, y*y).
-    out[pos] = min(255, max(0, (int)hypot(sumx, sumy)));
+  // Compute the direction angle theta in radians
+  // atan2 has a range of (-PI, PI) degrees
+  angle = atan2(sumy, sumx);
 
-    // Compute the direction angle theta in radians
-    // atan2 has a range of (-PI, PI) degrees
-    angle = atan2(sumy, sumx);
+  // If the angle is negative,
+  // shift the range to (0, 2PI) by adding 2PI to the angle,
+  // then perform modulo operation of 2PI
+  if(angle < 0) {
+      angle = fmod((angle + 2 * PI), (2 * PI));
+  }
 
-    // If the angle is negative,
-    // shift the range to (0, 2PI) by adding 2PI to the angle,
-    // then perform modulo operation of 2PI
-    if(angle < 0) {
-        angle = fmod((angle + 2 * PI), (2 * PI));
-    }
-
-    // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
-    // then store it in the theta buffer at the proper position
-    //theta[pos] = ((int)(degrees(angle * (PI/8) + PI/8-0.0001) / 45) * 45) % 180;
-    if(angle <= PI / 8)
-        theta[pos] = 0;
-    else if(angle <= 3 * PI / 8)
-        theta[pos] = 45;
-    else if(angle <= 5 * PI / 8)
-        theta[pos] = 90;
-    else if(angle <= 7 * PI / 8)
-        theta[pos] = 135;
-    else if(angle <= 9 * PI / 8)
-        theta[pos] = 0;
-    else if(angle <= 11 * PI / 8)
-        theta[pos] = 45;
-    else if(angle <= 13 * PI / 8)
-        theta[pos] = 90;
-    else if(angle <= 15 * PI / 8)
-        theta[pos] = 135;
-    else
-        theta[pos] = 0; // (angle <= 16*PI/8)
+  // Round the angle to one of four possibilities: 0, 45, 90, 135 degrees
+  // then store it in the theta buffer at the proper position
+  //theta[pos] = ((int)(degrees(angle * (PI/8) + PI/8-0.0001) / 45) * 45) % 180;
+  if(angle <= PI / 8)
+      theta[pos] = 0;
+  else if(angle <= 3 * PI / 8)
+      theta[pos] = 45;
+  else if(angle <= 5 * PI / 8)
+      theta[pos] = 90;
+  else if(angle <= 7 * PI / 8)
+      theta[pos] = 135;
+  else if(angle <= 9 * PI / 8)
+      theta[pos] = 0;
+  else if(angle <= 11 * PI / 8)
+      theta[pos] = 45;
+  else if(angle <= 13 * PI / 8)
+      theta[pos] = 90;
+  else if(angle <= 15 * PI / 8)
+      theta[pos] = 135;
+  else
+      theta[pos] = 0; // (angle <= 16*PI/8)
 }
 
 // Non-maximum Supression Kernel
@@ -218,59 +224,61 @@ sobel_kernel(const unsigned char *data, unsigned char *out, unsigned char *theta
 // out: image output data (8B1C)
 // theta: angle input data
 __global__ void 
-non_max_supp_kernel(const unsigned char *data, unsigned char *out, 
-                    const unsigned char *theta, const int rows, const int cols) {
+non_max_supp_kernel(const unsigned char *__restrict__ data,
+                          unsigned char *__restrict__ out, 
+                    const unsigned char *__restrict__ theta,
+                    const int rows, const int cols)
+{
+  extern __shared__ int l_mem[];
+  int* l_data = l_mem;
 
-    HIP_DYNAMIC_SHARED( int, l_mem)
-    int* l_data = l_mem;
+  // These variables are offset by one to avoid seg. fault errors
+  // As such, this kernel ignores the outside ring of pixels
+  const int L_SIZE = blockDim.x;
+  const int l_row = threadIdx.y + 1;
+  const int l_col = threadIdx.x + 1;
+  const int g_row = blockIdx.y * blockDim.y + l_row;
+  const int g_col = blockIdx.x * blockDim.x + l_col;
 
-    // These variables are offset by one to avoid seg. fault errors
-    // As such, this kernel ignores the outside ring of pixels
-    const int L_SIZE = blockDim.x;
-    const int l_row = threadIdx.y + 1;
-    const int l_col = threadIdx.x + 1;
-    const int g_row = blockIdx.y * blockDim.y + l_row;
-    const int g_col = blockIdx.x * blockDim.x + l_col;
+  const int pos = g_row * cols + g_col;
 
-    const int pos = g_row * cols + g_col;
+  // copy to l_data
+  l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
 
-    // copy to l_data
-    l_data[l_row * (L_SIZE + 2) + l_col] = data[pos];
+  // top most row
+  if(l_row == 1) {
+      l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
+      // top left
+      if(l_col == 1)
+          l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
 
-    // top most row
-    if(l_row == 1) {
-        l_data[0 * (L_SIZE + 2) + l_col] = data[pos - cols];
-        // top left
-        if(l_col == 1)
-            l_data[0 * (L_SIZE + 2) + 0] = data[pos - cols - 1];
+      // top right
+      else if(l_col == L_SIZE)
+          l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
+  }
+  // bottom most row
+  else if(l_row == L_SIZE) {
+      l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
+      // bottom left
+      if(l_col == 1)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
 
-        // top right
-        else if(l_col == L_SIZE)
-            l_data[0 * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos - cols + 1];
-    }
-    // bottom most row
-    else if(l_row == L_SIZE) {
-        l_data[(L_SIZE + 1) * (L_SIZE + 2) + l_col] = data[pos + cols];
-        // bottom left
-        if(l_col == 1)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + 0] = data[pos + cols - 1];
+      // bottom right
+      else if(l_col == L_SIZE)
+          l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
+  }
 
-        // bottom right
-        else if(l_col == L_SIZE)
-            l_data[(L_SIZE + 1) * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + cols + 1];
-    }
+  if(l_col == 1)
+      l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
+  else if(l_col == L_SIZE)
+      l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-    if(l_col == 1)
-        l_data[l_row * (L_SIZE + 2) + 0] = data[pos - 1];
-    else if(l_col == L_SIZE)
-        l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
+  __syncthreads();
 
-    __syncthreads();
+  unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
 
-    unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
-
-    // The following variables are used to address the matrices more easily
-    switch(theta[pos]) {
+  // The following variables are used to address the matrices more easily
+  switch(theta[pos]) {
     // A gradient angle of 0 degrees = an edge that is North/South
     // Check neighbors to the East and West
     case 0:
@@ -332,40 +340,43 @@ non_max_supp_kernel(const unsigned char *data, unsigned char *out,
         break;
 
     default: out[pos] = my_magnitude; break;
-    }
+  }
 }
 
 // Hysteresis Threshold Kernel
 // data: image input data with each pixel taking up 1 byte (8Bit 1Channel)
 // out: image output data (8B1C)
 __global__ void 
-hyst_kernel(const unsigned char *data, unsigned char *out, const int rows, const int cols) {
-    // Establish our high and low thresholds as floats
-    float lowThresh  = 10;
-    float highThresh = 70;
+hyst_kernel(const unsigned char *__restrict__ data,
+                  unsigned char *__restrict__ out,
+            const int rows, const int cols)
+{
+  // Establish our high and low thresholds as floats
+  float lowThresh  = 10;
+  float highThresh = 70;
 
-    // These variables are offset by one to avoid seg. fault errors
-    // As such, this kernel ignores the outside ring of pixels
-    const int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
-    const int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
-    const int pos = row * cols + col;
+  // These variables are offset by one to avoid seg. fault errors
+  // As such, this kernel ignores the outside ring of pixels
+  const int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+  const int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+  const int pos = row * cols + col;
 
-    const unsigned char EDGE = 255;
+  const unsigned char EDGE = 255;
 
-    unsigned char magnitude = data[pos];
+  unsigned char magnitude = data[pos];
 
-    if(magnitude >= highThresh)
-        out[pos] = EDGE;
-    else if(magnitude <= lowThresh)
-        out[pos] = 0;
-    else {
-        float med = (highThresh + lowThresh) / 2;
+  if(magnitude >= highThresh)
+      out[pos] = EDGE;
+  else if(magnitude <= lowThresh)
+      out[pos] = 0;
+  else {
+      float med = (highThresh + lowThresh) / 2;
 
-        if(magnitude >= med)
-            out[pos] = EDGE;
-        else
-            out[pos] = 0;
-    }
+      if(magnitude >= med)
+          out[pos] = EDGE;
+      else
+          out[pos] = 0;
+  }
 }
 
 // Params ---------------------------------------------------------------------
@@ -460,7 +471,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred: ");
+      perror ("The following error occurred");
       exit(EXIT_FAILURE);
     }
 
@@ -478,7 +489,6 @@ void read_input(unsigned char** all_gray_frames,
   }
 }
 
-// Main ------------------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 
   Params      p(argc, argv);
@@ -509,6 +519,8 @@ int main(int argc, char **argv) {
   unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
 
+  auto t1 = std::chrono::high_resolution_clock::now();
+
   unsigned char* d_in_out;
   hipMalloc((void**)&d_in_out, sizeof(unsigned char)*in_size);
   
@@ -534,18 +546,16 @@ int main(int argc, char **argv) {
         int smem_size = (threads+2)*(threads+2)*sizeof(int); 
 
         // call GAUSSIAN KERNEL
-        hipLaunchKernelGGL(gaussian_kernel, dim3(grid), dim3(block), smem_size, 0, d_in_out, d_interm_gpu_proxy, rows, cols);
+        hipLaunchKernelGGL(gaussian_kernel, grid, block, smem_size, 0, d_in_out, d_interm_gpu_proxy, rows, cols);
 
         // call SOBEL KERNEL
-        hipLaunchKernelGGL(sobel_kernel, dim3(grid), dim3(block), smem_size, 0, d_interm_gpu_proxy, d_in_out, d_theta_gpu_proxy, rows, cols);
+        hipLaunchKernelGGL(sobel_kernel, grid, block, smem_size, 0, d_interm_gpu_proxy, d_in_out, d_theta_gpu_proxy, rows, cols);
 
         // call NON-MAXIMUM SUPPRESSION KERNEL
-        hipLaunchKernelGGL(non_max_supp_kernel, dim3(grid), dim3(block), smem_size, 0, d_in_out, d_interm_gpu_proxy, d_theta_gpu_proxy, rows, cols);
+        hipLaunchKernelGGL(non_max_supp_kernel, grid, block, smem_size, 0, d_in_out, d_interm_gpu_proxy, d_theta_gpu_proxy, rows, cols);
 
         // call HYSTERESIS KERNEL
-        hipLaunchKernelGGL(hyst_kernel, dim3(grid), dim3(block), smem_size, 0, d_interm_gpu_proxy, d_in_out, rows, cols);
-
-        //hipDeviceSynchronize();
+        hipLaunchKernelGGL(hyst_kernel, grid, block, smem_size, 0, d_interm_gpu_proxy, d_in_out, rows, cols);
 
         // Copy from Device
         hipMemcpy(all_out_frames[task_id], d_in_out, in_size, hipMemcpyDeviceToHost);
@@ -566,6 +576,10 @@ int main(int argc, char **argv) {
       }
   }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
+
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time %lf secs \n", total_time / 1.0e6);
 
 
 #ifdef CHAI_OPENCV
@@ -604,6 +618,6 @@ int main(int argc, char **argv) {
   free(all_out_frames);
   free(worklist);
 
-  if (status == 0) printf("Test Passed\n");
+  if (status == 0) printf("PASS\n");
   return 0;
 }

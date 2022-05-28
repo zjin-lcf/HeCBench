@@ -161,15 +161,13 @@ int main(int argc, char **argv) {
   unsigned char *theta_gpu_proxy  = (unsigned char *)malloc(in_size);
 
 #pragma omp target data map(alloc: gpu_in_out[0:in_size], \
-    interm_gpu_proxy[0:in_size], \
-    theta_gpu_proxy[0:in_size]) 
+                                   interm_gpu_proxy[0:in_size], \
+                                   theta_gpu_proxy[0:in_size]) 
   {
-
     for(int task_id = 0; task_id < n_frames; task_id++) {
 
       // Next frame
       memcpy(gpu_in_out, all_gray_frames[task_id], in_size);
-
 
       // Copy to Device
 
@@ -181,9 +179,7 @@ int main(int argc, char **argv) {
       // call GAUSSIAN KERNEL
 #pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
       {
-
         int l_data[(threads+2)*(threads+2)];
-
 #pragma omp parallel
         {
           const int L_SIZE = 16; //threads; 
@@ -243,9 +239,7 @@ int main(int argc, char **argv) {
       // call SOBEL KERNEL
 #pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
       {
-
         int l_data[(threads+2)*(threads+2)];
-
 #pragma omp parallel 
         {
           const int L_SIZE = 16;
@@ -345,9 +339,7 @@ int main(int argc, char **argv) {
       // call NON-MAXIMUM SUPPRESSION KERNEL
 #pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
       {
-
         int l_data[(threads+2)*(threads+2)];
-
 #pragma omp parallel 
         {
           const int L_SIZE = 16;
@@ -462,7 +454,6 @@ int main(int argc, char **argv) {
       // call HYSTERESIS KERNEL
 #pragma omp target teams num_teams(team_size) thread_limit(max_gpu_threads)
       {
-
 #pragma omp parallel 
         {
           const int l_row = omp_get_thread_num() / 16 + 1;
@@ -494,9 +485,7 @@ int main(int argc, char **argv) {
 #pragma omp target update from(gpu_in_out[0:in_size])
 
       memcpy(all_out_frames[task_id], gpu_in_out, in_size);
-
     }
-
   } // #pragma omp target
 
 #ifdef CHAI_OPENCV
@@ -530,6 +519,6 @@ int main(int argc, char **argv) {
   }
   free(all_out_frames);
 
-  if (status == 0) printf("Test Passed\n");
+  if (status == 0) printf("PASS\n");
   return 0;
 }
