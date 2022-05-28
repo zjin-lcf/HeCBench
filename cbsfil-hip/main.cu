@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
 
@@ -49,22 +50,31 @@ int main(int argc, char* argv[]) {
   dim3 dimBlockY (blocks);
   dim3 dimGridY ((width  + blocks - 1) / blocks);
 
+  double total_time = 0.0;
   for (int i = 0; i < repeat; i++) {
     hipMemcpy(d_image, image, image_size, hipMemcpyHostToDevice);
+    auto start = std::chrono::steady_clock::now();
+
     hipLaunchKernelGGL(toCoef2DX, dimGridX, dimBlockX, 0, 0, d_image, image_pitch, width, height);
     hipLaunchKernelGGL(toCoef2DY, dimGridY, dimBlockY, 0, 0, d_image, image_pitch, width, height);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+  printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
 
   hipMemcpy(image, d_image, image_size, hipMemcpyDeviceToHost);
+  hipFree(d_image);
 
   float sum = 0.f;
   for (int i = 0; i < numPix; i++) {
     const uchar *t = (const uchar*)(&image[i]);
-    sum += t[0] + t[1] + t[2] + t[3];
+    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
   }
-  printf("Checksum: %f\n", sum);
+  printf("Checksum: %f\n", sum / numPix);
 
-  hipFree(d_image);
   free(image);
   return 0;
 }

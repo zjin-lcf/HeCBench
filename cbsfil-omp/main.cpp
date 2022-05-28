@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <algorithm>
+#include <chrono>
 #include <omp.h>
 #include "kernels.h"
 
@@ -39,6 +40,7 @@ int main(int argc, char* argv[]) {
     *(uint*)(&image[i]) = (w << 24) | (z << 16) | (y << 8) | x;
   }
 
+  double total_time = 0.0;
   #pragma omp target data map(from: image[0:numPix])
   {
     int numThreadsX = std::min(PowTwoDivider(height), 64);
@@ -46,17 +48,25 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < repeat; i++) {
       #pragma omp target update to (image[0:numPix])
+
+      auto start = std::chrono::steady_clock::now();
+
       toCoef2DX(image, numThreadsX, image_pitch, width, height);
       toCoef2DY(image, numThreadsY, image_pitch, width, height);
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
     }
+    printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
   }
 
   float sum = 0.f;
   for (int i = 0; i < numPix; i++) {
     const uchar *t = (const uchar*)(&image[i]);
-    sum += t[0] + t[1] + t[2] + t[3];
+    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
   }
-  printf("Checksum: %f\n", sum);
+  printf("Checksum: %f\n", sum / numPix);
 
   free(image);
   return 0;

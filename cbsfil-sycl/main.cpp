@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include "common.h"
 #include "kernels.h"
 
@@ -55,12 +56,14 @@ int main(int argc, char* argv[]) {
   range<1> lwsY (blocks);
   range<1> gwsY ((width + blocks-1) / blocks * blocks);
 
+  double total_time = 0.0;
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto acc = d_image.get_access<sycl_discard_write>(cgh);
       cgh.copy(image, acc);
-    });
+    }).wait();
 
+    auto start = std::chrono::steady_clock::now();
     q.submit([&] (handler &cgh) {
       auto img = d_image.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class convertX>(nd_range<1>(gwsX, lwsX), [=] (nd_item<1> item) {
@@ -74,7 +77,13 @@ int main(int argc, char* argv[]) {
         toCoef2DY(item, img.get_pointer(), image_pitch, width, height);
       });
     });
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+  printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_image.get_access<sycl_read>(cgh);
@@ -84,9 +93,9 @@ int main(int argc, char* argv[]) {
   float sum = 0.f;
   for (int i = 0; i < numPix; i++) {
     const uchar *t = (const uchar*)(&image[i]);
-    sum += t[0] + t[1] + t[2] + t[3];
+    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
   }
-  printf("Checksum: %f\n", sum);
+  printf("Checksum: %f\n", sum / numPix);
 
   free(image);
   return 0;
