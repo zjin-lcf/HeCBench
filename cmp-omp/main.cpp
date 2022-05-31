@@ -36,9 +36,6 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
-
-////////////////////////////////////////////////////////////////////////////////
-
 void
 compute_semblances(const real* __restrict h, 
                    const real* __restrict c, 
@@ -111,8 +108,6 @@ compute_semblances(const real* __restrict h,
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 void
 redux_semblances(const real* __restrict num, 
                  const real* __restrict stt, 
@@ -142,8 +137,6 @@ redux_semblances(const real* __restrict num,
     stk[cdp_id*ns + t0] = max_c > -1 ? stt[max_c] : 0;
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, const char** argv) {
 #ifdef SAVE

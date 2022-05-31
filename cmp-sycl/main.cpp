@@ -35,20 +35,12 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////////////////////////////////
-
 void
 init_c(nd_item<1> &item, real *c, real inc, real c0) 
 {
   int i = item.get_group(0);
   c[i] = c0 + inc*i;
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 void
 init_half(nd_item<1> &item,
@@ -70,8 +62,6 @@ init_half(nd_item<1> &item,
 
   h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 void
 compute_semblances(nd_item<1> &item,
@@ -147,8 +137,6 @@ compute_semblances(nd_item<1> &item,
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 void
 redux_semblances(nd_item<1> &item,
                  const real* __restrict num, 
@@ -180,8 +168,6 @@ redux_semblances(nd_item<1> &item,
     stk[cdp_id*ns + t0] = max_c > -1 ? stt[max_c] : 0;
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, const char** argv) {
 #ifdef SAVE
