@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cuda.h>
 
 __device__  __host__
@@ -7,14 +8,14 @@ inline int _timestep(float t, float dt)
 }
 
 __global__ void cobahh (
-    float* __restrict d_h, 
-    float* __restrict d_m,
-    float* __restrict d_n,
-    float* __restrict d_ge,
-    float* __restrict d_v,
-    float* __restrict d_gi,
-    const float* __restrict d_lastspike, 
-    char* __restrict d_not_refractory, 
+    float* __restrict__ d_h, 
+    float* __restrict__ d_m,
+    float* __restrict__ d_n,
+    float* __restrict__ d_ge,
+    float* __restrict__ d_v,
+    float* __restrict__ d_gi,
+    const float* __restrict__ d_lastspike, 
+    char* __restrict__ d_not_refractory, 
     const int _N ,
     const float dt,
     const float t,
@@ -86,20 +87,19 @@ __global__ void cobahh (
 }
 
 void neurongroup_stateupdater (
-    float* __restrict  _ptr_array_neurongroup_ge,
-    float* __restrict  _ptr_array_neurongroup_gi,
-    float* __restrict  _ptr_array_neurongroup_h,
-    float* __restrict  _ptr_array_neurongroup_m,
-    float* __restrict  _ptr_array_neurongroup_n,
-    float* __restrict  _ptr_array_neurongroup_v,
-    float* __restrict   _ptr_array_neurongroup_lastspike,
-    float* __restrict  _ptr_array_defaultclock_dt,
-    float*__restrict  _ptr_array_defaultclock_t,
-    char* __restrict  _ptr_array_neurongroup_not_refractory,
+    float* __restrict__  _ptr_array_neurongroup_ge,
+    float* __restrict__  _ptr_array_neurongroup_gi,
+    float* __restrict__  _ptr_array_neurongroup_h,
+    float* __restrict__  _ptr_array_neurongroup_m,
+    float* __restrict__  _ptr_array_neurongroup_n,
+    float* __restrict__  _ptr_array_neurongroup_v,
+    float* __restrict__   _ptr_array_neurongroup_lastspike,
+    float* __restrict__  _ptr_array_defaultclock_dt,
+    float*__restrict__  _ptr_array_defaultclock_t,
+    char* __restrict__  _ptr_array_neurongroup_not_refractory,
     const int _N,
     const int iteration ) 
 {
-
   const float dt = _ptr_array_defaultclock_dt[0];
   const float t = _ptr_array_defaultclock_t[0];
   const int    _lio_1 = _timestep(0.003, dt);
@@ -170,6 +170,9 @@ void neurongroup_stateupdater (
   dim3 grids ((_N+255)/256);
   dim3 threads (256);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+    
   for (int n = 0; n < iteration; n++) {
 
     cobahh<<<grids, threads>>>(d_h, d_m, d_n, d_ge,
@@ -210,6 +213,11 @@ void neurongroup_stateupdater (
         _lio_32,
         _lio_33);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 
   cudaMemcpyAsync(_ptr_array_neurongroup_ge, d_ge, _N*sizeof(float), cudaMemcpyDeviceToHost, 0);
   cudaMemcpyAsync(_ptr_array_neurongroup_gi, d_gi, _N*sizeof(float), cudaMemcpyDeviceToHost, 0);

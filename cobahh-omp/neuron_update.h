@@ -1,3 +1,6 @@
+#include <chrono>
+#include <omp.h>
+
 #pragma omp declare target 
 inline int _timestep(float t, float dt)
 {
@@ -19,7 +22,6 @@ void neurongroup_stateupdater (
     const int _N,
     const int iteration ) 
 {
-
   const float dt = _ptr_array_defaultclock_dt[0];
   const float t = _ptr_array_defaultclock_t[0];
   const int    _lio_1 = _timestep(0.003, dt);
@@ -65,6 +67,7 @@ void neurongroup_stateupdater (
                         map(to: _ptr_array_neurongroup_lastspike[0:_N]) \
                         map(from: _ptr_array_neurongroup_not_refractory[0:_N])
   {
+    auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iteration; i++) {
       #pragma omp target teams distribute parallel for thread_limit(256) 
@@ -100,6 +103,10 @@ void neurongroup_stateupdater (
         _ptr_array_neurongroup_not_refractory[_idx] = not_refractory;
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
   }
 }
 
