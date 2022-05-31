@@ -10,7 +10,7 @@
 
 float sigmoid(float x)
 {
-    return 1.0f / (1.0f + cl::sycl::exp(-x));
+  return 1.f / (1.f + cl::sycl::exp(-x));
 }
 
 #ifdef DEBUG
@@ -36,7 +36,6 @@ void dump (const char* work_path, const char* result_filename, const float* resu
 void init(const char* work_path, const char* input_filename, const char* weight_filename,
 		float* sample_input, float* inW, float* intW, float* intB, float* outW, float* outB) 
 {
-
   char file_name[100];
 
   float weightVal;
@@ -96,14 +95,14 @@ void init(const char* work_path, const char* input_filename, const char* weight_
   fclose(fp);
 }
 
-void  lstm_n5( queue &q,
-               const float* x, 
-               const float* inW, 
-               const float* intW, 
-               const float* intB, 
-               const float* outW, 
-               const float* outB,
-               float* y) 
+void lstm_n5( queue &q,
+              const float* x, 
+              const float* inW, 
+              const float* intW, 
+              const float* intB, 
+              const float* outW, 
+              const float* outB,
+                    float* y) 
 {
   const property_list props = property::buffer::use_host_ptr();
   buffer<float,1> d_x(x, N*SAMPLE_TEST_LEN, props);
@@ -138,105 +137,105 @@ void  lstm_n5( queue &q,
         for (j = 0; j < 5; ++j) {
           i_state[j] = d_inW_acc[j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
           for (i = 0; i < 5; ++i)
-             i_state[j] += h_state[i] * d_intW_acc[j*5+i];
+            i_state[j] += h_state[i] * d_intW_acc[j*5+i];
           i_state[j] += d_intB_acc[j];
           i_state[j] = sigmoid(i_state[j]);
         }
         
         for (j = 0; j < 5; ++j) {
-        	f_state[j] = d_inW_acc[5+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
-        	for (i = 0; i < 5; ++i)
-        		f_state[j] += h_state[i] * d_intW_acc[25+j*5+i];
-        	f_state[j] += d_intB_acc[5+j];
-        	f_state[j] = sigmoid(f_state[j]);
+          f_state[j] = d_inW_acc[5+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
+          for (i = 0; i < 5; ++i)
+            f_state[j] += h_state[i] * d_intW_acc[25+j*5+i];
+          f_state[j] += d_intB_acc[5+j];
+          f_state[j] = sigmoid(f_state[j]);
         }
-        
+
         for (j = 0; j < 5; ++j) {
-        	o_state[j] = d_inW_acc[10+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
-        	for (i = 0; i < 5; ++i)
-        		o_state[j] += h_state[i] * d_intW_acc[50+j*5+i];
-        	o_state[j] += d_intB_acc[10+j];
-        	o_state[j] = sigmoid(o_state[j]);
+          o_state[j] = d_inW_acc[10+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
+          for (i = 0; i < 5; ++i)
+            o_state[j] += h_state[i] * d_intW_acc[50+j*5+i];
+          o_state[j] += d_intB_acc[10+j];
+          o_state[j] = sigmoid(o_state[j]);
         }
-        
+
         for (j = 0; j < 5; ++j) {
-        	g_state[j] = d_inW_acc[15+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
-        	for (i = 0; i < 5; ++i)
-        		g_state[j] += h_state[i] * d_intW_acc[75+j*5+i];
-        	g_state[j] += d_intB_acc[15+j];
-        	g_state[j] = cl::sycl::tanh(g_state[j]);
+          g_state[j] = d_inW_acc[15+j] * d_x_acc[gid * SAMPLE_TEST_LEN + t];
+          for (i = 0; i < 5; ++i)
+            g_state[j] += h_state[i] * d_intW_acc[75+j*5+i];
+          g_state[j] += d_intB_acc[15+j];
+          g_state[j] = cl::sycl::tanh(g_state[j]);
         }
-        
+
         for (j = 0; j < 5; ++j) {
-        	c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
-        	h_state[j] = cl::sycl::tanh(c_state[j]) * o_state[j];
+          c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
+          h_state[j] = cl::sycl::tanh(c_state[j]) * o_state[j];
         }
-        
+
         d_y_acc[gid * SAMPLE_TEST_LEN + t] = d_outB_acc[0];
         for (j = 0; j < 5; ++j)
-        	d_y_acc[gid * SAMPLE_TEST_LEN + t] += h_state[j] * d_outW_acc[j];
-        }
-      });
+          d_y_acc[gid * SAMPLE_TEST_LEN + t] += h_state[j] * d_outW_acc[j];
+      }
     });
+  });
   q.wait();
 }
 
 int main() {
 
-    float* sample_input = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
-    float* infer1_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
-    float* infer2_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
+  float* sample_input = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
+  float* infer1_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
+  float* infer2_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
 
-    float inW[20], intW[100], intB[20], outW[5];
-    float outB;
+  float inW[20], intW[100], intB[20], outW[5];
+  float outB;
 
-    const char* work_path = "./";
-    const char* input_filename = "input.hpp";
-    const char* weight1_filename = "weight_1.hpp";
-    const char* weight2_filename = "weight_2.hpp";
+  const char* work_path = "./";
+  const char* input_filename = "input.hpp";
+  const char* weight1_filename = "weight_1.hpp";
+  const char* weight2_filename = "weight_2.hpp";
 #ifdef DEBUG
-    const char* result1_filename = "sycl_float_infer_result_1.hpp";
-    const char* result2_filename = "sycl_float_infer_result_2.hpp";
+  const char* result1_filename = "float_infer_result_1.hpp";
+  const char* result2_filename = "float_infer_result_2.hpp";
 #endif
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    for (int n = 0; n < 10; n++) {
-      init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
-      auto start = std::chrono::steady_clock::now();
-      lstm_n5(q, sample_input, inW, intW, intB, outW, &outB, infer1_out);
-      auto end = std::chrono::steady_clock::now();
-      auto elapsedTime =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
-	
-#ifdef DEBUG
-      dump(work_path, result1_filename, infer1_out);
-#endif
-
-
-      init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
-      start = std::chrono::steady_clock::now();
-      lstm_n5(q, sample_input, inW, intW, intB, outW, &outB, infer2_out);
-      end = std::chrono::steady_clock::now();
-      elapsedTime =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-      std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+  for (int n = 0; n < 10; n++) {
+    init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
+    auto start = std::chrono::steady_clock::now();
+    lstm_n5(q, sample_input, inW, intW, intB, outW, &outB, infer1_out);
+    auto end = std::chrono::steady_clock::now();
+    auto elapsedTime =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
 
 #ifdef DEBUG
-      dump(work_path, result2_filename, infer2_out);
+    dump(work_path, result1_filename, infer1_out);
 #endif
-    }
 
-    free(sample_input);
-    free(infer1_out);
-    free(infer2_out);
-    printf("Processing complete.\n");
-    return 0;
+
+    init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
+    start = std::chrono::steady_clock::now();
+    lstm_n5(q, sample_input, inW, intW, intB, outW, &outB, infer2_out);
+    end = std::chrono::steady_clock::now();
+    elapsedTime =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+
+#ifdef DEBUG
+    dump(work_path, result2_filename, infer2_out);
+#endif
+  }
+
+  free(sample_input);
+  free(infer1_out);
+  free(infer2_out);
+  printf("Processing complete.\n");
+  return 0;
 }
 
