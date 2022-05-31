@@ -8,6 +8,11 @@
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <neurons> <repeat>\n", argv[0]);
+    return 1;
+  }
+
   int N = atoi(argv[1]);
   int iteration = atoi(argv[2]);
   srand(2);

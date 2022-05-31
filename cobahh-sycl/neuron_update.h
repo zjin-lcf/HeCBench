@@ -1,3 +1,4 @@
+#include <chrono>
 #include "common.h"
 
 inline int _timestep(float t, float dt)
@@ -75,6 +76,9 @@ void neurongroup_stateupdater (
   range<1> global_work_size ((_N+255)/256*256);
   range<1> local_work_size (256);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iteration; i++) {
 
     q.submit([&] (handler &h) {
@@ -120,6 +124,10 @@ void neurongroup_stateupdater (
     });
   }
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+
 }
 
 
