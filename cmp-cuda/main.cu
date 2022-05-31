@@ -35,12 +35,6 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////////////////////////////////
-
 __global__ void
 init_c(real *c, real inc, real c0) 
 {
@@ -48,15 +42,13 @@ init_c(real *c, real inc, real c0)
   c[i] = c0 + inc*i;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 __global__ void
-init_half(const real* __restrict scalco, 
-          const real* __restrict gx, 
-          const real* __restrict gy, 
-          const real* __restrict sx, 
-          const real* __restrict sy, 
-          real* __restrict h) 
+init_half(const real* __restrict__ scalco, 
+          const real* __restrict__ gx, 
+          const real* __restrict__ gy, 
+          const real* __restrict__ sx, 
+          const real* __restrict__ sy, 
+          real* __restrict__ h) 
 {
   int i = blockIdx.x;
   real _s = scalco[i];
@@ -70,14 +62,12 @@ init_half(const real* __restrict scalco,
   h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 __global__ void
-compute_semblances(const real* __restrict h, 
-                   const real* __restrict c, 
-                   const real* __restrict samples, 
-                   real* __restrict num,
-                   real* __restrict stt,
+compute_semblances(const real* __restrict__ h, 
+                   const real* __restrict__ c, 
+                   const real* __restrict__ samples, 
+                   real* __restrict__ num,
+                   real* __restrict__ stt,
                    int t_id0, 
                    int t_idf,
                    real _idt,
@@ -145,14 +135,12 @@ compute_semblances(const real* __restrict h,
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 __global__ void
-redux_semblances(const real* __restrict num, 
-                 const real* __restrict stt, 
-                 int*  __restrict ctr, 
-                 real* __restrict str, 
-                 real* __restrict stk,
+redux_semblances(const real* __restrict__ num, 
+                 const real* __restrict__ stt, 
+                 int*  __restrict__ ctr, 
+                 real* __restrict__ str, 
+                 real* __restrict__ stk,
                  const int nc, 
                  const int cdp_id,
                  const int ns) 
@@ -177,8 +165,6 @@ redux_semblances(const real* __restrict num,
     stk[cdp_id*ns + t0] = max_c > -1 ? stt[max_c] : 0;
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, const char** argv) {
 #ifdef SAVE
@@ -341,7 +327,7 @@ int main(int argc, const char** argv) {
    }
   }
   if (error)
-    LOG(INFO, "Test: FAILED");
+    LOG(INFO, "Test: FAIL");
   else
     LOG(INFO, "Test: PASS");
 

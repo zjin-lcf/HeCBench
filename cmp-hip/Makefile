@@ -68,4 +68,3 @@ clean:
 
 run: $(program)
 	./$(program) -c0 1.98e-7 -c1 1.77e-6 -nc 5 -aph 600 -tau 0.002 -v 2 -i ../cmp-cuda/data/simple-synthetic.su
-
