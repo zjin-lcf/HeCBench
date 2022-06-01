@@ -258,6 +258,9 @@ Early results are shown [here](results/README.md)
 ### dpid (cuda)
   Detail-preserving image downscaling (https://github.com/mergian/dpid)
 
+### dropout (cuda)
+  Randomly zero some elements of the input array with a probability using samples from a uniform distribution (https://github.com/pytorch/)
+
 ### dslash (sycl)
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
