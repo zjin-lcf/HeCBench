@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernel.h"
 
@@ -51,9 +52,17 @@ void contract (const int max_N, const int max_C, const int repeat) {
   dim3 dimGrid(rounded_division(output_size, nThreads));
   dim3 dimBlock(nThreads);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < repeat; i++)
     hipLaunchKernelGGL(contraction, dimGrid, dimBlock , 0, 0, 
       device_tensor_value, device_adj_value, device_value, output_size, max_N, max_C);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(value, device_value, output_size_byte, hipMemcpyDeviceToHost);
 
