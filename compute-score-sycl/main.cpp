@@ -36,10 +36,9 @@ using namespace aocl_utils;
 #define BLOOM_SIZE         14
 #define docEndingTag       0xFFFFFFFF
 
-
-
 // Params
 uint block_size = 64;
+uint repeat = 100;
 uint total_num_docs = 256*1024;
 uint total_doc_size = 0;
 uint total_doc_size_no_padding = 0;
@@ -267,142 +266,146 @@ ulong mulfp( ulong weight, uint freq )
 
 int main(int argc, char** argv)
 {
-   Options options(argc, argv);
-   // Optional argument to specify the problem size.
-   if(options.has("n")) {
-      total_num_docs = options.get<uint>("n");
-   }
-   printf("Total number of documents: %u\n", total_num_docs);
+  Options options(argc, argv);
+  // Optional argument to specify the problem size.
+  if(options.has("n")) {
+     total_num_docs = options.get<uint>("n");
+  }
+  printf("Total number of documents: %u\n", total_num_docs);
 
-   srand(2);
-   printf("RAND_MAX: %d\n", RAND_MAX);
-   printf("Allocating and setting up data\n");
-   setupData();
+  if(options.has("p")) {
+    repeat = options.get<uint>("p");
+  }
+  printf("Kernel execution count: %u\n", repeat);
 
-   printf("Setting up SYCL\n");
-   {
+  srand(2);
+  printf("RAND_MAX: %d\n", RAND_MAX);
+  printf("Allocating and setting up data\n");
+  setupData();
+
+  {
 #ifdef USE_GPU
-   gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-   cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-   queue q(dev_sel);
+  queue q(dev_sel);
 
-   size_t global_size = total_doc_size / 2 / MANUAL_VECTOR;
-   size_t local_size = (block_size / MANUAL_VECTOR); 
-   size_t global_size_reduction = total_num_docs;
-   size_t local_size_reduction = 1;
+  size_t global_size = total_doc_size / 2 / MANUAL_VECTOR;
+  size_t local_size = (block_size / MANUAL_VECTOR); 
+  size_t global_size_reduction = total_num_docs;
+  size_t local_size_reduction = 1;
 
-   buffer<uint, 1> d_docWordFrequencies_dimm1 (h_docWordFrequencies_dimm1, total_doc_size/2);
-   buffer<uint, 1> d_docWordFrequencies_dimm2 (h_docWordFrequencies_dimm2, total_doc_size/2);
-   buffer<uint, 1> d_partialSums_dimm1 (total_doc_size/(2*block_size));
-   buffer<uint, 1> d_partialSums_dimm2 (total_doc_size/(2*block_size));
-   buffer<ulong, 1> d_profileWeights_dimm1 (h_profileWeights, 1L << 24);
-   buffer<ulong, 1> d_profileWeights_dimm2 (h_profileWeights, 1L << 24);
-   buffer<uint, 1> d_isWordInProfileHash(h_isWordInProfileHash, 1L << BLOOM_SIZE);
-   buffer<ulong, 1> d_docInfo(h_docInfo, total_num_docs);
-   buffer<ulong, 1> d_profileScore(h_profileScore, total_num_docs);
+  buffer<uint, 1> d_docWordFrequencies_dimm1 (h_docWordFrequencies_dimm1, total_doc_size/2);
+  buffer<uint, 1> d_docWordFrequencies_dimm2 (h_docWordFrequencies_dimm2, total_doc_size/2);
+  buffer<uint, 1> d_partialSums_dimm1 (total_doc_size/(2*block_size));
+  buffer<uint, 1> d_partialSums_dimm2 (total_doc_size/(2*block_size));
+  buffer<ulong, 1> d_profileWeights_dimm1 (h_profileWeights, 1L << 24);
+  buffer<ulong, 1> d_profileWeights_dimm2 (h_profileWeights, 1L << 24);
+  buffer<uint, 1> d_isWordInProfileHash(h_isWordInProfileHash, 1L << BLOOM_SIZE);
+  buffer<ulong, 1> d_docInfo(h_docInfo, total_num_docs);
+  buffer<ulong, 1> d_profileScore(h_profileScore, total_num_docs);
 
-   const double start_time = getCurrentTimestamp();
-   for (int i=0; i<100; i++) {
-     q.submit([&] (handler &h) {
-       accessor<ulong, 1, sycl_read_write, access::target::local> partial (NUM_THREADS_PER_WG/MANUAL_VECTOR, h);
-       auto docWordFrequencies_dimm1 = d_docWordFrequencies_dimm1.get_access<sycl_read>(h);
-       auto docWordFrequencies_dimm2 = d_docWordFrequencies_dimm2.get_access<sycl_read>(h);
-       auto profileWeights_dimm1 = d_profileWeights_dimm1.get_access<sycl_read>(h);
-       auto profileWeights_dimm2 = d_profileWeights_dimm2.get_access<sycl_read>(h);
-       auto isWordInProfileHash = d_isWordInProfileHash.get_access<sycl_read>(h);
-       auto profileScorePerGroup_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_write>(h);
-       auto profileScorePerGroup_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_write>(h);
-       h.parallel_for<class compute>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
-         uint curr_entry[MANUAL_VECTOR];
-         uint word_id[MANUAL_VECTOR];
-         uint freq[MANUAL_VECTOR];
-         uint hash1[MANUAL_VECTOR];
-         uint hash2[MANUAL_VECTOR];
-         bool     is_end[MANUAL_VECTOR];
-         bool     make_access[MANUAL_VECTOR];
+  const double start_time = getCurrentTimestamp();
+  for (uint i=0; i<repeat; i++) {
+    q.submit([&] (handler &h) {
+      accessor<ulong, 1, sycl_read_write, access::target::local> partial (NUM_THREADS_PER_WG/MANUAL_VECTOR, h);
+      auto docWordFrequencies_dimm1 = d_docWordFrequencies_dimm1.get_access<sycl_read>(h);
+      auto docWordFrequencies_dimm2 = d_docWordFrequencies_dimm2.get_access<sycl_read>(h);
+      auto profileWeights_dimm1 = d_profileWeights_dimm1.get_access<sycl_read>(h);
+      auto profileWeights_dimm2 = d_profileWeights_dimm2.get_access<sycl_read>(h);
+      auto isWordInProfileHash = d_isWordInProfileHash.get_access<sycl_read>(h);
+      auto profileScorePerGroup_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_write>(h);
+      auto profileScorePerGroup_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_write>(h);
+      h.parallel_for<class compute>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+        uint curr_entry[MANUAL_VECTOR];
+        uint word_id[MANUAL_VECTOR];
+        uint freq[MANUAL_VECTOR];
+        uint hash1[MANUAL_VECTOR];
+        uint hash2[MANUAL_VECTOR];
+        bool     is_end[MANUAL_VECTOR];
+        bool     make_access[MANUAL_VECTOR];
 
-         ulong sum = 0;
-         //#pragma unroll
-         for (uint i=0; i<MANUAL_VECTOR; i++) {
-            curr_entry[i] = docWordFrequencies_dimm1[item.get_global_id(0)*MANUAL_VECTOR + i]; 
-            freq[i] = curr_entry[i] & 0xff;
-            word_id[i] = curr_entry[i] >> 8;
-            is_end[i] = curr_entry[i] == docEndingTag;
-            hash1[i] = word_id[i] >> BLOOM_1;
-            hash2[i] = word_id[i] & BLOOM_2;
-            make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-                                        && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
-            if (make_access[i]) {
-               sum += mulfp(profileWeights_dimm1[word_id[i]],freq[i]);
-            }
-         }
-
-         //#pragma unroll
-         for (uint i=0; i<MANUAL_VECTOR; i++) {
-            curr_entry[i] = docWordFrequencies_dimm2[item.get_global_id(0)*MANUAL_VECTOR + i]; 
-            freq[i] = curr_entry[i] & 0xff;
-            word_id[i] = curr_entry[i] >> 8;
-            is_end[i] = curr_entry[i] == docEndingTag;
-            hash1[i] = word_id[i] >> BLOOM_1;
-            hash2[i] = word_id[i] & BLOOM_2;
-            make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-                                        && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
-            if (make_access[i]) {
-               sum += mulfp(profileWeights_dimm2[word_id[i]],freq[i]);
-            }
-         }
-
-         partial[item.get_local_id(0)] = sum;
-         item.barrier(access::fence_space::local_space);
-
-         if (item.get_local_id(0) == 0) {
-            vec<ulong, 8> res;
-            res.load(0, partial.get_pointer());
-            ulong final_result = res.s0() + res.s1() + res.s2() + res.s3() +
-                                 res.s4() + res.s5() + res.s6() + res.s7();
-            profileScorePerGroup_highbits_dimm1[item.get_group(0)] = (uint) (final_result >> 32); 
-            profileScorePerGroup_lowbits_dimm2[item.get_group(0)] = (uint) (final_result & 0xFFFFFFFF); 
-         }
-       });
-     });
-
-     q.submit([&] (handler &h) {
-       auto docInfo = d_docInfo.get_access<sycl_read>(h);
-       auto partial_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_read>(h);
-       auto partial_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_read>(h);
-       auto result = d_profileScore.get_access<sycl_discard_write>(h);
-       h.parallel_for<class reduction>(nd_range<1>(global_size_reduction, local_size_reduction), [=] (nd_item<1> item) {
-        ulong info = docInfo[item.get_global_id(0)]; 
-        uint start = info >> 32;
-        uint end = info & 0xFFFFFFFF;
-
-        ulong total = 0;
-        //#pragma unroll 2
-        for (uint i=start; i<=end; i++) {
-           ulong upper = partial_highbits_dimm1[i];
-           ulong lower = partial_lowbits_dimm2[i];
-           ulong sum = (upper << 32) | lower;
-           total += sum;
+        ulong sum = 0;
+        //#pragma unroll
+        for (uint i=0; i<MANUAL_VECTOR; i++) {
+           curr_entry[i] = docWordFrequencies_dimm1[item.get_global_id(0)*MANUAL_VECTOR + i]; 
+           freq[i] = curr_entry[i] & 0xff;
+           word_id[i] = curr_entry[i] >> 8;
+           is_end[i] = curr_entry[i] == docEndingTag;
+           hash1[i] = word_id[i] >> BLOOM_1;
+           hash2[i] = word_id[i] & BLOOM_2;
+           make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+                                       && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           if (make_access[i]) {
+              sum += mulfp(profileWeights_dimm1[word_id[i]],freq[i]);
+           }
         }
 
-        result[item.get_global_id(0)] = total;
-       });
-     });
-   }
-   q.wait();
+        //#pragma unroll
+        for (uint i=0; i<MANUAL_VECTOR; i++) {
+           curr_entry[i] = docWordFrequencies_dimm2[item.get_global_id(0)*MANUAL_VECTOR + i]; 
+           freq[i] = curr_entry[i] & 0xff;
+           word_id[i] = curr_entry[i] >> 8;
+           is_end[i] = curr_entry[i] == docEndingTag;
+           hash1[i] = word_id[i] >> BLOOM_1;
+           hash2[i] = word_id[i] & BLOOM_2;
+           make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+                                       && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           if (make_access[i]) {
+              sum += mulfp(profileWeights_dimm2[word_id[i]],freq[i]);
+           }
+        }
 
-   const double end_time = getCurrentTimestamp();
-   double kernelExecutionTime = (end_time - start_time)/100;
-   printf("======================================================\n");
-   printf("Kernel Time = %f ms (averaged over 100 times)\n", kernelExecutionTime * 1000.0f );
-   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
+        partial[item.get_local_id(0)] = sum;
+        item.barrier(access::fence_space::local_space);
 
-   }
-   printf("Done\n");
+        if (item.get_local_id(0) == 0) {
+           vec<ulong, 8> res;
+           res.load(0, partial.get_pointer());
+           ulong final_result = res.s0() + res.s1() + res.s2() + res.s3() +
+                                res.s4() + res.s5() + res.s6() + res.s7();
+           profileScorePerGroup_highbits_dimm1[item.get_group(0)] = (uint) (final_result >> 32); 
+           profileScorePerGroup_lowbits_dimm2[item.get_group(0)] = (uint) (final_result & 0xFFFFFFFF); 
+        }
+      });
+    });
 
-   runOnCPU();
+    q.submit([&] (handler &h) {
+      auto docInfo = d_docInfo.get_access<sycl_read>(h);
+      auto partial_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_read>(h);
+      auto partial_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_read>(h);
+      auto result = d_profileScore.get_access<sycl_discard_write>(h);
+      h.parallel_for<class reduction>(nd_range<1>(global_size_reduction, local_size_reduction), [=] (nd_item<1> item) {
+       ulong info = docInfo[item.get_global_id(0)]; 
+       uint start = info >> 32;
+       uint end = info & 0xFFFFFFFF;
+
+       ulong total = 0;
+       //#pragma unroll 2
+       for (uint i=start; i<=end; i++) {
+          ulong upper = partial_highbits_dimm1[i];
+          ulong lower = partial_lowbits_dimm2[i];
+          ulong sum = (upper << 32) | lower;
+          total += sum;
+       }
+
+       result[item.get_global_id(0)] = total;
+      });
+    });
+  }
+  q.wait();
+
+  const double end_time = getCurrentTimestamp();
+  double kernelExecutionTime = (end_time - start_time)/repeat;
+  printf("======================================================\n");
+  printf("Kernel Time = %f ms (averaged over %d times)\n", kernelExecutionTime * 1000.0f, repeat );
+  printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
+
+  }
+  printf("Done\n");
+
+  runOnCPU();
 }
 
 

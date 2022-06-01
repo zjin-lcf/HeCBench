@@ -8,6 +8,7 @@ entitled "GNU Free Documentation License".
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define B ((int)32)
@@ -67,7 +68,10 @@ float candidateScore(int* decrMsg, float* scores) {
 
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 2) {
+    printf("Usage: %s <path to file>\n", argv[0]);
+    return 1;
+  }
   const char* filename = argv[1];
 
   int encryptedMap[ENCRYPTEDLEN];
@@ -91,10 +95,18 @@ int main(int argc, char* argv[]) {
 
   unsigned int* devStates;
   hipMalloc(&devStates, THREADS*sizeof(unsigned int));
+  
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   hipLaunchKernelGGL(setupKernel, dim3(B), dim3(T), 0, 0, devStates);
 
   hipLaunchKernelGGL(decode, dim3(B), dim3(T), 0, 0, d_scores, d_encrypted, devStates, d_decrypted);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time %f (s)\n", time * 1e-9f);
 
   hipMemcpy(decrypted, d_decrypted, sizeof(int)*ENCRYPTEDLEN*THREADS, hipMemcpyDeviceToHost);
 
