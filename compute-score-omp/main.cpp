@@ -36,10 +36,9 @@ using namespace aocl_utils;
 #define BLOOM_SIZE         14
 #define docEndingTag       0xFFFFFFFF
 
-
-
 // Params
 uint block_size = 64;
+uint repeat = 100;
 uint total_num_docs = 256*1024;
 uint total_doc_size = 0;
 uint total_doc_size_no_padding = 0;
@@ -277,12 +276,15 @@ int main(int argc, char** argv)
   }
   printf("Total number of documents: %u\n", total_num_docs);
 
+  if(options.has("p")) {
+    repeat = options.get<uint>("p");
+  }
+  printf("Kernel execution count: %u\n", repeat);
+
   srand(2);
   printf("RAND_MAX: %d\n", RAND_MAX);
   printf("Allocating and setting up data\n");
   setupData();
-
-  printf("Setting up OMP\n");
 
   size_t local_size = (block_size / MANUAL_VECTOR); 
   size_t global_size = total_doc_size / 2 / MANUAL_VECTOR / local_size;
@@ -312,13 +314,12 @@ int main(int argc, char** argv)
 
 {
   const double start_time = getCurrentTimestamp();
-  for (int i=0; i<100; i++) {
+  for (uint i=0; i<repeat; i++) {
     #pragma omp target teams num_teams(global_size) thread_limit(local_size) 
     {
        ulong partial[NUM_THREADS_PER_WG/MANUAL_VECTOR];
        #pragma omp parallel 
        {
-         //int gid = blockIdx.x * blockDim.x + threadIdx.x;
          int gid = omp_get_team_num() * omp_get_num_threads() + omp_get_thread_num();
      
          uint curr_entry[MANUAL_VECTOR];
@@ -390,9 +391,9 @@ int main(int argc, char** argv)
     }
   }
   const double end_time = getCurrentTimestamp();
-  double kernelExecutionTime = (end_time - start_time)/100;
+  double kernelExecutionTime = (end_time - start_time)/repeat;
   printf("======================================================\n");
-  printf("Kernel Time = %f ms (averaged over 100 times)\n", kernelExecutionTime * 1000.0f );
+  printf("Kernel Time = %f ms (averaged over %d times)\n", kernelExecutionTime * 1000.0f, repeat );
   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
 }
 

@@ -9,6 +9,7 @@ entitled "GNU Free Documentation License".
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #define B ((int)32)
@@ -68,7 +69,10 @@ float candidateScore(int* decrMsg, float* scores) {
 
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 2) {
+    printf("Usage: %s <path to file>\n", argv[0]);
+    return 1;
+  }
   const char* filename = argv[1];
 
   int encryptedMap[ENCRYPTEDLEN];
@@ -87,6 +91,8 @@ int main(int argc, char* argv[]) {
                         map(from: decrypted[0:ENCRYPTEDLEN * THREADS]) \
                         map(alloc: state[0:THREADS])
   {
+    auto start = std::chrono::steady_clock::now();
+
     #pragma omp target teams distribute parallel for thread_limit(T)
     for (int idx = 0; idx < THREADS; idx++) {
       state[idx] = idx;
@@ -102,6 +108,10 @@ int main(int argc, char* argv[]) {
         decodeKernel(scores, encryptedMap, state, decrypted, shared_scores);
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Kernel execution time %f (s)\n", time * 1e-9f);
   }
 
   int bestCandidate = 0;
