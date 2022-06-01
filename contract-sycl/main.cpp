@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include "common.h"
 
 const int nContractions = 18;  // the device kernel contains 18 cases
@@ -381,6 +382,9 @@ void contract (queue &q, const int max_N, const int max_C, const int repeat) {
   range<1> gws (rounded_division(output_size, nThreads) * nThreads);
   range<1> lws (nThreads);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto t = device_tensor_value.template get_access<sycl_read>(cgh);
@@ -391,6 +395,11 @@ void contract (queue &q, const int max_N, const int max_C, const int repeat) {
                     output_size, max_N, max_C);
       });
     });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = device_value.template get_access<sycl_read>(cgh);

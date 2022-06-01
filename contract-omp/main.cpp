@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <omp.h>
 
 const int nContractions = 18;  // the device kernel contains 18 cases
@@ -368,8 +369,14 @@ void contract (const int max_N, const int max_C, const int repeat) {
   #pragma omp target data map (to: tensor_value[0:tensor_size], adj_value[0:adj_size]) \
                           map (from: value[0:output_size])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for (int i = 0; i < repeat; i++)
       contraction(tensor_value, adj_value, value, output_size, max_N, max_C);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   double checksum = 0;
