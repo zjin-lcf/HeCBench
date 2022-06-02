@@ -123,35 +123,34 @@ isGreater(const float x, const float y)
   return x > y ? 1 : 0;
 }
 
-__global__ void
-d2q9_bgk( float* Speed0A,
-   const float* Speed1A,
-   const float* Speed2A,
-   const float* Speed3A,
-   const float* Speed4A,
-   const float* Speed5A,
-   const float* Speed6A,
-   const float* Speed7A,
-   const float* Speed8A,
-   float* Tmp0A,
-   float* Tmp1A,
-   float* Tmp2A,
-   float* Tmp3A,
-   float* Tmp4A,
-   float* Tmp5A,
-   float* Tmp6A,
-   float* Tmp7A,
-   float* Tmp8A,
-   const int* ObstaclesA,
-   float* Partial_Sum,
-   int* Partial_Sum2,
-   const float densityaccel,
-   const float omega,
-   const int nx,
-   const int ny,
-   const int tt)
+__global__ void d2q9_bgk(
+  const float* Speed0A,
+  const float* Speed1A,
+  const float* Speed2A,
+  const float* Speed3A,
+  const float* Speed4A,
+  const float* Speed5A,
+  const float* Speed6A,
+  const float* Speed7A,
+  const float* Speed8A,
+  float* Tmp0A,
+  float* Tmp1A,
+  float* Tmp2A,
+  float* Tmp3A,
+  float* Tmp4A,
+  float* Tmp5A,
+  float* Tmp6A,
+  float* Tmp7A,
+  float* Tmp8A,
+  const int* ObstaclesA,
+  float* Partial_Sum,
+  int* Partial_Sum2,
+  const float densityaccel,
+  const float omega,
+  const int nx,
+  const int ny,
+  const int tt)
 {
-
   //setup local memory
   __shared__ int local_sum2[LOCALSIZEX*LOCALSIZEY];
   __shared__ float local_sum[LOCALSIZEX*LOCALSIZEY];
@@ -383,7 +382,6 @@ int main(int argc, char* argv[])
     }
   }
 
-
   //start timer
   gettimeofday(&timstr, NULL);
   tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
@@ -597,7 +595,6 @@ int main(int argc, char* argv[])
 
   return EXIT_SUCCESS;
 }
-
 
 float av_velocity(const t_param params, t_speed* cells, int* obstacles)
 {
