@@ -11,13 +11,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 #include "conv.h"
 
 int main(int argc, char **argv)
 {
-  const unsigned int imageW = 3072;
-  const unsigned int imageH = 3072;
+  if (argc != 4) {
+    printf("Usage: %s <image width> <image height> <repeat>\n", argv[0]); 
+    return 1;
+  }
+  const unsigned int imageW = atoi(argv[1]);
+  const unsigned int imageH = atoi(argv[2]);
+  const int numIterations = atoi(argv[3]);
 
   float* h_Kernel    = (float*)malloc(KERNEL_LENGTH * sizeof(float));
   float* h_Input     = (float*)malloc(imageW * imageH * sizeof(float));
@@ -31,7 +37,6 @@ int main(int argc, char **argv)
 
   for(unsigned int i = 0; i < imageW * imageH; i++)
     h_Input[i] = (float)(rand() % 16);
-
 
   float* d_Kernel;
   cudaMalloc((void**)&d_Kernel, sizeof(float)*KERNEL_LENGTH);
@@ -47,7 +52,6 @@ int main(int argc, char **argv)
   float* d_Output;
   cudaMalloc((void**)&d_Output, sizeof(float)*imageW*imageH);
 
-
   //Just a single run or a warmup iteration
   convolutionRows(
       d_Buffer,
@@ -57,8 +61,6 @@ int main(int argc, char **argv)
       imageH,
       imageW);
 
-  cudaMemcpy(h_Buffer, d_Buffer, sizeof(float)*imageW * imageH, cudaMemcpyDeviceToHost);
-
   convolutionColumns(
       d_Output,
       d_Buffer,
@@ -67,9 +69,10 @@ int main(int argc, char **argv)
       imageH,
       imageW);
 
-  const int numIterations = 100;
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
-  for(int iter = 0; iter < numIterations; iter++){
+  for(int iter = 0; iter < numIterations; iter++) {
     convolutionRows(
         d_Buffer,
         d_Input,
@@ -86,6 +89,11 @@ int main(int argc, char **argv)
         imageH,
         imageW);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 
   cudaMemcpy(h_OutputGPU, d_Output, sizeof(float)*imageW * imageH, cudaMemcpyDeviceToHost);
 
