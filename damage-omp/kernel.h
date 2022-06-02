@@ -9,10 +9,10 @@
  */
 void damage_of_node(
   const int n,
-  const int *__restrict__ nlist,
-  const int *__restrict__ family,
-        int *__restrict__ n_neigh,
-     double *__restrict__ damage)
+  const int *__restrict nlist,
+  const int *__restrict family,
+        int *__restrict n_neigh,
+     double *__restrict damage)
 {
   #pragma omp target teams num_teams((n+BS-1)/BS) thread_limit(BS)
   {
