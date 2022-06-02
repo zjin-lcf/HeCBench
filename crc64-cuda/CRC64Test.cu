@@ -41,7 +41,6 @@
 #include <iostream>
 #include "CRC64.h"
 
-//using namespace std;
 int main(int argc, char *argv[]) {
   int ntests = 10;
   if (argc > 1) ntests = atoi(argv[1]);
@@ -111,4 +110,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-
