@@ -12,7 +12,6 @@
 #include "common.h"
 #include "DCT8x8.h"
 
-
 inline void DCT8(float *D){
     float X07P = D[0] + D[7];
     float X16P = D[1] + D[6];
@@ -68,12 +67,6 @@ inline void IDCT8(float *D){
     D[6] = C_norm * (Y04M2e6bMP - Y1c7dM3f5aPM);
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-// 8x8 DCT kernels
-////////////////////////////////////////////////////////////////////////////////
-
 void DCT8x8_kernel(
     nd_item<2> &item,
     global_ptr<float> d_Dst,
@@ -83,11 +76,11 @@ void DCT8x8_kernel(
     const unsigned int imageH,
     const unsigned int imageW
 ){
-    const unsigned int    localX = item.get_local_id(1); //get_local_id(0);
-    const unsigned int    localY = BLOCK_SIZE * item.get_local_id(0); //get_local_id(1);
+    const unsigned int    localX = item.get_local_id(1);
+    const unsigned int    localY = BLOCK_SIZE * item.get_local_id(0);
     const unsigned int modLocalX = localX & (BLOCK_SIZE - 1);
-    const unsigned int   globalX = item.get_group(1) * BLOCK_X + localX;//get_group_id(0) * BLOCK_X + localX;
-    const unsigned int   globalY = item.get_group(0) * BLOCK_Y + localY;//get_group_id(1) * BLOCK_Y + localY;
+    const unsigned int   globalX = item.get_group(1) * BLOCK_X + localX;
+    const unsigned int   globalY = item.get_group(0) * BLOCK_Y + localY;
 
     //Process only full blocks
     if( (globalX - modLocalX + BLOCK_SIZE - 1 >= imageW) || (globalY + BLOCK_SIZE - 1 >= imageH) )
@@ -125,11 +118,11 @@ void IDCT8x8_kernel(
     const unsigned int imageH,
     const unsigned int imageW
 ){
-    const unsigned int    localX = item.get_local_id(1); //get_local_id(0);
-    const unsigned int    localY = BLOCK_SIZE * item.get_local_id(0); //get_local_id(1);
+    const unsigned int    localX = item.get_local_id(1);
+    const unsigned int    localY = BLOCK_SIZE * item.get_local_id(0);
     const unsigned int modLocalX = localX & (BLOCK_SIZE - 1);
-    const unsigned int   globalX = item.get_group(1) * BLOCK_X + localX;//get_group_id(0) * BLOCK_X + localX;
-    const unsigned int   globalY = item.get_group(0) * BLOCK_Y + localY;//get_group_id(1) * BLOCK_Y + localY;
+    const unsigned int   globalX = item.get_group(1) * BLOCK_X + localX;
+    const unsigned int   globalY = item.get_group(0) * BLOCK_Y + localY;
 
     //Process only full blocks
     if( (globalX - modLocalX + BLOCK_SIZE - 1 >= imageW) || (globalY + BLOCK_SIZE - 1 >= imageH) )
