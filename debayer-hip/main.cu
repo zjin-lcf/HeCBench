@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "util.h"
-#include "../debayer-cuda/image.h"
-#include "../debayer-cuda/kernel.h"
+#include "image.h"
+#include "kernel.h"
 
 int main(int argc, char* argv[]) 
 {
@@ -44,13 +45,22 @@ int main(int argc, char* argv[])
   dim3 grids ((width + tile_cols - 1) / tile_cols, (height + tile_rows - 1) / tile_rows);
   dim3 blocks (tile_cols, tile_rows);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   //this version takes a tile (z=1) and each tile job does 4 line median sorts
   for (int i = 0; i < repeat; i++) 
-    hipLaunchKernelGGL(malvar_he_cutler_demosaic, grids, blocks, 0, 0, 
+    hipMemset(d_output, 0, output_image_size);
+    hipLaunchKernelGGL(malvar_he_cutler_demosaic, grids, blocks , 0, 0, 
       height, width, 
       d_input, input_image_pitch,
       d_output, output_image_pitch,
       bayer_pattern );
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
 
   hipMemcpy(output, d_output, output_image_size, hipMemcpyDeviceToHost);
 

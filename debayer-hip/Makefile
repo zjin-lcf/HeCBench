@@ -44,7 +44,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../debayer-sycl/util.h ../debayer-cuda/image.h ../debayer-cuda/kernel.h Makefile
+%.o: %.cu ../debayer-sycl/util.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -52,4 +52,3 @@ clean:
 
 run: $(program)
 	./$(program) 8192 8192 100
-
