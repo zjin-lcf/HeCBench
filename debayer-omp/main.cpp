@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <chrono>
 #include <omp.h>
 #include "util.h"
 #include "image.h"
@@ -39,15 +41,23 @@ int main(int argc, char* argv[])
 
   #pragma omp target data map(to: input[0:numPix]) map(from: output[0:numPix])
   {
+    auto start = std::chrono::steady_clock::now();
 
     //this version takes a tile (z=1) and each tile job does 4 line median sorts
-    for (int i = 0; i < repeat; i++) 
+    for (int i = 0; i < repeat; i++) {
+      memset(output, 0, output_image_size);
+      #pragma omp target update to(output[0:numPix])
       malvar_he_cutler_demosaic (
         teamX, teamY,
         height, width, 
         input, input_image_pitch,
         output, output_image_pitch,
         bayer_pattern );
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
   }
 
   long sum = 0;
