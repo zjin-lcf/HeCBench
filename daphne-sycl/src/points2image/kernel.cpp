@@ -367,7 +367,6 @@ void compute_point_from_pointcloud(
   {
     pid = py * w + px;
     cm_point = point.data[2] * 100.0;  // double precision multiply
-    //dpct::atomic_compare_exchange_strong((int *)&msg_distance[pid], 0, sycl::bit_cast<int>(cm_point));
     atomicCAS((int*)&msg_distance[pid], 0, sycl::bit_cast<int>(cm_point));
 
     //atomicFloatMin(&msg_distance[pid], cm_point);
@@ -389,7 +388,7 @@ void compute_point_from_pointcloud(
       atomicMax(*max_y, py);
       atomicMin(*min_y, py);
     }
-    msg_min_height[pid] = -1.25;
+    msg_min_height[pid] = -1.25f;
   }
 }
 
