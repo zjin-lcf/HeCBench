@@ -255,7 +255,7 @@ void points2image::init() {
 }
 
 /**
- * Improvised atomic min function for floats in Cuda
+ * Improvised atomic min function for floats
  * Does only work for positive values.
  */
 __device__ __forceinline__ float atomicFloatMin(float * addr, float value) {
@@ -263,7 +263,6 @@ __device__ __forceinline__ float atomicFloatMin(float * addr, float value) {
 }
 
 /** 
- * The Cuda kernel to execute.
  * Performs the transformation for a single point.
  * cp: pointer to cloud memory
  * msg_distance: image distances
@@ -362,7 +361,7 @@ __global__ void compute_point_from_pointcloud(
       atomicMax(max_y, py);
       atomicMin(min_y, py);
     }
-    msg_min_height[pid] = -1.25;
+    msg_min_height[pid] = -1.25f;
   }
 }
 
