@@ -12,8 +12,8 @@
 #include <omp.h>
 #include "DCT8x8.h"
 
-
 #pragma omp declare target
+
 inline void DCT8(float *D){
     float X07P = D[0] + D[7];
     float X16P = D[1] + D[6];
@@ -70,11 +70,6 @@ inline void IDCT8(float *D){
 }
 
 #pragma omp end declare target
-
-
-////////////////////////////////////////////////////////////////////////////////
-// 8x8 DCT kernels
-////////////////////////////////////////////////////////////////////////////////
 
 inline unsigned int iDivUp(unsigned int dividend, unsigned int divisor){
     return dividend / divisor + (dividend % divisor != 0);

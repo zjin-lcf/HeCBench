@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include 
+CFLAGS := -std=c++14 -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 
@@ -53,5 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
-
+	./$(program) 8192 8192 100
