@@ -36,6 +36,7 @@ Original author: Rodrigo de Barros Vimieiro
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 // thread block size
@@ -758,6 +759,8 @@ int main()
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
+  auto start = std::chrono::steady_clock::now();
+
   backprojectionDDb(
     h_pVolume,
     h_pProj,
@@ -771,6 +774,10 @@ int main()
     dx, dy, dz,
     du, dv,
     DSD, DDR, DAG);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("backprojectionDDb execution time %f (s)\n", time * 1e-9f);
   
   double checkSum = 0;
   for (size_t i = 0; i < pixVol; i++)
