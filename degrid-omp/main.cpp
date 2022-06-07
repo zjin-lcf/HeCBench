@@ -53,7 +53,6 @@ void degridCPU(PRECISION2 *out, PRECISION2 *in, PRECISION2 *img, PRECISION2 *gcf
   gcf -= GCF_DIM*(GCF_DIM+1)/2;
 }
 
-
 template <class T,class Thalf>
 int w_comp_sub(const void* A, const void* B) {
   Thalf quota, rema, quotb, remb;
