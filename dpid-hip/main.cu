@@ -17,9 +17,10 @@ struct Params {
   uint32_t oHeight;
   uint32_t iWidth;
   uint32_t iHeight;
-  float pWidth;
-  float pHeight;
-  float lambda;
+     float pWidth;
+     float pHeight;
+     float lambda;
+  uint32_t repeat;
 };
 
 double LCG_random_double(uint64_t * seed)
@@ -33,11 +34,10 @@ double LCG_random_double(uint64_t * seed)
 
 void run(const Params& i, const void* hInput, void* hOutput);
 
-//-------------------------------------------------------------------
 int main(int argc, char** argv) {
   // generate a random image for testing
-  if(argc != 4) {
-    printf("Usage: %s <width> <height> <lambda>\n", argv[0]);
+  if(argc != 5) {
+    printf("Usage: %s <width> <height> <lambda> <repeat>\n", argv[0]);
     exit(1);
   }
 
@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
   p.oWidth = (uint32_t)std::atoi(argv[1]);
   p.oHeight = (uint32_t)std::atoi(argv[2]);
   p.lambda = (float)std::atof(argv[3]);
+  p.repeat = (uint32_t)std::atoi(argv[4]);
 
   // check params
   if(p.oWidth == 0 && p.oHeight == 0) {
