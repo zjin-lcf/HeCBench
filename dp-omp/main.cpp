@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "shrUtils.h"
 
 // Forward Declarations
@@ -26,7 +27,12 @@ void DotProductHost(const float* pfData1, const float* pfData2, float* pfResult,
 
 int main(int argc, char **argv)
 {
-  int iNumElements = atoi(argv[1]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int iNumElements = atoi(argv[1]);
+  const int iNumIterations = atoi(argv[2]);
 
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
@@ -47,7 +53,9 @@ int main(int argc, char **argv)
   #pragma omp target data map(to: srcA[0:szGlobalWorkSize * 4], srcB[0:szGlobalWorkSize * 4]) \
                           map(from: dst[0:szGlobalWorkSize])
   {
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < iNumIterations; i++) {
       #pragma omp target teams distribute parallel for thread_limit(szLocalWorkSize)
       for (int iGID = 0; iGID < iNumElements; iGID++) {
         int iInOffset = iGID << 2;
@@ -57,6 +65,10 @@ int main(int argc, char **argv)
                    + srcA[iInOffset + 3] * srcB[iInOffset + 3];
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
   }
 
   // Compute and compare results for golden-host and report errors and pass/fail
