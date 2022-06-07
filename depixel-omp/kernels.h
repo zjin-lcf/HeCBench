@@ -20,13 +20,13 @@ inline float saturatef(float v)
 inline uint rgbToyuv(float3 rgba)
 {
   float3 yuv;
-  yuv.x = 0.29900f*rgba.x + 0.58700f*rgba.y+0.11400f*rgba.z;
-  yuv.y = 0.71300f*(rgba.x - yuv.x) + 0.500f;
-  yuv.z = 0.56400f*(rgba.z - yuv.x) + 0.500f;
+  yuv.x = 0.299f*rgba.x + 0.587f*rgba.y+0.114f*rgba.z;
+  yuv.y = 0.713f*(rgba.x - yuv.x) + 0.5f;
+  yuv.z = 0.564f*(rgba.z - yuv.x) + 0.5f;
   yuv.x = saturatef(yuv.x);
   yuv.y = saturatef(yuv.y);
   yuv.z = saturatef(yuv.z);
-  return (uint(255)<<24) | (uint(yuv.z*255.0f) << 16) | (uint(yuv.y*255.0f) << 8) | uint(yuv.x*255.0f);
+  return (uint(255)<<24) | (uint(yuv.z*255.f) << 16) | (uint(yuv.y*255.f) << 8) | uint(yuv.x*255.f);
 }
 
 // If two node's YUV difference is larger than either 48 for Y, 7 for U or 6 for V.
@@ -139,7 +139,10 @@ void eliminate_crosses(
 
     if ((row<h-1) && (column<w-1))
     {
-      od[center] = (id[center]&0x08)>>3 | (((id[center+w+1]&0x02)>>1)<<1) | (((id[center+w+1]&0x80)>>7)<<2) | (((id[center]&0x20)>>5)<<3);
+      od[center] = (id[center]&0x08)>>3 |
+                   ((id[center+w+1]&0x02)>>1)<<1 |
+                   ((id[center+w+1]&0x80)>>7)<<2 |
+                   ((id[center]&0x20)>>5)<<3;
 
       if ((id[center]&0x10 && id[center+1]&0x40))
       {
