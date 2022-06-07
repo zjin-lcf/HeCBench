@@ -1,12 +1,12 @@
 #include "dslash.h"
 
 __global__ void make_back(
-    const su3_matrix* d_fat,
-    const su3_matrix* d_lng,
-    const size_t* d_bck, 
-    const size_t* d_bck3,
-          su3_matrix* d_fatbck,
-          su3_matrix* d_lngbck,
+    const su3_matrix*__restrict__ d_fat,
+    const su3_matrix*__restrict__ d_lng,
+    const size_t*__restrict__ d_bck, 
+    const size_t*__restrict__ d_bck3,
+          su3_matrix*__restrict__ d_fatbck,
+          su3_matrix*__restrict__ d_lngbck,
     const int total_even_sites)
 {
   size_t mySite = blockIdx.x * blockDim.x + threadIdx.x;
@@ -21,16 +21,16 @@ __global__ void make_back(
 }
 
 __global__ void dslash (
-    const su3_matrix* d_fat,
-    const su3_matrix* d_lng,
-    const su3_matrix* d_fatbck,
-    const su3_matrix* d_lngbck,
-    const su3_vector* d_src,
-          su3_vector* d_dst,
-    const size_t* d_fwd,
-    const size_t* d_bck,
-    const size_t* d_fwd3,
-    const size_t* d_bck3,
+    const su3_matrix*__restrict__ d_fat,
+    const su3_matrix*__restrict__ d_lng,
+    const su3_matrix*__restrict__ d_fatbck,
+    const su3_matrix*__restrict__ d_lngbck,
+    const su3_vector*__restrict__ d_src,
+          su3_vector*__restrict__ d_dst,
+    const size_t*__restrict__ d_fwd,
+    const size_t*__restrict__ d_bck,
+    const size_t*__restrict__ d_fwd3,
+    const size_t*__restrict__ d_bck3,
     const int total_even_sites)
 {
   size_t mySite = blockIdx.x * blockDim.x + threadIdx.x;
@@ -164,7 +164,7 @@ double dslash_fn(
     std::cout << "Setting workgroup size to " << wgsize << std::endl;
   }
   auto tstart = Clock::now();
-  for (int iters=0; iters<iterations+warmups; ++iters) {
+  for (size_t iters=0; iters<iterations+warmups; ++iters) {
     if (iters == warmups) {
       cudaDeviceSynchronize();
       tstart = Clock::now();
