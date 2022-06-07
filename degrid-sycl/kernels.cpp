@@ -1,3 +1,5 @@
+#include <chrono>
+
 // Forward declarations
 template <typename CmplxType>
 class degrid;
@@ -80,6 +82,9 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   range<2> gws(8, NPOINTS);
   range<2> lws(8, 32);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < REPEAT; n++) {
     q.submit([&] (handler &cgh) {
       auto out = d_out.template get_access<sycl_discard_write>(cgh);
@@ -98,6 +103,11 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / REPEAT << " (s)\n";
 
   q.submit([&] (handler &cgh) {
     auto acc = d_out.template get_access<sycl_read>(cgh);

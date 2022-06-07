@@ -1,3 +1,5 @@
+#include <chrono>
+
 template <typename CmplxType>
 void
 degrid_kernel(CmplxType* __restrict out, 
@@ -8,7 +10,7 @@ degrid_kernel(CmplxType* __restrict out,
               const CmplxType* __restrict gcf)
 {
 
-#pragma omp target teams distribute num_teams(NPOINTS/32) thread_limit(256)
+  #pragma omp target teams distribute num_teams(NPOINTS/32) thread_limit(256)
   for(size_t n=0; n<NPOINTS; n++) {
     int sub_x = floorf(GCF_GRID*(in[n].x-floorf(in[n].x)));
     int sub_y = floorf(GCF_GRID*(in[n].y-floorf(in[n].y)));
@@ -50,6 +52,8 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
                                  in[0:NPOINTS]) \
                           map(from:out[0:NPOINTS])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for (int n = 0; n < REPEAT; n++) {
       // GCF_DIM is at least 32
       degrid_kernel(out, in, NPOINTS,
@@ -57,6 +61,9 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
                     IMG_SIZE,
                     gcf + GCF_DIM*(GCF_DIM+1)/2);
     }
-  }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time " << (time * 1e-9f) / REPEAT << " (s)\n";
+  }
 }
