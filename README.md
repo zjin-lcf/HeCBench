@@ -51,6 +51,9 @@ Early results are shown [here](results/README.md)
 ### all-pairs-distance (cuda)
   All-pairs distance calculation (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2910913/)
 
+### alp (cuda)
+  Associated Legendre polynomials (https://github.com/mstsuite/lsms)
+
 ### amgmk (openmp)
   The relax kernel in the AMGmk benchmark (https://asc.llnl.gov/CORAL-benchmarks/Micro/amgmk-v1.0.tar.gz)
   
