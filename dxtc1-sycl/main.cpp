@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
+#include <chrono>
 #include "dds.h"
 #include "permutations.h"
 #include "block.h"
@@ -30,6 +31,18 @@
 
 int main(int argc, char** argv) 
 {
+  if (argc != 4) {
+    printf("Usage: %s <path to image> <path to reference image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const char* image_path = argv[1];
+  assert(image_path != NULL);
+
+  const char* reference_image_path = argv[2];
+  assert(reference_image_path != NULL);
+
+  const int numIterations = atoi(argv[3]);
+
   unsigned int width, height;
   unsigned int* h_img = NULL;
   const float alphaTable4[4] = {9.0f, 0.0f, 6.0f, 3.0f};
@@ -38,8 +51,6 @@ int main(int argc, char** argv)
   const int prods3[4] = {0x040000, 0x000400, 0x040101, 0x010401};
 
   // load image 
-  const char* image_path = argv[1];
-  assert(image_path != NULL);
   shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height);
   assert(h_img != NULL);
   printf("Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
@@ -68,9 +79,7 @@ int main(int argc, char** argv)
   const unsigned int compressedSize = (width / 4) * (height / 4) * 8;
   unsigned int * h_result = (unsigned int*)malloc(compressedSize);
 
-
-{
-
+  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -109,8 +118,10 @@ int main(int argc, char** argv)
   printf("\n%u Workgroups, %u Work Items per Workgroup, %u Work Items in NDRange...\n\n", 
       blocks, NUM_THREADS, blocks * NUM_THREADS);
 
-  int numIterations = 100;
-  for (int i = -1; i < numIterations; ++i) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < numIterations; ++i) {
     for( int j=0; j<blocks; j+= blocksPerLaunch ) {
 
       szGlobalWorkSize = MIN( blocksPerLaunch, blocks-j ) * NUM_THREADS;
@@ -159,6 +170,11 @@ int main(int argc, char** argv)
       });
     }
   }
+  
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 }
   
   // Write DDS file.
@@ -206,9 +222,6 @@ int main(int argc, char** argv)
 
   // Make sure the generated image matches the reference image (regression check)
   printf("\nComparing against Host/C++ computation...\n");     
-  //const char* reference_image_path = shrFindFilePath(refimage_filename, argv[0]);
-  //assert(reference_image_path != NULL);
-  const char* reference_image_path = argv[2];
 
   // read in the reference image from file
 #ifdef WIN32
@@ -238,7 +251,7 @@ int main(int argc, char** argv)
       if (cmp != 0.0f) 
       {
         compareBlock(((BlockDXT1 *)h_result) + resultBlockIdx, ((BlockDXT1 *)reference) + referenceBlockIdx);
-        printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
+        //printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
       }
       rms += cmp;
     }
