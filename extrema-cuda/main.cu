@@ -13,9 +13,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
-__host__ __device__ __forceinline__ void clip_plus( const bool &clip, const int &n, int &plus ) {
+__host__ __device__ __forceinline__
+void clip_plus( const bool &clip, const int &n, int &plus ) {
   if ( clip ) {
     if ( plus >= n ) {
       plus = n - 1;
@@ -27,7 +29,8 @@ __host__ __device__ __forceinline__ void clip_plus( const bool &clip, const int 
   }
 }
 
-__host__ __device__ __forceinline__ void clip_minus( const bool &clip, const int &n, int &minus ) {
+__host__ __device__ __forceinline__
+void clip_minus( const bool &clip, const int &n, int &minus ) {
   if ( clip ) {
     if ( minus < 0 ) {
       minus = 0;
@@ -43,14 +46,14 @@ __host__ __device__ __forceinline__ void clip_minus( const bool &clip, const int
 //                          BOOLRELEXTREMA 1D                                //
 ///////////////////////////////////////////////////////////////////////////////
 
-  template<typename T>
-__global__ void relextrema_1D( const int  n,
-    const int  order,
-    const bool clip,
-    const T *__restrict__ inp,
-    bool *__restrict__ results)
+template<typename T>
+__global__ void relextrema_1D(
+  const int  n,
+  const int  order,
+  const bool clip,
+  const T *__restrict__ inp,
+  bool *__restrict__ results)
 {
-
   const int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = blockDim.x * gridDim.x;
 
@@ -73,14 +76,14 @@ __global__ void relextrema_1D( const int  n,
   }
 }
 
-  template<typename T>
-void cpu_relextrema_1D( const int  n,
-    const int  order,
-    const bool clip,
-    const T *__restrict__ inp,
-    bool *__restrict__ results)
+template<typename T>
+void cpu_relextrema_1D(
+  const int  n,
+  const int  order,
+  const bool clip,
+  const T *__restrict__ inp,
+  bool *__restrict__ results)
 {
-
   for ( int tid = 0; tid < n; tid++ ) {
 
     const T data = inp[tid];
@@ -101,16 +104,16 @@ void cpu_relextrema_1D( const int  n,
 }
 
 
-  template<typename T>
-__global__ void relextrema_2D( const int  in_x,
-    const int  in_y,
-    const int  order,
-    const bool clip,
-    const int  axis,
-    const T *__restrict__ inp,
-    bool *__restrict__ results) 
+template<typename T>
+__global__ void relextrema_2D(
+  const int  in_x,
+  const int  in_y,
+  const int  order,
+  const bool clip,
+  const int  axis,
+  const T *__restrict__ inp,
+  bool *__restrict__ results) 
 {
-
   const int ty = blockIdx.x * blockDim.x + threadIdx.x;
   const int tx = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -153,13 +156,14 @@ __global__ void relextrema_2D( const int  in_x,
 }
 
 template<typename T>
-void cpu_relextrema_2D( const int  in_x,
-    const int  in_y,
-    const int  order,
-    const bool clip,
-    const int  axis,
-    const T *__restrict__ inp,
-    bool *__restrict__ results) 
+void cpu_relextrema_2D(
+  const int  in_x,
+  const int  in_y,
+  const int  order,
+  const bool clip,
+  const int  axis,
+  const T *__restrict__ inp,
+  bool *__restrict__ results) 
 {
   for (int tx = 0; tx < in_y; tx++)
     for (int ty = 0; ty < in_x; ty++) {
@@ -202,7 +206,8 @@ void cpu_relextrema_2D( const int  in_x,
 }
 
 template <typename T>
-void test_1D (const int length, const int order, const bool clip) 
+void test_1D (const int length, const int order, const bool clip,
+              const int repeat, const char* type) 
 {
   T* x = (T*) malloc (sizeof(T)*length);
   for (int i = 0; i < length; i++)
@@ -220,8 +225,17 @@ void test_1D (const int length, const int order, const bool clip)
   dim3 grids ((length+255)/256);
   dim3 threads (256);
 
-  for (int n = 0; n < 100; n++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     relextrema_1D<T><<<grids, threads>>>(length, order, clip, d_x, d_result);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average 1D kernel (type = %s, order = %d, clip = %d) execution time %f (s)\n", 
+         type, order, clip, (time * 1e-9f) / repeat);
 
   cudaMemcpy(gpu_r, d_result, length*sizeof(bool), cudaMemcpyDeviceToHost);
 
@@ -244,7 +258,7 @@ void test_1D (const int length, const int order, const bool clip)
 
 template <typename T>
 void test_2D (const int length_x, const int length_y, const int order,
-              const bool clip, const int axis) 
+              const bool clip, const int axis, const int repeat, const char* type) 
 {
   const int length = length_x * length_y;
   T* x = (T*) malloc (sizeof(T)*length);
@@ -263,8 +277,17 @@ void test_2D (const int length_x, const int length_y, const int order,
   dim3 grids ((length_x+15)/16, (length_y+15)/16);
   dim3 threads (16, 16);
 
-  for (int n = 0; n < 100; n++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     relextrema_2D<<<grids, threads>>>(length_x, length_y, order, clip, axis, d_x, d_result);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average 2D kernel (type = %s, order = %d, clip = %d, axis = %d) execution time %f (s)\n", 
+         type, order, clip, axis, (time * 1e-9f) / repeat);
 
   cudaMemcpy(gpu_r, d_result, length*sizeof(bool), cudaMemcpyDeviceToHost);
 
@@ -285,29 +308,33 @@ void test_2D (const int length_x, const int length_y, const int order,
   if (error) printf("2D test: FAILED\n");
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage ./%s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_1D<int>(1000000, order, true);
-    test_1D<long>(1000000, order, true);
-    test_1D<float>(1000000, order, true);
-    test_1D<double>(1000000, order, true);
+    test_1D<   int>(1000000, order, true, repeat, "int");
+    test_1D<  long>(1000000, order, true, repeat, "long");
+    test_1D< float>(1000000, order, true, repeat, "float");
+    test_1D<double>(1000000, order, true, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<int>(1000, 1000, order, true, 1);
-    test_2D<long>(1000, 1000, order, true, 1);
-    test_2D<float>(1000, 1000, order, true, 1);
-    test_2D<double>(1000, 1000, order, true, 1);
+    test_2D<   int>(1000, 1000, order, true, 1, repeat, "int");
+    test_2D<  long>(1000, 1000, order, true, 1, repeat, "long");
+    test_2D< float>(1000, 1000, order, true, 1, repeat, "float");
+    test_2D<double>(1000, 1000, order, true, 1, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<int>(1000, 1000, order, true, 0);
-    test_2D<long>(1000, 1000, order, true, 0);
-    test_2D<float>(1000, 1000, order, true, 0);
-    test_2D<double>(1000, 1000, order, true, 0);
+    test_2D<   int>(1000, 1000, order, true, 0, repeat, "int");
+    test_2D<  long>(1000, 1000, order, true, 0, repeat, "long");
+    test_2D< float>(1000, 1000, order, true, 0, repeat, "float");
+    test_2D<double>(1000, 1000, order, true, 0, repeat, "double");
   }
 
   return 0;
 }
-
