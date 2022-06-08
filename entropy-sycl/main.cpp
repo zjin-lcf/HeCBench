@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "reference.h"
 
@@ -46,12 +47,13 @@ void entropy(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
   const int width = atoi(argv[1]); 
   const int height = atoi(argv[2]); 
+  const int repeat = atoi(argv[3]); 
 
   const int input_bytes = width * height * sizeof(char);
   const int output_bytes = width * height * sizeof(float);
@@ -78,7 +80,10 @@ int main(int argc, char* argv[]) {
   range<2> gws ((height+15)/16*16, (width+15)/16*16);
   range<2> lws (16, 16);
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto in = d_input.get_access<sycl_read>(cgh);
       auto out = d_output.get_access<sycl_discard_write>(cgh);
@@ -87,11 +92,19 @@ int main(int argc, char* argv[]) {
       });
     });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (baseline) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   float logTable[26];
   for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
   buffer<float, 1> d_logTable (logTable, 26);
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto input = d_input.get_access<sycl_read>(cgh);
       auto logTable = d_logTable.get_access<sycl_read>(cgh);
@@ -125,6 +138,12 @@ int main(int argc, char* argv[]) {
         if(y < height && x < width) output[y*width+x] = entropy;
       });
     });
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (optimized) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   }
 
   // verify

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "reference.h"
 
@@ -82,12 +83,13 @@ __global__ void entropy_opt(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
   const int width = atoi(argv[1]); 
   const int height = atoi(argv[2]); 
+  const int repeat = atoi(argv[3]); 
 
   const int input_bytes = width * height * sizeof(char);
   const int output_bytes = width * height * sizeof(float);
@@ -111,10 +113,16 @@ int main(int argc, char* argv[]) {
   dim3 blocks (16, 16);
 
   // baseline kernel
-  for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(entropy, grids, blocks, 0, 0, d_output, d_input, height, width);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(entropy, grids, blocks , 0, 0, d_output, d_input, height, width);
 
-  hipMemcpy(output, d_output, output_bytes, hipMemcpyDeviceToHost);
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (baseline) execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // optimized kernel
 
@@ -124,9 +132,17 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_logTable, sizeof(logTable));
   hipMemcpy(d_logTable, logTable, sizeof(logTable), hipMemcpyHostToDevice);
  
-  for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(entropy_opt<16, 16>), dim3(grids), dim3(blocks ),
-      0, 0, d_output, d_input, d_logTable, height, width);
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(entropy_opt<16, 16>), grids, blocks , 0, 0, d_output, d_input, d_logTable, height, width);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (optimized) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   hipMemcpy(output, d_output, output_bytes, hipMemcpyDeviceToHost);
 
   hipFree(d_input);

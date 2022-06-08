@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "reference.h"
 
@@ -96,12 +97,13 @@ void entropy_opt(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
   const int width = atoi(argv[1]); 
   const int height = atoi(argv[2]); 
+  const int repeat = atoi(argv[3]); 
 
   const int input_bytes = width * height * sizeof(char);
   const int output_bytes = width * height * sizeof(float);
@@ -120,11 +122,23 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map(to: input[0:width*height], logTable[0:26]) \
                           map(from: output[0:width*height])
   {
-    for (int i = 0; i < 100; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       entropy(output, input, height, width);
 
-    for (int i = 0; i < 100; i++)
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel (baseline) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       entropy_opt<16, 16>(output, input, logTable, height, width);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel (optimized) execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verify
