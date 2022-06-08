@@ -14,10 +14,11 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-#include <cstdlib>
-#include <vector>
-#include <iostream>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <vector>
 #include "common.h"
 
 #include "reference.h"
@@ -190,7 +191,6 @@ int main(int argc, char * argv[])
   // store the diagonal elements of the matrix
   buffer<float, 1> diagonalBuffer (diagonal, length); 
 
-
   // store the number of eigenvalues in each interval
   buffer<uint, 1> numEigenValuesIntervalBuffer (length); 
 
@@ -217,15 +217,15 @@ int main(int argc, char * argv[])
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
-        in
-        );
-
+        in);
   }
 
   std::cout << "Executing kernel for " << iterations
             << " iterations" << std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   for(int i = 0; i < iterations; i++)
   {
@@ -238,12 +238,15 @@ int main(int argc, char * argv[])
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
-        in
-        );
+        in);
   }
 
-  // VerifyResults
-  uint offset = 0;
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  // Verify results
   for(int i = 0 ; i < 2; ++i)
   {
     verificationEigenIntervals[i] = (float *) malloc(eigenIntervalsSizeBytes);
@@ -266,10 +269,9 @@ int main(int argc, char * argv[])
     verificationEigenIntervals[verificationIn][i] = upperLimit;
   }
 
-
   while(isComplete(verificationEigenIntervals[verificationIn], length, tolerance))
   {
-    offset = eigenValueCPUReference(diagonal,offDiagonal, length,
+    eigenValueCPUReference(diagonal,offDiagonal, length,
         verificationEigenIntervals[verificationIn],
         verificationEigenIntervals[1-verificationIn],
         tolerance);
@@ -280,11 +282,11 @@ int main(int argc, char * argv[])
   if(compare(eigenIntervals[in], 
              verificationEigenIntervals[verificationIn], 2*length))
   {
-    std::cout<<"Passed!\n" << std::endl;
+    std::cout<<"PASS\n" << std::endl;
   }
   else
   {
-    std::cout<<"Failed\n" << std::endl;
+    std::cout<<"FAIL\n" << std::endl;
   }
 
   // release program resources

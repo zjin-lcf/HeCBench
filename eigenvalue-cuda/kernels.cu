@@ -18,8 +18,8 @@ __device__
 float calNumEigenValuesLessThan(
    const float x, 
    const uint width, 
-   const float *diagonal, 
-   const float *offDiagonal)
+   const float *__restrict__ diagonal, 
+   const float *__restrict__ offDiagonal)
 {
   uint count = 0;
 
@@ -37,10 +37,10 @@ float calNumEigenValuesLessThan(
 
 __global__
 void calNumEigenValueInterval(
-    uint  * numEigenIntervals,
-    const float * eigenIntervals,
-    const float * diagonal, 
-    const float * offDiagonal,
+    uint  *__restrict__ numEigenIntervals,
+    const float *__restrict__ eigenIntervals,
+    const float *__restrict__ diagonal, 
+    const float *__restrict__ offDiagonal,
     const uint     width)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,11 +55,11 @@ void calNumEigenValueInterval(
 
 __global__
 void recalculateEigenIntervals(
-          float * newEigenIntervals,
-    const float * eigenIntervals,
-    const uint  * numEigenIntervals,
-    const float * diagonal,
-    const float * offDiagonal,
+          float *__restrict__ newEigenIntervals,
+    const float *__restrict__ eigenIntervals,
+    const uint  *__restrict__ numEigenIntervals,
+    const float *__restrict__ diagonal,
+    const float *__restrict__ offDiagonal,
     const    uint    width,  
     const    float   tolerance)
 {
@@ -110,4 +110,3 @@ void recalculateEigenIntervals(
     newEigenIntervals[upperId] = newEigenIntervals[lowerId] + divisionWidth;
   }  
 }
-
