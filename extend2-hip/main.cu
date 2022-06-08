@@ -24,7 +24,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+#include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "read_data.h"
 
@@ -37,7 +38,7 @@ typedef struct {
   int h, e;
 } eh_t;
 
-  __global__ void
+__global__ void
 kernel_extend2(
     const unsigned char* query,
     const unsigned char* target,
@@ -62,7 +63,6 @@ kernel_extend2(
     const int zdrop, 
     const int h0)
 {
-
   int oe_del = o_del + e_del;
   int oe_ins = o_ins + e_ins; 
   int i, j, k;
@@ -172,8 +172,7 @@ kernel_extend2(
   *score_acc = max;
 }
 
-
-void extend2(struct extend2_dat *d)
+float extend2(struct extend2_dat *d)
 {
   eh_t *eh = NULL; /* score array*/
   char *qp = NULL; /* query profile*/
@@ -195,6 +194,7 @@ void extend2(struct extend2_dat *d)
   const int zdrop = d->zdrop;
   const int h0 = d->h0;
 
+  auto start = std::chrono::steady_clock::now();
 
   unsigned char *d_query;
   hipMalloc((void**)&d_query, qlen);
@@ -234,8 +234,7 @@ void extend2(struct extend2_dat *d)
   int *d_score;
   hipMalloc((void**)&d_score, 4);
 
-
-  hipLaunchKernelGGL(kernel_extend2, dim3(1), dim3(1), 0, 0, 
+  hipLaunchKernelGGL(kernel_extend2, 1, 1, 0, 0, 
       d_query,
       d_target,
       d_mat,
@@ -278,6 +277,9 @@ void extend2(struct extend2_dat *d)
   hipFree(d_max_off);
   hipFree(d_score);
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   check(d->qle, qle, "qle");
   check(d->tle, tle, "tle");
   check(d->gtle, gtle, "gtle");
@@ -292,11 +294,17 @@ void extend2(struct extend2_dat *d)
   printf("device: qle=%d, tle=%d, gtle=%d, gscore=%d, max_off=%d, score=%d\n",
       qle, tle, gtle, gscore, max_off, score);
 #endif
+
+ return time;
 }
 
 int main(int argc, char *argv[])
 {
-  int iterations = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  int repeat = atoi(argv[1]);
 
   struct extend2_dat d;
 
@@ -305,9 +313,11 @@ int main(int argc, char *argv[])
 #include "filelist.txt"
   };
 
-  for (int f = 0; f < iterations; f++) {
+  float time = 0.f;
+  for (int f = 0; f < repeat; f++) {
     read_data(files[f%17], &d);
-    extend2(&d);
+    time += extend2(&d);
   }
+  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
   return 0;
 }
