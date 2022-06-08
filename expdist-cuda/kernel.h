@@ -145,4 +145,3 @@ void reduce_cross_term(
 
   if (tx == 0) output[0] = sum;
 }
-
