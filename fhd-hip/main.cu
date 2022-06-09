@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define CHUNK_S 4096
@@ -116,19 +117,28 @@ int main(int argc, char* argv[]) {
   int c = CHUNK_S;
   int s = sizeof(kdata) * c;
   int nchunks = (voxels + c - 1) / c;
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < nchunks; i++) {
     if (i == nchunks - 1) {
       c = voxels - CHUNK_S * i;
       s = sizeof(kdata) * c;
     }
     hipMemcpyToSymbol(HIP_SYMBOL(k), &h_k[i * CHUNK_S], s);
-    hipLaunchKernelGGL(cmpfhd, dim3(grid), dim3(block), 0, 0, 
+    hipLaunchKernelGGL(cmpfhd, grid, block, 0, 0, 
        d_rmu + i*CHUNK_S,
        d_imu + i*CHUNK_S, 
        d_rfhd, d_ifhd, 
        d_x, d_y, d_z, 
        samples, c);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device execution time %f (s)\n", time * 1e-9f);
 
   hipMemcpy(rfhd, d_rfhd, sampleSize, hipMemcpyDeviceToHost);
   hipMemcpy(ifhd, d_ifhd, sampleSize, hipMemcpyDeviceToHost);
