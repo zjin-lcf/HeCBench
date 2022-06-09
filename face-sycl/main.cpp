@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "image.h"
 #include "stdio-wrapper.h"
 #include "haar.h"
@@ -82,7 +83,13 @@ int main (int argc, char *argv[])
 
   printf("-- detecting faces --\r\n");
 
+  auto start = std::chrono::steady_clock::now();
+
   result = detectObjects(image, minSize, maxSize, cascade, scaleFactor, minNeighbours, total_nodes);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Object detection time %f (s)\n", time * 1e-9f);
 
   for(unsigned int i = 0; i < result.size(); i++ )
   {

@@ -40,10 +40,8 @@ static int *tree_thresh_array;
 static int *stages_thresh_array;
 static int **scaled_rectangles_array;
 
-
 int clock_counter = 0;
 float n_features = 0;
-
 
 int iter_counter = 0;
 
@@ -70,7 +68,6 @@ inline  int  myRound( float value )
 std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize, myCascade* cascade,
     float scaleFactor, int minNeighbors, int total_nodes)
 {
-
   /* group overlaping windows */
   const float GROUP_EPS = 0.4f;
   /* pointer to input image */
@@ -222,7 +219,6 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   hipFree(d_rectangles_array);
 #endif
   return allCandidates;
-
 }
 
 /***********************************************
@@ -263,9 +259,9 @@ unsigned int int_sqrt (unsigned int value)
 
 #ifdef GPU
 __global__ 
-void filter_kernel (const int*__restrict d_rectangles_array, 
-                    int**__restrict d_scaled_rectangles_array, 
-                    int*__restrict data, int width, int total_nodes)
+void filter_kernel (const int*__restrict__ d_rectangles_array, 
+                    int**__restrict__ d_scaled_rectangles_array, 
+                    int*__restrict__ data, int width, int total_nodes)
 {
   int gid = blockDim.x * blockIdx.x + threadIdx.x;
   if (gid >= total_nodes) return;
@@ -299,7 +295,6 @@ void filter_kernel (const int*__restrict d_rectangles_array,
   }   /* end of k loop */
 }
 #endif
-
 
 void setImageForCascadeClassifier( myCascade* _cascade, MyIntImage* _sum, MyIntImage* _sqsum, 
 #ifdef GPU
@@ -396,7 +391,6 @@ void setImageForCascadeClassifier( myCascade* _cascade, MyIntImage* _sum, MyIntI
 #endif
 }
 
-
 /****************************************************
  * evalWeakClassifier:
  * the actual computation of a haar filter.
@@ -405,7 +399,6 @@ void setImageForCascadeClassifier( myCascade* _cascade, MyIntImage* _sum, MyIntI
  ***************************************************/
 inline int evalWeakClassifier(int variance_norm_factor, int p_offset, int tree_index, int w_index, int r_index )
 {
-
   /* the node threshold is multiplied by the standard deviation of the image */
   int t = tree_thresh_array[tree_index] * variance_norm_factor;
 
@@ -433,14 +426,10 @@ inline int evalWeakClassifier(int variance_norm_factor, int p_offset, int tree_i
     return alpha2_array[tree_index];
   else
     return alpha1_array[tree_index];
-
 }
-
-
 
 int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
 {
-
   int p_offset, pq_offset;
   int i, j;
   unsigned int mean;
@@ -540,10 +529,8 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
   return 1;
 }
 
-
 void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int sum_col, std::vector<MyRect>& _vec)
 {
-
   myCascade* cascade = _cascade;
 
   float factor = _factor;
@@ -670,7 +657,6 @@ void integralImages( MyImage *src, MyIntImage *sum, MyIntImage *sqsum )
  **********************************************************/
 void nearestNeighbor (MyImage *src, MyImage *dst)
 {
-
   int y;
   int j;
   int x;
@@ -842,7 +828,6 @@ int readTextClassifier()
   fclose(fp);
   return total_nodes;
 }
-
 
 void releaseTextClassifier()
 {
