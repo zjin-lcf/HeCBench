@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 #define NUM_OF_BLOCKS 1024
@@ -61,16 +62,15 @@ half half_max(const half a, const half b) {
 
 template <typename T>
 void hmax(nd_item<1> &item,
-          T const *__restrict__ const a,
-          T const *__restrict__ const b,
-          T *__restrict__ const r,
+          T const *__restrict const a,
+          T const *__restrict const b,
+          T *__restrict const r,
           const size_t size)
 {
   for (size_t i = item.get_global_id(0);
               i < size; i += item.get_local_range(0) * item.get_group_range(0))
     r[i] = half_max(a[i], b[i]);
 }
-
 
 void generateInput(half2 * a, size_t size)
 {
@@ -86,6 +86,12 @@ void generateInput(half2 * a, size_t size)
 // compute the maximum of two values
 int main(int argc, char *argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
   half2 * a, *b, *r;
@@ -113,8 +119,11 @@ int main(int argc, char *argv[])
   range<1> gws (NUM_OF_BLOCKS * NUM_OF_THREADS);
   range<1> lws (NUM_OF_THREADS);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   // run hmax2
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto a = d_a.get_access<sycl_read>(cgh);
       auto b = d_b.get_access<sycl_read>(cgh);
@@ -123,6 +132,11 @@ int main(int argc, char *argv[])
         hmax<half2>(item, a.get_pointer(), b.get_pointer(), r.get_pointer(), size);
       });
     });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (max_half2) execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // verify
   q.submit([&] (handler &cgh) {
@@ -143,15 +157,17 @@ int main(int argc, char *argv[])
       break;
     }
   }
-  printf("fp16_hmax2 %s\n", ok ?  "PASSED" : "FAILED");
-
+  printf("fp16_hmax2 %s\n", ok ?  "PASS" : "FAIL");
 
   // run hmax (the size is doubled)
   auto d_a_re = d_a.reinterpret<half>(range<1>(2*size));
   auto d_b_re = d_b.reinterpret<half>(range<1>(2*size));
   auto d_r_re = d_r.reinterpret<half>(range<1>(2*size));
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto a = d_a_re.get_access<sycl_read>(cgh);
       auto b = d_b_re.get_access<sycl_read>(cgh);
@@ -160,6 +176,10 @@ int main(int argc, char *argv[])
         hmax<half>(item, a.get_pointer(), b.get_pointer(), r.get_pointer(), size*2);
       });
     });
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (max_half) execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // verify
   q.submit([&] (handler &cgh) {
@@ -181,7 +201,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  printf("fp16_hmax %s\n", ok ?  "PASSED" : "FAILED");
+  printf("fp16_hmax %s\n", ok ?  "PASS" : "FAIL");
 
   free(a);
   free(b);

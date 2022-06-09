@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
+#include <cuda.h>
 #include <cuda_fp16.h>
 
 #define NUM_OF_BLOCKS 1024
@@ -53,6 +55,12 @@ void generateInput(half2 * a, size_t size)
 // compute the maximum of two values
 int main(int argc, char *argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
   half2 * a, *b, *r;
@@ -74,11 +82,18 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   cudaMemcpy(d_b, b, size*sizeof(half2), cudaMemcpyHostToDevice);
 
-
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   // run hmax2
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     hmax<half2><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       d_a, d_b, d_r, size);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // verify
   cudaMemcpy(r, d_r, size*sizeof(half2), cudaMemcpyDeviceToHost);
@@ -96,13 +111,20 @@ int main(int argc, char *argv[])
       break;
     }
   }
-  printf("fp16_hmax2 %s\n", ok ?  "PASSED" : "FAILED");
+  printf("fp16_hmax2 %s\n", ok ?  "PASS" : "FAIL");
 
-
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+  
   // run hmax (the size is doubled)
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     hmax<half><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       (half*)d_a, (half*)d_b, (half*)d_r, size*2);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // verify
   ok = true;
@@ -119,7 +141,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  printf("fp16_hmax %s\n", ok ?  "PASSED" : "FAILED");
+  printf("fp16_hmax %s\n", ok ?  "PASS" : "FAIL");
 
   cudaFree(d_a);
   cudaFree(d_b);
