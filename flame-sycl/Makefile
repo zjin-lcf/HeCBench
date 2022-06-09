@@ -56,6 +56,10 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DUMP),yes)
+  CFLAGS += -DDUMP
+endif
+
 ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
@@ -73,4 +77,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 1000

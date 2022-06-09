@@ -34,11 +34,16 @@
 #define AFFINE_PRE(a, b) const_mem_params.pre_transform_params[a][b]
 #define AFFINE_POST(a, b) const_mem_params.post_transform_params[a][b]
 
-
 #include "kernels.cu"
 
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   printf("reset parameters..\n");
   ConstMemParams const_mem_params;
   float function_weights[NUM_FUNCTIONS];
@@ -150,8 +155,9 @@ int main(int argc, char **argv)
   printf("entering mainloop\n");
   struct timeval tv, tv2;
   gettimeofday(&tv, NULL);
+
   int perm_pos = 0;
-  for (int n = 0; n < 100; n++) { // while (running)
+  for (int n = 0; n < repeat; n++) {
     float sum = 0.0f;
     for(int i = 0; i < NUM_FUNCTIONS; i++)
       sum += function_weights[i];
@@ -194,17 +200,21 @@ int main(int argc, char **argv)
     perm_pos += NUM_POINTS_PER_THREAD - 1;
     perm_pos %= NUM_PERMUTATIONS;
   }
+
   gettimeofday(&tv2, NULL);
   float frametime = (tv2.tv_sec - tv.tv_sec) * 1000000 + tv2.tv_usec - tv.tv_usec;
   printf("Total frame time is %.1f us\n", frametime);
 
+  #ifdef DUMP
   // dump vertices
   float3 *pixels = new float3[NUM_POINTS_PER_THREAD * NUM_THREADS];
   cudaMemcpy(pixels, vertices, NUM_POINTS_PER_THREAD * NUM_THREADS * sizeof(float3), cudaMemcpyDeviceToHost);
+
   for (int i = 0; i < NUM_POINTS_PER_THREAD * NUM_THREADS; i++)
     printf("%d x=%.1f y=%.1f color=%.1f\n", i, pixels[i].x, pixels[i].y, pixels[i].z);
 
   delete[] pixels;
+  #endif
 
   cudaFree(start_points);
   cudaFree(short_points);

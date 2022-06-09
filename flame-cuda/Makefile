@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+DUMP      = no
 
 #===============================================================================
 # Program name & source code list
@@ -34,12 +35,14 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DUMP),yes)
+  CFLAGS += -DDUMP
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -54,5 +57,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
-
+	./$(program) 1000
