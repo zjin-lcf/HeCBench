@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cmath>
+#include <chrono>
 #include <omp.h>
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
@@ -58,10 +59,11 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
     // Execute the FDTD
     shrLog(" GPU FDTD loop\n");
 
-#pragma omp target data map(to: bufferIn[0:paddedVolumeSize], \
-                                bufferOut[0:paddedVolumeSize], \
-                                coeff[0:radius+1]) 
-{
+    #pragma omp target data map(to: bufferIn[0:paddedVolumeSize], \
+                                    bufferOut[0:paddedVolumeSize], \
+                                    coeff[0:radius+1]) 
+    {
+    auto start = std::chrono::steady_clock::now();
 
     for (int it = 0 ; it < timesteps ; it++)
     {
@@ -179,8 +181,14 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
       bufferIn = bufferOut;
       bufferOut = tmp;
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / timesteps);
+
     #pragma omp target update from (bufferIn[0:paddedVolumeSize])
-}
+    }
+
     memcpy(output, bufferIn+padding, volumeSize*sizeof(float));
     free(bufferIn);
     free(bufferOut);

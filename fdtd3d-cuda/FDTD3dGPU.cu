@@ -11,12 +11,17 @@
 
 #include <iostream>
 #include <algorithm>
+#include <chrono>
+#include <cuda.h>
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
-#include <cuda.h>
 
-__global__ void finite_difference(float *output, const float* input, const float* coef, 
-                                  const int dimx, const int dimy, const int dimz, const int padding)
+__global__ void finite_difference(
+        float*__restrict__ output,
+  const float*__restrict__ input,
+  const float*__restrict__ coef, 
+  const int dimx, const int dimy, const int dimz,
+  const int padding)
 {
   bool valid = true;
   const int gtidx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -151,7 +156,6 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
   cudaMalloc((void**)&bufferCoef, (radius+1) * sizeof(float));
   cudaMemcpy(bufferCoef, coeff, (radius+1) * sizeof(float), cudaMemcpyHostToDevice);
 
-
   // Set the maximum work group size
   size_t maxWorkSize = 256;
 
@@ -172,9 +176,12 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
   // Copy the input to the device output buffer (actually only need the halo)
   cudaMemcpy(bufferOut + padding, input, volumeSize * sizeof(float), cudaMemcpyHostToDevice);
 
-
   // Execute the FDTD
   shrLog(" GPU FDTD loop\n");
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int it = 0 ; it < timesteps ; it++)
   {
     // Launch the kernel
@@ -185,6 +192,11 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
     bufferIn = bufferOut;
     bufferOut = tmp;
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / timesteps);
 
   // Read the result back, result is in bufferSrc (after final toggle)
   cudaMemcpy(output, bufferIn + padding, volumeSize * sizeof(float), cudaMemcpyDeviceToHost);

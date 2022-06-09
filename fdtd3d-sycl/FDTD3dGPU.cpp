@@ -11,9 +11,10 @@
 
 #include <iostream>
 #include <algorithm>
+#include <chrono>
+#include "common.h"
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
-#include "common.h"
 
 bool fdtdGPU(float *output, const float *input, const float *coeff, 
              const int dimx, const int dimy, const int dimz, const int radius, 
@@ -43,7 +44,6 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
     buffer<float, 1> bufferIn (paddedVolumeSize);
     buffer<float, 1> bufferCoef (coeff, radius+1);
 
-
     // Get the maximum work group size
     size_t userWorkSize = 256;
 
@@ -72,6 +72,10 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
       
     // Execute the FDTD
     shrLog(" GPU FDTD loop\n");
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     for (int it = 0 ; it < timesteps ; it++)
     {
         // Launch the kernel
@@ -192,12 +196,16 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
       bufferOut = std::move(tmp);
     }
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / timesteps);
+
     // Read the result back, result is in bufferSrc (after final toggle)
     q.submit([&] (handler &cgh) {
       auto src = bufferIn.get_access<sycl_read>(cgh, volumeSize, padding);
       cgh.copy(src, output);
-    });
-    q.wait();
+    }).wait();
 
     return ok;
 }

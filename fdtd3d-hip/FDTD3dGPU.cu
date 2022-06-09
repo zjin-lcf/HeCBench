@@ -11,12 +11,17 @@
 
 #include <iostream>
 #include <algorithm>
+#include <chrono>
+#include <hip/hip_runtime.h>
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
-#include <hip/hip_runtime.h>
 
-__global__ void finite_difference(float *output, const float* input, const float* coef, 
-                                  const int dimx, const int dimy, const int dimz, const int padding)
+__global__ void finite_difference(
+        float*__restrict__ output,
+  const float*__restrict__ input,
+  const float*__restrict__ coef, 
+  const int dimx, const int dimy, const int dimz,
+  const int padding)
 {
   bool valid = true;
   const int gtidx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -151,7 +156,6 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
   hipMalloc((void**)&bufferCoef, (radius+1) * sizeof(float));
   hipMemcpy(bufferCoef, coeff, (radius+1) * sizeof(float), hipMemcpyHostToDevice);
 
-
   // Set the maximum work group size
   size_t maxWorkSize = 256;
 
@@ -172,19 +176,27 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
   // Copy the input to the device output buffer (actually only need the halo)
   hipMemcpy(bufferOut + padding, input, volumeSize * sizeof(float), hipMemcpyHostToDevice);
 
-
   // Execute the FDTD
   shrLog(" GPU FDTD loop\n");
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int it = 0 ; it < timesteps ; it++)
   {
     // Launch the kernel
-    hipLaunchKernelGGL(finite_difference, dim3(grid), dim3(block), 0, 0, bufferOut, bufferIn, bufferCoef, dimx, dimy, dimz, padding);
+    hipLaunchKernelGGL(finite_difference, grid, block, 0, 0, bufferOut, bufferIn, bufferCoef, dimx, dimy, dimz, padding);
 
     // Toggle the buffers
     float* tmp = bufferIn;
     bufferIn = bufferOut;
     bufferOut = tmp;
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / timesteps);
 
   // Read the result back, result is in bufferSrc (after final toggle)
   hipMemcpy(output, bufferIn + padding, volumeSize * sizeof(float), hipMemcpyDeviceToHost);
