@@ -38,7 +38,7 @@ https://cs.txstate.edu/~burtscher/research/ECL-APSP/.
 #include <cstdio>
 #include <limits>
 #include <sys/time.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include "graph.h"
 
 using mtype = int;
@@ -120,11 +120,11 @@ void FW0_64(
 
     mtype ik_a, ik_b;
     if (k < ws) {
-      ik_a = __shfl_sync(~0, ij_aa, k);
-      ik_b = __shfl_sync(~0, ij_ba, k);
+      ik_a = __shfl(ij_aa, k, ws);
+      ik_b = __shfl(ij_ba, k, ws);
     } else {
-      ik_a = __shfl_sync(~0, ij_ab, k - ws);
-      ik_b = __shfl_sync(~0, ij_bb, k - ws);
+      ik_a = __shfl(ij_ab, k - ws, ws);
+      ik_b = __shfl(ij_bb, k - ws, ws);
     }
 
     const mtype kr_a = krow[idx2_a];
@@ -280,12 +280,12 @@ void FWrowcol_64(
     for (int k = 0; k < tile; k++) {
       mtype ik_a, ik_b;
       if (k < ws) {
-        ik_a = __shfl_sync(~0, ij_aa, k);
-        ik_b = __shfl_sync(~0, ij_ba, k);
+        ik_a = __shfl(ij_aa, k, ws);
+        ik_b = __shfl(ij_ba, k, ws);
       }
       if (k >= ws) {
-        ik_a = __shfl_sync(~0, ij_ab, k - ws);
-        ik_b = __shfl_sync(~0, ij_bb, k - ws);
+        ik_a = __shfl(ij_ab, k - ws, ws);
+        ik_b = __shfl(ij_bb, k - ws, ws);
       }
       const mtype kr_a = krows[idx2_a];
       const mtype kr_b = krows[idx2_b];
@@ -413,12 +413,12 @@ void FWrem_64(
 
       mtype ik_a, ik_b;
       if (k < ws) {
-        ik_a = __shfl_sync(~0, ij_aa, k);
-        ik_b = __shfl_sync(~0, ij_ba, k);
+        ik_a = __shfl(ij_aa, k, ws);
+        ik_b = __shfl(ij_ba, k, ws);
       }
       else {
-        ik_a = __shfl_sync(~0, ij_ab, k - ws);
-        ik_b = __shfl_sync(~0, ij_bb, k - ws);
+        ik_a = __shfl(ij_ab, k - ws, ws);
+        ik_b = __shfl(ij_bb, k - ws, ws);
       }
 
       const mtype sk_a = s_kj[idx2_a];
@@ -459,27 +459,27 @@ static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
 {
   // copy graph to GPU
   ECLgraph d_g = g;
-  cudaMalloc((void **)&d_g.nindex, sizeof(int) * (g.nodes + 1));
-  cudaMalloc((void **)&d_g.nlist, sizeof(int) * g.edges);
-  cudaMalloc((void **)&d_g.eweight, sizeof(int) * g.edges);
-  cudaMemcpy(d_g.nindex, g.nindex, sizeof(int) * (g.nodes + 1), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_g.nlist, g.nlist, sizeof(int) * g.edges, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_g.eweight, g.eweight, sizeof(int) * g.edges, cudaMemcpyHostToDevice);
+  hipMalloc((void **)&d_g.nindex, sizeof(int) * (g.nodes + 1));
+  hipMalloc((void **)&d_g.nlist, sizeof(int) * g.edges);
+  hipMalloc((void **)&d_g.eweight, sizeof(int) * g.edges);
+  hipMemcpy(d_g.nindex, g.nindex, sizeof(int) * (g.nodes + 1), hipMemcpyHostToDevice);
+  hipMemcpy(d_g.nlist, g.nlist, sizeof(int) * g.edges, hipMemcpyHostToDevice);
+  hipMemcpy(d_g.eweight, g.eweight, sizeof(int) * g.edges, hipMemcpyHostToDevice);
 
   // allocate GPU memory
   const int sub = (g.nodes + tile - 1) / tile;
 
   const int upper = sub * tile; // upper bound of the GPU matrix
   mtype* d_AdjMat;
-  if (cudaSuccess != cudaMalloc((void **)&d_AdjMat, sizeof(mtype) * upper * upper))
+  if (hipSuccess != hipMalloc((void **)&d_AdjMat, sizeof(mtype) * upper * upper))
     fprintf(stderr, "ERROR: could not allocate memory\n");
 
   mtype* d_krows;
-  if (cudaSuccess != cudaMalloc((void **)&d_krows, sizeof(mtype) * upper * upper))
+  if (hipSuccess != hipMalloc((void **)&d_krows, sizeof(mtype) * upper * upper))
     fprintf(stderr, "ERROR: could not allocate memory\n");
 
   mtype* d_kcols;
-  if (cudaSuccess != cudaMalloc((void **)&d_kcols, sizeof(mtype) * upper * upper))
+  if (hipSuccess != hipMalloc((void **)&d_kcols, sizeof(mtype) * upper * upper))
     fprintf(stderr, "ERROR: could not allocate memory\n");
 
   printf("GPU matrix size: %.1f MB\n", sizeof(mtype) * upper * upper / (1024.0 * 1024.0));
@@ -491,7 +491,7 @@ static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
   init1<<<(upper * upper + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(g.nodes, d_AdjMat, upper);
   init2<<<(g.nodes + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(d_g, d_AdjMat, upper);
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   gettimeofday(&end, NULL);
   const double inittime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
   printf("FW_64 gpu init time: %10.6f s\n", inittime);
@@ -500,30 +500,30 @@ static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
   gettimeofday(&start, NULL);
 
   // compute 64*64 tile
-  FW0_64<<<1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols);
+  hipLaunchKernelGGL(FW0_64, 1, ThreadsPerBlock, 0, 0, d_AdjMat, upper, d_krows, d_kcols);
 
   if (sub > 1) {
     for (int x = 0; x < sub; x++) {
-      FWrowcol_64<<<2 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
-      FWrem_64<<<subm1 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
+      hipLaunchKernelGGL(FWrowcol_64, 2 * subm1, ThreadsPerBlock, 0, 0, d_AdjMat, upper, d_krows, d_kcols, x, subm1);
+      hipLaunchKernelGGL(FWrem_64, subm1 * subm1, ThreadsPerBlock, 0, 0, d_AdjMat, upper, d_krows, d_kcols, x, subm1);
     }
   }
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   gettimeofday(&end, NULL);
   const double comptime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
   printf("FW_64 gpu comp time: %10.6f s\n", comptime);
 
   // copy result back to CPU
-  if (cudaSuccess != cudaMemcpy(AdjMat, d_AdjMat, sizeof(mtype) * upper * upper, cudaMemcpyDeviceToHost))
+  if (hipSuccess != hipMemcpy(AdjMat, d_AdjMat, sizeof(mtype) * upper * upper, hipMemcpyDeviceToHost))
     fprintf(stderr, "ERROR: copying from device failed\n");
 
   // clean up
-  cudaFree(d_g.nindex);
-  cudaFree(d_g.nlist);
-  cudaFree(d_g.eweight);
-  cudaFree(d_AdjMat);
-  cudaFree(d_krows);
-  cudaFree(d_kcols);
+  hipFree(d_g.nindex);
+  hipFree(d_g.nlist);
+  hipFree(d_g.eweight);
+  hipFree(d_AdjMat);
+  hipFree(d_krows);
+  hipFree(d_kcols);
 }
 
 static void FW_cpu(const ECLgraph g, mtype* const AdjMat)

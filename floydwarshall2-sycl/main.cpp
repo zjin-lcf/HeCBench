@@ -47,7 +47,7 @@ static const int tile = 64; // tile size
 static const int TPB = ws * ws; // threads per block is fixed at 1024
 
 // initialize adj matrix
-static void init1(const int nodes, mtype* const __restrict AdjMat, const int upper,
+static void init1(const int nodes, mtype* const AdjMat, const int upper,
                   sycl::nd_item<1> &item)
 {
   const int idx = item.get_global_id(0);
@@ -59,7 +59,7 @@ static void init1(const int nodes, mtype* const __restrict AdjMat, const int upp
 }
 
 // add edges to adj matrix
-static void init2(const ECLgraph g, mtype* const __restrict AdjMat, const int upper,
+static void init2(const ECLgraph g, mtype* const AdjMat, const int upper,
                   sycl::nd_item<1> &item)
 {
   const int i = item.get_global_id(0);
