@@ -500,6 +500,9 @@ Early results are shown [here](results/README.md)
 ### layout (opencl)
   AoS and SoA comparison (https://github.com/OpenCL/AMD_APP_samples)
 
+### lci (c)
+  Landau collisional integral (https://github.com/vskokov/Landau_Collisional_Integral)
+
 ### lda (cuda)
   Latent Dirichlet allocation (https://github.com/js1010/cusim)
 
