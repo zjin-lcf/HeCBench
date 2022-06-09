@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <chrono>
 #include "common.h"
 
 #define NUM_OF_BLOCKS 1024
@@ -113,6 +114,12 @@ void generateInput(half2 *a, size_t size)
 
 int main(int argc, char *argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
 #ifdef USE_GPU
@@ -137,7 +144,10 @@ int main(int argc, char *argv[])
   range<1> gws (NUM_OF_BLOCKS * NUM_OF_THREADS);
   range<1> lws (NUM_OF_THREADS);
 
-  for (int i = 0; i < 10000; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&](handler &cgh) {
       auto a = d_a.get_access<sycl_read>(cgh); 
       auto b = d_b.get_access<sycl_read>(cgh); 
@@ -153,6 +163,11 @@ int main(int argc, char *argv[])
         });
       });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   q.submit([&](handler &cgh) {
     auto acc = d_r.get_access<sycl_read>(cgh); 
     cgh.copy(acc, r);
@@ -165,7 +180,10 @@ int main(int argc, char *argv[])
   }
   printf("Result intrinsics\t: %f \n", result_intrinsics);
 
-  for (int i = 0; i < 10000; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     q.submit([&](handler &cgh) {
       auto a = d_a.get_access<sycl_read>(cgh); 
       auto b = d_b.get_access<sycl_read>(cgh); 
@@ -181,6 +199,11 @@ int main(int argc, char *argv[])
         });
       });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   q.submit([&](handler &cgh) {
     auto acc = d_r.get_access<sycl_read>(cgh); 
     cgh.copy(acc, r);
@@ -194,7 +217,7 @@ int main(int argc, char *argv[])
   printf("Result native operators\t: %f \n", result_native);
 
   printf("fp16ScalarProduct %s\n", (fabs(result_intrinsics - result_native) < 0.00001) ? 
-      "PASSED" : "FAILED");
+         "PASS" : "FAIL");
 
   free(a);
   free(b);
