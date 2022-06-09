@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #define CHUNK_S 4096
@@ -61,6 +62,8 @@ int main(int argc, char* argv[]) {
                         map(tofrom: rfhd[0:samples],\
                                     ifhd[0:samples])
 {
+  auto start = std::chrono::steady_clock::now();
+
   #pragma omp target teams distribute parallel for
   for (int n = 0; n < samples; n++) {
     float r = rfhd[n];
@@ -80,6 +83,10 @@ int main(int argc, char* argv[]) {
     rfhd[n] = r;
     ifhd[n] = i;   
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device execution time %f (s)\n", time * 1e-9f);
 }
   
   printf("Computing root mean square error between host and device results.\n");
@@ -123,5 +130,4 @@ int main(int argc, char* argv[]) {
   free(h_z);
 
   return 0;
-   
 }

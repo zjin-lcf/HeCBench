@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 #define CHUNK_S 4096
@@ -8,7 +9,6 @@
 typedef struct {
   float x, y, z;
 } kdata;
-
 
 void cmpfhd(const float*__restrict rmu, 
             const float*__restrict imu,
@@ -110,6 +110,10 @@ int main(int argc, char* argv[]) {
 
   int c = CHUNK_S;
   int nchunks = (voxels + c - 1) / c;
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < nchunks; i++) {
     if (i == nchunks - 1) {
       c = voxels - CHUNK_S * i;
@@ -118,7 +122,7 @@ int main(int argc, char* argv[]) {
     q.submit([&] (handler &cgh) {
       auto acc = d_k.get_access<sycl_discard_write>(cgh, range<1>(c));
       cgh.copy(&h_k[i * CHUNK_S], acc);
-    });
+    }).wait();
 
     q.submit([&] (handler &cgh) {
       auto rmu = d_rmu.get_access<sycl_read>(cgh, range<1>(c), id<1>(i*CHUNK_S));
@@ -143,6 +147,11 @@ int main(int argc, char* argv[]) {
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device execution time %f (s)\n", time * 1e-9f);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_rfhd.get_access<sycl_read>(cgh);

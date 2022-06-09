@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 #define CHUNK_S 4096
@@ -12,13 +13,13 @@ typedef struct {
 __constant__ kdata k[CHUNK_S];
 
 __global__
-void cmpfhd(const float*__restrict rmu, 
-            const float*__restrict imu,
-                  float*__restrict rfhd,
-                  float*__restrict ifhd,
-            const float*__restrict x, 
-            const float*__restrict y,
-            const float*__restrict z,
+void cmpfhd(const float*__restrict__ rmu, 
+            const float*__restrict__ imu,
+                  float*__restrict__ rfhd,
+                  float*__restrict__ ifhd,
+            const float*__restrict__ x, 
+            const float*__restrict__ y,
+            const float*__restrict__ z,
             const int samples,
             const int voxels) 
 {
@@ -116,12 +117,17 @@ int main(int argc, char* argv[]) {
   int c = CHUNK_S;
   int s = sizeof(kdata) * c;
   int nchunks = (voxels + c - 1) / c;
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < nchunks; i++) {
     if (i == nchunks - 1) {
       c = voxels - CHUNK_S * i;
       s = sizeof(kdata) * c;
     }
     cudaMemcpyToSymbol(k, &h_k[i * CHUNK_S], s);
+
     cmpfhd<<<grid, block>>>(
        d_rmu + i*CHUNK_S,
        d_imu + i*CHUNK_S, 
@@ -129,6 +135,11 @@ int main(int argc, char* argv[]) {
        d_x, d_y, d_z, 
        samples, c);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device execution time %f (s)\n", time * 1e-9f);
 
   cudaMemcpy(rfhd, d_rfhd, sampleSize, cudaMemcpyDeviceToHost);
   cudaMemcpy(ifhd, d_ifhd, sampleSize, cudaMemcpyDeviceToHost);
