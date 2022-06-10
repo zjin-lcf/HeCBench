@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <chrono>
 #include "common.h"
 
 // Thread block size
@@ -224,6 +226,9 @@ void fluidSim (
   range<2> lws (1, groupSize);
   range<2> gws (dims[1], dims[0]); 
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; ++i) {
     q.submit([&] (handler &cgh) {
       auto if0 = d_if0.get_access<sycl_read>(cgh);
@@ -263,6 +268,11 @@ void fluidSim (
     d_if1234 = std::move(temp1234);
     d_if5678 = std::move(temp5678);
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_if0.get_access<sycl_read>(cgh);

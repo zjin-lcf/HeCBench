@@ -54,11 +54,10 @@ main.o: main.cpp utils.h Makefile
 	$(CC) $(CFLAGS) -x cu -c $< -o $@
 
 reference.o: ../fluidSim-sycl/reference.cpp Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -x cu -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) 10000
-

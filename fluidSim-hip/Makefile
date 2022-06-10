@@ -50,14 +50,13 @@ kernels.o: kernels.cu ../fluidSim-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 main.o: ../fluidSim-cuda/main.cpp ../fluidSim-cuda/utils.h Makefile
-	$(CC) $(CFLAGS) -x hip -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 reference.o: ../fluidSim-sycl/reference.cpp Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -x hip -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) 10000
-

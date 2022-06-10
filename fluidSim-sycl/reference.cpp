@@ -1,20 +1,19 @@
-#ifdef VERIFY
-
-#include <iostream>
-#include <algorithm>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
-// error bound
-const double EPISON = 1e-3;
-
 double computefEq(double rho, double weight, const double dir[2], const double velocity[2])
 {
   double u2 = velocity[0] * velocity[0] + velocity[1] * velocity[1];
   double eu = dir[0] * velocity[0] + dir[1] * velocity[1];
   return rho * weight * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * u2);
 }
+
+#ifdef VERIFY
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <algorithm>
+
+// error bound
+const double EPISON = 1e-3;
 
 void reference (
   const int iterations,
@@ -254,8 +253,6 @@ void verify(
       int pos = x + y * dims[0];
       if(h_of1234[pos] - v_of1234[pos] > EPISON)
       {
-        //std::cout << "of1234 @" << pos << " device:" << h_of1234[pos]
-        //          << " host:" << v_of1234[pos] << std::endl;
         flag1234 = 1;
         break;
       } 
@@ -270,8 +267,6 @@ void verify(
       int pos = x + y * dims[0];
       if(h_of5678[pos] - v_of5678[pos] > EPISON)
       {
-        //std::cout << "of5678 @" << pos << " device:" << h_of5678[pos]
-        //          << " host:" << v_of5678[pos] << std::endl;
         flag5678 = 1;
         break;
       } 

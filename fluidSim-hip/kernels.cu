@@ -1,5 +1,6 @@
-#include <string.h>
 #include "hip/hip_runtime.h"
+#include <stdio.h>
+#include <chrono>
 #include "utils.h"
 
 // Thread block size
@@ -243,6 +244,9 @@ void fluidSim (
   dim3 grids (groupSize, 1);
   dim3 blocks (dims[0]/groupSize, dims[1]);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; ++i) {
     hipLaunchKernelGGL(lbm, grids, blocks, 0, 0, 
         d_if0, d_of0, d_if1234, d_of1234,
@@ -263,6 +267,11 @@ void fluidSim (
     d_if1234 = temp1234;
     d_if5678 = temp5678;
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
   hipMemcpy(h_of0, d_if0, dbl_size, hipMemcpyDeviceToHost);
   hipMemcpy((double4*)h_of1234, d_if1234, dbl4_size, hipMemcpyDeviceToHost);
