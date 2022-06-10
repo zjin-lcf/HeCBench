@@ -20,11 +20,11 @@
    THE SOFTWARE.
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <chrono>
 #include <cuda.h>
 
 #define MAXDISTANCE    (200)
@@ -131,9 +131,13 @@ __global__ void floydWarshallPass(
 }
 
 int main(int argc, char** argv) {
+  if (argc != 4) {
+    printf("Usage: %s <number of nodes> <iterations> <block size>\n", argv[0]);
+    return 1;
+  }
   // There are three required command-line arguments
   unsigned int numNodes = atoi(argv[1]);
-  unsigned int iterations = atoi(argv[2]);
+  unsigned int numIterations = atoi(argv[2]);
   unsigned int blockSize = atoi(argv[3]);
 
   // allocate and init memory used by host
@@ -210,9 +214,11 @@ int main(int argc, char** argv) {
   cudaMalloc((void**)&pathDistanceBuffer, matrixSizeBytes);
   cudaMalloc((void**)&pathBuffer, matrixSizeBytes);
 
+  float total_time = 0.f;
+
   // copy the matrix from a host to a device "iterations" times,
   // but copy the result from a device to a host once
-  for (unsigned int n = 0; n < iterations; n++) {
+  for (unsigned int n = 0; n < numIterations; n++) {
     /*
      * The floyd Warshall algorithm is a multipass algorithm
      * that calculates the shortest path between each pair of
@@ -234,11 +240,22 @@ int main(int argc, char** argv) {
     cudaMemcpyAsync(pathDistanceBuffer, pathDistanceMatrix, 
         matrixSizeBytes, cudaMemcpyHostToDevice, 0);
 
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     for(unsigned int i = 0; i < numPasses; i++)
     {
       floydWarshallPass <<< grids, threads >>> (pathDistanceBuffer,pathBuffer,numNodes,i);
     }
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / numIterations);
+
   cudaMemcpy(pathDistanceMatrix, pathDistanceBuffer, matrixSizeBytes, cudaMemcpyDeviceToHost);
   cudaFree(pathDistanceBuffer);
   cudaFree(pathBuffer);
@@ -247,11 +264,11 @@ int main(int argc, char** argv) {
   floydWarshallCPUReference(verificationPathDistanceMatrix, verificationPathMatrix, numNodes);
   if(memcmp(pathDistanceMatrix, verificationPathDistanceMatrix, matrixSizeBytes) == 0)
   {
-    printf("Pass\n");
+    printf("PASS\n");
   }
   else
   {
-    printf("Fail\n");
+    printf("FAIL\n");
     if (numNodes <= 8) 
     {
       for (unsigned int i = 0; i < numNodes; i++) {
