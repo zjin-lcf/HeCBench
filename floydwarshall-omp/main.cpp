@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <chrono>
+#include <omp.h>
 
 #define MAXDISTANCE    (200)
 
@@ -110,9 +112,13 @@ void floydWarshallCPUReference(unsigned int * pathDistanceMatrix,
 
 
 int main(int argc, char** argv) {
+  if (argc != 4) {
+    printf("Usage: %s <number of nodes> <iterations> <block size>\n", argv[0]);
+    return 1;
+  }
   // There are three required command-line arguments
   unsigned int numNodes = atoi(argv[1]);
-  unsigned int iterations = atoi(argv[2]);
+  unsigned int numIterations = atoi(argv[2]);
   unsigned int blockSize = atoi(argv[3]);
 
   // allocate and init memory used by host
@@ -172,10 +178,12 @@ int main(int argc, char** argv) {
 
   unsigned int numPasses = numNodes;
 
-#pragma omp target data map(alloc: pathDistanceMatrix[0:matrixSize], \
-                                   pathMatrix[0:matrixSize])
+  #pragma omp target data map(alloc: pathDistanceMatrix[0:matrixSize], \
+                                     pathMatrix[0:matrixSize])
   {
-    for (unsigned int n = 0; n < iterations; n++) {
+    float total_time = 0.f;
+
+    for (unsigned int n = 0; n < numIterations; n++) {
       /*
        * The floyd Warshall algorithm is a multipass algorithm
        * that calculates the shortest path between each pair of
@@ -194,11 +202,14 @@ int main(int argc, char** argv) {
        * path goes for each pair of nodes.
        */
 
-#pragma omp target update to (pathDistanceMatrix[0:matrixSize]) 
+      #pragma omp target update to (pathDistanceMatrix[0:matrixSize]) 
+
+      auto start = std::chrono::steady_clock::now();
 
       for(unsigned int k = 0; k < numPasses; k++)
       {
-#pragma omp target teams distribute parallel for collapse(2) thread_limit (blockSize*blockSize) nowait
+        #pragma omp target teams distribute parallel for collapse(2) \
+        thread_limit (blockSize*blockSize) nowait
         for(unsigned int y = 0; y < numNodes; ++y)
         {
           for(unsigned int x = 0; x < numNodes; ++x)
@@ -216,10 +227,16 @@ int main(int argc, char** argv) {
           }
         }
       }
-    }
-#pragma omp target update from (pathDistanceMatrix[0:matrixSize]) 
-  }
 
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
+    }
+
+    printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / numIterations);
+
+    #pragma omp target update from (pathDistanceMatrix[0:matrixSize]) 
+  }
 
   // verify
   floydWarshallCPUReference(verificationPathDistanceMatrix,
@@ -227,11 +244,11 @@ int main(int argc, char** argv) {
   if(memcmp(pathDistanceMatrix, verificationPathDistanceMatrix,
         numNodes*numNodes*sizeof(unsigned int)) == 0)
   {
-    printf("Pass\n");
+    printf("PASS\n");
   }
   else
   {
-    printf("Fail\n");
+    printf("FAIL\n");
     if (numNodes <= 8) 
     {
       for (unsigned int i = 0; i < numNodes; i++) {
