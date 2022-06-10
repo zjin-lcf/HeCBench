@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <string.h>
+#include <chrono>
 #include "utils.h"
 
 // Thread block size
@@ -49,7 +51,7 @@ inline int8 newPos (const int p, const double8 &dir)
   return np;
 }
 
-inline int8 fma8 (const uint &a, const int8 &b, const int8 &c)
+inline int8 fma8 (const unsigned int &a, const int8 &b, const int8 &c)
 {
   int8 r;
   r.s0 = a * b.s0 + c.s0;
@@ -64,8 +66,8 @@ inline int8 fma8 (const uint &a, const int8 &b, const int8 &c)
 }
 
 void lbm (
-    const uint width,
-    const uint height,
+    const unsigned int width,
+    const unsigned int height,
     const double *__restrict if0,
           double *__restrict of0, 
     const double4 *__restrict if1234,
@@ -79,9 +81,9 @@ void lbm (
     double omega)
 {
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(GROUP_SIZE)
-  for (uint idy = 0; idy < height; idy++) {
-    for (uint idx = 0; idx < width; idx++) {
-      uint pos = idx + width * idy;
+  for (unsigned int idy = 0; idy < height; idy++) {
+    for (unsigned int idx = 0; idx < width; idx++) {
+      unsigned int pos = idx + width * idy;
 
       // Read input distributions
       double f0 = if0[pos];
@@ -206,8 +208,8 @@ void fluidSim (
         double *h_of1234,
         double *h_of5678)
 {
-  uint width = dims[0];
-  uint height = dims[1]; 
+  unsigned int width = dims[0];
+  unsigned int height = dims[1]; 
   size_t temp = width * height;
   size_t dbl_size = temp * sizeof(double);
   size_t dbl4_size = dbl_size * 4;
@@ -225,6 +227,8 @@ void fluidSim (
                                    h_weight[0:9],\
                                    h_type[0:temp])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; ++i) {
       lbm(width, height, h_if0, h_of0, 
           (double4*)h_if1234, (double4*)h_of1234,
@@ -245,6 +249,11 @@ void fluidSim (
       h_if1234 = temp1234;
       h_if5678 = temp5678;
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
+
     #pragma omp target update from (h_if0[0:temp])
     #pragma omp target update from (h_if1234[0:temp*4])
     #pragma omp target update from (h_if5678[0:temp*4])

@@ -1,4 +1,5 @@
-#include <string.h>
+#include <stdio.h>
+#include <chrono>
 #include "utils.h"
 
 // Thread block size
@@ -242,6 +243,9 @@ void fluidSim (
   dim3 grids (groupSize, 1);
   dim3 blocks (dims[0]/groupSize, dims[1]);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; ++i) {
     lbm<<<grids, blocks>>>(
         d_if0, d_of0, d_if1234, d_of1234,
@@ -262,6 +266,11 @@ void fluidSim (
     d_if1234 = temp1234;
     d_if5678 = temp5678;
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
   cudaMemcpy(h_of0, d_if0, dbl_size, cudaMemcpyDeviceToHost);
   cudaMemcpy((double4*)h_of1234, d_if1234, dbl4_size, cudaMemcpyDeviceToHost);
