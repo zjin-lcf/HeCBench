@@ -1,4 +1,6 @@
 #include <stdio.h>      /* defines printf for tests */
+#include <stdlib.h> 
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 typedef unsigned long ulong;
@@ -79,21 +81,25 @@ unsigned f1(ulong value, bool* mask) {
   } 
   return 1;
 }
+
 __device__
 unsigned f2(ulong value, bool* mask) {
   if (my_abs((int)(value)) <= 0xFF) *mask = 1;
   return 1;
 }
+
 __device__
 unsigned f3(ulong value, bool* mask) {
   if (my_abs((int)(value)) <= 0xFFFF) *mask = 1;
   return 2;
 }
+
 __device__
 unsigned f4(ulong value, bool* mask) {
   if (((value) & 0xFFFF) == 0 ) *mask = 1;
   return 2;
 }
+
 __device__
 unsigned f5(ulong value, bool* mask) {
   if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF && 
@@ -112,6 +118,7 @@ unsigned f6(ulong value, bool* mask) {
     *mask = 1;
   return 1;
 }
+
 __device__
 unsigned f7(ulong value, bool* mask) {
   *mask = 1;
@@ -242,7 +249,6 @@ void fpc (const ulong* values, unsigned *cmp_size_hw, const int values_size, con
   hipFree(d_cmp_size);
 }
 
-
 void fpc2 (const ulong* values, unsigned *cmp_size_hw, const int values_size, const int wgs)
 {
   *cmp_size_hw = 0;
@@ -256,26 +262,28 @@ void fpc2 (const ulong* values, unsigned *cmp_size_hw, const int values_size, co
   dim3 grids (values_size/wgs);
   dim3 threads (wgs);
 
-  hipLaunchKernelGGL(fpc2_kernel, dim3(grids), dim3(threads), 0, 0, d_values, d_cmp_size);
+  hipLaunchKernelGGL(fpc2_kernel, grids, threads, 0, 0, d_values, d_cmp_size);
 
   hipMemcpy(cmp_size_hw, d_cmp_size, sizeof(unsigned), hipMemcpyDeviceToHost);
   hipFree(d_values);
   hipFree(d_cmp_size);
 }
 
-
 int main(int argc, char** argv) {
-
-  // size must be a multiple of step and work-group size (wgs)
-  const int step = 4;
-  const int size = atoi(argv[1]);
-  const int wgs = atoi(argv[2]);
+  if (argc != 3) {
+    printf("Usage: %s <work-group size> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int wgs = atoi(argv[1]); 
+  const int repeat = atoi(argv[2]);
 
   // create the char buffer
-  char* cbuffer = (char*) malloc (sizeof(char) * size * step);
+  const int step = 4;
+  const size_t size = (size_t)wgs * wgs * wgs;
+  char* cbuffer = (char*) malloc (size * step);
 
   srand(2);
-  for (int i = 0; i < size*step; i++) {
+  for (size_t i = 0; i < size*step; i++) {
     cbuffer[i] = 0xFF << (rand() % 256);
   }
 
@@ -285,16 +293,35 @@ int main(int argc, char** argv) {
   // run on the host
   unsigned cmp_size = FPCCompress(values, values_size);
 
+  // run on the device
   unsigned cmp_size_hw; 
 
-  // fpc is faster than fpc2 on a GPU
-  for (int i = 0; i < 100; i++) {
+  bool ok = true;
+
+  // warmup
+  fpc(values, &cmp_size_hw, values_size, wgs);
+
+  auto start = std::chrono::high_resolution_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     fpc(values, &cmp_size_hw, values_size, wgs);
     if (cmp_size_hw != cmp_size) {
       printf("fpc failed %u != %u\n", cmp_size_hw, cmp_size);
       ok = false;
       break;
     }
+  }
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("fpc: average device execution time %f (s)\n", (time * 1e-9f) / repeat);
+
+  // warmup
+  fpc2(values, &cmp_size_hw, values_size, wgs);
+
+  start = std::chrono::high_resolution_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     fpc2(values, &cmp_size_hw, values_size, wgs);
     if (cmp_size_hw != cmp_size) {
       printf("fpc2 failed %u != %u\n", cmp_size_hw, cmp_size);
@@ -302,6 +329,11 @@ int main(int argc, char** argv) {
       break;
     }
   }
+
+  end = std::chrono::high_resolution_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("fpc2: average device execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(values);
