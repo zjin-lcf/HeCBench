@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <chrono>
 #include "common.h"
 #include "reference.h"
 
@@ -78,7 +79,9 @@ int main(int argc, char* argv[])
   char batch_result[kBatchSize];
   char batch_result_ref[kBatchSize];
 
-  bool ok = true;
+  float total_time = 0.f;
+
+  int error = 0;
   while (current_position < max_searchable_length) {
     q.submit([&] (handler &cgh) {
       auto acc = d_batch_result.get_access<sycl_discard_write>(cgh);
@@ -96,6 +99,9 @@ int main(int argc, char* argv[])
     range<1> lws (256);
     range<1> gws ((length + 255) / 256 * 256);
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     q.submit([&] (handler &cgh) {
       auto t = d_target.get_access<sycl_read>(cgh);
       auto q = d_query.get_access<sycl_read>(cgh);
@@ -106,6 +112,11 @@ int main(int argc, char* argv[])
       });
     });
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     reference(target_sequence.data(), query_sequence.data(), batch_result_ref, length, qseq_size,
               coarse_match_length, coarse_match_threshold, current_position);
 
@@ -114,14 +125,12 @@ int main(int argc, char* argv[])
       cgh.copy(acc, batch_result);
     }).wait();
 
-    int error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
-    if (error) {
-      ok = false;
-      break;
-    }
+    error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
+    if (error) break;
+
     current_position = end_position;
   }
-  
-  printf("%s\n", ok ? "PASS" : "FAIL");  
+  printf("Total kernel execution time %f (s)\n", total_time * 1e-9f);
+  printf("%s\n", error ? "FAIL" : "PASS");
   return 0;
 }

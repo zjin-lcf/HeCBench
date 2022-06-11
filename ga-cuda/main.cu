@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <chrono>
 #include <cuda.h>
 #include "reference.h"
 
@@ -75,7 +76,9 @@ int main(int argc, char* argv[])
   char batch_result[kBatchSize];
   char batch_result_ref[kBatchSize];
 
-  bool ok = true;
+  float total_time = 0.f;
+
+  int error = 0;
   while (current_position < max_searchable_length) {
     cudaMemset(d_batch_result, 0, kBatchSize);
     memset(batch_result_ref, 0, kBatchSize);
@@ -89,25 +92,33 @@ int main(int argc, char* argv[])
     dim3 block_size(256);
     dim3 grid_size((length + block_size.x - 1) / block_size.x);
 
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     ga<<<grid_size, block_size>>>(
         d_target, d_query, d_batch_result, length, qseq_size,
         coarse_match_length, coarse_match_threshold, current_position);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
 
     reference(target_sequence.data(), query_sequence.data(), batch_result_ref, length, qseq_size,
               coarse_match_length, coarse_match_threshold, current_position);
 
     cudaMemcpy(batch_result, d_batch_result, kBatchSize * sizeof(char), cudaMemcpyDeviceToHost);
-    int error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
-    if (error) {
-      ok = false;
-      break;
-    }
+
+    error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
+    if (error) break;
+
     current_position = end_position;
   }
+  printf("Total kernel execution time %f (s)\n", total_time * 1e-9f);
+  printf("%s\n", error ? "FAIL" : "PASS");
   
   cudaFree(d_target);
   cudaFree(d_query);
   cudaFree(d_batch_result);
-  printf("%s\n", ok ? "PASS" : "FAIL");  
   return 0;
 }

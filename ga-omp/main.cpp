@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <chrono>
 #include <omp.h>
 #include "reference.h"
 
@@ -70,7 +71,9 @@ int main(int argc, char* argv[])
   char d_batch_result[kBatchSize];
   char batch_result_ref[kBatchSize];
 
-  bool ok = true;
+  float total_time = 0.f;
+
+  int error = 0;
 
   #pragma omp target data map (to: d_target[0:tseq_size], \
                                    d_query[0:qseq_size]) \
@@ -89,21 +92,26 @@ int main(int argc, char* argv[])
       }
       uint32_t length = end_position - current_position;
 
+      auto start = std::chrono::steady_clock::now();
+
       ga( d_target, d_query, d_batch_result, length, qseq_size,
           coarse_match_length, coarse_match_threshold, current_position);
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
 
       reference(target_sequence.data(), query_sequence.data(), batch_result_ref, length, qseq_size,
                 coarse_match_length, coarse_match_threshold, current_position);
 
       #pragma omp target update from (d_batch_result[0:kBatchSize])
-      int error = memcmp(batch_result_ref, d_batch_result, kBatchSize * sizeof(char));
-      if (error) {
-        ok = false;
-        break;
-      }
+      error = memcmp(batch_result_ref, d_batch_result, kBatchSize * sizeof(char));
+      if (error) break;
+
       current_position = end_position;
     }
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");  
+  printf("Total kernel execution time %f (s)\n", total_time * 1e-9f);
+  printf("%s\n", error ? "FAIL" : "PASS");
   return 0;
 }
