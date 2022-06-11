@@ -47,19 +47,8 @@ Authors: Martin Burtscher
 
 int main(int argc, char *argv[])
 {
-  int i, j, d, s, bit, length, pc, misses, besthits, generations;
-  unsigned short *data, *d_data;
-  unsigned char state[TABSIZE], fsm[FSMSIZE * 2];
-  int *d_best, best[FSMSIZE * 2 + 3], trans[FSMSIZE][2];
-  unsigned int *d_state;
-  unsigned char *d_bfsm, *d_same;
-  int *d_smax, *d_sbest, *d_oldmax;
-  double runtime;
-  struct timeval starttime, endtime;
-
   if (argc != 2) {fprintf(stderr, "usage: %s trace_length\n", argv[0]); exit(-1);}
-
-  length = atoi(argv[1]);
+  int length = atoi(argv[1]);
 
   assert(sizeof(unsigned short) == 2);
   assert(0 < length);
@@ -70,6 +59,16 @@ int main(int argc, char *argv[])
   assert(0 < POPCNT);
   assert((0 < POPSIZE) && (POPSIZE <= 1024));
   assert(0 < CUTOFF);
+
+  int i, j, d, s, bit, pc, misses, besthits, generations;
+  unsigned short *data, *d_data;
+  unsigned char state[TABSIZE], fsm[FSMSIZE * 2];
+  int *d_best, best[FSMSIZE * 2 + 3], trans[FSMSIZE][2];
+  unsigned int *d_state;
+  unsigned char *d_bfsm, *d_same;
+  int *d_smax, *d_sbest, *d_oldmax;
+  double runtime;
+  struct timeval starttime, endtime;
 
   data = (unsigned short*) malloc (sizeof(unsigned short) * length);
 
@@ -95,7 +94,9 @@ int main(int argc, char *argv[])
   hipMalloc((void **)&d_sbest, POPCNT * sizeof(int));
   hipMalloc((void **)&d_oldmax, POPCNT * sizeof(int));
 
+  hipDeviceSynchronize();
   gettimeofday(&starttime, NULL);
+
   for (int i = 0; i < REPEAT; i++) {
     hipMemset(d_best, 0, sizeof(int) * (FSMSIZE * 2 + 3));
     hipLaunchKernelGGL(FSMKernel, POPCNT, POPSIZE, 0, 0, length, d_data, d_best, d_state, 
@@ -104,13 +105,13 @@ int main(int argc, char *argv[])
   }
   hipDeviceSynchronize();
   gettimeofday(&endtime, NULL);
-  hipMemcpy(best, d_best, sizeof(int) * (FSMSIZE * 2 + 3), hipMemcpyDeviceToHost);
-
-  besthits = best[1];
-  generations = best[2];
 
   runtime = endtime.tv_sec + endtime.tv_usec / 1000000.0 - starttime.tv_sec - starttime.tv_usec / 1000000.0;
   printf("%.6lf\t#runtime [s]\n", runtime / REPEAT);
+
+  hipMemcpy(best, d_best, sizeof(int) * (FSMSIZE * 2 + 3), hipMemcpyDeviceToHost);
+  besthits = best[1];
+  generations = best[2];
   printf("%.6lf\t#throughput [Gtr/s]\n", 0.000000001 * POPSIZE * generations * length / (runtime / REPEAT));
 
   // evaluate saturating up/down counter
