@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "reference.h"
 
@@ -75,7 +76,9 @@ int main(int argc, char* argv[])
   char batch_result[kBatchSize];
   char batch_result_ref[kBatchSize];
 
-  bool ok = true;
+  float total_time = 0.f;
+
+  int error = 0;
   while (current_position < max_searchable_length) {
     hipMemset(d_batch_result, 0, kBatchSize);
     memset(batch_result_ref, 0, kBatchSize);
@@ -89,25 +92,33 @@ int main(int argc, char* argv[])
     dim3 block_size(256);
     dim3 grid_size((length + block_size.x - 1) / block_size.x);
 
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     hipLaunchKernelGGL(ga, grid_size, block_size, 0, 0, 
         d_target, d_query, d_batch_result, length, qseq_size,
         coarse_match_length, coarse_match_threshold, current_position);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
 
     reference(target_sequence.data(), query_sequence.data(), batch_result_ref, length, qseq_size,
               coarse_match_length, coarse_match_threshold, current_position);
 
     hipMemcpy(batch_result, d_batch_result, kBatchSize * sizeof(char), hipMemcpyDeviceToHost);
-    int error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
-    if (error) {
-      ok = false;
-      break;
-    }
+
+    error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
+    if (error) break;
+
     current_position = end_position;
   }
+  printn("Total kernel execution time %f (s)\n", total_time * 1e-9f);
+  printf("%s\n", error ? "FAIL" : "PASS");
   
   hipFree(d_target);
   hipFree(d_query);
   hipFree(d_batch_result);
-  printf("%s\n", ok ? "PASS" : "FAIL");  
   return 0;
 }
