@@ -46,16 +46,8 @@ Authors: Martin Burtscher
 
 int main(int argc, char *argv[])
 {
-  int i, j, d, s, bit, length, pc, misses, besthits, generations;
-  unsigned short *data;
-  unsigned char state[TABSIZE], fsm[FSMSIZE * 2];
-  int best[FSMSIZE * 2 + 3], trans[FSMSIZE][2];
-  double runtime;
-  struct timeval starttime, endtime;
-
   if (argc != 2) {fprintf(stderr, "usage: %s trace_length\n", argv[0]); exit(-1);}
-
-  length = atoi(argv[1]);
+  int length = atoi(argv[1]);
 
   assert(sizeof(unsigned short) == 2);
   assert(0 < length);
@@ -66,6 +58,13 @@ int main(int argc, char *argv[])
   assert(0 < POPCNT);
   assert((0 < POPSIZE) && (POPSIZE <= 1024));
   assert(0 < CUTOFF);
+
+  int i, j, d, s, bit, pc, misses, besthits, generations;
+  unsigned short *data;
+  unsigned char state[TABSIZE], fsm[FSMSIZE * 2];
+  int best[FSMSIZE * 2 + 3], trans[FSMSIZE][2];
+  double runtime;
+  struct timeval starttime, endtime;
 
   data = (unsigned short*) malloc (sizeof(unsigned short) * length);
 
@@ -97,21 +96,22 @@ int main(int argc, char *argv[])
                                       oldmax[0:POPCNT])
   {
     gettimeofday(&starttime, NULL);
+
     for (int i = 0; i < REPEAT; i++) {
       #pragma omp target teams distribute parallel for
-      for (int i = 0; i < FSMSIZE * 2 + 3; i++)
-        best[i] = 0;
+      for (int i = 0; i < FSMSIZE * 2 + 3; i++) best[i] = 0;
       FSMKernel(length, data, best, rndstate, bfsm, same, smax, sbest, oldmax);
       MaxKernel(best, bfsm);
     }
+
     gettimeofday(&endtime, NULL);
+    runtime = endtime.tv_sec + endtime.tv_usec / 1000000.0 - starttime.tv_sec - starttime.tv_usec / 1000000.0;
+    printf("%.6lf\t#runtime [s]\n", runtime / REPEAT);
   }
 
   besthits = best[1];
   generations = best[2];
 
-  runtime = endtime.tv_sec + endtime.tv_usec / 1000000.0 - starttime.tv_sec - starttime.tv_usec / 1000000.0;
-  printf("%.6lf\t#runtime [s]\n", runtime / REPEAT);
   printf("%.6lf\t#throughput [Gtr/s]\n", 0.000000001 * POPSIZE * generations * length / (runtime / REPEAT));
 
   // evaluate saturating up/down counter
