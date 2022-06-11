@@ -9,11 +9,8 @@
  *
  */
 
-
-///////////////////////////////////////////////////////////////////////////////
 // Elementary(for vectors less than elementary size) in-shared memory
 // combined radix-2 + radix-4 Fast Walsh Transform
-///////////////////////////////////////////////////////////////////////////////
 #define ELEMENTARY_LOG2SIZE 11
 
 void fwtBatch1Kernel(      float *__restrict d_Output, 
@@ -95,10 +92,8 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Single in-global memory radix-4 Fast Walsh Transform pass
 // (for strides exceeding elementary vector size)
-////////////////////////////////////////////////////////////////////////////////
 void fwtBatch2Kernel(
           float *__restrict d_Output,
     const float *__restrict d_Input,
@@ -142,9 +137,7 @@ void fwtBatch2Kernel(
     d_Dst[i3] = T - D3;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Put everything together: batched Fast Walsh Transform CPU front-end
-////////////////////////////////////////////////////////////////////////////////
 void fwtBatchGPU(queue &q, buffer<float, 1> &d_Data, int M, int log2N)
 {
     const int THREAD_N = 256;
@@ -181,12 +174,7 @@ void fwtBatchGPU(queue &q, buffer<float, 1> &d_Data, int M, int log2N)
     });
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
 // Modulate two arrays
-////////////////////////////////////////////////////////////////////////////////
-
 void modulateGPU(queue &q, buffer<float, 1> &d_A, buffer<float, 1> &d_B, int N)
 {
     range<1> gws (128*256);

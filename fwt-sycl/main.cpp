@@ -22,18 +22,14 @@
  * Victor Podlozhnyuk (vpodlozhnyuk@nvidia.com)
  */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
-
-////////////////////////////////////////////////////////////////////////////////
 // Reference CPU FWT
-////////////////////////////////////////////////////////////////////////////////
 extern"C" void fwtCPU(float *h_Output, float *h_Input, int log2N);
 extern"C" void slowWTcpu(float *h_Output, float *h_Input, int log2N);
 extern "C" void dyadicConvolutionCPU(
@@ -41,17 +37,12 @@ extern "C" void dyadicConvolutionCPU(
     float *h_Data,
     float *h_Kernel,
     int log2dataN,
-    int log2kernelN
-);
+    int log2kernelN);
 
-////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
-////////////////////////////////////////////////////////////////////////////////
 #include "kernels.cpp"
 
-////////////////////////////////////////////////////////////////////////////////
 // Data configuration
-////////////////////////////////////////////////////////////////////////////////
 const int log2Data = 23;
 const int dataN = 1 << log2Data;
 const int DATA_SIZE = dataN * sizeof(float);
@@ -60,104 +51,112 @@ const int log2Kernel = 7;
 const int kernelN = 1 << log2Kernel;
 const int KERNEL_SIZE = kernelN * sizeof(float);
 
-//const double NOPS = 3.0 * (double)dataN * (double)log2Data / 2.0;
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Main program
-////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-    const int repeat = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
-    double delta, ref, sum_delta2, sum_ref2, L2norm;
+  double delta, ref, sum_delta2, sum_ref2, L2norm;
 
-    int i;
+  int i;
 
-    printf("Data length: %i; kernel length: %i\n", dataN, kernelN);
+  printf("Data length: %i; kernel length: %i\n", dataN, kernelN);
 
-    printf("Initializing data...\n");
-    float *h_Kernel    = (float *)malloc(KERNEL_SIZE);
-    float *h_Data      = (float *)malloc(DATA_SIZE);
-    float *h_ResultCPU = (float *)malloc(DATA_SIZE);
-    float *h_ResultGPU = (float *)malloc(DATA_SIZE);
+  printf("Initializing data...\n");
+  float *h_Kernel    = (float *)malloc(KERNEL_SIZE);
+  float *h_Data      = (float *)malloc(DATA_SIZE);
+  float *h_ResultCPU = (float *)malloc(DATA_SIZE);
+  float *h_ResultGPU = (float *)malloc(DATA_SIZE);
 
-    srand(123);
-    for (i = 0; i < kernelN; i++)
-    {
-        h_Kernel[i] = (float)rand() / (float)RAND_MAX;
-    }
+  srand(123);
+  for (i = 0; i < kernelN; i++)
+  {
+    h_Kernel[i] = (float)rand() / (float)RAND_MAX;
+  }
 
-    for (i = 0; i < dataN; i++)
-    {
-        h_Data[i] = (float)rand() / (float)RAND_MAX;
-    }
+  for (i = 0; i < dataN; i++)
+  {
+    h_Data[i] = (float)rand() / (float)RAND_MAX;
+  }
 
-    printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
+  printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    buffer<float, 1> d_Data (dataN);
-    buffer<float, 1> d_Kernel (dataN);
+  buffer<float, 1> d_Data (dataN);
+  buffer<float, 1> d_Kernel (dataN);
 
-    for (i = 0; i < repeat; i++)
-    {
-      q.submit([&] (handler &cgh) {
-        auto acc = d_Kernel.get_access<sycl_discard_write>(cgh);
-        cgh.fill(acc, 0.f);	
-      });
+  float total_time = 0.f;
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_Kernel.get_access<sycl_write>(cgh, range<1>(kernelN));
-        cgh.copy(h_Kernel, acc);
-      });
-
-      q.submit([&] (handler &cgh) {
-        auto acc = d_Data.get_access<sycl_discard_write>(cgh);
-        cgh.copy(h_Data, acc);
-      });
-
-      fwtBatchGPU(q, d_Data, 1, log2Data);
-      fwtBatchGPU(q, d_Kernel, 1, log2Data);
-      modulateGPU(q, d_Data, d_Kernel, dataN);
-      fwtBatchGPU(q, d_Data, 1, log2Data);
-    }
-
-    printf("Reading back GPU results...\n");
+  for (i = 0; i < repeat; i++)
+  {
     q.submit([&] (handler &cgh) {
-      auto acc = d_Data.get_access<sycl_read>(cgh);
-      cgh.copy(acc, h_ResultGPU);
-    }).wait();
+      auto acc = d_Kernel.get_access<sycl_discard_write>(cgh);
+      cgh.fill(acc, 0.f);  
+    });
 
-    printf("Running straightforward CPU dyadic convolution...\n");
-    dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
+    q.submit([&] (handler &cgh) {
+      auto acc = d_Kernel.get_access<sycl_write>(cgh, range<1>(kernelN));
+      cgh.copy(h_Kernel, acc);
+    });
 
-    printf("Comparing the results...\n");
-    sum_delta2 = 0;
-    sum_ref2   = 0;
+    q.submit([&] (handler &cgh) {
+      auto acc = d_Data.get_access<sycl_discard_write>(cgh);
+      cgh.copy(h_Data, acc);
+    });
 
-    for (i = 0; i < dataN; i++)
-    {
-        delta       = h_ResultCPU[i] - h_ResultGPU[i];
-        ref         = h_ResultCPU[i];
-        sum_delta2 += delta * delta;
-        sum_ref2   += ref * ref;
-    }
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
-    L2norm = sqrt(sum_delta2 / sum_ref2);
+    fwtBatchGPU(q, d_Data, 1, log2Data);
+    fwtBatchGPU(q, d_Kernel, 1, log2Data);
+    modulateGPU(q, d_Data, d_Kernel, dataN);
+    fwtBatchGPU(q, d_Data, 1, log2Data);
 
-    printf("Shutting down...\n");
-    free(h_ResultGPU);
-    free(h_ResultCPU);
-    free(h_Data);
-    free(h_Kernel);
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+  }
+  printf("Average device execution time %f (s)\n", (total_time * 1e-9f) / repeat);
 
-    printf("L2 norm: %E\n", L2norm);
-    printf(L2norm < 1e-6 ? "Test passed\n" : "Test failed!\n");
+  printf("Reading back GPU results...\n");
+  q.submit([&] (handler &cgh) {
+    auto acc = d_Data.get_access<sycl_read>(cgh);
+    cgh.copy(acc, h_ResultGPU);
+  }).wait();
+
+  printf("Running straightforward CPU dyadic convolution...\n");
+  dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
+
+  printf("Comparing the results...\n");
+  sum_delta2 = 0;
+  sum_ref2   = 0;
+
+  for (i = 0; i < dataN; i++)
+  {
+    delta       = h_ResultCPU[i] - h_ResultGPU[i];
+    ref         = h_ResultCPU[i];
+    sum_delta2 += delta * delta;
+    sum_ref2   += ref * ref;
+  }
+
+  L2norm = sqrt(sum_delta2 / sum_ref2);
+
+  printf("Shutting down...\n");
+  free(h_ResultGPU);
+  free(h_ResultCPU);
+  free(h_Data);
+  free(h_Kernel);
+
+  printf("L2 norm: %E\n", L2norm);
+  printf(L2norm < 1e-6 ? "PASS\n" : "FAIL\n");
 }

@@ -9,16 +9,13 @@
  *
  */
 
-
-///////////////////////////////////////////////////////////////////////////////
 // Elementary(for vectors less than elementary size) in-shared memory
 // combined radix-2 + radix-4 Fast Walsh Transform
-///////////////////////////////////////////////////////////////////////////////
 #define ELEMENTARY_LOG2SIZE 11
 
 __global__ 
-void fwtBatch1Kernel(      float *__restrict d_Output, 
-                     const float *__restrict d_Input,
+void fwtBatch1Kernel(      float *__restrict__ d_Output, 
+                     const float *__restrict__ d_Input,
                            int log2N)
 {
     // Handle to thread block group
@@ -92,16 +89,13 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Single in-global memory radix-4 Fast Walsh Transform pass
 // (for strides exceeding elementary vector size)
-////////////////////////////////////////////////////////////////////////////////
 __global__
 void fwtBatch2Kernel(
-          float *__restrict d_Output,
-    const float *__restrict d_Input,
-    int stride
-)
+          float *__restrict__ d_Output,
+    const float *__restrict__ d_Input,
+    int stride)
 {
     const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     const int   N = blockDim.x *  gridDim.x * 4;
@@ -135,9 +129,7 @@ void fwtBatch2Kernel(
     d_Dst[i3] = T - D3;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Put everything together: batched Fast Walsh Transform CPU front-end
-////////////////////////////////////////////////////////////////////////////////
 void fwtBatchGPU(float *d_Data, int M, int log2N)
 {
     const int THREAD_N = 256;
@@ -147,24 +139,20 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
 
     for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
     {
-        hipLaunchKernelGGL(fwtBatch2Kernel, dim3(grid), dim3(THREAD_N), 0, 0, d_Data, d_Data, N / 4);
+        hipLaunchKernelGGL(fwtBatch2Kernel, grid, THREAD_N, 0, 0, d_Data, d_Data, N / 4);
     }
 
-    hipLaunchKernelGGL(fwtBatch1Kernel, dim3(M), dim3(N / 4), N *sizeof(float), 0, 
+    fwtBatch1Kernel<<<M, N / 4, N *sizeof(float)>>>(
         d_Data,
         d_Data,
         log2N
     );
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
 // Modulate two arrays
-////////////////////////////////////////////////////////////////////////////////
 __global__ 
-void modulateKernel(      float *__restrict d_A, 
-                    const float *__restrict d_B, 
+void modulateKernel(      float *__restrict__ d_A, 
+                    const float *__restrict__ d_B, 
                           int N)
 {
     int        tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -180,5 +168,5 @@ void modulateKernel(      float *__restrict d_A,
 //Interface to modulateKernel()
 void modulateGPU(float *d_A, float *d_B, int N)
 {
-    hipLaunchKernelGGL(modulateKernel, dim3(128), dim3(256), 0, 0, d_A, d_B, N);
+    hipLaunchKernelGGL(modulateKernel, 128, 256, 0, 0, d_A, d_B, N);
 }
