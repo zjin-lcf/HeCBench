@@ -9,11 +9,7 @@
  *
  */
 
-
-
-///////////////////////////////////////////////////////////////////////////////
 // CPU Fast Walsh Transform
-///////////////////////////////////////////////////////////////////////////////
 extern"C" void fwtCPU(float *h_Output, float *h_Input, int log2N)
 {
   const int N = 1 << log2N;
@@ -41,12 +37,8 @@ extern"C" void fwtCPU(float *h_Output, float *h_Input, int log2N)
   }
 }
 
-
-
-///////////////////////////////////////////////////////////////////////////////
 // Straightforward Walsh Transform: used to test both CPU and GPU FWT
 // Slow. Uses doubles because of straightforward accumulation
-///////////////////////////////////////////////////////////////////////////////
 extern"C" void slowWTcpu(float *h_Output, float *h_Input, int log2N)
 {
   const int N = 1 << log2N;
@@ -70,19 +62,14 @@ extern"C" void slowWTcpu(float *h_Output, float *h_Input, int log2N)
   }
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
 // Reference CPU dyadic convolution.
 // Extremely slow because of non-linear memory access patterns (cache thrashing)
-////////////////////////////////////////////////////////////////////////////////
 extern "C" void dyadicConvolutionCPU(
     float *h_Result,
     float *h_Data,
     float *h_Kernel,
     int log2dataN,
-    int log2kernelN
-    )
+    int log2kernelN)
 {
   const int   dataN = 1 << log2dataN;
   const int kernelN = 1 << log2kernelN;

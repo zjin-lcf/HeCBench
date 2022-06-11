@@ -9,16 +9,13 @@
  *
  */
 
-
-///////////////////////////////////////////////////////////////////////////////
 // Elementary(for vectors less than elementary size) in-shared memory
 // combined radix-2 + radix-4 Fast Walsh Transform
-///////////////////////////////////////////////////////////////////////////////
 #define ELEMENTARY_LOG2SIZE 11
 
 __global__ 
-void fwtBatch1Kernel(      float *__restrict d_Output, 
-                     const float *__restrict d_Input,
+void fwtBatch1Kernel(      float *__restrict__ d_Output, 
+                     const float *__restrict__ d_Input,
                            int log2N)
 {
     // Handle to thread block group
@@ -92,16 +89,13 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Single in-global memory radix-4 Fast Walsh Transform pass
 // (for strides exceeding elementary vector size)
-////////////////////////////////////////////////////////////////////////////////
 __global__
 void fwtBatch2Kernel(
-          float *__restrict d_Output,
-    const float *__restrict d_Input,
-    int stride
-)
+          float *__restrict__ d_Output,
+    const float *__restrict__ d_Input,
+    int stride)
 {
     const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     const int   N = blockDim.x *  gridDim.x * 4;
@@ -135,13 +129,10 @@ void fwtBatch2Kernel(
     d_Dst[i3] = T - D3;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Put everything together: batched Fast Walsh Transform CPU front-end
-////////////////////////////////////////////////////////////////////////////////
 void fwtBatchGPU(float *d_Data, int M, int log2N)
 {
     const int THREAD_N = 256;
-    float h_Data[4096];
 
     int N = 1 << log2N;
     dim3 grid(N / (4 * THREAD_N), M, 1);
@@ -158,14 +149,10 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
     );
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
 // Modulate two arrays
-////////////////////////////////////////////////////////////////////////////////
 __global__ 
-void modulateKernel(      float *__restrict d_A, 
-                    const float *__restrict d_B, 
+void modulateKernel(      float *__restrict__ d_A, 
+                    const float *__restrict__ d_B, 
                           int N)
 {
     int        tid = blockIdx.x * blockDim.x + threadIdx.x;

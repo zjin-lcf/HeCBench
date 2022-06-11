@@ -22,18 +22,14 @@
  * Victor Podlozhnyuk (vpodlozhnyuk@nvidia.com)
  */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
-
-////////////////////////////////////////////////////////////////////////////////
 // Reference CPU FWT
-////////////////////////////////////////////////////////////////////////////////
 extern"C" void fwtCPU(float *h_Output, float *h_Input, int log2N);
 extern"C" void slowWTcpu(float *h_Output, float *h_Input, int log2N);
 extern "C" void dyadicConvolutionCPU(
@@ -44,105 +40,107 @@ extern "C" void dyadicConvolutionCPU(
     int log2kernelN
 );
 
-////////////////////////////////////////////////////////////////////////////////
 // GPU FWT
-////////////////////////////////////////////////////////////////////////////////
 #include "kernels.cpp"
 
-////////////////////////////////////////////////////////////////////////////////
 // Data configuration
-////////////////////////////////////////////////////////////////////////////////
 const int log2Data = 23;
-const int   dataN = 1 << log2Data;
-const int   DATA_SIZE = dataN   * sizeof(float);
+const int dataN = 1 << log2Data;
+const int DATA_SIZE = dataN * sizeof(float);
 
 const int log2Kernel = 7;
 const int kernelN = 1 << log2Kernel;
 const int KERNEL_SIZE = kernelN * sizeof(float);
 
-//const double NOPS = 3.0 * (double)dataN * (double)log2Data / 2.0;
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Main program
-////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-    const int repeat = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
-    double delta, ref, sum_delta2, sum_ref2, L2norm;
+  double delta, ref, sum_delta2, sum_ref2, L2norm;
 
-    int i;
+  int i;
 
-    printf("Data length: %i; kernel length: %i\n", dataN, kernelN);
+  printf("Data length: %i; kernel length: %i\n", dataN, kernelN);
 
-    printf("Initializing data...\n");
-    float *h_Kernel    = (float *)malloc(KERNEL_SIZE);
-    float *h_Data      = (float *)malloc(DATA_SIZE);
-    float *h_ResultCPU = (float *)malloc(DATA_SIZE);
+  printf("Initializing data...\n");
+  float *h_Kernel    = (float *)malloc(KERNEL_SIZE);
+  float *h_Data      = (float *)malloc(DATA_SIZE);
+  float *h_ResultCPU = (float *)malloc(DATA_SIZE);
 
-    srand(123);
-    for (i = 0; i < kernelN; i++)
+  srand(123);
+  for (i = 0; i < kernelN; i++)
+  {
+    h_Kernel[i] = (float)rand() / (float)RAND_MAX;
+  }
+
+  for (i = 0; i < dataN; i++)
+  {
+    h_Data[i] = (float)rand() / (float)RAND_MAX;
+  }
+
+  printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
+
+  float *d_Kernel = (float *)malloc(DATA_SIZE);
+  float *d_Data   = (float *)malloc(DATA_SIZE);
+
+  #pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
+  {
+    float total_time = 0.f;
+
+    for (i = 0; i < repeat; i++)
     {
-        h_Kernel[i] = (float)rand() / (float)RAND_MAX;
+      memset(d_Kernel, 0, DATA_SIZE);
+      memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
+      #pragma omp target update to (d_Kernel[0:dataN])
+  
+      memcpy(d_Data, h_Data, DATA_SIZE);
+      #pragma omp target update to (d_Data[0:dataN])
+  
+      auto start = std::chrono::steady_clock::now();
+
+      fwtBatchGPU(d_Data, 1, log2Data);
+      fwtBatchGPU(d_Kernel, 1, log2Data);
+      modulateGPU(d_Data, d_Kernel, dataN);
+      fwtBatchGPU(d_Data, 1, log2Data);
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
     }
+    printf("Average device execution time %f (s)\n", (total_time * 1e-9f) / repeat);
+  
+    printf("Reading back GPU results...\n");
+    #pragma omp target update from (d_Data[0:dataN])
+  }
 
-    for (i = 0; i < dataN; i++)
-    {
-        h_Data[i] = (float)rand() / (float)RAND_MAX;
-    }
+  printf("Running straightforward CPU dyadic convolution...\n");
+  dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
 
-    printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
+  printf("Comparing the results...\n");
+  sum_delta2 = 0;
+  sum_ref2   = 0;
 
-    float *d_Kernel = (float *)malloc(DATA_SIZE);
-    float *d_Data   = (float *)malloc(DATA_SIZE);
+  for (i = 0; i < dataN; i++)
+  {
+      delta       = h_ResultCPU[i] - d_Data[i];
+      ref         = h_ResultCPU[i];
+      sum_delta2 += delta * delta;
+      sum_ref2   += ref * ref;
+  }
 
-    #pragma omp target data map (alloc: d_Kernel[0:dataN], d_Data[0:dataN])
-    {
-        for (i = 0; i < repeat; i++)
-        {
-          memset(d_Kernel, 0, DATA_SIZE);
-          memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
-          #pragma omp target update to (d_Kernel[0:dataN])
-    
-          memcpy(d_Data, h_Data, DATA_SIZE);
-          #pragma omp target update to (d_Data[0:dataN])
-    
-          fwtBatchGPU(d_Data, 1, log2Data);
-          fwtBatchGPU(d_Kernel, 1, log2Data);
-          modulateGPU(d_Data, d_Kernel, dataN);
-          fwtBatchGPU(d_Data, 1, log2Data);
-        }
-    
-        printf("Reading back GPU results...\n");
-        #pragma omp target update from (d_Data[0:dataN])
-    }
+  L2norm = sqrt(sum_delta2 / sum_ref2);
 
-    printf("Running straightforward CPU dyadic convolution...\n");
-    dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);
+  printf("Shutting down...\n");
+  free(h_ResultCPU);
+  free(h_Data);
+  free(h_Kernel);
+  free(d_Data);
+  free(d_Kernel);
 
-    printf("Comparing the results...\n");
-    sum_delta2 = 0;
-    sum_ref2   = 0;
-
-    for (i = 0; i < dataN; i++)
-    {
-        delta       = h_ResultCPU[i] - d_Data[i];
-        ref         = h_ResultCPU[i];
-        sum_delta2 += delta * delta;
-        sum_ref2   += ref * ref;
-    }
-
-    L2norm = sqrt(sum_delta2 / sum_ref2);
-
-    printf("Shutting down...\n");
-    free(h_ResultCPU);
-    free(h_Data);
-    free(h_Kernel);
-    free(d_Data);
-    free(d_Kernel);
-
-    printf("L2 norm: %E\n", L2norm);
-    printf(L2norm < 1e-6 ? "Test passed\n" : "Test failed!\n");
+  printf("L2 norm: %E\n", L2norm);
+  printf(L2norm < 1e-6 ? "PASS\n" : "FAIL\n");
 }
