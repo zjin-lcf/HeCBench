@@ -73,5 +73,5 @@ clean:
 	rm -rf $(program) $(obj) README*
 
 run: $(program)
-	./$(program) 255 8 2 < ../README.md > README.fpc
-	./$(program) < README.fpc > README
+	./$(program) 255 8 100 2 < ../README.md > README.fpc
+	./$(program) 100 < README.fpc > README

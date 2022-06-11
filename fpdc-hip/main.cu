@@ -205,9 +205,6 @@ static void Decompress(int blocks, int warpsperblock,
 {
   hipGetLastError();  // reset error value
 
-#ifdef DEBUG
-  printf("[Decompress] allocate CPU buffers\n");
-#endif
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data, divided by chunk
   if (dbuf == NULL) { 
     fprintf(stderr, "cannot allocate dbuf\n");
@@ -225,23 +222,14 @@ static void Decompress(int blocks, int warpsperblock,
     fprintf(stderr, "cannot allocate off\n");
   }
 
-#ifdef DEBUG
-  printf("[Decompress] read in offset table\n");
-#endif
   for(int i = 0; i < blocks * warpsperblock; i++) {
     int num = fread(&off[i], 4, 1, stdin);
     assert(1 == num);
   }
 
-#ifdef DEBUG
-  printf("[Decompress] calculate required padding for last chunk\n");
-#endif
   int padding = ((doubles + WARPSIZE - 1) & -WARPSIZE) - doubles;
   doubles += padding;
 
-#ifdef DEBUG
-  printf("[Decompress] determine chunk assignments per warp\n");
-#endif
   int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock); 
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
@@ -251,9 +239,6 @@ static void Decompress(int blocks, int warpsperblock,
     cut[i] = min(curr, doubles);
   }
 
-#ifdef DEBUG
-  printf("[Decompress] allocate GPU buffers\n");
-#endif
   char *dbufl; // compressed data
   ull *fbufl; // uncompressed data
   int *cutl; // chunk boundaries
@@ -266,9 +251,6 @@ static void Decompress(int blocks, int warpsperblock,
   if (hipSuccess != hipMalloc((void **)&cutl, sizeof(int) * blocks * warpsperblock))
     fprintf(stderr, "could not allocate cutd\n");
 
-#ifdef DEBUG
-  printf("[Decompress] read in input data and divide into chunks\n");
-#endif
   for(int i = 0; i < blocks * warpsperblock; i++) {
     int num, chbeg, start = 0;
     if (i > 0) start = cut[i-1];
@@ -283,10 +265,6 @@ static void Decompress(int blocks, int warpsperblock,
   // copy CPU cut buffer contents to GPU
   if (hipSuccess != hipMemcpy(cutl, cut, sizeof(int) * blocks * warpsperblock, hipMemcpyHostToDevice))
     fprintf(stderr, "copying of cut to device failed\n");
-
-#ifdef DEBUG
-  printf("[Decompress] run the kernel for 100 iterations\n");
-#endif
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
@@ -304,9 +282,6 @@ static void Decompress(int blocks, int warpsperblock,
   if (hipSuccess != hipMemcpy(fbuf, fbufl, sizeof(ull) * doubles, hipMemcpyDeviceToHost))
     fprintf(stderr, "copying of fbuf from device failed\n");
 
-#ifdef DEBUG
-  printf("[Decompress] output decompressed data\n");
-#endif
   int num = fwrite(fbuf, 8, doubles-padding, stdout);
   assert(num == doubles-padding);
 
@@ -393,10 +368,6 @@ int main(int argc, char *argv[])
     num = fread(&doubles, 4, 1, stdin);
     assert(1 == num);
 
-#ifdef DEBUG
-    printf("blocks=%d warps/block=%d repeat=%d dim=%d doubles=%d\n",
-           blocks, warpsperblock, repeat, dimensionality, doubles);
-#endif
     Decompress(blocks, warpsperblock, repeat, dimensionality, doubles);
   }
   else {

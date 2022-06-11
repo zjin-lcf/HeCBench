@@ -1,2 +1,3 @@
-export DATAPATH=/absolute/path/to/prna-cuda/data_tables
+RNA structure can be downloaded from https://rna.urmc.rochester.edu/RNAstructure.html
 
+export DATAPATH=/absolute/path/to/RNAstructure/data_tables
