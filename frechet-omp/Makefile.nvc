@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
+DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
@@ -14,44 +15,48 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -Wall 
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g
+  CFLAGS += -g
+  LDFLAGS  += -g 
 endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+else
+  CFLAGS +=
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h Makefile
+%.o: %.cpp *.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) README*
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	rm -rf README*
-	./$(program) 255 8 100 2 < ../README.md > README.fpc
-	./$(program) 100 < README.fpc > README
+	./$(program) 4 4 1000

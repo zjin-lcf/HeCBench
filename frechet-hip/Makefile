@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
-OPTIMIZE  = yes
-DEBUG     = no
-ARCH      = sm_60
+CC        = hipcc
+OPTIMIZE  = no
+DEBUG     = yes
 
 #===============================================================================
 # Program name & source code list
@@ -23,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall -I../frechet-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -45,13 +44,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h Makefile
+%.o: %.cu ../frechet-cuda/norm1.h \
+          ../frechet-cuda/norm2.h \
+          ../frechet-cuda/norm3.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) README*
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	rm -rf README*
-	./$(program) 255 8 100 2 < ../README.md > README.fpc
-	./$(program) 100 < README.fpc > README
+	./$(program) 4 4 1000

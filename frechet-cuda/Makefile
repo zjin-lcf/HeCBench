@@ -45,13 +45,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h Makefile
+%.o: %.cu norm1.h norm2.h norm3.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) README*
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	rm -rf README*
-	./$(program) 255 8 100 2 < ../README.md > README.fpc
-	./$(program) 100 < README.fpc > README
+	./$(program) 4 4 1000
