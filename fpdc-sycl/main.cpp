@@ -46,7 +46,7 @@ Using GPUs, pp. 7:1-7:7. March 2011.
 #include "common.h"
 #include "kernels.h"
 
-static void Compress(queue &q, int blocks, int warpsperblock, int dimensionality) {
+static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int dimensionality) {
   // allocate CPU buffers
   ull *cbuf = (ull *)malloc(sizeof(ull) * MAX); // uncompressed data
   if (cbuf == NULL) {
@@ -103,10 +103,13 @@ static void Compress(queue &q, int blocks, int warpsperblock, int dimensionality
   buffer<int, 1> cutd (cut, blocks * warpsperblock); // chunk boundaries
   buffer<int, 1> offd (blocks * warpsperblock); // offset table
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   range<1> gws (blocks * WARPSIZE * warpsperblock);
   range<1> lws (WARPSIZE * warpsperblock);
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&](handler &cgh) {
       auto cbuf = cbufd.get_access<sycl_read>(cgh);
       auto dbuf = dbufd.get_access<sycl_write>(cgh);
@@ -119,6 +122,11 @@ static void Compress(queue &q, int blocks, int warpsperblock, int dimensionality
                           off.get_pointer(), ibufs.get_pointer());
       });
     });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer offsets back to CPU
   q.submit([&] (handler &cgh) {
@@ -169,12 +177,9 @@ static void Compress(queue &q, int blocks, int warpsperblock, int dimensionality
 
 /************************************************************************************/
 
-static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionality,
-                       int doubles)
+static void Decompress(queue &q, int blocks, int warpsperblock,
+                       int repeat, int dimensionality, int doubles)
 {
-#ifdef DEBUG
-  printf("[Decompress] allocate CPU buffers\n");
-#endif
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data, divided by chunk
   if (dbuf == NULL) { 
     fprintf(stderr, "cannot allocate dbuf\n");
@@ -192,23 +197,14 @@ static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionali
     fprintf(stderr, "cannot allocate off\n");
   }
 
-#ifdef DEBUG
-  printf("[Decompress] read in offset table\n");
-#endif
   for(int i = 0; i < blocks * warpsperblock; i++) {
     int num = fread(&off[i], 4, 1, stdin);
     assert(1 == num);
   }
 
-#ifdef DEBUG
-  printf("[Decompress] calculate required padding for last chunk\n");
-#endif
   int padding = ((doubles + WARPSIZE - 1) & -WARPSIZE) - doubles;
   doubles += padding;
 
-#ifdef DEBUG
-  printf("[Decompress] determine chunk assignments per warp\n");
-#endif
   int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock); 
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
@@ -218,16 +214,10 @@ static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionali
     cut[i] = std::min(curr, doubles);
   }
 
-#ifdef DEBUG
-  printf("[Decompress] allocate GPU buffers\n");
-#endif
   buffer<char, 1> dbufd ((doubles+1)/2*17); // compressed data
   buffer<ull, 1> fbufd (doubles); // uncompressed data
   buffer<int, 1> cutd (cut, blocks * warpsperblock); // chunk boundaries
 
-#ifdef DEBUG
-  printf("[Decompress] read in input data and divide into chunks\n");
-#endif
   for(int i = 0; i < blocks * warpsperblock; i++) {
     int num, chbeg, start = 0;
     if (i > 0) start = cut[i-1];
@@ -243,14 +233,13 @@ static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionali
     });
   }
 
-#ifdef DEBUG
-  printf("[Decompress] run the kernel for 100 iterations\n");
-#endif
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   range<1> gws (blocks * WARPSIZE * warpsperblock);
   range<1> lws (WARPSIZE * warpsperblock);
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&](handler &cgh) {
       auto dbuf = dbufd.get_access<sycl_read>(cgh);
       auto fbuf = fbufd.get_access<sycl_read_write>(cgh);
@@ -263,15 +252,17 @@ static void Decompress(queue &q, int blocks, int warpsperblock, int dimensionali
       });
     });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  fprintf(stderr, "Average decompression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   // transfer result back to CPU
   q.submit([&](handler &cgh) {
     auto acc = fbufd.get_access<sycl_read>(cgh);
     cgh.copy(acc, fbuf);
   }).wait();
 
-#ifdef DEBUG
-  printf("[Decompress] output decompressed data\n");
-#endif
   int num = fwrite(fbuf, 8, doubles-padding, stdout);
   assert(num == doubles-padding);
 
@@ -307,6 +298,7 @@ int main(int argc, char *argv[])
   VerifySystemParameters();
 
   int blocks, warpsperblock, dimensionality;
+  int repeat;
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -315,23 +307,30 @@ int main(int argc, char *argv[])
 #endif
   queue q(dev_sel);
 
-  if((3 == argc) || (4 == argc)) { /* compress */
+  if((4 == argc) || (5 == argc)) { /* compress */
     char dummy;
     blocks = atoi(argv[1]);
     assert((0 < blocks) && (blocks < 256));
+
     warpsperblock = atoi(argv[2]);
     assert((0 < warpsperblock) && (warpsperblock < 256));
-    if(3 == argc) {
+
+    repeat = atoi(argv[3]);
+
+    if(4 == argc) {
       dimensionality = 1;
     } else {
-      dimensionality = atoi(argv[3]);
+      dimensionality = atoi(argv[4]);
     }
     assert((0 < dimensionality) && (dimensionality <= WARPSIZE));
 
-    Compress(q, blocks, warpsperblock, dimensionality);
+    Compress(q, blocks, warpsperblock, repeat, dimensionality);
     assert(0 == fread(&dummy, 1, 1, stdin));
   }
-  else if(1 == argc) { /* decompress */
+  else if(2 == argc) { /* decompress */
+
+    repeat = atoi(argv[1]);
+
     int num, doubles;
     num = fread(&blocks, 1, 1, stdin);
     assert(1 == num);
@@ -348,7 +347,7 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
     printf("blocks=%d warps/block=%d dim=%d doubles=%d\n", blocks, warpsperblock, dimensionality, doubles);
 #endif
-    Decompress(q, blocks, warpsperblock, dimensionality, doubles);
+    Decompress(q, blocks, warpsperblock, repeat, dimensionality, doubles);
   }
   else {
     fprintf(stderr, "usage:\n");
