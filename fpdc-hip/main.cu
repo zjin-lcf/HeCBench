@@ -38,13 +38,12 @@ Gb/s on a GPU. Proceedings of the Fourth Workshop on General Purpose Processing
 Using GPUs, pp. 7:1-7:7. March 2011.
 */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
-
 
 static void CheckTest(const char *msg)
 {
@@ -58,7 +57,7 @@ static void CheckTest(const char *msg)
 
 /************************************************************************************/
 
-static void Compress(int blocks, int warpsperblock, int dimensionality)
+static void Compress(int blocks, int warpsperblock, int repeat, int dimensionality)
 {
   hipGetLastError();  // reset error value
 
@@ -137,10 +136,17 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
   if (hipSuccess != hipMemcpy(cutl, cut, sizeof(int) * blocks * warpsperblock, hipMemcpyHostToDevice))
     fprintf(stderr, "copying of cut to device failed\n");
 
-  for (int i = 0; i < 100; i++)
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     hipLaunchKernelGGL(CompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0, 
       dimensionality, cbufl, dbufl, cutl, offl);
-  CheckTest("compression kernel launch failed");
+  CheckTest("compression kernel launch failed"); // hipDeviceSynchronize();
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer offsets back to CPU
   if(hipSuccess != hipMemcpy(off, offl, sizeof(int) * blocks * warpsperblock, hipMemcpyDeviceToHost))
@@ -194,7 +200,8 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
 
 /************************************************************************************/
 
-static void Decompress(int blocks, int warpsperblock, int dimensionality, int doubles)
+static void Decompress(int blocks, int warpsperblock,
+                       int repeat, int dimensionality, int doubles)
 {
   hipGetLastError();  // reset error value
 
@@ -280,10 +287,18 @@ static void Decompress(int blocks, int warpsperblock, int dimensionality, int do
 #ifdef DEBUG
   printf("[Decompress] run the kernel for 100 iterations\n");
 #endif
-  for (int i = 0; i < 100; i++)
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     hipLaunchKernelGGL(DecompressionKernel, blocks, WARPSIZE*warpsperblock, 0, 0, 
       dimensionality, dbufl, fbufl, cutl);
   CheckTest("decompression kernel launch failed");
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  fprintf(stderr, "Average decompression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer result back to CPU
   if (hipSuccess != hipMemcpy(fbuf, fbufl, sizeof(ull) * doubles, hipMemcpyDeviceToHost))
@@ -336,27 +351,35 @@ int main(int argc, char *argv[])
   VerifySystemParameters();
 
   int blocks, warpsperblock, dimensionality;
+  int repeat;
 
   hipFuncSetCacheConfig(reinterpret_cast<const void*>(CompressionKernel), hipFuncCachePreferL1);
   hipFuncSetCacheConfig(reinterpret_cast<const void*>(DecompressionKernel), hipFuncCachePreferL1);
 
-  if((3 == argc) || (4 == argc)) { /* compress */
+  if((4 == argc) || (5 == argc)) { /* compress */
     char dummy;
     blocks = atoi(argv[1]);
     assert((0 < blocks) && (blocks < 256));
+
     warpsperblock = atoi(argv[2]);
     assert((0 < warpsperblock) && (warpsperblock < 256));
-    if(3 == argc) {
+
+    repeat = atoi(argv[3]);
+
+    if(4 == argc) {
       dimensionality = 1;
     } else {
-      dimensionality = atoi(argv[3]);
+      dimensionality = atoi(argv[4]);
     }
     assert((0 < dimensionality) && (dimensionality <= WARPSIZE));
 
-    Compress(blocks, warpsperblock, dimensionality);
+    Compress(blocks, warpsperblock, repeat, dimensionality);
     assert(0 == fread(&dummy, 1, 1, stdin));
   }
-  else if(1 == argc) { /* decompress */
+  else if(2 == argc) { /* decompress */
+
+    repeat = atoi(argv[1]);
+
     int num, doubles;
     num = fread(&blocks, 1, 1, stdin);
     assert(1 == num);
@@ -371,9 +394,10 @@ int main(int argc, char *argv[])
     assert(1 == num);
 
 #ifdef DEBUG
-    printf("blocks=%d warps/block=%d dim=%d doubles=%d\n", blocks, warpsperblock, dimensionality, doubles);
+    printf("blocks=%d warps/block=%d repeat=%d dim=%d doubles=%d\n",
+           blocks, warpsperblock, repeat, dimensionality, doubles);
 #endif
-    Decompress(blocks, warpsperblock, dimensionality, doubles);
+    Decompress(blocks, warpsperblock, repeat, dimensionality, doubles);
   }
   else {
     fprintf(stderr, "usage:\n");
