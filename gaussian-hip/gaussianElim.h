@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <algorithm>
 
-
 void printUsage();
 int parseCommandline(int argc, char *argv[], char* filename,
                      int *q, int *t, int *size);
