@@ -7,7 +7,6 @@
 #define BLOCK_SIZE_1_X 16
 #define BLOCK_SIZE_1_Y 16
 
-
 long long get_time() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -29,7 +28,6 @@ void create_matrix(float *m, int size){
     j=size-1-i;     
     coe[j]=coe_i;
   }
-
 
   for (i=0; i < size; i++) {
     for (j=0; j < size; j++) {
@@ -101,7 +99,6 @@ int main(int argc, char *argv[]) {
       b[i]=1.0;
   }
 
-
   if (!quiet) {    
     printf("The input matrix a is:\n");
     PrintMat(a, size, size, size);
@@ -157,12 +154,15 @@ int main(int argc, char *argv[]) {
 
   // verification
   printf("Checking the results..\n");
+  bool ok = true;
   for (int i = 0; i < size; i++) {
     if (fabsf(finalVec[i] - finalVec_host[i]) > 1e-3) {
+      ok = false; 
       printf("Result mismatch at index %d: %f(device)  %f(host)\n", 
           i, finalVec[i], finalVec_host[i]);
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(m);
   free(a);
@@ -176,7 +176,6 @@ int main(int argc, char *argv[]) {
   free(finalVec_host);
   return 0;
 }
-
 
 /*------------------------------------------------------
  ** ForwardSub() -- Forward substitution of Gaussian
@@ -201,9 +200,11 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
   range<1> gws((size + BLOCK_SIZE_0 - 1)/ BLOCK_SIZE_0 * BLOCK_SIZE_0);
 
   range<2> lws2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
-  range<2> gws2(
-      (size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y,
-      (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X);
+  range<2> gws2((size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y,
+                (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X);
+
+  q.wait();
+  auto start = get_time();
 
   // Run kernels
   for (int t=0; t<(size-1); t++) {
@@ -238,8 +239,11 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
       });
     });
   } // for (t=0; t<(size-1); t++) 
-}
 
+  q.wait();
+  auto end = get_time();
+  printf("Total kernel execution time %lld (us)\n", (end - start));
+}
 
 int parseCommandline(int argc, char *argv[], char* filename,
                      int *q, int *t, int *size)
@@ -265,7 +269,6 @@ int parseCommandline(int argc, char *argv[], char* filename,
           break;
         case 'h': // help
           return 1;
-          break;
         case 'q': // quiet
           *q = 1;
           break;

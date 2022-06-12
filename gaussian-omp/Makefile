@@ -64,4 +64,3 @@ clean:
 
 run: $(program)
 	./$(program) -q -t -s 4096
-

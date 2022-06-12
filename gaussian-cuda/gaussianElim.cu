@@ -7,7 +7,6 @@
 #define BLOCK_SIZE_1_X 16
 #define BLOCK_SIZE_1_Y 16
 
-
 long long get_time() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -15,8 +14,7 @@ long long get_time() {
 }
 
 // create both matrix and right hand side, Ke Wang 2013/08/12 11:51:06
-void
-create_matrix(float *m, int size){
+void create_matrix(float *m, int size){
   int i,j;
   float lamda = -0.01;
   float coe[2*size-1];
@@ -30,7 +28,6 @@ create_matrix(float *m, int size){
     j=size-1-i;     
     coe[j]=coe_i;
   }
-
 
   for (i=0; i < size; i++) {
     for (j=0; j < size; j++) {
@@ -79,7 +76,6 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-
   if(size < 1)
   {
     fp = fopen(filename, "r");
@@ -92,7 +88,6 @@ int main(int argc, char *argv[]) {
     InitAry(fp, b, size);
 
     fclose(fp);
-
   }
   else
   {
@@ -138,7 +133,8 @@ int main(int argc, char *argv[]) {
   long long offload_end = get_time();
 
   if (timing) {
-    printf("Device offloading time %lld (us)\n\n",offload_end - offload_start);
+    printf("Device offloading time %lld (us)\n\n",
+           offload_end - offload_start);
   }
 
   // Compute the backward phase on a host
@@ -157,12 +153,15 @@ int main(int argc, char *argv[]) {
 
   // verification
   printf("Checking the results..\n");
+  bool ok = true;
   for (int i = 0; i < size; i++) {
     if (fabsf(finalVec[i] - finalVec_host[i]) > 1e-3) {
+      ok = false; 
       printf("Result mismatch at index %d: %f(device)  %f(host)\n", 
           i, finalVec[i], finalVec_host[i]);
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(m);
   free(a);
@@ -178,7 +177,9 @@ int main(int argc, char *argv[]) {
 }
 
 __global__ void
-fan1 (const float* a, float* m, const int size, const int t)
+fan1 (const float*__restrict__ a,
+            float*__restrict__ m,
+      const int size, const int t)
 {
   int globalId = blockDim.x * blockIdx.x + threadIdx.x;
   if (globalId < size-1-t) {
@@ -188,7 +189,10 @@ fan1 (const float* a, float* m, const int size, const int t)
 }
 
 __global__ void
-fan2 (float* a, float* b, float* m, const int size, const int t)
+fan2 (float*__restrict__ a,
+      float*__restrict__ b,
+      const float*__restrict__ m,
+      const int size, const int t)
 {
   int globalIdy = blockDim.x * blockIdx.x + threadIdx.x;
   int globalIdx = blockDim.y * blockIdx.y + threadIdx.y;
@@ -226,10 +230,17 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing){
   cudaMemcpy(d_b, b, size*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(d_m, m, size*size*sizeof(float), cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto start = get_time();
+
   for (int t=0; t<(size-1); t++) {
     fan1<<<gridDim_fan1, blockDim_fan1>>> (d_a, d_m, size, t);
     fan2<<<gridDim_fan2, blockDim_fan2>>> (d_a, d_b, d_m, size, t);
   } 
+
+  cudaDeviceSynchronize();
+  auto end = get_time();
+  printf("Total kernel execution time %lld (us)\n", (end - start));
 
   cudaMemcpy(a, d_a, size*size*sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(b, d_b, size*sizeof(float), cudaMemcpyDeviceToHost);
@@ -239,7 +250,6 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing){
   cudaFree(d_b);
   cudaFree(d_m);
 }
-
 
 // Ke Wang add a function to generate input internally
 int parseCommandline(int argc, char *argv[], char* filename,
@@ -297,7 +307,6 @@ void printUsage(){
   printf("       2. If you declare either the device or the platform,\n");
   printf("          you must declare both.\n\n");
 }
-
 
 /*------------------------------------------------------
  ** InitPerRun() -- Initialize the contents of the

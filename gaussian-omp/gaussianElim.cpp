@@ -4,7 +4,6 @@
 
 #define BLOCK_SIZE_0 256
 
-
 long long get_time() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -12,8 +11,7 @@ long long get_time() {
 }
 
 // create both matrix and right hand side, Ke Wang 2013/08/12 11:51:06
-void
-create_matrix(float *m, int size){
+void create_matrix(float *m, int size){
   int i,j;
   float lamda = -0.01;
   float coe[2*size-1];
@@ -27,7 +25,6 @@ create_matrix(float *m, int size){
     j=size-1-i;     
     coe[j]=coe_i;
   }
-
 
   for (i=0; i < size; i++) {
     for (j=0; j < size; j++) {
@@ -75,7 +72,6 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-
   if(size < 1)
   {
     fp = fopen(filename, "r");
@@ -88,7 +84,6 @@ int main(int argc, char *argv[]) {
     InitAry(fp, b, size);
 
     fclose(fp);
-
   }
   else
   {
@@ -98,7 +93,6 @@ int main(int argc, char *argv[]) {
     b = (float *) malloc(size * sizeof(float));
     for (int i =0; i< size; i++)
       b[i]=1.0;
-
   }
 
   if (!quiet) {    
@@ -128,7 +122,6 @@ int main(int argc, char *argv[]) {
   // Compute the reference on a host
   gaussian_reference(a_host, b_host, m_host, finalVec_host, size);
 
-
   // Compute the forward phase on a device
   long long offload_start = get_time();
   ForwardSub(a,b,m,size,timing);
@@ -156,12 +149,15 @@ int main(int argc, char *argv[]) {
 
   // verification
   printf("Checking the results..\n");
+  bool ok = true;
   for (int i = 0; i < size; i++) {
     if (fabsf(finalVec[i] - finalVec_host[i]) > 1e-3) {
+      ok = false; 
       printf("Result mismatch at index %d: %f(device)  %f(host)\n", 
           i, finalVec[i], finalVec_host[i]);
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(m);
   free(a);
@@ -184,6 +180,8 @@ int main(int argc, char *argv[]) {
 void ForwardSub(float *a, float *b, float *m, int size,int timing){    
 #pragma omp target data map(tofrom: a[0:size*size], b[0:size], m[0:size*size])
   {
+    auto start = get_time();
+
     for (int t=0; t<(size-1); t++) {
 
       #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE_0)
@@ -203,9 +201,11 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
         }
       }
     } // for (t=0; t<(size-1); t++) 
+
+    auto end = get_time();
+    printf("Total kernel execution time %lld (us)\n", (end - start));
   } 
 }
-
 
 // Ke Wang add a function to generate input internally
 int parseCommandline(int argc, char *argv[], char* filename,
@@ -230,8 +230,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
           printf("Read file from %s \n", filename);
           break;
         case 'h': // help
-          return 1;
-          break;
+          return 1; 
         case 'q': // quiet
           *q = 1;
           break;
@@ -265,7 +264,6 @@ void printUsage(){
   printf("          you must declare both.\n\n");
 }
 
-
 /*------------------------------------------------------
  ** InitPerRun() -- Initialize the contents of the
  ** multipier matrix **m
@@ -277,6 +275,7 @@ void InitPerRun(int size,float *m)
   for (i=0; i<size*size; i++)
     *(m+i) = 0.0;
 }
+
 void BackSub(float *a, float *b, float *finalVec, int size)
 {
   // solve "bottom up"
@@ -290,6 +289,7 @@ void BackSub(float *a, float *b, float *finalVec, int size)
     finalVec[size-i-1]=finalVec[size-i-1]/ *(a+size*(size-i-1)+(size-i-1));
   }
 }
+
 void InitMat(FILE *fp, int size, float *ary, int nrow, int ncol)
 {
   int i, j;
@@ -300,6 +300,7 @@ void InitMat(FILE *fp, int size, float *ary, int nrow, int ncol)
     }
   }  
 }
+
 /*------------------------------------------------------
  ** InitAry() -- Initialize the array (vector) by reading
  ** data from the data file
