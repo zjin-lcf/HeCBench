@@ -1,9 +1,11 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 #include "common.h"
 
-float  distance_host ( int i, float  latitude_1, float  longitude_1, float  latitude_2, float  longitude_2 )
+float  distance_host ( int i, float latitude_1, float longitude_1,
+                       float latitude_2, float longitude_2 )
 {
   float  dist ;
   float  rad_latitude_1 ;
@@ -20,7 +22,6 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
   const float GC_SEMI_MINOR = 6356752.31424518f;
   const float EPS = 0.5e-5f;
-
 
   rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
   rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
@@ -85,6 +86,9 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
   const  property_list props = { property::buffer::use_host_ptr()};
   buffer<sycl::float4, 1> bufferA(VA, N, props);
   buffer<float, 1> bufferC(VC, N, props);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < iteration; n++) {
     q.submit([&](handler& cgh) {
@@ -156,6 +160,10 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
     });
   }
   q.wait();
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 }
 
 void verify( int size, const float *output, const float *expected_output) {
@@ -169,7 +177,10 @@ void verify( int size, const float *output, const float *expected_output) {
 }
 
 int main(int argc, char** argv) {
-
+  if (argc != 2) {
+    printf("Usage %s <repeat>\n", argv[0]);
+    return 1;
+  }
   int iteration = atoi(argv[1]);
 
   int num_cities = 2097152; // 2 ** 21
