@@ -1,14 +1,15 @@
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <iomanip>
-#include <cassert>
 #include <omp.h>
 #include "utils.h"
 
 int main(int argc, const char *argv[]) {
-
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
+    return 1;
+  }
   const std::string file_path = argv[1]; 
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
@@ -35,8 +36,6 @@ int main(int argc, const char *argv[]) {
   float l2_norm[1];
   int   correct[1];
 
-  long long train_start = get_time();
-
   #pragma omp target data map (to: d_x[0:n], \
                                    d_A_row_ptr[0:A.row_ptr.size()], \
                                    d_A_value[0:A.values.size()], \
@@ -47,6 +46,10 @@ int main(int argc, const char *argv[]) {
                                       l2_norm[0:1], \
                                       correct[0:1])
 {
+  long long train_start = get_time();
+
+  float obj_val = 0.f;
+  float train_error = 0.f;
 
   for (int k = 0; k < iters; k++) {
 
@@ -109,13 +112,8 @@ int main(int argc, const char *argv[]) {
     #pragma omp target update from (l2_norm[0:1])
     #pragma omp target update from (correct[0:1])
 
-    float obj_val = total_obj_val[0] / (float)m + 0.5f * lambda * l2_norm[0];
-
-    float train_error = 1.f - (correct[0]/(float)m); 
-
-    std::cout << std::setw(10) << std::left << k << std::setw(20) << std::left 
-      << std::setprecision(10) << obj_val << std::setw(20) << std::left 
-      << train_error << "\n" ;
+    obj_val = total_obj_val[0] / (float)m + 0.5f * lambda * l2_norm[0];
+    train_error = 1.f - (correct[0]/(float)m); 
 
     // update x (gradient does not need to be updated)
     #pragma omp target teams distribute parallel for thread_limit(256)
@@ -124,11 +122,14 @@ int main(int argc, const char *argv[]) {
       d_x[i] = d_x[i] - alpha * g;
     }
   }
+
   long long train_end = get_time();
   printf("Training time takes %lld(us) for %d iterations\n\n", 
-     train_end - train_start, iters);
-}
+         train_end - train_start, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
+  printf("object value = %f train_error = %f\n", obj_val, train_error);
+}
+
   return 0; 
 }

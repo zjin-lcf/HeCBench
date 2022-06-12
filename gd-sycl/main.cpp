@@ -1,14 +1,15 @@
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <iomanip>
-#include <cassert>
 #include "common.h"
 #include "utils.h"
 
 int main(int argc, const char *argv[]) {
-
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
+    return 1;
+  }
   const std::string file_path = argv[1]; 
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
@@ -55,6 +56,9 @@ int main(int argc, const char *argv[]) {
   range<1> gws2((n+255)/256*256);
   range<1> lws2 (256);
 
+  float obj_val = 0.f;
+  float train_error = 0.f;
+
   long long train_start = get_time();
 
   for (int k = 0; k < iters; k++) {
@@ -87,7 +91,6 @@ int main(int argc, const char *argv[]) {
       cgh.copy(grad.data(), acc);
     });
     
-
     // compute the total objective, correct rate, and gradient
     q.submit([&] (handler &cgh) {
       auto x = d_x.get_access<sycl_read>(cgh);
@@ -173,13 +176,9 @@ int main(int argc, const char *argv[]) {
     });
     
     q.wait();
-    float obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
 
-    float train_error = 1.f-(correct/(float)m); 
-
-    std::cout << std::setw(10) << std::left << k << std::setw(20) << std::left 
-      << std::setprecision(10) << obj_val << std::setw(20) << std::left 
-      << train_error << "\n" ;
+    bj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
+    train_error = 1.f-(correct/(float)m); 
 
     // update x (gradient does not need to be updated)
     q.submit([&] (handler &cgh) {
@@ -194,12 +193,13 @@ int main(int argc, const char *argv[]) {
       });
     });
   }
-  q.wait();
+
   long long train_end = get_time();
   printf("Training time takes %lld(us) for %d iterations\n\n", 
-     train_end - train_start, iters);
+         train_end - train_start, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
+  printf("object value = %f train_error = %f\n", obj_val, train_error);
 
   return 0; 
 }
