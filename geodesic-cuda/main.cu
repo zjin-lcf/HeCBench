@@ -3,10 +3,11 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 #include <cuda.h>
 
-
-float  distance_host ( int i, float  latitude_1, float  longitude_1, float  latitude_2, float  longitude_2 )
+float  distance_host ( int i, float latitude_1, float longitude_1,
+                       float latitude_2, float longitude_2 )
 {
   float  dist ;
   float  rad_latitude_1 ;
@@ -23,7 +24,6 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
   const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
   const float GC_SEMI_MINOR = 6356752.31424518f;
   const float EPS = 0.5e-5f;
-
 
   rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
   rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
@@ -76,8 +76,10 @@ float  distance_host ( int i, float  latitude_1, float  longitude_1, float  lati
 }
 
 __global__ void 
-kernel_distance (const float4 *d_A, float *d_C, const int N) {
-
+kernel_distance (const float4 *__restrict__ d_A,
+                        float *__restrict__ d_C,
+                 const int N)
+{
   const int wiID = blockIdx.x * blockDim.x + threadIdx.x;
   if (wiID >= N) return;
 
@@ -151,9 +153,17 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
   cudaMemcpy(d_VA, VA, sizeof(float4)*N, cudaMemcpyHostToDevice);
   cudaMalloc((void**)&d_VC, sizeof(float)*N);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < iteration; n++) {
     kernel_distance<<<grids, threads>>>(d_VA, d_VC, N);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 
   cudaMemcpy(VC, d_VC, sizeof(float)*N, cudaMemcpyDeviceToHost);
   cudaFree(d_VA);
@@ -171,7 +181,10 @@ void verify(int size, const float *output, const float *expected_output) {
 }
 
 int main(int argc, char** argv) {
-
+  if (argc != 2) {
+    printf("Usage %s <repeat>\n", argv[0]);
+    return 1;
+  }
   int iteration = atoi(argv[1]);
 
   int num_cities = 2097152; // 2 ** 21
