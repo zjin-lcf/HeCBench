@@ -74,5 +74,3 @@ clean:
 
 run: $(program)
 	./$(program) gisette_scale 0.0001 10 100  
-
-

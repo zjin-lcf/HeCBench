@@ -1,9 +1,7 @@
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <iomanip>
-#include <cassert>
 #include <cuda.h>
 #include "utils.h"
 
@@ -66,7 +64,10 @@ update(float * __restrict__ x, float * __restrict__ grad,
 }
 
 int main(int argc, const char *argv[]) {
-
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
+    return 1;
+  }
   const std::string file_path = argv[1]; 
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
@@ -124,6 +125,9 @@ int main(int argc, const char *argv[]) {
   dim3 grid2 ((n+255)/256);
   dim3 block2 (256);
 
+  float obj_val = 0.f;
+  float train_error = 0.f;
+
   long long train_start = get_time();
 
   for (int k = 0; k < iters; k++) {
@@ -162,23 +166,19 @@ int main(int argc, const char *argv[]) {
     cudaMemcpy(&l2_norm, d_l2_norm, sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(&correct, d_correct, sizeof(int), cudaMemcpyDeviceToHost);
 
-    float obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
-
-    float train_error = 1.f-(correct/(float)m); 
-
-    std::cout << std::setw(10) << std::left << k << std::setw(20) << std::left 
-      << std::setprecision(10) << obj_val << std::setw(20) << std::left 
-      << train_error << "\n" ;
+    obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
+    train_error = 1.f-(correct/(float)m); 
 
     // update x (gradient does not need to be updated)
     update<<<grid2, block2>>>(d_x, d_grad, m, n, lambda, alpha);
-
   }
+
   long long train_end = get_time();
   printf("Training time takes %lld(us) for %d iterations\n\n", 
-     train_end - train_start, iters);
+         train_end - train_start, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
+  printf("object value = %f train_error = %f\n", obj_val, train_error);
 
   cudaFree(d_row_ptr);
   cudaFree(d_col_index);

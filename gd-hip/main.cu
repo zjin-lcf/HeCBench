@@ -1,9 +1,7 @@
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <iomanip>
-#include <cassert>
 #include <hip/hip_runtime.h>
 #include "utils.h"
 
@@ -66,7 +64,10 @@ update(float * __restrict__ x, float * __restrict__ grad,
 }
 
 int main(int argc, const char *argv[]) {
-
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
+    return 1;
+  }
   const std::string file_path = argv[1]; 
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
@@ -124,6 +125,9 @@ int main(int argc, const char *argv[]) {
   dim3 grid2 ((n+255)/256);
   dim3 block2 (256);
 
+  float obj_val = 0.f;
+  float train_error = 0.f;
+
   long long train_start = get_time();
 
   for (int k = 0; k < iters; k++) {
@@ -143,7 +147,7 @@ int main(int argc, const char *argv[]) {
     hipMemcpy(d_grad, grad.data(), n * sizeof(float), hipMemcpyHostToDevice);
 
     // compute the total objective, correct rate, and gradient
-    hipLaunchKernelGGL(compute, dim3(grid), dim3(block), 0, 0, 
+    hipLaunchKernelGGL(compute, grid, block, 0, 0, 
         d_x, 
         d_grad, 
         d_row_ptr,
@@ -156,29 +160,25 @@ int main(int argc, const char *argv[]) {
       ); 
 
     // display training status for verification
-    hipLaunchKernelGGL(L2_norm, dim3(grid2), dim3(block2), 0, 0, d_x, d_l2_norm, n);
+    hipLaunchKernelGGL(L2_norm, grid2, block2, 0, 0, d_x, d_l2_norm, n);
 
     hipMemcpy(&total_obj_val, d_total_obj_val, sizeof(float), hipMemcpyDeviceToHost);
     hipMemcpy(&l2_norm, d_l2_norm, sizeof(float), hipMemcpyDeviceToHost);
     hipMemcpy(&correct, d_correct, sizeof(int), hipMemcpyDeviceToHost);
 
-    float obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
-
-    float train_error = 1.f-(correct/(float)m); 
-
-    std::cout << std::setw(10) << std::left << k << std::setw(20) << std::left 
-      << std::setprecision(10) << obj_val << std::setw(20) << std::left 
-      << train_error << "\n" ;
+    obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
+    train_error = 1.f-(correct/(float)m); 
 
     // update x (gradient does not need to be updated)
-    hipLaunchKernelGGL(update, dim3(grid2), dim3(block2), 0, 0, d_x, d_grad, m, n, lambda, alpha);
-
+    hipLaunchKernelGGL(update, grid2, block2, 0, 0, d_x, d_grad, m, n, lambda, alpha);
   }
+
   long long train_end = get_time();
   printf("Training time takes %lld(us) for %d iterations\n\n", 
-     train_end - train_start, iters);
+         train_end - train_start, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
+  printf("object value = %f train_error = %f\n", obj_val, train_error);
 
   hipFree(d_row_ptr);
   hipFree(d_col_index);
