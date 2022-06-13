@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) data/snap/amazon0302/amazon0302.mtx 8 100
+	./$(program) ../ge-spmm-cuda/data/snap/amazon0302/amazon0302.mtx 8 100

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <fstream>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
 
@@ -184,8 +185,18 @@ int main(int argc, char** argv) {
     NEXT_METHOD:
     for (int method=1; method<5; method++) {
       checkHipError(hipMemset((void*)C_dev, 0, A_nrows*B_ncols*sizeof(C_dev[0])));
+
+      hipDeviceSynchronize();
+      auto start = std::chrono::steady_clock::now();
+
       for (int i=0; i<repeat; i++)
         spmmWrapper(method, tile_row,  A_nrows, B_ncols, A_indptr_dev, A_indices_dev, A_data_dev, B_dev, C_dev);
+
+      hipDeviceSynchronize();
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel (method %d) execution time %f (s)\n", method, (time * 1e-9f) / repeat);
+
       checkHipError(hipMemcpy(C, C_dev, A_nrows*B_ncols*sizeof(C[0]), hipMemcpyDeviceToHost));
       #ifdef VALIDATE
       for (int i=0; i<A_nrows; i++) 

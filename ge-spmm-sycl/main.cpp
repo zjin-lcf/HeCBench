@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <fstream>
+#include <chrono>
 #include "common.h"
 #include "kernels.h"
 
@@ -221,9 +222,17 @@ int main(int argc, char** argv) {
         cgh.fill(acc, 0.f);
       });
 
+      q.wait();
+      auto start = std::chrono::steady_clock::now();
+
       for (int i=0; i<repeat; i++)
         spmmWrapper(q, method, tile_row, A_nrows, B_ncols,
                     A_indptr_dev, A_indices_dev, A_data_dev, B_dev, C_dev);
+
+      q.wait();
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel (method %d) execution time %f (s)\n", method, (time * 1e-9f) / repeat);
 
       q.submit([&] (handler &cgh) {
         auto acc = C_dev.get_access<sycl_read>(cgh);
