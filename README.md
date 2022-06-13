@@ -339,6 +339,9 @@ Early results are shown [here](results/README.md)
 ### fpdc (cuda)
   Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
 
+### frechet (matlab)
+  Compute the discrete Frechet distance between two curves specified by discrete ordered points in n-dimensional space (https://github.com/mp4096/discrete-frechet-distance)
+
 ### fresnel (c)
   Fresnel integral (http://www.mymathlib.com/functions/fresnel_sin_cos_integrals.html)
 
@@ -366,7 +369,10 @@ Early results are shown [here](results/README.md)
 ### gd (c++)
   Gradient descent (https://github.com/CGudapati/BinaryClassification)
 
-##a geodesic (opencl)
+### geam (cuda)
+  Matrix transpose using the BLAS-extension functions (https://docs.nvidia.com/cuda/cublas/index.html#cublas-lt-t-gt-geam)
+
+### geodesic (opencl)
   Geodesic distance (https://www.osti.gov/servlets/purl/1576565)
 
 ### ge-spmm (cuda)
