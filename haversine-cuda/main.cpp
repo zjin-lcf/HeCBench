@@ -15,14 +15,13 @@ void verify(int size, const double *output, const double *expected_output) {
   printf("The maximum error in distance is %f\n", error_rate); 
 }
 
-
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <file>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <file> <repeat>\n", argv[0]);
     return 1;
   }
-
   const char* filename = argv[1];
+  const int repeat = atoi(argv[2]);
 
   printf("Reading city locations from file %s...\n", filename);
   FILE* fp = fopen(filename, "r");
@@ -85,8 +84,7 @@ int main(int argc, char* argv[]) {
     expected_output[i] = 2.0 * EARTH_RADIUS_KM * asin(sqrt(sinysqrd + sinxsqrd * scale));
   }
 
-  // kernel runs for 100 iterations
-  distance_device(input, output, N, 100);
+  distance_device(input, output, N, repeat);
 
   verify(N, output, expected_output);
 

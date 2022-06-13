@@ -1,7 +1,9 @@
 #ifndef DIST_H
 #define DIST_H
 
+#include <stdio.h>
 #include <math.h>
+#include <chrono>
 
 #if defined __CUDACC__
 #include <cuda.h>
@@ -26,4 +28,3 @@ typedef struct __attribute__((__aligned__(16)))
 #define EARTH_RADIUS_KM   6371.0
 
 #endif
-
