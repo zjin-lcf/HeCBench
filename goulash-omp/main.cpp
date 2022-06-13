@@ -11,7 +11,6 @@
 #include <math.h>
 #include <sys/time.h>
 #include <omp.h>
-
 #include "utils.h"
 
 void gate(double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
@@ -45,12 +44,11 @@ void gate(double* __restrict m_gate, const long nCells, const double* __restrict
   }
 }
 
-
 int main(int argc, char* argv[]) 
 {
   if (argc != 3)
   {
-    printf ("Usage: %s  Iterations  Kernel_GBs_used\n\n", argv[0]);
+    printf ("Usage: %s <Iterations> <Kernel_GBs_used>\n\n", argv[0]);
     exit (1);
   }
 
@@ -77,19 +75,16 @@ int main(int argc, char* argv[])
   double kernel_starttime, kernel_endtime, kernel_runtime;
   for (long itime=0; itime<=iterations; itime++) {
     /* Start timer after warm-up iteration 0 */
-    if (itime==1) {
+    if (itime == 1) {
       #pragma omp target update from (m_gate[0:nCells])
-      kernel_starttime=secs_elapsed();
+      kernel_starttime = secs_elapsed();
     }
     gate(m_gate, nCells, Vm);
   }
 
-  kernel_endtime=secs_elapsed();
-
+  kernel_endtime = secs_elapsed();
   kernel_runtime = kernel_endtime-kernel_starttime;
-
   printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
-
 }
 
   // verify
