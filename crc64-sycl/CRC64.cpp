@@ -41,11 +41,9 @@
 #define __STDC_CONSTANT_MACROS
 #endif
 
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-
 
 #include <stdbool.h>
 
@@ -495,7 +493,6 @@ static const uint64_t crc64_x_pow_2n[64] = {
   UINT64_C(0x8ef8951d46606fb5), UINT64_C(0x9d58c1090f034d14)
 };
 
-
 // Compute (a*b) mod P
 // See: https://code.google.com/p/crcutil/source/browse/code/gf_util.h
 static inline uint64_t crc64_multiply_(uint64_t a, uint64_t b) {
@@ -605,4 +602,3 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
 
   return crc64(input, nbytes);
 }
-

@@ -36,10 +36,9 @@ using namespace aocl_utils;
 #define BLOOM_SIZE         14
 #define docEndingTag       0xFFFFFFFF
 
-
-
 // Params
 uint block_size = 64;
+uint repeat = 100;
 uint total_num_docs = 256*1024;
 uint total_doc_size = 0;
 uint total_doc_size_no_padding = 0;
@@ -254,7 +253,7 @@ void runOnCPU()
 }
 
 
-  __device__
+__device__
 ulong mulfp( ulong weight, uint freq )
 {
   uint part1 = weight & 0xFFFFF;         // lower 24-bits of weight
@@ -266,13 +265,14 @@ ulong mulfp( ulong weight, uint freq )
   return (ulong)res1 + (((ulong)res2) << 24);
 }
 
-__global__ void compute ( const uint*  docWordFrequencies_dimm1, 
-                          const uint*  docWordFrequencies_dimm2,
-                          const ulong*  profileWeights_dimm1,
-                          const ulong*  profileWeights_dimm2,
-                          const uint*  isWordInProfileHash,
-                                uint*  profileScorePerGroup_highbits_dimm1,
-                                uint*  profileScorePerGroup_lowbits_dimm2 )
+__global__ void
+compute ( const uint* __restrict__ docWordFrequencies_dimm1, 
+          const uint* __restrict__ docWordFrequencies_dimm2,
+          const ulong*__restrict__ profileWeights_dimm1,
+          const ulong*__restrict__ profileWeights_dimm2,
+          const uint* __restrict__ isWordInProfileHash,
+                uint* __restrict__ profileScorePerGroup_highbits_dimm1,
+                uint* __restrict__ profileScorePerGroup_lowbits_dimm2 )
 {
   uint curr_entry[MANUAL_VECTOR];
   uint word_id[MANUAL_VECTOR];
@@ -329,10 +329,11 @@ __global__ void compute ( const uint*  docWordFrequencies_dimm1,
   }
 }
 
-__global__ void reduction( const ulong*  docInfo,
-                           const uint*   partial_highbits_dimm1,
-                           const uint*   partial_lowbits_dimm2,
-                                 ulong*  result)
+__global__ void
+reduction( const ulong* __restrict__ docInfo,
+           const uint*  __restrict__ partial_highbits_dimm1,
+           const uint*  __restrict__ partial_lowbits_dimm2,
+                 ulong* __restrict__ result)
 {
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   ulong info = docInfo[gid];
@@ -359,12 +360,15 @@ int main(int argc, char** argv)
   }
   printf("Total number of documents: %u\n", total_num_docs);
 
+  if(options.has("p")) {
+    repeat = options.get<uint>("p");
+  }
+  printf("Kernel execution count: %u\n", repeat);
+
   srand(2);
   printf("RAND_MAX: %d\n", RAND_MAX);
   printf("Allocating and setting up data\n");
   setupData();
-
-  printf("Setting up HIP\n");
 
   size_t local_size = (block_size / MANUAL_VECTOR); 
   size_t global_size = total_doc_size / 2 / MANUAL_VECTOR / local_size;
@@ -401,7 +405,7 @@ int main(int argc, char** argv)
 
   const double start_time = getCurrentTimestamp();
 
-  for (int i=0; i<100; i++) {
+  for (uint i=0; i<repeat; i++) {
     hipLaunchKernelGGL(compute, global_size, local_size, 0, 0, 
         d_docWordFrequencies_dimm1,
         d_docWordFrequencies_dimm2, 
@@ -420,9 +424,9 @@ int main(int argc, char** argv)
   hipDeviceSynchronize();
 
   const double end_time = getCurrentTimestamp();
-  double kernelExecutionTime = (end_time - start_time)/100;
+  double kernelExecutionTime = (end_time - start_time)/repeat;
   printf("======================================================\n");
-  printf("Kernel Time = %f ms (averaged over 100 times)\n", kernelExecutionTime * 1000.0f );
+  printf("Kernel Time = %f ms (averaged over %d times)\n", kernelExecutionTime * 1000.0f, repeat );
   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
 
   hipMemcpy(h_profileScore, d_profileScore, sizeof(ulong) * total_num_docs, hipMemcpyDeviceToHost);

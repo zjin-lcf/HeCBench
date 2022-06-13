@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 #include "shrUtils.h"
 
@@ -38,7 +39,12 @@ __global__ void dot_product(const float *a, const float *b, float *c, const int 
 
 int main(int argc, char **argv)
 {
-  int iNumElements = atoi(argv[1]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int iNumElements = atoi(argv[1]);
+  const int iNumIterations = atoi(argv[2]);
 
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
@@ -70,8 +76,16 @@ int main(int argc, char **argv)
   dim3 grid (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize); 
   dim3 block (szLocalWorkSize);
 
-  for (int i = 0; i < 100; i++) 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iNumIterations; i++) 
     dot_product<<<grid, block>>>(d_srcA, d_srcB, d_dst, iNumElements);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   cudaMemcpy(dst, d_dst, sizeof(float) * szGlobalWorkSize, cudaMemcpyDeviceToHost);
   cudaFree(d_dst);

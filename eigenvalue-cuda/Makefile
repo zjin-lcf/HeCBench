@@ -55,4 +55,3 @@ clean:
 
 run: $(program)
 	./$(program) 2048 100
-

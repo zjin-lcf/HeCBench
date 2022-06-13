@@ -143,4 +143,3 @@ T reduce_cross_term(
     sum += cross_term[i];
   return sum;
 }
-

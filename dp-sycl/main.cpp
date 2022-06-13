@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 #include "shrUtils.h"
 
@@ -27,7 +28,12 @@ void DotProductHost(const float* pfData1, const float* pfData2, float* pfResult,
 
 int main(int argc, char **argv)
 {
-  int iNumElements = atoi(argv[1]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int iNumElements = atoi(argv[1]);
+  const int iNumIterations = atoi(argv[2]);
 
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
@@ -58,7 +64,10 @@ int main(int argc, char **argv)
   range<1> gws (szGlobalWorkSize);
   range<1> lws (szLocalWorkSize);
 
-  for (int i = 0; i < 100; i++) 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iNumIterations; i++) {
     q.submit([&] (handler &cgh) {
       auto a = d_srcA.get_access<sycl_read>(cgh);
       auto b = d_srcB.get_access<sycl_read>(cgh);
@@ -74,9 +83,14 @@ int main(int argc, char **argv)
         }
       });
     });
+  }
 
   q.wait();
-  }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+
+  } // sycl scope
 
   // Compute and compare results for golden-host and report errors and pass/fail
   printf("Comparing against Host/C++ computation...\n\n"); 

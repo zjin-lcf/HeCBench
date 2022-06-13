@@ -25,7 +25,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+#include <math.h>
+#include <chrono>
 #include "common.h"
 #include "read_data.h"
 
@@ -39,7 +40,7 @@ typedef struct {
 } eh_t;
 
 
-void extend2(queue &q, struct extend2_dat *d)
+float extend2(queue &q, struct extend2_dat *d)
 {
   eh_t *eh = NULL; /* score array*/
   char *qp = NULL; /* query profile*/
@@ -61,8 +62,9 @@ void extend2(queue &q, struct extend2_dat *d)
   const int zdrop = d->zdrop;
   const int h0 = d->h0;
 
-  {
+  auto start = std::chrono::steady_clock::now();
 
+  {
     buffer<unsigned char, 1> d_query (d->query, qlen);
     buffer<unsigned char, 1> d_target (d->target, tlen);
     buffer<char, 1> d_mat (d->mat, m*m);
@@ -205,6 +207,9 @@ void extend2(queue &q, struct extend2_dat *d)
     });
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   check(d->qle, qle, "qle");
   check(d->tle, tle, "tle");
   check(d->gtle, gtle, "gtle");
@@ -219,11 +224,16 @@ void extend2(queue &q, struct extend2_dat *d)
   printf("device: qle=%d, tle=%d, gtle=%d, gscore=%d, max_off=%d, score=%d\n",
       qle, tle, gtle, gscore, max_off, score);
 #endif
+  return time;
 }
 
 int main(int argc, char *argv[])
 {
-  int iterations = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU 
   gpu_selector dev_sel;
@@ -239,9 +249,11 @@ int main(int argc, char *argv[])
 #include "filelist.txt"
   };
 
-  for (int f = 0; f < iterations; f++) {
+  float time = 0.f;
+  for (int f = 0; f < repeat; f++) {
     read_data(files[f%17], &d);
-    extend2(q, &d);
+    time += extend2(q, &d);
   }
+  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
   return 0;
 }

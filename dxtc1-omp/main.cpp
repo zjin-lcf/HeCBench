@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
+#include <chrono>
 #include <omp.h>
 #include "dds.h"
 #include "permutations.h"
@@ -35,6 +36,18 @@ typedef struct { uint x; uint y; uint z; uint w;} uint4 ;
 // *********************************************************************
 int main(int argc, char** argv) 
 {
+  if (argc != 4) {
+    printf("Usage: %s <path to image> <path to reference image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const char* image_path = argv[1];
+  assert(image_path != NULL);
+
+  const char* reference_image_path = argv[2];
+  assert(reference_image_path != NULL);
+
+  const int numIterations = atoi(argv[3]);
+
   unsigned int width, height;
   unsigned int* h_img = NULL;
   const float alphaTable4[4] = {9.0f, 0.0f, 6.0f, 3.0f};
@@ -43,8 +56,6 @@ int main(int argc, char** argv)
   const int prods3[4] = {0x040000, 0x000400, 0x040101, 0x010401};
 
   // load image 
-  const char* image_path = argv[1];
-  assert(image_path != NULL);
   shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height);
   assert(h_img != NULL);
   printf("Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
@@ -73,15 +84,14 @@ int main(int argc, char** argv)
   const unsigned int compressedSize = (width / 4) * (height / 4) * 8;
   unsigned int * h_result = (unsigned int*)malloc(compressedSize);
 
-#pragma omp target data map(to: permutations[0:1024], \
-                                prods4[0:4], \
-                                prods3[0:4], \
-                                alphaTable4[0:4], \
-                                alphaTable3[0:4], \
-                                block_image[0:memSize]) \
-                        map(from: h_result[0:compressedSize/4])
+  #pragma omp target data map(to: permutations[0:1024], \
+                                  prods4[0:4], \
+                                  prods3[0:4], \
+                                  alphaTable4[0:4], \
+                                  alphaTable3[0:4], \
+                                  block_image[0:memSize]) \
+                          map(from: h_result[0:compressedSize/4])
 {
-
   // Determine launch configuration and run timed computation numIterations times
   int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
 
@@ -93,8 +103,9 @@ int main(int argc, char** argv)
   printf("\n%u Workgroups, %u Work Items per Workgroup, %u Work Items in NDRange...\n\n", 
       blocks, NUM_THREADS, blocks * NUM_THREADS);
 
-  int numIterations = 100;
-  for (int i = -1; i < numIterations; ++i) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < numIterations; ++i) {
     for( int j=0; j<blocks; j+= blocksPerLaunch ) {
       int grid = MIN( blocksPerLaunch, blocks-j );
       #pragma omp target teams num_teams(grid) thread_limit(NUM_THREADS)
@@ -129,6 +140,10 @@ int main(int argc, char** argv)
       }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 }
 
   // Write DDS file.
@@ -176,9 +191,6 @@ int main(int argc, char** argv)
 
   // Make sure the generated image matches the reference image (regression check)
   printf("\nComparing against Host/C++ computation...\n");     
-  //const char* reference_image_path = shrFindFilePath(refimage_filename, argv[0]);
-  //assert(reference_image_path != NULL);
-  const char* reference_image_path = argv[2];
 
   // read in the reference image from file
 #ifdef WIN32
@@ -208,7 +220,7 @@ int main(int argc, char** argv)
       if (cmp != 0.0f) 
       {
         compareBlock(((BlockDXT1 *)h_result) + resultBlockIdx, ((BlockDXT1 *)reference) + referenceBlockIdx);
-        printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
+        //printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
       }
       rms += cmp;
     }

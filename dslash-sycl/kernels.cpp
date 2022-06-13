@@ -93,11 +93,11 @@ double dslash_fn(
     std::cout << "Setting workgroup size to " << wgsize << std::endl;
   }
   auto tstart = Clock::now();
-  for (int iters=0; iters<iterations+warmups; ++iters) {
+  for (size_t iters=0; iters<iterations+warmups; ++iters) {
     if (iters == warmups) {
       q.wait();
       tstart = Clock::now();
-    } 
+    }
     // Dslash kernel
     q.submit( [&](handler& cgh) {
       auto d_fat_acc = d_fat.get_access<sycl_read>(cgh);

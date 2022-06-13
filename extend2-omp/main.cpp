@@ -23,8 +23,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <math.h>
 #include <unistd.h>
 #include "read_data.h"
+#include <chrono>
+#include <omp.h>
 
 static void check(int a, int b, const char *s)
 {
@@ -35,8 +38,7 @@ typedef struct {
   int h, e;
 } eh_t;
 
-
-void extend2(struct extend2_dat *d)
+float extend2(struct extend2_dat *d)
 {
   eh_t *eh = NULL; /* score array*/
   char *qp = NULL; /* query profile*/
@@ -67,6 +69,8 @@ void extend2(struct extend2_dat *d)
   unsigned char *target = d->target;
   char* mat = d->mat;
 
+  auto start = std::chrono::steady_clock::now();
+
 #pragma omp target map(to: query[0:qlen], \
                            target[0:tlen], \
                            mat[0:m*m], \
@@ -74,6 +78,7 @@ void extend2(struct extend2_dat *d)
                            qp[0:qlen*m])\
   map(from: d_qle, d_tle, d_gtle, d_gscore, d_score, d_max_off) 
   {
+
     int oe_del = o_del + e_del;
     int oe_ins = o_ins + e_ins; 
     int i, j, k;
@@ -183,6 +188,9 @@ void extend2(struct extend2_dat *d)
     d_score = max;
   }
 
+  auto stop = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
+
   check(d->qle, d_qle, "qle");
   check(d->tle, d_tle, "tle");
   check(d->gtle, d_gtle, "gtle");
@@ -197,11 +205,17 @@ void extend2(struct extend2_dat *d)
   printf("device: qle=%d, tle=%d, gtle=%d, gscore=%d, max_off=%d, score=%d\n",
       d_qle, d_tle, d_gtle, d_gscore, d_max_off, d_score);
 #endif
+
+  return time;
 }
 
 int main(int argc, char *argv[])
 {
-  int iterations = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  int repeat = atoi(argv[1]);
 
   struct extend2_dat d;
 
@@ -210,9 +224,11 @@ int main(int argc, char *argv[])
 #include "filelist.txt"
   };
 
-  for (int f = 0; f < iterations; f++) {
+  float time = 0.f;
+  for (int f = 0; f < repeat; f++) {
     read_data(files[f%17], &d);
-    extend2(&d);
+    time += extend2(&d);
   }
+  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
   return 0;
 }

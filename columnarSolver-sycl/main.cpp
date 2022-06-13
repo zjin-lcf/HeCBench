@@ -8,6 +8,7 @@ entitled "GNU Free Documentation License".
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include "common.h"
 
 #define B ((int)32)
@@ -67,7 +68,10 @@ float candidateScore(int* decrMsg, float* scores) {
 
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 2) {
+    printf("Usage: %s <path to file>\n", argv[0]);
+    return 1;
+  }
   const char* filename = argv[1];
 
   int encryptedMap[ENCRYPTEDLEN];
@@ -96,6 +100,9 @@ int main(int argc, char* argv[]) {
   range<1> gws(THREADS);
   range<1> lws(T);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto states = d_states.get_access<sycl_read_write>(cgh);
     cgh.parallel_for<class setup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -120,6 +127,9 @@ int main(int argc, char* argv[]) {
   });
 
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time %f (s)\n", time * 1e-9f);
 
   } // sycl scope
 

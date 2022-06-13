@@ -3,8 +3,8 @@
 
   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
-  •   Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-  •   Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
+  Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
   other materials provided with the distribution.
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -14,10 +14,11 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-#include <cstdlib>
-#include <vector>
-#include <iostream>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <vector>
 #include <hip/hip_runtime.h>
 
 #include "reference.h"
@@ -48,14 +49,14 @@ void runKernels(
   in = 0;
   while (isComplete(eigenIntervals[in], length, tolerance)) {
 
-    hipLaunchKernelGGL(calNumEigenValueInterval, dim3(grid), dim3(block), 0, 0, 
+    hipLaunchKernelGGL(calNumEigenValueInterval, grid, block, 0, 0, 
             numEigenValuesIntervalBuffer,
             eigenIntervalBuffer[in],
             diagonalBuffer,
             offDiagonalBuffer,
             length);
 
-    hipLaunchKernelGGL(recalculateEigenIntervals, dim3(grid), dim3(block), 0, 0, 
+    hipLaunchKernelGGL(recalculateEigenIntervals, grid, block, 0, 0, 
           eigenIntervalBuffer[1-in],
           eigenIntervalBuffer[in],
           numEigenValuesIntervalBuffer,
@@ -155,12 +156,10 @@ int main(int argc, char * argv[])
     printArray<float>("offDiagonal", offDiagonal, length-1, 1);
 #endif
 
-
   // store the diagonal elements of the matrix
   float *diagonalBuffer;
   hipMalloc((void**)&diagonalBuffer, sizeof(float) * length);
   hipMemcpy(diagonalBuffer, diagonal, sizeof(float) * length, hipMemcpyHostToDevice); 
-
 
   // store the number of eigenvalues in each interval
   uint *numEigenValuesIntervalBuffer;
@@ -170,7 +169,6 @@ int main(int argc, char * argv[])
   float *offDiagonalBuffer;
   hipMalloc((void**)&offDiagonalBuffer, sizeof(float) * (length-1));
   hipMemcpy(offDiagonalBuffer, offDiagonal, sizeof(float) * (length-1), hipMemcpyHostToDevice); 
-
 
   // store the eigenvalue intervals
   float *eigenIntervalBuffer[2];
@@ -191,16 +189,16 @@ int main(int argc, char * argv[])
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
-        in
-        );
-
+        in);
   }
 
   std::cout << "Executing kernel for " << iterations
             << " iterations" << std::endl;
   std::cout << "-------------------------------------------" << std::endl;
-
-
+  
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   for(int i = 0; i < iterations; i++)
   {
     runKernels(
@@ -211,12 +209,15 @@ int main(int argc, char * argv[])
         eigenIntervals,   // reset eigenIntervals
         length,
         tolerance,
-        in
-        );
+        in);
   }
 
-  // VerifyResults
-  uint offset = 0;
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  // Verify results
   for(int i = 0 ; i < 2; ++i)
   {
     verificationEigenIntervals[i] = (float *) malloc(eigenIntervalsSizeBytes);
@@ -239,10 +240,9 @@ int main(int argc, char * argv[])
     verificationEigenIntervals[verificationIn][i] = upperLimit;
   }
 
-
   while(isComplete(verificationEigenIntervals[verificationIn], length, tolerance))
   {
-    offset = eigenValueCPUReference(diagonal,offDiagonal, length,
+    eigenValueCPUReference(diagonal,offDiagonal, length,
         verificationEigenIntervals[verificationIn],
         verificationEigenIntervals[1-verificationIn],
         tolerance);
@@ -253,11 +253,11 @@ int main(int argc, char * argv[])
   if(compare(eigenIntervals[in], 
              verificationEigenIntervals[verificationIn], 2*length))
   {
-    std::cout<<"Passed!\n" << std::endl;
+    std::cout<<"PASS\n" << std::endl;
   }
   else
   {
-    std::cout<<"Failed\n" << std::endl;
+    std::cout<<"FAIL\n" << std::endl;
   }
 
   // release program resources

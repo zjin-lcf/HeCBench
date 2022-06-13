@@ -12,7 +12,6 @@ double dslash_fn(
     const size_t iterations,
     size_t wgsize )
 { 
-
   // Set the loop and work-group parameters
   size_t total_sites = sites_on_node; 
   size_t total_even_sites = even_sites_on_node;
@@ -86,7 +85,7 @@ double dslash_fn(
     std::cout << "Setting workgroup size to " << wgsize << std::endl;
   }
   auto tstart = Clock::now();
-  for (int iters=0; iters<iterations+warmups; ++iters) {
+  for (size_t iters=0; iters<iterations+warmups; ++iters) {
     if (iters == warmups) {
       tstart = Clock::now();
     } 

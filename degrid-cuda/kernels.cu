@@ -1,3 +1,5 @@
+#include <chrono>
+
 template <typename CmplxType>
 __global__ void
 degrid_kernel(CmplxType* __restrict out, 
@@ -81,6 +83,9 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   dim3 grid(NPOINTS/32, 1);
   dim3 block(32, 8);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < REPEAT; n++) {
     // GCF_DIM is at least 32
     degrid_kernel<<<grid, block>>> (d_out, d_in, NPOINTS,
@@ -88,6 +93,11 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
                   IMG_SIZE,
                   d_gcf + GCF_DIM*(GCF_DIM+1)/2);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / REPEAT << " (s)\n";
 
   cudaMemcpy(out, d_out, sizeof(CmplxType)*NPOINTS, cudaMemcpyDeviceToHost);
   cudaFree(d_img);

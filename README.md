@@ -51,6 +51,9 @@ Early results are shown [here](results/README.md)
 ### all-pairs-distance (cuda)
   All-pairs distance calculation (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2910913/)
 
+### alp (cuda)
+  Associated Legendre polynomials (https://github.com/mstsuite/lsms)
+
 ### amgmk (openmp)
   The relax kernel in the AMGmk benchmark (https://asc.llnl.gov/CORAL-benchmarks/Micro/amgmk-v1.0.tar.gz)
   
@@ -198,6 +201,9 @@ Early results are shown [here](results/README.md)
 ### columnarSolver (cuda)
   Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
 
+### complex (cuda)
+  Complex numbers arithmetics (https://github.com/tpn/cuda-samples/blob/master/v8.0/include/cuComplex.h)
+
 ### compute-score (opencl)
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
@@ -257,6 +263,9 @@ Early results are shown [here](results/README.md)
 
 ### dpid (cuda)
   Detail-preserving image downscaling (https://github.com/mergian/dpid)
+
+### dropout (cuda)
+  Randomly zero some elements of the input array with a probability using samples from a uniform distribution (https://github.com/pytorch/)
 
 ### dslash (sycl)
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
@@ -490,6 +499,9 @@ Early results are shown [here](results/README.md)
 
 ### layout (opencl)
   AoS and SoA comparison (https://github.com/OpenCL/AMD_APP_samples)
+
+### lci (c)
+  Landau collisional integral (https://github.com/vskokov/Landau_Collisional_Integral)
 
 ### lda (cuda)
   Latent Dirichlet allocation (https://github.com/js1010/cusim)

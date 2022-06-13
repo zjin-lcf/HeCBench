@@ -1363,7 +1363,6 @@ static const uint64_t crc64_x_pow_2n[64] = {
   UINT64_C(0x8ef8951d46606fb5), UINT64_C(0x9d58c1090f034d14)
 };
 
-
 // Compute (a*b) mod P
 // See: https://code.google.com/p/crcutil/source/browse/code/gf_util.h
 static inline uint64_t crc64_multiply_(uint64_t a, uint64_t b) {
@@ -1423,7 +1422,8 @@ uint64_t crc64_omp(const void *input, size_t nbytes) {
     const unsigned char *data = (const unsigned char*) input;
 
     #pragma omp target data map(from: thread_sz[0:nthreads], thread_cs[0:nthreads]) \
-                            map(to: data[0:nbytes], crc64_table[0:4][0:256], crc64_interleaved_table[0:4][0:256])
+                            map(to: data[0:nbytes], crc64_table[0:4][0:256], \
+                                    crc64_interleaved_table[0:4][0:256])
     {
        #pragma omp target teams distribute parallel for num_teams(nthreads/64) thread_limit(64)
        for (int tid = 0; tid < nthreads; tid++) {
@@ -1451,4 +1451,3 @@ uint64_t crc64_omp(const void *input, size_t nbytes) {
 
   return crc64(input, nbytes);
 }
-

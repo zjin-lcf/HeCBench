@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 #include "util.h"
 #include "image.h"
@@ -34,7 +35,6 @@ int main(int argc, char* argv[])
     input[i] = rand() % 256;
   }
 
-  { // sycl scope
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -43,17 +43,25 @@ int main(int argc, char* argv[])
 
   queue q(dev_sel);
   buffer<uchar, 1> d_input (input, numPix);
-  buffer<uchar, 1> d_output (output, numPix);
+  buffer<uchar, 1> d_output (numPix);
 
   range<2> gws ((height + tile_rows - 1) / tile_rows * tile_rows, 
                 (width + tile_cols - 1) / tile_cols * tile_cols);
   range<2> lws (tile_rows, tile_cols);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   //this version takes a tile (z=1) and each tile job does 4 line median sorts
-  for (int i = 0; i < repeat; i++) 
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto om = d_output.get_access<sycl_discard_write>(cgh);
+      cgh.fill(om, (uchar)0);
+    });
+
     q.submit([&] (handler &cgh) {
       auto im = d_input.get_access<sycl_read>(cgh);
-      auto om = d_output.get_access<sycl_discard_write>(cgh);
+      auto om = d_output.get_access<sycl_read_write>(cgh);
       accessor<LDSPixelT, 1, sycl_read_write, access::target::local> apron(apron_rows * apron_cols, cgh);
       cgh.parallel_for<class debayer>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         malvar_he_cutler_demosaic (
@@ -64,6 +72,16 @@ int main(int argc, char* argv[])
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
+
+  q.submit([&] (handler &cgh) {
+    auto acc = d_output.get_access<sycl_read>(cgh);
+    cgh.copy(acc, output);
+  }).wait();
 
   long sum = 0;
   for (int i = 0; i < numPix; i++) sum += output[i];

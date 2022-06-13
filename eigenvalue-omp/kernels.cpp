@@ -17,8 +17,8 @@
 float calNumEigenValuesLessThan(
    const float x, 
    const uint width, 
-   const float *diagonal, 
-   const float *offDiagonal)
+   const float *__restrict diagonal, 
+   const float *__restrict offDiagonal)
 {
   uint count = 0;
 
@@ -35,10 +35,10 @@ float calNumEigenValuesLessThan(
 }
 
 void calNumEigenValueInterval(
-    uint  * numEigenIntervals,
-    const float * eigenIntervals,
-    const float * diagonal, 
-    const float * offDiagonal,
+    uint  *__restrict numEigenIntervals,
+    const float *__restrict  eigenIntervals,
+    const float *__restrict  diagonal, 
+    const float *__restrict offDiagonal,
     const uint     width)
 {
   #pragma omp target teams distribute parallel for thread_limit(256)
@@ -55,11 +55,11 @@ void calNumEigenValueInterval(
 
 
 void recalculateEigenIntervals(
-          float * newEigenIntervals,
-    const float * eigenIntervals,
-    const uint  * numEigenIntervals,
-    const float * diagonal,
-    const float * offDiagonal,
+          float *__restrict newEigenIntervals,
+    const float *__restrict eigenIntervals,
+    const uint  *__restrict numEigenIntervals,
+    const float *__restrict diagonal,
+    const float *__restrict offDiagonal,
     const    uint    width,  
     const    float   tolerance)
 {

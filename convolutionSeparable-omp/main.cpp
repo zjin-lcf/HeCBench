@@ -11,12 +11,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "conv.h"
 
 int main(int argc, char **argv)
 {
-  const unsigned int imageW = 3072;
-  const unsigned int imageH = 3072;
+  if (argc != 4) {
+    printf("Usage: %s <image width> <image height> <repeat>\n", argv[0]); 
+    return 1;
+  }
+  const unsigned int imageW = atoi(argv[1]);
+  const unsigned int imageH = atoi(argv[2]);
+  const int numIterations = atoi(argv[3]);
 
   float* h_Kernel    = (float*)malloc(KERNEL_LENGTH * sizeof(float));
   float* h_Input     = (float*)malloc(imageW * imageH * sizeof(float));
@@ -35,7 +41,6 @@ int main(int argc, char **argv)
                         map(alloc: h_Buffer[0:imageW*imageH]) \
                         map(from: h_OutputGPU[0:imageW*imageH]) 
   {
-
     //Just a single run or a warmup iteration
     convolutionRows(
         h_Buffer,
@@ -53,9 +58,9 @@ int main(int argc, char **argv)
         imageH,
         imageW);
 
-    const int numIterations = 100;
+    auto start = std::chrono::steady_clock::now();
 
-    for(int iter = 0; iter < numIterations; iter++){
+    for(int iter = 0; iter < numIterations; iter++) {
       convolutionRows(
           h_Buffer,
           h_Input,
@@ -72,8 +77,11 @@ int main(int argc, char **argv)
           imageH,
           imageW);
     }
-  }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
+  }
 
   printf("Comparing against Host/C++ computation...\n"); 
   convolutionRowHost(h_Buffer, h_Input, h_Kernel, imageW, imageH, KERNEL_RADIUS);

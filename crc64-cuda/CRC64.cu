@@ -41,11 +41,9 @@
 #define __STDC_CONSTANT_MACROS
 #endif
 
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-
 
 #include <stdbool.h>
 
@@ -1541,7 +1539,6 @@ static const uint64_t crc64_x_pow_2n[64] = {
   UINT64_C(0x8ef8951d46606fb5), UINT64_C(0x9d58c1090f034d14)
 };
 
-
 // Compute (a*b) mod P
 // See: https://code.google.com/p/crcutil/source/browse/code/gf_util.h
 static inline uint64_t crc64_multiply_(uint64_t a, uint64_t b) {
@@ -1587,12 +1584,13 @@ uint64_t crc64_combine(uint64_t cs1, uint64_t cs2, size_t nbytes2) {
 static const size_t crc64_min_thread_bytes = 1024;
 
 __global__ void 
-crc64_kernel(size_t *d_thread_sz, 
-		uint64_t *d_thread_cs, 
-		const unsigned char* d_data, 
-		const uint64_t *d_crc64_table, 
-		const uint64_t *d_crc64_interleaved_table, 
-		size_t nbytes, int nthreads) 
+crc64_kernel(
+  size_t *__restrict__ d_thread_sz, 
+  uint64_t *__restrict__ d_thread_cs, 
+  const unsigned char*__restrict__  d_data, 
+  const uint64_t *__restrict__ d_crc64_table, 
+  const uint64_t *__restrict__ d_crc64_interleaved_table, 
+  size_t nbytes, int nthreads) 
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t bpt = nbytes/nthreads;
@@ -1658,5 +1656,3 @@ uint64_t crc64_parallel(const void *input, size_t nbytes) {
 
   return crc64(input, nbytes);
 }
-
-

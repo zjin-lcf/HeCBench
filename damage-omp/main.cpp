@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <chrono>
 #include <omp.h>
 
 // threads per block
@@ -17,12 +18,13 @@ double LCG_random_double(uint64_t * seed)
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <number of points>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of points> <repeat>\n", argv[0]);
     return 1;
   }
 
   const int n = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int m = (n + BS - 1) / BS; // number of groups
 
   int *nlist = (int*) malloc (sizeof(int) * n);
@@ -47,8 +49,14 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map(to: nlist[0:n], family[0:m]) \
                           map(from: n_neigh[0:m], damage[0:m])
   {
-    for (int i = 0; i < 100; i++) 
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) 
       damage_of_node (n, nlist, family, n_neigh, damage);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   double sum = 0.0;
