@@ -3,14 +3,15 @@
 #include <sys/time.h>
 #include <string.h>
 #include <utility>
-#include <cublas_v2.h>
+#include <oneapi/mkl.hpp>
+#include "common.h"
 
 #define uS_PER_SEC 1000000
 #define uS_PER_mS 1000
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   if (argc != 4) {
-    printf("Usage %s <matrix col> <matrix row> <repeat>\n", argv[0]);
+    printf("Usage %s <matrix col> <matrix row> <repeat times>\n", argv[0]);
     return 1;
   }
 
@@ -23,6 +24,14 @@ int main(int argc, char* argv[]) {
   }
 
   int error = 0;
+
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel);
+
   const size_t size = N * M;
   const size_t size_byte = size * sizeof(float);
 
@@ -43,47 +52,66 @@ int main(int argc, char* argv[]) {
   float et1 = (((t2.tv_sec*uS_PER_SEC)+t2.tv_usec) - ((t1.tv_sec*uS_PER_SEC)+t1.tv_usec))/(float)uS_PER_mS;
   printf("CPU time = %fms\n", et1);
 
-  cublasHandle_t handle;
-  cublasCreate(&handle);
-
   const float alpha = 1.f;
   const float beta  = 0.f;
 
   // store host and device results
   float *h_matrixT , *d_matrixT , *d_matrix;
   h_matrixT = (float *) malloc (size_byte);
-  cudaMalloc((void**)&d_matrixT , size_byte);
-  cudaMalloc((void**)&d_matrix , size_byte);
+  d_matrixT = (float *)sycl::malloc_device(size_byte, q);
+  d_matrix = (float *)sycl::malloc_device(size_byte, q);
 
-  cudaMemcpy(d_matrix , matrix , size_byte, cudaMemcpyHostToDevice);
+  q.memcpy(d_matrix, matrix, size_byte).wait();
+
+  std::vector<event> deps;
 
   // start the device timing
   gettimeofday(&t1, NULL);
 
   for (int i = 0; i < repeat; i++) {
-    auto status = cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_N, N, M, &alpha, 
-                              d_matrix, M, &beta, d_matrix, N, d_matrixT, N);
-
-    if (status != CUBLAS_STATUS_SUCCESS) {
+    event status;
+    try {
+      status = oneapi::mkl::blas::omatadd_batch(
+        q,
+        oneapi::mkl::transpose::trans,
+        oneapi::mkl::transpose::nontrans,
+        N,
+        M,
+        alpha,
+        d_matrix,
+        M,
+        size,
+        beta,
+        d_matrix,
+        N,
+        size,
+        d_matrixT,
+        N,
+        size,
+        1,
+        deps);
+    } catch(sycl::exception const& e) {
+      std::cout << "\t\tCaught SYCL exception during omatadd_batch:\n"
+                << e.what() << std::endl;
       error = 1;
-      printf("Error: cublasSgeam failed to complete\n"):
       break;
     }
-
+    status.wait();
     std::swap(d_matrix, d_matrixT);
     std::swap(N, M);
   }
 
   gettimeofday(&t2, NULL);
+
   float et2 = (((t2.tv_sec*uS_PER_SEC)+t2.tv_usec) - 
                ((t1.tv_sec*uS_PER_SEC)+t1.tv_usec)) / (float)uS_PER_mS;
 
   printf("Average device execution time = %fms\n", et2 / repeat);
 
-  cudaMemcpy(h_matrixT , d_matrix , size_byte , cudaMemcpyDeviceToHost);
+  q.memcpy(h_matrixT, d_matrix, size_byte).wait();
 
-  cudaFree(d_matrix);
-  cudaFree(d_matrixT);
+  sycl::free(d_matrix, q);
+  sycl::free(d_matrixT, q);
 
   if (error == 0) {
 
@@ -96,7 +124,6 @@ int main(int argc, char* argv[]) {
 
   printf("%s\n", error ? "FAIL" : "PASS");
 
-  cublasDestroy(handle);
   free(matrixT);
   free(matrix);
   return 0;
