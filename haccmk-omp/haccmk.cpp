@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <iostream>
+#include <chrono>
+#include <omp.h>
 
 template <typename T>
 void haccmk (
+    const int repeat,
     const size_t n,  // global size
     const int ilp, // inner loop count
     const T fsrrmax,
@@ -18,51 +20,66 @@ void haccmk (
     T*__restrict vy2,
     T*__restrict vz2 ) 
 {
-  #pragma omp target map(to: xx[0:ilp], yy[0:ilp], zz[0:ilp], mass[0:ilp]) \
-                   map(tofrom: vx2[0:n], vy2[0:n], vz2[0:n])
+  #pragma omp target data map(to: xx[0:ilp], yy[0:ilp], zz[0:ilp], mass[0:ilp]) \
+                          map(from: vx2[0:n], vy2[0:n], vz2[0:n])
   {
-    #pragma omp teams distribute parallel for
-    for (int i = 0; i < n; i++) {
+    float total_time = 0.f;
 
-      const float ma0 = 0.269327f; 
-      const float ma1 = -0.0750978f; 
-      const float ma2 = 0.0114808f; 
-      const float ma3 = -0.00109313f; 
-      const float ma4 = 0.0000605491f; 
-      const float ma5 = -0.00000147177f;
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target update to (vx2[0:n])
+      #pragma omp target update to (vy2[0:n])
+      #pragma omp target update to (vz2[0:n])
 
-      float dxc, dyc, dzc, m, r2, f, xi, yi, zi;
+      auto start = std::chrono::steady_clock::now();
 
-      xi = 0.f; 
-      yi = 0.f;
-      zi = 0.f;
+      #pragma omp target teams distribute parallel for
+      for (int i = 0; i < n; i++) {
 
-      float xxi = xx[i];
-      float yyi = yy[i];
-      float zzi = zz[i];
+        const float ma0 = 0.269327f; 
+        const float ma1 = -0.0750978f; 
+        const float ma2 = 0.0114808f; 
+        const float ma3 = -0.00109313f; 
+        const float ma4 = 0.0000605491f; 
+        const float ma5 = -0.00000147177f;
 
-      for ( int j = 0; j < ilp; j++ ) {
-        dxc = xx[j] - xxi;
-        dyc = yy[j] - yyi;
-        dzc = zz[j] - zzi;
+        float dxc, dyc, dzc, m, r2, f, xi, yi, zi;
 
-        r2 = dxc * dxc + dyc * dyc + dzc * dzc;
+        xi = 0.f; 
+        yi = 0.f;
+        zi = 0.f;
 
-        if ( r2 < fsrrmax ) m = mass[j]; else m = 0.f;
+        float xxi = xx[i];
+        float yyi = yy[i];
+        float zzi = zz[i];
 
-        f = r2 + mp_rsm;
-        f = m * ( 1.f / (f * sqrtf(f)) - 
-            (ma0 + r2*(ma1 + r2*(ma2 + r2*(ma3 + r2*(ma4 + r2*ma5))))));
+        for ( int j = 0; j < ilp; j++ ) {
+          dxc = xx[j] - xxi;
+          dyc = yy[j] - yyi;
+          dzc = zz[j] - zzi;
 
-        xi = xi + f * dxc;
-        yi = yi + f * dyc;
-        zi = zi + f * dzc;
+          r2 = dxc * dxc + dyc * dyc + dzc * dzc;
+
+          if ( r2 < fsrrmax ) m = mass[j]; else m = 0.f;
+
+          f = r2 + mp_rsm;
+          f = m * ( 1.f / (f * sqrtf(f)) - 
+              (ma0 + r2*(ma1 + r2*(ma2 + r2*(ma3 + r2*(ma4 + r2*ma5))))));
+
+          xi = xi + f * dxc;
+          yi = yi + f * dyc;
+          zi = zi + f * dzc;
+        }
+
+        vx2[i] += xi * fcoeff;
+        vy2[i] += yi * fcoeff;
+        vz2[i] += zi * fcoeff;
       }
 
-      vx2[i] = vx2[i] + xi * fcoeff;
-      vy2[i] = vy2[i] + yi * fcoeff;
-      vz2[i] = vz2[i] + zi * fcoeff;
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
     }
+    printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / repeat);
   }
 }
 
@@ -120,6 +137,11 @@ void haccmk_gold(
 
 int main( int argc, char *argv[] )
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   float fsrrmax2, mp_rsm2, fcoeff, dx1, dy1, dz1, dx2, dy2, dz2;
   int n1, n2, i;
@@ -174,7 +196,7 @@ int main( int argc, char *argv[] )
     vz2[i] = vz2[i] + dz2 * fcoeff;
   }
 
-  haccmk(n1, n2, fsrrmax2, mp_rsm2, fcoeff, xx,
+  haccmk(repeat, n1, n2, fsrrmax2, mp_rsm2, fcoeff, xx,
       yy, zz, mass, vx2_hw, vy2_hw, vz2_hw); 
 
   // verify
@@ -208,13 +230,8 @@ int main( int argc, char *argv[] )
   free(vx2_hw);
   free(vy2_hw);
   free(vz2_hw);
-  if (error) {
-    printf("FAIL\n"); 
-    return EXIT_FAILURE; 
-  } else {
-    printf("PASS\n"); 
-    return EXIT_SUCCESS;
-  }
+
+  printf("%s\n", error ? "FAIL" : "PASS");
+
+  return 0;
 }
-
-

@@ -18,7 +18,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = haccmk
 
 source = haccmk.cpp
 
@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100
