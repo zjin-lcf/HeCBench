@@ -11,6 +11,9 @@ void distance_device(queue &q, const double4* loc, double* dist, const int n, co
   buffer<double4, 1> d_loc (loc, n);
   buffer<double, 1> d_dist (dist, n);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iteration; i++) {
     q.submit([&] (handler &cgh) {
       auto in = d_loc.get_access<sycl_read>(cgh);
@@ -34,6 +37,11 @@ void distance_device(queue &q, const double4* loc, double* dist, const int n, co
       });
     });
   }
+  
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 }
 
 void verify(int size, const double *output, const double *expected_output) {
@@ -46,14 +54,13 @@ void verify(int size, const double *output, const double *expected_output) {
   printf("The maximum error in distance is %f\n", error_rate); 
 }
 
-
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <file>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <file> <repeat>\n", argv[0]);
     return 1;
   }
-
   const char* filename = argv[1];
+  const int repeat = atoi(argv[2]);
 
   printf("Reading city locations from file %s...\n", filename);
   FILE* fp = fopen(filename, "r");
@@ -123,8 +130,7 @@ int main(int argc, char* argv[]) {
 #endif
   queue q(dev_sel);
 
-  // kernel runs for 100 iterations
-  distance_device(q, input, output, N, 100);
+  distance_device(q, input, output, N, repeat);
 
   verify(N, output, expected_output);
 
@@ -133,4 +139,3 @@ int main(int argc, char* argv[]) {
   free(expected_output);
   return 0;
 }
-

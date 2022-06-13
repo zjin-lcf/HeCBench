@@ -33,12 +33,19 @@ void distance_device(const double4* loc, double* dist, const int n, const int it
   hipMemcpy(d_loc, loc, sizeof(double4)*n, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_dist, sizeof(double)*n);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iteration; i++) {
     hipLaunchKernelGGL(compute_haversine_distance, grids, threads, 0, 0, d_loc, d_dist, n);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 
   hipMemcpy(dist, d_dist, sizeof(double)*n, hipMemcpyDeviceToHost);
   hipFree(d_loc);
   hipFree(d_dist);
 }
-

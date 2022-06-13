@@ -23,4 +23,3 @@ void distance_device(const double4* loc, double* dist, const int n, const int it
     }
   }
 }
-

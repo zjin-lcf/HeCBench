@@ -55,4 +55,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../geodesic-cuda/locations.txt
+	./$(program) ../geodesic-cuda/locations.txt 100
