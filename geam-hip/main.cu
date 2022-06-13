@@ -10,7 +10,7 @@
 
 int main(int argc, char* argv[]) {
   if (argc != 4) {
-    printf("Usage %s <matrix col> <matrix row> <repeat times>\n", argv[0]);
+    printf("Usage %s <matrix col> <matrix row> <repeat>\n", argv[0]);
     return 1;
   }
 
@@ -22,6 +22,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  int error = 0;
   const size_t size = N * M;
   const size_t size_byte = size * sizeof(float);
 
@@ -45,9 +46,6 @@ int main(int argc, char* argv[]) {
   hipblasHandle_t handle;
   hipblasCreate(&handle);
 
-  // start the device timing
-  gettimeofday(&t1, NULL);
-
   const float alpha = 1.f;
   const float beta  = 0.f;
 
@@ -59,33 +57,45 @@ int main(int argc, char* argv[]) {
 
   hipMemcpy(d_matrix , matrix , size_byte, hipMemcpyHostToDevice);
 
+  // start the device timing
+  gettimeofday(&t1, NULL);
+
   for (int i = 0; i < repeat; i++) {
     auto status = hipblasSgeam(handle, HIPBLAS_OP_T, HIPBLAS_OP_N, N, M, &alpha, 
                               d_matrix, M, &beta, d_matrix, N, d_matrixT, N);
 
-    if (status != HIPBLAS_STATUS_SUCCESS) break;
+    if (status != HIPBLAS_STATUS_SUCCESS) {
+      error = 1;
+      printf("Error: hipblasSgeam failed to complete\n"):
+      break;
+    }
 
     std::swap(d_matrix, d_matrixT);
     std::swap(N, M);
   }
+
+  gettimeofday(&t2, NULL);
+
+  float et2 = (((t2.tv_sec*uS_PER_SEC)+t2.tv_usec) - 
+               ((t1.tv_sec*uS_PER_SEC)+t1.tv_usec)) / (float)uS_PER_mS;
+
+  printf("Average device execution time = %fms\n", et2 / repeat);
 
   hipMemcpy(h_matrixT , d_matrix , size_byte , hipMemcpyDeviceToHost);
 
   hipFree(d_matrix);
   hipFree(d_matrixT);
 
-  gettimeofday(&t2, NULL);
+  if (error == 0) {
 
-  float et2 = (((t2.tv_sec*uS_PER_SEC)+t2.tv_usec) - 
-               ((t1.tv_sec*uS_PER_SEC)+t1.tv_usec)) / (float)uS_PER_mS;
-  printf("GPU time = %fms\n", et2);
 
-  // check host and device results
-  int error;
-  if (repeat % 2)
-    error = memcmp(h_matrixT, matrixT, size_byte);
-  else
-    error = memcmp(h_matrixT, matrix, size_byte);
+    // check host and device results
+    int error;
+    if (repeat % 2)
+      error = memcmp(h_matrixT, matrixT, size_byte);
+    else
+      error = memcmp(h_matrixT, matrix, size_byte);
+  }
 
   printf("%s\n", error ? "FAIL" : "PASS");
 
