@@ -1,4 +1,5 @@
 #include <omp.h>
+#include <chrono>
 #include <string.h>
 
 #ifndef dataType
@@ -156,97 +157,97 @@ int main(int argc, char **argv) {
       aqsntemp [0:aqsntemp_size], I_eps_array [0:I_eps_array_size],            \
       wx_array [0:wx_array_size], wtilde_array [0:wtilde_array_size])
   {
+    dataType ach_re0, ach_re1, ach_re2, ach_im0, ach_im1, ach_im2;
 
-  // Time the kernel execution
-  timeval startKernelTimer, endKernelTimer;
-  gettimeofday(&startKernelTimer, NULL);
+    float total_time = 0.f;
 
-  dataType ach_re0, ach_re1, ach_re2, ach_im0, ach_im1, ach_im2;
-  for (int i = 0; i < 10; i++) {
-    ach_re0 = 0.0, ach_re1 = 0.0, ach_re2 = 0.0,
-    ach_im0 = 0.0, ach_im1 = 0.0, ach_im2 = 0.0;
+    for (int i = 0; i < 10; i++) {
+      ach_re0 = 0.0, ach_re1 = 0.0, ach_re2 = 0.0,
+      ach_im0 = 0.0, ach_im1 = 0.0, ach_im2 = 0.0;
 
-    #pragma omp target teams distribute parallel for collapse(2) \
-     reduction(+:ach_re0, ach_re1, ach_re2, ach_im0, ach_im1, ach_im2)
-    for (int my_igp = 0; my_igp < ngpown; ++my_igp) // 1634
-    {
-      for (int n1 = 0; n1 < number_bands; ++n1) // 512
+      auto start = std::chrono::steady_clock::now();
+
+      #pragma omp target teams distribute parallel for collapse(2) \
+       reduction(+:ach_re0, ach_re1, ach_re2, ach_im0, ach_im1, ach_im2)
+      for (int my_igp = 0; my_igp < ngpown; ++my_igp) // 1634
       {
-        int indigp = inv_igp_index[my_igp];
-        int igp = indinv[indigp];
-
-        dataType achtemp_re_loc[nend - nstart], achtemp_im_loc[nend - nstart];
-        #pragma unroll
-        for (size_t iw = nstart; iw < nend; ++iw) {
-          achtemp_re_loc[iw] = 0.0;
-          achtemp_im_loc[iw] = 0.0;
-        }
-
-        CustomComplex<dataType> sch_store1 =
-            aqsmtemp(n1, igp).conj() * aqsntemp(n1, igp) * 0.5 *
-            vcoul[igp];
-
-        for (size_t ig = 0; ig < ncouls; ++ig) // 32768
+        for (int n1 = 0; n1 < number_bands; ++n1) // 512
         {
+          int indigp = inv_igp_index[my_igp];
+          int igp = indinv[indigp];
+
+          dataType achtemp_re_loc[nend - nstart], achtemp_im_loc[nend - nstart];
           #pragma unroll
-          for (size_t iw = nstart; iw < nend; ++iw) // 3
-          {
-            CustomComplex<dataType> wdiff =
-                wx_array[iw] - wtilde_array(my_igp, ig);
-            CustomComplex<dataType> delw =
-                wtilde_array(my_igp, ig) * wdiff.conj() *
-                (1 / CustomComplex_real((wdiff * wdiff.conj())));
-            CustomComplex<dataType> sch_array =
-                delw * I_eps_array(my_igp, ig) * sch_store1;
-
-            achtemp_re_loc[iw] += sch_array.real();
-            achtemp_im_loc[iw] += sch_array.imag();
+          for (size_t iw = nstart; iw < nend; ++iw) {
+            achtemp_re_loc[iw] = 0.0;
+            achtemp_im_loc[iw] = 0.0;
           }
-        }
 
-        ach_re0 += achtemp_re_loc[0];
-        ach_re1 += achtemp_re_loc[1];
-        ach_re2 += achtemp_re_loc[2];
-        ach_im0 += achtemp_im_loc[0];
-        ach_im1 += achtemp_im_loc[1];
-        ach_im2 += achtemp_im_loc[2];
-      } // ngpown
-    }   // number_bands
-  } // for
+          CustomComplex<dataType> sch_store1 =
+              aqsmtemp(n1, igp).conj() * aqsntemp(n1, igp) * 0.5 *
+              vcoul[igp];
 
-  achtemp_re[0] = ach_re0;
-  achtemp_re[1] = ach_re1;
-  achtemp_re[2] = ach_re2;
-  achtemp_im[0] = ach_im0;
-  achtemp_im[1] = ach_im1;
-  achtemp_im[2] = ach_im2;
+          for (size_t ig = 0; ig < ncouls; ++ig) // 32768
+          {
+            #pragma unroll
+            for (size_t iw = nstart; iw < nend; ++iw) // 3
+            {
+              CustomComplex<dataType> wdiff =
+                  wx_array[iw] - wtilde_array(my_igp, ig);
+              CustomComplex<dataType> delw =
+                  wtilde_array(my_igp, ig) * wdiff.conj() *
+                  (1 / CustomComplex_real((wdiff * wdiff.conj())));
+              CustomComplex<dataType> sch_array =
+                  delw * I_eps_array(my_igp, ig) * sch_store1;
 
-  gettimeofday(&endKernelTimer, NULL);
+              achtemp_re_loc[iw] += sch_array.real();
+              achtemp_im_loc[iw] += sch_array.imag();
+            }
+          }
 
-  elapsedKernelTimer =
-      (endKernelTimer.tv_sec - startKernelTimer.tv_sec) +
-      1e-6 * (endKernelTimer.tv_usec - startKernelTimer.tv_usec);
+          ach_re0 += achtemp_re_loc[0];
+          ach_re1 += achtemp_re_loc[1];
+          ach_re2 += achtemp_re_loc[2];
+          ach_im0 += achtemp_im_loc[0];
+          ach_im1 += achtemp_im_loc[1];
+          ach_im2 += achtemp_im_loc[2];
+        } // ngpown
+      }   // number_bands
 
-  for (int iw = nstart; iw < nend; ++iw)
-    achtemp[iw] = CustomComplex<dataType>(achtemp_re[iw], achtemp_im[iw]);
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      total_time += time;
+    } // for
 
-  // Check for correctness
-  if (argc == 2) {
-    if (strcmp(argv[1], "benchmark") == 0)
-      correctness(0, achtemp[0]);
-    else if (strcmp(argv[1], "test") == 0)
+    printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / 10.f);
+
+    achtemp_re[0] = ach_re0;
+    achtemp_re[1] = ach_re1;
+    achtemp_re[2] = ach_re2;
+    achtemp_im[0] = ach_im0;
+    achtemp_im[1] = ach_im1;
+    achtemp_im[2] = ach_im2;
+
+    for (int iw = nstart; iw < nend; ++iw)
+      achtemp[iw] = CustomComplex<dataType>(achtemp_re[iw], achtemp_im[iw]);
+
+    // Check for correctness
+    if (argc == 2) {
+      if (strcmp(argv[1], "benchmark") == 0)
+        correctness(0, achtemp[0]);
+      else if (strcmp(argv[1], "test") == 0)
+        correctness(1, achtemp[0]);
+    } else
       correctness(1, achtemp[0]);
-  } else
-    correctness(1, achtemp[0]);
 
-  printf("\n Final achtemp\n");
-  achtemp[0].print();
+    printf("\n Final achtemp\n");
+    achtemp[0].print();
 
-  gettimeofday(&endTimer, NULL);
-  elapsedTimer = (endTimer.tv_sec - startTimer.tv_sec) +
-                 1e-6 * (endTimer.tv_usec - startTimer.tv_usec);
-
+    gettimeofday(&endTimer, NULL);
+    elapsedTimer = (endTimer.tv_sec - startTimer.tv_sec) +
+                   1e-6 * (endTimer.tv_usec - startTimer.tv_usec);
   }
+
   // Free the allocated memory
   free(achtemp);
   free(aqsmtemp);
@@ -260,8 +261,6 @@ int main(int argc, char **argv) {
   free(achtemp_im);
   free(wx_array);
 
-  std::cout << "********** Kernel Time Taken **********= " << elapsedKernelTimer
-            << " secs" << std::endl;
   std::cout << "********** Total Time Taken **********= " << elapsedTimer << " secs"
             << std::endl;
 

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #ifndef dataType
@@ -55,11 +56,6 @@ int main(int argc, char **argv) {
   const dataType to1 = 1e-6;
   const dataType e_n1kq = 6.0;
 
-  // Start the timer before the work begins.
-  dataType elapsedKernelTimer, elapsedTimer;
-  timeval startTimer, endTimer;
-  gettimeofday(&startTimer, NULL);
-
   // Printing out the params passed.
   std::cout << "Sizeof(CustomComplex<dataType> = "
             << sizeof(CustomComplex<dataType>) << " bytes" << std::endl;
@@ -72,6 +68,11 @@ int main(int argc, char **argv) {
   CustomComplex<dataType> expr0(0.0, 0.0);
   CustomComplex<dataType> expr(0.025, 0.025);
   size_t memFootPrint = 0;
+
+  // Start the timer before the work begins.
+  dataType elapsedTimer;
+  timeval startTimer, endTimer;
+  gettimeofday(&startTimer, NULL);
 
   CustomComplex<dataType> *achtemp;
   achtemp = (CustomComplex<dataType> *)safe_malloc(
@@ -186,15 +187,13 @@ int main(int argc, char **argv) {
              inv_igp_index_size * sizeof(int), hipMemcpyHostToDevice);
   hipMemcpy(d_indinv, indinv, indinv_size * sizeof(int), hipMemcpyHostToDevice);
 
-  // Time the kernel execution
-  timeval startKernelTimer, endKernelTimer;
-  gettimeofday(&startKernelTimer, NULL);
-
   dim3 grid(number_bands, ngpown, 1);
   dim3 threads(32, 1, 1);  // kernel time is longer with a work-group size of 256 
   printf("Launching a kernel with grid = "
          "(%d,%d,%d), and threads = (%d,%d,%d) \n",
          number_bands, ngpown, 1, 32, 1, 1);
+
+  float total_time = 0.f;
 
   for (int i = 0; i < 10; i++) {
     // Reset the atomic sums
@@ -202,23 +201,28 @@ int main(int argc, char **argv) {
                achtemp_re_size * sizeof(dataType), hipMemcpyHostToDevice);
     hipMemcpy(d_achtemp_im, achtemp_im,
                achtemp_im_size * sizeof(dataType), hipMemcpyHostToDevice);
+
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     hipLaunchKernelGGL(solver, grid, threads, 0, 0, 
         number_bands, ngpown, ncouls, d_inv_igp_index, d_indinv, d_wx_array,
         d_wtilde_array, d_aqsmtemp, d_aqsntemp, d_I_eps_array, d_vcoul, d_achtemp_re,
         d_achtemp_im);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / 10.f);
 
   hipMemcpy(achtemp_re, d_achtemp_re,
              achtemp_re_size * sizeof(dataType), hipMemcpyDeviceToHost);
 
   hipMemcpy(achtemp_im, d_achtemp_im,
              achtemp_re_size * sizeof(dataType), hipMemcpyDeviceToHost);
-
-  gettimeofday(&endKernelTimer, NULL);
-
-  elapsedKernelTimer =
-      (endKernelTimer.tv_sec - startKernelTimer.tv_sec) +
-      1e-6 * (endKernelTimer.tv_usec - startKernelTimer.tv_usec);
 
   for (int iw = nstart; iw < nend; ++iw)
     achtemp[iw] = CustomComplex<dataType>(achtemp_re[iw], achtemp_im[iw]);
@@ -234,10 +238,6 @@ int main(int argc, char **argv) {
 
   printf("\n Final achtemp\n");
   achtemp[0].print();
-
-  gettimeofday(&endTimer, NULL);
-  elapsedTimer = (endTimer.tv_sec - startTimer.tv_sec) +
-                 1e-6 * (endTimer.tv_usec - startTimer.tv_usec);
 
   // Free the allocated memory
   free(achtemp);
@@ -263,10 +263,11 @@ int main(int argc, char **argv) {
   hipFree(d_achtemp_im);
   hipFree(d_wx_array);
 
-  std::cout << "********** Kernel Time Taken **********= " << elapsedKernelTimer
-            << " secs" << std::endl;
+  gettimeofday(&endTimer, NULL);
+  elapsedTimer = (endTimer.tv_sec - startTimer.tv_sec) +
+                 1e-6 * (endTimer.tv_usec - startTimer.tv_usec);
+
   std::cout << "********** Total Time Taken **********= " << elapsedTimer << " secs"
             << std::endl;
-
   return 0;
 }

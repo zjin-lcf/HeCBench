@@ -1,4 +1,5 @@
 #include <string.h>
+#include <chrono>
 #include "common.h"
 
 #ifndef dataType
@@ -183,6 +184,8 @@ int main(int argc, char **argv) {
          "(%d,%d,%d), and local work size = (%d,%d,%d) \n",
          number_bands * 32, ngpown, 1, 32, 1, 1);
 
+  float total_time = 0.f;
+
   for (int i = 0; i < 10; i++) {
     // Reset the atomic sums
     q.submit([&] (handler &cgh) {
@@ -194,6 +197,9 @@ int main(int argc, char **argv) {
       auto acc = d_achtemp_im.get_access<sycl_discard_write>(cgh);
       cgh.copy(achtemp_im, acc);
     });
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto igp = d_inv_igp_index.get_access<sycl_read>(cgh);
@@ -214,7 +220,14 @@ int main(int argc, char **argv) {
                eps.get_pointer(), vc.get_pointer(), re.get_pointer(), im.get_pointer());
       });
     });
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / 10.f);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_achtemp_re.get_access<sycl_read>(cgh);
