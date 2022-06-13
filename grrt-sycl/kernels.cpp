@@ -36,7 +36,6 @@ static void geodesic(double* Variables, const double* VariablesIn, double *y, do
   double siginv  = 1.0 / sigma;
   double bot    = 1.0 / sd;
 
-
   //avoid problems near the axis
   if (sintheta < 1e-8)
   {
@@ -127,7 +126,6 @@ static void rkstep(double* Variables, const double* VariablesIn,
   }
 }
 
-
 static double rk5(double* Variables, const double* VariablesIn, double *y, double *dydx, 
                              double htry, double escal, double *yscal, double *hdid)
 {
@@ -180,7 +178,6 @@ static double rk5(double* Variables, const double* VariablesIn, double *y, doubl
 
   return hnext;
 }
-
 
 static void initial(double* Variables, const double* VariablesIn, double *y0, double *ydot0)
 {
@@ -242,7 +239,6 @@ static void initial(double* Variables, const double* VariablesIn, double *y0, do
   // Eq below Eq.15
   kappa = y0[5]*y0[5]+a2*sin2+L*L/sin2;
 }
-
 
 static float ISCO(const double* VariablesIn)
 {
@@ -312,7 +308,6 @@ static double K2_tab[] = {
   +9.627144  //Te=87.09
 };
 
-
 static double K2_find(double Te, const double *K2_tab)
 {
   double d = Te_grids*(sycl::log(Te / Te_min)/ sycl::log(Te_max / Te_min));
@@ -338,7 +333,6 @@ static double K2(double Te, const double *K2_tab)
   tab_K2= K2_find(Te, K2_tab);
   return sycl::exp(tab_K2);
 }
-
 
 static double Jansky_Correction(const double* VariablesIn,double ima_width)
 {
@@ -421,7 +415,6 @@ void task1(nd_item<2> &item, double*__restrict ResultsPixel, const double*__rest
     htry = hnext;
   }
 }
-
 
 double task2fun_GetZ(double* Variables, const double* VariablesIn, double *y)
 {

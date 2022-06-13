@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <omp.h>
 #include "constants.h"
 
@@ -65,11 +66,17 @@ int main()
 {
   #pragma omp target update to (VariablesIn[0:VarINNUM])
 
+  auto start = std::chrono::steady_clock::now();
+
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       task1(Results, VariablesIn, GridIdxX, GridIdxY);
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task1) %f (s)\n", time * 1e-9f);
 
   #pragma omp target update from (Results[0:IMAGE_SIZE* IMAGE_SIZE * 3])
 
@@ -96,11 +103,17 @@ int main()
 
   #pragma omp target update to (VariablesIn[0:VarINNUM])
 
+  start = std::chrono::steady_clock::now();
+
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       task2(Results, VariablesIn, GridIdxX, GridIdxY);
     }
   }
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task2) %f (s)\n", time * 1e-9f);
 
   #pragma omp target update from (Results[0:IMAGE_SIZE * IMAGE_SIZE * 3])
 }

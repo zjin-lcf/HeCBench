@@ -37,7 +37,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O3 -use_fast_math
 endif
 
 #===============================================================================
@@ -55,4 +55,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

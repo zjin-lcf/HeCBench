@@ -52,7 +52,8 @@ __device__ static void geodesic(double* Variables, double* VariablesIn, double *
   dydx[5] = -sintheta * costheta*(L * L / (sin2 * sin2) - a2) * siginv;
 }
 
-__device__ static void rkstep(double* Variables, double* VariablesIn,double *y, double *dydx, double h, double *yout, double *yerr)
+__device__ static void rkstep(double* Variables, double* VariablesIn,double *y,
+                              double *dydx, double h, double *yout, double *yerr)
 {
   int i;
   double ak[N];
@@ -126,7 +127,6 @@ __device__ static void rkstep(double* Variables, double* VariablesIn,double *y, 
   }
 }
 
-
 __device__ static double rk5(double* Variables, double* VariablesIn, double *y, double *dydx, 
                              double htry, double escal, double *yscal, double *hdid)
 {
@@ -179,7 +179,6 @@ __device__ static double rk5(double* Variables, double* VariablesIn, double *y, 
 
   return hnext;
 }
-
 
 __device__ static void initial(double* Variables, double* VariablesIn, double *y0, double *ydot0)
 {
@@ -241,7 +240,6 @@ __device__ static void initial(double* Variables, double* VariablesIn, double *y
   // Eq below Eq.15
   kappa = y0[5]*y0[5]+a2*sin2+L*L/sin2;
 }
-
 
 __device__ static float ISCO(double* VariablesIn)
 {
@@ -311,7 +309,6 @@ static __device__ __constant__ double K2_tab[] = {
   +9.627144  //Te=87.09
 };
 
-
 __device__ static double K2_find(double Te)
 {
   double d = Te_grids*(log(Te / Te_min)/ log(Te_max / Te_min));
@@ -338,7 +335,6 @@ __device__ static  double K2(double Te)
   return exp(tab_K2);
 }
 
-
 __device__ static double Jansky_Correction(double* VariablesIn,double ima_width)
 {
   double distance=C_sgrA_d*C_pc;
@@ -364,7 +360,9 @@ __device__ double task1fun_GetZ(double* Variables, double* VariablesIn, double *
   return E_local / E_inf; 
 }
 
-__global__ void task1(double*__restrict ResultsPixel, double*__restrict VariablesIn, int GridIdxX, int GridIdxY)
+__global__ void task1(double*__restrict__ ResultsPixel,
+                      double*__restrict__ VariablesIn,
+                      int GridIdxX, int GridIdxY)
 {
   // to check whether the photon is inside image plane
   if(X1 >= SIZE || Y1 >= SIZE) return;  
@@ -419,7 +417,6 @@ __global__ void task1(double*__restrict ResultsPixel, double*__restrict Variable
     htry = hnext;
   }
 }
-
 
 __device__ double task2fun_GetZ(double* Variables, double* VariablesIn, double *y)
 {
@@ -479,12 +476,12 @@ __device__ double task2fun_GetZ(double* Variables, double* VariablesIn, double *
   // compute redshift
   E_local=-ut+L*uphi+pr*ur;
   return E_local/E_inf; 
-
 }
 
-__global__ void task2(double*__restrict ResultsPixel, double*__restrict VariablesIn, int GridIdxX, int GridIdxY)
+__global__ void task2(double*__restrict__ ResultsPixel,
+                      double*__restrict__ VariablesIn,
+                      int GridIdxX, int GridIdxY)
 {
-
   if(X1 >= SIZE || Y1 >= SIZE) return;  
 
   double Variables[VarNUM];
