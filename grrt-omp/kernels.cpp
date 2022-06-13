@@ -36,7 +36,6 @@ static void geodesic(double* Variables, double* VariablesIn, double *y, double *
   double siginv  = 1.0 / sigma;
   double bot    = 1.0 / sd;
 
-
   //avoid problems near the axis
   if (sintheta < 1e-8)
   {
@@ -126,7 +125,6 @@ static void rkstep(double* Variables, double* VariablesIn,double *y, double *dyd
   }
 }
 
-
 static double rk5(double* Variables, double* VariablesIn, double *y, double *dydx, 
     double htry, double escal, double *yscal, double *hdid)
 {
@@ -179,7 +177,6 @@ static double rk5(double* Variables, double* VariablesIn, double *y, double *dyd
 
   return hnext;
 }
-
 
 static void initial(double* Variables, double* VariablesIn, double *y0, double *ydot0)
 {
@@ -241,7 +238,6 @@ static void initial(double* Variables, double* VariablesIn, double *y0, double *
   // Eq below Eq.15
   kappa = y0[5]*y0[5]+a2*sin2+L*L/sin2;
 }
-
 
 static float ISCO(double* VariablesIn)
 {
@@ -311,7 +307,6 @@ static double K2_tab[] = {
   +9.627144  //Te=87.09
 };
 
-
 static double K2_find(double Te)
 {
   double d = Te_grids*(log(Te / Te_min)/ log(Te_max / Te_min));
@@ -337,7 +332,6 @@ static  double K2(double Te)
   tab_K2= K2_find(Te);
   return exp(tab_K2);
 }
-
 
 static double Jansky_Correction(double* VariablesIn,double ima_width)
 {
@@ -365,7 +359,9 @@ double task1fun_GetZ(double* Variables, double* VariablesIn, double *y)
 }
 #pragma omp end declare target
 
-void task1(double*__restrict ResultsPixel, double*__restrict VariablesIn, int GridIdxX, int GridIdxY)
+void task1(double*__restrict ResultsPixel,
+           double*__restrict VariablesIn,
+           int GridIdxX, int GridIdxY)
 {
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
   for (int y1 = 0; y1 < 50; y1++)
@@ -459,7 +455,6 @@ double task2fun_GetZ(double* Variables, double* VariablesIn, double *y)
   //==========Keplerian flow: inside ISCO    
   if( r<Rmstable)
   {
-
     double delta = r*r-2.*r+a2;
     double lambda=(Rmstable*Rmstable-2.*A*sqrt(Rmstable)+a2)/(sqrt(Rmstable*Rmstable*Rmstable)-2.*sqrt(Rmstable)+A);
     double gamma=sqrt(1-2./3./Rmstable);
@@ -488,7 +483,6 @@ double task2fun_GetZ(double* Variables, double* VariablesIn, double *y)
 
 void task2(double*__restrict ResultsPixel, double*__restrict VariablesIn, int GridIdxX, int GridIdxY)
 {
-
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
   for (int y1 = 0; y1 < 50; y1++)
     for (int x1 = 0; x1 < 100; x1++)

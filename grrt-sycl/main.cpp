@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 #include "common.h"
 #include "constants.h"
 
@@ -77,6 +78,9 @@ int main()
     cgh.copy(VariablesIn, acc);
   });
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       q.submit([&] (handler &cgh) {
@@ -88,6 +92,11 @@ int main()
       });
     }
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task1) %f (s)\n", time * 1e-9f);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_ResultsPixel.get_access<sycl_read>(cgh);
@@ -121,6 +130,10 @@ int main()
   });
 
   buffer<const double, 1> d_K2_tab (K2_tab, 50); 
+
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       q.submit([&] (handler &cgh) {
@@ -133,6 +146,11 @@ int main()
       });
     }
   }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task2) %f (s)\n", time * 1e-9f);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_ResultsPixel.get_access<sycl_read>(cgh);

@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "constants.h"
 
@@ -68,11 +69,20 @@ int main()
   hipMalloc(&d_VariablesIn, sizeof(double) * VarINNUM);
   hipMemcpy(d_VariablesIn, VariablesIn, sizeof(double) * VarINNUM, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       hipLaunchKernelGGL(task1, GridDim, BlockDim, 0, 0, d_ResultsPixel, d_VariablesIn, GridIdxX, GridIdxY);
     }
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task1) %f (s)\n", time * 1e-9f);
+  
 
   hipMemcpy(Results, d_ResultsPixel, sizeof(double) * IMAGE_SIZE * IMAGE_SIZE * 3, hipMemcpyDeviceToHost);
 
@@ -99,12 +109,20 @@ int main()
 
   hipMemcpy(d_VariablesIn, VariablesIn, sizeof(double) * VarINNUM, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   //compute number of grides, to cover the whole image plane
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
       hipLaunchKernelGGL(task2, GridDim, BlockDim, 0, 0, d_ResultsPixel, d_VariablesIn, GridIdxX, GridIdxY);
     }
   }
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (task2) %f (s)\n", time * 1e-9f);
 
   hipMemcpy(Results, d_ResultsPixel, sizeof(double) * IMAGE_SIZE * IMAGE_SIZE * 3, hipMemcpyDeviceToHost);
 
