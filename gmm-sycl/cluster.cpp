@@ -426,7 +426,6 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   buffer<float, 1> d_memberships(num_events*(original_num_clusters+
                    NUM_CLUSTERS_PER_BLOCK-original_num_clusters % NUM_CLUSTERS_PER_BLOCK));
 
-
   // allocate and copy relavant FCS data to device.
   //CUDA_SAFE_CALL(cudaMalloc( (void**) &d_fcs_data_by_event, mem_size));
   //CUDA_SAFE_CALL(cudaMalloc( (void**) &d_fcs_data_by_dimension, mem_size));
