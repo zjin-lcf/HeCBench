@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
  * Inverts a square matrix (stored as a 1D float array)
  * 
@@ -150,26 +149,6 @@ void writeCluster(FILE* f, clusters_t &clusters, const int c, const int num_dime
     fprintf(f,"\n");
   }
   fflush(f);   
-}
-
-/*
- * Seeds the cluster centers (means) with random data points
- */
-void seed_clusters(clusters_t* clusters, float* fcs_data, int num_clusters, int num_dimensions, int num_events) {
-  float fraction;
-  int seed;
-  if(num_clusters > 1) {
-    fraction = (num_events-1.0f)/(num_clusters-1.0f);
-  } else {
-    fraction = 0.0;
-  }
-  srand((unsigned int) time(NULL));
-  // Sets the means from evenly distributed points in the input data
-  for(int c=0; c < num_clusters; c++) {
-    clusters->N[c] = (float)num_events/(float)num_clusters;
-    for(int d=0; d < num_dimensions; d++)
-      clusters->means[c*num_dimensions+d] = fcs_data[((int)(c*fraction))*num_dimensions+d];
-  }
 }
 
 void add_clusters(clusters_t &clusters, const int c1, const int c2, clusters_t &temp_cluster, const int num_dimensions) {
@@ -410,8 +389,6 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
   // copy clusters from the device
   copyClusterFromDevice(&clusters, &temp_clusters, d_clusters, original_num_clusters, num_dimensions);
-
-  //seed_clusters(&clusters,fcs_data_by_event,original_num_clusters,num_dimensions,num_events);
 
   DEBUG("Starting Clusters\n");
   for(int c=0; c < original_num_clusters; c++) {

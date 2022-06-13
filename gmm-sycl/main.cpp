@@ -18,6 +18,7 @@
 #include <time.h> // for clock(), clock_t, CLOCKS_PER_SEC
 #include <stdlib.h>
 #include <float.h>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -56,12 +57,16 @@ int main( int argc, char** argv) {
     return 1;
   }
 
+  auto start = std::chrono::steady_clock::now();
+
   clusters_t* clusters = cluster(original_num_clusters, desired_num_clusters, &ideal_num_clusters, 
       num_dimensions, num_events, fcs_data_by_event);
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   clusters_t saved_clusters;
   memcpy(&saved_clusters,clusters,sizeof(clusters_t));
-
 
   const char* result_suffix = ".results";
   const char* summary_suffix = ".summary";
@@ -130,6 +135,7 @@ int main( int argc, char** argv) {
   free(fcs_data_by_event);
   freeCluster(&saved_clusters);
 
+  printf("Execution time of the cluster function %f (s)\n", time * 1e-9f);
+
   return 0;
 }
-

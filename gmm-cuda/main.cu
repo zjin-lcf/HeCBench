@@ -18,6 +18,7 @@
 #include <time.h> // for clock(), clock_t, CLOCKS_PER_SEC
 #include <stdlib.h>
 #include <float.h>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -56,15 +57,19 @@ int main( int argc, char** argv) {
     return 1;
   }
 
+  auto start = std::chrono::steady_clock::now();
+
   clusters_t* clusters = cluster(original_num_clusters, desired_num_clusters, &ideal_num_clusters, 
       num_dimensions, num_events, fcs_data_by_event);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   clusters_t saved_clusters;
   memcpy(&saved_clusters,clusters,sizeof(clusters_t));
 
-
-  char* result_suffix = ".results";
-  char* summary_suffix = ".summary";
+  const char* result_suffix = ".results";
+  const char* summary_suffix = ".summary";
   int filenamesize1 = strlen(argv[3]) + strlen(result_suffix) + 1;
   int filenamesize2 = strlen(argv[3]) + strlen(summary_suffix) + 1;
   char* result_filename = (char*) malloc(filenamesize1);
@@ -73,7 +78,6 @@ int main( int argc, char** argv) {
   strcpy(summary_filename,argv[3]);
   strcat(result_filename,result_suffix);
   strcat(summary_filename,summary_suffix);
-
 
   PRINT("Summary filename: %s\n",summary_filename);
   PRINT("Results filename: %s\n",result_filename);
@@ -129,6 +133,8 @@ int main( int argc, char** argv) {
   // cleanup host memory
   free(fcs_data_by_event);
   freeCluster(&saved_clusters);
+
+  printf("Execution time of the cluster function %f (s)\n", time * 1e-9f);
 
   return 0;
 }
