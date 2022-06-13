@@ -189,9 +189,7 @@ int main(int argc, char* argv[])
     }
   }
 
-
   {
-
 #ifdef USE_GPU
     gpu_selector dev_sel; 
 #else
@@ -408,7 +406,6 @@ int main(int argc, char* argv[])
               Tmp7A[ii + jj*Nx] = tmp_s7;
               Tmp8A[ii + jj*Nx] = tmp_s8;
 
-
               int local_idi = item.get_local_id(1);
               int local_idj = item.get_local_id(0);
               int local_sizei = item.get_local_range(1);
@@ -475,7 +472,6 @@ int main(int argc, char* argv[])
 
   }//sycl scope
 
-
   float tot_u = 0;
   int tot_cells = 0;
   for (int tt = 0; tt < MaxIters; tt++){
@@ -517,7 +513,6 @@ int main(int argc, char* argv[])
   write_values(params, cells, obstaclesHost, av_vels);
   finalise(cells, tmp_cells, obstaclesHost, av_vels);
 
-
   free(speedsHostS0);
   free(speedsHostS1);
   free(speedsHostS2);
@@ -532,7 +527,6 @@ int main(int argc, char* argv[])
 
   return EXIT_SUCCESS;
 }
-
 
 float av_velocity(const t_param params, t_speed* cells, int* obstacles)
 {
@@ -751,7 +745,6 @@ int finalise(t_speed* cells_ptr, t_speed* tmp_cells_ptr,
 
   return EXIT_SUCCESS;
 }
-
 
 float calc_reynolds(const t_param params, t_speed* cells, int* obstacles)
 {

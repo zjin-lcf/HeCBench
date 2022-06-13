@@ -12,7 +12,6 @@
 #include <cuda.h>
 #include "DCT8x8.h"
 
-
 __device__
 inline void DCT8(float *D){
     float X07P = D[0] + D[7];
@@ -70,15 +69,9 @@ inline void IDCT8(float *D){
     D[6] = C_norm * (Y04M2e6bMP - Y1c7dM3f5aPM);
 }
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-// 8x8 DCT kernels
-////////////////////////////////////////////////////////////////////////////////
-
 __global__ void DCT8x8_kernel(
-    float* d_Dst,
-    const float* d_Src,
+    float*__restrict__ d_Dst,
+    const float*__restrict__ d_Src,
     const unsigned int stride,
     const unsigned int imageH,
     const unsigned int imageW
@@ -119,8 +112,8 @@ __global__ void DCT8x8_kernel(
 }
 
 __global__ void IDCT8x8_kernel(
-    float* d_Dst,
-    const float* d_Src,
+    float*__restrict__ d_Dst,
+    const float*__restrict__ d_Src,
     const unsigned int stride,
     const unsigned int imageH,
     const unsigned int imageW

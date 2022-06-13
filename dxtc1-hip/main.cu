@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "dds.h"
 #include "permutations.h"
@@ -27,17 +28,16 @@
 #define ERROR_THRESHOLD 0.02f
 #define NUM_THREADS     64      // Number of threads per work group.
 
-
-__global__ void compress (const uint* permutations, 
-                          const uint* image, 
-                          uint2* result, 
-                          float* alphaTable4, 
-                          int* prods4,
-                          float* alphaTable3,
-                          int* prods3,
-                          int groupOffset)
+__global__
+void compress (const uint*__restrict__ permutations, 
+               const uint*__restrict__ image, 
+               uint2*__restrict__ result, 
+               float*__restrict__ alphaTable4, 
+               int*__restrict__ prods4,
+               float*__restrict__ alphaTable3,
+               int*__restrict__ prods3,
+               int groupOffset)
 {
-
   __shared__ float4 colors[16];
   __shared__ float4 sums[16];
   __shared__ int s_int[64];
@@ -66,10 +66,20 @@ __global__ void compress (const uint* permutations,
   }
 }
 
-// Main function
-// *********************************************************************
 int main(int argc, char** argv) 
 {
+  if (argc != 4) {
+    printf("Usage: %s <path to image> <path to reference image> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const char* image_path = argv[1];
+  assert(image_path != NULL);
+
+  const char* reference_image_path = argv[2];
+  assert(reference_image_path != NULL);
+
+  const int numIterations = atoi(argv[3]);
+
   unsigned int width, height;
   unsigned int* h_img = NULL;
   const float alphaTable4[4] = {9.0f, 0.0f, 6.0f, 3.0f};
@@ -78,8 +88,6 @@ int main(int argc, char** argv)
   const int prods3[4] = {0x040000, 0x000400, 0x040101, 0x010401};
 
   // load image 
-  const char* image_path = argv[1];
-  assert(image_path != NULL);
   shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height);
   assert(h_img != NULL);
   printf("Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
@@ -107,7 +115,6 @@ int main(int argc, char** argv)
 
   const unsigned int compressedSize = (width / 4) * (height / 4) * 8;
   unsigned int * h_result = (unsigned int*)malloc(compressedSize);
-
 
   // Tables
   float* d_alphaTable4;
@@ -148,11 +155,13 @@ int main(int argc, char** argv)
   printf("\n%u Workgroups, %u Work Items per Workgroup, %u Work Items in NDRange...\n\n", 
       blocks, NUM_THREADS, blocks * NUM_THREADS);
 
-  int numIterations = 100;
-  for (int i = -1; i < numIterations; ++i) {
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < numIterations; ++i) {
     for( int j=0; j<blocks; j+= blocksPerLaunch ) {
       int grid = MIN( blocksPerLaunch, blocks-j );
-      hipLaunchKernelGGL(compress, dim3(grid), dim3(NUM_THREADS), 0, 0, 
+      hipLaunchKernelGGL(compress, grid, NUM_THREADS, 0, 0, 
           d_permutations,
           d_image,
           d_result,
@@ -163,6 +172,11 @@ int main(int argc, char** argv)
           j); 
     }
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 
   hipMemcpy(h_result, (uint*)d_result, compressedSize, hipMemcpyDeviceToHost);
   hipFree(d_permutations);  
@@ -218,9 +232,6 @@ int main(int argc, char** argv)
 
   // Make sure the generated image matches the reference image (regression check)
   printf("\nComparing against Host/C++ computation...\n");     
-  //const char* reference_image_path = shrFindFilePath(refimage_filename, argv[0]);
-  //assert(reference_image_path != NULL);
-  const char* reference_image_path = argv[2];
 
   // read in the reference image from file
 #ifdef WIN32
@@ -250,7 +261,7 @@ int main(int argc, char** argv)
       if (cmp != 0.0f) 
       {
         compareBlock(((BlockDXT1 *)h_result) + resultBlockIdx, ((BlockDXT1 *)reference) + referenceBlockIdx);
-        printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
+        //printf("Deviation at (%d, %d):\t%f rms\n", x/4, y/4, float(cmp)/16/3);
       }
       rms += cmp;
     }

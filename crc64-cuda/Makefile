@@ -47,7 +47,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu CRC64.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -55,4 +55,3 @@ clean:
 
 run: $(program)
 	./$(program) 10 5 33554432
-

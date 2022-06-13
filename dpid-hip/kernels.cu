@@ -2,7 +2,9 @@
 // Use of this source code is governed by the BSD 3-Clause license that can be
 // found in the LICENSE file.
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define THREADS 128
@@ -22,9 +24,10 @@ struct Params {
   uint32_t oHeight;
   uint32_t iWidth;
   uint32_t iHeight;
-  float pWidth;
-  float pHeight;
-  float lambda;
+     float pWidth;
+     float pHeight;
+     float lambda;
+  uint32_t repeat;
 };
 
 __device__ __forceinline__
@@ -255,10 +258,18 @@ void run(const Params& p, const void* hInput, void* hOutput) {
   const dim3 threads(THREADS, 1, 1); // 4 warps, 1 warp per patch
   const dim3 blocks((uint32_t)std::ceil(p.oWidth / (float)TSIZE), p.oHeight, 1);
 
-  for (int i = 0; i < 100; i++) {
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (uint32_t i = 0; i < p.repeat; i++) {
     hipLaunchKernelGGL(kernelGuidance, blocks, threads, 0, 0, dInput, dGuidance, p);
     hipLaunchKernelGGL(kernelDownsampling, blocks, threads, 0, 0, dInput, dGuidance, p, dOutput);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / p.repeat);
 
   hipMemcpy(hOutput, dOutput, sOutput, hipMemcpyDeviceToHost);
 

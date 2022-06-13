@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <hip/hip_runtime.h>
+#include <chrono>
 #include "kernel.h"
 
 // threads per block
@@ -16,12 +17,13 @@ double LCG_random_double(uint64_t * seed)
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <number of points>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of points> <repeat>\n", argv[0]);
     return 1;
   }
 
   const int n = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int m = (n + BS - 1) / BS; // number of groups
 
   int *nlist = (int*) malloc (sizeof(int) * n);
@@ -30,9 +32,8 @@ int main(int argc, char* argv[]) {
   double *damage = (double*) malloc (sizeof(double) * m);
 
   unsigned long seed = 123;
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++)
     nlist[i] = (LCG_random_double(&seed) > 0.5) ? 1 : -1;
-  }
 
   for (int i = 0; i < m; i++) {
     int s = 0;
@@ -58,11 +59,19 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_damage, sizeof(double)*m);
 
   dim3 blocks (BS);
-  dim3 grids ((n+BS-1)/BS);
+  dim3 grids (m);
 
-  for (int i = 0; i < 100; i++) 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) 
     damage_of_node <<< grids, blocks, BS*sizeof(int) >>> (
       n, d_nlist, d_family, d_n_neigh, d_damage);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(n_neigh, d_n_neigh, sizeof(int)*m, hipMemcpyDeviceToHost);
   hipMemcpy(damage, d_damage, sizeof(double)*m, hipMemcpyDeviceToHost);

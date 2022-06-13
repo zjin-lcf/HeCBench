@@ -39,7 +39,6 @@
 
 #define _XOPEN_SOURCE 600
 
-
 #include <ctime>
 #include <vector>
 #include <iostream>
@@ -115,4 +114,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-

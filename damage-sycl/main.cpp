@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <chrono>
 #include "common.h"
 #include "kernel.h"
 
@@ -16,12 +17,13 @@ double LCG_random_double(uint64_t * seed)
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <number of points>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of points> <repeat>\n", argv[0]);
     return 1;
   }
 
   const int n = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int m = (n + BS - 1) / BS; // number of groups
 
   int *nlist = (int*) malloc (sizeof(int) * n);
@@ -57,9 +59,12 @@ int main(int argc, char* argv[]) {
   buffer<double, 1> d_damage (damage, m);
 
   range<1> lws (BS);
-  range<1> gws ((n+BS-1)/BS*BS);
+  range<1> gws (m*BS);
 
-  for (int i = 0; i < 100; i++) 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto nlist = d_nlist.get_access<sycl_read>(cgh);
       auto family = d_family.get_access<sycl_read>(cgh);
@@ -76,6 +81,13 @@ int main(int argc, char* argv[]) {
                 sm.get_pointer());
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   } // sycl scope
 
   double sum = 0.0;

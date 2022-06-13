@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <random>
 #include <omp.h>
 #include "kernel.h"
 
 template <typename FP>
-void test(const int size) {
+void test(const int size, const int repeat) {
   const int max_blocks = (int)(ceilf(size * size / 256.f)); 
 
   std::default_random_engine rng (123);
@@ -15,7 +16,7 @@ void test(const int size) {
   FP *B = (FP*) malloc (sizeof(FP) * size * 2);
   for (int i = 0; i < size * 2; i++) {
     A[i] = distribution(rng);
-    B[i] = A[i] + (FP)0.00001 * distribution(rng);
+    B[i] = A[i] + distribution(rng);
   }
 
   FP *scaleA = (FP*) malloc (sizeof(FP) * size);
@@ -38,10 +39,17 @@ void test(const int size) {
                         ceilf(size / (block_size_y * tile_size_y));
 
     FP output;
-    for (int i = 0; i < 100; i++) {
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       distance<FP>(A, B, size, size, scaleA, scaleB, cost);  
       output = reduce_cross_term<FP>(cost, size, size, nblocks);  
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
     printf("output value: %lf\n", output);
   }
 
@@ -53,18 +61,19 @@ void test(const int size) {
 } 
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage ./%s <size>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage ./%s <size> <repeat>\n", argv[0]);
     return 1;
   }
 
   const int size = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   printf("Test single precision\n");
-  test<float>(size);
+  test<float>(size, repeat);
 
   printf("Test double precision\n");
-  test<double>(size);
+  test<double>(size, repeat);
 
   return 0;
 }
