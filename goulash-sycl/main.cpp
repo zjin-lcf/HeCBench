@@ -11,9 +11,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include "common.h"
-
 #include "utils.h"
-
 
 void gate(nd_item<1> &item, double* __restrict m_gate, 
           const long nCells, const double* __restrict Vm) 
@@ -46,12 +44,11 @@ void gate(nd_item<1> &item, double* __restrict m_gate,
   m_gate[ii] += (mhu - m_gate[ii])*(1-sycl::exp(-tauR));
 }
 
-
 int main(int argc, char* argv[]) 
 {
   if (argc != 3)
   {
-    printf ("Usage: %s  Iterations  Kernel_GBs_used\n\n", argv[0]);
+    printf ("Usage: %s <Iterations> <Kernel_GBs_used>\n\n", argv[0]);
     exit (1);
   }
 
@@ -91,12 +88,12 @@ int main(int argc, char* argv[])
 
   for (long itime=0; itime<=iterations; itime++) {
     /* Start timer after warm-up iteration 0 */
-    if (itime==1) {
+    if (itime == 1) {
       q.submit([&] (handler &cgh) {
         auto acc = d_m_gate.get_access<sycl_read>(cgh);
 	cgh.copy(acc, m_gate);
       }).wait();
-      kernel_starttime=secs_elapsed();
+      kernel_starttime = secs_elapsed();
     }
 
     q.submit([&] (handler &cgh) {
@@ -109,11 +106,8 @@ int main(int argc, char* argv[])
   }
 
   q.wait();
-
-  kernel_endtime=secs_elapsed();
-
+  kernel_endtime = secs_elapsed();
   kernel_runtime = kernel_endtime-kernel_starttime;
-
   printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
 
   // verify

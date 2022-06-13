@@ -11,7 +11,6 @@
 #include <math.h>
 #include <sys/time.h>
 #include <hip/hip_runtime.h>
-
 #include "utils.h"
 
 /* Preprocessing macro to check return code from HIP calls */
@@ -19,7 +18,7 @@
 	printf ("ERROR HIP failed: %s", hipGetErrorString(err));}
 
 __global__ 
-void gate(double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
+void gate(double* __restrict__ m_gate, const long nCells, const double* __restrict__ Vm) 
 {
   long ii = blockIdx.x*blockDim.x + threadIdx.x;
   if (ii >= nCells) return;
@@ -49,12 +48,11 @@ void gate(double* __restrict m_gate, const long nCells, const double* __restrict
   m_gate[ii] += (mhu - m_gate[ii])*(1-exp(-tauR));
 }
 
-
 int main(int argc, char* argv[]) 
 {
   if (argc != 3)
   {
-    printf ("Usage: %s  Iterations  Kernel_GBs_used\n\n", argv[0]);
+    printf ("Usage: %s <Iterations> <Kernel_GBs_used>\n\n", argv[0]);
     exit (1);
   }
 
@@ -90,20 +88,17 @@ int main(int argc, char* argv[])
 
   for (long itime=0; itime<=iterations; itime++) {
     /* Start timer after warm-up iteration 0 */
-    if (itime==1) {
+    if (itime == 1) {
       HIPCHECK(hipMemcpy(m_gate, d_m_gate, sizeof(double)*nCells, hipMemcpyDeviceToHost));
-      kernel_starttime=secs_elapsed();
+      kernel_starttime = secs_elapsed();
     }
 
-    hipLaunchKernelGGL(gate, dim3(gridSize), dim3(blockSize), 0, 0, d_m_gate, nCells, d_Vm);
+    hipLaunchKernelGGL(gate, gridSize, blockSize, 0, 0, d_m_gate, nCells, d_Vm);
   }
 
   hipDeviceSynchronize();
-
-  kernel_endtime=secs_elapsed();
-
+  kernel_endtime = secs_elapsed();
   kernel_runtime = kernel_endtime-kernel_starttime;
-
   printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
 
   HIPCHECK(hipFree(d_Vm));
