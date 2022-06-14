@@ -39,13 +39,12 @@ double LCG_random_double(uint64_t * seed)
   return (double) (*seed) / (double) m;
 }
 
-
 // Compute the Boltzmann factor of methane at point (x, y, z) inside structure
 //   Loop over all atoms of unit cell of crystal structure
 //   Find nearest image to methane at point (x, y, z) for application of periodic boundary conditions
 //   Compute energy contribution due to this atom via the Lennard-Jones potential
 double compute(double x, double y, double z,
-    const StructureAtom * __restrict__ structureAtoms,
+    const StructureAtom * __restrict structureAtoms,
     double natoms, double L) 
 {
   // (x, y, z) : Cartesian coords of methane molecule
@@ -91,8 +90,8 @@ double compute(double x, double y, double z,
 // Stores Boltzmann factor computed at this thread in boltzmannFactors
 void insertions(
     nd_item<1> &item,
-    double *__restrict__ boltzmannFactors, 
-    const StructureAtom * __restrict__ structureAtoms, 
+    double *__restrict boltzmannFactors, 
+    const StructureAtom * __restrict structureAtoms, 
     int natoms, double L) 
 {
   // boltzmannFactors : pointer array in which to store computed Boltzmann factors
@@ -116,7 +115,7 @@ void insertions(
 int main(int argc, char *argv[]) {
   // take in number of MC insertions as argument
   if (argc != 3) {
-    printf("Usage: ./%s <material file> ninsertions\n", argv[0]);
+    printf("Usage: ./%s <material file> <ninsertions>\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
@@ -224,8 +223,13 @@ int main(int argc, char *argv[]) {
   range<1> gws (insertionsPerCycle);
   range<1> lws (NUMTHREADS);
 
+  double total_time = 0.0;
+
   double KH = 0.0;  // will be Henry coefficient
   for (int cycle = 0; cycle < ncycles; cycle++) {
+
+    auto start = std::chrono::steady_clock::now();
+
     //  Perform Monte Carlo insertions in parallel on the GPU
     q.submit([&] (handler &cgh) {
       auto out = d_boltzmannFactors.get_access<sycl_discard_write>(cgh);
@@ -233,7 +237,11 @@ int main(int argc, char *argv[]) {
       cgh.parallel_for<class insertations>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         insertions(item, out.get_pointer(), in.get_pointer(), natoms, L);
       });
-    });
+    }).wait();
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
 
     q.submit([&] (handler &cgh) {
       auto acc = d_boltzmannFactors.get_access<sycl_read>(cgh);
@@ -244,6 +252,7 @@ int main(int argc, char *argv[]) {
     for(int i = 0; i < insertionsPerCycle; i++)
       KH += boltzmannFactors[i];
   }
+
   // average Boltzmann factor: < e^{-E/(kB/T)} >
   KH = KH / ninsertions;  
   KH = KH / (R * T);  // divide by RT
@@ -251,6 +260,7 @@ int main(int argc, char *argv[]) {
   printf("Henry constant = %e mol/(m3 - Pa)\n", KH);
   printf("Number of actual insertions: %d\n", ninsertions);
   printf("Number of times we called the device kernel: %d\n", ncycles);
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9) / ncycles);
 
   free(structureAtoms);
   free(boltzmannFactors);
