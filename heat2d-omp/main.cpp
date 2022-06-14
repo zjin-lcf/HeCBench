@@ -119,7 +119,6 @@ int main(int argc, char *argv[]) {
     t0 = stop_watch(t0)/(double)niter;
   }
 
-
   printf("Device: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
   	 niter, Lx, Ly, t0*1e6,
   	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9),
@@ -128,16 +127,16 @@ int main(int argc, char *argv[]) {
   float *gpu_arr = in;
   float *cpu_arr = cpu_in;
   // verification
+  bool ok = true;
   for (int i = 0; i < Lx*Ly; i++) {
     // choose 1e-2 because the error rate increases with the iteration from 1 to 100000
     if ( fabs(cpu_arr[i] - gpu_arr[i]) > 1e-2 ) {
-	    printf("FAILED at %d cpu=%f gpu=%f\n", i, cpu_arr[i], gpu_arr[i]);
-            /* free main memory array */
-            free(cpu_arr);
-            free(gpu_arr);
-	    return 1;
+      printf("Mismatch at %d cpu=%f gpu=%f\n", i, cpu_arr[i], gpu_arr[i]);
+      ok = false;
+      break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(cpu_in);
   free(cpu_out);
