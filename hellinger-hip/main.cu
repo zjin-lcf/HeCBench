@@ -1,6 +1,7 @@
 #include <iostream>
 #include <new>
 #include <cmath>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define BLOCK_SIZE 16
@@ -53,7 +54,14 @@ void hellinger(
     }
 }
 
-int main() {
+int main(int argc, char** argv)
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int i, j;
 
   // 2D arrays on host side.
@@ -95,8 +103,16 @@ int main() {
   dim3 dimGrid(grid_cols, grid_rows);
   dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
 
-  for (int i = 0; i < 100; i++)
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     hipLaunchKernelGGL(hellinger, dimGrid, dimBlock, 0, 0, a_device, b_device, c_device, M, N, P);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / repeat << " (s)\n";
 
   hipMemcpy(c_back, c_device, sizeof(int)*M*P, hipMemcpyDeviceToHost);
 
