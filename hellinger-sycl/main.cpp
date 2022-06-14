@@ -1,6 +1,7 @@
 #include <iostream>
 #include <new>
 #include <cmath>
+#include <chrono>
 #include "common.h"
 
 #define BLOCK_SIZE 16
@@ -30,7 +31,14 @@ constexpr int P = m_size / 2;
 #include "verify.h"
 #endif
 
-int main() {
+int main(int argc, char** argv)
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int i, j;
 
   // 2D arrays on host side.
@@ -81,7 +89,10 @@ int main() {
     range<2> gws (grid_rows, grid_cols);
     range<2> lws (BLOCK_SIZE, BLOCK_SIZE);
 
-    for (int i = 0; i < 100; i++) {
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       q.submit([&](handler &h) {
         auto A = a.get_access<sycl_read>(h);
         auto B = b.get_access<sycl_read>(h);
@@ -101,6 +112,11 @@ int main() {
         });
       });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time " << (time * 1e-9f) / repeat << " (s)\n";
   }
 
 #ifdef VERIFY
