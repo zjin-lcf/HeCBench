@@ -127,6 +127,7 @@ main(int argc, char *argv[]) {
   float xnorm = 1.0/(1.0+4.0*sigma);
 
   /* Do iterations on GPU, record time */
+  hipDeviceSynchronize();
   t0 = stop_watch(0);
 
   /* Fixed number of threads per block (in x- and y-direction), number
@@ -139,6 +140,7 @@ main(int argc, char *argv[]) {
     out = in;
     in = tmp;
   }
+
   hipDeviceSynchronize();
   t0 = stop_watch(t0)/(double)niter;
 
@@ -153,20 +155,17 @@ main(int argc, char *argv[]) {
   	 (Lx*Ly*6.0)/(t0*1.0e9));
 
   // verification
+  bool ok = true;
   for (int i = 0; i < Lx*Ly; i++) {
     // choose 1e-2 because the error rate increases with the iteration from 1 to 100000
     if ( fabs(cpu_arr[i] - gpu_arr[i]) > 1e-2 ) {
-	    printf("FAILED at %d cpu=%f gpu=%f\n", i, cpu_arr[i], gpu_arr[i]);
-            /* free main memory array */
-            free(cpu_arr);
-            free(gpu_arr);
-	    return 1;
+      printf("Mismatch at %d cpu=%f gpu=%f\n", i, cpu_arr[i], gpu_arr[i]);
+      ok = false;
+      break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
-  /* write to file */
-  //write_to_file(fname, arr);
-  /* write timing info */
   free(cpu_arr);
   free(gpu_arr);
   return 0;
