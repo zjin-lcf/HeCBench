@@ -1,5 +1,6 @@
 #include <vector>
 #include <iostream>
+#include <chrono>
 #include <cuda.h>
 #include "util.h"  // graph
 
@@ -453,6 +454,9 @@ std::vector<float> bc_gpu(
     approx = false;
   }
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   bc_kernel<<<dimGrid,dimBlock>>>(
       bc_d,
       R_d,
@@ -481,6 +485,11 @@ std::vector<float> bc_gpu(
       diameters_d,
       source_vertices_d,
       approx);
+
+  cudaDeviceSynchronize();
+  auto stop = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
+  std::cout << "Kernel execution time " << time * 1e-9f << " (s)\n";
 
   // GPU result
   checkCudaErrors(cudaMemcpy(bc_gpu,bc_d,sizeof(float)*g.n,cudaMemcpyDeviceToHost));

@@ -494,6 +494,9 @@ std::vector<float> bc_gpu(
     approx = false;
   }
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&](sycl::handler &cgh) {
     auto g_n = g.n;
     auto g_m = g.m;
@@ -565,7 +568,11 @@ std::vector<float> bc_gpu(
         next_index_sm.get_pointer(),
         diameter_keys_sm.get_pointer());
      });
-  });
+  }).wait();
+
+  auto stop = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
+  std::cout << "Kernel execution time " << time * 1e-9f << " (s)\n";
 
   // GPU result
   q.submit([&](sycl::handler &cgh) {
