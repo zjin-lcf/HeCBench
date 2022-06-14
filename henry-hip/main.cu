@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define NUMTHREADS 256  // number of threads per GPU block
@@ -39,7 +40,6 @@ double LCG_random_double(uint64_t * seed)
   *seed = (a * (*seed) + c) % m;
   return (double) (*seed) / (double) m;
 }
-
 
 // Compute the Boltzmann factor of methane at point (x, y, z) inside structure
 //   Loop over all atoms of unit cell of crystal structure
@@ -116,7 +116,7 @@ __global__ void insertions(
 int main(int argc, char *argv[]) {
   // take in number of MC insertions as argument
   if (argc != 3) {
-    printf("Usage: ./%s <material file> ninsertions\n", argv[0]);
+    printf("Usage: ./%s <material file> <ninsertions>\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
@@ -217,10 +217,21 @@ int main(int argc, char *argv[]) {
   //  KH = < e^{-E/(kB * T)} > / (R * T)
   //  Brackets denote average over space
 
+  double total_time = 0.0;
+
   double KH = 0.0;  // will be Henry coefficient
   for (int cycle = 0; cycle < ncycles; cycle++) {
+
+    auto start = std::chrono::steady_clock::now();
+
     //  Perform Monte Carlo insertions in parallel on the GPU
-    hipLaunchKernelGGL(insertions, dim3(nBlocks), dim3(NUMTHREADS), 0, 0, d_boltzmannFactors, d_structureAtoms, natoms, L);
+    hipLaunchKernelGGL(insertions, nBlocks, NUMTHREADS, 0, 0, d_boltzmannFactors, d_structureAtoms, natoms, L);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     hipMemcpy(boltzmannFactors, d_boltzmannFactors, insertionsPerCycle * sizeof(double), hipMemcpyDeviceToHost);
 
     // Compute Henry coefficient from the sampled Boltzmann factors
@@ -234,6 +245,7 @@ int main(int argc, char *argv[]) {
   printf("Henry constant = %e mol/(m3 - Pa)\n", KH);
   printf("Number of actual insertions: %d\n", ninsertions);
   printf("Number of times we called the device kernel: %d\n", ncycles);
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9) / ncycles);
 
   hipFree(d_structureAtoms);
   hipFree(d_boltzmannFactors);
