@@ -41,7 +41,6 @@
 #define PI acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
-// Function definitions
 __global__ void initial_value(const unsigned int n, const double dx, const double length, double * u);
 __global__ void zero(const unsigned int n, double * u);
 __global__ void solve(const unsigned int n, const double alpha, const double dx, const double dt, const double r, const double r2,
@@ -49,8 +48,6 @@ __global__ void solve(const unsigned int n, const double alpha, const double dx,
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
-
-// Main function
 int main(int argc, char *argv[]) {
 
   // Start the total program runtime timer
@@ -61,7 +58,6 @@ int main(int argc, char *argv[]) {
 
   // Number of timesteps
   int nsteps = 10;
-
 
   // Check for the correct number of arguments
   // Print usage and exits if not correct
@@ -82,7 +78,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-
   //
   // Set problem definition
   //
@@ -90,7 +85,6 @@ int main(int argc, char *argv[]) {
   double length = 1000.0;      // physical size of domain: length x length square
   double dx = length / (n+1);  // physical size of each cell (+1 as don't simulate boundaries as they are given)
   double dt = 0.5 / nsteps;    // time interval (total time of 0.5s)
-
 
   // Stability requires that dt/(dx^2) <= 0.5,
   double r = alpha * dt / (dx * dx);
@@ -117,16 +111,12 @@ int main(int argc, char *argv[]) {
     << " HIP device: " << device_name << std::endl
     << LINE << std::endl;
 
-
-
-
   // Stability check
   std::cout << "Stability" << std::endl << std::endl;
   std::cout << " r value: " << r << std::endl;
   if (r > 0.5)
     std::cout << " Warning: unstable" << std::endl;
   std::cout << LINE << std::endl;
-
 
   // Allocate two nxn grids
   double *u;
@@ -155,9 +145,9 @@ int main(int argc, char *argv[]) {
   // Finite difference constant multiplier
   const double r2 = 1.0 - 4.0*r;
 
-
   // Start the solve timer
   auto tic = std::chrono::high_resolution_clock::now();
+
   for (int t = 0; t < nsteps; ++t) {
 
     // Call the solve kernel
@@ -202,7 +192,6 @@ int main(int argc, char *argv[]) {
     << LINE << std::endl;
 
   delete[] u_host;
-
 }
 
 // Sets the mesh to an initial value, determined by the MMS scheme
@@ -279,6 +268,4 @@ double l2norm(const int n, const double * u, const int nsteps, const double dt, 
   }
 
   return sqrt(l2norm);
-
 }
-

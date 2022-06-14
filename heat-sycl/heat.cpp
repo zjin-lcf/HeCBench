@@ -1,4 +1,3 @@
-
 /*
 ** PROGRAM: heat equation solve
 **
@@ -37,13 +36,12 @@
 #include <CL/sycl.hpp>
 
 // Key constants used in this program
-#define PI cl::sycl::acos(-1.0) // Pi
+#define PI sycl::acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
-// Function definitions
-void initial_value(cl::sycl::queue &q, const unsigned int n, const double dx, const double length, cl::sycl::buffer<double,1>& u);
-void zero(cl::sycl::queue &q, const unsigned int n, cl::sycl::buffer<double,1>& u);
-void solve(cl::sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, cl::sycl::buffer<double,1>& u, cl::sycl::buffer<double,1>& u_tmp);
+void initial_value(sycl::queue &q, const unsigned int n, const double dx, const double length, sycl::buffer<double,1>& u);
+void zero(sycl::queue &q, const unsigned int n, sycl::buffer<double,1>& u);
+void solve(sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, sycl::buffer<double,1>& u, sycl::buffer<double,1>& u_tmp);
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const unsigned int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
@@ -58,7 +56,6 @@ int main(int argc, char *argv[]) {
 
   // Number of timesteps
   int nsteps = 10;
-
 
   // Check for the correct number of arguments
   // Print usage and exits if not correct
@@ -79,7 +76,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-
   //
   // Set problem definition
   //
@@ -88,16 +84,15 @@ int main(int argc, char *argv[]) {
   double dx = length / (n+1);  // physical size of each cell (+1 as don't simulate boundaries as they are given)
   double dt = 0.5 / nsteps;    // time interval (total time of 0.5s)
 
-
   // Stability requires that dt/(dx^2) <= 0.5,
   double r = alpha * dt / (dx * dx);
 
 #ifdef USE_GPU
-  cl::sycl::gpu_selector dev_sel;
+  sycl::gpu_selector dev_sel;
 #else
-  cl::sycl::cpu_selector dev_sel;
+  sycl::cpu_selector dev_sel;
 #endif
-  cl::sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel);
 
   // Print message detailing runtime configuration
   std::cout
@@ -114,7 +109,7 @@ int main(int argc, char *argv[]) {
     << " Steps: " <<  nsteps << std::endl
     << " Total time: " << dt*(double)nsteps << std::endl
     << " Time step: " << dt << std::endl
-    << " SYCL device: " << q.get_device().get_info<cl::sycl::info::device::name>() << std::endl
+    << " SYCL device: " << q.get_device().get_info<sycl::info::device::name>() << std::endl
     << LINE << std::endl;
 
   // Stability check
@@ -124,38 +119,37 @@ int main(int argc, char *argv[]) {
     std::cout << " Warning: unstable" << std::endl;
   std::cout << LINE << std::endl;
 
-
   // Allocate two nxn grids
-  cl::sycl::buffer<double, 1> u{cl::sycl::range<1>{n*n}};
-  cl::sycl::buffer<double, 1> u_tmp{cl::sycl::range<1>{n*n}};
+  sycl::buffer<double, 1> u{sycl::range<1>{n*n}};
+  sycl::buffer<double, 1> u_tmp{sycl::range<1>{n*n}};
 
   const int block_size = 256;
   const int n_ceil = (n*n+block_size-1) / block_size * block_size;
 
   // Set the initial value of the grid under the MMS scheme
-  q.submit([&](cl::sycl::handler& cgh) {
-    auto ua = u.get_access<cl::sycl::access::mode::discard_write>(cgh);
+  q.submit([&](sycl::handler& cgh) {
+    auto ua = u.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class initial_value_kernel>(
-		    cl::sycl::nd_range<1>(
-			    cl::sycl::range<1>(n_ceil), 
-			    cl::sycl::range<1>(block_size)), [=](cl::sycl::nd_item<1> item) {
+		    sycl::nd_range<1>(
+			    sycl::range<1>(n_ceil), 
+			    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
       int idx = item.get_global_id(0);
       if (idx < n*n) {
         int i = idx % n;
         int j = idx / n;
         double y = dx * (j+1); // Physical y position
         double x = dx * (i+1); // Physical x position
-        ua[i+j*n] = cl::sycl::sin(PI * x / length) * cl::sycl::sin(PI * y / length);
+        ua[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
       }
     });
   });
 
-  q.submit([&](cl::sycl::handler& cgh) {
-    auto ua = u_tmp.get_access<cl::sycl::access::mode::discard_write>(cgh);
+  q.submit([&](sycl::handler& cgh) {
+    auto ua = u_tmp.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class zero_kernel>(
-		    cl::sycl::nd_range<1>(
-			    cl::sycl::range<1>(n_ceil), 
-			    cl::sycl::range<1>(block_size)), [=](cl::sycl::nd_item<1> item) {
+		    sycl::nd_range<1>(
+			    sycl::range<1>(n_ceil), 
+			    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
       int idx = item.get_global_id(0);
       if (idx < n*n) ua[idx] = 0.0;
     });
@@ -172,19 +166,20 @@ int main(int argc, char *argv[]) {
 
   // Start the solve timer
   auto tic = std::chrono::high_resolution_clock::now();
+
   for (int t = 0; t < nsteps; ++t) {
 
     // Call the solve kernel
     // Computes u_tmp at the next timestep
     // given the value of u at the current timestep
-    q.submit([&](cl::sycl::handler& cgh) {
-      auto u_tmp_acc = u_tmp.get_access<cl::sycl::access::mode::discard_write>(cgh);
-      auto u_acc = u.get_access<cl::sycl::access::mode::read>(cgh);
+    q.submit([&](sycl::handler& cgh) {
+      auto u_tmp_acc = u_tmp.get_access<sycl::access::mode::discard_write>(cgh);
+      auto u_acc = u.get_access<sycl::access::mode::read>(cgh);
 
       // Loop over the nxn grid
-      cgh.parallel_for<class solve_kernel>( cl::sycl::nd_range<1>(
-          		    cl::sycl::range<1>(n_ceil), 
-          		    cl::sycl::range<1>(block_size)), [=](cl::sycl::nd_item<1> item) {
+      cgh.parallel_for<class solve_kernel>( sycl::nd_range<1>(
+          		    sycl::range<1>(n_ceil), 
+          		    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
         int idx = item.get_global_id(0);
         if (idx < n*n) {
           int i = idx % n;
@@ -206,16 +201,16 @@ int main(int argc, char *argv[]) {
     u = std::move(u_tmp);
     u_tmp = std::move(tmp);
   }
+
   q.wait();
   auto toc = std::chrono::high_resolution_clock::now();
 
   double *u_host = new double[n*n];
-  q.submit([&](cl::sycl::handler& cgh) {
-      auto u_acc = u.get_access<cl::sycl::access::mode::read>(cgh);
+  q.submit([&](sycl::handler& cgh) {
+      auto u_acc = u.get_access<sycl::access::mode::read>(cgh);
       cgh.copy(u_acc, u_host);
   });
   q.wait();
-
 
   //
   // Check the L2-norm of the computed solution
@@ -239,8 +234,6 @@ int main(int argc, char *argv[]) {
 }
 
 
-
-
 // True answer given by the manufactured solution
 double solution(const double t, const double x, const double y, const double alpha, const double length) {
 
@@ -252,7 +245,6 @@ double solution(const double t, const double x, const double y, const double alp
 // Computes the L2-norm of the computed grid and the MMS known solution
 // The known solution is the same as the boundary function.
 double l2norm(const unsigned int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length) {
-
   // Final (real) time simulated
   double time = dt * (double)nsteps;
 
@@ -273,6 +265,4 @@ double l2norm(const unsigned int n, const double * u, const int nsteps, const do
   }
 
   return sqrt(l2norm);
-
 }
-

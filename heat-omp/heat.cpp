@@ -1,4 +1,3 @@
-
 /*
 ** PROGRAM: heat equation solve
 **
@@ -32,18 +31,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
 #include <omp.h>
 
 // Key constants used in this program
 #define PI acos(-1.0) // Pi
 #define LINE "--------------------\n" // A line for fancy output
 
-// Function definitions
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const int n, const double * __restrict u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
-// Main function
 int main(int argc, char *argv[]) {
 
   // Start the total program runtime timer
@@ -54,7 +50,6 @@ int main(int argc, char *argv[]) {
 
   // Number of timesteps
   int nsteps = 10;
-
 
   // Check for the correct number of arguments
   // Print usage and exits if not correct
@@ -75,7 +70,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-
   //
   // Set problem definition
   //
@@ -83,7 +77,6 @@ int main(int argc, char *argv[]) {
   double length = 1000.0;      // physical size of domain: length x length square
   double dx = length / (n+1);  // physical size of each cell (+1 as don't simulate boundaries as they are given)
   double dt = 0.5 / nsteps;    // time interval (total time of 0.5s)
-
 
   // Stability requires that dt/(dx^2) <= 0.5,
   double r = alpha * dt / (dx * dx);
@@ -110,7 +103,6 @@ int main(int argc, char *argv[]) {
   if (r > 0.5)
     printf(" Warning: unstable\n");
   printf(LINE);
-
 
   // Allocate two nxn grids
   double *u     = (double*) malloc(sizeof(double)*n*n);
@@ -147,6 +139,7 @@ int main(int argc, char *argv[]) {
 
   // Start the solve timer
   tic = omp_get_wtime();
+
   for (int t = 0; t < nsteps; ++t) {
 
     // Call the solve kernel
@@ -195,7 +188,6 @@ int main(int argc, char *argv[]) {
   // Free the memory
   free(u);
   free(u_tmp);
-
 }
 
 
@@ -209,7 +201,8 @@ double solution(const double t, const double x, const double y, const double alp
 
 // Computes the L2-norm of the computed grid and the MMS known solution
 // The known solution is the same as the boundary function.
-double l2norm(const int n, const double * __restrict u, const int nsteps, const double dt, const double alpha, const double dx, const double length) {
+double l2norm(const int n, const double * restrict u, const int nsteps, const double dt,
+              const double alpha, const double dx, const double length) {
 
   // Final (real) time simulated
   double time = dt * (double)nsteps;
@@ -231,6 +224,4 @@ double l2norm(const int n, const double * __restrict u, const int nsteps, const 
   }
 
   return sqrt(l2norm);
-
 }
-
