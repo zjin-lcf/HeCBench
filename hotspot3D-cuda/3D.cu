@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <chrono>
 #include <cuda.h>
 #include "3D_helper.h"
 
@@ -21,7 +22,6 @@ float chip_height = 0.016;
 float chip_width  = 0.016;
 float amb_temp    = 80.0;
 
-
 void usage(int argc, char **argv)
 {
   fprintf(stderr, "Usage: %s <rows/cols> <layers> <iterations> <powerFile> <tempFile> <outputFile>\n", argv[0]);
@@ -36,9 +36,10 @@ void usage(int argc, char **argv)
 }
 
 __global__ void
-hotspot3d(const float* tIn, 
-    const float* pIn, 
-    float* tOut,
+hotspot3d(
+    const float*__restrict__ tIn, 
+    const float*__restrict__ pIn, 
+          float*__restrict__ tOut,
     const int numCols, 
     const int numRows, 
     const int layers,
@@ -92,7 +93,6 @@ hotspot3d(const float* tIn,
     + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
 }
 
-
 int main(int argc, char** argv)
 {
   if (argc != 7)
@@ -132,11 +132,10 @@ int main(int argc, char** argv)
 
   cc               = 1.0 - (2.0*ce + 2.0*cn + 3.0*ct);
 
-
   int size = numCols * numRows * layers;
-  float* tIn      = (float*) calloc(size,sizeof(float));
-  float* pIn      = (float*) calloc(size,sizeof(float));
-  float* tCopy = (float*)malloc(size * sizeof(float));
+  float* tIn   = (float*) calloc(size,sizeof(float));
+  float* pIn   = (float*) calloc(size,sizeof(float));
+  float* tCopy = (float*) malloc(size * sizeof(float));
   float* tOut  = (float*) calloc(size,sizeof(float));
 
   readinput(tIn,numRows, numCols, layers, tfile);
@@ -157,6 +156,8 @@ int main(int argc, char** argv)
   dim3 gridDim(numCols/WG_SIZE_X, numRows/WG_SIZE_Y);
   dim3 blockDim(WG_SIZE_X, WG_SIZE_Y);
 
+  cudaDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
 
   for(int j = 0; j < iterations; j++)
   {
@@ -168,6 +169,11 @@ int main(int argc, char** argv)
     d_tIn = d_tOut;
     d_tOut = temp;
   }
+
+  cudaDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+  printf("Average kernel execution time %f (s)\n", (ktime * 1e-9f) / iterations);
 
   float* d_sel = (iterations & 01) ? d_tIn : d_tOut;
   cudaMemcpy(tOut, d_sel,  sizeof(float)*size, cudaMemcpyDeviceToHost); 
@@ -185,10 +191,11 @@ int main(int argc, char** argv)
   printf("Root-mean-square error: %e\n",acc);
 
   writeoutput(tOut,numRows,numCols,layers,ofile);
+
+  free(answer);
   free(tIn);
   free(pIn);
   free(tCopy);
   free(tOut);
   return 0;
 }
-
