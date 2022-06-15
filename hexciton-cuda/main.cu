@@ -6,7 +6,6 @@
 #include "utils.hpp"
 #include "kernels.cu"
 
-
 void benchmark(
     complex_t *sigma_in,
     complex_t *sigma_out,
@@ -79,6 +78,7 @@ void benchmark(
 
   cudaMalloc((void**)&d_sigma_out, sizeof(real_2_t) * size_sigma);
 
+  float total_time = 0.f;
 
   // benchmark loop
   for (size_t i = 0; i < NUM_ITERATIONS; ++i) {
@@ -86,6 +86,9 @@ void benchmark(
     // clear output 
     cudaMemcpy(d_sigma_out, sout, sizeof(real_2_t) * size_sigma,
                cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
 
     // empty kernel
     switch(kernel_id) {
@@ -291,12 +294,20 @@ void benchmark(
       }
       default: std::cerr << "ERROR: **** benchmark kernel unavailable **** \n";
     }
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+
+  std::cout << "Total execution time of kernel "
+            << look_up(kernel_id)  << " : " << total_time * 1e-9f << " (s)" << std::endl;
 
   real_t deviation = 0;
 
-  // the deviation of an empty kernel does not make sense
   if (kernel_id > 0)  {
+
     cudaMemcpy(sout, d_sigma_out, sizeof(real_2_t) * size_sigma, cudaMemcpyDeviceToHost);
 
     for (size_t i = 0; i < size_sigma; i++) {
@@ -306,8 +317,14 @@ void benchmark(
     // measure the differences between the CPU and GPU results 
     deviation = compare_matrices(sigma_out, sigma_reference_transformed, dim, num);
 
-    std::cout << "Deviation of kernel " << look_up(kernel_id) << ": " << deviation << std::endl;
+    std::cout << "Deviation of kernel " << look_up(kernel_id) << ": " << deviation;
+
+  } else {
+    // the deviation of an empty kernel does not make sense
+    std::cout << "Deviation of kernel " << look_up(kernel_id) << "N/A";
   }
+
+  std::cout << std::endl << std::endl;
 
   cudaFree(d_hamiltonian);
   cudaFree(d_sigma_in);

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstring> // memcpy
 #include <cstdlib>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define SINGLE_PRECISION

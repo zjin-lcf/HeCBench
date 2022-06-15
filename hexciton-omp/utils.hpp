@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstring> // memcpy
 #include <cstdlib>
+#include <chrono>
 #include <omp.h>
 
 #define SINGLE_PRECISION
