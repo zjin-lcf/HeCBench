@@ -9,25 +9,26 @@
  *
  */
 
+#include <chrono>
 #include <cstdlib>
 #include <cstdio>
+#include <omp.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Using Viterbi algorithm to search for a Hidden Markov Model for the most
 // probable state path given the observation sequence.
 ///////////////////////////////////////////////////////////////////////////////
 int ViterbiGPU(float &viterbiProb,
-    int   *__restrict__ viterbiPath,
-    int   *__restrict__ obs, 
+    int   *__restrict viterbiPath,
+    int   *__restrict obs, 
     const int nObs, 
-    float *__restrict__ initProb,
-    float *__restrict__ mtState, 
+    float *__restrict initProb,
+    float *__restrict mtState, 
     //const int &nState,
     const int nState,
     const int nEmit,
-    float *__restrict__ mtEmit)
+    float *__restrict mtEmit)
 {
-
   float maxProbNew[nState];
   int path[(nObs-1)*nState];
   float *maxProbOld = initProb;
@@ -39,6 +40,7 @@ int ViterbiGPU(float &viterbiProb,
                                maxProbOld[0:nState]) \
                         map(from: maxProbNew[0:nState], path[0:(nObs-1)*nState])
   {
+    auto start = std::chrono::steady_clock::now();
 
     // main iteration of Viterbi algorithm
     for (int t = 1; t < nObs; t++) // for every input observation
@@ -68,6 +70,10 @@ int ViterbiGPU(float &viterbiProb,
         maxProbOld[iState] = maxProbNew[iState];
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Device execution time of Viterbi iterations %f (s)\n", time * 1e-9f);
   }
 
   // find the final most probable state
