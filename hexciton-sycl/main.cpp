@@ -5,7 +5,6 @@
 
 #include "utils.hpp"
 
-
 void benchmark(
     queue &q,
     complex_t *sigma_in,
@@ -69,6 +68,7 @@ void benchmark(
   buffer<real_2_t, 1> d_sigma_in (sin, size_sigma);
   buffer<real_2_t, 1> d_sigma_out(size_sigma);
 
+  float total_time = 0.f;
 
   // benchmark loop
   for (size_t i = 0; i < NUM_ITERATIONS; ++i) {
@@ -78,6 +78,9 @@ void benchmark(
       auto acc = d_sigma_out.get_access<sycl_discard_write>(cgh);
       cgh.copy(sout, acc); 
     });
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     // empty kernel
     switch(kernel_id) {
@@ -1245,11 +1248,18 @@ void benchmark(
       }
       default: std::cerr << "ERROR: **** benchmark kernel unavailable **** \n";
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
   }
+
+  std::cout << "Total execution time of kernel "
+            << look_up(kernel_id)  << " : " << total_time * 1e-9f << " (s)" << std::endl;
 
   real_t deviation = 0;
 
-  // the deviation of an empty kernel does not make sense
   if (kernel_id > 0)  {
     q.submit([&] (handler &cgh) {
       auto acc = d_sigma_out.get_access<sycl_read>(cgh);
@@ -1264,7 +1274,12 @@ void benchmark(
     deviation = compare_matrices(sigma_out, sigma_reference_transformed, dim, num);
 
     std::cout << "Deviation of kernel " << look_up(kernel_id) << ": " << deviation << std::endl;
+  } else {
+    // the deviation of an empty kernel does not make sense
+    std::cout << "Deviation of kernel " << look_up(kernel_id) << "N/A";
   }
+
+  std::cout << std::endl << std::endl;
 
   free(sin);
   free(sout);
