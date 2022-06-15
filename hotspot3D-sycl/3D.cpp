@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <chrono>
 #include "common.h"
 #include "3D_helper.h"
 
@@ -21,7 +22,6 @@ float chip_height = 0.016;
 float chip_width  = 0.016;
 float amb_temp    = 80.0;
 
-
 void usage(int argc, char **argv)
 {
   fprintf(stderr, "Usage: %s <rows/cols> <layers> <iterations> <powerFile> <tempFile> <outputFile>\n", argv[0]);
@@ -34,8 +34,6 @@ void usage(int argc, char **argv)
   fprintf(stderr, "\t<outputFile - output file\n");
   exit(1);
 }
-
-
 
 int main(int argc, char** argv)
 {
@@ -76,11 +74,10 @@ int main(int argc, char** argv)
 
   cc               = 1.0 - (2.0*ce + 2.0*cn + 3.0*ct);
 
-
   int size = numCols * numRows * layers;
-  float* tIn      = (float*) calloc(size,sizeof(float));
-  float* pIn      = (float*) calloc(size,sizeof(float));
-  float* tCopy = (float*)malloc(size * sizeof(float));
+  float* tIn   = (float*) calloc(size,sizeof(float));
+  float* pIn   = (float*) calloc(size,sizeof(float));
+  float* tCopy = (float*) malloc(size * sizeof(float));
   float* tOut  = (float*) calloc(size,sizeof(float));
 
   readinput(tIn,numRows, numCols, layers, tfile);
@@ -112,8 +109,11 @@ int main(int argc, char** argv)
 
     local_work_size[1] = WG_SIZE_X;
     local_work_size[0] = WG_SIZE_Y;
-    int j;
-    for(j = 0; j < iterations; j++)
+
+    q.wait();
+    auto kstart = std::chrono::steady_clock::now();
+
+    for(int j = 0; j < iterations; j++)
     {
       q.submit([&](handler& cgh) {
           auto pIn_acc = d_pIn.get_access<sycl_read>(cgh); 
@@ -131,13 +131,20 @@ int main(int argc, char** argv)
       d_tIn = d_tOut;
       d_tOut = temp;
     }
+
+    q.wait();
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    printf("Average kernel execution time %f (s)\n", (ktime * 1e-9f) / iterations);
+
     q.submit([&](handler& cgh) {
       auto d_sel = (iterations & 01) ? d_tIn : d_tOut;
       auto d_tOut_acc = d_sel.get_access<sycl_read>(cgh);
       cgh.copy(d_tOut_acc, tOut);
-    });
-    q.wait(); 
+    }).wait();
+
   } // SYCL scope
+
   long long stop = get_time();
 
   float* answer = (float*)calloc(size, sizeof(float));
@@ -149,10 +156,11 @@ int main(int argc, char** argv)
   printf("Root-mean-square error: %e\n",acc);
 
   writeoutput(tOut,numRows,numCols,layers,ofile);
+
+  free(answer);
   free(tIn);
   free(pIn);
   free(tCopy);
   free(tOut);
   return 0;
 }
-
