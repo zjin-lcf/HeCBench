@@ -1,3 +1,4 @@
+#include <chrono>
 #include "common.h"
 #include "hotspot.h"
 
@@ -101,6 +102,9 @@ int compute_tran_temp(
   range<2> gws (global_work_size[1], global_work_size[0]);
   range<2> lws (local_work_size[1], local_work_size[0]);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (t = 0; t < total_iterations; t += num_iterations) {
 
     // Specify kernel arguments
@@ -123,8 +127,12 @@ int compute_tran_temp(
     dst = 1 - dst;
   }
 
-#ifdef DEBUG
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time %f (s)\n", time * 1e-9f);
+
+#ifdef DEBUG
   auto vect_acc = MatrixTemp[src].get_access<sycl_read>();
   for (int i=0; i < 1; i++) 
     for (int j=0; j < 16; j++)

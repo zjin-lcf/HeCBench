@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cuda.h>
 #include "hotspot.h"
 #include "kernel.h"
@@ -92,6 +93,9 @@ int compute_tran_temp(
   dim3 blocks (BLOCK_SIZE, BLOCK_SIZE);
   dim3 grids (blockCols, blockRows);  
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (t = 0; t < total_iterations; t += num_iterations) {
 
     // Specify kernel arguments
@@ -104,6 +108,11 @@ int compute_tran_temp(
     src = 1 - src;
     dst = 1 - dst;
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
   return src;
 }
@@ -121,7 +130,7 @@ void usage(int argc, char **argv) {
 
 int main(int argc, char** argv) {
 
-  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
+  if (argc < 7) usage(argc, argv);
 
   int size;
   int grid_rows,grid_cols = 0;
@@ -131,13 +140,13 @@ int main(int argc, char** argv) {
   int total_iterations = 60;  // this can be overwritten by the commandline argument
   int pyramid_height = 1;     // step size
 
-  if (argc < 7) usage(argc, argv);
-
   if((grid_rows = atoi(argv[1]))<=0||
      (grid_cols = atoi(argv[1]))<=0||
      (pyramid_height = atoi(argv[2]))<=0||
      (total_iterations = atoi(argv[3]))<=0)
     usage(argc, argv);
+
+  printf("Work-group size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
 
   tfile=argv[4];
   pfile=argv[5];
