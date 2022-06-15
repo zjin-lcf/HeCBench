@@ -18,14 +18,21 @@ const float threshold = 0.00001f;
 
 int main(int argc, char* argv[])
 {
-  std::cout << "Reading dirty image and psf image" << std::endl;
+  if (argc != 4) {
+    std::cout << "Usage: " << argv[0]
+              << " <dirty image> <PSF file> <repeat>" << std::endl;
+    return 1;
+  }
+
   // Load dirty image and psf
   const char* dirtyFile = argv[1];  // dirty.img
   const char* psfFile = argv[2];    // psf.img
   niters = atoi(argv[3]);           // iterations
 
+  std::cout << "Reading dirty image and psf image" << std::endl;
   std::vector<float> dirty = readImage(dirtyFile);
   const size_t dim = checkSquare(dirty);
+
   std::vector<float> psf = readImage(psfFile);
   const size_t psfDim = checkSquare(psf);
 
