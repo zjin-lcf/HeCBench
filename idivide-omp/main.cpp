@@ -52,6 +52,12 @@ int test()
 
 int main(int argc, char* argv[])
 {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <repeat>\n";
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   // performance evaluation after functional test is done
   if (test()) return 1;
 
@@ -70,7 +76,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking plain division by constant... ";
   auto start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     throughput_test<int>(n, 3, 5, 7, 0, 0);
 
   auto end = NOW;
@@ -80,7 +86,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking fast division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     throughput_test<int_fastdiv>(n, 3, 5, 7, 0, 0);
 
   end = NOW;
@@ -99,7 +105,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking plain division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     latency_test<int>(n, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0);
 
   end = NOW;
@@ -109,7 +115,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking fast division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     latency_test<int_fastdiv>(n, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0);
 
   end = NOW;
