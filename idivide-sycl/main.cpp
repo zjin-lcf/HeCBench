@@ -60,6 +60,12 @@ int test(queue &q)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <repeat>\n";
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -75,6 +81,7 @@ int main(int argc, char* argv[])
 
   range<1> gws (grids * blocks);
   range<1> lws (blocks);
+
   // warmup may be needed for accurate performance measurement with chrono
   for (int i = 0; i < 100; i++) {
     q.submit([&] (handler &cgh) {
@@ -95,7 +102,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking plain division by constant... ";
   auto start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       cgh.parallel_for<class bench_thru>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         throughput_test<int>(item, 3, 5, 7, 0, 0);
@@ -110,7 +117,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking fast division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       cgh.parallel_for<class bench_thru_fast>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         throughput_test<int_fastdiv>(item, 3, 5, 7, 0, 0);
@@ -143,7 +150,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking plain division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       cgh.parallel_for<class bench_lat>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         latency_test<int>(item, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0);
@@ -158,7 +165,7 @@ int main(int argc, char* argv[])
   std::cout << "Benchmarking fast division by constant... ";
   start = NOW;
 
-  for (int i = 0; i < 100; i++)
+  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       cgh.parallel_for<class bench_lat_fast>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         latency_test<int_fastdiv>(item, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0);

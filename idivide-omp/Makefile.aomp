@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-cFLAGS := -std=c++14 -Wall -I../idivide-cuda 
+CFLAGS := -std=c++14 -Wall -I../idivide-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -63,4 +62,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100
