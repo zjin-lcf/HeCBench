@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "is.h"
 #include "kernels.h"
@@ -30,6 +31,18 @@ int test_index_array[TEST_ARRAY_SIZE],
 
 /* is */
 int main(int argc, char** argv){
+  /* printout initial NPB info */
+  printf("\n\n NAS Parallel Benchmarks 4.1 IS Benchmark\n\n");
+  printf(" Size:  %ld  (class %c)\n", (long)TOTAL_KEYS, CLASS);
+  printf(" Iterations:   %d\n", MAX_ITERATIONS);
+
+  if (argc != 4) {
+    printf("Usage: %s <threads per block for the create_seq kernel>\n", argv[0]);
+    printf("           <threads per block for the rank kernel>\n");
+    printf("           <threads per block for the verify kernel>\n");
+    return 1;
+  }
+
   int i, iteration;
   int passed_verification;
   int* key_array_device; 
@@ -87,6 +100,11 @@ int main(int argc, char** argv){
   int amount_of_work_on_full_verify_2;
   int amount_of_work_on_full_verify_3;
 
+  /* define threads_per_block */
+  threads_per_block_on_create_seq = atoi(argv[1]);
+  threads_per_block_on_rank = atoi(argv[2]);
+  threads_per_block_on_full_verify = atoi(argv[3]);
+
   /* initialize the verification arrays for a valid class */
   for(i=0; i<TEST_ARRAY_SIZE; i++){
     switch(CLASS){
@@ -116,16 +134,6 @@ int main(int argc, char** argv){
         break;
     };
   }
-
-  /* printout initial NPB info */
-  printf("\n\n NAS Parallel Benchmarks 4.1 IS Benchmark\n\n");
-  printf(" Size:  %ld  (class %c)\n", (long)TOTAL_KEYS, CLASS);
-  printf(" Iterations:   %d\n", MAX_ITERATIONS);
-
-  /* define threads_per_block */
-  threads_per_block_on_create_seq = atoi(argv[1]);
-  threads_per_block_on_rank = atoi(argv[2]);
-  threads_per_block_on_full_verify = atoi(argv[3]);
 
   threads_per_block_on_rank_1=1;
   threads_per_block_on_rank_2=threads_per_block_on_rank;
@@ -197,7 +205,7 @@ int main(int argc, char** argv){
   hipMemcpy(rank_array_device, test_rank_array, size_rank_array_device, hipMemcpyHostToDevice);
 
   /* generate random number sequence and subsequent keys on all procs */
-  hipLaunchKernelGGL(create_seq_gpu_kernel, dim3(blocks_per_grid_on_create_seq), dim3(threads_per_block_on_create_seq), 0, 0, key_array_device,
+  hipLaunchKernelGGL(create_seq_gpu_kernel, blocks_per_grid_on_create_seq, threads_per_block_on_create_seq, 0, 0, key_array_device,
         314159265.00, /* random number gen seed */
         1220703125.00, /* random number gen mult */
         blocks_per_grid_on_create_seq,
@@ -206,43 +214,47 @@ int main(int argc, char** argv){
   /* reset verification counter */
   passed_verification = 0;
 
-  hipMemcpy(passed_verification_device, &passed_verification, size_passed_verification_device, hipMemcpyHostToDevice);
+  hipMemcpy(passed_verification_device, &passed_verification,
+             size_passed_verification_device, hipMemcpyHostToDevice);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for(iteration=1; iteration<=MAX_ITERATIONS; iteration++){
-    hipLaunchKernelGGL(rank_gpu_kernel_1, dim3(blocks_per_grid_on_rank_1), dim3(threads_per_block_on_rank_1), 0, 0, key_array_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_1, blocks_per_grid_on_rank_1, threads_per_block_on_rank_1, 0, 0, key_array_device,
           partial_verify_vals_device,
           index_array_device,
           iteration,
           blocks_per_grid_on_rank_1,
           amount_of_work_on_rank_1);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_2, dim3(blocks_per_grid_on_rank_2), dim3(threads_per_block_on_rank_2), 0, 0, key_buff1_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_2, blocks_per_grid_on_rank_2, threads_per_block_on_rank_2, 0, 0, key_buff1_device,
           blocks_per_grid_on_rank_2,
           amount_of_work_on_rank_2);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_3, dim3(blocks_per_grid_on_rank_3), dim3(threads_per_block_on_rank_3), 0, 0, key_buff1_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_3, blocks_per_grid_on_rank_3, threads_per_block_on_rank_3, 0, 0, key_buff1_device,
           key_array_device,
           blocks_per_grid_on_rank_3,
           amount_of_work_on_rank_3);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_4, dim3(blocks_per_grid_on_rank_4), dim3(threads_per_block_on_rank_4), size_shared_data_on_rank_4, 0, key_buff1_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_4, blocks_per_grid_on_rank_4, threads_per_block_on_rank_4, size_shared_data_on_rank_4, 0, key_buff1_device,
           key_buff1_device,
           sum_device,
           blocks_per_grid_on_rank_4,
           amount_of_work_on_rank_4);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_5, dim3(blocks_per_grid_on_rank_5), dim3(threads_per_block_on_rank_5), size_shared_data_on_rank_5, 0, sum_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_5, blocks_per_grid_on_rank_5, threads_per_block_on_rank_5, size_shared_data_on_rank_5, 0, sum_device,
           sum_device,
           blocks_per_grid_on_rank_5,
           amount_of_work_on_rank_5);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_6, dim3(blocks_per_grid_on_rank_6), dim3(threads_per_block_on_rank_6), 0, 0, key_buff1_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_6, blocks_per_grid_on_rank_6, threads_per_block_on_rank_6, 0, 0, key_buff1_device,
           key_buff1_device,
           sum_device,
           blocks_per_grid_on_rank_6,
           amount_of_work_on_rank_6);
 
-    hipLaunchKernelGGL(rank_gpu_kernel_7, dim3(blocks_per_grid_on_rank_7), dim3(threads_per_block_on_rank_7), 0, 0, partial_verify_vals_device,
+    hipLaunchKernelGGL(rank_gpu_kernel_7, blocks_per_grid_on_rank_7, threads_per_block_on_rank_7, 0, 0, partial_verify_vals_device,
           key_buff1_device,
           rank_array_device,
           passed_verification_device,
@@ -251,7 +263,14 @@ int main(int argc, char** argv){
           amount_of_work_on_rank_7);
   }
 
-  hipMemcpy(&passed_verification, passed_verification_device, size_passed_verification_device, hipMemcpyDeviceToHost);  
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of the rank kernels %f (s)\n",
+         (time * 1e-9f) / MAX_ITERATIONS);
+
+  hipMemcpy(&passed_verification, passed_verification_device,
+             size_passed_verification_device, hipMemcpyDeviceToHost);  
 
   /* 
    * this tests that keys are in sequence: sorting of last ranked key seq
@@ -263,20 +282,20 @@ int main(int argc, char** argv){
   hipMalloc(&memory_aux_device, size_memory_aux);  
 
   /* full_verify_gpu_kernel_1 */
-  hipLaunchKernelGGL(full_verify_gpu_kernel_1, dim3(blocks_per_grid_on_full_verify_1), dim3(threads_per_block_on_full_verify_1), 0, 0, key_array_device,
+  hipLaunchKernelGGL(full_verify_gpu_kernel_1, blocks_per_grid_on_full_verify_1, threads_per_block_on_full_verify_1, 0, 0, key_array_device,
         key_buff2_device,
         blocks_per_grid_on_full_verify_1,
         amount_of_work_on_full_verify_1);
 
   /* full_verify_gpu_kernel_2 */
-  hipLaunchKernelGGL(full_verify_gpu_kernel_2, dim3(blocks_per_grid_on_full_verify_2), dim3(threads_per_block_on_full_verify_2), 0, 0, key_buff2_device,
+  hipLaunchKernelGGL(full_verify_gpu_kernel_2, blocks_per_grid_on_full_verify_2, threads_per_block_on_full_verify_2, 0, 0, key_buff2_device,
         key_buff1_device,
         key_array_device,
         blocks_per_grid_on_full_verify_2,
         amount_of_work_on_full_verify_2);
 
   /* full_verify_gpu_kernel_3 */
-  hipLaunchKernelGGL(full_verify_gpu_kernel_3, dim3(blocks_per_grid_on_full_verify_3), dim3(threads_per_block_on_full_verify_3), size_shared_data_on_full_verify_3, 0, key_array_device,
+  hipLaunchKernelGGL(full_verify_gpu_kernel_3, blocks_per_grid_on_full_verify_3, threads_per_block_on_full_verify_3, size_shared_data_on_full_verify_3, 0, key_array_device,
         memory_aux_device,
         blocks_per_grid_on_full_verify_3,
         amount_of_work_on_full_verify_3);

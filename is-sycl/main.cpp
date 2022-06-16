@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 #include "is.h"
 #include "kernels.h"
@@ -30,6 +31,18 @@ int test_index_array[TEST_ARRAY_SIZE],
 
 /* is */
 int main(int argc, char** argv){
+  /* printout initial NPB info */
+  printf("\n\n NAS Parallel Benchmarks 4.1 IS Benchmark\n\n");
+  printf(" Size:  %ld  (class %c)\n", (long)TOTAL_KEYS, CLASS);
+  printf(" Iterations:   %d\n", MAX_ITERATIONS);
+
+  if (argc != 4) {
+    printf("Usage: %s <threads per block for the create_seq kernel>\n", argv[0]);
+    printf("           <threads per block for the rank kernel>\n");
+    printf("           <threads per block for the verify kernel>\n");
+    return 1;
+  }
+
   int i, iteration;
   int passed_verification;
   int size_shared_data_on_rank_4;
@@ -71,6 +84,11 @@ int main(int argc, char** argv){
   int amount_of_work_on_full_verify_2;
   int amount_of_work_on_full_verify_3;
 
+  /* define threads_per_block */
+  threads_per_block_on_create_seq = atoi(argv[1]);
+  threads_per_block_on_rank = atoi(argv[2]);
+  threads_per_block_on_full_verify = atoi(argv[3]);
+
   /* initialize the verification arrays for a valid class */
   for(i=0; i<TEST_ARRAY_SIZE; i++){
     switch(CLASS){
@@ -100,16 +118,6 @@ int main(int argc, char** argv){
         break;
     };
   }
-
-  /* printout initial NPB info */
-  printf("\n\n NAS Parallel Benchmarks 4.1 IS Benchmark\n\n");
-  printf(" Size:  %ld  (class %c)\n", (long)TOTAL_KEYS, CLASS);
-  printf(" Iterations:   %d\n", MAX_ITERATIONS);
-
-  /* define threads_per_block */
-  threads_per_block_on_create_seq = atoi(argv[1]);
-  threads_per_block_on_rank = atoi(argv[2]);
-  threads_per_block_on_full_verify = atoi(argv[3]);
 
   threads_per_block_on_rank_1=1;
   threads_per_block_on_rank_2=threads_per_block_on_rank;
@@ -216,6 +224,9 @@ int main(int argc, char** argv){
   range<1> lws_rank_7 (threads_per_block_on_rank_7);
   range<1> gws_rank_7 (threads_per_block_on_rank_7 * blocks_per_grid_on_rank_7);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for(iteration=1; iteration<=MAX_ITERATIONS; iteration++) {
     q.submit([&] (handler &cgh) {
       auto key = key_array_device.get_access<sycl_write>(cgh);
@@ -321,6 +332,12 @@ int main(int argc, char** argv){
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of the rank kernels %f (s)\n",
+         (time * 1e-9f) / MAX_ITERATIONS);
 
   q.submit([&] (handler &cgh) {
     auto acc = passed_verification_device.get_access<sycl_read>(cgh);
