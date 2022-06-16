@@ -3,9 +3,11 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <omp.h>
 
 #define NUM_ELEMENTS 4096
-#define REPEAT 4096       // accumulation count
+#define COUNT 4096       // accumulation count
 
 // an interleaved type
 typedef struct
@@ -59,16 +61,18 @@ typedef struct
 void add_test_interleaved(
     INTERLEAVED_T * const h_dst,
     const INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const unsigned int repeat,
     const unsigned int num_elements)
 {
-#pragma omp target data map(to: h_src[0:num_elements]) map(tofrom: h_dst[0:num_elements]) 
+  #pragma omp target data map(to: h_src[0:num_elements]) map(tofrom: h_dst[0:num_elements]) 
   {
-    for (int n = 0; n < 100; n++) {
-#pragma omp target teams distribute parallel for thread_limit(256)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
+      #pragma omp target teams distribute parallel for thread_limit(256)
       for (unsigned int tid = 0; tid < num_elements; tid++)
       {
-        for (unsigned int i=0; i<iter; i++)
+        for (unsigned int i=0; i<COUNT; i++)
         {
           h_dst[tid].s0 += h_src[tid].s0;
           h_dst[tid].s1 += h_src[tid].s1;
@@ -89,22 +93,28 @@ void add_test_interleaved(
         }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel (interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 }
 
 void add_test_non_interleaved(
     NON_INTERLEAVED_T * const h_dst,
     const NON_INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const unsigned int repeat,
     const unsigned int num_elements)
 {
-#pragma omp target data map(to: h_src[0:1]) map(tofrom: h_dst[0:1]) 
+  #pragma omp target data map(to: h_src[0:1]) map(tofrom: h_dst[0:1]) 
   {
-    for (int n = 0; n < 100; n++) {
-#pragma omp target teams distribute parallel for thread_limit(256)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
+      #pragma omp target teams distribute parallel for thread_limit(256)
       for (unsigned int tid = 0; tid < num_elements; tid++)
       {
-        for (unsigned int i=0; i<iter; i++)
+        for (unsigned int i=0; i<COUNT; i++)
         {
           h_dst->s0[tid] += h_src->s0[tid];
           h_dst->s1[tid] += h_src->s1[tid];
@@ -125,16 +135,27 @@ void add_test_non_interleaved(
         }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel (non-interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   NON_INTERLEAVED_T non_interleaved_src, non_interleaved_dst; 
   INTERLEAVED_ARRAY_T interleaved_src, interleaved_dst; 
-  initialize (interleaved_src, interleaved_dst, 
-		  non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
-  add_test_non_interleaved(&non_interleaved_dst, &non_interleaved_src, REPEAT, NUM_ELEMENTS);
-  add_test_interleaved(interleaved_dst, interleaved_src, REPEAT, NUM_ELEMENTS);
+  initialize (interleaved_src, interleaved_dst,
+              non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
+  add_test_non_interleaved(&non_interleaved_dst, &non_interleaved_src,
+                           repeat, NUM_ELEMENTS);
+  add_test_interleaved(interleaved_dst, interleaved_src, repeat, NUM_ELEMENTS);
   verify(interleaved_dst, non_interleaved_dst, NUM_ELEMENTS);
   return 0;
 }

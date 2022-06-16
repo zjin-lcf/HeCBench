@@ -3,10 +3,11 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
 #define NUM_ELEMENTS 4096
-#define REPEAT 4096       // accumulation count
+#define COUNT 4096       // accumulation count
 
 // an interleaved type
 typedef struct
@@ -60,13 +61,12 @@ typedef struct
 __global__ void add_kernel_interleaved(
     INTERLEAVED_T * const dest_ptr,
     const INTERLEAVED_T * const src_ptr,
-    const unsigned int iter,
     const unsigned int num_elements)
 {
   const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < num_elements)
   {
-    for (unsigned int i=0; i<iter; i++)
+    for (unsigned int i=0; i<COUNT; i++)
     {
       dest_ptr[tid].s0 += src_ptr[tid].s0;
       dest_ptr[tid].s1 += src_ptr[tid].s1;
@@ -91,13 +91,12 @@ __global__ void add_kernel_interleaved(
 __global__ void add_kernel_non_interleaved(
     NON_INTERLEAVED_T * const dest_ptr,
     const NON_INTERLEAVED_T * const src_ptr,
-    const unsigned int iter,
     const unsigned int num_elements)
 {
   const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < num_elements)
   {
-    for (unsigned int i=0; i<iter; i++)
+    for (unsigned int i=0; i<COUNT; i++)
     {
       dest_ptr->s0[tid] += src_ptr->s0[tid];
       dest_ptr->s1[tid] += src_ptr->s1[tid];
@@ -122,23 +121,33 @@ __global__ void add_kernel_non_interleaved(
 void add_test_interleaved(
     INTERLEAVED_T * const h_dst,
     const INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const int repeat,
     const unsigned int num_elements)
 {
   // Set launch params
   const unsigned int num_threads = 256;
   const unsigned int num_blocks = (num_elements + (num_threads-1)) / num_threads;
+
   // Allocate memory on the device
   const size_t num_bytes = (sizeof(INTERLEAVED_T) * num_elements);
-  //printf("%lu\n", num_bytes);
   INTERLEAVED_T * d_dst;
   INTERLEAVED_T * d_src;
   cudaMalloc((void **) &d_src, num_bytes);
   cudaMalloc((void **) &d_dst, num_bytes);
   cudaMemcpy(d_src, h_src, num_bytes, cudaMemcpyHostToDevice);
   cudaMemcpy(d_dst, h_dst, num_bytes, cudaMemcpyHostToDevice);
-  for (int n = 0; n < 100; n++)
-    add_kernel_interleaved<<<num_blocks, num_threads>>>(d_dst, d_src, iter, num_elements);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
+    add_kernel_interleaved<<<num_blocks, num_threads>>>(d_dst, d_src, num_elements);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(h_dst, d_dst, num_bytes, cudaMemcpyDeviceToHost);
   cudaFree(d_src);
   cudaFree(d_dst);
@@ -147,7 +156,7 @@ void add_test_interleaved(
 void add_test_non_interleaved(
     NON_INTERLEAVED_T * const h_dst,
     const NON_INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const int repeat,
     const unsigned int num_elements)
 {
   // Set launch params
@@ -162,20 +171,37 @@ void add_test_non_interleaved(
   cudaMalloc((void **) &d_dst, num_bytes);
   cudaMemcpy(d_src, h_src, num_bytes, cudaMemcpyHostToDevice);
   cudaMemcpy(d_dst, h_dst, num_bytes, cudaMemcpyHostToDevice);
-  for (int n = 0; n < 100; n++)
-    add_kernel_non_interleaved<<<num_blocks, num_threads>>>(d_dst, d_src, iter, num_elements);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
+    add_kernel_non_interleaved<<<num_blocks, num_threads>>>(d_dst, d_src, num_elements);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (non-interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(h_dst, d_dst, num_bytes, cudaMemcpyDeviceToHost);
   cudaFree(d_src);
   cudaFree(d_dst);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   NON_INTERLEAVED_T non_interleaved_src, non_interleaved_dst; 
   INTERLEAVED_ARRAY_T interleaved_src, interleaved_dst; 
   initialize (interleaved_src, interleaved_dst, 
-		  non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
-  add_test_non_interleaved(&non_interleaved_dst, &non_interleaved_src, REPEAT, NUM_ELEMENTS);
-  add_test_interleaved(interleaved_dst, interleaved_src, REPEAT, NUM_ELEMENTS);
+              non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
+  add_test_non_interleaved(&non_interleaved_dst, &non_interleaved_src,
+                           repeat, NUM_ELEMENTS);
+  add_test_interleaved(interleaved_dst, interleaved_src, repeat, NUM_ELEMENTS);
   verify(interleaved_dst, non_interleaved_dst, NUM_ELEMENTS);
   return 0;
 }
