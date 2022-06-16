@@ -60,4 +60,3 @@ clean:
 
 run: $(program)
 	./$(program) ../inverse2kj-sycl/coord_in.txt 100000
-
