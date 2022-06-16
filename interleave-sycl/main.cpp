@@ -6,8 +6,7 @@
 #include "common.h"
 
 #define NUM_ELEMENTS 4096
-#define REPEAT 4096       // accumulation count
-
+#define COUNT 4096       // accumulation count
 
 // an interleaved type
 typedef struct
@@ -62,7 +61,7 @@ void add_test_interleaved(
     queue &q,
     INTERLEAVED_T * const h_dst,
     const INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const int repeat,
     const unsigned int num_elements)
 {
   // Set launch params
@@ -73,7 +72,10 @@ void add_test_interleaved(
   buffer<INTERLEAVED_T, 1> d_src(h_src, num_elements);
   buffer<INTERLEAVED_T, 1> d_dst(h_dst, num_elements);
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto src_acc = d_src.get_access<sycl_read>(h);
       auto dest_acc = d_dst.get_access<sycl_write>(h);
@@ -81,7 +83,7 @@ void add_test_interleaved(
         const unsigned int tid = item.get_global_id(0);
         if (tid < num_elements)
         {
-          for (unsigned int i=0; i<iter; i++)
+          for (unsigned int i=0; i<COUNT; i++)
           {
             dest_acc[tid].s0 += src_acc[tid].s0;
             dest_acc[tid].s1 += src_acc[tid].s1;
@@ -104,14 +106,18 @@ void add_test_interleaved(
       });
     });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
 }
 
 void add_test_non_interleaved(
     queue &q,
     NON_INTERLEAVED_T * const h_dst,
     const NON_INTERLEAVED_T * const h_src,
-    const unsigned int iter,
+    const int repeat,
     const unsigned int num_elements)
 {
   // Set launch params
@@ -123,7 +129,10 @@ void add_test_non_interleaved(
   buffer<NON_INTERLEAVED_T, 1> d_src(h_src, 1);
   buffer<NON_INTERLEAVED_T, 1> d_dst(h_dst, 1);
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto src_acc = d_src.get_access<sycl_read>(h);
       auto dest_acc = d_dst.get_access<sycl_write>(h);
@@ -133,7 +142,7 @@ void add_test_non_interleaved(
         {
 	  auto src_ptr = src_acc.get_pointer();
 	  auto dest_ptr = dest_acc.get_pointer();
-          for (unsigned int i=0; i<iter; i++)
+          for (unsigned int i=0; i<COUNT; i++)
           {
             dest_ptr->s0[tid] += src_ptr->s0[tid];
             dest_ptr->s1[tid] += src_ptr->s1[tid];
@@ -156,17 +165,25 @@ void add_test_non_interleaved(
       });
     });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (non-interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
 }
 
-int main() {
-  srand(2);
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   NON_INTERLEAVED_T non_interleaved_src, non_interleaved_dst; 
   INTERLEAVED_ARRAY_T interleaved_src, interleaved_dst; 
 
-  initialize (interleaved_src, interleaved_dst, 
-		  non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
+  initialize (interleaved_src, interleaved_dst,
+              non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
 
 #ifdef USE_GPU 
   gpu_selector dev_sel;
@@ -174,8 +191,11 @@ int main() {
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel);
-  add_test_non_interleaved(q, &non_interleaved_dst, &non_interleaved_src, REPEAT, NUM_ELEMENTS);
-  add_test_interleaved(q, interleaved_dst, interleaved_src, REPEAT, NUM_ELEMENTS);
+
+  add_test_non_interleaved(q, &non_interleaved_dst, &non_interleaved_src,
+                           repeat, NUM_ELEMENTS);
+  add_test_interleaved(q, interleaved_dst, interleaved_src,
+                       repeat, NUM_ELEMENTS);
   verify(interleaved_dst, non_interleaved_dst, NUM_ELEMENTS);
 
   return 0;
