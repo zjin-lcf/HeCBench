@@ -3,8 +3,8 @@
 
   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
-     Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-     Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
+  Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
   other materials provided with the distribution.
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -13,7 +13,6 @@
   OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
-
 
 #include "hwt.h"
 
@@ -31,6 +30,10 @@ T roundToPowerOf2(T val)
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " <signal length> <repeat>\n";
+    return 1;
+  }
   unsigned int signalLength = atoi(argv[1]);
   const int iterations = atoi(argv[2]);
 
@@ -72,6 +75,8 @@ int main(int argc, char * argv[])
                                    dOutData[0:signalLength], \
                                    dPartialOutData[0:signalLength])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     unsigned int levels = 0;
@@ -206,17 +211,21 @@ int main(int argc, char * argv[])
     memcpy(inData, temp, signalLength * sizeof(float));
     free(temp);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device offload time " << (time * 1e-9f) / iterations << " (s)\n";
 }
 
   // Verify
   calApproxFinalOnHost(inData, hOutData, signalLength);
 
-  bool result = true;
+  bool ok = true;
   for(unsigned int i = 0; i < signalLength; ++i)
   {
     if(fabs(dOutData[i] - hOutData[i]) > 0.1f)
     {
-      result = false;
+      ok = false;
       break;
     }
   }
@@ -226,15 +235,10 @@ int main(int argc, char * argv[])
   free(dPartialOutData);
   free(hOutData);
 
-  if(result)
-  {
-    std::cout << "Passed!\n" << std::endl;
-    return 0;
-  }
+  if(ok)
+    std::cout << "PASS" << std::endl;
   else
-  {
-    std::cout << "Failed\n" << std::endl;
-    return 1;
-  }
+    std::cout << "FAIL" << std::endl;
 
+  return 0;
 }

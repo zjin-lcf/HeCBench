@@ -3,8 +3,8 @@ Copyright ©2013 Advanced Micro Devices, Inc. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
-•	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-•	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -36,9 +36,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include "hwt.h"
 
 __global__
-void dwtHaar1D( const float *__restrict inSignal,
-                      float *__restrict coefsSignal,
-                      float *__restrict AverageSignal,
+void dwtHaar1D( const float *__restrict__ inSignal,
+                      float *__restrict__ coefsSignal,
+                      float *__restrict__ AverageSignal,
                       const unsigned int tLevels,
                       const unsigned int signalLength,
                       const unsigned int levelsDone,
@@ -49,7 +49,7 @@ void dwtHaar1D( const float *__restrict inSignal,
     size_t groupId = blockIdx.x;
     size_t localSize = blockDim.x;
 
-    HIP_DYNAMIC_SHARED(float, sharedArray); 
+    extern __shared__ float sharedArray[];
     
     /**
      * Read input signal data from global memory
@@ -166,7 +166,7 @@ int runKernel(
     dim3 grid ((curSignalLength >> 1) / groupSize);
     dim3 block (groupSize);
 
-    hipLaunchKernelGGL(dwtHaar1D, dim3(grid), dim3(block), groupSize*2*sizeof(float), 0, 
+    dwtHaar1D<<<grid, block, groupSize*2*sizeof(float)>>>(
       inDataBuf,
       outDataBuf,
       partialOutDataBuf,
@@ -178,7 +178,6 @@ int runKernel(
     hipMemcpy(dOutData, outDataBuf, signalLengthByte, hipMemcpyDeviceToHost);
 
     hipMemcpy(dPartialOutData, partialOutDataBuf, signalLengthByte, hipMemcpyDeviceToHost);
-
 
     if(levels <= maxLevelsOnDevice)
     {
