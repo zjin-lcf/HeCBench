@@ -18,6 +18,7 @@
 #include <algorithm> 
 #include <iostream> 
 #include <vector> 
+#include <chrono>
 #include "common.h"
 
 using namespace std; 
@@ -76,7 +77,6 @@ T parallel_prefix_sum(nd_item<3> &item, const int n, const int *ind, global_ptr<
   return last;
 }
 
-
 // Volume of neighboors (*weight_s)
 template<bool weighted, typename T>
 void jaccard_row_sum(
@@ -87,7 +87,6 @@ void jaccard_row_sum(
   buffer<T, 1> &d_weight_j, 
   buffer<T, 1> &d_work) 
 {
-
   const int y = 4;
   range<3> sum_gws (1, (n+y-1)/y*y, 64/y);
   range<3> sum_lws (1, y, 64/y);
@@ -226,7 +225,6 @@ void jaccard_jw(
   });
 }
 
-
 template <bool weighted, typename T>
 void fill_weights(queue &q, const int e, buffer<T, 1> &d_w, const T value) 
 {
@@ -263,6 +261,9 @@ void jaccard_weight (queue &q, const int iteration, const int n, const int e,
     buffer<T, 1> d_csrVal (csr_val, e);
     buffer<int, 1> d_csrPtr (csr_ptr, n+1);
     buffer<int, 1> d_csrInd (csr_ind, e);
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iteration; i++) {
 
@@ -301,6 +302,11 @@ void jaccard_weight (queue &q, const int iteration, const int n, const int e,
       // compute jaccard weights
       jaccard_jw<weighted,T>(q, e, d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average execution time of kernels: " << (time * 1e-9f) / iteration << " (s)\n";
   }
 
 #ifdef DEBUG
@@ -325,9 +331,9 @@ void jaccard_weight (queue &q, const int iteration, const int n, const int e,
 
   if (error > 1e-5) {
     for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
-    printf("FAILED");
+    printf("FAIL");
   } else {
-    printf("PASSED");
+    printf("PASS");
   }
   printf("\n");
 #endif
@@ -428,4 +434,3 @@ int main(int argc, char** argv)
 
   return 0; 
 } 
-

@@ -19,6 +19,7 @@
 #include <algorithm> 
 #include <iostream> 
 #include <vector> 
+#include <chrono>
 
 using namespace std; 
 
@@ -76,9 +77,12 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w)
 // Volume of neighboors (*weight_s)
 template<bool weighted, typename T>
 __global__ void 
-jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T *work) 
+jaccard_row_sum(const int n,
+                const int *__restrict__ csrPtr,
+                const int *__restrict__ csrInd,
+                const T *__restrict__ w,
+                      T *__restrict__ work)
 {
-
   for (int row=threadIdx.y+blockIdx.y*blockDim.y; row<n; row+=gridDim.y*blockDim.y) {
     int start = csrPtr[row];
     int end   = csrPtr[row+1];
@@ -97,13 +101,18 @@ jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T
 // Volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
 // Note the number of columns is constrained by the number of rows
 template<bool weighted, typename T>
-__global__ void 
-jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd, 
-    const T *v, const T *work, T *weight_i, T *weight_s) 
+__global__ void
+jaccard_is(const int n, const int e,
+           const int *__restrict__ csrPtr,
+           const int *__restrict__ csrInd,
+           const T *__restrict__ v,
+           const T *__restrict__ work,
+                 T *__restrict__ weight_i,
+                 T *__restrict__ weight_s) 
 {
-
   for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {  
-    for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y; j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) { 
+    for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y;
+             j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) { 
       int col = csrInd[j];
       //find which row has least elements (and call it reference row)
       int Ni = csrPtr[row+1] - csrPtr[row];
@@ -150,12 +159,12 @@ jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd,
 
 template<bool weighted, typename T>
 __global__ void 
-jaccard_jw(const int e, 
-    const T *csrVal, 
-    const T gamma, 
-    const T *weight_i, 
-    const T *weight_s, 
-    T *weight_j) 
+jaccard_jw(const int e,
+    const T *__restrict__ csrVal,
+    const T gamma,
+    const T *__restrict__ weight_i,
+    const T *__restrict__ weight_s,
+          T *__restrict__ weight_j) 
 {
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
     T Wi =  weight_i[j];
@@ -163,8 +172,6 @@ jaccard_jw(const int e,
     weight_j[j] = (gamma*csrVal[j])* (Wi/(Ws-Wi));
   }
 }
-
-
 
 template <bool weighted, typename T>
 __global__ void 
@@ -182,7 +189,6 @@ template <bool weighted, typename T>
 void jaccard_weight (const int iteration, const int n, const int e, 
     int* csr_ptr, int* csr_ind, T* csr_val)
 {
-
   const T gamma = (T)0.46;  // arbitrary
 
   T *d_weight_i, 
@@ -208,9 +214,12 @@ void jaccard_weight (const int iteration, const int n, const int e,
   cudaMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
   cudaMalloc ((void**)&d_csrInd, sizeof(int) * e);
 
-  cudaMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(d_csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(d_csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_csrPtr, csr_ptr, sizeof(int) * (n+1), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_csrInd, csr_ind, sizeof(int) * e, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_csrVal, csr_val, sizeof(T) * e, cudaMemcpyHostToDevice);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
     dim3 nthreads, nblocks; // reuse for multiple kernels
@@ -273,8 +282,12 @@ void jaccard_weight (const int iteration, const int n, const int e,
     nblocks.z  = 1;
     jaccard_jw<weighted,T><<<nblocks,nthreads>>>(e, 
         d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
-
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  cout << "Average execution time of kernels: " << (time * 1e-9f) / iteration << " (s)\n";
 
   cudaMemcpy(weight_j, d_weight_j, sizeof(T) * e, cudaMemcpyDeviceToHost);
 #ifdef DEBUG
@@ -299,9 +312,9 @@ void jaccard_weight (const int iteration, const int n, const int e,
 
   if (error > 1e-5) {
     for (int i = 0; i < e; i++) printf("wj: %d %f\n", i, weight_j[i]);
-    printf("FAILED");
+    printf("FAIL");
   } else {
-    printf("PASSED");
+    printf("PASS");
   }
   printf("\n");
 #endif
@@ -333,7 +346,7 @@ void printMatrix(const matrix& M)
   } 
 } 
 
-  template <typename T>
+template <typename T>
 void printVector(const vector<T>& V, char* msg) 
 { 
   cout << msg << "[ "; 
