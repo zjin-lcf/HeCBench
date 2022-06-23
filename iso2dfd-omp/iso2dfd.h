@@ -4,11 +4,9 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
-
 #include <chrono>
 #include <cmath>
 #include <cstring>
-#include <ctime>
 
 /*
  * Parameters to define coefficients

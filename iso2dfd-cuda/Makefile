@@ -53,6 +53,5 @@ $(program): $(obj) iso2dfd.h Makefile
 clean:
 	rm -rf $(program) $(obj) *.bin *.txt
 
-run:
+run: $(program)
 	./$(program) 2048 2048 1000
-
