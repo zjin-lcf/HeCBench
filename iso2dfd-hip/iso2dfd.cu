@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
-// ISO2DFD: HIP Port of the 2D-Finite-Difference-Wave Propagation, 
+// ISO2DFD: the 2D-Finite-Difference-Wave Propagation, 
 //
 // ISO2DFD is a finite difference stencil kernel for solving the 2D acoustic
 // isotropic wave equation. Kernels in this sample are implemented as 2nd order
@@ -12,7 +12,7 @@
 // the sample will explicitly run on the GPU as well as CPU to
 // calculate a result.  If successful, the output will include GPU device name.
 //
-// A complete online tutorial for this code sample can be found at :
+// this code sample can be found at :
 // https://software.intel.com/en-us/articles/code-sample-two-dimensional-finite-difference-wave-propagation-in-isotropic-media-iso2dfd
 
 
@@ -54,7 +54,7 @@ void initialize(float* ptr_prev, float* ptr_next, float* ptr_vel, size_t nRows,
   for (size_t i = 0; i < nRows; i++) {
     size_t offset = i * nCols;
 
-    for (int k = 0; k < nCols; k++) {
+    for (size_t k = 0; k < nCols; k++) {
       ptr_prev[offset + k] = 0.0f;
       ptr_next[offset + k] = 0.0f;
       // pre-compute squared value of sample wave velocity v*v (v = 1500 m/s)
@@ -63,9 +63,9 @@ void initialize(float* ptr_prev, float* ptr_next, float* ptr_vel, size_t nRows,
   }
   // Add a source to initial wavefield as an initial condition
   for (int s = 11; s >= 0; s--) {
-    for (int i = nRows / 2 - s; i < nRows / 2 + s; i++) {
+    for (size_t i = nRows / 2 - s; i < nRows / 2 + s; i++) {
       size_t offset = i * nCols;
-      for (int k = nCols / 2 - s; k < nCols / 2 + s; k++) {
+      for (size_t k = nCols / 2 - s; k < nCols / 2 + s; k++) {
         ptr_prev[offset + k] = wavelet[s];
       }
     }
@@ -117,23 +117,25 @@ bool within_epsilon(float* output, float* reference, const size_t dimx,
  * Updates wavefield for the number of iterations given in nIteratons parameter
  */
 void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
-                            const float dtDIVdxy, int nRows, int nCols,
+                            const float dtDIVdxy, size_t nRows, size_t nCols,
                             int nIterations) {
-  for (unsigned int k = 0; k < nIterations; k += 1) {
-    for (unsigned int i = 1; i < nRows - HALF_LENGTH; i += 1) {
-      for (unsigned int j = 1; j < nCols - HALF_LENGTH; j += 1) {
+  float* swap;
+  float value = 0.f;
+  for (int k = 0; k < nIterations; k += 1) {
+    for (size_t i = 1; i < nRows - HALF_LENGTH; i += 1) {
+      for (size_t j = 1; j < nCols - HALF_LENGTH; j += 1) {
         // Stencil code to update grid
-        int gid = j + (i * nCols);
-        float value = 0.f;
+        size_t gid = j + (i * nCols);
+        value = 0.f;
         value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
         value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
         value *= dtDIVdxy * vel[gid];
-        next[gid] = 2.0f * prev[gid] - next[gid] + value;
+        next[gid] = 2.f * prev[gid] - next[gid] + value;
       }
     }
 
     // Swap arrays
-    float* swap = next;
+    swap = next;
     next = prev;
     prev = swap;
   }
@@ -141,19 +143,21 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
 
 /*
  * Device-Code - GPU
- * SYCL implementation for single iteration of iso2dfd kernel
- *
  * Range kernel is used to spawn work-items in x, y dimension
  *
  */
-__global__ void iso_2dfd_kernel(float* next, const float* prev, const float* vel, 
-			        const float dtDIVdxy, const int nRows, const int nCols) {
+__global__ void iso_2dfd_kernel(
+        float*__restrict__ next,
+  const float*__restrict__ prev,
+  const float*__restrict__ vel, 
+  const float dtDIVdxy, const size_t nRows, const size_t nCols)
+{
   // Compute global id
   // We can use the get.global.id() function of the item variable
   //   to compute global id. The 2D array is laid out in memory in row major
   //   order.
-  int gidCol = blockDim.x * blockIdx.x + threadIdx.x;
-  int gidRow = blockDim.y * blockIdx.y + threadIdx.y;
+  size_t gidCol = blockDim.x * blockIdx.x + threadIdx.x;
+  size_t gidRow = blockDim.y * blockIdx.y + threadIdx.y;
 
   if (gidRow < nRows && gidCol < nCols) {
 
@@ -224,7 +228,6 @@ int main(int argc, char* argv[]) {
   // Start timer
   auto start = std::chrono::steady_clock::now();
 
-
   std::cout << "Computing wavefield in device .." << std::endl;
 
   // Display info about device
@@ -248,14 +251,21 @@ int main(int argc, char* argv[]) {
   dim3 dimGrid(grid_cols, grid_rows);
   dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
 
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+
   // Iterate over time steps
   for (unsigned int k = 0; k < nIterations; k += 1) {
     //    swaps their content at every iteration.
-    if (k % 2 == 0)
-      hipLaunchKernelGGL(iso_2dfd_kernel, dim3(dimGrid), dim3(dimBlock), 0, 0, d_next, d_prev, d_vel, dtDIVdxy, nRows, nCols);
-    else
-      hipLaunchKernelGGL(iso_2dfd_kernel, dim3(dimGrid), dim3(dimBlock), 0, 0, d_prev, d_next, d_vel, dtDIVdxy, nRows, nCols);
+    hipLaunchKernelGGL(iso_2dfd_kernel, dimGrid, dimBlock, 0, 0, (k % 2) ? d_prev : d_next, 
+                                           (k % 2) ? d_next : d_prev,
+                                           d_vel, dtDIVdxy, nRows, nCols);
   }
+
+  hipDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+  std::cout << "Average kernel execution time " << (ktime * 1e-9f) / nIterations << " (s)\n";
 
   hipMemcpy(next_base, d_next, sizeof(float)*nsize, hipMemcpyDeviceToHost);
 

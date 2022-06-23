@@ -61,9 +61,9 @@ void initialize(float* ptr_prev, float* ptr_next, float* ptr_vel, size_t nRows,
   }
   // Add a source to initial wavefield as an initial condition
   for (int s = 11; s >= 0; s--) {
-    for (int i = nRows / 2 - s; i < nRows / 2 + s; i++) {
+    for (size_t i = nRows / 2 - s; i < nRows / 2 + s; i++) {
       size_t offset = i * nCols;
-      for (int k = nCols / 2 - s; k < nCols / 2 + s; k++) {
+      for (size_t k = nCols / 2 - s; k < nCols / 2 + s; k++) {
         ptr_prev[offset + k] = wavelet[s];
       }
     }
@@ -118,10 +118,10 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
                             const float dtDIVdxy, int nRows, int nCols,
                             int nIterations) {
   for (unsigned int k = 0; k < nIterations; k += 1) {
-    for (unsigned int i = 1; i < nRows - HALF_LENGTH; i += 1) {
-      for (unsigned int j = 1; j < nCols - HALF_LENGTH; j += 1) {
+    for (size_t i = 1; i < nRows - HALF_LENGTH; i += 1) {
+      for (size_t j = 1; j < nCols - HALF_LENGTH; j += 1) {
         // Stencil code to update grid
-        int gid = j + (i * nCols);
+        size_t gid = j + (i * nCols);
         float value = 0.f;
         value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
         value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
@@ -145,10 +145,10 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
  *
  */
 void iso_2dfd_kernel(float* next, const float* prev, const float* vel, 
-                     const float dtDIVdxy, const int nRows, const int nCols) {
+                     const float dtDIVdxy, const size_t nRows, const size_t nCols) {
   #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(256) 
-  for (int gidRow = 0; gidRow < nRows ; gidRow++)
-    for (int gidCol = 0; gidCol < nCols ; gidCol++) {
+  for (size_t gidRow = 0; gidRow < nRows ; gidRow++)
+    for (size_t gidCol = 0; gidCol < nCols ; gidCol++) {
       size_t gid = (gidRow)*nCols + gidCol;
       // Computation to solve wave equation in 2D
       // First check if gid is inside the effective grid (not in halo)
@@ -212,24 +212,29 @@ int main(int argc, char* argv[]) {
   std::cout << "Iterations: " << nIterations << std::endl;
   std::cout << std::endl;
 
-
   // Start timer
   auto start = std::chrono::steady_clock::now();
 
   std::cout << "Computing wavefield in device .." << std::endl;
 
-#pragma omp target data map(next_base[0:nsize], prev_base[0:nsize]) \
-                        map(to: vel_base[0:nsize])
-  // Iterate over time steps
-  for (unsigned int k = 0; k < nIterations; k += 1) {
-    // alternating the 'next' and 'prev' parameters which effectively
-    //    swaps their content at every iteration.
-    if (k % 2 == 0)
-      iso_2dfd_kernel(next_base, prev_base, vel_base, dtDIVdxy, nRows, nCols);
-    else
-      iso_2dfd_kernel(prev_base, next_base, vel_base, dtDIVdxy, nRows, nCols);
-  }  // end for
-
+  #pragma omp target data map(next_base[0:nsize], prev_base[0:nsize]) \
+                          map(to: vel_base[0:nsize])
+  {
+    auto kstart = std::chrono::steady_clock::now();
+  
+    // Iterate over time steps
+    for (unsigned int k = 0; k < nIterations; k += 1) {
+      // alternating the 'next' and 'prev' parameters which effectively
+      //    swaps their content at every iteration.
+      iso_2dfd_kernel((k % 2) ? prev_base : next_base,
+                      (k % 2) ? next_base : prev_base,
+                      vel_base, dtDIVdxy, nRows, nCols);
+    }  // end for
+  
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    std::cout << "Average kernel execution time " << (ktime * 1e-9f) / nIterations << " (s)\n";
+  }
 
   // Compute and display time used by device
   auto end = std::chrono::steady_clock::now();

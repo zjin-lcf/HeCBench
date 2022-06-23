@@ -50,10 +50,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) iso2dfd.h Makefile
+$(program): $(obj) iso2dfd.h
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp iso2dfd.h Makefile
+%.o: %.cpp iso2dfd.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -61,4 +61,3 @@ clean:
 
 run: $(program)
 	./$(program) 2048 2048 1000
-
