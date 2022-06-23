@@ -38,7 +38,6 @@ void initialize_data (float* f) {
       else {
         f[IDX(i,j)] = 0.0f;
       }
-
     }
   }
 }
@@ -88,6 +87,9 @@ int main () {
 
   range<2> gws (N, N);
   range<2> lws (16, 16);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
@@ -224,14 +226,19 @@ int main () {
     ++num_iters;
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time per iteration: " << (time * 1e-9f) / num_iters << " (s)\n";
+
   // If we took fewer than max_iters steps and the error is below the tolerance,
   // we succeeded. Otherwise, we failed.
 
   if (error <= tolerance && num_iters < max_iters) {
-    std::cout << "Success!" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else {
-    std::cout << "Failure!" << std::endl;
+    std::cout << "FAIL" << std::endl;
     return -1;
   }
 
@@ -241,7 +248,7 @@ int main () {
 
   // End wall timing
   double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
-  std::cout << "Run time = " << std::setprecision(4) << duration << " seconds" << std::endl;
+  std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
 }
