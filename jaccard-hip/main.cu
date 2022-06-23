@@ -75,9 +75,12 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w)
 // Volume of neighboors (*weight_s)
 template<bool weighted, typename T>
 __global__ void 
-jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T *work) 
+jaccard_row_sum(const int n,
+                const int *__restrict__ csrPtr,
+                const int *__restrict__ csrInd,
+                const T *__restrict__ w,
+                      T *__restrict__ work) 
 {
-
   for (int row=threadIdx.y+blockIdx.y*blockDim.y; row<n; row+=gridDim.y*blockDim.y) {
     int start = csrPtr[row];
     int end   = csrPtr[row+1];
@@ -97,10 +100,14 @@ jaccard_row_sum(const int n, const int *csrPtr, const int *csrInd, const T *w, T
 // Note the number of columns is constrained by the number of rows
 template<bool weighted, typename T>
 __global__ void 
-jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd, 
-    const T *v, const T *work, T *weight_i, T *weight_s) 
+jaccard_is(const int n, const int e,
+           const int *__restrict__ csrPtr,
+           const int *__restrict__ csrInd, 
+           const T *__restrict__ v,
+           const T *__restrict__ work,
+                 T *__restrict__ weight_i,
+                 T *__restrict__ weight_s) 
 {
-
   for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {  
     for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y; j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) { 
       int col = csrInd[j];
@@ -149,12 +156,12 @@ jaccard_is(const int n, const int e, const int *csrPtr, const int *csrInd,
 
 template<bool weighted, typename T>
 __global__ void 
-jaccard_jw(const int e, 
-    const T *csrVal, 
+jaccard_jw(const int e,
+    const T *__restrict__ csrVal,
     const T gamma, 
-    const T *weight_i, 
-    const T *weight_s, 
-    T *weight_j) 
+    const T *__restrict__ weight_i,
+    const T *__restrict__ weight_s, 
+          T *__restrict__ weight_j) 
 {
   for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
     T Wi =  weight_i[j];
@@ -162,8 +169,6 @@ jaccard_jw(const int e,
     weight_j[j] = (gamma*csrVal[j])* (Wi/(Ws-Wi));
   }
 }
-
-
 
 template <bool weighted, typename T>
 __global__ void 
@@ -207,9 +212,12 @@ void jaccard_weight (const int iteration, const int n, const int e,
   hipMalloc ((void**)&d_csrPtr, sizeof(int) * (n+1));
   hipMalloc ((void**)&d_csrInd, sizeof(int) * e);
 
-  hipMemcpyAsync(d_csrPtr, csr_ptr, sizeof(int) * (n+1), hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(d_csrInd, csr_ind, sizeof(int) * e, hipMemcpyHostToDevice, 0);
-  hipMemcpyAsync(d_csrVal, csr_val, sizeof(T) * e, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_csrPtr, csr_ptr, sizeof(int) * (n+1), hipMemcpyHostToDevice);
+  hipMemcpy(d_csrInd, csr_ind, sizeof(int) * e, hipMemcpyHostToDevice);
+  hipMemcpy(d_csrVal, csr_val, sizeof(T) * e, hipMemcpyHostToDevice);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
     dim3 nthreads, nblocks; // reuse for multiple kernels
@@ -274,6 +282,11 @@ void jaccard_weight (const int iteration, const int n, const int e,
         d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
 
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  cout << "Average execution time of kernels: " << (time * 1e-9f) / iteration << " (s)\n";
 
   hipMemcpy(weight_j, d_weight_j, sizeof(T) * e, hipMemcpyDeviceToHost);
 #ifdef DEBUG

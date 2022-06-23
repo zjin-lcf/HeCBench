@@ -54,4 +54,3 @@ clean:
 
 run: $(program)
 	./$(program) 1024 512 10
-

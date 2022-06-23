@@ -30,7 +30,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g -DDEBUG -G
   LDFLAGS  += -g
 endif
 
@@ -55,4 +55,3 @@ clean:
 
 run: $(program)
 	./$(program) 1024 512 10
-
