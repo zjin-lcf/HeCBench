@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <ctime>
+#include <chrono>
 #include <cuda.h>
 
 // A multiple of thread block size
@@ -43,9 +44,9 @@ void initialize_data (float* f) {
   }
 }
 
-__global__ void jacobi_step (float*__restrict f, 
-                             const float*__restrict f_old, 
-                             float*__restrict error) {
+__global__ void jacobi_step (float*__restrict__ f, 
+                             const float*__restrict__ f_old, 
+                             float*__restrict__ error) {
   __shared__ float f_old_tile[18][18];
 
   int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -124,7 +125,8 @@ __global__ void jacobi_step (float*__restrict f,
   }
 }
 
-__global__ void swap_data (const float*__restrict f, float*__restrict f_old) {
+__global__ void swap_data (const float*__restrict__ f,
+                                 float*__restrict__ f_old) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j = threadIdx.y + blockIdx.y * blockDim.y;
 
@@ -172,6 +174,9 @@ int main () {
   dim3 grid (N/16, N/16);
   dim3 block (16, 16);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
     cudaMemset(d_error, 0, 4);
@@ -199,14 +204,19 @@ int main () {
     ++num_iters;
   }
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time per iteration: " << (time * 1e-9f) / num_iters << " (s)\n";
+
   // If we took fewer than max_iters steps and the error is below the tolerance,
   // we succeeded. Otherwise, we failed.
 
   if (error <= tolerance && num_iters < max_iters) {
-    std::cout << "Success!" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else {
-    std::cout << "Failure!" << std::endl;
+    std::cout << "FAIL" << std::endl;
     return -1;
   }
 
@@ -219,7 +229,7 @@ int main () {
 
   // End wall timing
   double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
-  std::cout << "Run time = " << std::setprecision(4) << duration << " seconds" << std::endl;
+  std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
 }

@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <ctime>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // A multiple of thread block size
@@ -43,9 +44,9 @@ void initialize_data (float* f) {
   }
 }
 
-__global__ void jacobi_step (float*__restrict f, 
-                             const float*__restrict f_old, 
-                             float*__restrict error) {
+__global__ void jacobi_step (float*__restrict__ f, 
+                             const float*__restrict__ f_old, 
+                             float*__restrict__ error) {
   __shared__ float f_old_tile[18][18];
 
   int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -96,7 +97,7 @@ __global__ void jacobi_step (float*__restrict f,
   // For simplicity, we do this outside the above conditional
   // so that all threads participate
   for (int offset = 8; offset > 0; offset /= 2) {
-    err += __shfl_down(err, offset);
+    err += __shfl_down(0xffffffff, err, offset);
   }
 
   // If we're thread 0 in the warp, update our value to shared memory
@@ -116,7 +117,7 @@ __global__ void jacobi_step (float*__restrict f,
   if (threadIdx.y == 0) {
     err = reduction_array[threadIdx.x];
     for (int offset = 8; offset > 0; offset /= 2) {
-      err += __shfl_down(err, offset);
+      err += __shfl_down(0xffffffff, err, offset);
     }
     if (threadIdx.x == 0) {
       atomicAdd(error, err);
@@ -124,7 +125,8 @@ __global__ void jacobi_step (float*__restrict f,
   }
 }
 
-__global__ void swap_data (const float*__restrict f, float*__restrict f_old) {
+__global__ void swap_data (const float*__restrict__ f,
+                                 float*__restrict__ f_old) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j = threadIdx.y + blockIdx.y * blockDim.y;
 
@@ -172,17 +174,20 @@ int main () {
   dim3 grid (N/16, N/16);
   dim3 block (16, 16);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
     hipMemset(d_error, 0, 4);
 
     // Perform a Jacobi relaxation step
-    hipLaunchKernelGGL(jacobi_step, dim3(grid), dim3(block), 0, 0, d_f, d_f_old, d_error);
+    hipLaunchKernelGGL(jacobi_step, grid, block, 0, 0, d_f, d_f_old, d_error);
 
     // Swap the old data and the new data
     // We're doing this explicitly for pedagogical purposes, even though
     // in this specific application a std::swap would have been OK
-    hipLaunchKernelGGL(swap_data, dim3(grid), dim3(block), 0, 0, d_f, d_f_old);
+    hipLaunchKernelGGL(swap_data, grid, block, 0, 0, d_f, d_f_old);
 
     hipMemcpy(&error, d_error, sizeof(float), hipMemcpyDeviceToHost);
 
@@ -199,14 +204,19 @@ int main () {
     ++num_iters;
   }
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time per iteration: " << (time * 1e-9f) / num_iters << " (s)\n";
+
   // If we took fewer than max_iters steps and the error is below the tolerance,
   // we succeeded. Otherwise, we failed.
 
   if (error <= tolerance && num_iters < max_iters) {
-    std::cout << "Success!" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else {
-    std::cout << "Failure!" << std::endl;
+    std::cout << "FAIL" << std::endl;
     return -1;
   }
 
@@ -219,7 +229,7 @@ int main () {
 
   // End wall timing
   double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
-  std::cout << "Run time = " << std::setprecision(4) << duration << " seconds" << std::endl;
+  std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
 }

@@ -54,4 +54,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

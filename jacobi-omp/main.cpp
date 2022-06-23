@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <ctime>
+#include <chrono>
 #include <omp.h>
 
 // A multiple of thread block size
@@ -66,6 +67,8 @@ int main () {
 
 #pragma omp target data map(to: f[0:N*N], f_old[0:N*N])
 {
+  auto start = std::chrono::steady_clock::now();
+
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
     // Perform a Jacobi relaxation step
@@ -143,16 +146,20 @@ int main () {
     // Increment the iteration count
     ++num_iters;
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time per iteration: " << (time * 1e-9f) / num_iters << " (s)\n";
 }
 
   // If we took fewer than max_iters steps and the error is below the tolerance,
   // we succeeded. Otherwise, we failed.
 
   if (error <= tolerance && num_iters < max_iters) {
-    std::cout << "Success!" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else {
-    std::cout << "Failure!" << std::endl;
+    std::cout << "FAIL" << std::endl;
     return -1;
   }
 
@@ -162,7 +169,7 @@ int main () {
 
   // End wall timing
   double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
-  std::cout << "Run time = " << std::setprecision(4) << duration << " seconds" << std::endl;
+  std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
 }
