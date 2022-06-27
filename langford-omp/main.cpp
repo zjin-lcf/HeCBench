@@ -305,7 +305,6 @@ if (k == two_n) {
 }
 #pragma omp end declare target
 
-
 // Sort the vector of solution sequences and count the unique ones.
 // Optionally print each unique one.
 template <int n>
@@ -326,14 +325,11 @@ int64_t unique_count(Results<n> &results) {
   return unique;
 }
 
-
-
 // Return number of milliseconds elapsed since Jan 1, 1970 00:00 GMT.
 long unixtime() {
   using namespace chrono;
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
-
 
 // Start and manage the computation on GPU device "device"
 template <int n>
@@ -347,6 +343,8 @@ void run_gpu_d(int64_t* count, Results<n>& final_results) {
 
 #pragma omp target data map(to: count[0:1]) map(alloc: results[0:kLimit * kAlignedCnt])
 {
+  auto start = std::chrono::steady_clock::now();
+
   #pragma omp target teams num_teams(blocks_x) thread_limit(kThreadsPerBlock) 
   {
     Availability<n> availability[kThreadsPerBlock]; 
@@ -370,6 +368,10 @@ void run_gpu_d(int64_t* count, Results<n>& final_results) {
       result_index);
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
 
 #pragma omp target update from(count[0:1])
 

@@ -189,7 +189,7 @@ constexpr int kNumLogicalThreads = 16383;
 
 // To do:  Run on CPU (right now only runs on GPU).
 template <int n>
-  __device__
+__device__
 void dfs(int64_t* p_result,
     Availability<n> &availability,
     Open<n> &open,
@@ -342,14 +342,11 @@ int64_t unique_count(Results<n> &results) {
   return unique;
 }
 
-
-
 // Return number of milliseconds elapsed since Jan 1, 1970 00:00 GMT.
 long unixtime() {
   using namespace chrono;
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
-
 
 // Start and manage the computation on GPU device "device"
 template <int n>
@@ -363,7 +360,17 @@ void run_gpu_d(int64_t* count, Results<n>& final_results) {
   hipMemcpy(results_device, count, sizeof(int64_t), hipMemcpyHostToDevice); 
   int blocks_x = div_up(kNumLogicalThreads, kThreadsPerBlock);
   dim3 blocks(blocks_x);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   hipLaunchKernelGGL(HIP_KERNEL_NAME(dfs_gpu<n>), dim3(blocks), dim3(kThreadsPerBlock), 0, 0, results_device);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
+
   hipMemcpy(count, results_device, sizeof(int64_t), hipMemcpyDeviceToHost);
 
   if (*count >= kLimit) {
