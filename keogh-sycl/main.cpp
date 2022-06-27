@@ -1,19 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
-
 #include "reference.h"
 
 int main(int argc, char* argv[]) {
 
-  if (argc != 3) {
-    printf("Usage: ./%s <query length> <subject length>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: ./%s <query length> <subject length> <repeat>\n", argv[0]);
     return -1;
   }
 
   const int M = atoi(argv[1]);
   const int N = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   printf("Query length = %d\n", M);
   printf("Subject length = %d\n", N);
@@ -34,7 +35,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < M; ++i) upper[i] = (float)rand() / (float)RAND_MAX;
   for (int i = 0; i < M; ++i) lower[i] = (float)rand() / (float)RAND_MAX;
 
-  {
+  { // sycl scope
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -54,7 +55,10 @@ int main(int argc, char* argv[]) {
   range<1> gws (grids * blocks);
   range<1> lws (blocks);
 
-  for (int i = 0; i < 100; i++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto subject = d_subject.get_access<sycl_read>(cgh);
       auto avgs = d_avgs.get_access<sycl_read>(cgh);
@@ -99,6 +103,11 @@ int main(int argc, char* argv[]) {
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   }
 

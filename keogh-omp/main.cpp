@@ -1,19 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
-
 #include "reference.h"
 
 int main(int argc, char* argv[]) {
 
-  if (argc != 3) {
-    printf("Usage: ./%s <query length> <subject length>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: ./%s <query length> <subject length> <repeat>\n", argv[0]);
     return -1;
   }
 
   const int M = atoi(argv[1]);
   const int N = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   printf("Query length = %d\n", M);
   printf("Subject length = %d\n", N);
@@ -44,7 +45,9 @@ int main(int argc, char* argv[]) {
                                    upper_bound[0:N])\
                           map(from: lb[0:N-M+1])
   {
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       #pragma omp target teams distribute num_teams(grids) thread_limit(blocks)
       for (int idx = 0; idx < N-M+1; idx++) {
         // obtain statistics
@@ -66,6 +69,10 @@ int main(int argc, char* argv[]) {
         lb[idx] = residues;
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verify
@@ -89,5 +96,3 @@ int main(int argc, char* argv[]) {
   free(upper_bound);
   return 0;
 }
-
-

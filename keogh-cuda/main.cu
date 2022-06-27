@@ -1,21 +1,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
-
-#define EUCLIDEAN (true)
-#define MANHATTAN (false)
-
 #include "reference.h"
 
 // calculate LB_Keogh
 __global__
-void lb_keogh(const float *__restrict subject,
-              const float *__restrict avgs,
-              const float *__restrict stds, 
-                    float *__restrict lb_keogh,
-              const float *__restrict lower_bound,
-              const float *__restrict upper_bound,
+void lb_keogh(const float *__restrict__ subject,
+              const float *__restrict__ avgs,
+              const float *__restrict__ stds, 
+                    float *__restrict__ lb_keogh,
+              const float *__restrict__ lower_bound,
+              const float *__restrict__ upper_bound,
               const int M,
               const int N) 
 {
@@ -27,9 +24,7 @@ void lb_keogh(const float *__restrict subject,
   int idx = blockSize + lid;
 
   for (int k = lid; k < blockDim.x + M; k += blockDim.x)
-    if (blockSize + k < N) {
-      cache[k] = subject[blockSize + k];
-    }
+    if (blockSize + k < N) cache[k] = subject[blockSize + k];
 
   __syncthreads();
 
@@ -54,16 +49,16 @@ void lb_keogh(const float *__restrict subject,
   }
 }
 
-
 int main(int argc, char* argv[]) {
 
-  if (argc != 3) {
-    printf("Usage: ./%s <query length> <subject length>\n", argv[0]);
-    return -1;
+  if (argc != 4) {
+    printf("Usage: ./%s <query length> <subject length> <repeat>\n", argv[0]);
+    return 1;
   }
 
   const int M = atoi(argv[1]);
   const int N = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   printf("Query length = %d\n", M);
   printf("Subject length = %d\n", N);
@@ -104,10 +99,18 @@ int main(int argc, char* argv[]) {
   const int grids = (N-M+1 + blocks - 1) / blocks;
   int smem_size = (M+blocks)*sizeof(float);
 
-  for (int i = 0; i < 100; i++) {
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     lb_keogh<<<grids, blocks, smem_size>>>
       (d_subject, d_avgs, d_stds, d_lb, d_lower, d_upper, M, N);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(lb, d_lb, sizeof(float)*(N-M+1), cudaMemcpyDeviceToHost);
 
@@ -138,5 +141,3 @@ int main(int argc, char* argv[]) {
   free(upper);
   return 0;
 }
-
-
