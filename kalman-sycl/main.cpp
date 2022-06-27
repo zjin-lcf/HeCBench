@@ -16,8 +16,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <chrono>
 #include "common.h"
-
 
 //! Thread-local Matrix-Vector multiplication.
 template <int n>
@@ -265,14 +266,15 @@ void kalman(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <#series> <#observations> <forcast steps>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <#series> <#observations> <forcast steps> <repeat>\n", argv[0]);
     return 1;
   }
   
   const int nseries = atoi(argv[1]); 
   const int nobs = atoi(argv[2]);
   const int fc_steps = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
   const int rd = 8;
   const int rd2 = rd * rd;
@@ -355,8 +357,11 @@ int main(int argc, char* argv[]) {
   range<1> gws ((nseries + 255)/256*256);
   range<1> lws  (256);
   
-  for (int n_diff = 0; n_diff < rd; n_diff++)
-    for (i = 0; i < 100; i++)
+  for (int n_diff = 0; n_diff < rd; n_diff++) {
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+  
+    for (i = 0; i < repeat; i++)
       q.submit([&] (handler &cgh) {
         auto ys = d_ys.get_access<sycl_read>(cgh);
         auto t = d_T.get_access<sycl_read>(cgh);
@@ -394,13 +399,20 @@ int main(int argc, char* argv[]) {
         });
      });
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (n_diff = %d): %f (s)\n", n_diff, (time * 1e-9f) / repeat);
+  }
+
   q.submit([&] (handler &cgh) {
     auto acc = d_F_fc.get_access<sycl_read>(cgh);
     cgh.copy(acc, F_fc);
   }).wait();
 
   double sum = 0.0;
-  for (i = 0; i < fc_steps * nseries; i++) sum += F_fc[i];
+  for (i = 0; i < fc_steps * nseries - 1; i++)
+    sum += (fabs(F_fc[i+1]) - fabs(F_fc[i])) / (fabs(F_fc[i+1]) + fabs(F_fc[i]));
   printf("Checksum: %lf\n", sum);
 
   free(F_fc);
@@ -413,4 +425,3 @@ int main(int argc, char* argv[]) {
   free(RQR);
   return 0;
 }
-
