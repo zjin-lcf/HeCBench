@@ -1,6 +1,8 @@
 #include <stdio.h>      /* defines printf for tests */
 #include <stdlib.h>     /* defines atol and posix_memalign */
 #include <string.h>     /* defines memcpy */
+#include <chrono>
+#include <omp.h>
 
 #define rot(x,k) (((x)<<(k)) | ((x)>>(32-(k))))
 
@@ -181,13 +183,19 @@ unsigned int hashlittle( const void *key, size_t length, unsigned int initval)
 
 int main(int argc, char** argv) {
 
+  if (argc != 4) {
+    printf("Usage: %s <block size> <number of strings> <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  int block_size = atoi(argv[1]);  // work group size
+  unsigned long N = atol(argv[2]); // total number of strings
+  int repeat = atoi(argv[3]);
+
   // sample gold result
   const char* str = "Four score and seven years ago";
   unsigned int c = hashlittle(str, 30, 1);
   printf("input string: %s hash is %.8x\n", str, c);   /* cd628161 */
-
-  int block_size = atoi(argv[1]);  // work group size
-  unsigned long N = atol(argv[2]); // total number of strings
 
   unsigned int *keys = NULL;
   unsigned int *lens = NULL;
@@ -210,10 +218,11 @@ int main(int argc, char** argv) {
     initvals[i] = i%2;
   }
 
+  auto start = std::chrono::steady_clock::now();
 
-#pragma omp target data map(to: keys[0:N*16], lens[0:N], initvals[0:N]) map(from: out[0:N])
+  #pragma omp target data map(to: keys[0:N*16], lens[0:N], initvals[0:N]) map(from: out[0:N])
   {
-    for (int n = 0; n < 100; n++) {
+    for (int n = 0; n < repeat; n++) {
       #pragma omp target teams distribute parallel for thread_limit(block_size)
       for (unsigned long id = 0; id < N; id++) {
         unsigned int length = lens[id];
@@ -253,6 +262,9 @@ int main(int argc, char** argv) {
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   printf("Verify the results computed on the device..\n");
   bool error = false;
@@ -265,10 +277,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (error)
-    printf("FAILED\n");
-  else
-    printf("PASS\n");
+  printf("%s\n", error ? "FAIL" : "PASS");
 
   free(keys);
   free(lens);
