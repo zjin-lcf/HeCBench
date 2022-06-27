@@ -1,13 +1,4 @@
-/**   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee					**/
-/**				 University of Virginia									**/
-/**																		**/
-/**   Description:	No longer supports fuzzy c-means clustering;	 	**/
-/**					only regular k-means clustering.					**/
-/**					No longer performs "validity" function to analyze	**/
-/**					compactness and separation crietria; instead		**/
-/**					calculate root mean squared error.					**/
-/**                                                                     **/
-/*************************************************************************/
+//   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee, University of Virginia
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +14,11 @@ extern double wtime(void);
 /* reference min_rmse value */
 
 // copy the feature to a feature swap region
-__global__ void feature_transpose (float* feature_swap, const float* feature, const int nfeatures, const int npoints)
+__global__
+void feature_transpose (float* feature_swap,
+                        const float* feature,
+                        const int nfeatures,
+                        const int npoints)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x; 
   if (tid < npoints) {
@@ -32,8 +27,13 @@ __global__ void feature_transpose (float* feature_swap, const float* feature, co
   }
 }
 
-__global__ void find_membership (const float* feature, const float* cluster, int* member, 
-    const int nclusters, const int nfeatures, const int npoints)
+__global__
+void find_membership (const float*__restrict__ feature,
+                      const float*__restrict__ cluster,
+                              int*__restrict__ member, 
+                      const int nclusters,
+                      const int nfeatures,
+                      const int npoints)
 {
   int point_id = blockIdx.x * blockDim.x + threadIdx.x; 
   if (point_id < npoints) {
@@ -56,23 +56,21 @@ __global__ void find_membership (const float* feature, const float* cluster, int
   }
 }
 
-
-/*---< cluster() >-----------------------------------------------------------*/
-int cluster(int      npoints,         /* number of data points */
-            int      nfeatures,       /* number of attributes for each point */
-            float  **features,        /* array: [npoints][nfeatures] */                  
-            int      min_nclusters,   /* range of min to max number of clusters */
-            int		 max_nclusters,
-            float    threshold,       /* loop terminating factor */
-            int     *best_nclusters,  /* out: number between min and max with lowest RMSE */
+int cluster(int npoints,         /* number of data points */
+            int nfeatures,       /* number of attributes for each point */
+            float **features,    /* array: [npoints][nfeatures] */                  
+            int min_nclusters,   /* range of min to max number of clusters */
+            int max_nclusters,
+            float threshold,     /* loop terminating factor */
+            int *best_nclusters, /* out: number between min and max with lowest RMSE */
             float ***cluster_centres, /* out: [best_nclusters][nfeatures] */
-            float	*min_rmse,          /* out: minimum RMSE */
-            int		 isRMSE,            /* calculate RMSE */
-            int		 nloops             /* number of iteration for each number of clusters */
-    )
+            float *min_rmse,     /* out: minimum RMSE */
+            int	isRMSE,          /* calculate RMSE */
+            int	nloops           /* number of iteration for each number of clusters */
+           )
 {    
-  int		index =0;	/* number of iteration to reach the best RMSE */
-  int		rmse;     /* RMSE for each clustering */
+  int index = 0; /* number of iteration to reach the best RMSE */
+  int rmse;     /* RMSE for each clustering */
   float delta;
 
   /* current memberships of points  */
@@ -84,7 +82,6 @@ int cluster(int      npoints,         /* number of data points */
   // associated with feature[0]
   float *d_feature;
   hipMalloc((void**)&d_feature, npoints * nfeatures * sizeof(float));
-  //hipMemcpyAsync(d_feature, features[0], npoints * nfeatures * sizeof(float), hipMemcpyHostToDevice, 0);
   hipMemcpy(d_feature, features[0], npoints * nfeatures * sizeof(float), hipMemcpyHostToDevice);
 
   // d_feature_swap is written by the first kernel, and read by the second kernel 
@@ -243,4 +240,3 @@ int cluster(int      npoints,         /* number of data points */
 
   return index;
 }
-

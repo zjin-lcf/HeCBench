@@ -1,13 +1,4 @@
-/**   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee					**/
-/**				 University of Virginia									**/
-/**																		**/
-/**   Description:	No longer supports fuzzy c-means clustering;	 	**/
-/**					only regular k-means clustering.					**/
-/**					No longer performs "validity" function to analyze	**/
-/**					compactness and separation crietria; instead		**/
-/**					calculate root mean squared error.					**/
-/**                                                                     **/
-/*************************************************************************/
+//   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee, University of Virginia
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,22 +12,21 @@ float	min_rmse_ref = FLT_MAX;
 extern double wtime(void);
 /* reference min_rmse value */
 
-/*---< cluster() >-----------------------------------------------------------*/
-int cluster(int      npoints,         /* number of data points */
-            int      nfeatures,       /* number of attributes for each point */
-            float  **features,        /* array: [npoints][nfeatures] */                  
-            int      min_nclusters,   /* range of min to max number of clusters */
-            int		 max_nclusters,
-            float    threshold,       /* loop terminating factor */
-            int     *best_nclusters,  /* out: number between min and max with lowest RMSE */
+int cluster(int npoints,         /* number of data points */
+            int nfeatures,       /* number of attributes for each point */
+            float **features,    /* array: [npoints][nfeatures] */                  
+            int min_nclusters,   /* range of min to max number of clusters */
+            int max_nclusters,
+            float threshold,     /* loop terminating factor */
+            int *best_nclusters, /* out: number between min and max with lowest RMSE */
             float ***cluster_centres, /* out: [best_nclusters][nfeatures] */
-            float	*min_rmse,          /* out: minimum RMSE */
-            int		 isRMSE,            /* calculate RMSE */
-            int		 nloops             /* number of iteration for each number of clusters */
-    )
+            float *min_rmse,     /* out: minimum RMSE */
+            int	isRMSE,          /* calculate RMSE */
+            int	nloops           /* number of iteration for each number of clusters */
+           )
 {    
-  int		index =0;	/* number of iteration to reach the best RMSE */
-  int		rmse;     /* RMSE for each clustering */
+  int index = 0; /* number of iteration to reach the best RMSE */
+  int rmse;     /* RMSE for each clustering */
   float delta;
 
 #ifdef USE_GPU
@@ -46,7 +36,6 @@ int cluster(int      npoints,         /* number of data points */
 #endif
 
   queue q(dev_sel);
-
 
   /* current memberships of points  */
   int *membership = (int*) malloc(npoints * sizeof(int));
@@ -62,13 +51,14 @@ int cluster(int      npoints,         /* number of data points */
   
   buffer<int, 1>d_membership((range<1>(npoints)));
 
-
   // set the global work size based on local work size
   size_t global_work_size = npoints;
   size_t local_work_size= BLOCK_SIZE; // work group size is defined by RD_WG_SIZE_0 or RD_WG_SIZE_0_0 2014/06/10 17:00:51
   if(global_work_size%local_work_size !=0)
     global_work_size=(global_work_size/local_work_size+1)*local_work_size;
 
+  range<1> gws (global_work_size);
+  range<1> lws (local_work_size);
 
   /* sweep k from min to max_nclusters to find the best number of clusters */
   for(int nclusters = min_nclusters; nclusters <= max_nclusters; nclusters++)
@@ -79,18 +69,16 @@ int cluster(int      npoints,         /* number of data points */
 
     // copy the feature to a feature swap region
     q.submit([&](handler& cgh) {
-        auto acc_feature = d_feature.get_access<sycl_read>(cgh);
-        auto acc_feature_swap = d_feature_swap.get_access<sycl_write>(cgh);
-
-        cgh.parallel_for<class kernel2>(
-            nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
-              unsigned int tid = item.get_global_id(0);
-              if (tid < npoints) {
-                for(int i = 0; i <  nfeatures; i++)
-                  acc_feature_swap[i * npoints + tid] = acc_feature[tid * nfeatures + i];
-                }
-            });
-        });
+      auto acc_feature = d_feature.get_access<sycl_read>(cgh);
+      auto acc_feature_swap = d_feature_swap.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class kernel2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        unsigned int tid = item.get_global_id(0);
+        if (tid < npoints) {
+          for(int i = 0; i <  nfeatures; i++)
+            acc_feature_swap[i * npoints + tid] = acc_feature[tid * nfeatures + i];
+        }
+      });
+    });
 
     // create clusters of size 'nclusters'
     float** clusters;
@@ -139,7 +127,6 @@ int cluster(int      npoints,         /* number of data points */
       new_centers[0] = (float*)  calloc(nclusters * nfeatures, sizeof(float));
       for (int i=1; i<nclusters; i++) new_centers[i] = new_centers[i-1] + nfeatures;
 
-
       /* iterate until convergence */
 
       int loop = 0;
@@ -152,35 +139,30 @@ int cluster(int      npoints,         /* number of data points */
         });
 
         q.submit([&](handler& cgh) {
-            auto acc_feature    = d_feature_swap.get_access<sycl_read>(cgh);
-            auto acc_clusters   = d_clusters.get_access<sycl_read>(cgh);
-            auto acc_membership = d_membership.get_access<sycl_write>(cgh);
-
-            cgh.parallel_for<class kernel_s>(
-                nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), 
-                [=] (nd_item<1> item) 
-            {
-                unsigned int point_id = item.get_global_id(0);
-                int index = 0;
-                if (point_id < npoints) {
-                  float min_dist=FLT_MAX;
-                  for (int i=0; i < nclusters; i++) {
-                    float dist = 0;
-                    float ans  = 0;
-                    for (int l=0; l< nfeatures; l++) {
-                      ans += (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l])* 
-                             (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l]);
-                    }
-                    dist = ans;
-                    if (dist < min_dist) {
-                      min_dist = dist;
-                      index    = i;
-                    }
-                  }
-                  acc_membership[point_id] = index;
+          auto acc_feature    = d_feature_swap.get_access<sycl_read>(cgh);
+          auto acc_clusters   = d_clusters.get_access<sycl_read>(cgh);
+          auto acc_membership = d_membership.get_access<sycl_write>(cgh);
+          cgh.parallel_for<class kernel_s>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+            unsigned int point_id = item.get_global_id(0);
+            int index = 0;
+            if (point_id < npoints) {
+              float min_dist=FLT_MAX;
+              for (int i=0; i < nclusters; i++) {
+                float dist = 0;
+                float ans  = 0;
+                for (int l=0; l< nfeatures; l++) {
+                  ans += (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l])* 
+                         (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l]);
                 }
-
-            });
+                dist = ans;
+                if (dist < min_dist) {
+                  min_dist = dist;
+                  index    = i;
+                }
+              }
+              acc_membership[point_id] = index;
+            }
+          });
         });
 
         q.submit([&](handler& cgh) {
@@ -259,4 +241,3 @@ int cluster(int      npoints,         /* number of data points */
 
   return index;
 }
-
