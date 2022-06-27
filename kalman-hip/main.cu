@@ -16,6 +16,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define DI __device__
@@ -265,14 +267,15 @@ __global__ void kalman(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <#series> <#observations> <forcast steps>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <#series> <#observations> <forcast steps> <repeat>\n", argv[0]);
     return 1;
   }
   
   const int nseries = atoi(argv[1]); 
   const int nobs = atoi(argv[2]);
   const int fc_steps = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
   const int rd = 8;
   const int rd2 = rd * rd;
@@ -363,10 +366,14 @@ int main(int argc, char* argv[]) {
 
   dim3 grids ((nseries + 255)/256);
   dim3 blocks (256);
+
+  for (int n_diff = 0; n_diff < rd; n_diff++) {
+
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
   
-  for (int n_diff = 0; n_diff < rd; n_diff++)
-    for (i = 0; i < 100; i++)
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(kalman<rd>), grids, blocks, 0, 0, 
+    for (i = 0; i < repeat; i++)
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(kalman<rd>), grids, blocks , 0, 0, 
         d_ys,
         nobs,
         d_T,
@@ -386,10 +393,17 @@ int main(int argc, char* argv[]) {
         true, // forcast
         d_F_fc );
 
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (n_diff = %d): %f (s)\n", n_diff, (time * 1e-9f) / repeat);
+  }
+
   hipMemcpy(F_fc, d_F_fc, fc_size, hipMemcpyDeviceToHost);
 
   double sum = 0.0;
-  for (i = 0; i < fc_steps * nseries; i++) sum += F_fc[i];
+  for (i = 0; i < fc_steps * nseries - 1; i++)
+    sum += (fabs(F_fc[i+1]) - fabs(F_fc[i])) / (fabs(F_fc[i+1]) + fabs(F_fc[i]));
   printf("Checksum: %lf\n", sum);
 
   free(fc);
@@ -418,4 +432,3 @@ int main(int argc, char* argv[]) {
   hipFree(d_fc);
   return 0;
 }
-

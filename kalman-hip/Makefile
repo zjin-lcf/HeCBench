@@ -51,4 +51,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1000 100 3
+	./$(program) 1000 100 3 100

@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #pragma omp declare target
@@ -48,7 +49,7 @@ void Mv_l(double alpha, const double* A, const double* v, double* out)
 
 //! Thread-local Matrix-Matrix multiplication.
 template <int n, bool aT = false, bool bT = false>
-DI void MM_l(const double* A, const double* B, double* out)
+void MM_l(const double* A, const double* B, double* out)
 {
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
@@ -267,14 +268,15 @@ void kalman(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <#series> <#observations> <forcast steps>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <#series> <#observations> <forcast steps> <repeat>\n", argv[0]);
     return 1;
   }
   
   const int nseries = atoi(argv[1]); 
   const int nobs = atoi(argv[2]);
   const int fc_steps = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
   const int rd = 8;
   const int rd2 = rd * rd;
@@ -345,32 +347,40 @@ int main(int argc, char* argv[]) {
                                     fc[0:fc_word]) \
                           map(from: F_fc[0:fc_word])
   {
-  
-  for (int n_diff = 0; n_diff < rd; n_diff++)
-    for (i = 0; i < 100; i++)
-      kalman<rd> (
-        ys,
-        nobs,
-        T,
-        Z,
-        RQR,
-        P,
-        alpha,
-        true, // intercept,
-        mu,
-        batch_size,
-        vs,
-        Fs,
-        sum_logFs,
-        n_diff,
-        fc_steps,
-        fc,
-        true, // forcast
-        F_fc );
+    for (int n_diff = 0; n_diff < rd; n_diff++) {
+
+      auto start = std::chrono::steady_clock::now();
+
+      for (i = 0; i < repeat; i++)
+        kalman<rd> (
+          ys,
+          nobs,
+          T,
+          Z,
+          RQR,
+          P,
+          alpha,
+          true, // intercept,
+          mu,
+          batch_size,
+          vs,
+          Fs,
+          sum_logFs,
+          n_diff,
+          fc_steps,
+          fc,
+          true, // forcast
+          F_fc );
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time (n_diff = %d): %f (s)\n", n_diff, (time * 1e-9f) / repeat);
+    }
   }
 
   double sum = 0.0;
-  for (i = 0; i < fc_steps * nseries; i++) sum += F_fc[i];
+  for (i = 0; i < fc_steps * nseries - 1; i++)
+    sum += (fabs(F_fc[i+1]) - fabs(F_fc[i])) / (fabs(F_fc[i+1]) + fabs(F_fc[i]));
   printf("Checksum: %lf\n", sum);
 
   free(fc);
@@ -387,4 +397,3 @@ int main(int argc, char* argv[]) {
   free(RQR);
   return 0;
 }
-
