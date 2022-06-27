@@ -6,8 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <omp.h>
 #include <algorithm>
+#include <chrono>
+#include <omp.h>
 #include "kernel.h"
 #include "reference.h"
 
@@ -69,13 +70,22 @@ int main(int argc, char **argv){
   #pragma omp target data map (tofrom: h_u1[0:grid3D_size]) \
                           map (alloc: h_u2[0:grid3D_size])
   {
+    // Warmup
+    laplace3d(NX, NY, NZ, pitch, h_u1, h_u2);
+
     // Execute GPU kernel
+    auto start = std::chrono::steady_clock::now();
+
     for (i = 1; i <= REPEAT; ++i) {
       laplace3d(NX, NY, NZ, pitch, h_u1, h_u2);
       std::swap(h_u1, h_u2);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / REPEAT);
   }
-  // overwrite the h1_u array on the host after the omp target data region
+  // overwrite the h1_u array on the host after exiting the omp target data region
 
   if (verify) {
     // Reference
