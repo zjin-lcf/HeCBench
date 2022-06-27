@@ -333,7 +333,13 @@ bool knn_serial(const float *ref, int ref_nb, const float *query, int query_nb,
   return true;
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int iterations = atoi(argv[1]);
+
   float *ref;          // Pointer to reference point array
   float *query;        // Pointer to query point array
   float *dist;         // Pointer to distance array
@@ -342,7 +348,6 @@ int main(void) {
   int query_nb = 4096; // Query point number,     max=65535
   int dim = 68;        // Dimension of points
   int k = 20;          // Nearest neighbors to consider
-  int iterations = 100;
   int c_iterations = 1;
   int i;
   const float precision = 0.001f; // distance error max
@@ -360,7 +365,6 @@ int main(void) {
     ref[i] = (float)rand() / (float)RAND_MAX;
   for (i = 0; i < query_nb * dim; i++)
     query[i] = (float)rand() / (float)RAND_MAX;
-
 
   // Display informations
   printf("Number of reference points      : %6d\n", ref_nb);
@@ -394,7 +398,6 @@ int main(void) {
   elapsed_time += (toc.tv_usec - tic.tv_usec) / 1000000.;
   printf(" done in %f s for %d iterations (%f s by iteration)\n", elapsed_time,
          c_iterations, elapsed_time / (c_iterations));
-
 
 #ifdef USE_GPU 
   gpu_selector dev_sel;

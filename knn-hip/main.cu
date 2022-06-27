@@ -9,14 +9,13 @@
 
 // Includes
 #include <cstdio>
+#include <algorithm>
 #include <sys/time.h>
 #include <time.h>
-#include <algorithm>
 #include <hip/hip_runtime.h>
 
 // Constants used by the program
 #define BLOCK_DIM 16
-
 
 /**
   * Computes the distance between two matrix A (reference points) and
@@ -29,9 +28,14 @@
   * @param dim   dimension of points = height of matrices A and B
   * @param AB    pointer on the matrix containing the wA*wB distances computed
   */
-__global__ void cuComputeDistanceGlobal(float *A, int wA, float *B, int wB,
-                                        int dim, float *AB) {
-
+__global__
+void cuComputeDistanceGlobal(const float *__restrict__ A,
+                             int wA,
+                             const float *__restrict__ B,
+                             int wB,
+                             int dim,
+                             float *__restrict__ AB)
+{
   // Declaration of the shared memory arrays As and Bs used to store the
   // sub-matrix of A and B
   __shared__ float shared_A[BLOCK_DIM][BLOCK_DIM];
@@ -111,9 +115,11 @@ __global__ void cuComputeDistanceGlobal(float *A, int wA, float *B, int wB,
   * @param height      height of the distance matrix and of the index matrix
   * @param k           number of neighbors to consider
   */
-__global__ void cuInsertionSort(float *dist, int *ind, int width, int height,
-                                int k) {
-
+__global__
+void cuInsertionSort(float *__restrict__ dist,
+                       int *__restrict__ ind,
+                       int width, int height, int k)
+{
   // Variables
   int l, i, j;
   float *p_dist;
@@ -228,7 +234,6 @@ void knn_parallel(float *ref_host, int ref_width, float *query_host,
   float *ref_dev;
   float *dist_dev;
   int *ind_dev;
-
 
   // Allocation of global memory for query points and for distances, CUDA_CHECK
   hipMalloc((void **)&query_dev, query_width * height * size_of_float);
@@ -389,7 +394,13 @@ bool knn_c(const float *ref, int ref_nb, const float *query, int query_nb,
 /**
   * Example of use of kNN search CUDA.
   */
-int main(void) {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int iterations = atoi(argv[1]);
+  
   // Variables and parameters
   float *ref;          // Pointer to reference point array
   float *query;        // Pointer to query point array
@@ -399,7 +410,6 @@ int main(void) {
   int query_nb = 4096; // Query point number,     max=65535
   int dim = 68;        // Dimension of points
   int k = 20;          // Nearest neighbors to consider
-  int iterations = 100;
   int c_iterations = 1;
   int i;
   const float precision = 0.001f; // distance error max
