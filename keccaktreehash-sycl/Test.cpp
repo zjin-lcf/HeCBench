@@ -28,8 +28,6 @@ void print_out(tKeccakLane * h_outBuffer,int nb_threads)
    printf("\n\n");
 }
 
-
-
 void TestCPU(int reduc)
 {
    time_t t1,t2;
@@ -42,7 +40,6 @@ void TestCPU(int reduc)
    tKeccakLane Kstate[25]; //Keccak State for top node
    memset(Kstate, 0, 25 * sizeof(tKeccakLane));
 
-
    //init host inBuffer 
    h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
    memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
@@ -53,14 +50,13 @@ void TestCPU(int reduc)
 
    //***************************
    //init h_inBuffer with values
-   for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++ )
-   {h_inBuffer[i]=i;}
-
+   for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++) h_inBuffer[i]=i;
 
    //CPU computation *******************************
    printf("CPU speed test started \n");   
 
    t1=time(NULL);
+
    for(i=0;i<(IMAX/reduc);i++)
    {
       KeccakTreeCPU(h_inBuffer,h_outBuffer);
@@ -68,13 +64,13 @@ void TestCPU(int reduc)
       //print_out(h_outBuffer,NB_THREADS);
       Keccak_top(Kstate,h_outBuffer,NB_THREADS*NB_THREADS_BLOCKS);
    }
+
    t2=time(NULL);
 
    print_KS_256(Kstate);
 
    speed1= (INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK *(IMAX/(reduc*1000.)))  / ((t2-t1) + 0.01);
    printf("CPU speed : %.2f kB/s \n\n",speed1);
-
 
    //free all buffer host and device
    free(h_inBuffer);
@@ -83,7 +79,6 @@ void TestCPU(int reduc)
 
 void TestGPU()
 {
-
    time_t t1,t2;
    double speed1;
    unsigned int i;
@@ -120,7 +115,6 @@ void TestGPU()
    tKeccakLane Kstate[25]; //Keccak State for top node
    memset(Kstate, 0, 25 * sizeof(tKeccakLane));
 
-
    //init host inBuffer 
    h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
    memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
@@ -149,6 +143,7 @@ void TestGPU()
    printf("GPU speed test started\n");
 
    t1=time(NULL);
+
    for(i=0;i<IMAX;i++)
    {
       KeccakTreeGPU(q, h_inBuffer, d_inBuffer, h_outBuffer, d_outBuffer, d_KeccakF_RoundConstants);
@@ -157,13 +152,13 @@ void TestGPU()
       Keccak_top(Kstate,h_outBuffer,NB_THREADS*NB_THREADS_BLOCKS);
       //print_KS_256(Kstate);
    }
+
    t2=time(NULL);
 
    print_KS_256(Kstate);
 
    speed1= (INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK *(IMAX/1000.))  / ((t2-t1) + 0.01);
    printf("GPU speed : %.2f kB/s \n\n",speed1);
-
 
    //free all buffer host and device
    free(h_inBuffer);
@@ -180,11 +175,5 @@ void Print_Param(void)
    printf("Output block size of Keccak (in Byte)   OUTPUT_BLOCK_SIZE_B  %u \n", OUTPUT_BLOCK_SIZE_B);
    printf("\n");
    printf("NB of input blocks in by Threads        NB_INPUT_BLOCK       %u \n", NB_INPUT_BLOCK );
-   //printf("Numbers of Streams                      NB_STREAMS           %u \n", NB_STREAMS );
-   //printf("\n");
-   //printf("NB of 2 stage Threads                   NB_SCND_STAGE_THREADS        %u \n", NB_SCND_STAGE_THREADS );
-   //printf("NB of in blocks 2 stage                 NB_INPUT_BLOCK_SNCD_STAGE    %u \n", NB_INPUT_BLOCK_SNCD_STAGE );
    printf("\n");
-
 }
-

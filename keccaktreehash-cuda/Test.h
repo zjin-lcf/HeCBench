@@ -22,7 +22,6 @@ void TestGPU(void);
 //Test Tree hash mode 1 , GPU and CPU, CPU computation overlapped with GPU computation
 void TestGPU_OverlapCPU(void);
 
-
 void TestGPU_Split(void);
 
 //Test Tree hash mode 1 , GPU and CPU, GPU computation is overlapped with memory transfers (Host to device) 
@@ -43,18 +42,15 @@ void TestGPU_2stg(void);
 
 void TestGPU_2stg_Stream_OverlapCPU(void);
 
-
 //***************************
 //Keccak in StreamCipher mode
 //***************************
 void TestGPU_SCipher(void);
 
-
 // Other function
 
 //Empirically Test if all words in input data are taken into the hash function
 void Test_Completness(void);
-
 
 //print GPU device info
 void Device_Info(void);

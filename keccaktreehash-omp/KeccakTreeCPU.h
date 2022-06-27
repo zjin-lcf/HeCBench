@@ -11,11 +11,9 @@ It is given as is, without any guarantee.
 #include "KeccakTree.h"
 #include "KeccakTypes.h"
 
-
 //Implement Tree hash mode 1 on CPU
 //data to be hashed is present in inBuffer
 //output result is in outBuffer
 void KeccakTreeCPU(tKeccakLane * inBuffer, tKeccakLane * outBuffer);
-
 
 #endif // KECCAKTREECPU_H_INCLUDED

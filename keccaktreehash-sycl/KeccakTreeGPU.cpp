@@ -11,7 +11,6 @@
 #include "KeccakTreeGPU.h"
 #include "common.h"
 
-
 //host constants
 tKeccakLane KeccakF_RoundConstants_h[22] =
 {
@@ -49,7 +48,6 @@ void KeccakFunr( tKeccakLane * state, const tKeccakLane *KeccakF_RoundConstants 
 
    for ( round = 0; round < cKeccakNumberOfRounds; ++round )
    {
-
       {
          // Theta
          BC[0] = state[0] ^ state[5] ^ state[10] ^ state[15] ^ state[20];
@@ -237,7 +235,6 @@ void KeccakFunr_h( tKeccakLane * state )
 
    for ( round = 0; round < cKeccakNumberOfRounds; ++round )
    {
-
       {
          // Theta
          BC[0] = state[0] ^ state[5] ^ state[10] ^ state[15] ^ state[20];
@@ -412,7 +409,6 @@ void KeccakFunr_h( tKeccakLane * state )
       //   Iota
       state[0] ^= KeccakF_RoundConstants_h[round];
    }
-
 }
 //end unrolled
 
@@ -423,19 +419,13 @@ void Keccak_top_GPU(tKeccakLane * Kstate, tKeccakLane *inBuffer , int block_numb
 
    for (k=0;k<block_number;k++)
    {
-
       for (ind_word=0; ind_word<OUTPUT_BLOCK_SIZE_B/4; ind_word++)
       {
          Kstate[ind_word] ^= inBuffer[ind_word + k * OUTPUT_BLOCK_SIZE_B/4];
       }
       KeccakFunr_h(Kstate);
-
    }
-
 }
-
-
-//********************************************************************************
 
 //************************
 //First Tree mode
@@ -444,10 +434,8 @@ void Keccak_top_GPU(tKeccakLane * Kstate, tKeccakLane *inBuffer , int block_numb
 //************************
 void KeccakTreeGPU(queue &q, tKeccakLane * h_inBuffer, buffer<tKeccakLane,1> &d_inBuffer,
                    tKeccakLane * h_outBuffer, buffer<tKeccakLane,1> &d_outBuffer,
-		   buffer<tKeccakLane,1> &d_KeccakF_RoundConstants)
+                   buffer<tKeccakLane,1> &d_KeccakF_RoundConstants)
 {
-
-
    range<1> global_work_size(NB_THREADS_BLOCKS*NB_THREADS);
    range<1> local_work_size(NB_THREADS);
 
@@ -486,17 +474,16 @@ void KeccakTreeGPU(queue &q, tKeccakLane * h_inBuffer, buffer<tKeccakLane,1> &d_
        //output hash in buffer
        for (ind_word=0; ind_word<OUTPUT_BLOCK_SIZE_B/4; ind_word++)
        {
-
           outBuffer[item.get_local_id(0)
              + ind_word * NB_THREADS
              + item.get_group(0) * NB_THREADS * OUTPUT_BLOCK_SIZE_B/4 ]= Kstate[ind_word];
        }
-    });
-    });
-    q.submit([&](handler &h) {
-      auto outBuffer = d_outBuffer.get_access<sycl_read>(h);
-      h.copy(outBuffer, h_outBuffer);
-    });
-    q.wait();
+     });
+   });
+
+   q.submit([&](handler &h) {
+     auto outBuffer = d_outBuffer.get_access<sycl_read>(h);
+     h.copy(outBuffer, h_outBuffer);
+   }).wait();
 }
 

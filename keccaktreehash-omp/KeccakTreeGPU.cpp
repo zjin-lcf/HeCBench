@@ -10,7 +10,6 @@
 #include <string.h>
 #include "KeccakTreeGPU.h"
 
-
 //host constants
 tKeccakLane KeccakF_RoundConstants_h[22] =
 {
@@ -49,7 +48,6 @@ void KeccakFunr( tKeccakLane * state, const tKeccakLane *KeccakF_RoundConstants 
 
    for ( round = 0; round < cKeccakNumberOfRounds; ++round )
    {
-
       {
          // Theta
          BC[0] = state[0] ^ state[5] ^ state[10] ^ state[15] ^ state[20];
@@ -224,7 +222,6 @@ void KeccakFunr( tKeccakLane * state, const tKeccakLane *KeccakF_RoundConstants 
       //   Iota
       state[0] ^= KeccakF_RoundConstants[round];
    }
-
 }
 #pragma omp end declare target 
 
@@ -238,7 +235,6 @@ void KeccakFunr_h( tKeccakLane * state )
 
    for ( round = 0; round < cKeccakNumberOfRounds; ++round )
    {
-
       {
          // Theta
          BC[0] = state[0] ^ state[5] ^ state[10] ^ state[15] ^ state[20];
@@ -413,7 +409,6 @@ void KeccakFunr_h( tKeccakLane * state )
       //   Iota
       state[0] ^= KeccakF_RoundConstants_h[round];
    }
-
 }
 //end unrolled
 
@@ -424,22 +419,13 @@ void Keccak_top_GPU(tKeccakLane * Kstate, tKeccakLane *inBuffer , int block_numb
 
    for (k=0;k<block_number;k++)
    {
-
       for (ind_word=0; ind_word<OUTPUT_BLOCK_SIZE_B/4; ind_word++)
       {
          Kstate[ind_word] ^= inBuffer[ind_word + k * OUTPUT_BLOCK_SIZE_B/4];
       }
       KeccakFunr_h(Kstate);
-
    }
-
 }
-
-
-
-
-
-//********************************************************************************
 
 //************************
 //First Tree mode

@@ -8,7 +8,6 @@ It is given as is, without any guarantee.
 #ifndef KECCAKF_H_INCLUDED
 #define KECCAKF_H_INCLUDED
 
-
 #include "KeccakTypes.h"
 
 #define cKeccakNumberOfRounds   22 //22
