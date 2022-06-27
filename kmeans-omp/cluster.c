@@ -1,13 +1,4 @@
-/**   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee					**/
-/**				 University of Virginia									**/
-/**																		**/
-/**   Description:	No longer supports fuzzy c-means clustering;	 	**/
-/**					only regular k-means clustering.					**/
-/**					No longer performs "validity" function to analyze	**/
-/**					compactness and separation crietria; instead		**/
-/**					calculate root mean squared error.					**/
-/**                                                                     **/
-/*************************************************************************/
+//   Edited by: Shuai Che, David Tarjan, Sang-Ha Lee, University of Virginia
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,22 +12,21 @@ float	min_rmse_ref = FLT_MAX;
 extern double wtime(void);
 /* reference min_rmse value */
 
-/*---< cluster() >-----------------------------------------------------------*/
-int cluster(int      npoints,         /* number of data points */
-            int      nfeatures,       /* number of attributes for each point */
-            float  **features,        /* array: [npoints][nfeatures] */                  
-            int      min_nclusters,   /* range of min to max number of clusters */
-            int		 max_nclusters,
-            float    threshold,       /* loop terminating factor */
-            int     *best_nclusters,  /* out: number between min and max with lowest RMSE */
+int cluster(int npoints,         /* number of data points */
+            int nfeatures,       /* number of attributes for each point */
+            float **features,    /* array: [npoints][nfeatures] */                  
+            int min_nclusters,   /* range of min to max number of clusters */
+            int max_nclusters,
+            float threshold,     /* loop terminating factor */
+            int *best_nclusters, /* out: number between min and max with lowest RMSE */
             float ***cluster_centres, /* out: [best_nclusters][nfeatures] */
-            float	*min_rmse,          /* out: minimum RMSE */
-            int		 isRMSE,            /* calculate RMSE */
-            int		 nloops             /* number of iteration for each number of clusters */
-    )
+            float *min_rmse,     /* out: minimum RMSE */
+            int	isRMSE,          /* calculate RMSE */
+            int	nloops           /* number of iteration for each number of clusters */
+           )
 {    
-  int		index =0;	/* number of iteration to reach the best RMSE */
-  int		rmse;     /* RMSE for each clustering */
+  int index = 0; /* number of iteration to reach the best RMSE */
+  int rmse;     /* RMSE for each clustering */
   float delta;
 
   /* current memberships of points  */
@@ -53,7 +43,6 @@ int cluster(int      npoints,         /* number of data points */
                         map(alloc: feature_swap[0:npoints * nfeatures], \
                                    membership_OCL[0:npoints])
 {
-
   /* sweep k from min to max_nclusters to find the best number of clusters */
   for(int nclusters = min_nclusters; nclusters <= max_nclusters; nclusters++)
   {
@@ -214,4 +203,3 @@ int cluster(int      npoints,         /* number of data points */
 
   return index;
 }
-
