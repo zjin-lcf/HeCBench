@@ -6,8 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include "common.h"
 #include <algorithm>
+#include <chrono>
+#include "common.h"
 #include "kernel.h"
 #include "reference.h"
 
@@ -22,7 +23,6 @@ void printHelp(void);
 int main(int argc, char **argv){
 
   // check command line inputs
-
   if(argc != 6) {
     printHelp();
     return 1;
@@ -85,10 +85,23 @@ int main(int argc, char **argv){
   range<2> lws (BLOCK_Y, BLOCK_X);
   range<2> gws (by * BLOCK_Y, bx * BLOCK_X);
 
-  printf("\n globalSize  = %d %d %d \n", bx * BLOCK_X, by * BLOCK_Y, 1);
-  printf(" localSize = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
+  printf("\nglobal work size  = %d %d %d \n", bx * BLOCK_X, by * BLOCK_Y, 1);
+  printf("local work size = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
+
+  // Warmup
+  q.submit([&] (handler &cgh) {
+    auto u1 = d_u1.get_access<sycl_read>(cgh);
+    auto u2 = d_u2.get_access<sycl_discard_write>(cgh);
+    accessor<float, 1, sycl_read_write, access::target::local> sm (3*KOFF, cgh);
+    cgh.parallel_for<class warmup>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      laplace3d(item, NX, NY, NZ, pitch,
+                u1.get_pointer(), u2.get_pointer(), sm.get_pointer());
+    });
+  }).wait();
 
   // Execute GPU kernel
+  auto start = std::chrono::steady_clock::now();
+
   for (i = 1; i <= REPEAT; ++i) {
     q.submit([&] (handler &cgh) {
       auto u1 = d_u1.get_access<sycl_read>(cgh);
@@ -101,6 +114,11 @@ int main(int argc, char **argv){
     });
     std::swap(d_u1, d_u2);
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / REPEAT);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_u1.get_access<sycl_read>(cgh);

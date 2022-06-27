@@ -6,8 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <hip/hip_runtime.h>
 #include <algorithm>
+#include <chrono>
+#include <hip/hip_runtime.h>
 #include "kernel.h"
 #include "reference.h"
 
@@ -22,7 +23,6 @@ void printHelp(void);
 int main(int argc, char **argv){
 
   // check command line inputs
-
   if(argc != 6) {
     printHelp();
     return 1;
@@ -80,17 +80,28 @@ int main(int argc, char **argv){
   dim3 dimGrid(bx,by);
   dim3 dimBlock(BLOCK_X,BLOCK_Y);
 
-  printf("\n dimGrid  = %d %d %d \n", bx, by, 1);
-  printf(" dimBlock = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
+  printf("\ndimGrid  = %d %d %d \n", bx, by, 1);
+  printf("dimBlock = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
+
+  // Warmup
+  hipLaunchKernelGGL(laplace3d, dimGrid, dimBlock, 0, 0, NX, NY, NZ, pitch, d_u1, d_u2);
+  hipDeviceSynchronize();
 
   // Execute GPU kernel
+  auto start = std::chrono::steady_clock::now();
+
   for (i = 1; i <= REPEAT; ++i) {
     hipLaunchKernelGGL(laplace3d, dimGrid, dimBlock, 0, 0, NX, NY, NZ, pitch, d_u1, d_u2);
     std::swap(d_u1, d_u2);
   }
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / REPEAT);
+
   // Read back GPU results
-  hipMemcpy(h_u2,  d_u1, grid3D_bytes, hipMemcpyDeviceToHost);
+  hipMemcpy(h_u2, d_u1, grid3D_bytes, hipMemcpyDeviceToHost);
 
   if (verify) {
     // Reference
@@ -109,7 +120,7 @@ int main(int argc, char **argv){
         }
       }
     }
-    printf("\n rms error = %f \n",sqrtf(err/ NX*NY*NZ));
+    printf("\n rms error = %f \n", sqrtf(err/ NX*NY*NZ));
   }
 
  // Release GPU and CPU memory
@@ -121,7 +132,6 @@ int main(int argc, char **argv){
 
   return 0;
 }
-
 
 //Print help screen
 void printHelp(void)

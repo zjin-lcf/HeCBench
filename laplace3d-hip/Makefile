@@ -52,5 +52,4 @@ clean:
 
 run: $(program)
 	./$(program) 128 128 128 100 1
-	./$(program) 1024 1024 1024 100 0
-
+	./$(program) 512 512 512 100 0
