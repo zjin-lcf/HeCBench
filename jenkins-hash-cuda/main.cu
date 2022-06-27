@@ -1,10 +1,10 @@
 #include <stdio.h>      /* defines printf for tests */
 #include <stdlib.h>     /* defines atol and posix_memalign */
 #include <string.h>     /* defines memcpy */
+#include <chrono>
 #include <cuda.h>
 
 #define rot(x,k) (((x)<<(k)) | ((x)>>(32-(k))))
-
 
 /*
    -------------------------------------------------------------------------------
@@ -97,7 +97,7 @@
 }
 
 
-  __device__ __host__
+__device__ __host__
 unsigned int mixRemainder(unsigned int a, 
     unsigned int b, 
     unsigned int c, 
@@ -180,10 +180,10 @@ unsigned int hashlittle( const void *key, size_t length, unsigned int initval)
 }
 
 __global__ void kernel (
-    const unsigned int *lengths,
-    const unsigned int *initvals,
-    const unsigned int *keys,
-    unsigned int *out,
+    const unsigned int *__restrict__ lengths,
+    const unsigned int *__restrict__ initvals,
+    const unsigned int *__restrict__ keys,
+    unsigned int *__restrict__ out,
     const int N ) 
 {
   int id = blockDim.x*blockIdx.x+threadIdx.x;
@@ -224,16 +224,21 @@ __global__ void kernel (
   out[id] = mixRemainder(a, b, c, r0, r1, r2, length);
 }
 
-
 int main(int argc, char** argv) {
+
+  if (argc != 4) {
+    printf("Usage: %s <block size> <number of strings> <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  int block_size = atoi(argv[1]);  // work group size
+  unsigned long N = atol(argv[2]); // total number of strings
+  int repeat = atoi(argv[3]);
 
   // sample gold result
   const char* str = "Four score and seven years ago";
   unsigned int c = hashlittle(str, 30, 1);
   printf("input string: %s hash is %.8x\n", str, c);   /* cd628161 */
-
-  int block_size = atoi(argv[1]);  // work group size
-  unsigned long N = atol(argv[2]); // total number of strings
 
   unsigned int *keys = NULL;
   unsigned int *lens = NULL;
@@ -271,20 +276,26 @@ int main(int argc, char** argv) {
   unsigned int* d_out;
   cudaMalloc((void**)&d_out, sizeof(unsigned int)*N);
 
-
   dim3 grids ((N+block_size-1)/block_size);
   dim3 threads (block_size);
 
-  for (int n = 0; n < 100; n++) {
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     kernel<<<grids,threads>>>(d_lens, d_initvals, d_keys, d_out, N);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(out, d_out, sizeof(unsigned int)*N, cudaMemcpyDeviceToHost);
   cudaFree(d_keys);
   cudaFree(d_lens);
   cudaFree(d_initvals);
   cudaFree(d_out);
-
 
   printf("Verify the results computed on the device..\n");
   bool error = false;
@@ -297,10 +308,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (error)
-    printf("FAILED\n");
-  else
-    printf("PASS\n");
+  printf("%s\n", error ? "FAIL" : "PASS");
 
   free(keys);
   free(lens);
