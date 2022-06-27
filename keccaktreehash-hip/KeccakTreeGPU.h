@@ -23,6 +23,6 @@ void KeccakTreeGPU(tKeccakLane * h_inBuffer, tKeccakLane * d_inBuffer,
 
 
 //error function
-void  checkCUDAError(const char *msg);
+void  checkHIPError(const char *msg);
 
 #endif // KECCAKTREEGPU_H_INCLUDED

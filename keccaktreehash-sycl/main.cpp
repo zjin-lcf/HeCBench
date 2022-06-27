@@ -15,8 +15,8 @@
 
 int main()
 {
-	Print_Param();
-	TestCPU(1);
-	TestGPU();
-	return 0;
+  Print_Param();
+  TestCPU(1);
+  TestGPU();
+  return 0;
 }
