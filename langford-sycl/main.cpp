@@ -321,8 +321,6 @@ int64_t unique_count(Results<n> &results) {
   return unique;
 }
 
-
-
 // Return number of milliseconds elapsed since Jan 1, 1970 00:00 GMT.
 long unixtime() {
   using namespace chrono;
@@ -348,6 +346,9 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
   int blocks_x = div_up(kNumLogicalThreads, kThreadsPerBlock);
   range<1> gws (blocks_x*kThreadsPerBlock);
   range<1> lws (kThreadsPerBlock);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   q.submit([&] (handler &cgh) {
     auto p_result = results_device.template get_access<sycl_discard_write>(cgh);
@@ -375,6 +376,11 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
       result_index);
       });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
 
   q.submit([&] (handler &cgh) {
     auto acc = count_device.template get_access<sycl_read>(cgh, range<1>(1));
