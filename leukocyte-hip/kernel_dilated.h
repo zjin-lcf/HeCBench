@@ -1,7 +1,8 @@
-__global__ void 
-kernel_dilated (const float* c_strel,
-    const float* img,
-    float* dilated,
+__global__ 
+void kernel_dilated (
+    const float*__restrict__ c_strel,
+    const float*__restrict__ img,
+    float*__restrict__ dilated,
     const int strel_m,
     const int strel_n,
     const int max_gicov_m,

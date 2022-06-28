@@ -1,6 +1,5 @@
 #include "track_ellipse.h"
 
-
 // Host and device arrays to hold matrices for all cells
 // (so we can copy to and from the device in a single transfer)
 
@@ -23,7 +22,7 @@ FP_TYPE heaviside(FP_TYPE x) {
 
 // Host function that launches an OpenCL kernel to compute the MGVF matrices for the specified cells
 void IMGVF_GPU(MAT **IE, MAT **IMGVF, 
-		double vx, double vy, double e, int max_iterations, double cutoff, int num_cells) {
+    double vx, double vy, double e, int max_iterations, double cutoff, int num_cells) {
 
   // Initialize the data on the GPU
   // Allocate array of offsets to each cell's image
@@ -68,28 +67,32 @@ void IMGVF_GPU(MAT **IE, MAT **IMGVF,
     for (i = 0; i < m; i++)
       for (j = 0; j < n; j++)
         host_I_all[offset + (i * n) + j] = host_IMGVF_all[offset + (i * n) + j] = 
-		(float) m_get_val(I, i, j);
+          (float) m_get_val(I, i, j);
 
     offset += size;
   }
 
 
 
-    // Convert double-precision parameters to single-precision
-    float vx_float = (float) vx;
-    float vy_float = (float) vy;
-    float e_float = (float) e;
-    float cutoff_float = (float) cutoff;
+  // Convert double-precision parameters to single-precision
+  float vx_float = (float) vx;
+  float vy_float = (float) vy;
+  float e_float = (float) e;
+  float cutoff_float = (float) cutoff;
 
-#pragma omp target data map(to: host_I_offsets[0:num_cells],\
-		host_m_array[0:num_cells], \
-		host_n_array[0:num_cells], \
-		host_I_all[0:total_size]) \
-		map(tofrom: host_IMGVF_all[0:total_size])
+  #pragma omp target data map(to: host_I_offsets[0:num_cells],\
+                                  host_m_array[0:num_cells], \
+                                  host_n_array[0:num_cells], \
+                                  host_I_all[0:total_size]) \
+                          map(tofrom: host_IMGVF_all[0:total_size])
   {
+    auto start = std::chrono::steady_clock::now();
 
-#include "kernel_IMGVF.h"
+    #include "kernel_IMGVF.h"
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Kernel execution time (IMGVF): %f (s)\n", time * 1e-9f);
   }
 
   // Copy each result matrix into its appropriate host matrix
@@ -119,5 +122,3 @@ void IMGVF_GPU(MAT **IE, MAT **IMGVF,
   free(host_I_offsets);
   free(host_IMGVF_all);
 }
-
-

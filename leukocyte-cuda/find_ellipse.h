@@ -6,6 +6,8 @@
 #include "misc_math.h"
 #include <math.h>
 #include <stdlib.h>
+#include <chrono>
+#include <cuda.h>
 
 // Defines the region in the video frame containing the blood vessel
 #define TOP 110

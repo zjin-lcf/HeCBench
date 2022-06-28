@@ -3,18 +3,19 @@ FP_TYPE heaviside(FP_TYPE x) {
   return atan(x) * ONE_OVER_PI + FP_CONST(0.5);
 }
 
-__global__ void kernel_IMGVF(float* IMGVF_array,
-    const float* I_array,
-    const int* I_offsets,
-    const int* m_array,
-    const int* n_array,
+__global__
+void kernel_IMGVF(
+          float*__restrict__ IMGVF_array,
+    const float*__restrict__ I_array,
+    const int*__restrict__ I_offsets,
+    const int*__restrict__ m_array,
+    const int*__restrict__ n_array,
     const float vx_float,
     const float vy_float,
     const float e_float,
     const float cutoff_float,
     const int max_iterations )
 {
-
   __shared__ float IMGVF [41*81];
   __shared__ float IMGVF_buffer [LOCAL_WORK_SIZE];
   __shared__ int cell_converged;
@@ -122,7 +123,7 @@ __global__ void kernel_IMGVF(float* IMGVF_array,
         // 2) Compute IMGVF -= (1 / lambda)(I .* (IMGVF - I))
         //FP_TYPE vI = I[(i * n) + j];
         FP_TYPE vI = I_array[I_offset+ (i * n) + j];
-        new_val -= ((FP_CONST(1.0) / LAMBDA) * vI * (new_val - vI));
+        new_val -= ((1.0 / LAMBDA) * vI * (new_val - vI));
 
       }
       // Save the previous virtual thread block's value (if it exists)

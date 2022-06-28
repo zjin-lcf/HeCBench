@@ -1,11 +1,12 @@
-__global__ void 
-kernel_GICOV ( const float* grad_x,
-    const float* grad_y,
-    const float* sin_angle,
-    const float* cos_angle,
-    const int* tX,
-    const int* tY,
-    float* gicov,
+__global__
+void kernel_GICOV (
+    const float*__restrict__ grad_x,
+    const float*__restrict__ grad_y,
+    const float*__restrict__ sin_angle,
+    const float*__restrict__ cos_angle,
+    const int*__restrict__ tX,
+    const int*__restrict__ tY,
+    float*__restrict__ gicov,
     const int local_work_size,
     const int num_work_groups,
     const int grad_m)

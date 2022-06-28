@@ -1,6 +1,5 @@
 #include "track_ellipse.h"
 
-
 // Host and device arrays to hold matrices for all cells
 // (so we can copy to and from the device in a single transfer)
 
@@ -18,7 +17,7 @@
 
 // Host function that launches a GPU kernel to compute the MGVF matrices for the specified cells
 void IMGVF_GPU(MAT **IE, MAT **IMGVF, 
-		double vx, double vy, double e, int max_iterations, double cutoff, int num_cells) {
+    double vx, double vy, double e, int max_iterations, double cutoff, int num_cells) {
 
   // Initialize the data on the GPU
   // Allocate array of offsets to each cell's image
@@ -66,34 +65,36 @@ void IMGVF_GPU(MAT **IE, MAT **IMGVF,
     offset += size;
   }
 
+  // Convert double-precision parameters to single-precision
+  float vx_float = (float) vx;
+  float vy_float = (float) vy;
+  float e_float = (float) e;
+  float cutoff_float = (float) cutoff;
 
-    // Convert double-precision parameters to single-precision
-    float vx_float = (float) vx;
-    float vy_float = (float) vy;
-    float e_float = (float) e;
-    float cutoff_float = (float) cutoff;
+  int* d_I_offsets;
+  int* d_m_array;
+  int* d_n_array;
+  float* d_I_all;
+  float* d_IMGVF_all;
+  cudaMalloc((void**)&d_I_offsets, sizeof(int)*num_cells);
+  cudaMemcpyAsync(d_I_offsets, host_I_offsets, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
 
-    int* d_I_offsets;
-    int* d_m_array;
-    int* d_n_array;
-    float* d_I_all;
-    float* d_IMGVF_all;
-    cudaMalloc((void**)&d_I_offsets, sizeof(int)*num_cells);
-    cudaMemcpyAsync(d_I_offsets, host_I_offsets, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
+  cudaMalloc((void**)&d_m_array, sizeof(int)*num_cells);
+  cudaMemcpyAsync(d_m_array, host_m_array, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
 
-    cudaMalloc((void**)&d_m_array, sizeof(int)*num_cells);
-    cudaMemcpyAsync(d_m_array, host_m_array, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
+  cudaMalloc((void**)&d_n_array, sizeof(int)*num_cells);
+  cudaMemcpyAsync(d_n_array, host_n_array, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
 
-    cudaMalloc((void**)&d_n_array, sizeof(int)*num_cells);
-    cudaMemcpyAsync(d_n_array, host_n_array, sizeof(int)*num_cells, cudaMemcpyHostToDevice, 0); 
+  cudaMalloc((void**)&d_I_all, sizeof(float)*total_size);
+  cudaMemcpyAsync(d_I_all, host_I_all, sizeof(float)*total_size, cudaMemcpyHostToDevice, 0); 
 
-    cudaMalloc((void**)&d_I_all, sizeof(float)*total_size);
-    cudaMemcpyAsync(d_I_all, host_I_all, sizeof(float)*total_size, cudaMemcpyHostToDevice, 0); 
+  cudaMalloc((void**)&d_IMGVF_all, sizeof(float)*total_size);
+  cudaMemcpyAsync(d_IMGVF_all, host_I_all, sizeof(float)*total_size, cudaMemcpyHostToDevice, 0); 
 
-    cudaMalloc((void**)&d_IMGVF_all, sizeof(float)*total_size);
-    cudaMemcpyAsync(d_IMGVF_all, host_I_all, sizeof(float)*total_size, cudaMemcpyHostToDevice, 0); 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
-    kernel_IMGVF<<<num_cells, LOCAL_WORK_SIZE>>>( 
+  kernel_IMGVF<<<num_cells, LOCAL_WORK_SIZE>>>( 
       d_IMGVF_all, 
       d_I_all, 
       d_I_offsets, 
@@ -101,13 +102,18 @@ void IMGVF_GPU(MAT **IE, MAT **IMGVF,
       d_n_array,
       vx_float, vy_float, e_float, cutoff_float, max_iterations);
 
-    cudaMemcpy(host_I_all, d_IMGVF_all, sizeof(float)*total_size, cudaMemcpyDeviceToHost); 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (IMGVF): %f (s)\n", time * 1e-9f);
 
-    cudaFree(d_I_offsets);
-    cudaFree(d_m_array);
-    cudaFree(d_n_array);
-    cudaFree(d_I_all);
-    cudaFree(d_IMGVF_all);
+  cudaMemcpy(host_I_all, d_IMGVF_all, sizeof(float)*total_size, cudaMemcpyDeviceToHost); 
+
+  cudaFree(d_I_offsets);
+  cudaFree(d_m_array);
+  cudaFree(d_n_array);
+  cudaFree(d_I_all);
+  cudaFree(d_IMGVF_all);
 
   // Copy each result matrix into its appropriate host matrix
   offset = 0;  
@@ -135,5 +141,3 @@ void IMGVF_GPU(MAT **IE, MAT **IMGVF,
   free(host_I_all);
   free(host_I_offsets);
 }
-
-
