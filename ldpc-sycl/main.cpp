@@ -1,7 +1,7 @@
 /*  Copyright (c) 2011-2016, Robert Wang, email: robertwgh (at) gmail.com
   All rights reserved. https://github.com/robertwgh/cuLDPC
 
-  CUDA implementation of LDPC decoding algorithm.
+  Implementation of LDPC decoding algorithm.
 
   The details of implementation can be found from the following papers:
   1. Wang, G., Wu, M., Sun, Y., & Cavallaro, J. R. (2011, June). A massively parallel implementation of QC-LDPC decoder on GPU. In Application Specific Processors (SASP), 2011 IEEE 9th Symposium on (pp. 82-85). IEEE.
@@ -14,13 +14,11 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
-
+#include <chrono>
 #include "common.h"
 #include "LDPC.h"
 #include "matrix.h"
-
 #include "kernel.cpp"
-
 
 float sigma ;
 int *info_bin ;
@@ -206,7 +204,7 @@ int main()
         memcpy(llr_gpu + i * CODEWORD_LEN, llr, memorySize_llr);
       }
 
-      // Define CUDA kernel dimension
+      // Define kernel dimension
       range<2> gws(MCW * CW, BLK_ROW * BLOCK_SIZE_X); // dim of the thread blocks
       range<2> lws(CW, BLOCK_SIZE_X);
       int sharedRCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT;
@@ -216,6 +214,8 @@ int main()
       //int sharedDtCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT_VNP * sizeof(float);
 
       // run the kernel
+      float total_time = 0.f;
+
       for(int j = 0; j < MAX_SIM; j++)
       {
         // Transfer LLR data into device.
@@ -225,6 +225,9 @@ int main()
         });
 
         // kernel launch
+        q.wait();
+        auto start = std::chrono::steady_clock::now();
+
         for(int ii = 0; ii < MAX_ITERATION; ii++)
         {
 
@@ -267,10 +270,6 @@ int main()
               });
             });
           }
-            //auto h_dt = d_dt.get_access<sycl_read>();
-            //auto h_R = d_R.get_access<sycl_read>();
-            //for (int i = 0; i < wordSize_dt; i++) printf("%d dt: %f\n", ii, h_dt[i]);
-            //for (int i = 0; i < wordSize_R; i++) printf("%d R: %f\n",  ii,h_R[i]);
 
           // run variable-node processing kernel
           // for the last iteration we run a special
@@ -312,19 +311,24 @@ int main()
           }
         }
 
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        total_time += time;
+
         // copy the decoded data from device to host
         q.submit([&] (handler &cgh) {
           auto acc = d_hard_decision.get_access<sycl_read>(cgh);
           cgh.copy(acc, hard_decision_gpu); 
-        });
-
-        q.wait();
+        }).wait();
 
         this_error = cuda_error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
 
+      printf ("\n");
+      printf ("Total kernel execution time: %f (s)\n", total_time * 1e-9f);
       printf ("# codewords = %d, CW=%d, MCW=%d\n",total_codeword, CW, MCW);
       printf ("total bit error = %d\n", total_bit_error);
       printf ("total frame error = %d\n", total_frame_error);

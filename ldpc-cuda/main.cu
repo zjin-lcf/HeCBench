@@ -1,7 +1,7 @@
 /*  Copyright (c) 2011-2016, Robert Wang, email: robertwgh (at) gmail.com
   All rights reserved. https://github.com/robertwgh/cuLDPC
 
-  CUDA implementation of LDPC decoding algorithm.
+  Implementation of LDPC decoding algorithm.
 
   The details of implementation can be found from the following papers:
   1. Wang, G., Wu, M., Sun, Y., & Cavallaro, J. R. (2011, June). A massively parallel implementation of QC-LDPC decoder on GPU. In Application Specific Processors (SASP), 2011 IEEE 9th Symposium on (pp. 82-85). IEEE.
@@ -14,15 +14,11 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
-
-// CUDA runtime
+#include <chrono>
 #include <cuda.h>
-
 #include "LDPC.h"
 #include "matrix.h"
-
 #include "kernel.cu"
-
 
 float sigma ;
 int *info_bin ;
@@ -211,7 +207,7 @@ int main()
         memcpy(llr_gpu + i * CODEWORD_LEN, llr, memorySize_llr);
       }
 
-      // Define CUDA kernel dimension
+      // Define kernel dimension
       dim3 dimGridKernel1(BLK_ROW, MCW, 1); // dim of the thread blocks
       dim3 dimBlockKernel1(BLOCK_SIZE_X, CW, 1);
       int sharedRCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT * sizeof(float);
@@ -221,15 +217,19 @@ int main()
       //int sharedDtCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT_VNP * sizeof(float);
 
       // run the kernel
+      float total_time = 0.f;
+
       for(int j = 0; j < MAX_SIM; j++)
       {
         // Transfer LLR data into device.
         cudaMemcpy(dev_llr, llr_gpu, memorySize_llr_gpu, cudaMemcpyHostToDevice);
 
         // kernel launch
+        cudaDeviceSynchronize();
+        auto start = std::chrono::steady_clock::now();
+
         for(int ii = 0; ii < MAX_ITERATION; ii++)
         {
-
           // run check-node processing kernel
           // TODO: run a special kernel the first iteration?
           if(ii == 0) {
@@ -278,6 +278,11 @@ int main()
           }
         }
 
+        cudaDeviceSynchronize();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        total_time += time;
+
         // copy the decoded data from device to host
         cudaMemcpy(hard_decision_gpu, 
               dev_hard_decision, 
@@ -289,6 +294,8 @@ int main()
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
 
+      printf ("\n");
+      printf ("Total kernel execution time: %f (s)\n", total_time * 1e-9f);
       printf ("# codewords = %d, CW=%d, MCW=%d\n",total_codeword, CW, MCW);
       printf ("total bit error = %d\n", total_bit_error);
       printf ("total frame error = %d\n", total_frame_error);
