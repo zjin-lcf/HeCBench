@@ -64,7 +64,6 @@ float ReduceSum(const float* vec, const int length) {
   return shared[0];
 }
 
-
 // reference: http://web.science.mq.edu.au/~mjohnson/code/digamma.c
 __inline__ __device__
 float Digamma(float x) {
@@ -222,4 +221,3 @@ __global__ void EstepKernel(
     __syncthreads();
   } 
 }
-

@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -99,8 +100,12 @@ int main(int argc, char* argv[]) {
   range<1> lws (block_dim);
   
   bool init_gamma = false;
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (i = 0; i < repeat; i++) {
-    if (i == 0) init_gamma = true;
+    init_gamma = (i == 0) ? true : false;
     q.submit([&] (handler &cgh) {
       auto cols = d_cols.get_access<sycl_read>(cgh);
       auto indptr = d_indptr.get_access<sycl_read>(cgh);
@@ -138,11 +143,19 @@ int main(int argc, char* argv[]) {
      });
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (training): %f (s)\n", (time * 1e-9f) / repeat);
+
   // validation
   q.submit([&] (handler &cgh) {
     auto acc = d_vali.get_access<sycl_write>(cgh); 
     cgh.fill(acc, true);
   });
+
+  q.wait();
+  start = std::chrono::steady_clock::now();
 
   for (i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
@@ -181,6 +194,11 @@ int main(int argc, char* argv[]) {
        });
      });
   }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (validation): %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_vali_losses.get_access<sycl_read>(cgh); 

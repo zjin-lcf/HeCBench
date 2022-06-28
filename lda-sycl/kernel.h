@@ -7,7 +7,6 @@
 #define WARP_SIZE 32
 #define EPS 1e-6f
 
-
 inline 
 float ReduceSum(nd_item<1> &item, 
                 float*__restrict shared, 
@@ -60,7 +59,6 @@ float ReduceSum(nd_item<1> &item,
   item.barrier(access::fence_space::local_space);
   return shared[0];
 }
-
 
 // reference: http://web.science.mq.edu.au/~mjohnson/code/digamma.c
 inline float Digamma(float x) {
@@ -234,4 +232,3 @@ void EstepKernel(
     item.barrier(access::fence_space::local_space);
   } 
 }
-
