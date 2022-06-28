@@ -1,18 +1,15 @@
-#include <stdio.h>          // (in path known to compiler)      needed by printf
-#include <stdlib.h>          // (in path known to compiler)      needed by malloc
-#include <stdbool.h>        // (in path known to compiler)      needed by true/false
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <hip/hip_runtime.h>
-#include "./util/timer/timer.h"      // (in path specified here)
-#include "./util/num/num.h"        // (in path specified here)
-#include "./main.h"            // (in the current directory)
-
-// CUDA kernel
+#include "./util/timer/timer.h"
+#include "./util/num/num.h"
+#include "./main.h"
 #include "kernel.h"
 
 int main(  int argc, char *argv [])
 {
-
   // counters
   int i, j, k, l, m, n;
 
@@ -198,8 +195,14 @@ int main(  int argc, char *argv [])
   hipMemcpy(d_qv_gpu, qv_cpu, dim_cpu.space_mem2, hipMemcpyHostToDevice); 
   hipMemcpy(d_fv_gpu, fv_cpu, dim_cpu.space_mem, hipMemcpyHostToDevice); 
 
-  hipLaunchKernelGGL(md, dim3(dim_cpu_number_boxes), dim3(NUMBER_THREADS), 0, 0, 
+  hipDeviceSynchronize();
+  long long kstart = get_time();
+
+  hipLaunchKernelGGL(md, dim_cpu_number_boxes, NUMBER_THREADS, 0, 0, 
     d_box_gpu, d_rv_gpu, d_qv_gpu, d_fv_gpu, par_cpu.alpha, dim_cpu_number_boxes);
+
+  hipDeviceSynchronize();
+  long long kend = get_time();
 
   hipMemcpy(fv_cpu, d_fv_gpu, dim_cpu.space_mem, hipMemcpyDeviceToHost); 
 
@@ -212,6 +215,9 @@ int main(  int argc, char *argv [])
   printf("Device offloading time:\n"); 
   printf("%.12f s\n", (float) (end-start) / 1000000); 
 
+  printf("Kernel execution time:\n"); 
+  printf("%.12f s\n", (float) (kend-kstart) / 1000000); 
+
   // dump results
 #ifdef OUTPUT
   FILE *fptr;
@@ -222,14 +228,10 @@ int main(  int argc, char *argv [])
   fclose(fptr);
 #endif         
 
-
   free(rv_cpu);
   free(qv_cpu);
   free(fv_cpu);
   free(box_cpu);
 
   return 0; 
-
 }
-
-
