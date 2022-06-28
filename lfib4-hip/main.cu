@@ -200,7 +200,6 @@ void gLFIB4(uint32_t n, uint32_t *x, int s, int r, uint32_t *seed) {
   hipStreamDestroy(cstr2);
 
   hipFree(y);
-  hipDeviceSynchronize();
 }
 
 int main(int argc, char**argv) {

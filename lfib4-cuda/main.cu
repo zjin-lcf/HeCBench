@@ -200,7 +200,6 @@ void gLFIB4(uint32_t n, uint32_t *x, int s, int r, uint32_t *seed) {
   cudaStreamDestroy(cstr2);
 
   cudaFree(y);
-  cudaDeviceSynchronize();
 }
 
 int main(int argc, char**argv) {
