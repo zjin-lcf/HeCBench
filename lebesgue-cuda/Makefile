@@ -54,8 +54,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 test: $(program)
-	./$(program) 501
+	./$(program) 501 2
 
 run: $(program)
-	./$(program) 1000000
-
+	./$(program) 1000000 2
