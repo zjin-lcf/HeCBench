@@ -1,7 +1,7 @@
 /*  Copyright (c) 2011-2016, Robert Wang, email: robertwgh (at) gmail.com
   All rights reserved. https://github.com/robertwgh/cuLDPC
 
-  CUDA implementation of LDPC decoding algorithm.
+  Implementation of LDPC decoding algorithm.
 
   The details of implementation can be found from the following papers:
   1. Wang, G., Wu, M., Sun, Y., & Cavallaro, J. R. (2011, June). A massively parallel implementation of QC-LDPC decoder on GPU. In Application Specific Processors (SASP), 2011 IEEE 9th Symposium on (pp. 82-85). IEEE.
@@ -14,15 +14,11 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
-
-// HIP runtime
+#include <chrono>
 #include <hip/hip_runtime.h>
-
 #include "LDPC.h"
 #include "matrix.h"
-
 #include "kernel.cu"
-
 
 float sigma ;
 int *info_bin ;
@@ -211,7 +207,7 @@ int main()
         memcpy(llr_gpu + i * CODEWORD_LEN, llr, memorySize_llr);
       }
 
-      // Define CUDA kernel dimension
+      // Define kernel dimension
       dim3 dimGridKernel1(BLK_ROW, MCW, 1); // dim of the thread blocks
       dim3 dimBlockKernel1(BLOCK_SIZE_X, CW, 1);
       int sharedRCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT * sizeof(float);
@@ -221,25 +217,29 @@ int main()
       //int sharedDtCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT_VNP * sizeof(float);
 
       // run the kernel
+      float total_time = 0.f;
+
       for(int j = 0; j < MAX_SIM; j++)
       {
         // Transfer LLR data into device.
         hipMemcpy(dev_llr, llr_gpu, memorySize_llr_gpu, hipMemcpyHostToDevice);
 
         // kernel launch
+        cudaDeviceSynchronize();
+        auto start = std::chrono::steady_clock::now();
+
         for(int ii = 0; ii < MAX_ITERATION; ii++)
         {
-
           // run check-node processing kernel
           // TODO: run a special kernel the first iteration?
           if(ii == 0) {
-            hipLaunchKernelGGL(ldpc_cnp_kernel_1st_iter, dim3(dimGridKernel1), dim3(dimBlockKernel1), 0, 0, dev_llr, 
+            hipLaunchKernelGGL(ldpc_cnp_kernel_1st_iter, dimGridKernel1, dimBlockKernel1, 0, 0, dev_llr, 
                  dev_dt, 
                  dev_R, 
                  dev_h_element_count1, 
                  dev_h_compact1);
           } else {
-            hipLaunchKernelGGL(ldpc_cnp_kernel, dim3(dimGridKernel1), dim3(dimBlockKernel1), sharedRCacheSize, 0, dev_llr, 
+            hipLaunchKernelGGL(ldpc_cnp_kernel, dimGridKernel1, dimBlockKernel1, sharedRCacheSize, 0, dev_llr, 
                  dev_dt, 
                  dev_R, 
                  dev_h_element_count1, 
@@ -252,18 +252,23 @@ int main()
           // decision instead of writing back the belief
           // for the value of each bit.
           if(ii < MAX_ITERATION - 1) {
-            hipLaunchKernelGGL(ldpc_vnp_kernel_normal, dim3(dimGridKernel2), dim3(dimBlockKernel2), 0, 0, dev_llr, 
+            hipLaunchKernelGGL(ldpc_vnp_kernel_normal, dimGridKernel2, dimBlockKernel2, 0, 0, dev_llr, 
                  dev_dt, 
                  dev_h_element_count2, 
                  dev_h_compact2);
           } else {
-            hipLaunchKernelGGL(ldpc_vnp_kernel_last_iter, dim3(dimGridKernel2), dim3(dimBlockKernel2), 0, 0, dev_llr, 
+            hipLaunchKernelGGL(ldpc_vnp_kernel_last_iter, dimGridKernel2, dimBlockKernel2, 0, 0, dev_llr, 
                  dev_dt, 
                  dev_hard_decision, 
                  dev_h_element_count2, 
                  dev_h_compact2);
           }
         }
+
+        hipDeviceSynchronize();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        total_time += time;
 
         // copy the decoded data from device to host
         hipMemcpy(hard_decision_gpu, 
@@ -276,6 +281,8 @@ int main()
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
 
+      printf ("\n");
+      printf ("Total kernel execution time: %f (s)\n", total_time * 1e-9f);
       printf ("# codewords = %d, CW=%d, MCW=%d\n",total_codeword, CW, MCW);
       printf ("total bit error = %d\n", total_bit_error);
       printf ("total frame error = %d\n", total_frame_error);
