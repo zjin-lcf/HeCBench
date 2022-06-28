@@ -1,11 +1,11 @@
-#include <stdio.h>          // (in path known to compiler)      needed by printf
-#include <stdlib.h>          // (in path known to compiler)      needed by malloc
-#include <stdbool.h>        // (in path known to compiler)      needed by true/false
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
-#include "./util/timer/timer.h"      // (in path specified here)
-#include "./util/num/num.h"        // (in path specified here)
+#include "./util/timer/timer.h"
+#include "./util/num/num.h"
 #include "common.h"
-#include "./main.h"            // (in the current directory)
+#include "./main.h"
 
 int main(  int argc, char *argv [])
 {
@@ -20,7 +20,6 @@ int main(  int argc, char *argv [])
   fp* qv_cpu;
   FOUR_VECTOR* fv_cpu;
   int nh;
-
 
   printf("WG size of kernel = %d \n", NUMBER_THREADS);
 
@@ -172,6 +171,7 @@ int main(  int argc, char *argv [])
     fv_cpu[i].z = 0;                // set to 0, because kernels keeps adding to initial value
   }
 
+  long long kstart, kend;
   long long start = get_time();
 
   { // SYCL scope
@@ -184,14 +184,12 @@ int main(  int argc, char *argv [])
     queue q(dev_sel);
 
     //  EXECUTION PARAMETERS
-    size_t local_work_size[1];
-    local_work_size[0] = NUMBER_THREADS;
-    size_t global_work_size[1];
-    global_work_size[0] = dim_cpu.number_boxes * local_work_size[0];
+    size_t local_work_size = NUMBER_THREADS;
+    size_t global_work_size = dim_cpu.number_boxes * local_work_size;
 
 #ifdef DEBUG
     printf("# of blocks = %lu, # of threads/block = %lu (ensure that device can handle)\n", 
-        global_work_size[0]/local_work_size[0], local_work_size[0]);
+        global_work_size/local_work_size, local_work_size);
 #endif
 
     const property_list props = property::buffer::use_host_ptr();
@@ -210,30 +208,38 @@ int main(  int argc, char *argv [])
     //  fv
     buffer<FOUR_VECTOR, 1> d_fv_gpu(fv_cpu, dim_cpu.space_elem, props);
 
+    range<1> gws (global_work_size);
+    range<1> lws (local_work_size);
+
+    q.wait();
+    kstart = get_time();
+
     q.submit([&](handler& cgh) {
+      auto d_box_gpu_acc = d_box_gpu.get_access<sycl_read>(cgh);
+      auto d_rv_gpu_acc = d_rv_gpu.get_access<sycl_read>(cgh);
+      auto d_qv_gpu_acc = d_qv_gpu.get_access<sycl_read>(cgh);
+      auto d_fv_gpu_acc = d_fv_gpu.get_access<sycl_read_write>(cgh);
 
-        auto d_box_gpu_acc = d_box_gpu.get_access<sycl_read>(cgh);
-        auto d_rv_gpu_acc = d_rv_gpu.get_access<sycl_read>(cgh);
-        auto d_qv_gpu_acc = d_qv_gpu.get_access<sycl_read>(cgh);
-        auto d_fv_gpu_acc = d_fv_gpu.get_access<sycl_read_write>(cgh);
+      accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rA_shared (100, cgh);
+      accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rB_shared (100, cgh);
+      accessor <fp, 1, sycl_read_write, access::target::local> qB_shared (100, cgh);
 
-        accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rA_shared (100, cgh);
-        accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rB_shared (100, cgh);
-        accessor <fp, 1, sycl_read_write, access::target::local> qB_shared (100, cgh);
+      cgh.parallel_for<class lavamd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        #include "kernel.sycl"
+      });
+    });
 
-        cgh.parallel_for<class kernel_lavamd>(
-            nd_range<1>(range<1>(global_work_size[0]), 
-              range<1>(local_work_size[0])), [=] (nd_item<1> item) {
-#include "kernel.sycl"
-            });
-        });
-
+    q.wait();
+    kend = get_time();
+    
   } // SYCL scope
-
 
   long long end = get_time();
   printf("Device offloading time:\n"); 
   printf("%.12f s\n", (float) (end-start) / 1000000); 
+
+  printf("Kernel execution time:\n"); 
+  printf("%.12f s\n", (float) (kend-kstart) / 1000000); 
 
   // dump results
 #ifdef OUTPUT

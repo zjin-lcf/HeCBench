@@ -65,4 +65,3 @@ clean:
 
 run: $(program)
 	./$(program) -boxes1d 30
-

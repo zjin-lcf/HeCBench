@@ -4,13 +4,11 @@
 #include <string.h>
 #include <omp.h>
 #include <math.h>
+#include "./util/timer/timer.h"
+#include "./util/num/num.h"
+#include "main.h"
 
-#include "./util/timer/timer.h"      // (in path specified here)
-#include "./util/num/num.h"        // (in path specified here)
-#include "main.h"            // (in the current directory)
-
-
-int main(  int argc, char *argv [])
+int main(int argc, char *argv [])
 {
   // counters
   int i, j, k, l, m, n;
@@ -23,7 +21,6 @@ int main(  int argc, char *argv [])
   fp* qv_cpu;
   FOUR_VECTOR* fv_cpu;
   int nh;
-
 
   printf("WG size of kernel = %d \n", NUMBER_THREADS);
 
@@ -182,6 +179,7 @@ int main(  int argc, char *argv [])
     fv_cpu[i].z = 0;                // set to 0, because kernels keeps adding to initial value
   }
 
+  long long kstart, kend;
   long long start = get_time();
 
   // only the member number_boxes is used in the kernel
@@ -192,6 +190,7 @@ int main(  int argc, char *argv [])
                                 qv_cpu[0:dim_cpu.space_elem]) \
                         map(tofrom: fv_cpu[0:dim_cpu.space_elem])
 {
+  kstart = get_time();
   #pragma omp target teams num_teams(dim_cpu_number_boxes) thread_limit(NUMBER_THREADS)
   {
     FOUR_VECTOR rA_shared[100];
@@ -329,11 +328,15 @@ int main(  int argc, char *argv [])
       }
     }
   }
+  kend = get_time();
 }
 
   long long end = get_time();
   printf("Device offloading time:\n"); 
   printf("%.12f s\n", (float) (end-start) / 1000000);
+
+  printf("Kernel execution time:\n"); 
+  printf("%.12f s\n", (float) (kend-kstart) / 1000000); 
 
 #ifdef DEBUG
   int offset = 395;
