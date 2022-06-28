@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <chrono>
 #include "lebesgue.h"
 
 //
@@ -26,12 +27,23 @@ void test01 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = chebyshev1 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l,
     "  Chebyshev1 Lebesgue constants for N = 1 to 11:" );
@@ -64,12 +76,23 @@ void test02 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = chebyshev2 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l,
     "  Chebyshev2 Lebesgue constants for N = 1 to 11:" );
@@ -102,12 +125,23 @@ void test03 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = chebyshev3 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l, 
     "  Chebyshev3 Lebesgue constants for N = 1 to 11:" );
@@ -140,12 +174,23 @@ void test04 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = chebyshev4 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l, 
     "  Chebyshev4 Lebesgue constants for N = 1 to 11:" );
@@ -178,12 +223,23 @@ void test05 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = equidistant1 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l, 
     "  Equidistant1 Lebesgue constants for N = 1 to 11:" );
@@ -216,12 +272,23 @@ void test06 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = equidistant2 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l, 
     "  Equidistant2 Lebesgue constants for N = 1 to 11:" );
@@ -254,12 +321,23 @@ void test07 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = equidistant3 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l,
     "  Equidistant3 Lebesgue constants for N = 1 to 11:" );
@@ -292,12 +370,23 @@ void test08 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = fejer1 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l,
     "  Fejer1 Lebesgue constants for N = 1 to 11:" );
@@ -330,12 +419,23 @@ void test09 ( queue &q, int nfun  )
 
   l = ( double * ) malloc ( n_max * sizeof ( double ) );
 
+  float total_time = 0.f;
+
   for ( n = 1; n <= n_max; n++ )
   {
     x = fejer2 ( n );
+
+    auto start = std::chrono::steady_clock::now();
+
     l[n-1] = lebesgue_constant ( q, n, x, nfun, xfun );
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+
     free ( x );
   }
+  printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
   r8vec_print ( n_max, l,
     "  Fejer2 Lebesgue constants for N = 1 to 11:" );
@@ -353,9 +453,13 @@ void test09 ( queue &q, int nfun  )
 
 int main (int argc, char* argv[] )
 {
-  int nfun = atoi(argv[1]); // number of pointers in an interval 
+  if (argc != 3) {
+    printf("Usage: %s <number of points in an interval> <repeat>\n", argv[0]);
+    return 1;
+  }
+  int nfun = atoi(argv[1]);
+  int repeat = atoi(argv[2]);
 
-  timestamp ( );
   printf ( "\n" );
   printf ( "LEBESGUE_TEST\n" );
 
@@ -366,16 +470,21 @@ int main (int argc, char* argv[] )
 #endif
   queue q(dev_sel);
 
-  test01 ( q, nfun );
-  test02 ( q, nfun );
-  test03 ( q, nfun );
-  test04 ( q, nfun );
-  test05 ( q, nfun );
-  test06 ( q, nfun );
-  test07 ( q, nfun );
-  test08 ( q, nfun );
-  test09 ( q, nfun );
-  timestamp ( );
+  for (int i = 0; i < repeat; i++) {
+    timestamp ( );
+
+    test01 ( q, nfun );
+    test02 ( q, nfun );
+    test03 ( q, nfun );
+    test04 ( q, nfun );
+    test05 ( q, nfun );
+    test06 ( q, nfun );
+    test07 ( q, nfun );
+    test08 ( q, nfun );
+    test09 ( q, nfun );
+
+    timestamp ( );
+  }
 
   return 0;
 }

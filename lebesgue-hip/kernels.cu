@@ -1,7 +1,7 @@
 #include <math.h>
 #include <hip/hip_runtime.h>
 
-// double-precision atomic max
+/* double-precision atomic max is defined in HIP
 __device__ __forceinline__
 double atomicMax(double *address, double val)
 {
@@ -14,6 +14,7 @@ double atomicMax(double *address, double val)
   }
   return __longlong_as_double(ret);
 }
+*/
 
 __global__
 void kernel (double *__restrict__ lmax,
