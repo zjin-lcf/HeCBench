@@ -18,7 +18,7 @@
 #include "common.h"
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 256
+#define NUM 512
 
 // block size
 #define BLOCK_SIZE 128
@@ -31,24 +31,21 @@
 /** SOR relaxation parameter */
 const Real omega = 1.85;
 
-
-///////////////////////////////////////////////////////////////////////////////
-
 /** Function to evaluate coefficient matrix and right-hand side vector.
  * 
- * \param[in]		rowmax		number of rows
- * \param[in]		colmax		number of columns
- * \param[in]		th_cond		thermal conductivity
- * \param[in]		dx				grid size in x dimension (uniform)
- * \param[in]		dy				grid size in y dimension (uniform)
- * \param[in]		width			width of plate (z dimension)
- * \param[in]		TN				temperature at top boundary
- * \param[out]	aP				array of self coefficients
- * \param[out]	aW				array of west neighbor coefficients
- * \param[out]	aE				array of east neighbor coefficients
- * \param[out]	aS				array of south neighbor coefficients
- * \param[out]	aN				array of north neighbor coefficients
- * \param[out]	b					right-hand side array
+ * \param[in]   rowmax   number of rows
+ * \param[in]   colmax   number of columns
+ * \param[in]   th_cond  thermal conductivity
+ * \param[in]   dx       grid size in x dimension (uniform)
+ * \param[in]   dy       grid size in y dimension (uniform)
+ * \param[in]   width    width of plate (z dimension)
+ * \param[in]   TN       temperature at top boundary
+ * \param[out]  aP       array of self coefficients
+ * \param[out]  aW       array of west neighbor coefficients
+ * \param[out]  aE       array of east neighbor coefficients
+ * \param[out]  aS       array of south neighbor coefficients
+ * \param[out]  aN       array of north neighbor coefficients
+ * \param[out]  b        right-hand side array
  */
 void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
     Real width, Real TN, Real * aP, Real * aW, Real * aE, 
@@ -99,8 +96,6 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
     } // end for row
   } // end for col
 } // end fill_coeffs
-
-///////////////////////////////////////////////////////////////////////////////
 
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
  * 
@@ -170,16 +165,10 @@ int main (void) {
   // one for each temperature value
   int size_norm = size_temp;
   bl_norm_L2 = (Real *) calloc (size_norm, sizeof(Real));
-  for (i = 0; i < size_norm; ++i) {
-    bl_norm_L2[i] = ZERO;
-  }
 
   // print problem info
   printf("Problem size: %d x %d \n", NUM, NUM);
 
-  StartTimer();
-  
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -196,11 +185,17 @@ int main (void) {
   buffer<Real, 1> temp_red_d (temp_red, size_temp);
   buffer<Real, 1> temp_black_d (temp_black, size_temp);
   buffer<Real, 1> bl_norm_L2_d (bl_norm_L2, size_norm);
+
   bl_norm_L2_d.set_final_data(nullptr);
+  temp_red_d.set_final_data(nullptr);
+  temp_black_d.set_final_data(nullptr);
 
   auto global_range = range<2>(NUM, NUM/2); 
   auto local_range = range<2>(1, BLOCK_SIZE);
 
+  q.wait();
+  StartTimer();
+  
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
@@ -224,10 +219,11 @@ int main (void) {
         int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);
 
         Real temp_old = temp_red[ind_red];
-        Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
+        Real res = b[ind]
+              + aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
               + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
               + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
+              + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
 
         Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
 
@@ -241,13 +237,10 @@ int main (void) {
     q.submit([&](auto &h) {
       auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
       h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+    }).wait();
 
     // add red cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
+    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     q.submit([&](auto &h) {
       // Create accessors
@@ -268,10 +261,11 @@ int main (void) {
         int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);
 
         Real temp_old = temp_black[ind_black];
-        Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
+        Real res = b[ind]
+              + aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
               + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
               + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
+              + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)];
 
         Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
 
@@ -285,14 +279,11 @@ int main (void) {
     q.submit([&](auto &h) {
       auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
       h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    });
-    q.wait();
+    }).wait();
 
     // transfer residual value(s) back to CPU and 
     // add black cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
+    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     // calculate residual
     norm_L2 = std::sqrt(norm_L2 / ((Real)size));
@@ -300,18 +291,25 @@ int main (void) {
     if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
-    if (norm_L2 < tol) {
-      break;
-    }	
-  }
-
+    if (norm_L2 < tol) break;
   }
 
   double runtime = GetTimer();
-
   printf("GPU\n");
-  printf("Iterations: %i\n", iter);
-  printf("Total time: %f s\n", runtime / 1000.0);
+  printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
+
+  // transfer final temperature values back
+  q.submit([&](auto &h) {
+    auto acc = temp_red_d.get_access<sycl_read>(h);
+    h.copy(acc, temp_red); 
+  });
+
+  q.submit([&](auto &h) {
+    auto acc = temp_black_d.get_access<sycl_read>(h);
+    h.copy(acc, temp_black); 
+  });
+
+  q.wait();
 
   // print temperature data to file
   FILE * pfile;
@@ -339,6 +337,7 @@ int main (void) {
       fprintf(pfile, "\n");
     }
   }
+
   fclose(pfile);
 
   free(aP);

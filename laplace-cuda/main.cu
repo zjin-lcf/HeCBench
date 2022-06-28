@@ -1,7 +1,7 @@
 /** GPU Laplace solver using optimized red-black Gauss Seidel with SOR solver
  *
- * \author Kyle E. Niemeyer
- * \date 09/21/2012
+ * author Kyle E. Niemeyer
+ * date 09/21/2012
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
  * on GPU using CUDA with the red-black Gauss Seidel with sucessive overrelaxation
@@ -17,14 +17,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
+#include <cuda.h>
 #include "timer.h"
 
-// CUDA libraries
-#include <cuda.h>
-
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 256
+#define NUM 512
 
 // block size
 #define BLOCK_SIZE 128
@@ -37,24 +34,21 @@
 /** SOR relaxation parameter */
 const Real omega = 1.85f;
 
-
-///////////////////////////////////////////////////////////////////////////////
-
 /** Function to evaluate coefficient matrix and right-hand side vector.
  * 
- * \param[in]		rowmax		number of rows
- * \param[in]		colmax		number of columns
- * \param[in]		th_cond		thermal conductivity
- * \param[in]		dx				grid size in x dimension (uniform)
- * \param[in]		dy				grid size in y dimension (uniform)
- * \param[in]		width			width of plate (z dimension)
- * \param[in]		TN				temperature at top boundary
- * \param[out]	aP				array of self coefficients
- * \param[out]	aW				array of west neighbor coefficients
- * \param[out]	aE				array of east neighbor coefficients
- * \param[out]	aS				array of south neighbor coefficients
- * \param[out]	aN				array of north neighbor coefficients
- * \param[out]	b					right-hand side array
+ * \param[in]   rowmax   number of rows
+ * \param[in]   colmax   number of columns
+ * \param[in]   th_cond  thermal conductivity
+ * \param[in]   dx       grid size in x dimension (uniform)
+ * \param[in]   dy       grid size in y dimension (uniform)
+ * \param[in]   width    width of plate (z dimension)
+ * \param[in]   TN       temperature at top boundary
+ * \param[out]  aP       array of self coefficients
+ * \param[out]  aW       array of west neighbor coefficients
+ * \param[out]  aE       array of east neighbor coefficients
+ * \param[out]  aS       array of south neighbor coefficients
+ * \param[out]  aN       array of north neighbor coefficients
+ * \param[out]  b        right-hand side array
  */
 void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
     Real width, Real TN, Real * aP, Real * aW, Real * aE, 
@@ -106,38 +100,42 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
   } // end for col
 } // end fill_coeffs
 
-///////////////////////////////////////////////////////////////////////////////
-
 /** Function to update temperature for red cells
  * 
- * \param[in]			aP					array of self coefficients
- * \param[in]			aW					array of west neighbor coefficients
- * \param[in]			aE					array of east neighbor coefficients
- * \param[in]			aS					array of south neighbor coefficients
- * \param[in]			aN					array of north neighbor coefficients
- * \param[in]			b						right-hand side array
- * \param[in]			temp_black	temperatures of black cells, constant in this function
- * \param[inout]	temp_red		temperatures of red cells
- * \param[out]		bl_norm_L2	array with residual information for blocks
+ * \param[in]     aP          array of self coefficients
+ * \param[in]     aW          array of west neighbor coefficients
+ * \param[in]     aE          array of east neighbor coefficients
+ * \param[in]     aS          array of south neighbor coefficients
+ * \param[in]     aN          array of north neighbor coefficients
+ * \param[in]     b           right-hand side array
+ * \param[in]     temp_black  temperatures of black cells, constant in this function
+ * \param[inout]  temp_red    temperatures of red cells
+ * \param[out]    bl_norm_L2  array with residual information for blocks
  */
-__global__ void red_kernel (const Real * aP, const Real * aW, const Real * aE,
-    const Real * aS, const Real * aN, const Real * b,
-    const Real * temp_black, Real * temp_red,
-    Real * norm_L2)
-{	
+__global__
+void red_kernel (const Real *__restrict__ aP,
+                 const Real *__restrict__ aW,
+                 const Real *__restrict__ aE,
+                 const Real *__restrict__ aS,
+                 const Real *__restrict__ aN,
+                 const Real *__restrict__ b,
+                 const Real *__restrict__ temp_black,
+                       Real *__restrict__ temp_red,
+                       Real *__restrict__ norm_L2)
+{
   int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
   int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
 
-  int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-  int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
+  int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
+  int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
 
   Real temp_old = temp_red[ind_red];
 
   Real res = b[ind]
-    + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
+        + aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
         + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
         + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-        + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
+        + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
 
   Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
 
@@ -148,38 +146,42 @@ __global__ void red_kernel (const Real * aP, const Real * aW, const Real * aE,
 
 } // end red_kernel
 
-///////////////////////////////////////////////////////////////////////////////
-
 /** Function to update temperature for black cells
  * 
- * \param[in]			aP					array of self coefficients
- * \param[in]			aW					array of west neighbor coefficients
- * \param[in]			aE					array of east neighbor coefficients
- * \param[in]			aS					array of south neighbor coefficients
- * \param[in]			aN					array of north neighbor coefficients
- * \param[in]			b						right-hand side array
- * \param[in]			temp_red		temperatures of red cells, constant in this function
- * \param[inout]	temp_black	temperatures of black cells
- * \param[out]		bl_norm_L2	array with residual information for blocks
+ * \param[in]      aP          array of self coefficients
+ * \param[in]      aW          array of west neighbor coefficients
+ * \param[in]      aE          array of east neighbor coefficients
+ * \param[in]      aS          array of south neighbor coefficients
+ * \param[in]      aN          array of north neighbor coefficients
+ * \param[in]      b           right-hand side array
+ * \param[in]      temp_red    temperatures of red cells, constant in this function
+ * \param[inout]   temp_black  temperatures of black cells
+ * \param[out]     bl_norm_L2  array with residual information for blocks
  */
-__global__ void black_kernel (const Real * aP, const Real * aW, const Real * aE,
-    const Real * aS, const Real * aN, const Real * b,
-    const Real * temp_red, Real * temp_black, 
-    Real * norm_L2)
+__global__
+void black_kernel (const Real *__restrict__ aP,
+                   const Real *__restrict__ aW,
+                   const Real *__restrict__ aE,
+                   const Real *__restrict__ aS,
+                   const Real *__restrict__ aN,
+                   const Real *__restrict__ b,
+                   const Real *__restrict__ temp_red,
+                         Real *__restrict__ temp_black, 
+                         Real *__restrict__ norm_L2)
 {
   int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
   int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
 
-  int ind_black = col * ((NUM >> 1) + 2) + row;  				// local (black) index
-  int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1);	// global index
+  int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
+  int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
 
   Real temp_old = temp_black[ind_black];
 
   Real res = b[ind]
-    + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
+        + aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
         + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
         + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-        + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
+        + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)];
 
   Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
 
@@ -188,8 +190,6 @@ __global__ void black_kernel (const Real * aP, const Real * aW, const Real * aE,
 
   norm_L2[ind_black] = res * res;
 } // end black_kernel
-
-///////////////////////////////////////////////////////////////////////////////
 
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
  * 
@@ -263,14 +263,9 @@ int main (void) {
   // one for each temperature value
   int size_norm = size_temp;
   bl_norm_L2 = (Real *) calloc (size_norm, sizeof(Real));
-  for (i = 0; i < size_norm; ++i) {
-    bl_norm_L2[i] = ZERO;
-  }
 
   // print problem info
   printf("Problem size: %d x %d \n", NUM, NUM);
-
-  StartTimer();
 
   // allocate device memory
   Real *aP_d, *aW_d, *aE_d, *aS_d, *aN_d, *b_d;
@@ -296,11 +291,13 @@ int main (void) {
   cudaMemcpy (temp_red_d, temp_red, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
   cudaMemcpy (temp_black_d, temp_black, size_temp * sizeof(Real), cudaMemcpyHostToDevice);
 
-
   // residual
-  Real *bl_norm_L2_d;	
+  Real *bl_norm_L2_d;
   cudaMalloc ((void**) &bl_norm_L2_d, size_norm * sizeof(Real));
   cudaMemcpy (bl_norm_L2_d, bl_norm_L2, size_norm * sizeof(Real), cudaMemcpyHostToDevice);
+
+  cudaDeviceSynchronize();
+  StartTimer();
 
   // iteration loop
   for (iter = 1; iter <= it_max; ++iter) {
@@ -313,18 +310,15 @@ int main (void) {
     cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
 
     // add red cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
+    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     black_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_red_d, temp_black_d, bl_norm_L2_d);
 
     // transfer residual value(s) back to CPU and 
-    // add black cell contributions to residual
     cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
+
+    // add black cell contributions to residual
+    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     // calculate residual
     norm_L2 = sqrt(norm_L2 / ((Real)size));
@@ -332,20 +326,16 @@ int main (void) {
     if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
-    if (norm_L2 < tol) {
-      break;
-    }	
+    if (norm_L2 < tol) break;
   }
+
+  double runtime = GetTimer();
+  printf("GPU\n");
+  printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
 
   // transfer final temperature values back
   cudaMemcpy (temp_red, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
   cudaMemcpy (temp_black, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
-
-  double runtime = GetTimer();
-
-  printf("GPU\n");
-  printf("Iterations: %i\n", iter);
-  printf("Total time: %f s\n", runtime / 1000.0);
 
   // print temperature data to file
   FILE * pfile;
@@ -368,14 +358,14 @@ int main (void) {
           // odd, so black cell
           int ind = col * num_rows + (row + ((col + 1) % 2)) / 2;
           fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
-        }	
+        }
       }
       fprintf(pfile, "\n");
     }
   }
+
   fclose(pfile);
 
-  // free device memory
   cudaFree(aP_d);
   cudaFree(aW_d);
   cudaFree(aE_d);
@@ -385,7 +375,6 @@ int main (void) {
   cudaFree(temp_red_d);
   cudaFree(temp_black_d);
   cudaFree(bl_norm_L2_d);
-
 
   free(aP);
   free(aW);
