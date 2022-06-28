@@ -118,4 +118,3 @@ clean:
 
 run: leukocyte
 	./leukocyte ../data/leukocyte/testfile.avi 100
-

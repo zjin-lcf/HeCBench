@@ -4,7 +4,6 @@
 #include "find_ellipse.h"
 #include <omp.h>
 
-
 extern void ellipsetrack(avi_t *video, double *xc0, double *yc0, int num_centers, int R, int Np, int Nf);
 extern MAT **MGVF(MAT **I, double vx, double vy, int Nc);
 extern void ellipseevolve(MAT *f, double *xc0, double *yc0, double *r0, double* t, int Np, double Er, double Ey);

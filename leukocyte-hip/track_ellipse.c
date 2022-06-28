@@ -76,7 +76,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
   long long  MGVF_time = 0;
   long long snake_time = 0;
 
-
   // Process each frame sequentially
   int frame_num;
   for (frame_num = 1; frame_num <= Nf; frame_num++) {   
@@ -118,10 +117,10 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
       ycavg[cell_num] = ycavg[cell_num] / (double) (frame_num > 10 ? 10 : frame_num);
 
       // Determine the range of the subimage surrounding the current position
-      u1[cell_num] = fmax(xci[cell_num] - 4.0 * R + 0.5, 0 );
-      u2[cell_num] = fmin(xci[cell_num] + 4.0 * R + 0.5, Iw - 1);
-      v1[cell_num] = fmax(yci[cell_num] - 2.0 * R + 1.5, 0 );    
-      v2[cell_num] = fmin(yci[cell_num] + 2.0 * R + 1.5, Ih - 1);
+      u1[cell_num] = std::fmax(xci[cell_num] - 4.0 * R + 0.5, 0 );
+      u2[cell_num] = std::fmin(xci[cell_num] + 4.0 * R + 0.5, Iw - 1);
+      v1[cell_num] = std::fmax(yci[cell_num] - 2.0 * R + 1.5, 0 );    
+      v2[cell_num] = std::fmin(yci[cell_num] + 2.0 * R + 1.5, Ih - 1);
 
       // Extract the subimage
       Isub[cell_num] = m_get(v2[cell_num] - v1[cell_num] + 1, u2[cell_num] - u1[cell_num] + 1);
@@ -178,8 +177,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
       // Output the updated center of each cell
       // printf("\n%d,%f,%f", cell_num, xci[cell_num], yci[cell_num]);
 
-
-
       // Free temporary memory
       m_free(Isub[cell_num]);
       m_free(Ix[cell_num]);
@@ -201,7 +198,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
     }
 
 #endif
-
 
     free(IMGVF);
 
@@ -484,7 +480,7 @@ void ellipseevolve(MAT *f, double *xc0, double *yc0, double *r0, double *t, int 
 double sum_m(MAT *matrix) {
   if (matrix == NULL) return 0.0;  
 
-  int i, j;
+  unsigned int i, j;
   double sum = 0.0;
   for (i = 0; i < matrix->m; i++)
     for (j = 0; j < matrix->n; j++)
@@ -498,7 +494,7 @@ double sum_m(MAT *matrix) {
 double sum_v(VEC *vector) {
   if (vector == NULL) return 0.0;  
 
-  int i;
+  unsigned int i;
   double sum = 0.0;
   for (i = 0; i < vector->dim; i++)
     sum += v_get_val(vector, i);

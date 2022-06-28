@@ -9,14 +9,14 @@
 #define MAX_RAD (RADIUS * 2)
 #define MaxR  (MAX_RAD + 2)
 
-// CUDA kernels
+// kernels
 #include "kernel_GICOV.h"
 #include "kernel_dilated.h"
 
 int main(int argc, char ** argv) {
 
   // Make sure the command line arguments have been specified
-  if (argc !=3)  {
+  if (argc != 3)  {
     fprintf(stderr, "Usage: %s <input file> <number of frames to process>", argv[0]);
     exit(EXIT_FAILURE);
   }
@@ -24,13 +24,11 @@ int main(int argc, char ** argv) {
   // Keep track of the start time of the program
   long long program_start_time = get_time();
 
-
-
-  // Let the user specify the number of frames to process
-  int num_frames = atoi(argv[2]);
-
   // Open video file
   char *video_file_name = argv[1];
+
+  // Specify the number of frames to process
+  int num_frames = atoi(argv[2]);
 
   avi_t *cell_file = AVI_open_input_file(video_file_name, 1);
   if (cell_file == NULL)  {
@@ -38,7 +36,6 @@ int main(int argc, char ** argv) {
     AVI_print_error(avi_err_msg);
     exit(EXIT_FAILURE);
   }
-
 
   // Compute the sine and cosine of the angle to each point in each sample circle
   //  (which are the same across all sample circles)
@@ -66,7 +63,6 @@ int main(int argc, char ** argv) {
   }
 
   float *host_strel = structuring_element(12);
-
 
   int i, j, *crow, *ccol, pair_counter = 0, x_result_len = 0, Iter = 20, ns = 4, k_count = 0, n;
   MAT *cellx, *celly, *A;
@@ -107,7 +103,6 @@ int main(int argc, char ** argv) {
   }
 
   memset(host_gicov, 0, grad_mem_size);
-
 
   // Offload the GICOV score computation to the GPU
   long long GICOV_start_time = get_time();
@@ -153,6 +148,8 @@ int main(int argc, char ** argv) {
 
   cudaMalloc((void**)&d_gicov, sizeof(float)*grad_m*grad_n);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   kernel_GICOV<<<global_work_size/work_group_size, work_group_size>>>(
     d_grad_x,
@@ -164,8 +161,12 @@ int main(int argc, char ** argv) {
     d_gicov,
     local_work_size,
     num_work_groups,
-    grad_m
-    );
+    grad_m);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (GICOV): %f (s)\n", time * 1e-9f);
 
   cudaMemcpy(host_gicov, d_gicov, sizeof(float)*grad_m*grad_n, cudaMemcpyDeviceToHost);
 
@@ -213,8 +214,16 @@ int main(int argc, char ** argv) {
   printf("image dilate: local_work_size = %zu, global_work_size = %zu \n", local_work_size, global_work_size);
 #endif
 
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   kernel_dilated<<<global_work_size/local_work_size, local_work_size>>>(
 	  d_strel, d_gicov, d_img_dilated, strel_m, strel_n, max_gicov_m, max_gicov_n);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (dilated): %f (s)\n", time * 1e-9f);
 
   cudaMemcpy(host_dilated, d_img_dilated, sizeof(float)*grad_m*grad_n, cudaMemcpyDeviceToHost);
 

@@ -23,13 +23,11 @@ int main(int argc, char ** argv) {
   // Keep track of the start time of the program
   long long program_start_time = get_time();
 
-
-
-  // Let the user specify the number of frames to process
-  int num_frames = atoi(argv[2]);
-
   // Open video file
   char *video_file_name = argv[1];
+
+  // Specify the number of frames to process
+  int num_frames = atoi(argv[2]);
 
   avi_t *cell_file = AVI_open_input_file(video_file_name, 1);
   if (cell_file == NULL)  {
@@ -37,7 +35,6 @@ int main(int argc, char ** argv) {
     AVI_print_error(avi_err_msg);
     exit(EXIT_FAILURE);
   }
-
 
   // Compute the sine and cosine of the angle to each point in each sample circle
   //  (which are the same across all sample circles)
@@ -137,29 +134,36 @@ int main(int argc, char ** argv) {
   buffer<float,1> d_grad_y(host_grad_y, grad_m * grad_n, props);
   buffer<float,1> d_gicov(grad_m * grad_n);
 
-
 #ifdef DEBUG
   printf("Find: local_work_size = %zu, global_work_size = %zu \n" ,work_group_size, global_work_size);
 #endif
 
-  q.submit([&](handler& cgh) {
-      auto grad_x_acc = d_grad_x.get_access<sycl_read>(cgh);
-      auto grad_y_acc = d_grad_y.get_access<sycl_read>(cgh);
-      auto sin_angle_acc = d_sin_angle.get_access<sycl_read>(cgh);
-      auto cos_angle_acc = d_cos_angle.get_access<sycl_read>(cgh);
-      auto tX_acc = d_tX.get_access<sycl_read>(cgh);
-      auto tY_acc = d_tY.get_access<sycl_read>(cgh);
-      auto gicov_acc = d_gicov.get_access<sycl_write>(cgh);
-
-      cgh.parallel_for<class gicov>(
-          nd_range<1>(range<1>(global_work_size), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel_GICOV.sycl"
-          });
-      });
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   q.submit([&](handler& cgh) {
-      auto gicov_acc = d_gicov.get_access<sycl_read>(cgh);
-      cgh.copy(gicov_acc, host_gicov);
+    auto grad_x_acc = d_grad_x.get_access<sycl_read>(cgh);
+    auto grad_y_acc = d_grad_y.get_access<sycl_read>(cgh);
+    auto sin_angle_acc = d_sin_angle.get_access<sycl_read>(cgh);
+    auto cos_angle_acc = d_cos_angle.get_access<sycl_read>(cgh);
+    auto tX_acc = d_tX.get_access<sycl_read>(cgh);
+    auto tY_acc = d_tY.get_access<sycl_read>(cgh);
+    auto gicov_acc = d_gicov.get_access<sycl_write>(cgh);
+
+    cgh.parallel_for<class gicov>(
+        nd_range<1>(range<1>(global_work_size), range<1>(work_group_size)), [=] (nd_item<1> item) {
+       #include "kernel_GICOV.sycl"
+    });
+  });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (GICOV): %f (s)\n", time * 1e-9f);
+
+  q.submit([&](handler& cgh) {
+    auto gicov_acc = d_gicov.get_access<sycl_read>(cgh);
+    cgh.copy(gicov_acc, host_gicov);
   });
   q.wait();
 
@@ -203,19 +207,27 @@ int main(int argc, char ** argv) {
   printf("image dilate: local_work_size = %zu, global_work_size = %zu \n", local_work_size, global_work_size);
 #endif
 
-  q.submit([&](handler& cgh) {
-      auto c_strel_acc = d_strel.get_access<sycl_read>(cgh);
-      auto img_acc = d_gicov.get_access<sycl_read>(cgh);
-      auto dilated_acc = d_img_dilated.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class dilated>(
-          nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
-#include "kernel_dilated.sycl"
-          });
-      });
+  q.wait();
+  start = std::chrono::steady_clock::now();
 
   q.submit([&](handler& cgh) {
-      auto dilated_acc = d_img_dilated.get_access<sycl_read>(cgh);
-      cgh.copy(dilated_acc, host_dilated);
+    auto c_strel_acc = d_strel.get_access<sycl_read>(cgh);
+    auto img_acc = d_gicov.get_access<sycl_read>(cgh);
+    auto dilated_acc = d_img_dilated.get_access<sycl_write>(cgh);
+    cgh.parallel_for<class dilated>(
+      nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
+      #include "kernel_dilated.sycl"
+    });
+  });
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (dilated): %f (s)\n", time * 1e-9f);
+
+  q.submit([&](handler& cgh) {
+    auto dilated_acc = d_img_dilated.get_access<sycl_read>(cgh);
+    cgh.copy(dilated_acc, host_dilated);
   });
   q.wait();
 

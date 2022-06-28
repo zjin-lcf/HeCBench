@@ -76,7 +76,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
   long long  MGVF_time = 0;
   long long snake_time = 0;
 
-
   // Process each frame sequentially
   int frame_num;
   for (frame_num = 1; frame_num <= Nf; frame_num++) {   
@@ -178,8 +177,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
       // Output the updated center of each cell
       // printf("\n%d,%f,%f", cell_num, xci[cell_num], yci[cell_num]);
 
-
-
       // Free temporary memory
       m_free(Isub[cell_num]);
       m_free(Ix[cell_num]);
@@ -201,7 +198,6 @@ void ellipsetrack(avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np,
     }
 
 #endif
-
 
     free(IMGVF);
 
@@ -484,7 +480,7 @@ void ellipseevolve(MAT *f, double *xc0, double *yc0, double *r0, double *t, int 
 double sum_m(MAT *matrix) {
   if (matrix == NULL) return 0.0;  
 
-  int i, j;
+  unsigned int i, j;
   double sum = 0.0;
   for (i = 0; i < matrix->m; i++)
     for (j = 0; j < matrix->n; j++)
@@ -498,7 +494,7 @@ double sum_m(MAT *matrix) {
 double sum_v(VEC *vector) {
   if (vector == NULL) return 0.0;  
 
-  int i;
+  unsigned int i;
   double sum = 0.0;
   for (i = 0; i < vector->dim; i++)
     sum += v_get_val(vector, i);
