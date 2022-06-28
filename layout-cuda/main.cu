@@ -17,6 +17,8 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <string.h>
+#include <chrono>
 #include <cuda.h>
 
 #define TREE_NUM 4096
@@ -34,8 +36,9 @@ struct ApplesOnTrees
 };
 
 __global__
-void AoSKernel(const AppleTree *__restrict trees, 
-               int *__restrict outBuf,int treeSize)
+void AoSKernel(const AppleTree *__restrict__ trees, 
+               int *__restrict__ outBuf,
+               int treeSize)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -46,10 +49,10 @@ void AoSKernel(const AppleTree *__restrict trees,
   outBuf[gid] = res;
 }
 
-
 __global__
-void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
-               int *__restrict outBuf,int treeSize)
+void SoAKernel(const ApplesOnTrees *__restrict__ applesOnTrees,
+               int *__restrict__ outBuf,
+               int treeSize)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -59,7 +62,6 @@ void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
   }
   outBuf[gid] = res;
 }
-
 
 int main(int argc, char * argv[])
 {
@@ -118,8 +120,16 @@ int main(int argc, char * argv[])
 
   cudaMemcpy(inputBuffer, data, inputSize, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
     AoSKernel<<<grid, block>>>((AppleTree*)inputBuffer, outputBuffer, treeSize);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
 
   cudaMemcpy(deviceResult, outputBuffer, outputSize, cudaMemcpyDeviceToHost);
 
@@ -133,9 +143,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
 
   //initialize soa data
   for (int i = 0; i < treeNumber; i++)
@@ -144,8 +154,16 @@ int main(int argc, char * argv[])
 
   cudaMemcpy(inputBuffer, data, inputSize, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
     SoAKernel<<<grid, block>>>((ApplesOnTrees*)inputBuffer, outputBuffer, treeSize);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
 
   cudaMemcpy(deviceResult, outputBuffer, outputSize, cudaMemcpyDeviceToHost);
 
@@ -159,9 +177,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
   
   cudaFree(inputBuffer);
   cudaFree(outputBuffer);
@@ -170,4 +188,3 @@ int main(int argc, char * argv[])
   free(data);
   return 0;
 }
-

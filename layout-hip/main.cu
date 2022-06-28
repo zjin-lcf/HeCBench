@@ -17,6 +17,8 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <string.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define TREE_NUM 4096
@@ -34,8 +36,9 @@ struct ApplesOnTrees
 };
 
 __global__
-void AoSKernel(const AppleTree *__restrict trees, 
-               int *__restrict outBuf,int treeSize)
+void AoSKernel(const AppleTree *__restrict__ trees, 
+               int *__restrict__ outBuf,
+               int treeSize)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -46,10 +49,10 @@ void AoSKernel(const AppleTree *__restrict trees,
   outBuf[gid] = res;
 }
 
-
 __global__
-void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
-               int *__restrict outBuf,int treeSize)
+void SoAKernel(const ApplesOnTrees *__restrict__ applesOnTrees,
+               int *__restrict__ outBuf,
+               int treeSize)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -59,7 +62,6 @@ void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
   }
   outBuf[gid] = res;
 }
-
 
 int main(int argc, char * argv[])
 {
@@ -98,8 +100,8 @@ int main(int argc, char * argv[])
   // compute reference for verification
   int *reference = (int *)malloc(outputSize);
   memset(reference,0,outputSize);
-  for(int i=0; i < treeNumber; i++)
-    for(int j=0; j < treeSize; j++)
+  for(int i = 0; i < treeNumber; i++)
+    for(int j = 0; j < treeSize; j++)
       reference[i] += i * treeSize + j;
 
   dim3 grid(treeNumber/GROUP_SIZE);
@@ -118,8 +120,16 @@ int main(int argc, char * argv[])
 
   hipMemcpy(inputBuffer, data, inputSize, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
-    hipLaunchKernelGGL(AoSKernel, dim3(grid), dim3(block), 0, 0, (AppleTree*)inputBuffer, outputBuffer, treeSize);
+    hipLaunchKernelGGL(AoSKernel, grid, block, 0, 0, (AppleTree*)inputBuffer, outputBuffer, treeSize);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
 
   hipMemcpy(deviceResult, outputBuffer, outputSize, hipMemcpyDeviceToHost);
 
@@ -133,9 +143,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
 
   //initialize soa data
   for (int i = 0; i < treeNumber; i++)
@@ -144,13 +154,18 @@ int main(int argc, char * argv[])
 
   hipMemcpy(inputBuffer, data, inputSize, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
-    hipLaunchKernelGGL(SoAKernel, dim3(grid), dim3(block), 0, 0, (ApplesOnTrees*)inputBuffer, outputBuffer, treeSize);
+    hipLaunchKernelGGL(SoAKernel, grid, block, 0, 0, (ApplesOnTrees*)inputBuffer, outputBuffer, treeSize);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
 
   hipMemcpy(deviceResult, outputBuffer, outputSize, hipMemcpyDeviceToHost);
-
-  hipFree(inputBuffer);
-  hipFree(outputBuffer);
 
   for(int i = 0; i < treeNumber; i++)
   {
@@ -162,13 +177,14 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
   
+  hipFree(inputBuffer);
+  hipFree(outputBuffer);
   free(deviceResult);
   free(reference);
   free(data);
   return 0;
 }
-

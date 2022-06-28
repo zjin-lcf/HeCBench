@@ -17,6 +17,8 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <string.h>
+#include <chrono>
 #include "common.h"
 
 #define TREE_NUM 4096
@@ -34,7 +36,8 @@ struct ApplesOnTrees
 };
 
 void AoSKernel(const AppleTree *__restrict trees, 
-               int *__restrict outBuf,int treeSize, nd_item<1> &item)
+               int *__restrict outBuf,
+               int treeSize, nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint res = 0;
@@ -47,7 +50,8 @@ void AoSKernel(const AppleTree *__restrict trees,
 
 
 void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
-               int *__restrict outBuf,int treeSize, nd_item<1> &item)
+               int *__restrict outBuf,
+               int treeSize, nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint res = 0;
@@ -57,7 +61,6 @@ void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
   }
   outBuf[gid] = res;
 }
-
 
 int main(int argc, char * argv[])
 {
@@ -123,8 +126,11 @@ int main(int argc, char * argv[])
     cgh.copy(data, in);
   });
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   auto trees = inputBuffer.reinterpret<AppleTree>(range<1>(treeNumber));
-  for (int i = 0; i < iterations; i++)
+  for (int i = 0; i < iterations; i++) {
     q.submit([&] (handler &cgh) {
       auto out = outputBuffer.get_access<sycl_discard_write>(cgh);
       auto in = trees.get_access<sycl_read>(cgh);
@@ -132,6 +138,12 @@ int main(int argc, char * argv[])
         AoSKernel(in.get_pointer(), out.get_pointer(), treeSize, item);
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
 
   q.submit([&] (handler &cgh) {
     auto out = outputBuffer.get_access<sycl_read>(cgh);
@@ -148,9 +160,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
 
   //initialize soa data
   for (int i = 0; i < treeNumber; i++)
@@ -163,7 +175,11 @@ int main(int argc, char * argv[])
   });
 
   auto apples = inputBuffer.reinterpret<ApplesOnTrees>(range<1>(treeNumber));
-  for (int i = 0; i < iterations; i++)
+
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iterations; i++) {
     q.submit([&] (handler &cgh) {
       auto out = outputBuffer.get_access<sycl_discard_write>(cgh);
       auto in = apples.get_access<sycl_read>(cgh);
@@ -171,6 +187,12 @@ int main(int argc, char * argv[])
         SoAKernel(in.get_pointer(), out.get_pointer(), treeSize, item);
       });
     });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
 
   q.submit([&] (handler &cgh) {
     auto out = outputBuffer.get_access<sycl_read>(cgh);
@@ -187,13 +209,12 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
   
   free(deviceResult);
   free(reference);
   free(data);
   return 0;
 }
-
