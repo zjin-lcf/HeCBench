@@ -14,11 +14,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
 #include "timer.h"
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 256
+#define NUM 512
 
 // block size
 #define BLOCK_SIZE 128
@@ -31,24 +30,21 @@
 /** SOR relaxation parameter */
 const Real omega = 1.85f;
 
-
-///////////////////////////////////////////////////////////////////////////////
-
 /** Function to evaluate coefficient matrix and right-hand side vector.
  * 
- * \param[in]		rowmax		number of rows
- * \param[in]		colmax		number of columns
- * \param[in]		th_cond		thermal conductivity
- * \param[in]		dx				grid size in x dimension (uniform)
- * \param[in]		dy				grid size in y dimension (uniform)
- * \param[in]		width			width of plate (z dimension)
- * \param[in]		TN				temperature at top boundary
- * \param[out]	aP				array of self coefficients
- * \param[out]	aW				array of west neighbor coefficients
- * \param[out]	aE				array of east neighbor coefficients
- * \param[out]	aS				array of south neighbor coefficients
- * \param[out]	aN				array of north neighbor coefficients
- * \param[out]	b					right-hand side array
+ * \param[in]   rowmax   number of rows
+ * \param[in]   colmax   number of columns
+ * \param[in]   th_cond  thermal conductivity
+ * \param[in]   dx       grid size in x dimension (uniform)
+ * \param[in]   dy       grid size in y dimension (uniform)
+ * \param[in]   width    width of plate (z dimension)
+ * \param[in]   TN       temperature at top boundary
+ * \param[out]  aP       array of self coefficients
+ * \param[out]  aW       array of west neighbor coefficients
+ * \param[out]  aE       array of east neighbor coefficients
+ * \param[out]  aS       array of south neighbor coefficients
+ * \param[out]  aN       array of north neighbor coefficients
+ * \param[out]  b        right-hand side array
  */
 void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
     Real width, Real TN, Real * aP, Real * aW, Real * aE, 
@@ -99,8 +95,6 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
     } // end for row
   } // end for col
 } // end fill_coeffs
-
-///////////////////////////////////////////////////////////////////////////////
 
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
  * 
@@ -177,13 +171,13 @@ int main (void) {
   // print problem info
   printf("Problem size: %d x %d \n", NUM, NUM);
 
-  StartTimer();
-
   // iteration loop
-#pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], b[0:size], \
-                                bl_norm_L2[0:size_norm]) \
+#pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], \
+                                b[0:size], bl_norm_L2[0:size_norm]) \
                         map(tofrom: temp_red[0:size_temp], temp_black[0:size_temp])
 {
+  StartTimer();
+
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
@@ -219,8 +213,8 @@ int main (void) {
     #pragma omp target teams distribute parallel for collapse(2)
     for (int row = 1; row <= NUM/2; row++) {
       for (int col = 1; col <= NUM; col++) {
-        int ind_black = col * ((NUM >> 1) + 2) + row;  				// local (black) index
-        int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1);	// global index
+        int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
+        int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
 
         Real temp_old = temp_black[ind_black];
 
@@ -241,9 +235,7 @@ int main (void) {
 
     // transfer residual value(s) back to CPU and 
     // add black cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
+    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     // calculate residual
     norm_L2 = sqrt(norm_L2 / ((Real)size));
@@ -251,17 +243,13 @@ int main (void) {
     if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
 
     // if tolerance has been reached, end SOR iterations
-    if (norm_L2 < tol) {
-      break;
-    }	
+    if (norm_L2 < tol) break;
   }
-}
 
   double runtime = GetTimer();
-
   printf("GPU\n");
-  printf("Iterations: %i\n", iter);
-  printf("Total time: %f s\n", runtime / 1000.0);
+  printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
+}
 
   // print temperature data to file
   FILE * pfile;
