@@ -18,6 +18,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <omp.h>
 
 #define TREE_NUM 4096
@@ -33,7 +34,6 @@ struct ApplesOnTrees
 {
   int trees[TREE_NUM];
 };
-
 
 int main(int argc, char * argv[])
 {
@@ -87,6 +87,8 @@ int main(int argc, char * argv[])
 
   AppleTree *trees = (AppleTree*) data;
 
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < iterations; n++) {
     #pragma omp target teams distribute parallel for thread_limit(GROUP_SIZE) 
     for (uint gid = 0; gid < treeNumber; gid++) 
@@ -100,6 +102,10 @@ int main(int argc, char * argv[])
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
+
   #pragma omp target update from (output[0:treeNumber])
 
   for(int i=0; i< treeNumber; i++)
@@ -112,9 +118,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
 
   //initialize soa data
   for (int i = 0; i < treeNumber; i++)
@@ -124,6 +130,8 @@ int main(int argc, char * argv[])
   #pragma omp target update to (data[0:elements])
 
   ApplesOnTrees *applesOnTrees = (ApplesOnTrees*) data;
+
+  start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < iterations; n++) {
     #pragma omp target teams distribute parallel for thread_limit(GROUP_SIZE) 
@@ -138,6 +146,10 @@ int main(int argc, char * argv[])
     }
   }
 
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
+
   #pragma omp target update from (output[0:treeNumber])
 
   for(int i=0; i< treeNumber; i++)
@@ -150,9 +162,9 @@ int main(int argc, char * argv[])
   }
 
   if (fail)
-    std::cout << "Failed\n";
+    std::cout << "FAIL\n";
   else
-    std::cout << "Passed\n";
+    std::cout << "PASS\n";
 
 }
 
