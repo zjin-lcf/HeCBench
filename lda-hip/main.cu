@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -100,9 +101,13 @@ int main(int argc, char* argv[]) {
   // training
   hipMemset(d_vali, 0, sizeof(bool) * num_cols); 
   bool init_gamma = false;
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (i = 0; i < repeat; i++) {
-    if (i == 0) init_gamma = true;
-    hipLaunchKernelGGL(EstepKernel, dim3(block_cnt), dim3(block_dim), 4 * num_topics * sizeof(float), 0, 
+    init_gamma = (i == 0) ? true : false;
+    EstepKernel<<<block_cnt, block_dim, 4 * num_topics * sizeof(float)>>>(
       d_cols,
       d_indptr,
       d_vali,
@@ -118,10 +123,19 @@ int main(int argc, char* argv[]) {
       d_locks);
   }
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (training): %f (s)\n", (time * 1e-9f) / repeat);
+
   // validation
   hipMemset(d_vali, 0xFFFFFFFF, sizeof(bool) * num_cols); 
+
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   for (i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(EstepKernel, dim3(block_cnt), dim3(block_dim), 4 * num_topics * sizeof(float), 0, 
+    EstepKernel<<<block_cnt, block_dim, 4 * num_topics * sizeof(float)>>>(
       d_cols,
       d_indptr,
       d_vali,
@@ -136,6 +150,11 @@ int main(int argc, char* argv[]) {
       d_vali_losses,
       d_locks);
   }
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (validation): %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(vali_losses.data(), d_vali_losses, sizeof(float) * block_cnt, hipMemcpyDeviceToHost);
   hipMemcpy(train_losses.data(), d_train_losses, sizeof(float) * block_cnt, hipMemcpyDeviceToHost);

@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -100,8 +101,12 @@ int main(int argc, char* argv[]) {
   // training
   cudaMemset(d_vali, 0, sizeof(bool) * num_cols); 
   bool init_gamma = false;
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (i = 0; i < repeat; i++) {
-    if (i == 0) init_gamma = true;
+    init_gamma = (i == 0) ? true : false;
     EstepKernel<<<block_cnt, block_dim, 4 * num_topics * sizeof(float)>>>(
       d_cols,
       d_indptr,
@@ -118,8 +123,17 @@ int main(int argc, char* argv[]) {
       d_locks);
   }
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (training): %f (s)\n", (time * 1e-9f) / repeat);
+
   // validation
   cudaMemset(d_vali, 0xFFFFFFFF, sizeof(bool) * num_cols); 
+
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
   for (i = 0; i < repeat; i++) {
     EstepKernel<<<block_cnt, block_dim, 4 * num_topics * sizeof(float)>>>(
       d_cols,
@@ -136,6 +150,11 @@ int main(int argc, char* argv[]) {
       d_vali_losses,
       d_locks);
   }
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (validation): %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(vali_losses.data(), d_vali_losses, sizeof(float) * block_cnt, cudaMemcpyDeviceToHost);
   cudaMemcpy(train_losses.data(), d_train_losses, sizeof(float) * block_cnt, cudaMemcpyDeviceToHost);

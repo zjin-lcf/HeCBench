@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -91,8 +92,11 @@ int main(int argc, char* argv[]) {
   {
     // training
     bool init_gamma = false;
+
+    auto start = std::chrono::steady_clock::now();
+
     for (i = 0; i < repeat; i++) {
-      if (i == 0) init_gamma = true;
+      init_gamma = (i == 0) ? true : false;
       EstepKernel<block_cnt, block_dim, 4 * num_topics>(
         d_cols,
         d_indptr,
@@ -108,11 +112,17 @@ int main(int argc, char* argv[]) {
         d_vali_losses,
         d_locks);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (training): %f (s)\n", (time * 1e-9f) / repeat);
 
     // validation
     memset(d_vali, 0xFFFFFFFF, sizeof(bool) * num_cols); 
     #pragma omp target update to (d_vali[0:num_cols])
 
+    start = std::chrono::steady_clock::now();
+
     for (i = 0; i < repeat; i++) {
       EstepKernel<block_cnt, block_dim, 4 * num_topics>(
         d_cols,
@@ -129,6 +139,10 @@ int main(int argc, char* argv[]) {
         d_vali_losses,
         d_locks);
     }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (validation): %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   float total_train_loss = std::accumulate(train_losses.begin(), train_losses.end(), 0.0f);
