@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 /** Problem size along one side; total number of cells is this squared */
@@ -31,74 +32,76 @@
 #define DOUBLE
 
 #ifdef DOUBLE
-#define Real double
 
-#define FMIN std::fmin
-#define FMAX std::fmax
-#define FABS std::fabs
-#define SQRT std::sqrt
+  #define Real double
+  
+  #define FMIN std::fmin
+  #define FMAX std::fmax
+  #define FABS std::fabs
+  #define SQRT std::sqrt
+  
+  #define ZERO 0.0
+  #define ONE 1.0
+  #define TWO 2.0
+  #define FOUR 4.0
+  
+  #define SMALL 1.0e-10;
+  
+  /** Reynolds number */
+  const Real Re_num = 1000.0;
+  
+  /** SOR relaxation parameter */
+  const Real omega = 1.7;
+  
+  /** Discretization mixture parameter (gamma) */
+  const Real mix_param = 0.9;
+  
+  /** Safety factor for time step modification */
+  const Real tau = 0.5;
+  
+  /** Body forces in x- and y- directions */
+  const Real gx = 0.0;
+  const Real gy = 0.0;
+  
+  /** Domain size (non-dimensional) */
+  #define xLength 1.0
+  #define yLength 1.0
 
-#define ZERO 0.0
-#define ONE 1.0
-#define TWO 2.0
-#define FOUR 4.0
-
-#define SMALL 1.0e-10;
-
-/** Reynolds number */
-const Real Re_num = 1000.0;
-
-/** SOR relaxation parameter */
-const Real omega = 1.7;
-
-/** Discretization mixture parameter (gamma) */
-const Real mix_param = 0.9;
-
-/** Safety factor for time step modification */
-const Real tau = 0.5;
-
-/** Body forces in x- and y- directions */
-const Real gx = 0.0;
-const Real gy = 0.0;
-
-/** Domain size (non-dimensional) */
-#define xLength 1.0
-#define yLength 1.0
 #else
-#define Real float
 
+  #define Real float
 
-#define ZERO 0.0f
-#define ONE 1.0f
-#define TWO 2.0f
-#define FOUR 4.0f
-#define SMALL 1.0e-10f;
+  #define ZERO 0.0f
+  #define ONE 1.0f
+  #define TWO 2.0f
+  #define FOUR 4.0f
+  #define SMALL 1.0e-10f;
+  
+  #define FMIN std::fminf
+  #define FMAX std::fmaxf
+  #define FABS std::fabsf
+  #define SQRT std::sqrtf
+  /** Reynolds number */
+  const Real Re_num = 1000.0f;
+  
+  /** SOR relaxation parameter */
+  const Real omega = 1.7f;
+  
+  /** Discretization mixture parameter (gamma) */
+  const Real mix_param = 0.9f;
+  
+  /** Safety factor for time step modification */
+  const Real tau = 0.5f;
+  
+  /** Body forces in x- and y- directions */
+  const Real gx = 0.0f;
+  const Real gy = 0.0f;
+  
+  /** Domain size (non-dimensional) */
+  #define xLength 1.0f
+  #define yLength 1.0f
 
-#define FMIN std::fminf
-#define FMAX std::fmaxf
-#define FABS std::fabsf
-#define SQRT std::sqrtf
-/** Reynolds number */
-const Real Re_num = 1000.0f;
-
-/** SOR relaxation parameter */
-const Real omega = 1.7f;
-
-/** Discretization mixture parameter (gamma) */
-const Real mix_param = 0.9f;
-
-/** Safety factor for time step modification */
-const Real tau = 0.5f;
-
-/** Body forces in x- and y- directions */
-const Real gx = 0.0f;
-const Real gy = 0.0f;
-
-/** Domain size (non-dimensional) */
-#define xLength 1.0f
-#define yLength 1.0f
 #endif
-
 
 /** Mesh sizes */
 const Real dx = xLength / NUM;
@@ -172,9 +175,7 @@ void set_BCs_host (Real* u, Real* v)
 
 } // end set_BCs_host
 
-
 ///////////////////////////////////////////////////////////////////////////////
-
 
 int main (int argc, char *argv[])
 {
@@ -281,17 +282,17 @@ int main (int argc, char *argv[])
   Real max_u = SMALL;
   Real max_v = SMALL;
   // get max velocity for initial values (including BCs)
-#pragma unroll
+  #pragma unroll
   for (int col = 0; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
       max_u = FMAX(max_u, FABS( u(col, row) ));
     }
   }
 
-#pragma unroll
+  #pragma unroll
   for (int col = 1; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
       max_v = FMAX(max_v, FABS( v(col, row) ));
     }
@@ -305,7 +306,6 @@ int main (int argc, char *argv[])
 #endif
     queue q(dev_sel);
 
-    ////////////////////////////////////////
     // allocate and transfer device memory
     buffer<Real,1> u_d(u, size);
     buffer<Real,1> v_d(v, size);
@@ -327,6 +327,9 @@ int main (int argc, char *argv[])
     // time-step size based on grid and Reynolds number
     Real dt_Re = 0.5 * Re_num / ((1.0 / (dx * dx)) + (1.0 / (dy * dy)));
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     // time iteration loop
     while (time < time_end) {
 
@@ -341,45 +344,44 @@ int main (int argc, char *argv[])
       // calculate F and G    
       //calculate_F <<<grid_F, block_F>>> (dt, u_d, v_d, F_d);
       q.submit([&](handler &h) {
-          auto u = u_d.get_access<sycl_read>(h);
-          auto v = v_d.get_access<sycl_read>(h);
-          auto F = F_d.get_access<sycl_write>(h);
-          h.parallel_for<class calculate_F>(nd_range<2>(gws_F, lws_F), [=] (nd_item<2> item) {
-#include "calculate_F.sycl"
-              });
-          });
+        auto u = u_d.get_access<sycl_read>(h);
+        auto v = v_d.get_access<sycl_read>(h);
+        auto F = F_d.get_access<sycl_write>(h);
+        h.parallel_for<class calculate_F>(nd_range<2>(gws_F, lws_F), [=] (nd_item<2> item) {
+          #include "calculate_F.sycl"
+        });
+      });
 
       //    calculate_G <<<grid_G, block_G>>> (dt, u_d, v_d, G_d);
       q.submit([&](handler &h) {
-          auto u = u_d.get_access<sycl_read>(h);
-          auto v = v_d.get_access<sycl_read>(h);
-          auto G = G_d.get_access<sycl_write>(h);
-          h.parallel_for<class calculate_G>(nd_range<2>(gws_G, lws_G), [=] (nd_item<2> item) {
-#include "calculate_G.sycl"
-              });
-          });
-
+        auto u = u_d.get_access<sycl_read>(h);
+        auto v = v_d.get_access<sycl_read>(h);
+        auto G = G_d.get_access<sycl_write>(h);
+        h.parallel_for<class calculate_G>(nd_range<2>(gws_G, lws_G), [=] (nd_item<2> item) {
+          #include "calculate_G.sycl"
+        });
+      });
 
       // get L2 norm of initial pressure
       //sum_pressure <<<grid_pr, block_pr>>> (pres_red_d, pres_black_d, pres_sum_d);
       q.submit([&](handler &h) {
-          auto pres_red = pres_red_d.get_access<sycl_read>(h);
-          auto pres_black = pres_black_d.get_access<sycl_read>(h);
-          auto pres_sum = pres_sum_d.get_access<sycl_write>(h);
-          accessor <Real, 1, sycl_read_write, access::target::local> sum_cache (BLOCK_SIZE, h);
-          h.parallel_for<class sum_pressure>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "sum_pressure.sycl"
-              });
-          });
+        auto pres_red = pres_red_d.get_access<sycl_read>(h);
+        auto pres_black = pres_black_d.get_access<sycl_read>(h);
+        auto pres_sum = pres_sum_d.get_access<sycl_write>(h);
+        accessor <Real, 1, sycl_read_write, access::target::local> sum_cache (BLOCK_SIZE, h);
+        h.parallel_for<class sum_pressure>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+          #include "sum_pressure.sycl"
+        });
+      });
+
       q.submit([&] (handler &h) {
-          auto pres_sum_d_acc = pres_sum_d.get_access<sycl_read>(h);
-          h.copy(pres_sum_d_acc, pres_sum);
-          });
-      q.wait();
+        auto pres_sum_d_acc = pres_sum_d.get_access<sycl_read>(h);
+        h.copy(pres_sum_d_acc, pres_sum);
+      }).wait();
       //cudaMemcpy (pres_sum, pres_sum_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
 
       Real p0_norm = ZERO;
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < size_res; ++i) {
         p0_norm += pres_sum[i];
       }
@@ -399,72 +401,70 @@ int main (int argc, char *argv[])
         // set pressure boundary conditions
         //set_horz_pres_BCs <<<grid_hpbc, block_hpbc>>> (pres_red_d, pres_black_d);
         q.submit([&](handler &h) {
-            auto pres_red = pres_red_d.get_access<sycl_read_write>(h);
-            auto pres_black = pres_black_d.get_access<sycl_read_write>(h);
-            h.parallel_for<class set_horz_pres_BCs>(nd_range<1>(gws_hpbc, lws_hpbc), [=] (nd_item<1> item) {
-#include "set_horz_pres_BCs.sycl"
-                });
-            });
+          auto pres_red = pres_red_d.get_access<sycl_read_write>(h);
+          auto pres_black = pres_black_d.get_access<sycl_read_write>(h);
+          h.parallel_for<class set_horz_pres_BCs>(nd_range<1>(gws_hpbc, lws_hpbc), [=] (nd_item<1> item) {
+            #include "set_horz_pres_BCs.sycl"
+          });
+        });
 
         //      set_vert_pres_BCs <<<grid_vpbc, block_hpbc>>> (pres_red_d, pres_black_d);
         q.submit([&](handler &h) {
-            auto pres_red = pres_red_d.get_access<sycl_read_write>(h);
-            auto pres_black = pres_black_d.get_access<sycl_read_write>(h);
-            h.parallel_for<class set_vert_pres_BCs>(nd_range<1>(gws_vpbc, lws_vpbc), [=] (nd_item<1> item) {
-#include "set_vert_pres_BCs.sycl"
-                });
-            });
+          auto pres_red = pres_red_d.get_access<sycl_read_write>(h);
+          auto pres_black = pres_black_d.get_access<sycl_read_write>(h);
+          h.parallel_for<class set_vert_pres_BCs>(nd_range<1>(gws_vpbc, lws_vpbc), [=] (nd_item<1> item) {
+            #include "set_vert_pres_BCs.sycl"
+          });
+        });
 
         // update red cells
         //      red_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_black_d, pres_red_d);
         q.submit([&](handler &h) {
-            auto pres_red = pres_red_d.get_access<sycl_write>(h);
-            auto pres_black = pres_black_d.get_access<sycl_read>(h);
-            auto F = F_d.get_access<sycl_read>(h);
-            auto G = G_d.get_access<sycl_read>(h);
-            h.parallel_for<class red_kernel>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "red_kernel.sycl"
-                });
-            });
-
+          auto pres_red = pres_red_d.get_access<sycl_write>(h);
+          auto pres_black = pres_black_d.get_access<sycl_read>(h);
+          auto F = F_d.get_access<sycl_read>(h);
+          auto G = G_d.get_access<sycl_read>(h);
+          h.parallel_for<class red_kernel>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+            #include "red_kernel.sycl"
+          });
+        });
 
         // update black cells
         //      black_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d);
         q.submit([&](handler &h) {
-            auto pres_red = pres_red_d.get_access<sycl_read>(h);
-            auto pres_black = pres_black_d.get_access<sycl_write>(h);
-            auto F = F_d.get_access<sycl_read>(h);
-            auto G = G_d.get_access<sycl_read>(h);
-            h.parallel_for<class black_kernel>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "black_kernel.sycl"
-                });
-            });
-
+          auto pres_red = pres_red_d.get_access<sycl_read>(h);
+          auto pres_black = pres_black_d.get_access<sycl_write>(h);
+          auto F = F_d.get_access<sycl_read>(h);
+          auto G = G_d.get_access<sycl_read>(h);
+          h.parallel_for<class black_kernel>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+            #include "black_kernel.sycl"
+          });
+        });
 
         // calculate residual values
         //calc_residual <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d, res_d);
         q.submit([&](handler &h) {
-            auto pres_red = pres_red_d.get_access<sycl_read>(h);
-            auto pres_black = pres_black_d.get_access<sycl_read>(h);
-            auto F = F_d.get_access<sycl_read>(h);
-            auto G = G_d.get_access<sycl_read>(h);
-            auto res_array = res_d.get_access<sycl_write>(h);
-            accessor <Real, 1, sycl_read_write, access::target::local> sum_cache (BLOCK_SIZE, h);
-            h.parallel_for<class calc_residual>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "calc_residual.sycl"
-                });
-            });
+          auto pres_red = pres_red_d.get_access<sycl_read>(h);
+          auto pres_black = pres_black_d.get_access<sycl_read>(h);
+          auto F = F_d.get_access<sycl_read>(h);
+          auto G = G_d.get_access<sycl_read>(h);
+          auto res_array = res_d.get_access<sycl_write>(h);
+          accessor <Real, 1, sycl_read_write, access::target::local> sum_cache (BLOCK_SIZE, h);
+          h.parallel_for<class calc_residual>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+            #include "calc_residual.sycl"
+          });
+        });
 
         q.submit([&] (handler &h) {
-            auto res_d_acc = res_d.get_access<sycl_read>(h);
-            h.copy(res_d_acc, res);
-            });
-        q.wait();
+          auto res_d_acc = res_d.get_access<sycl_read>(h);
+          h.copy(res_d_acc, res);
+        }).wait();
+
         // transfer residual value(s) back to CPU
         //      cudaMemcpy (res, res_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
 
         norm_L2 = ZERO;
-#pragma unroll
+        #pragma unroll
         for (int i = 0; i < size_res; ++i) {
           norm_L2 += res[i];
         }
@@ -485,47 +485,47 @@ int main (int argc, char *argv[])
 
       //calculate_u <<<grid_pr, block_pr>>> (dt, F_d, pres_red_d, pres_black_d, u_d, max_u_d);
       q.submit([&](handler &h) {
-          auto pres_red = pres_red_d.get_access<sycl_read>(h);
-          auto pres_black = pres_black_d.get_access<sycl_read>(h);
-          auto F = F_d.get_access<sycl_read>(h);
-          auto u = u_d.get_access<sycl_write>(h);
-          auto max_u = max_u_d.get_access<sycl_write>(h);
-          accessor <Real, 1, sycl_read_write, access::target::local> max_cache (BLOCK_SIZE, h);
-          h.parallel_for<class calculate_u>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "calculate_u.sycl"
-              });
-          });
+        auto pres_red = pres_red_d.get_access<sycl_read>(h);
+        auto pres_black = pres_black_d.get_access<sycl_read>(h);
+        auto F = F_d.get_access<sycl_read>(h);
+        auto u = u_d.get_access<sycl_write>(h);
+        auto max_u = max_u_d.get_access<sycl_write>(h);
+        accessor <Real, 1, sycl_read_write, access::target::local> max_cache (BLOCK_SIZE, h);
+        h.parallel_for<class calculate_u>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+          #include "calculate_u.sycl"
+        });
+      });
 
       q.submit([&] (handler &h) {
-          auto max_u_acc = max_u_d.get_access<sycl_read>(h);
-          h.copy(max_u_acc, max_u_arr);
-          });
+        auto max_u_acc = max_u_d.get_access<sycl_read>(h);
+        h.copy(max_u_acc, max_u_arr);
+      });
       //    cudaMemcpy (max_u_arr, max_u_d, size_max * sizeof(Real), cudaMemcpyDeviceToHost);
 
       //    calculate_v <<<grid_pr, block_pr>>> (dt, G_d, pres_red_d, pres_black_d, v_d, max_v_d);
       q.submit([&](handler &h) {
-          auto pres_red = pres_red_d.get_access<sycl_read>(h);
-          auto pres_black = pres_black_d.get_access<sycl_read>(h);
-          auto G = G_d.get_access<sycl_read>(h);
-          auto v = v_d.get_access<sycl_write>(h);
-          auto max_v = max_v_d.get_access<sycl_write>(h);
-          accessor <Real, 1, sycl_read_write, access::target::local> max_cache (BLOCK_SIZE, h);
-          h.parallel_for<class calculate_v>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
-#include "calculate_v.sycl"
-              });
-          });
+        auto pres_red = pres_red_d.get_access<sycl_read>(h);
+        auto pres_black = pres_black_d.get_access<sycl_read>(h);
+        auto G = G_d.get_access<sycl_read>(h);
+        auto v = v_d.get_access<sycl_write>(h);
+        auto max_v = max_v_d.get_access<sycl_write>(h);
+        accessor <Real, 1, sycl_read_write, access::target::local> max_cache (BLOCK_SIZE, h);
+        h.parallel_for<class calculate_v>(nd_range<2>(gws_pr, lws_pr), [=] (nd_item<2> item) {
+          #include "calculate_v.sycl"
+        });
+      });
+
       q.submit([&] (handler &h) {
-          auto max_v_acc = max_v_d.get_access<sycl_read>(h);
-          h.copy(max_v_acc, max_v_arr);
-          });
+        auto max_v_acc = max_v_d.get_access<sycl_read>(h);
+        h.copy(max_v_acc, max_v_arr);
+      }).wait();
       //    cudaMemcpy (max_v_arr, max_v_d, size_max * sizeof(Real), cudaMemcpyDeviceToHost);
-      q.wait();
 
       // get maximum u- and v- velocities
       max_v = SMALL;
       max_u = SMALL;
 
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < size_max; ++i) {
         Real test_u = max_u_arr[i];
         max_u = FMAX(max_u, test_u);
@@ -537,13 +537,12 @@ int main (int argc, char *argv[])
       // set velocity boundary conditions
       //set_BCs <<<grid_bcs, block_bcs>>> (u_d, v_d);
       q.submit([&](handler &h) {
-          auto u = u_d.get_access<sycl_read_write>(h);
-          auto v = v_d.get_access<sycl_read_write>(h);
-          h.parallel_for<class set_BCs>(nd_range<1>(gws_bcs, lws_bcs), [=] (nd_item<1> item) {
-#include "set_BCs.sycl"
-              });
-          });
-      q.wait();
+        auto u = u_d.get_access<sycl_read_write>(h);
+        auto v = v_d.get_access<sycl_read_write>(h);
+        h.parallel_for<class set_BCs>(nd_range<1>(gws_bcs, lws_bcs), [=] (nd_item<1> item) {
+          #include "set_BCs.sycl"
+        });
+      }).wait();
 
       // increase time
       time += dt;
@@ -553,6 +552,9 @@ int main (int argc, char *argv[])
 
     } // end while
 
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("\nTotal execution time of the iteration loop: %f (s)\n", elapsed_time * 1e-9f);
   }
 
   // transfer final temperature values back implicitly

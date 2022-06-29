@@ -22,9 +22,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
-
-// CUDA libraries
+#include <chrono>
 #include <cuda.h>
 
 /** Problem size along one side; total number of cells is this squared */
@@ -105,7 +103,6 @@ const Real gy = 0.0f;
 #define yLength 1.0f
 #endif
 
-
 /** Mesh sizes */
 const Real dx = xLength / NUM;
 const Real dy = yLength / NUM;
@@ -125,7 +122,7 @@ const Real dy = yLength / NUM;
 #define pres_black(I, J) pres_black[((I) * ((NUM_2) + 2)) + (J)]
 
 ///////////////////////////////////////////////////////////////////////////////
-  __host__
+__host__
 void set_BCs_host (Real* u, Real* v) 
 {
   int ind;
@@ -180,8 +177,8 @@ void set_BCs_host (Real* u, Real* v)
 } // end set_BCs_host
 
 ///////////////////////////////////////////////////////////////////////////////
-  __global__
-void set_BCs (Real* u, Real* v) 
+__global__
+void set_BCs (Real*__restrict__ u, Real*__restrict__ v) 
 {
   int ind = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
 
@@ -231,9 +228,11 @@ void set_BCs (Real* u, Real* v)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__ 
-void calculate_F (const Real dt, const Real* u, const Real* v,
-    Real* F) 
+__global__ 
+void calculate_F (const Real dt,
+                  const Real*__restrict__ u,
+                  const Real*__restrict__ v,
+                        Real*__restrict__ F) 
 {  
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -278,9 +277,11 @@ void calculate_F (const Real dt, const Real* u, const Real* v,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__ 
-void calculate_G (const Real dt, const Real* u, const Real* v,
-    Real* G) 
+__global__ 
+void calculate_G (const Real dt,
+                  const Real*__restrict__ u,
+                  const Real*__restrict__ v,
+                        Real*__restrict__ G) 
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -325,9 +326,10 @@ void calculate_G (const Real dt, const Real* u, const Real* v,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__ 
-void sum_pressure (const Real* pres_red, const Real* pres_black, 
-    Real* pres_sum) 
+__global__ 
+void sum_pressure (const Real*__restrict__ pres_red,
+                   const Real*__restrict__ pres_black, 
+                         Real*__restrict__ pres_sum) 
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -364,8 +366,8 @@ void sum_pressure (const Real* pres_red, const Real* pres_black,
 } // end sum_pressure
 
 ///////////////////////////////////////////////////////////////////////////////
-  __global__ 
-void set_horz_pres_BCs (Real* pres_red, Real* pres_black) 
+__global__ 
+void set_horz_pres_BCs (Real*__restrict__ pres_red, Real*__restrict__ pres_black) 
 {
   int col = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   col = (col * 2) - 1;
@@ -384,8 +386,8 @@ void set_horz_pres_BCs (Real* pres_red, Real* pres_black)
 
 //////////////////////////////////////////////////////////////////////////////
 
-  __global__
-void set_vert_pres_BCs (Real* pres_red, Real* pres_black) 
+__global__
+void set_vert_pres_BCs (Real*__restrict__ pres_red, Real*__restrict__ pres_black) 
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
 
@@ -411,10 +413,12 @@ void set_vert_pres_BCs (Real* pres_red, Real* pres_black)
  * \param[in]    pres_black  pressure values of black cells
  * \param[inout]  pres_red  pressure values of red cells
  */
-  __global__
-void red_kernel (const Real dt, const Real* F, 
-    const Real* G, const Real* pres_black,
-    Real* pres_red) 
+__global__
+void red_kernel (const Real dt,
+                 const Real*__restrict__ F, 
+                 const Real*__restrict__ G,
+                 const Real*__restrict__ pres_black,
+                       Real*__restrict__ pres_red) 
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -450,10 +454,12 @@ void red_kernel (const Real dt, const Real* F,
  * \param[in]    pres_red  pressure values of red cells
  * \param[inout]  pres_black  pressure values of black cells
  */
-  __global__ 
-void black_kernel (const Real dt, const Real* F, 
-    const Real* G, const Real* pres_red, 
-    Real* pres_black) 
+__global__ 
+void black_kernel (const Real dt,
+                   const Real*__restrict__ F, 
+                   const Real*__restrict__ G,
+                   const Real*__restrict__ pres_red, 
+                         Real*__restrict__ pres_black) 
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -481,10 +487,13 @@ void black_kernel (const Real dt, const Real* F,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__
-void calc_residual (const Real dt, const Real* F, const Real* G, 
-    const Real* pres_red, const Real* pres_black,
-    Real* res_array)
+__global__
+void calc_residual (const Real dt,
+                    const Real*__restrict__ F,
+                    const Real*__restrict__ G, 
+                    const Real*__restrict__ pres_red,
+                    const Real*__restrict__ pres_black,
+                          Real*__restrict__ res_array)
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -550,10 +559,13 @@ void calc_residual (const Real dt, const Real* F, const Real* G,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__ 
-void calculate_u (const Real dt, const Real* F, 
-    const Real* pres_red, const Real* pres_black, 
-    Real* u, Real* max_u)
+__global__ 
+void calculate_u (const Real dt,
+                  const Real*__restrict__ F, 
+                  const Real*__restrict__ pres_red,
+                  const Real*__restrict__ pres_black, 
+                        Real*__restrict__ u,
+                        Real*__restrict__ max_u)
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -621,16 +633,17 @@ void calculate_u (const Real dt, const Real* F,
   if (threadIdx.x == 0) {
     max_u[blockIdx.y + (gridDim.y * blockIdx.x)] = max_cache[0];
   }
-
-
 } // end calculate_u
 
 ///////////////////////////////////////////////////////////////////////////////
 
-  __global__ 
-void calculate_v (const Real dt, const Real* G, 
-    const Real* pres_red, const Real* pres_black, 
-    Real* v, Real* max_v)
+__global__ 
+void calculate_v (const Real dt,
+                  const Real*__restrict__ G, 
+                  const Real*__restrict__ pres_red,
+                  const Real*__restrict__ pres_black, 
+                        Real*__restrict__ v,
+                        Real*__restrict__ max_v)
 {
   int row = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
   int col = (blockIdx.y * blockDim.y) + threadIdx.y + 1;
@@ -652,14 +665,12 @@ void calculate_v (const Real dt, const Real* G,
     new_v = G(col, (2 * row) - (col & 1)) - (dt * (p_ijp1 - p_ij) / dy);
     v(col, (2 * row) - (col & 1)) = new_v;
 
-
     // black pressure point
     p_ij = pres_black(col, row);
     p_ijp1 = pres_red(col, row + (col & 1));
 
     new_v2 = G(col, (2 * row) - ((col + 1) & 1)) - (dt * (p_ijp1 - p_ij) / dy);
     v(col, (2 * row) - ((col + 1) & 1)) = new_v2;
-
 
     // check for max of these two
     new_v = fmax(fabs(new_v), fabs(new_v2));
@@ -678,7 +689,6 @@ void calculate_v (const Real dt, const Real* G,
 
       new_v = G(col, (2 * row) - (col & 1)) - (dt * (p_ijp1 - p_ij) / dy);
       v(col, (2 * row) - (col & 1)) = new_v;
-
     } else {
       // red point is on boundary, only calculate black point below it
       Real p_ij = pres_black(col, row);
@@ -696,7 +706,6 @@ void calculate_v (const Real dt, const Real* G,
     new_v = fmax(fabs( v(col, 0) ), new_v);
 
     new_v = fmax(fabs( v(col, NUM + 1) ), new_v);
-
   } // end if
 
   // store absolute value of velocity
@@ -719,7 +728,6 @@ void calculate_v (const Real dt, const Real* G,
   if (threadIdx.x == 0) {
     max_v[blockIdx.y + (gridDim.y * blockIdx.x)] = max_cache[0];
   }
-
 } // end calculate_v
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -776,7 +784,6 @@ int main (int argc, char *argv[])
   // print problem size
   printf("Problem size: %d x %d \n", NUM, NUM);
 
-  ////////////////////////////////////////
   // block and grid dimensions
 
   // boundary conditions kernel
@@ -802,7 +809,6 @@ int main (int argc, char *argv[])
   // vertical pressure boundary conditions
   dim3 block_vpbc (BLOCK_SIZE, 1);
   dim3 grid_vpbc (NUM / (2 * BLOCK_SIZE), 1);
-  ///////////////////////////////////////////
 
   // residual variable
   Real* res;
@@ -828,23 +834,22 @@ int main (int argc, char *argv[])
   Real max_u = SMALL;
   Real max_v = SMALL;
   // get max velocity for initial values (including BCs)
-#pragma unroll
+  #pragma unroll
   for (int col = 0; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
       max_u = fmax(max_u, fabs( u(col, row) ));
     }
   }
 
-#pragma unroll
+  #pragma unroll
   for (int col = 1; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
       max_v = fmax(max_v, fabs( v(col, row) ));
     }
   }
 
-  ////////////////////////////////////////
   // allocate and transfer device memory
   Real* u_d;
   Real* F_d;
@@ -879,12 +884,14 @@ int main (int argc, char *argv[])
   cudaMemcpy (G_d, G, size * sizeof(Real), cudaMemcpyHostToDevice);
   cudaMemcpy (pres_red_d, pres_red, size_pres * sizeof(Real), cudaMemcpyHostToDevice);
   cudaMemcpy (pres_black_d, pres_black, size_pres * sizeof(Real), cudaMemcpyHostToDevice);
-  ////////////////////////////////////////
 
   Real time = time_start;
 
   // time-step size based on grid and Reynolds number
   Real dt_Re = 0.5 * Re_num / ((1.0 / (dx * dx)) + (1.0 / (dy * dy)));
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   // time iteration loop
   while (time < time_end) {
@@ -906,7 +913,7 @@ int main (int argc, char *argv[])
     cudaMemcpy (pres_sum, pres_sum_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
 
     Real p0_norm = ZERO;
-#pragma unroll
+    #pragma unroll
     for (int i = 0; i < size_res; ++i) {
       p0_norm += pres_sum[i];
     }
@@ -927,7 +934,7 @@ int main (int argc, char *argv[])
 
       // set pressure boundary conditions
       set_horz_pres_BCs <<<grid_hpbc, block_hpbc>>> (pres_red_d, pres_black_d);
-      set_vert_pres_BCs <<<grid_vpbc, block_hpbc>>> (pres_red_d, pres_black_d);
+      set_vert_pres_BCs <<<grid_vpbc, block_vpbc>>> (pres_red_d, pres_black_d);
 
       // ensure kernel finished
       //cudaDeviceSynchronize();
@@ -951,7 +958,7 @@ int main (int argc, char *argv[])
       cudaMemcpy (res, res_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
 
       norm_L2 = ZERO;
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < size_res; ++i) {
         norm_L2 += res[i];
       }
@@ -979,7 +986,7 @@ int main (int argc, char *argv[])
     max_v = SMALL;
     max_u = SMALL;
 
-#pragma unroll
+    #pragma unroll
     for (int i = 0; i < size_max; ++i) {
       Real test_u = max_u_arr[i];
       max_u = fmax(max_u, test_u);
@@ -1001,12 +1008,15 @@ int main (int argc, char *argv[])
 
   } // end while
 
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\nTotal execution time of the iteration loop: %f (s)\n", elapsed_time * 1e-9f);
+
   // transfer final temperature values back
   cudaMemcpy (u, u_d, size * sizeof(Real), cudaMemcpyDeviceToHost);
   cudaMemcpy (v, v_d, size * sizeof(Real), cudaMemcpyDeviceToHost);
   cudaMemcpy (pres_red, pres_red_d, size_pres * sizeof(Real), cudaMemcpyDeviceToHost);
   cudaMemcpy (pres_black, pres_black_d, size_pres * sizeof(Real), cudaMemcpyDeviceToHost);
-
 
   // write data to file
   FILE * pfile;
