@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 /** Problem size along one side; total number of cells is this squared */
@@ -101,7 +102,6 @@ const Real gy = 0.0f;
 #define yLength 1.0f
 #endif
 
-
 /** Mesh sizes */
 const Real dx = xLength / NUM;
 const Real dy = yLength / NUM;
@@ -174,9 +174,7 @@ void set_BCs_host (Real* u, Real* v)
 
 } // end set_BCs_host
 
-
 ///////////////////////////////////////////////////////////////////////////////
-
 
 int main (int argc, char *argv[])
 {
@@ -255,17 +253,17 @@ int main (int argc, char *argv[])
   Real max_u = SMALL;
   Real max_v = SMALL;
   // get max velocity for initial values (including BCs)
-#pragma unroll
+  #pragma unroll
   for (int col = 0; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
       max_u = fmax(max_u, fabs( u(col, row) ));
     }
   }
 
-#pragma unroll
+  #pragma unroll
   for (int col = 1; col < NUM + 2; ++col) {
-#pragma unroll
+    #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
       max_v = fmax(max_v, fabs( v(col, row) ));
     }
@@ -286,6 +284,8 @@ int main (int argc, char *argv[])
     // time-step size based on grid and Reynolds number
     Real dt_Re = 0.5 * Re_num / ((1.0 / (dx * dx)) + (1.0 / (dy * dy)));
 
+    auto start = std::chrono::steady_clock::now();
+
     // time iteration loop
     while (time < time_end) {
 
@@ -299,21 +299,20 @@ int main (int argc, char *argv[])
 
       // calculate F and G    
       //calculate_F <<<grid_F, block_F>>> (dt, u_d, v_d, F_d);
-#include "calculate_F.h"
+      #include "calculate_F.h"
 
       //    calculate_G <<<grid_G, block_G>>> (dt, u_d, v_d, G_d);
-#include "calculate_G.h"
-
+      #include "calculate_G.h"
 
       // get L2 norm of initial pressure
       //sum_pressure <<<grid_pr, block_pr>>> (pres_red_d, pres_black_d, pres_sum_d);
-#include "sum_pressure.h"
+      #include "sum_pressure.h"
 
       //cudaMemcpy (pres_sum, pres_sum_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
-#pragma omp target update from(pres_sum[0:size_res])
+      #pragma omp target update from(pres_sum[0:size_res])
 
       Real p0_norm = ZERO;
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < size_res; ++i) {
         p0_norm += pres_sum[i];
       }
@@ -332,31 +331,30 @@ int main (int argc, char *argv[])
 
         // set pressure boundary conditions
         //set_horz_pres_BCs <<<grid_hpbc, block_hpbc>>> (pres_red_d, pres_black_d);
-#include "set_horz_pres_BCs.h"
+        #include "set_horz_pres_BCs.h"
 
         //      set_vert_pres_BCs <<<grid_vpbc, block_hpbc>>> (pres_red_d, pres_black_d);
-#include "set_vert_pres_BCs.h"
+        #include "set_vert_pres_BCs.h"
 
         // update red cells
         //      red_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_black_d, pres_red_d);
-#include "red_kernel.h"
-
+        #include "red_kernel.h"
 
         // update black cells
         //      black_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d);
-#include "black_kernel.h"
-
+        #include "black_kernel.h"
 
         // calculate residual values
         //calc_residual <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d, res_d);
-#include "calc_residual.h"
+        #include "calc_residual.h"
 
-#pragma omp target update from (res_arr[0:size_res])
+        #pragma omp target update from (res_arr[0:size_res])
         // transfer residual value(s) back to CPU
         //      cudaMemcpy (res, res_d, size_res * sizeof(Real), cudaMemcpyDeviceToHost);
 
         norm_L2 = ZERO;
-#pragma unroll
+
+        #pragma unroll
         for (int i = 0; i < size_res; ++i) {
           norm_L2 += res_arr[i];
         }
@@ -377,21 +375,22 @@ int main (int argc, char *argv[])
       // calculate new velocities and transfer maximums back
 
       //calculate_u <<<grid_pr, block_pr>>> (dt, F_d, pres_red_d, pres_black_d, u_d, max_u_d);
-#include "calculate_u.h"
+      #include "calculate_u.h"
 
       //    cudaMemcpy (max_u_arr, max_u_d, size_max * sizeof(Real), cudaMemcpyDeviceToHost);
-#pragma omp target update from(max_u_arr[0:size_max])
+      #pragma omp target update from(max_u_arr[0:size_max])
 
       //    calculate_v <<<grid_pr, block_pr>>> (dt, G_d, pres_red_d, pres_black_d, v_d, max_v_d);
-#include "calculate_v.h"
+      #include "calculate_v.h"
+
       //    cudaMemcpy (max_v_arr, max_v_d, size_max * sizeof(Real), cudaMemcpyDeviceToHost);
-#pragma omp target update from(max_v_arr[0:size_max])
+      #pragma omp target update from(max_v_arr[0:size_max])
 
       // get maximum u- and v- velocities
       max_v = SMALL;
       max_u = SMALL;
 
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < size_max; ++i) {
         Real test_u = max_u_arr[i];
         max_u = fmax(max_u, test_u);
@@ -402,7 +401,7 @@ int main (int argc, char *argv[])
 
       // set velocity boundary conditions
       //set_BCs <<<grid_bcs, block_bcs>>> (u_d, v_d);
-#include "set_BCs.h"
+      #include "set_BCs.h"
 
       // increase time
       time += dt;
@@ -412,9 +411,11 @@ int main (int argc, char *argv[])
 
     } // end while
 
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("\nTotal execution time of the iteration loop: %f (s)\n", elapsed_time * 1e-9f);
   }
   // transfer final temperature values back implicitly
-
 
   // write data to file
   FILE * pfile;
