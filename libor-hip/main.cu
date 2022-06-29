@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // parameters for device execution
@@ -35,17 +36,15 @@
 #define NOPT 15
 #define NPATH 96000
 
-#define __fdividef fdividef
-#define __expf expf
+// Monte Carlo LIBOR path calculation
 
-/* Monte Carlo LIBOR path calculation */
-
-__device__ void path_calc(float *L, 
-                          const float *z, 
-                          const float *lambda, 
-                          const float delta,
-                          const int Nmat, 
-                          const int N)
+__device__
+void path_calc(float *L, 
+               const float *z, 
+               const float *lambda, 
+               const float delta,
+               const int Nmat, 
+               const int N)
 {
   int   i, n;
   float sqez, lam, con1, v, vrat;
@@ -65,17 +64,17 @@ __device__ void path_calc(float *L,
 }
 
 
-/* forward path calculation storing data
-   for subsequent reverse path calculation */
+// forward path calculation storing data
+// for subsequent reverse path calculation
 
-__device__ void path_calc_b1(float *L, 
-                             const float *z, 
-                             float *L2,
-                             const float *lambda,
-                             const float delta,
-                             const int Nmat,
-                             const int N
-)
+__device__
+void path_calc_b1(float *L, 
+                  const float *z, 
+                  float *L2,
+                  const float *lambda,
+                  const float delta,
+                  const int Nmat,
+                  const int N)
 {
   int   i, n;
   float sqez, lam, con1, v, vrat;
@@ -93,22 +92,23 @@ __device__ void path_calc_b1(float *L,
       vrat = __expf(con1*v + lam*(sqez-0.5f*con1));
       L[i] = L[i]*vrat;
 
-      // store these values for reverse path //
+      // store these values for reverse path
       L2[i+(n+1)*N] = L[i];
     }
   }
 }
 
 
-/* reverse path calculation of deltas using stored data */
+// reverse path calculation of deltas using stored data
 
-__device__ void path_calc_b2(float *L_b, 
-                             const float *z, 
-                             const float *L2, 
-                             const float *lambda, 
-                             const float delta,
-                             const int Nmat,
-                             const int N)
+__device__
+void path_calc_b2(float *L_b, 
+                  const float *z, 
+                  const float *L2, 
+                  const float *lambda, 
+                  const float delta,
+                  const int Nmat,
+                  const int N)
 {
   int   i, n;
   float faci, v1;
@@ -125,18 +125,19 @@ __device__ void path_calc_b2(float *L_b,
   }
 }
 
-/* calculate the portfolio value v, and its sensitivity to L */
-/* hand-coded reverse mode sensitivity */
+// calculate the portfolio value v, and its sensitivity to L
+// hand-coded reverse mode sensitivity
 
-__device__ float portfolio_b(float *L, 
-                             float *L_b,
-                             const float *lambda, 
-                             const   int *maturities, 
-                             const float *swaprates, 
-                             const float delta,
-                             const int Nmat,
-                             const int N,
-                             const int Nopt)
+__device__
+float portfolio_b(float *L, 
+                  float *L_b,
+                  const float *lambda, 
+                  const   int *maturities, 
+                  const float *swaprates, 
+                  const float delta,
+                  const int Nmat,
+                  const int N,
+                  const int Nopt)
 {
   int   m, n;
   float b, s, swapval,v;
@@ -179,7 +180,7 @@ __device__ float portfolio_b(float *L,
     }
   }
 
-  // apply discount //
+  // apply discount
 
   b = 1.f;
   for (n=0; n<Nmat; n++) b = b/(1.f+delta*L[n]);
@@ -198,16 +199,17 @@ __device__ float portfolio_b(float *L,
 }
 
 
-/* calculate the portfolio value v */
+// calculate the portfolio value v
 
-__device__ float portfolio(float *L,
-                           const float *lambda, 
-                           const   int *maturities, 
-                           const float *swaprates, 
-                           const float delta,
-                           const int Nmat,
-                           const int N,
-                           const int Nopt)
+__device__
+float portfolio(float *L,
+                const float *lambda, 
+                const   int *maturities, 
+                const float *swaprates, 
+                const float delta,
+                const int Nmat,
+                const int N,
+                const int Nopt)
 {
   int   n, m, i;
   float v, b, s, swapval, B[40], S[40];
@@ -231,7 +233,7 @@ __device__ float portfolio(float *L,
       v += -100.f*swapval;
   }
 
-  // apply discount //
+  // apply discount
 
   b = 1.f;
   for (n=0; n<Nmat; n++) b = b/(1.f+delta*L[n]);
@@ -242,15 +244,17 @@ __device__ float portfolio(float *L,
 }
 
 
-__global__ void Pathcalc_Portfolio_KernelGPU(float *d_v, 
-                                             float *d_Lb,
-                                             const float *lambda, 
-                                             const   int *maturities, 
-                                             const float *swaprates, 
-                                             const float delta,
-                                             const int Nmat,
-                                             const int N,
-                                             const int Nopt)
+__global__
+void Pathcalc_Portfolio_KernelGPU(
+  float *__restrict__ d_v, 
+  float *__restrict__ d_Lb,
+  const float *__restrict__ lambda, 
+  const   int *__restrict__ maturities, 
+  const float *__restrict__ swaprates, 
+  const float delta,
+  const int Nmat,
+  const int N,
+  const int Nopt)
 {
   const int     tid = blockDim.x * blockIdx.x + threadIdx.x;
   const int threadN = blockDim.x * gridDim.x;
@@ -259,7 +263,7 @@ __global__ void Pathcalc_Portfolio_KernelGPU(float *d_v,
   float L[NN], L2[L2_SIZE], z[NN];
   float *L_b = L;
   
-  /* Monte Carlo LIBOR path calculation*/
+  // Monte Carlo LIBOR path calculation
 
   for(path = tid; path < NPATH; path += threadN){
     // initialise the data for current thread
@@ -275,15 +279,16 @@ __global__ void Pathcalc_Portfolio_KernelGPU(float *d_v,
   }
 }
 
-
-__global__ void Pathcalc_Portfolio_KernelGPU2(float *d_v, 
-                                              const float *lambda, 
-                                              const   int *maturities, 
-                                              const float *swaprates, 
-                                              const float delta,
-                                              const int Nmat,
-                                              const int N,
-                                              const int Nopt)
+__global__
+void Pathcalc_Portfolio_KernelGPU2(
+  float *__restrict__ d_v, 
+  const float *__restrict__ lambda, 
+  const   int *__restrict__ maturities, 
+  const float *__restrict__ swaprates, 
+  const float delta,
+  const int Nmat,
+  const int N,
+  const int Nopt)
 {
   const int     tid = blockDim.x * blockIdx.x + threadIdx.x;
   const int threadN = blockDim.x * gridDim.x;
@@ -291,7 +296,7 @@ __global__ void Pathcalc_Portfolio_KernelGPU2(float *d_v,
   int   i, path;
   float L[NN], z[NN];
   
-  /* Monte Carlo LIBOR path calculation*/
+  // Monte Carlo LIBOR path calculation
 
   for(path = tid; path < NPATH; path += threadN){
     // initialise the data for current thread
@@ -305,8 +310,12 @@ __global__ void Pathcalc_Portfolio_KernelGPU2(float *d_v,
   }
 }
 
-
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
     
   // 'h_' prefix - CPU (host) memory space
 
@@ -316,6 +325,7 @@ int main(int argc, char **argv){
   float   h_swaprates[]  = {.045f,.05f,.055f,.045f,.05f,.055f,.045f,.05f,
                             .055f,.045f,.05f,.055f,.045f,.05f,.055f };
   double  v, Lb; 
+  bool    ok = true;
 
   // 'd_' prefix - GPU (device) memory space
 
@@ -329,7 +339,6 @@ int main(int argc, char **argv){
 
   h_v      = (float *)malloc(sizeof(float)*NPATH);
   h_Lb     = (float *)malloc(sizeof(float)*NPATH);
-
 
   hipMalloc((void**)&d_maturities, sizeof(h_maturities));
 
@@ -351,15 +360,22 @@ int main(int argc, char **argv){
   hipMemcpy(d_lambda, h_lambda, sizeof(h_lambda), hipMemcpyHostToDevice);
 
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(Pathcalc_Portfolio_KernelGPU2, dim3(dimGrid), dim3(dimBlock), 0, 0, d_v,
-                                              d_lambda, 
-                                              d_maturities, 
-                                              d_swaprates, 
-                                              h_delta,
-                                              h_Nmat,
-                                              h_N,
-                                              h_Nopt);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(Pathcalc_Portfolio_KernelGPU2, dimGrid, dimBlock, 0, 0, d_v,
+                              d_lambda, 
+                              d_maturities, 
+                              d_swaprates, 
+                              h_delta,
+                              h_Nmat,
+                              h_N,
+                              h_Nopt);
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   // Read back GPU results and compute average
   hipMemcpy(h_v, d_v, sizeof(float)*NPATH, hipMemcpyDeviceToHost);
@@ -368,20 +384,32 @@ int main(int argc, char **argv){
   for (i=0; i<NPATH; i++) v += h_v[i];
   v = v / NPATH;
 
-  if (fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
 
   // Execute GPU kernel -- Greeks
 
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++)
-    hipLaunchKernelGGL(Pathcalc_Portfolio_KernelGPU, dim3(dimGrid), dim3(dimBlock), 0, 0, d_v, d_Lb,
-                                              d_lambda, 
-                                              d_maturities, 
-                                              d_swaprates, 
-                                              h_delta,
-                                              h_Nmat,
-                                              h_N,
-                                              h_Nopt);
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(Pathcalc_Portfolio_KernelGPU, dimGrid, dimBlock, 0, 0, d_v,
+                              d_Lb,
+                              d_lambda, 
+                              d_maturities, 
+                              d_swaprates, 
+                              h_delta,
+                              h_Nmat,
+                              h_N,
+                              h_Nopt);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   // Read back GPU results and compute average
   hipMemcpy(h_v, d_v, sizeof(float)*NPATH, hipMemcpyDeviceToHost);
@@ -395,10 +423,14 @@ int main(int argc, char **argv){
   for (i=0; i<NPATH; i++) Lb += h_Lb[i];
   Lb = Lb / NPATH;
 
-  if (fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
-  if (fabs(Lb - 21.348) > 1e-3) printf("Expected:  21.348 Actual %15.3f\n", Lb);
-
-  // Release GPU memory
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
+  if (fabs(Lb - 21.348) > 1e-3) {
+    ok = false;
+    printf("Expected:  21.348 Actual %15.3f\n", Lb);
+  }
 
   hipFree(d_v);
   hipFree(d_Lb);
@@ -406,11 +438,10 @@ int main(int argc, char **argv){
   hipFree(d_swaprates);
   hipFree(d_lambda);
        
-  // Release CPU memory
-
   free(h_v);
   free(h_Lb);
 
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
   return 0;
 }
-

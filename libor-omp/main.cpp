@@ -1,25 +1,26 @@
-////////////////////////////////////////////////////////////////////
-////                                                              //
-//// This software was written by Mike Giles in 2007 based on     //
-//// C code written by Zhao and Glasserman at Columbia University //
-////                                                              //
-//// It is copyright University of Oxford, and provided under     //
-//// the terms of the BSD3 license:                               //
-//// https://opensource.org/licenses/BSD-3-Clause                 //
-////                                                              //
-//// It is provided along with an informal report on              //
-//// https://people.maths.ox.ac.uk/~gilesm/cuda_old.html          //
-////                                                              //
-//// Note: this was written for CUDA 1.0 and optimised for        //
-//// execution on an NVIDIA 8800 GTX GPU                          //
-////                                                              //
-//// Mike Giles, 29 April 2021                                    //
-////                                                              //
-////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//                                                              //
+// This software was written by Mike Giles in 2007 based on     //
+// C code written by Zhao and Glasserman at Columbia University //
+//                                                              //
+// It is copyright University of Oxford, and provided under     //
+// the terms of the BSD3 license:                               //
+// https://opensource.org/licenses/BSD-3-Clause                 //
+//                                                              //
+// It is provided along with an informal report on              //
+// https://people.maths.ox.ac.uk/~gilesm/cuda_old.html          //
+//                                                              //
+// Note: this was written for CUDA 1.0 and optimised for        //
+// execution on an NVIDIA 8800 GTX GPU                          //
+//                                                              //
+// Mike Giles, 29 April 2021                                    //
+//                                                              //
+//////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 // parameters for device execution
@@ -35,7 +36,7 @@
 #define NOPT 15
 #define NPATH 96000
 
-/* Monte Carlo LIBOR path calculation */
+// Monte Carlo LIBOR path calculation
 
 #pragma omp declare target
 void path_calc(float *L, 
@@ -63,8 +64,8 @@ void path_calc(float *L,
 }
 
 
-/* forward path calculation storing data
-   for subsequent reverse path calculation */
+// forward path calculation storing data
+// for subsequent reverse path calculation
 
 void path_calc_b1(float *L, 
                   const float *z, 
@@ -96,8 +97,7 @@ void path_calc_b1(float *L,
   }
 }
 
-
-/* reverse path calculation of deltas using stored data */
+// reverse path calculation of deltas using stored data
 
 void path_calc_b2(float *L_b, 
                   const float *z, 
@@ -122,8 +122,8 @@ void path_calc_b2(float *L_b,
   }
 }
 
-/* calculate the portfolio value v, and its sensitivity to L */
-/* hand-coded reverse mode sensitivity */
+// calculate the portfolio value v, and its sensitivity to L
+// hand-coded reverse mode sensitivity
 
 float portfolio_b(float *L, 
                   float *L_b,
@@ -176,7 +176,7 @@ float portfolio_b(float *L,
     }
   }
 
-  // apply discount //
+  // apply discount
 
   b = 1.f;
   for (n=0; n<Nmat; n++) b = b/(1.f+delta*L[n]);
@@ -194,8 +194,7 @@ float portfolio_b(float *L,
   return v;
 }
 
-
-/* calculate the portfolio value v */
+// calculate the portfolio value v
 
 float portfolio(float *L,
                 const float *lambda, 
@@ -242,6 +241,12 @@ float portfolio(float *L,
 
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   // 'h_' prefix - CPU (host) memory space
 
   float  *h_v, *h_Lb, h_lambda[NN], h_delta=0.25f;
@@ -250,6 +255,7 @@ int main(int argc, char **argv)
   float   h_swaprates[]  = {.045f,.05f,.055f,.045f,.05f,.055f,.045f,.05f,
                             .055f,.045f,.05f,.055f,.045f,.05f,.055f };
   double  v, Lb; 
+  bool    ok = true;
 
   for (i=0; i<NN; i++) h_lambda[i] = 0.2f;
 
@@ -265,7 +271,9 @@ int main(int argc, char **argv)
                                    h_Lb[0:NPATH])
 {
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams distribute parallel for num_teams(GRID_SIZE) thread_limit(BLOCK_SIZE)
     for (int tid = 0; tid < GRID_SIZE * BLOCK_SIZE; tid++) {
       const int threadN = GRID_SIZE * BLOCK_SIZE;
@@ -287,6 +295,10 @@ int main(int argc, char **argv)
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
+
   // Read back GPU results and compute average
   #pragma omp target update from (h_v[0:NPATH])
   
@@ -294,12 +306,17 @@ int main(int argc, char **argv)
   for (i=0; i<NPATH; i++) v += h_v[i];
   v = v / NPATH;
 
-  if (std::fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
 
   // Execute GPU kernel -- Greeks
 
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++) { 
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) { 
     #pragma omp target teams distribute parallel for num_teams(GRID_SIZE) thread_limit(BLOCK_SIZE)
     for (int tid = 0; tid < GRID_SIZE * BLOCK_SIZE; tid++) {
       const int threadN = GRID_SIZE * BLOCK_SIZE;
@@ -326,6 +343,10 @@ int main(int argc, char **argv)
     }
   }
 
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
+
   // Read back GPU results and compute average
   #pragma omp target update from (h_Lb[0:NPATH])
   #pragma omp target update from (h_v[0:NPATH])
@@ -339,14 +360,17 @@ int main(int argc, char **argv)
   for (i=0; i<NPATH; i++) Lb += h_Lb[i];
   Lb = Lb / NPATH;
 
-  if (std::fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
-  if (std::fabs(Lb - 21.348) > 1e-3) printf("Expected:  21.348 Actual %15.3f\n", Lb);
-
-  // Release CPU memory
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
+  if (fabs(Lb - 21.348) > 1e-3) {
+    ok = false;
+    printf("Expected:  21.348 Actual %15.3f\n", Lb);
+  }
 
   free(h_v);
   free(h_Lb);
 
   return 0;
 }
-

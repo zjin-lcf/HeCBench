@@ -1,25 +1,26 @@
-////////////////////////////////////////////////////////////////////
-////                                                              //
-//// This software was written by Mike Giles in 2007 based on     //
-//// C code written by Zhao and Glasserman at Columbia University //
-////                                                              //
-//// It is copyright University of Oxford, and provided under     //
-//// the terms of the BSD3 license:                               //
-//// https://opensource.org/licenses/BSD-3-Clause                 //
-////                                                              //
-//// It is provided along with an informal report on              //
-//// https://people.maths.ox.ac.uk/~gilesm/cuda_old.html          //
-////                                                              //
-//// Note: this was written for CUDA 1.0 and optimised for        //
-//// execution on an NVIDIA 8800 GTX GPU                          //
-////                                                              //
-//// Mike Giles, 29 April 2021                                    //
-////                                                              //
-////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//                                                              //
+// This software was written by Mike Giles in 2007 based on     //
+// C code written by Zhao and Glasserman at Columbia University //
+//                                                              //
+// It is copyright University of Oxford, and provided under     //
+// the terms of the BSD3 license:                               //
+// https://opensource.org/licenses/BSD-3-Clause                 //
+//                                                              //
+// It is provided along with an informal report on              //
+// https://people.maths.ox.ac.uk/~gilesm/cuda_old.html          //
+//                                                              //
+// Note: this was written for CUDA 1.0 and optimised for        //
+// execution on an NVIDIA 8800 GTX GPU                          //
+//                                                              //
+// Mike Giles, 29 April 2021                                    //
+//                                                              //
+//////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 // parameters for device execution
@@ -35,7 +36,7 @@
 #define NOPT 15
 #define NPATH 96000
 
-/* Monte Carlo LIBOR path calculation */
+// Monte Carlo LIBOR path calculation
 
 void path_calc(float *L, 
                const float *z, 
@@ -48,14 +49,14 @@ void path_calc(float *L,
   float sqez, lam, con1, v, vrat;
 
   for(n=0; n<Nmat; n++) {
-    sqez = cl::sycl::sqrt(delta)*z[n];
+    sqez = sycl::sqrt(delta)*z[n];
     v = 0.f;
 
     for (i=n+1; i<N; i++) {
       lam  = lambda[i-n-1];
       con1 = delta*lam;
-      v   += cl::sycl::native::divide(con1*L[i],1.f+delta*L[i]);
-      vrat = cl::sycl::native::exp(con1*v + lam*(sqez-0.5f*con1));
+      v   += sycl::native::divide(con1*L[i],1.f+delta*L[i]);
+      vrat = sycl::native::exp(con1*v + lam*(sqez-0.5f*con1));
       L[i] = L[i]*vrat;
     }
   }
@@ -79,14 +80,14 @@ void path_calc_b1(float *L,
   for (i=0; i<N; i++) L2[i] = L[i];
    
   for(n=0; n<Nmat; n++) {
-    sqez = cl::sycl::sqrt(delta)*z[n];
+    sqez = sycl::sqrt(delta)*z[n];
     v = 0.f;
 
     for (i=n+1; i<N; i++) {
       lam  = lambda[i-n-1];
       con1 = delta*lam;
-      v   += cl::sycl::native::divide(con1*L[i],1.f+delta*L[i]);
-      vrat = cl::sycl::native::exp(con1*v + lam*(sqez-0.5f*con1));
+      v   += sycl::native::divide(con1*L[i],1.f+delta*L[i]);
+      vrat = sycl::native::exp(con1*v + lam*(sqez-0.5f*con1));
       L[i] = L[i]*vrat;
 
       // store these values for reverse path //
@@ -95,8 +96,7 @@ void path_calc_b1(float *L,
   }
 }
 
-
-/* reverse path calculation of deltas using stored data */
+// reverse path calculation of deltas using stored data
 
 void path_calc_b2(float *L_b, 
                   const float *z, 
@@ -113,16 +113,16 @@ void path_calc_b2(float *L_b,
     v1 = 0.f;
     for (i=N-1; i>n; i--) {
       v1    += lambda[i-n-1]*L2[i+(n+1)*N]*L_b[i];
-      faci   = cl::sycl::native::divide(delta,1.f+delta*L2[i+n*N]);
-      L_b[i] = L_b[i]*cl::sycl::native::divide(L2[i+(n+1)*N],L2[i+n*N])
+      faci   = sycl::native::divide(delta,1.f+delta*L2[i+n*N]);
+      L_b[i] = L_b[i]*sycl::native::divide(L2[i+(n+1)*N],L2[i+n*N])
               + v1*lambda[i-n-1]*faci*faci;
  
     }
   }
 }
 
-/* calculate the portfolio value v, and its sensitivity to L */
-/* hand-coded reverse mode sensitivity */
+// calculate the portfolio value v, and its sensitivity to L
+// hand-coded reverse mode sensitivity
 
 float portfolio_b(float *L, 
                   float *L_b,
@@ -142,7 +142,7 @@ float portfolio_b(float *L,
   s = 0.f;
   for (m=0; m<N-Nmat; m++) {
     n    = m + Nmat;
-    b    = cl::sycl::native::divide(b,1.f+delta*L[n]);
+    b    = sycl::native::divide(b,1.f+delta*L[n]);
     s    = s + delta*b;
     B[m] = b;
     S[m] = s;
@@ -168,10 +168,10 @@ float portfolio_b(float *L,
   for (m=N-Nmat-1; m>=0; m--) {
     n = m + Nmat;
     B_b[m] += delta*S_b[m];
-    L_b[n]  = -B_b[m]*B[m]*cl::sycl::native::divide(delta,1.f+delta*L[n]);
+    L_b[n]  = -B_b[m]*B[m]*sycl::native::divide(delta,1.f+delta*L[n]);
     if (m>0) {
       S_b[m-1] += S_b[m];
-      B_b[m-1] += cl::sycl::native::divide(B_b[m],1.f+delta*L[n]);
+      B_b[m-1] += sycl::native::divide(B_b[m],1.f+delta*L[n]);
     }
   }
 
@@ -194,7 +194,7 @@ float portfolio_b(float *L,
 }
 
 
-/* calculate the portfolio value v */
+// calculate the portfolio value v
 
 float portfolio(float *L,
                 const float *lambda, 
@@ -237,9 +237,14 @@ float portfolio(float *L,
   return v;
 }
 
-
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 0;
+  }
+  const int repeat = atoi(argv[1]);
+
   // 'h_' prefix - CPU (host) memory space
 
   float  *h_v, *h_Lb, h_lambda[NN], h_delta=0.25f;
@@ -248,6 +253,7 @@ int main(int argc, char **argv)
   float   h_swaprates[]  = {.045f,.05f,.055f,.045f,.05f,.055f,.045f,.05f,
                             .055f,.045f,.05f,.055f,.045f,.05f,.055f };
   double  v, Lb; 
+  bool    ok = true;
 
   // 'd_' prefix - GPU (device) memory space
 
@@ -255,9 +261,6 @@ int main(int argc, char **argv)
 
   h_v  = (float *)malloc(sizeof(float)*NPATH);
   h_Lb = (float *)malloc(sizeof(float)*NPATH);
-
-  // Execute GPU kernel -- no Greeks
-
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -276,8 +279,13 @@ int main(int argc, char **argv)
   range<1> gws (GRID_SIZE * BLOCK_SIZE);
   range<1> lws (BLOCK_SIZE);
 
+  // Execute GPU kernel -- no Greeks
+
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto maturities = d_maturities.get_access<sycl_read>(cgh);
       auto swaprates  = d_swaprates.get_access<sycl_read>(cgh);
@@ -303,6 +311,12 @@ int main(int argc, char **argv)
         }
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   // Read back GPU results and compute average
   q.submit([&] (handler &cgh) {
@@ -314,12 +328,18 @@ int main(int argc, char **argv)
   for (i=0; i<NPATH; i++) v += h_v[i];
   v = v / NPATH;
 
-  if (std::fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
 
   // Execute GPU kernel -- Greeks
 
   // Launch the device computation threads
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto maturities = d_maturities.get_access<sycl_read>(cgh);
       auto swaprates  = d_swaprates.get_access<sycl_read>(cgh);
@@ -351,6 +371,12 @@ int main(int argc, char **argv)
         }
       });
     });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   // Read back GPU results and compute average
 
@@ -374,14 +400,19 @@ int main(int argc, char **argv)
   for (i=0; i<NPATH; i++) Lb += h_Lb[i];
   Lb = Lb / NPATH;
 
-  if (std::fabs(v - 224.323) > 1e-3) printf("Expected: 224.323 Actual %15.3f\n", v);
-  if (std::fabs(Lb - 21.348) > 1e-3) printf("Expected:  21.348 Actual %15.3f\n", Lb);
-
-  // Release CPU memory
+  if (fabs(v - 224.323) > 1e-3) {
+    ok = false;
+    printf("Expected: 224.323 Actual %15.3f\n", v);
+  }
+  if (fabs(Lb - 21.348) > 1e-3) {
+    ok = false;
+    printf("Expected:  21.348 Actual %15.3f\n", Lb);
+  }
 
   free(h_v);
   free(h_Lb);
 
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
   return 0;
 }
-
