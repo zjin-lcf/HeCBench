@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 void reference (
@@ -100,10 +101,15 @@ void test (
   }
 }
 
-int main() {
-  const int num_steps = 400;
-  const int num_items = 1000;
-  const int neurons_per_item = 1000;
+int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <neurons per item> <num_items> <num_steps>\n", argv[0]);
+    return 1;
+  }
+  const int neurons_per_item = atoi(argv[1]);
+  const int num_items = atoi(argv[2]);
+  const int num_steps = atoi(argv[3]);
+
   const int num_neurons = neurons_per_item * num_items;
   const size_t neurons_size = num_neurons * sizeof(float);
   const size_t items_size = num_items * sizeof(float);
@@ -140,7 +146,6 @@ int main() {
     gain[i] = rand() / (float)RAND_MAX + 0.5f;
   }
 
-
 #pragma omp target data map(to: encode_result[0:num_items],\
                                 bias[0:neurons_per_item],\
                                 gain[0:neurons_per_item])\
@@ -148,6 +153,8 @@ int main() {
                         map(tofrom: voltage[0:num_neurons],\
                                     reftime[0:num_neurons])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for(int step = 0; step < num_steps; step++) {
     test(
         num_neurons, 
@@ -162,6 +169,10 @@ int main() {
         gain, 
         spikes);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (elapsed_time * 1e-9f) / num_steps);
 }
 
   for(int step = 0; step < num_steps; step++) {
