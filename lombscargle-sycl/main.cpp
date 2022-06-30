@@ -37,8 +37,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <chrono>
 #include "common.h"
-
 
 void lombscargle_cpu( const int x_shape,
     const int freqs_shape,
@@ -46,10 +46,9 @@ void lombscargle_cpu( const int x_shape,
     const float *__restrict__ y,
     const float *__restrict__ freqs,
     float *__restrict__ pgram,
-    const float y_dot ) {
-
-
-  for ( int tid = 0; tid < freqs_shape; tid ++) {
+    const float y_dot )
+{
+  for ( int tid = 0; tid < freqs_shape; tid++ ) {
 
     float freq = freqs[tid] ;
     float xc = 0;
@@ -84,7 +83,13 @@ void lombscargle_cpu( const int x_shape,
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const int x_shape = 1000;
   const int freqs_shape = 100000;
   const float A = 2.f;
@@ -126,7 +131,10 @@ int main() {
     range<1> gws ((freqs_shape+255)/256*256);
     range<1> lws (256);
 
-    for (int n = 0; n < 100; n++) {
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
       q.submit([&] (handler &cgh) {
         auto p = d_p.template get_access<sycl_discard_write>(cgh);
         auto x = d_x.template get_access<sycl_read>(cgh);
@@ -170,7 +178,11 @@ int main() {
         });
       });
     }
+
     q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verification
@@ -184,10 +196,8 @@ int main() {
       break;
     }
   }
-  if (error) 
-    printf("Fail\n");
-  else
-    printf("Pass\n");
+
+  printf("%s\n", error ? "FAIL" : "PASS");
 
   free(x);
   free(y);
@@ -196,4 +206,3 @@ int main() {
   free(p2);
   return 0;
 }
-

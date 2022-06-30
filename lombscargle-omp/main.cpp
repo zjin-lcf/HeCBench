@@ -37,17 +37,17 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <chrono>
 
 void lombscargle_cpu( const int x_shape,
     const int freqs_shape,
-    const float *__restrict__ x,
-    const float *__restrict__ y,
-    const float *__restrict__ freqs,
-    float *__restrict__ pgram,
-    const float y_dot ) {
-
-
-  for ( int tid = 0; tid < freqs_shape; tid ++) {
+    const float *__restrict x,
+    const float *__restrict y,
+    const float *__restrict freqs,
+    float *__restrict pgram,
+    const float y_dot )
+{
+  for ( int tid = 0; tid < freqs_shape; tid ++ ) {
 
     float freq = freqs[tid] ;
     float xc = 0;
@@ -82,7 +82,13 @@ void lombscargle_cpu( const int x_shape,
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const int x_shape = 1000;
   const int freqs_shape = 100000;
   const float A = 2.f;
@@ -106,12 +112,13 @@ int main() {
 
   const float y_dot = 2.0f/1.5f;
 
-#pragma omp target data map(to: x[0:x_shape], y[0:x_shape], f[0:freqs_shape]) \
-  map(from: p[0:freqs_shape])
+  #pragma omp target data map(to: x[0:x_shape], y[0:x_shape], f[0:freqs_shape]) \
+                          map(from: p[0:freqs_shape])
   {
+    auto start = std::chrono::steady_clock::now();
 
-    for (int n = 0; n < 100; n++) {
-#pragma omp target teams distribute parallel for thread_limit(256) nowait
+    for (int n = 0; n < repeat; n++) {
+      #pragma omp target teams distribute parallel for thread_limit(256)
       for ( int tid = 0; tid < freqs_shape; tid++) {
 
         float freq = f[tid] ;
@@ -147,6 +154,10 @@ int main() {
                 ( c_tau2 * ss - cs_tau * cs + s_tau2 * cc ) ) ) ) * y_dot;
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verification
@@ -160,10 +171,8 @@ int main() {
       break;
     }
   }
-  if (error) 
-    printf("Fail\n");
-  else
-    printf("Pass\n");
+
+  printf("%s\n", error ? "FAIL" : "PASS");
 
   free(x);
   free(y);
@@ -172,4 +181,3 @@ int main() {
   free(p2);
   return 0;
 }
-
