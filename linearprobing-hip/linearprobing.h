@@ -1,5 +1,6 @@
 #pragma once
-#include "hip/hip_runtime.h"
+
+#include <hip/hip_runtime.h>
 
 struct KeyValue
 {
@@ -15,9 +16,9 @@ const uint32_t kEmpty = 0xffffffff;
 
 KeyValue* create_hashtable();
 
-void insert_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_kvs);
+double insert_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_kvs);
 
-void delete_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_kvs);
+double delete_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_kvs);
 
 std::vector<KeyValue> iterate_hashtable(KeyValue* hashtable);
 

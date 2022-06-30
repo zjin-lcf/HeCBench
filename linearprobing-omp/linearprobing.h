@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cuda.h>
+#include <omp.h>
 
 struct KeyValue
 {
@@ -20,6 +20,6 @@ double insert_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_k
 
 double delete_hashtable(KeyValue* hashtable, const KeyValue* kvs, uint32_t num_kvs);
 
-std::vector<KeyValue> iterate_hashtable(KeyValue* hashtable);
+std::vector<KeyValue> iterate_hashtable(KeyValue* hashtable, KeyValue* device_kvs);
 
 void destroy_hashtable(KeyValue* hashtable);

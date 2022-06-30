@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <vector>
+#include <chrono>
 #include "linearprobing.h"
 
 // 32 bit Murmur3 hash
@@ -14,11 +15,11 @@ __device__ uint32_t hash(uint32_t k)
   return k & (kHashTableCapacity-1);
 }
 
-
 // Insert the key/values in kvs into the hashtable
 __global__ void
-k_hashtable_insert(KeyValue*__restrict hashtable,
-                   const KeyValue*__restrict kvs, unsigned int numkvs)
+k_hashtable_insert(KeyValue*__restrict__ hashtable,
+                   const KeyValue*__restrict__ kvs,
+                   unsigned int numkvs)
 {
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < numkvs)
@@ -41,31 +42,34 @@ k_hashtable_insert(KeyValue*__restrict hashtable,
   }
 }
 
-void insert_hashtable(KeyValue*__restrict pHashTable, const KeyValue*__restrict kvs, uint32_t num_kvs)
+double insert_hashtable(KeyValue* pHashTable, const KeyValue* kvs, uint32_t num_kvs)
 {
-  // Copy the keyvalues to device 
-  KeyValue* device_kvs;
-  cudaMalloc(&device_kvs, sizeof(KeyValue) * num_kvs);
-  cudaMemcpy(device_kvs, kvs, sizeof(KeyValue) * num_kvs, cudaMemcpyHostToDevice);
-
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
   int gridsize = ((uint32_t)num_kvs + threadblocksize - 1) / threadblocksize;
-  k_hashtable_insert<<<gridsize, threadblocksize>>>(pHashTable, device_kvs, (uint32_t)num_kvs);
-  cudaDeviceSynchronize();
 
-  cudaFree(device_kvs);
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  k_hashtable_insert<<<gridsize, threadblocksize>>>(pHashTable, kvs, (uint32_t)num_kvs);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  
+  return time;
 }
 
 // Delete each key in kvs from the hash table, if the key exists
 // A deleted key is left in the hash table, but its value is set to kEmpty
 // Deleted keys are not reused; once a key is assigned a slot, it never moves
 __global__ void 
-k_hashtable_delete(KeyValue*__restrict hashtable, 
-                   const KeyValue*__restrict kvs, unsigned int numkvs)
+k_hashtable_delete(KeyValue*__restrict__ hashtable, 
+                   const KeyValue*__restrict__ kvs,
+                   unsigned int numkvs)
 {
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tid < kHashTableCapacity)
+  if (tid < numkvs)
   {
     uint32_t key = kvs[tid].key;
     uint32_t slot = hash(key);
@@ -86,26 +90,29 @@ k_hashtable_delete(KeyValue*__restrict hashtable,
   }
 }
 
-void delete_hashtable(KeyValue* pHashTable, const KeyValue* kvs, uint32_t num_kvs)
+double delete_hashtable(KeyValue* pHashTable, const KeyValue* kvs, uint32_t num_kvs)
 {
-  // Copy the keyvalues to device
-  KeyValue* device_kvs;
-  cudaMalloc(&device_kvs, sizeof(KeyValue) * num_kvs);
-  cudaMemcpy(device_kvs, kvs, sizeof(KeyValue) * num_kvs, cudaMemcpyHostToDevice);
-
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
   int gridsize = ((uint32_t)num_kvs + threadblocksize - 1) / threadblocksize;
-  k_hashtable_delete<<<gridsize, threadblocksize>>>(pHashTable, device_kvs, (uint32_t)num_kvs);
-  cudaDeviceSynchronize();
 
-  cudaFree(device_kvs);
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  k_hashtable_delete<<<gridsize, threadblocksize>>>(pHashTable, kvs, (uint32_t)num_kvs);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  return time;
 }
 
 // Iterate over every item in the hashtable; return non-empty key/values
 __global__ void
-k_iterate_hashtable(KeyValue*__restrict pHashTable,
-                    KeyValue*__restrict kvs, uint32_t* kvs_size)
+k_iterate_hashtable(KeyValue*__restrict__ pHashTable,
+                    KeyValue*__restrict__ kvs,
+                    uint32_t* kvs_size)
 {
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < kHashTableCapacity) 
@@ -125,15 +132,24 @@ k_iterate_hashtable(KeyValue*__restrict pHashTable,
 std::vector<KeyValue> iterate_hashtable(KeyValue* pHashTable)
 {
   uint32_t* device_num_kvs;
-  cudaMalloc(&device_num_kvs, sizeof(uint32_t));
+  cudaMalloc((void**) &device_num_kvs, sizeof(uint32_t));
   cudaMemset(device_num_kvs, 0, sizeof(uint32_t));
 
   KeyValue* device_kvs;
-  cudaMalloc(&device_kvs, sizeof(KeyValue) * kNumKeyValues);
+  cudaMalloc((void**) &device_kvs, sizeof(KeyValue) * kNumKeyValues);
 
   const int threadblocksize = 256;
   int gridsize = (kHashTableCapacity + threadblocksize - 1) / threadblocksize;
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   k_iterate_hashtable<<<gridsize, threadblocksize>>>(pHashTable, device_kvs, device_num_kvs);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (iterate): %f (s)\n", time * 1e-9f);
 
   uint32_t num_kvs;
   cudaMemcpy(&num_kvs, device_num_kvs, sizeof(uint32_t), cudaMemcpyDeviceToHost);
@@ -148,4 +164,3 @@ std::vector<KeyValue> iterate_hashtable(KeyValue* pHashTable)
 
   return kvs;
 }
-

@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <algorithm>
 #include <random>
 #include <unordered_map>
@@ -113,64 +114,69 @@ int main(int argc, char* argv[])
   Time timer = start_timer();
 
   // Create a hash table. For linear probing, this is just an array of KeyValues
-  KeyValue* pHashTable;
-  hipMalloc((void**) &pHashTable, sizeof(KeyValue) * kHashTableCapacity);
+  KeyValue* pHashTable = (KeyValue*) malloc (sizeof(KeyValue) * kHashTableCapacity);
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
-  hipMemset(pHashTable, 0xff, sizeof(KeyValue) * kHashTableCapacity);
+  memset(pHashTable, 0xff, sizeof(KeyValue) * kHashTableCapacity);
 
-  double total_ktime = 0.0;
-
-  // Insert items into the hash table
+  // Create key value store for hashtable insert
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
+  KeyValue *ins_kvs = (KeyValue*) malloc (sizeof(KeyValue) * num_inserts_per_batch);
 
-  // Create insert key values 
-  KeyValue* pInsertKvs;
-  hipMalloc ((void**) &pInsertKvs, sizeof(KeyValue) * num_inserts_per_batch);
-
-  for (uint32_t i = 0; i < num_insert_batches; i++)
-  {
-    hipMemcpy(pInsertKvs, insert_kvs.data() + i * num_inserts_per_batch,
-               sizeof(KeyValue) * num_inserts_per_batch, hipMemcpyHostToDevice);
-
-    total_ktime += insert_hashtable(pHashTable, pInsertKvs, num_inserts_per_batch);
-  }
-  printf("Average kernel execution time (insert): %f (s)\n", (total_ktime * 1e-9) / num_insert_batches);
-
-  // Delete items from the hash table
-  total_ktime = 0.0;
+  // Create key value store for hashtable delete
   uint32_t num_deletes_per_batch = (uint32_t)delete_kvs.size() / num_delete_batches;
+  KeyValue *del_kvs = (KeyValue*) malloc (sizeof(KeyValue) * num_deletes_per_batch);
 
-  // Create delete key values 
-  KeyValue* pDeleteKvs;
-  hipMalloc ((void**) &pDeleteKvs, sizeof(KeyValue) * num_deletes_per_batch);
+  // Create key value store for hashtable iterate
+  KeyValue* iter_kvs = (KeyValue*) malloc (sizeof(KeyValue) * kNumKeyValues);
 
-  for (uint32_t i = 0; i < num_delete_batches; i++)
+  #pragma omp target data map(to : pHashTable[0:kHashTableCapacity]) \
+                          map(alloc: ins_kvs[0:num_inserts_per_batch], \
+                                     del_kvs[0:num_deletes_per_batch], \
+                                     iter_kvs[0:kNumKeyValues])
   {
-    hipMemcpy(pDeleteKvs, delete_kvs.data() + i * num_deletes_per_batch,
-               sizeof(KeyValue) * num_deletes_per_batch, hipMemcpyHostToDevice);
+    double total_ktime = 0.0;
 
-    total_ktime += delete_hashtable(pHashTable, pDeleteKvs, num_deletes_per_batch);
+    // Insert items into the hash table
+    for (uint32_t i = 0; i < num_insert_batches; i++)
+    {
+      memcpy(ins_kvs, insert_kvs.data() + i * num_inserts_per_batch, sizeof(KeyValue) * num_inserts_per_batch);
+      #pragma omp target update to (ins_kvs[0:num_inserts_per_batch])
+
+      total_ktime += insert_hashtable(pHashTable, ins_kvs, num_inserts_per_batch);
+    }
+    printf("Average kernel execution time (insert): %f (s)\n", (total_ktime * 1e-9) / num_insert_batches);
+
+    // Delete items from the hash table
+    total_ktime = 0.0;
+    for (uint32_t i = 0; i < num_delete_batches; i++)
+    {
+      memcpy(del_kvs, delete_kvs.data() + i * num_deletes_per_batch, sizeof(KeyValue) * num_deletes_per_batch);
+      #pragma omp target update to (del_kvs[0:num_deletes_per_batch])
+
+      total_ktime += delete_hashtable(pHashTable, del_kvs, num_deletes_per_batch);
+    }
+    printf("Average kernel execution time (delete): %f (s)\n", (total_ktime * 1e-9) / num_delete_batches);
+
+    // Get all the key-values from the hash table
+    std::vector<KeyValue> kvs = iterate_hashtable(pHashTable, iter_kvs);
+  
+    // Summarize results
+    double milliseconds = get_elapsed_time(timer);
+    double seconds = milliseconds / 1000.0f;
+    printf("Total time (including memory copies, readback, etc): %f ms (%f million keys/second)\n", milliseconds,
+        kNumKeyValues / seconds / 1000000.0f);
+  
+    test_unordered_map(insert_kvs, delete_kvs);
+  
+    test_correctness(insert_kvs, delete_kvs, kvs);
   }
-  printf("Average kernel execution time (delete): %f (s)\n", (total_ktime * 1e-9) / num_delete_batches);
 
-  // Get all the key-values from the hash table
-  std::vector<KeyValue> kvs = iterate_hashtable(pHashTable);
-
-  hipFree(pHashTable);
-  hipFree(pInsertKvs);
-  hipFree(pDeleteKvs);
-
-  // Summarize results
-  double milliseconds = get_elapsed_time(timer);
-  double seconds = milliseconds / 1000.0f;
-  printf("Total time (including memory copies, readback, etc): %f ms (%f million keys/second)\n", milliseconds,
-      kNumKeyValues / seconds / 1000000.0f);
-
-  test_unordered_map(insert_kvs, delete_kvs);
-
-  test_correctness(insert_kvs, delete_kvs, kvs);
+  free(pHashTable);
+  free(ins_kvs);
+  free(del_kvs);
+  free(iter_kvs);
 
   printf("Success\n");
 

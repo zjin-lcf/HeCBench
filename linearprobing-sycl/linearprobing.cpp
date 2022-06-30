@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <vector>
+#include <chrono>
 #include "linearprobing.h"
 
 // 32 bit Murmur3 hash
@@ -49,21 +50,21 @@ void k_hashtable_insert(
   }
 }
 
-void insert_hashtable(
+double insert_hashtable(
   queue &q,
   buffer<KeyValue, 1> &pHashTable, 
-  const KeyValue*__restrict kvs, 
+  buffer<KeyValue, 1> &device_kvs,
   uint32_t num_kvs)
 {
-  // Copy the keyvalues to device 
-  buffer<KeyValue, 1> device_kvs (kvs, num_kvs);
-
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
   int gridsize = ((uint32_t)num_kvs + threadblocksize - 1) / threadblocksize;
 
   range<1> gws (gridsize * threadblocksize);
   range<1> lws (threadblocksize);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
   
   q.submit([&] (handler &cgh) {
     auto table = pHashTable.get_access<sycl_read_write>(cgh);
@@ -72,6 +73,12 @@ void insert_hashtable(
       k_hashtable_insert(item, table.get_pointer(), kvs.get_pointer(), (uint32_t)num_kvs);
     });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  return time;
 }
 
 // Delete each key in kvs from the hash table, if the key exists
@@ -84,7 +91,7 @@ void k_hashtable_delete(
   unsigned int numkvs)
 {
   unsigned int tid = item.get_global_id(0);
-  if (tid < kHashTableCapacity)
+  if (tid < numkvs)
   {
     uint32_t key = kvs[tid].key;
     uint32_t slot = hash(key);
@@ -105,17 +112,22 @@ void k_hashtable_delete(
   }
 }
 
-void delete_hashtable(queue &q, buffer<KeyValue, 1> &pHashTable, const KeyValue* kvs, uint32_t num_kvs)
+double delete_hashtable(
+  queue &q,
+  buffer<KeyValue, 1> &pHashTable,
+  buffer<KeyValue, 1> &device_kvs,
+  uint32_t num_kvs)
 {
-  // Copy the keyvalues to device
-  buffer<KeyValue, 1> device_kvs (kvs, num_kvs);
-
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
   int gridsize = ((uint32_t)num_kvs + threadblocksize - 1) / threadblocksize;
+
   range<1> gws (gridsize * threadblocksize);
   range<1> lws (threadblocksize);
   
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto table = pHashTable.get_access<sycl_read_write>(cgh);
     auto kvs = device_kvs.get_access<sycl_read>(cgh);
@@ -123,6 +135,12 @@ void delete_hashtable(queue &q, buffer<KeyValue, 1> &pHashTable, const KeyValue*
       k_hashtable_delete(item, table.get_pointer(), kvs.get_pointer(), (uint32_t)num_kvs);
     });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  return time;
 }
 
 // Iterate over every item in the hashtable; return non-empty key/values
@@ -155,6 +173,7 @@ void k_iterate_hashtable(
 std::vector<KeyValue> iterate_hashtable(queue &q, buffer<KeyValue, 1> &pHashTable)
 {
   buffer<uint32_t, 1> device_num_kvs (1);
+
   q.submit([&] (handler &cgh) {
     auto acc = device_num_kvs.get_access<sycl_discard_write>(cgh);
     cgh.fill(acc, 0u);
@@ -164,8 +183,12 @@ std::vector<KeyValue> iterate_hashtable(queue &q, buffer<KeyValue, 1> &pHashTabl
 
   const int threadblocksize = 256;
   int gridsize = (kHashTableCapacity + threadblocksize - 1) / threadblocksize;
+
   range<1> gws (gridsize * threadblocksize);
   range<1> lws (threadblocksize);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   q.submit([&] (handler &cgh) {
     auto table = pHashTable.get_access<sycl_read>(cgh);
@@ -178,6 +201,11 @@ std::vector<KeyValue> iterate_hashtable(queue &q, buffer<KeyValue, 1> &pHashTabl
                           kvs_size.get_pointer());
     });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (iterate): %f (s)\n", time * 1e-9f);
 
   uint32_t num_kvs;
   q.submit([&] (handler &cgh) {
