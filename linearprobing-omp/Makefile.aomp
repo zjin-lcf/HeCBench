@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
+DEVICE    = gpu
+ARCH      = gfx906
 
 #===============================================================================
 # Program name & source code list
@@ -14,16 +15,16 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu linearprobing.cu test.cu
+source = main.cpp linearprobing.cpp test.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -34,20 +35,27 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=$(ARCH)
+else
+  CFLAGS +=-fopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu linearprobing.h Makefile
+%.o: %.cpp linearprobing.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

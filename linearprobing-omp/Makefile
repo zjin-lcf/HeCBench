@@ -3,10 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -14,16 +14,16 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu linearprobing.cu test.cu
+source = main.cpp linearprobing.cpp test.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -34,20 +34,24 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu linearprobing.h Makefile
+%.o: %.cpp linearprobing.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

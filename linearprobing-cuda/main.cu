@@ -84,8 +84,15 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
 void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
-int main() 
+int main(int argc, char* argv[]) 
 {
+  if (argc != 3) {
+    printf("Usage: %s <number of insert batches> <number of delete batches>\n", argv[0]);
+    return 1;
+  }
+  const uint32_t num_insert_batches = atoi(argv[1]);
+  const uint32_t num_delete_batches = atoi(argv[2]);
+
   // To recreate the same random numbers across runs of the program, set seed to a specific
   // number instead of a number from random_device
   std::random_device rd;
@@ -107,32 +114,53 @@ int main()
 
   // Create a hash table. For linear probing, this is just an array of KeyValues
   KeyValue* pHashTable;
-  cudaMalloc(&pHashTable, sizeof(KeyValue) * kHashTableCapacity);
+  cudaMalloc((void**) &pHashTable, sizeof(KeyValue) * kHashTableCapacity);
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
   cudaMemset(pHashTable, 0xff, sizeof(KeyValue) * kHashTableCapacity);
 
+  double total_ktime = 0.0;
+
   // Insert items into the hash table
-  const uint32_t num_insert_batches = 16;
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
+
+  // Create insert key values 
+  KeyValue* pInsertKvs;
+  cudaMalloc ((void**) &pInsertKvs, sizeof(KeyValue) * num_inserts_per_batch);
+
   for (uint32_t i = 0; i < num_insert_batches; i++)
   {
-    insert_hashtable(pHashTable, insert_kvs.data() + i * num_inserts_per_batch, num_inserts_per_batch);
+    cudaMemcpy(pInsertKvs, insert_kvs.data() + i * num_inserts_per_batch,
+               sizeof(KeyValue) * num_inserts_per_batch, cudaMemcpyHostToDevice);
+
+    total_ktime += insert_hashtable(pHashTable, pInsertKvs, num_inserts_per_batch);
   }
+  printf("Average kernel execution time (insert): %f (s)\n", (total_ktime * 1e-9) / num_insert_batches);
 
   // Delete items from the hash table
-  const uint32_t num_delete_batches = 8;
+  total_ktime = 0.0;
   uint32_t num_deletes_per_batch = (uint32_t)delete_kvs.size() / num_delete_batches;
+
+  // Create delete key values 
+  KeyValue* pDeleteKvs;
+  cudaMalloc ((void**) &pDeleteKvs, sizeof(KeyValue) * num_deletes_per_batch);
+
   for (uint32_t i = 0; i < num_delete_batches; i++)
   {
-    delete_hashtable(pHashTable, delete_kvs.data() + i * num_deletes_per_batch, num_deletes_per_batch);
+    cudaMemcpy(pDeleteKvs, delete_kvs.data() + i * num_deletes_per_batch,
+               sizeof(KeyValue) * num_deletes_per_batch, cudaMemcpyHostToDevice);
+
+    total_ktime += delete_hashtable(pHashTable, pDeleteKvs, num_deletes_per_batch);
   }
+  printf("Average kernel execution time (delete): %f (s)\n", (total_ktime * 1e-9) / num_delete_batches);
 
   // Get all the key-values from the hash table
   std::vector<KeyValue> kvs = iterate_hashtable(pHashTable);
 
   cudaFree(pHashTable);
+  cudaFree(pInsertKvs);
+  cudaFree(pDeleteKvs);
 
   // Summarize results
   double milliseconds = get_elapsed_time(timer);
