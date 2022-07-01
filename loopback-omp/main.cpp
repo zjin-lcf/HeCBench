@@ -5,15 +5,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "loopback.h"
 #include "kernels.cpp"
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 3) {
+    printf("Usage: %s <dump> <repeat>\n", argv[0]);
+    return 1;
+  }
   // display device results when enabled
-  int dump = 0;
-  if (argc == 2) dump = atoi(argv[1]);
+  const int dump = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   const size_t loopback_size = sizeof(float) * LOOKBACK_NUM_PARAMETER_VALUES;
   const size_t seed_size = sizeof(unsigned int) * TAUSWORTHE_NUM_SEEDS;
@@ -55,23 +60,29 @@ int main(int argc, char* argv[]) {
   map(from: lookbackSimulationResultsMean[0:LOOKBACK_NUM_PARAMETER_VALUES], \
             lookbackSimulationResultsVariance[0:LOOKBACK_NUM_PARAMETER_VALUES])
   {
+    // Execute the Tausworthe version of the lookback option
+    const unsigned num_cycles = LOOKBACK_MAX_T;
 
-  // Execute the Tausworthe version of the lookback option
-  const unsigned num_cycles = LOOKBACK_MAX_T;
+    auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < 100; i++)
-    tausworthe_lookback (
-       num_cycles,
-       tauswortheSeeds,
-       lookbackSimulationResultsMean,
-       lookbackSimulationResultsVariance,
-       lookback_VOL_0,
-       lookback_EPS_0,
-       lookback_A_0,
-       lookback_A_1,
-       lookback_A_2,
-       lookback_S_0,
-       lookback_MU);
+    for (int i = 0; i < repeat; i++) {
+      tausworthe_lookback (
+         num_cycles,
+         tauswortheSeeds,
+         lookbackSimulationResultsMean,
+         lookbackSimulationResultsVariance,
+         lookback_VOL_0,
+         lookback_EPS_0,
+         lookback_A_0,
+         lookback_A_1,
+         lookback_A_2,
+         lookback_S_0,
+         lookback_MU);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   if (dump) {
@@ -90,5 +101,6 @@ int main(int argc, char* argv[]) {
   free(lookbackSimulationResultsMean);
   free(lookbackSimulationResultsVariance);
   free(tauswortheSeeds);
+
   return 0;
 }

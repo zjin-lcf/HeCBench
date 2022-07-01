@@ -5,15 +5,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "loopback.h"
 #include "kernels.cpp"
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 3) {
+    printf("Usage: %s <dump> <repeat>\n", argv[0]);
+    return 1;
+  }
   // display device results when enabled
-  int dump = 0;
-  if (argc == 2) dump = atoi(argv[1]);
+  const int dump = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   const size_t loopback_size = sizeof(float) * LOOKBACK_NUM_PARAMETER_VALUES;
   const size_t seed_size = sizeof(unsigned int) * TAUSWORTHE_NUM_SEEDS;
@@ -67,7 +71,10 @@ int main(int argc, char* argv[]) {
   range<1> lws (LOOKBACK_TAUSWORTHE_NUM_THREADS);
   const unsigned num_cycles = LOOKBACK_MAX_T;
 
-  for (int i = 0; i < 100; i++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto mean = d_lookbackSimulationResultsMean.get_access<sycl_discard_write>(cgh);
       auto var  = d_lookbackSimulationResultsVariance.get_access<sycl_discard_write>(cgh);
@@ -99,6 +106,11 @@ int main(int argc, char* argv[]) {
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   
   } // sycl scope
 
@@ -118,5 +130,6 @@ int main(int argc, char* argv[]) {
   free(lookbackSimulationResultsMean);
   free(lookbackSimulationResultsVariance);
   free(tauswortheSeeds);
+
   return 0;
 }

@@ -29,7 +29,7 @@ void boxMuller(float u1, float u2, float &uo1, float &uo2)
 }
 
 float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3, 
-                                          unsigned &z4, float &temporary, unsigned phase)
+                               unsigned &z4, float &temporary, unsigned phase)
 {
   if (phase & 1)
   {
@@ -46,7 +46,6 @@ float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3,
     return t3;
   }
 }
-
 
 float tausworthe_lookback_sim(
     unsigned T, float VOL_0, float EPS_0, 
@@ -103,7 +102,6 @@ void tausworthe_lookback(
     float *__restrict path,
     nd_item<1> &item)
 {
-
   unsigned address = item.get_global_id(0);
 
   // Initialise tausworth with seeds
@@ -140,4 +138,3 @@ void tausworthe_lookback(
   simulationResultsMean[address] = mean;
   simulationResultsVariance[address] = variance / (LOOKBACK_PATHS_PER_SIM - 1);
 }
-
