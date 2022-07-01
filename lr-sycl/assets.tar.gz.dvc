@@ -1,0 +1,5 @@
+outs:
+- md5: 75cc2a6282a59b61ccdc60599f4134b9
+  size: 340173
+  hash: md5
+  path: assets.tar.gz
