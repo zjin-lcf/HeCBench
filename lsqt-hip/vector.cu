@@ -23,8 +23,8 @@
 
 #ifndef CPU_ONLY
 __global__ void gpu_set_zero(int number_of_elements, 
-  real* __restrict g_state_real, 
-  real* __restrict g_state_imag)
+  real* __restrict__ g_state_real, 
+  real* __restrict__ g_state_imag)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < number_of_elements) {
@@ -75,10 +75,10 @@ Vector::Vector(int n)
 #ifndef CPU_ONLY
 __global__ void gpu_copy_state(
   const int N,
-  const real* __restrict in_real,
-  const real* __restrict in_imag, 
-        real* __restrict out_real, 
-        real* __restrict out_imag)
+  const real* __restrict__ in_real,
+  const real* __restrict__ in_imag, 
+        real* __restrict__ out_real, 
+        real* __restrict__ out_imag)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < N) {
@@ -125,10 +125,10 @@ Vector::~Vector()
 #ifndef CPU_ONLY
 __global__ void gpu_add_state(
   const int n, 
-  const real*__restrict in_real,
-  const real*__restrict in_imag, 
-        real*__restrict out_real, 
-        real*__restrict out_imag)
+  const real*__restrict__ in_real,
+  const real*__restrict__ in_imag, 
+        real*__restrict__ out_real, 
+        real*__restrict__ out_imag)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) {
@@ -171,10 +171,10 @@ void Vector::copy(Vector& other)
 #ifndef CPU_ONLY
 __global__ void gpu_apply_sz(
   const int n, 
-  const real* __restrict in_real, 
-  const real* __restrict in_imag, 
-        real* __restrict out_real, 
-        real* __restrict out_imag)
+  const real* __restrict__ in_real, 
+  const real* __restrict__ in_imag, 
+        real* __restrict__ out_real, 
+        real* __restrict__ out_imag)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) {
@@ -259,12 +259,12 @@ __device__ void warp_reduce(volatile real* s, int t)
 #ifndef CPU_ONLY
 __global__ void gpu_find_inner_product_1(
   const int number_of_atoms,
-  const real* __restrict g_final_state_real,
-  const real* __restrict g_final_state_imag,
-  const real* __restrict g_random_state_real,
-  const real* __restrict g_random_state_imag,
-        real* __restrict g_inner_product_real,
-        real* __restrict g_inner_product_imag,
+  const real* __restrict__ g_final_state_real,
+  const real* __restrict__ g_final_state_imag,
+  const real* __restrict__ g_random_state_real,
+  const real* __restrict__ g_random_state_imag,
+        real* __restrict__ g_inner_product_real,
+        real* __restrict__ g_inner_product_imag,
   const int g_offset)
 {
   int tid = threadIdx.x;
@@ -366,10 +366,10 @@ void Vector::inner_product_1(int number_of_atoms, Vector& other, Vector& target,
 #ifndef CPU_ONLY
 __global__ void gpu_find_inner_product_2(
   const int number_of_atoms,
-  const real* __restrict g_inner_product_1_real,
-  const real* __restrict g_inner_product_1_imag,
-        real* __restrict g_inner_product_2_real,
-        real* __restrict g_inner_product_2_imag)
+  const real* __restrict__ g_inner_product_1_real,
+  const real* __restrict__ g_inner_product_1_imag,
+        real* __restrict__ g_inner_product_2_real,
+        real* __restrict__ g_inner_product_2_imag)
 {
   //<<<para.number_of_energy_points, BLOCK_SIZE)>>>
   int tid = threadIdx.x;
