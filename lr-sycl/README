@@ -1,0 +1,2 @@
+unzip the data file:
+  tar -zxf asserts.tar.gz
