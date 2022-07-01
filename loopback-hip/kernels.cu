@@ -47,7 +47,6 @@ __device__ float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &
   }
 }
 
-
 __device__ float tausworthe_lookback_sim(
     unsigned T, float VOL_0, float EPS_0, 
     float A_0, float A_1, float A_2, float S_0,
@@ -89,16 +88,16 @@ __device__ float tausworthe_lookback_sim(
 
 __global__ void tausworthe_lookback(
     unsigned num_cycles,
-    const unsigned int *__restrict seedValues,
-    float *__restrict simulationResultsMean,
-    float *__restrict simulationResultsVariance,
-    const float *__restrict g_VOL_0,
-    const float *__restrict g_EPS_0,
-    const float *__restrict g_A_0,
-    const float *__restrict g_A_1,
-    const float *__restrict g_A_2,
-    const float *__restrict g_S_0,
-    const float *__restrict g_MU)
+    const unsigned int *__restrict__ seedValues,
+    float *__restrict__ simulationResultsMean,
+    float *__restrict__ simulationResultsVariance,
+    const float *__restrict__ g_VOL_0,
+    const float *__restrict__ g_EPS_0,
+    const float *__restrict__ g_A_0,
+    const float *__restrict__ g_A_1,
+    const float *__restrict__ g_A_2,
+    const float *__restrict__ g_S_0,
+    const float *__restrict__ g_MU)
 {
   __shared__ float path[LOOKBACK_TAUSWORTHE_NUM_THREADS*LOOKBACK_MAX_T];
 
@@ -138,4 +137,3 @@ __global__ void tausworthe_lookback(
   simulationResultsMean[address] = mean;
   simulationResultsVariance[address] = variance / (LOOKBACK_PATHS_PER_SIM - 1);
 }
-

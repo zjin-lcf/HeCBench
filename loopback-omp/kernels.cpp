@@ -29,7 +29,7 @@ void boxMuller(float u1, float u2, float &uo1, float &uo2)
 }
 
 float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3, 
-                                          unsigned &z4, float &temporary, unsigned phase)
+                               unsigned &z4, float &temporary, unsigned phase)
 {
   if (phase & 1)
   {
@@ -46,7 +46,6 @@ float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3,
     return t3;
   }
 }
-
 
 float tausworthe_lookback_sim(
     unsigned T, float VOL_0, float EPS_0, 
@@ -100,7 +99,6 @@ void tausworthe_lookback(
     const float *__restrict g_S_0,
     const float *__restrict g_MU)
 {
-
   #pragma omp target teams num_teams(LOOKBACK_TAUSWORTHE_NUM_BLOCKS) \
                            thread_limit (LOOKBACK_TAUSWORTHE_NUM_THREADS)
   {
@@ -144,4 +142,3 @@ void tausworthe_lookback(
     }
   }
 }
-
