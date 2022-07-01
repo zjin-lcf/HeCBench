@@ -545,6 +545,9 @@ Early results are shown [here](results/README.md)
 ### loopback (cuda)
   Lookback option simulation (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
 
+### lr (opencl)
+  Linear regression (https://github.com/ChenyangZhang-cs/iMLBench)
+
 ### lsqt (cuda)
   Linear scaling quantum transport (https://github.com/brucefan1983/gpuqt)
 
