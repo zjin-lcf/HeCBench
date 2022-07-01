@@ -153,15 +153,15 @@ Hamiltonian::~Hamiltonian()
 __global__ void gpu_apply_hamiltonian(
   const int number_of_atoms,
   const real energy_max,
-  const  int* __restrict g_neighbor_number,
-  const  int* __restrict g_neighbor_list,
-  const real* __restrict g_potential,
-  const real* __restrict g_hopping_real,
-  const real* __restrict g_hopping_imag,
-  const real* __restrict g_state_in_real,
-  const real* __restrict g_state_in_imag,
-        real* __restrict g_state_out_real,
-        real* __restrict g_state_out_imag)
+  const  int* __restrict__ g_neighbor_number,
+  const  int* __restrict__ g_neighbor_list,
+  const real* __restrict__ g_potential,
+  const real* __restrict__ g_hopping_real,
+  const real* __restrict__ g_hopping_imag,
+  const real* __restrict__ g_state_in_real,
+  const real* __restrict__ g_state_in_imag,
+        real* __restrict__ g_state_out_real,
+        real* __restrict__ g_state_out_imag)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < number_of_atoms) {
@@ -322,15 +322,15 @@ void Hamiltonian::apply_commutator(Vector& input, Vector& output)
 #ifndef CPU_ONLY
 __global__ void gpu_apply_current(
   const int number_of_atoms,
-  const  int* __restrict g_neighbor_number,
-  const  int* __restrict g_neighbor_list,
-  const real* __restrict g_hopping_real,
-  const real* __restrict g_hopping_imag,
-  const real* __restrict g_xx,
-  const real* __restrict g_state_in_real,
-  const real* __restrict g_state_in_imag,
-        real* __restrict g_state_out_real,
-        real* __restrict g_state_out_imag)
+  const  int* __restrict__ g_neighbor_number,
+  const  int* __restrict__ g_neighbor_list,
+  const real* __restrict__ g_hopping_real,
+  const real* __restrict__ g_hopping_imag,
+  const real* __restrict__ g_xx,
+  const real* __restrict__ g_state_in_real,
+  const real* __restrict__ g_state_in_imag,
+        real* __restrict__ g_state_out_real,
+        real* __restrict__ g_state_out_imag)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < number_of_atoms) {
@@ -403,12 +403,12 @@ void Hamiltonian::apply_current(Vector& input, Vector& output)
 #ifndef CPU_ONLY
 __global__ void gpu_chebyshev_01(
   const int number_of_atoms,
-  const real* __restrict g_state_0_real,
-  const real* __restrict g_state_0_imag,
-  const real* __restrict g_state_1_real,
-  const real* __restrict g_state_1_imag,
-        real* __restrict g_state_real,
-        real* __restrict g_state_imag,
+  const real* __restrict__ g_state_0_real,
+  const real* __restrict__ g_state_0_imag,
+  const real* __restrict__ g_state_1_real,
+  const real* __restrict__ g_state_1_imag,
+        real* __restrict__ g_state_real,
+        real* __restrict__ g_state_imag,
   const real b0,
   const real b1,
   const int direction)
@@ -465,19 +465,19 @@ void Hamiltonian::chebyshev_01(
 __global__ void gpu_chebyshev_2(
   const int number_of_atoms,
   const real energy_max,
-  const  int* __restrict g_neighbor_number,
-  const  int* __restrict g_neighbor_list,
-  const real* __restrict g_potential,
-  const real* __restrict g_hopping_real,
-  const real* __restrict g_hopping_imag,
-  const real* __restrict g_state_0_real,
-  const real* __restrict g_state_0_imag,
-  const real* __restrict g_state_1_real,
-  const real* __restrict g_state_1_imag,
-        real* __restrict g_state_2_real,
-        real* __restrict g_state_2_imag,
-        real* __restrict g_state_real,
-        real* __restrict g_state_imag,
+  const  int* __restrict__ g_neighbor_number,
+  const  int* __restrict__ g_neighbor_list,
+  const real* __restrict__ g_potential,
+  const real* __restrict__ g_hopping_real,
+  const real* __restrict__ g_hopping_imag,
+  const real* __restrict__ g_state_0_real,
+  const real* __restrict__ g_state_0_imag,
+  const real* __restrict__ g_state_1_real,
+  const real* __restrict__ g_state_1_imag,
+        real* __restrict__ g_state_2_real,
+        real* __restrict__ g_state_2_imag,
+        real* __restrict__ g_state_real,
+        real* __restrict__ g_state_imag,
   const real bessel_m,
   const int label)
 {
@@ -618,10 +618,10 @@ void Hamiltonian::chebyshev_2(
 #ifndef CPU_ONLY
 __global__ void gpu_chebyshev_1x(
   const int number_of_atoms,
-  const real* __restrict g_state_1x_real,
-  const real* __restrict g_state_1x_imag,
-        real* __restrict g_state_real,
-        real* __restrict g_state_imag,
+  const real* __restrict__ g_state_1x_real,
+  const real* __restrict__ g_state_1x_imag,
+        real* __restrict__ g_state_real,
+        real* __restrict__ g_state_imag,
   const real g_bessel_1)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
@@ -666,26 +666,26 @@ void Hamiltonian::chebyshev_1x(Vector& input, Vector& output, real bessel_1)
 __global__ void gpu_chebyshev_2x(
   const int number_of_atoms,
   const real energy_max,
-  const  int* __restrict g_neighbor_number,
-  const  int* __restrict g_neighbor_list,
-  const real* __restrict g_potential,
-  const real* __restrict g_hopping_real,
-  const real* __restrict g_hopping_imag,
-  const real* __restrict g_xx,
-  const real* __restrict g_state_0_real,
-  const real* __restrict g_state_0_imag,
-  const real* __restrict g_state_0x_real,
-  const real* __restrict g_state_0x_imag,
-  const real* __restrict g_state_1_real,
-  const real* __restrict g_state_1_imag,
-  const real* __restrict g_state_1x_real,
-  const real* __restrict g_state_1x_imag,
-        real* __restrict g_state_2_real,
-        real* __restrict g_state_2_imag,
-        real* __restrict g_state_2x_real,
-        real* __restrict g_state_2x_imag,
-        real* __restrict g_state_real,
-        real* __restrict g_state_imag,
+  const  int* __restrict__ g_neighbor_number,
+  const  int* __restrict__ g_neighbor_list,
+  const real* __restrict__ g_potential,
+  const real* __restrict__ g_hopping_real,
+  const real* __restrict__ g_hopping_imag,
+  const real* __restrict__ g_xx,
+  const real* __restrict__ g_state_0_real,
+  const real* __restrict__ g_state_0_imag,
+  const real* __restrict__ g_state_0x_real,
+  const real* __restrict__ g_state_0x_imag,
+  const real* __restrict__ g_state_1_real,
+  const real* __restrict__ g_state_1_imag,
+  const real* __restrict__ g_state_1x_real,
+  const real* __restrict__ g_state_1x_imag,
+        real* __restrict__ g_state_2_real,
+        real* __restrict__ g_state_2_imag,
+        real* __restrict__ g_state_2x_real,
+        real* __restrict__ g_state_2x_imag,
+        real* __restrict__ g_state_real,
+        real* __restrict__ g_state_imag,
   const real g_bessel_m,
   const int g_label)
 {
@@ -886,17 +886,17 @@ void Hamiltonian::chebyshev_2x(
 __global__ void gpu_kernel_polynomial(
   const int number_of_atoms,
   const real energy_max,
-  const  int* __restrict g_neighbor_number,
-  const  int* __restrict g_neighbor_list,
-  const real* __restrict g_potential,
-  const real* __restrict g_hopping_real,
-  const real* __restrict g_hopping_imag,
-  const real* __restrict g_state_0_real,
-  const real* __restrict g_state_0_imag,
-  const real* __restrict g_state_1_real,
-  const real* __restrict g_state_1_imag,
-        real* __restrict g_state_2_real,
-        real* __restrict g_state_2_imag)
+  const  int* __restrict__ g_neighbor_number,
+  const  int* __restrict__ g_neighbor_list,
+  const real* __restrict__ g_potential,
+  const real* __restrict__ g_hopping_real,
+  const real* __restrict__ g_hopping_imag,
+  const real* __restrict__ g_state_0_real,
+  const real* __restrict__ g_state_0_imag,
+  const real* __restrict__ g_state_1_real,
+  const real* __restrict__ g_state_1_imag,
+        real* __restrict__ g_state_2_real,
+        real* __restrict__ g_state_2_imag)
 {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < number_of_atoms) {
