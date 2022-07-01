@@ -5,20 +5,17 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <string.h>
-#include <string>
-
+#include <chrono>
 #include "lud.h"
 #include "common.h"
 
 #define BLOCK_SIZE 16
-
 
 double gettime() {
   struct timeval t;
   gettimeofday(&t,NULL);
   return t.tv_sec+t.tv_usec*1e-6;
 }
-
 
 static int do_verify = 0;
 
@@ -30,9 +27,7 @@ static struct option long_options[] = {
   {0,0,0,0}
 };
 
-
-  int
-main ( int argc, char *argv[] )
+int main ( int argc, char *argv[] )
 {
   printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
@@ -107,7 +102,6 @@ main ( int argc, char *argv[] )
     matrix_duplicate(m, &mm, matrix_dim);
   }
 
-
   /* beginning of timing point */
   stopwatch_start(&sw);
 
@@ -127,68 +121,63 @@ main ( int argc, char *argv[] )
   range<1> local_work1(BLOCK_SIZE);
   int offset;
   int i=0;
+  
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
 
     offset = i;  // add the offset 
 
     q.submit([&](handler& cgh) {
-
       auto m_acc = d_m.get_access<sycl_read_write>(cgh);
       accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
-
       cgh.parallel_for<class diagonal>(nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
-#include "kernel_lud_diagonal.sycl"
-
-          });
+        #include "kernel_lud_diagonal.sycl"
       });
-
+    });
 
     range<1> global_work2 (BLOCK_SIZE * 2 * ((matrix_dim-i)/BLOCK_SIZE-1));
     range<1> local_work2 (BLOCK_SIZE * 2);
 
     q.submit([&](handler& cgh) {
-
       auto m_acc = d_m.get_access<sycl_read_write>(cgh);
       accessor <float, 1, sycl_read_write, access::target::local> dia (BLOCK_SIZE * BLOCK_SIZE, cgh);
       accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
       accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
-
       cgh.parallel_for<class peri>(nd_range<1>(global_work2, local_work2), [=] (nd_item<1> item) {
-#include "kernel_lud_perimeter.sycl"
-
-          });
+        #include "kernel_lud_perimeter.sycl"
       });
-
+    });
 
     range<2> global_work3(BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1), BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1));
     range<2> local_work3(BLOCK_SIZE, BLOCK_SIZE);
 
     q.submit([&](handler& cgh) {
-
       auto m_acc = d_m.get_access<sycl_read_write>(cgh);
       accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
       accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
-
       cgh.parallel_for<class internal>(nd_range<2>(global_work3, local_work3) , [=] (nd_item<2> item) {
-#include "kernel_lud_internal.sycl"
-
-          });
+        #include "kernel_lud_internal.sycl"
       });
+    });
   } // for
 
   offset = i;  // add the offset 
 
   q.submit([&](handler& cgh) {
-
     auto m_acc = d_m.get_access<sycl_read_write>(cgh);
     accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
-
     cgh.parallel_for<class diagonal2>(
         nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
-#include "kernel_lud_diagonal.sycl"
-
-        });
+      #include "kernel_lud_diagonal.sycl"
     });
+  });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
 
   } // SYCL scope
 
@@ -205,9 +194,4 @@ main ( int argc, char *argv[] )
   }
 
   free(m);
-
-}        
-
-/* ----------  end of function main  ---------- */
-
-
+}

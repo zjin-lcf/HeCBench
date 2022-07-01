@@ -115,8 +115,6 @@ lud_perimeter (float *m, const int matrix_dim, const int offset) {
   }
 }
 
-
-
 __global__ void
 lud_internal (float *m, const int matrix_dim, const int offset) {
   __shared__ float peri_row [BLOCK_SIZE*BLOCK_SIZE];
@@ -127,7 +125,6 @@ lud_internal (float *m, const int matrix_dim, const int offset) {
   int  tx = threadIdx.x;
   int  ty = threadIdx.y;
 
-  int i;
   float sum;
 
   int global_row_id = offset + (by+1)*BLOCK_SIZE;
@@ -138,9 +135,10 @@ lud_internal (float *m, const int matrix_dim, const int offset) {
 
   __syncthreads();
 
+  int i;
   sum = 0;
   for (i=0; i < BLOCK_SIZE; i++)
-    sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
-  m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
+    sum += peri_col[ty * BLOCK_SIZE + i]; // * peri_row[i * BLOCK_SIZE + tx];
 
+  m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
 }

@@ -18,20 +18,5 @@
   for (i=0; i < BLOCK_SIZE; i++)
     sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
 
-
-/*
-  for (i=0; i < BLOCK_SIZE/2; i++)
-    sum += peri_col[ty * BLOCK_SIZE + 2*i] * peri_row[2*i * BLOCK_SIZE + tx] +
-           peri_col[ty * BLOCK_SIZE + 2*i+1] * peri_row[(2*i+1) * BLOCK_SIZE + tx];
-
-  for (i=0; i < BLOCK_SIZE/4; i++) {
-     float4 *t = (float4*)&peri_col[ty * BLOCK_SIZE];
-     sum += (t+i)->x() * peri_row[64*i+tx] +
-            (t+i)->y() * peri_row[64*i+16+tx] +
-            (t+i)->z() * peri_row[64*i+32+tx] +
-            (t+i)->w() * peri_row[64*i+48+tx];
-  }
-*/
-
   m_acc[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum; 
 
