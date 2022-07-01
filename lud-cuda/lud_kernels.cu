@@ -115,8 +115,6 @@ lud_perimeter (float *m, const int matrix_dim, const int offset) {
   }
 }
 
-
-
 __global__ void
 lud_internal (float *m, const int matrix_dim, const int offset) {
   __shared__ float peri_row [BLOCK_SIZE*BLOCK_SIZE];
@@ -137,31 +135,10 @@ lud_internal (float *m, const int matrix_dim, const int offset) {
 
   __syncthreads();
 
-#ifdef UNROLL
-    sum = peri_col[ty * BLOCK_SIZE] * peri_row[tx];
-    sum += peri_col[ty * BLOCK_SIZE+1] * peri_row[BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+2] * peri_row[2*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+3] * peri_row[3*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+4] * peri_row[4*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+5] * peri_row[5*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+6] * peri_row[6*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+7] * peri_row[7*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+8] * peri_row[8*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+9] * peri_row[9*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+10] * peri_row[10*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+11] * peri_row[11*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+12] * peri_row[12*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+13] * peri_row[13*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+14] * peri_row[14*BLOCK_SIZE+tx];
-    sum += peri_col[ty * BLOCK_SIZE+15] * peri_row[15*BLOCK_SIZE+tx];
-#else
   int i;
   sum = 0;
   for (i=0; i < BLOCK_SIZE; i++)
     sum += peri_col[ty * BLOCK_SIZE + i]; // * peri_row[i * BLOCK_SIZE + tx];
-#endif
-
 
   m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
-
 }

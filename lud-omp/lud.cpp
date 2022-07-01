@@ -4,24 +4,18 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
-
 #include <string.h>
-#include <string>
-
+#include <chrono>
 #include <omp.h>
 #include "common.h"
 
-
 #define BLOCK_SIZE 16
-
-
 
 double gettime() {
   struct timeval t;
   gettimeofday(&t,NULL);
   return t.tv_sec+t.tv_usec*1e-6;
 }
-
 
 static int do_verify = 0;
 void lud_cuda(float *d_m, int matrix_dim);
@@ -34,9 +28,7 @@ static struct option long_options[] = {
   {0,0,0,0}
 };
 
-
-  int
-main ( int argc, char *argv[] )
+int main ( int argc, char *argv[] )
 {
   printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
@@ -99,7 +91,6 @@ main ( int argc, char *argv[] )
       exit(EXIT_FAILURE);
     }
   }
-
   else {
     printf("No input file specified!\n");
     exit(EXIT_FAILURE);
@@ -111,7 +102,6 @@ main ( int argc, char *argv[] )
     matrix_duplicate(m, &mm, matrix_dim);
   }
 
-
   /* beginning of timing point */
   stopwatch_start(&sw);
 
@@ -119,6 +109,9 @@ main ( int argc, char *argv[] )
   {
   int offset;
   int i=0;
+  
+  auto start = std::chrono::steady_clock::now();
+
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
     offset = i;  // add the offset 
     #pragma omp target teams num_teams(1) thread_limit(BLOCK_SIZE)
@@ -162,13 +155,6 @@ main ( int argc, char *argv[] )
         }
       }
     }
-
-#ifdef DEBUG
-    #pragma omp target update from (m[matrix_dim*matrix_dim])
-    for (int k = 0; k < matrix_dim*matrix_dim; k++)
-      printf("%d %f\n", k, m[k]);
-    printf("\n\n");
-#endif
 
     #pragma omp target teams num_teams((matrix_dim-i)/BLOCK_SIZE-1) thread_limit(2*BLOCK_SIZE)
     {
@@ -215,82 +201,69 @@ main ( int argc, char *argv[] )
        #pragma omp barrier
 
        if (tx < BLOCK_SIZE) { //peri-row
-        idx=tx;
+         idx=tx;
          for(i=1; i < BLOCK_SIZE; i++){
-         for (j=0; j < i; j++)
-           peri_row[i * BLOCK_SIZE + idx]-=dia[i * BLOCK_SIZE+ j]*peri_row[j * BLOCK_SIZE + idx];
-       }
+           for (j=0; j < i; j++)
+             peri_row[i * BLOCK_SIZE + idx]-=dia[i * BLOCK_SIZE+ j]*peri_row[j * BLOCK_SIZE + idx];
+         }
        } else { //peri-col
-        idx=tx - BLOCK_SIZE;
-        for(i=0; i < BLOCK_SIZE; i++){
-         for(j=0; j < i; j++)
-           peri_col[idx * BLOCK_SIZE + i]-=peri_col[idx * BLOCK_SIZE+ j]*dia[j * BLOCK_SIZE + i];
-         peri_col[idx * BLOCK_SIZE + i] /= dia[i * BLOCK_SIZE+ i];
-        }
-      }
+         idx=tx - BLOCK_SIZE;
+         for(i=0; i < BLOCK_SIZE; i++){
+           for(j=0; j < i; j++)
+             peri_col[idx * BLOCK_SIZE + i]-=peri_col[idx * BLOCK_SIZE+ j]*dia[j * BLOCK_SIZE + i];
+            peri_col[idx * BLOCK_SIZE + i] /= dia[i * BLOCK_SIZE+ i];
+         }
+       }
 
-      #pragma omp barrier
-      if (tx < BLOCK_SIZE) { //peri-row
-        idx=tx;
-        array_offset = (offset+1)*matrix_dim+offset;
-        for(i=1; i < BLOCK_SIZE; i++){
-          m[array_offset+(bx+1)*BLOCK_SIZE+idx] = peri_row[i*BLOCK_SIZE+idx];
-          array_offset += matrix_dim;
-        }
-      } else { //peri-col
-        idx=tx - BLOCK_SIZE;
-        array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
-        for(i=0; i < BLOCK_SIZE; i++){
-          m[array_offset+idx] =  peri_col[i*BLOCK_SIZE+idx];
-          array_offset += matrix_dim;
-        }
-      }
+       #pragma omp barrier
+       if (tx < BLOCK_SIZE) { //peri-row
+         idx=tx;
+         array_offset = (offset+1)*matrix_dim+offset;
+         for(i=1; i < BLOCK_SIZE; i++){
+           m[array_offset+(bx+1)*BLOCK_SIZE+idx] = peri_row[i*BLOCK_SIZE+idx];
+           array_offset += matrix_dim;
+         }
+       } else { //peri-col
+         idx=tx - BLOCK_SIZE;
+         array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
+         for(i=0; i < BLOCK_SIZE; i++){
+           m[array_offset+idx] =  peri_col[i*BLOCK_SIZE+idx];
+           array_offset += matrix_dim;
+         }
+       }
       }
     }
-#ifdef DEBUG
-    #pragma omp target update from (m[matrix_dim*matrix_dim])
-    for (int k = 0; k < matrix_dim*matrix_dim; k++)
-      printf("%d %f\n", k, m[k]);
-    printf("\n\n");
-#endif
 
     #pragma omp target teams num_teams(((matrix_dim-i)/BLOCK_SIZE-1) * ((matrix_dim-i)/BLOCK_SIZE-1)) \
                               thread_limit(BLOCK_SIZE*BLOCK_SIZE)
     {
-       float peri_row[BLOCK_SIZE * BLOCK_SIZE];
-       float peri_col[BLOCK_SIZE * BLOCK_SIZE];
-       #pragma omp parallel
-       {
-    int  bx = omp_get_team_num() % ((matrix_dim-i)/BLOCK_SIZE-1); // item.get_group(1);  
-    int  by = omp_get_team_num() / ((matrix_dim-i)/BLOCK_SIZE-1); //omp_get_team_num();  
-    
-    int  tx = omp_get_thread_num() % BLOCK_SIZE; //item.get_local_id(1);
-    int  ty = omp_get_thread_num() / BLOCK_SIZE; //omp_get_thread_num();
+      float peri_row[BLOCK_SIZE * BLOCK_SIZE];
+      float peri_col[BLOCK_SIZE * BLOCK_SIZE];
+      #pragma omp parallel
+      {
+        int  bx = omp_get_team_num() % ((matrix_dim-i)/BLOCK_SIZE-1); // item.get_group(1);  
+        int  by = omp_get_team_num() / ((matrix_dim-i)/BLOCK_SIZE-1); //omp_get_team_num();  
+        
+        int  tx = omp_get_thread_num() % BLOCK_SIZE; //item.get_local_id(1);
+        int  ty = omp_get_thread_num() / BLOCK_SIZE; //omp_get_thread_num();
 
-    int i;
-    float sum;
+        int i;
+        float sum;
 
-    int global_row_id = offset + (by+1)*BLOCK_SIZE;
-    int global_col_id = offset + (bx+1)*BLOCK_SIZE;
+        int global_row_id = offset + (by+1)*BLOCK_SIZE;
+        int global_col_id = offset + (bx+1)*BLOCK_SIZE;
 
-    peri_row[ty * BLOCK_SIZE + tx] = m[(offset+ty)*matrix_dim+global_col_id+tx];
-    peri_col[ty * BLOCK_SIZE + tx] = m[(global_row_id+ty)*matrix_dim+offset+tx];
+        peri_row[ty * BLOCK_SIZE + tx] = m[(offset+ty)*matrix_dim+global_col_id+tx];
+        peri_col[ty * BLOCK_SIZE + tx] = m[(global_row_id+ty)*matrix_dim+offset+tx];
 
-    #pragma omp barrier
+        #pragma omp barrier
 
-    sum = 0;
-    for (i=0; i < BLOCK_SIZE; i++)
-      sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
-    m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
-       }
+        sum = 0;
+        for (i=0; i < BLOCK_SIZE; i++)
+          sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
+        m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
+      }
     }
-#ifdef DEBUG
-    #pragma omp target update from (m[matrix_dim*matrix_dim])
-    for (int k = 0; k < matrix_dim*matrix_dim; k++)
-      printf("%d %f\n", k, m[k]);
-    printf("\n\n");
-#endif
-
   } // for
 
   offset = i;  // add the offset 
@@ -311,31 +284,32 @@ main ( int argc, char *argv[] )
       #pragma omp barrier
       
       for(i=0; i < BLOCK_SIZE-1; i++) {
-    
-        if (tx>i){
+        if (tx>i) {
           for(j=0; j < i; j++)
             shadow[tx * BLOCK_SIZE + i] -= shadow[tx * BLOCK_SIZE + j] * shadow[j * BLOCK_SIZE + i];
-        shadow[tx * BLOCK_SIZE + i] /= shadow[i * BLOCK_SIZE + i];
+          shadow[tx * BLOCK_SIZE + i] /= shadow[i * BLOCK_SIZE + i];
         }
     
-      #pragma omp barrier
+        #pragma omp barrier
         if (tx>i){
-    
           for(j=0; j < i+1; j++)
             shadow[(i+1) * BLOCK_SIZE + tx] -= shadow[(i+1) * BLOCK_SIZE + j]*shadow[j * BLOCK_SIZE + tx];
         }
-        
-      #pragma omp barrier
-        }
+
+        #pragma omp barrier
+      }
     
-        array_offset = (offset+1)*matrix_dim+offset;
-        for(i=1; i < BLOCK_SIZE; i++){
-          m[array_offset+tx]=shadow[i * BLOCK_SIZE + tx];
-          array_offset += matrix_dim;
-        }
-    
-     }
+      array_offset = (offset+1)*matrix_dim+offset;
+      for(i=1; i < BLOCK_SIZE; i++){
+        m[array_offset+tx]=shadow[i * BLOCK_SIZE + tx];
+        array_offset += matrix_dim;
+      }
+    }
    }
+
+   auto end = std::chrono::steady_clock::now();
+   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+   printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
   } // #pragma omp target  data map
 
   /* end of timing point */
@@ -351,9 +325,4 @@ main ( int argc, char *argv[] )
   }
 
   free(m);
-
-}        
-
-/* ----------  end of function main  ---------- */
-
-
+}

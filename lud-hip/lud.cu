@@ -4,13 +4,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
-
 #include <string.h>
-#include <string>
-
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "common.h"
-
 
 #define BLOCK_SIZE 16
 
@@ -22,7 +19,6 @@ double gettime() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
-
 static int do_verify = 0;
 
 static struct option long_options[] = {
@@ -33,10 +29,7 @@ static struct option long_options[] = {
   {0,0,0,0}
 };
 
-
-
-  int
-main ( int argc, char *argv[] )
+int main ( int argc, char *argv[] )
 {
   printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
@@ -111,7 +104,6 @@ main ( int argc, char *argv[] )
     matrix_duplicate(m, &mm, matrix_dim);
   }
 
-
   /* beginning of timing point */
   stopwatch_start(&sw);
 
@@ -121,15 +113,25 @@ main ( int argc, char *argv[] )
 
   int offset;
   int i=0;
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
     offset = i;  // add the offset 
-    hipLaunchKernelGGL(lud_diagonal, dim3(1), dim3(BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
-    hipLaunchKernelGGL(lud_perimeter, dim3((matrix_dim-i)/BLOCK_SIZE-1), dim3(2*BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
-    hipLaunchKernelGGL(lud_internal, dim3((matrix_dim-i)/BLOCK_SIZE-1, (matrix_dim-i)/BLOCK_SIZE-1), dim3(BLOCK_SIZE, BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
+    hipLaunchKernelGGL(lud_diagonal, 1, BLOCK_SIZE, 0, 0, d_m, matrix_dim, offset);
+    lud_perimeter<<<(matrix_dim-i)/BLOCK_SIZE-1, 2*BLOCK_SIZE>>>(d_m, matrix_dim, offset);
+    hipLaunchKernelGGL(lud_internal, dim3((matrix_dim-i)/BLOCK_SIZE-1, (matrix_dim-i)/BLOCK_SIZE-1),
+                                     dim3(BLOCK_SIZE, BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
   } // for
 
   offset = i;  // add the offset 
-  hipLaunchKernelGGL(lud_diagonal, dim3(1), dim3(BLOCK_SIZE), 0, 0, d_m, matrix_dim, offset);
+  hipLaunchKernelGGL(lud_diagonal, 1, BLOCK_SIZE, 0, 0, d_m, matrix_dim, offset);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
 
   hipMemcpy(m, d_m, matrix_dim*matrix_dim*sizeof(float), hipMemcpyDeviceToHost);
 
@@ -148,4 +150,4 @@ main ( int argc, char *argv[] )
   free(m);
   hipFree(d_m);
   return 0;
-}        
+}
