@@ -13,7 +13,6 @@
 #include <chrono>
 #include "common.h"
 
-#define REPEAT  100
 #define NPTS (2048*8)
 #define NDIM 128
 
@@ -698,6 +697,12 @@ void Match10(nd_item<2> &item,
 
 int main(int argc, char *argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t space = sizeof(float)*NPTS*NDIM*2 + 8;
   std::vector<float> data(NPTS*NDIM*2 + 8);
   void *ptr = (void*)&data[0];
@@ -760,7 +765,7 @@ int main(int argc, char *argv[])
   range<1> gws1 (NPTS);
   range<1> lws1 (M1W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -774,7 +779,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU1:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -790,7 +795,7 @@ int main(int argc, char *argv[])
   range<2> gws2 (M2H, NPTS/M2W);
   range<2> lws2 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -808,7 +813,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU2:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -824,7 +829,7 @@ int main(int argc, char *argv[])
   range<2> gws3 (M2H, NPTS/M2W);
   range<2> lws3 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -842,7 +847,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU3:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -857,7 +862,7 @@ int main(int argc, char *argv[])
   range<2> gws4 (M2H, NPTS);
   range<2> lws4 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -875,7 +880,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU4:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -891,7 +896,7 @@ int main(int argc, char *argv[])
   range<2> gws5 (M5H, NPTS);
   range<2> lws5 (M5H, M5W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -909,7 +914,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU5:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -925,7 +930,7 @@ int main(int argc, char *argv[])
   range<2> gws6 (M5H, NPTS);
   range<2> lws6 (M5H, M5W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -942,7 +947,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU6:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -958,7 +963,7 @@ int main(int argc, char *argv[])
   range<2> gws7 (M7H/M7R, NPTS);
   range<2> lws7 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -975,7 +980,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU7:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -991,7 +996,7 @@ int main(int argc, char *argv[])
   range<2> gws8 (M7H/M7R, NPTS);
   range<2> lws8 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -1008,7 +1013,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU8:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -1024,7 +1029,7 @@ int main(int argc, char *argv[])
   range<2> gws9 (M7H/M7R/2, NPTS);
   range<2> lws9 (M7H/M7R/2, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -1041,7 +1046,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU9:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);
@@ -1054,11 +1059,10 @@ int main(int argc, char *argv[])
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-
   range<2> gws10 (M7H/M7R, NPTS);
   range<2> lws10 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < REPEAT; i++) 
+  for (int i = 0; i < repeat; i++) 
     q.submit([&] (handler &cgh) {
       auto pts1  = d_pts1.get_access<sycl_read>(cgh);
       auto pts2  = d_pts2.get_access<sycl_read>(cgh);
@@ -1075,7 +1079,7 @@ int main(int argc, char *argv[])
   q.wait();
   end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  delay = elapsed_seconds.count() * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU10:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   q.submit([&] (handler &cgh) {
     auto score = d_score.get_access<sycl_read>(cgh);

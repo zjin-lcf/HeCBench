@@ -10,9 +10,9 @@
 #include <iostream>
 #include <vector>
 #include <memory>  // std::align
+#include <chrono>
 #include <omp.h>
 
-#define REPEAT  100
 #define NPTS (2048*8)
 #define NDIM 128
 
@@ -57,18 +57,20 @@ void CheckMatches(int *h_index, int *h_index2, float *h_score, float *h_score2)
   int ndiff = 0;
   for (int i=0;i<NPTS;i++) {
     ndiff += (h_index[i] != h_index2[i]);
-#ifdef DEBUG
     if (h_index[i] != h_index2[i])
-      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " 
-                << h_score[i] << " " << h_score2[i] << std::endl;
-#endif
+      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " << h_score[i] << " " << h_score2[i] << std::endl;
   }
   std::cout << "Number of incorrect matches: " << ndiff << std::endl;
 }
       
-
 int main(int argc, char *argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t space = sizeof(float)*NPTS*NDIM*2 + 8;
   std::vector<float> data(NPTS*NDIM*2 + 8);
   void *ptr = (void*)&data[0];
@@ -98,14 +100,6 @@ int main(int argc, char *argv[])
     }
   }
 
-  auto start = omp_get_wtime();
-  MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
-  auto end = omp_get_wtime();
-  auto elapsed_seconds = end - start;
-  auto delay = elapsed_seconds * 1000;
-  std::cout << "MatchCPU1:   " << delay << " ms  "
-            << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  
   float *d_pts1 = h_pts1;
   float *d_pts2 = h_pts2;
     int *d_index = h_index2.data();
@@ -113,8 +107,16 @@ int main(int argc, char *argv[])
 #pragma omp target data map (to: d_pts1[0:NPTS*NDIM], d_pts2[0:NPTS*NDIM]) \
                         map (alloc: d_index[0:NPTS], d_score[0:NPTS])
 {
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  auto start = std::chrono::high_resolution_clock::now();
+  MatchC1(h_pts1, h_pts2, h_score.data(), h_index.data());
+  auto end = std::chrono::high_resolution_clock::now();
+  auto elapsed_seconds = end - start;
+  auto delay = elapsed_seconds.count() * 1000;
+  std::cout << "MatchCPU1:   " << delay << " ms  "
+            << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
+  
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams distribute parallel for thread_limit (M1W)
     for (int p1 = 0; p1 < NPTS; p1++) { 
       float max_score = 0.0f;
@@ -134,16 +136,16 @@ int main(int argc, char *argv[])
       d_index[p1] = index;
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU1:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M2W) thread_limit(M2W*M2H)
     {
       float buffer1[M2W*NDIM];  
@@ -192,17 +194,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU2:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
-
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M2W) thread_limit(M2W*M2H)
     {
       float buffer1[M2W*(NDIM + 1)]; 
@@ -251,16 +252,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU3:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
   
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M2W) thread_limit(M2W*M2H)
     {
       float4 buffer1[M2W*(NDIM/4 + 1)];  
@@ -313,16 +314,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU4:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
   
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M5W) thread_limit(M5W*M5H)
     {
       float4 buffer1[M5W*(NDIM/4 + 1)]; 
@@ -381,16 +382,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU5:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
   
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M5W) thread_limit(M5W*M5H)
     {
       float4 buffer1[M5W*(NDIM/4 + 1)]; 
@@ -456,16 +457,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU6:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M7W) thread_limit(M7W*M7H/M7R)
     {
       float4 buffer1[M7W*NDIM/4]; 
@@ -529,16 +530,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU7:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M7W) thread_limit(M7W*M7H/M7R)
     {
       float4 buffer1[M7W*NDIM/4]; 
@@ -622,16 +623,16 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU8:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M7W) thread_limit(M7W*M7H/M7R/2)
     {
       float4 buffer1[M7W*NDIM/4]; 
@@ -713,17 +714,17 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
-  std::cout << "MatchGPU9:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
+  delay = elapsed_seconds.count() * 1000 / repeat;
+  std::cout << "Match9:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
   CheckMatches(h_index.data(), d_index, h_score.data(), d_score);
 
 
-  start = omp_get_wtime();
-  for (int i = 0; i < REPEAT; i++) {
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(NPTS/M7W) thread_limit(M7W*M7H/M7R)
     {
       float4 buffer1[M7W*NDIM/4];    // 32*32
@@ -823,9 +824,9 @@ int main(int argc, char *argv[])
       }
     }
   }
-  end = omp_get_wtime();
+  end = std::chrono::high_resolution_clock::now();
   elapsed_seconds = end - start;
-  delay = elapsed_seconds * 1000 / REPEAT;
+  delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU10:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
   #pragma omp target update from (d_index[0:NPTS])
   #pragma omp target update from (d_score[0:NPTS])
