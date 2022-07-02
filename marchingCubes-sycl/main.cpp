@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <random>
+#include <chrono>
 #include "common.h"
 #include "tables.h"
 
@@ -295,7 +296,11 @@ void compactLv2(
 
 int main(int argc, char* argv[])
 {
-  unsigned int iterations = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  unsigned int repeat = atoi(argv[1]);
 
   std::uniform_real_distribution<float>rd(0, 1);
   std::mt19937 mt(123);
@@ -336,7 +341,9 @@ int main(int argc, char* argv[])
   unsigned int countedVerticesNum;
   unsigned int countedTrianglesNum;
 
-  for (unsigned int c0(0); c0 < iterations; ++c0)
+  float time(0.f);
+
+  for (unsigned int c0(0); c0 < repeat; ++c0)
   {
     q.wait();
 
@@ -454,6 +461,8 @@ int main(int argc, char* argv[])
       auto acc = countedBlockNumLv2Device.get_access<sycl_read>(cgh);
       cgh.copy(acc, &countedBlockNumLv2);
     }).wait();
+
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto blockIndicesLv2 = blockIndicesLv2Device.get_access<sycl_read>(cgh);
@@ -667,6 +676,11 @@ int main(int argc, char* argv[])
       });
     });
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    time += ktime;
+
     q.submit([&] (handler &cgh) {
       auto acc = countedVerticesNumDevice.get_access<sycl_read>(cgh);
       cgh.copy(acc, &countedVerticesNum);
@@ -676,13 +690,13 @@ int main(int argc, char* argv[])
       auto acc = countedTrianglesNumDevice.get_access<sycl_read>(cgh);
       cgh.copy(acc, &countedTrianglesNum);
     }).wait();
-
   }
 
   printf("Block Lv1: %u\nBlock Lv2: %u\n", countedBlockNumLv1, countedBlockNumLv2);
   printf("Vertices Size: %u\n", countedBlockNumLv2 * 304);
   printf("Triangles Size: %u\n", countedBlockNumLv2 * 315 * 3);
   printf("Vertices: %u\nTriangles: %u\n", countedVerticesNum, countedTrianglesNum);
+  printf("Average kernel execution time (generatingTriangles): %f (s)\n", (time * 1e-9f) / repeat);
 
   // specific to the problem size
   bool ok = (countedBlockNumLv1 == 8296 && countedBlockNumLv2 == 240380 &&
