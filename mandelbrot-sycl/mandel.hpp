@@ -11,10 +11,11 @@
 #include <iostream>
 #include "common.h"
 
-constexpr int row_size = 100;
-constexpr int col_size = 100;
+constexpr int row_size = 1080;
+constexpr int col_size = 1920;
 constexpr int max_iterations = 100;
-constexpr int repetitions = 100;
+int repetitions;
+
 #define THREADS_PER_BLOCK_X 16
 #define THREADS_PER_BLOCK_Y 16
 
@@ -23,8 +24,6 @@ typedef struct {
 	float real;
 	float imag;
 } ComplexF;
-
-
 
 struct MandelParameters {
   int row_count_;
@@ -159,13 +158,12 @@ public:
   }
 };
 
-
 class MandelParallel : public Mandel {
 public:
   MandelParallel(int row_count, int col_count, int max_iterations)
     : Mandel(row_count, col_count, max_iterations) { }
 
-  void Evaluate(queue &q) {
+  double Evaluate(queue &q) {
     // iterate over image and check if each point is in mandelbrot set
     MandelParameters p = GetParameters();
 
@@ -184,13 +182,15 @@ public:
     size_t local_work_size[] = {THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y};
 
     //mandel <<< dim3(block_x, block_y), dim3(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y) >>> (data_buf, p_buf, rows, cols);
+    q.wait();
+    common::MyTimer t_ker;
 
     q.submit([&](handler &h) {
       // Get access to the buffer.
       auto b = data_buf.get_access<sycl_write>(h);
       h.parallel_for<class mandel_kernel>(
       nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
-      range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
+                  range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
       int i = item.get_global_id(0);
       int j = item.get_global_id(1);
       if (i < rows && j < cols) 
@@ -198,9 +198,14 @@ public:
       });
     });
 
+    q.wait();
+    common::Duration kernel_time = t_ker.elapsed();
+
     q.submit([&](handler &h) {
       auto b = data_buf.get_access<sycl_read>(h);
       h.copy(b, data());
     });
+
+    return kernel_time.count();
   }
 };

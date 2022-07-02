@@ -5,16 +5,8 @@
 //
 // =============================================================
 
-#include <chrono>
-#include "mandel.hpp"
 #include "util.hpp"
-
-void ShowDevice(queue &q) {
-  // Output platform and device information.
-  auto device = q.get_device();
-  auto deviceName = device.get_info<info::device::name>();
-  std::cout << "Device name " << deviceName << std::endl;
-}
+#include "mandel.hpp"
 
 void Execute(queue &q) {
   // Demonstrate the Mandelbrot calculation serial and parallel
@@ -24,11 +16,15 @@ void Execute(queue &q) {
   // Run the code once to trigger JIT
   m_par.Evaluate(q);
 
-  // Run the parallel version
+  double kernel_time = 0;
+
+  // Run and time the parallel version
+  //
   common::MyTimer t_par;
-  // time the parallel computation
+
   for (int i = 0; i < repetitions; ++i) 
-    m_par.Evaluate(q);
+    kernel_time += m_par.Evaluate(q);
+
   common::Duration parallel_time = t_par.elapsed();
 
   // Print the results
@@ -40,8 +36,9 @@ void Execute(queue &q) {
   common::Duration serial_time = t_ser.elapsed();
 
   // Report the results
-  std::cout << std::setw(20) << "serial time: " << serial_time.count() << "s\n";
-  std::cout << std::setw(20) << "parallel time: " << (parallel_time / repetitions).count() << "s\n";
+  std::cout << std::setw(20) << "Serial time: " << serial_time.count() << " s\n";
+  std::cout << std::setw(20) << "Average parallel time: " << (parallel_time / repetitions).count() << " s\n";
+  std::cout << std::setw(20) << "Average kernel execution time: " << kernel_time / repetitions << " s\n";
 
   // Validating
   m_par.Verify(m_ser);
@@ -51,12 +48,12 @@ void Usage(std::string program_name) {
   // Utility function to display argument usage
   std::cout << " Incorrect parameters\n";
   std::cout << " Usage: ";
-  std::cout << program_name << "\n\n";
+  std::cout << program_name << " <repeat>\n\n";
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 1) {
+  if (argc != 2) {
     Usage(argv[0]);
   }
 
@@ -67,7 +64,8 @@ int main(int argc, char *argv[]) {
     cpu_selector dev_sel;
 #endif
     queue q(dev_sel);
-    ShowDevice(q);
+
+    repetitions = atoi(argv[1]);
     Execute(q);
   } catch (...) {
     std::cout << "Failure\n";
