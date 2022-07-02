@@ -166,7 +166,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 
 #define THREADS 256
 
-
 #if !defined(USE_GPU)
 #define USE_GPU 1
 #endif
@@ -185,7 +184,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 
 #define PTINY Real_t(1e-36)
 
-
   /*********************************/
   /* Data structure implementation */
   /*********************************/
@@ -193,13 +191,13 @@ notice, this list of conditions and the disclaimer (as noted below)
   /* might want to add access methods so that memory can be */
   /* better managed, as in luleshFT */
 
-  template <typename T>
+template <typename T>
 T *Allocate(size_t size)
 {
   return static_cast<T *>(malloc(sizeof(T)*size)) ;
 }
 
-  template <typename T>
+template <typename T>
 void Release(T **ptr)
 {
   if (*ptr != NULL) {
@@ -212,7 +210,7 @@ void Release(T **ptr)
 
 /* Work Routines */
 
-  static inline
+static inline
 void TimeIncrement(Domain& domain)
 {
   Real_t targetdt = domain.stoptime() - domain.time() ;
@@ -266,8 +264,9 @@ void TimeIncrement(Domain& domain)
 
 
 /******************************************/
-  static inline
-void CalcElemShapeFunctionDerivatives( Real_t const x[],
+static inline
+void CalcElemShapeFunctionDerivatives(
+    Real_t const x[],
     Real_t const y[],
     Real_t const z[],
     Real_t b[][8],
@@ -355,7 +354,7 @@ void CalcElemShapeFunctionDerivatives( Real_t const x[],
   *volume = Real_t(8.) * ( fjxet * cjxet + fjyet * cjyet + fjzet * cjzet);
 }
 /******************************************/
-  static inline
+static inline
 void SumElemFaceNormal(Real_t *normalX0, Real_t *normalY0, Real_t *normalZ0,
     Real_t *normalX1, Real_t *normalY1, Real_t *normalZ1,
     Real_t *normalX2, Real_t *normalY2, Real_t *normalZ2,
@@ -390,9 +389,11 @@ void SumElemFaceNormal(Real_t *normalX0, Real_t *normalY0, Real_t *normalZ0,
   *normalZ2 += areaZ;
   *normalZ3 += areaZ;
 }
+
 /******************************************/
-  static inline
-void CalcElemNodeNormals(Real_t pfx[8],
+static inline
+void CalcElemNodeNormals(
+    Real_t pfx[8],
     Real_t pfy[8],
     Real_t pfz[8],
     const Real_t x[8],
@@ -448,7 +449,7 @@ void CalcElemNodeNormals(Real_t pfx[8],
       x[6], y[6], z[6], x[5], y[5], z[5]);
 }
 /******************************************/
-  static inline
+static inline
 void SumElemStressesToNodeForces( const Real_t B[][8],
     const Real_t stress_xx,
     const Real_t stress_yy,
@@ -465,7 +466,7 @@ void SumElemStressesToNodeForces( const Real_t B[][8],
 
 
 /******************************************/
-  static inline
+static inline
 void VoluDer(const Real_t x0, const Real_t x1, const Real_t x2,
     const Real_t x3, const Real_t x4, const Real_t x5,
     const Real_t y0, const Real_t y1, const Real_t y2,
@@ -496,8 +497,9 @@ void VoluDer(const Real_t x0, const Real_t x1, const Real_t x2,
 }
 
 /******************************************/
-  static inline
-void CalcElemVolumeDerivative(Real_t dvdx[8],
+static inline
+void CalcElemVolumeDerivative(
+    Real_t dvdx[8],
     Real_t dvdy[8],
     Real_t dvdz[8],
     const Real_t x[8],
@@ -540,8 +542,9 @@ void CalcElemVolumeDerivative(Real_t dvdx[8],
 
 
 /******************************************/
-  static inline
-Real_t CalcElemVolume( const Real_t x0, const Real_t x1,
+static inline
+Real_t CalcElemVolume(
+    const Real_t x0, const Real_t x1,
     const Real_t x2, const Real_t x3,
     const Real_t x4, const Real_t x5,
     const Real_t x6, const Real_t x7,
@@ -634,8 +637,9 @@ Real_t CalcElemVolume( const Real_t x[8], const Real_t y[8], const Real_t z[8] )
       z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7]);
 }
 /******************************************/
-  static inline
-Real_t AreaFace( const Real_t x0, const Real_t x1,
+static inline
+Real_t AreaFace(
+    const Real_t x0, const Real_t x1,
     const Real_t x2, const Real_t x3,
     const Real_t y0, const Real_t y1,
     const Real_t y2, const Real_t y3,
@@ -658,8 +662,9 @@ Real_t AreaFace( const Real_t x0, const Real_t x1,
 /******************************************/
 #define max(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 
-  static inline
-Real_t CalcElemCharacteristicLength( const Real_t x[8],
+static inline
+Real_t CalcElemCharacteristicLength(
+    const Real_t x[8],
     const Real_t y[8],
     const Real_t z[8],
     const Real_t volume)
@@ -700,9 +705,11 @@ Real_t CalcElemCharacteristicLength( const Real_t x[8],
 
   return charLength;
 }
+
 /******************************************/
-  static inline
-void CalcElemVelocityGradient( const Real_t* const xvel,
+static inline
+void CalcElemVelocityGradient(
+    const Real_t* const xvel,
     const Real_t* const yvel,
     const Real_t* const zvel,
     const Real_t b[][8],
@@ -768,7 +775,7 @@ void CalcElemVelocityGradient( const Real_t* const xvel,
 
 /******************************************/
 
-  static inline
+static inline
 void CalcCourantConstraintForElems(Domain &domain, Index_t length,
     Index_t *regElemlist,
     Real_t qqc, Real_t& dtcourant)
@@ -834,7 +841,7 @@ void CalcCourantConstraintForElems(Domain &domain, Index_t length,
 
 /******************************************/
 
-  static inline
+static inline
 void CalcHydroConstraintForElems(Domain &domain, Index_t length,
     Index_t *regElemlist, Real_t dvovmax, Real_t& dthydro)
 {
@@ -2155,7 +2162,6 @@ int main(int argc, char *argv[])
     //CalcQForElems(domain, vnew) ;
     //======================================================= 
 
-
     //================================================================
     // Calculate velocity gradients 
     //CalcMonotonicQGradientsForElems(domain, vnew);
@@ -2436,7 +2442,6 @@ int main(int argc, char *argv[])
         if ( delvp < phixi ) phixi = delvp ;
         if ( phixi < Real_t(0.)) phixi = Real_t(0.) ;
         if ( phixi > monoq_max_slope) phixi = monoq_max_slope;
-
 
         /*  phieta     */
         norm = Real_t(1.) / ( delv_eta[i] + PTINY ) ;
