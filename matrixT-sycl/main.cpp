@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 // Each block transposes/copies a tile of TILE_DIM x TILE_DIM elements
@@ -26,11 +27,6 @@ int MUL_FACTOR    = TILE_DIM;
 
 // Compute the tile size necessary to illustrate performance cases for SM20+ hardware
 int MAX_TILES = (FLOOR(MATRIX_SIZE_X,512) * FLOOR(MATRIX_SIZE_Y,512)) / (TILE_DIM *TILE_DIM);
-
-// Number of repetitions used for timing.  Two sets of repetitions are performed:
-// 1) over kernel launches and 2) inside the kernel over just the loads and stores
-
-#define NUM_REPS  100
 
 #define __syncthreads() \
   item.barrier(access::fence_space::local_space)
@@ -339,18 +335,17 @@ void computeTransposeGold(float *gold, float *idata,
   }
 }
 
-
 void showHelp()
 {
   printf("\nCommand line options\n");
   printf("\t<row_dim_size> (matrix row    dimensions)\n");
   printf("\t<col_dim_size> (matrix column dimensions)\n");
+  printf("\t<repeat> (kernel execution count)\n");
 }
-
 
 int main(int argc, char **argv)
 {
-  if (argc != 3)
+  if (argc != 4)
   {
     showHelp();
     return 0;
@@ -359,6 +354,7 @@ int main(int argc, char **argv)
   // Calculate number of tiles we will run for the Matrix Transpose performance tests
   int size_x = atoi(argv[1]);
   int size_y = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
 
   if (size_x != size_y)
   {
@@ -418,7 +414,7 @@ int main(int argc, char **argv)
       size_x, size_y, size_x/TILE_DIM, size_y/TILE_DIM, TILE_DIM, TILE_DIM, TILE_DIM, BLOCK_ROWS);
 
   //
-  // loop over different kernels and each kernel runs NUM_REPS times
+  // loop over different kernels
   //
 
   bool success = true;
@@ -427,135 +423,199 @@ int main(int argc, char **argv)
   {
     switch (k)
     {
-      case 0:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class simple_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            copy(item,
-                 odata.get_pointer(),
-                 idata.get_pointer(),
-                 size_x, size_y);
+      case 0: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            cgh.parallel_for<class simple_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              copy(item,
+                   odata.get_pointer(),
+                   idata.get_pointer(),
+                   size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 1:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
-          cgh.parallel_for<class shared_mem_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            copySharedMem(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 1: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
+            cgh.parallel_for<class shared_mem_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              copySharedMem(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 2:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class naive>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeNaive(
-              item,
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 2: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            cgh.parallel_for<class naive>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeNaive(
+                item,
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 3:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
-          cgh.parallel_for<class coalesced>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeCoalesced(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 3: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
+            cgh.parallel_for<class coalesced>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeCoalesced(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 4:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-          cgh.parallel_for<class optimized>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeNoBankConflicts(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 4: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
+            cgh.parallel_for<class optimized>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeNoBankConflicts(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 5:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-          cgh.parallel_for<class coarse_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeCoarseGrained(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 5: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
+            cgh.parallel_for<class coarse_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeCoarseGrained(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 6:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-          cgh.parallel_for<class fine_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeFineGrained(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 6: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
+            cgh.parallel_for<class fine_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeFineGrained(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
 
-      case 7:
-      for (int i = 0; i < NUM_REPS; i++)
-        q.submit([&] (handler &cgh) {
-          auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-          auto idata = d_idata.get_access<sycl_read>(cgh);
-          accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-          cgh.parallel_for<class diagonal>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            transposeDiagonal(
-              item,
-              sm.get_pointer(),
-              odata.get_pointer(),
-              idata.get_pointer(),
-              size_x, size_y);
+      case 7: {
+        auto start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++)
+          q.submit([&] (handler &cgh) {
+            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
+            auto idata = d_idata.get_access<sycl_read>(cgh);
+            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
+            cgh.parallel_for<class diagonal>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+              transposeDiagonal(
+                item,
+                sm.get_pointer(),
+                odata.get_pointer(),
+                idata.get_pointer(),
+                size_x, size_y);
+            });
           });
-        });
+
+        q.wait();
+        auto end = std::chrono::steady_clock::now();
+        auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+      }
       break;
     }
 
@@ -578,32 +638,26 @@ int main(int argc, char **argv)
       gold = transposeGold;
     }
     
-    bool res = true;
+    bool ok = true;
     for (int i = 0; i < size_x*size_y; i++)
       if (fabsf(gold[i] - h_odata[i]) > 0.01f) {
-        res = false;
+        ok = false;
         break;
       }
 
-    if (res == false)
+    if (!ok)
     {
       printf("*** case %d: kernel FAILED ***\n", k);
       success = false;
-      break;
     }
   }
+
+  printf("%s\n", success ? "PASS" : "FAIL");
 
   // cleanup
   free(h_idata);
   free(h_odata);
   free(transposeGold);
 
-  if (!success)
-  {
-    printf("Test failed!\n");
-    exit(EXIT_FAILURE);
-  }
-
-  printf("Test passed\n");
-  exit(EXIT_SUCCESS);
+  return 0;
 }
