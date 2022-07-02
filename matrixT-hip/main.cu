@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <hip/hip_runtime.h>
+#include <chrono>
 #include <hip/hip_cooperative_groups.h>
 
 #define checkHipErrors(call)                                                          \
@@ -50,11 +51,6 @@ int MUL_FACTOR    = TILE_DIM;
 // Compute the tile size necessary to illustrate performance cases for SM20+ hardware
 int MAX_TILES = (FLOOR(MATRIX_SIZE_X,512) * FLOOR(MATRIX_SIZE_Y,512)) / (TILE_DIM *TILE_DIM);
 
-// Number of repetitions used for timing.  Two sets of repetitions are performed:
-// 1) over kernel launches and 2) inside the kernel over just the loads and stores
-
-#define NUM_REPS  100
-
 // -------------------------------------------------------
 // Copies
 // width and height must be integral multiples of TILE_DIM
@@ -74,7 +70,6 @@ __global__ void copy(
   {
     odata[index+i*width] = idata[index+i*width];
   }
-
 }
 
 __global__ void copySharedMem(
@@ -290,7 +285,6 @@ __global__ void transposeFineGrained(
   }
 }
 
-
 __global__ void transposeCoarseGrained(
         float *__restrict__ odata,
   const float *__restrict__ idata,
@@ -321,7 +315,6 @@ __global__ void transposeCoarseGrained(
   }
 }
 
-
 // ---------------------
 // host utility routines
 // ---------------------
@@ -338,18 +331,17 @@ void computeTransposeGold(float *gold, float *idata,
   }
 }
 
-
 void showHelp()
 {
   printf("\nCommand line options\n");
   printf("\t<row_dim_size> (matrix row    dimensions)\n");
   printf("\t<col_dim_size> (matrix column dimensions)\n");
+  printf("\t<repeat> (kernel execution count)\n");
 }
-
 
 int main(int argc, char **argv)
 {
-  if (argc != 3)
+  if (argc != 4)
   {
     showHelp();
     return 0;
@@ -358,6 +350,7 @@ int main(int argc, char **argv)
   // Calculate number of tiles we will run for the Matrix Transpose performance tests
   int size_x = atoi(argv[1]);
   int size_y = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
 
   if (size_x != size_y)
   {
@@ -417,7 +410,6 @@ int main(int argc, char **argv)
   //
   // loop over different kernels
   //
-
   bool success = true;
 
   for (int k = 0; k<8; k++)
@@ -480,26 +472,36 @@ int main(int argc, char **argv)
       gold = transposeGold;
     }
 
-    for (int i=0; i < NUM_REPS; i++)
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i=0; i < repeat; i++)
     {
       hipLaunchKernelGGL(kernel, grid, threads, 0, 0, d_odata, d_idata, size_x, size_y);
     }
 
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
     checkHipErrors(hipMemcpy(h_odata, d_odata, mem_size, hipMemcpyDeviceToHost));
  
-    bool res = true;
+    bool ok = true;
     for (int i = 0; i < size_x*size_y; i++)
       if (fabsf(gold[i] - h_odata[i]) > 0.01f) {
-        res = false;
+        ok = false;
         break;
       }
 
-    if (res == false)
+    if (!ok)
     {
       printf("*** %s kernel FAILED ***\n", kernelName);
       success = false;
     }
   }
+
+  printf("%s\n", success ? "PASS" : "FAIL");
 
   // cleanup
   free(h_idata);
@@ -508,12 +510,5 @@ int main(int argc, char **argv)
   hipFree(d_idata);
   hipFree(d_odata);
 
-  if (!success)
-  {
-    printf("Test failed!\n");
-    exit(EXIT_FAILURE);
-  }
-
-  printf("Test passed\n");
-  exit(EXIT_SUCCESS);
+  return 0;
 }
