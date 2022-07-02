@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <chrono>
 #include <exception>
 
 namespace common {

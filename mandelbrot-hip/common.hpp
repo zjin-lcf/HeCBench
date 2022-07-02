@@ -2,8 +2,6 @@
 // Copyright © 2019 Intel Corporation
 //
 // SPDX-License-Identifier: MIT
-//
-// HIP port: Zheming Jin
 // =============================================================
 
 #ifndef _COMMON_HPP
@@ -11,8 +9,7 @@
 
 #pragma once
 
-#include <stdlib.h>
-#include <exception>
+#include <chrono>
 
 namespace common {
 

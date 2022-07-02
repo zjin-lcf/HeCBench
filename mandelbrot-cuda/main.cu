@@ -2,23 +2,12 @@
 // Copyright © 2019 Intel Corporation
 //
 // SPDX-License-Identifier: MIT
-//
-// A HIP port: Zheming Jin
 // =============================================================
 
-#include <chrono>
 #include "common.hpp"
 #include "mandel.hpp"
 
 using namespace std;
-
-void ShowDevice() {
-  // Output platform and device information.
-    cudaDeviceProp devProp;
-    cudaGetDeviceProperties(&devProp, 0);
-
-    std::cout << "Device name " << devProp.name << std::endl;
-}
 
 void Execute() {
   // Demonstrate the Mandelbrot calculation serial and parallel
@@ -28,11 +17,15 @@ void Execute() {
   // Run the code once to trigger JIT
   m_par.Evaluate();
 
-  // Run the parallel version
+  double kernel_time = 0;
+
+  // Run and time the parallel version
+
   common::MyTimer t_par;
-  // time the parallel computation
+
   for (int i = 0; i < repetitions; ++i) 
-    m_par.Evaluate();
+    kernel_time += m_par.Evaluate();
+
   common::Duration parallel_time = t_par.elapsed();
 
   // Print the results
@@ -44,8 +37,9 @@ void Execute() {
   common::Duration serial_time = t_ser.elapsed();
 
   // Report the results
-  cout << std::setw(20) << "serial time: " << serial_time.count() << "s\n";
-  cout << std::setw(20) << "parallel time: " << (parallel_time / repetitions).count() << "s\n";
+  cout << std::setw(20) << "Serial time: " << serial_time.count() << " s\n";
+  cout << std::setw(20) << "Average parallel time: " << (parallel_time / repetitions).count() << " s\n";
+  cout << std::setw(20) << "Average kernel execution time: " << kernel_time / repetitions << " s\n";
 
   // Validating
   m_par.Verify(m_ser);
@@ -55,17 +49,17 @@ void Usage(string program_name) {
   // Utility function to display argument usage
   cout << " Incorrect parameters\n";
   cout << " Usage: ";
-  cout << program_name << "\n\n";
+  cout << program_name << " <repeat>\n\n";
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 1) {
+  if (argc != 2) {
     Usage(argv[0]);
   }
 
   try {
-    ShowDevice();
+    repetitions = atoi(argv[1]);
     Execute();
   } catch (...) {
     cout << "Failure\n";

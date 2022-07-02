@@ -2,8 +2,6 @@
 // Copyright © 2019 Intel Corporation
 //
 // SPDX-License-Identifier: MIT
-//
-// HIP port: Zheming Jin
 // =============================================================
 
 #pragma once
@@ -13,10 +11,11 @@
 #include <iostream>
 #include <cuda.h>
 
-constexpr int row_size = 100;
-constexpr int col_size = 100;
+constexpr int row_size = 1080;
+constexpr int col_size = 1920;
 constexpr int max_iterations = 100;
-constexpr int repetitions = 100;
+int repetitions;
+
 #define THREADS_PER_BLOCK_X 16
 #define THREADS_PER_BLOCK_Y 16
 
@@ -25,8 +24,6 @@ typedef struct {
 	float real;
 	float imag;
 } ComplexF;
-
-
 
 struct MandelParameters {
   int row_count_;
@@ -147,7 +144,6 @@ class Mandel {
   }
 };
 
-
 class MandelSerial : public Mandel {
 public:
   MandelSerial(int row_count, int col_count, int max_iterations)
@@ -167,13 +163,12 @@ public:
   }
 };
 
-
-__global__ void mandel(int* b, const MandelParameters* p, const int rows, const int cols) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    int j = blockDim.y * blockIdx.y + threadIdx.y;
-    if (i < rows && j < cols)
+__global__
+void mandel(int* b, const MandelParameters* p, const int rows, const int cols) {
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  int j = blockDim.y * blockIdx.y + threadIdx.y;
+  if (i < rows && j < cols)
     b[i * cols + j] = p->Point({p->ScaleRow(i), p->ScaleCol(j)});
-
 }
 
 class MandelParallel : public Mandel {
@@ -181,7 +176,7 @@ public:
   MandelParallel(int row_count, int col_count, int max_iterations)
     : Mandel(row_count, col_count, max_iterations) { }
 
-  void Evaluate() {
+  double Evaluate() {
     // iterate over image and check if each point is in mandelbrot set
     MandelParameters p = GetParameters();
 
@@ -199,11 +194,21 @@ public:
 
     int block_x = (rows + THREADS_PER_BLOCK_X - 1)/THREADS_PER_BLOCK_X;
     int block_y = (cols + THREADS_PER_BLOCK_Y - 1)/THREADS_PER_BLOCK_Y;
+
+    cudaDeviceSynchronize();
+    common::MyTimer t_ker;
+
     mandel <<< dim3(block_x, block_y), 
 	       dim3(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y) >>> (data_buf, p_buf, rows, cols);
+
+    cudaDeviceSynchronize();
+    common::Duration kernel_time = t_ker.elapsed();
+
     cudaMemcpy(data(), data_buf, rows * cols * sizeof(int), cudaMemcpyDeviceToHost);
 
     cudaFree(data_buf);
     cudaFree(p_buf);
+    
+    return kernel_time.count();
   }
 };

@@ -9,11 +9,13 @@
 #include <exception>
 #include <iomanip>
 #include <iostream>
+#include <omp.h>
 
-constexpr int row_size = 100;
-constexpr int col_size = 100;
+constexpr int row_size = 1080;
+constexpr int col_size = 1920;
 constexpr int max_iterations = 100;
-constexpr int repetitions = 100;
+int repetitions;
+
 #define THREADS_PER_BLOCK_X 16
 #define THREADS_PER_BLOCK_Y 16
 
@@ -22,8 +24,6 @@ typedef struct {
 	float real;
 	float imag;
 } ComplexF;
-
-
 
 struct MandelParameters {
   int row_count_;
@@ -138,7 +138,6 @@ class Mandel {
   }
 };
 
-
 class MandelSerial : public Mandel {
 public:
   MandelSerial(int row_count, int col_count, int max_iterations)
@@ -158,13 +157,12 @@ public:
   }
 };
 
-
 class MandelParallel : public Mandel {
 public:
   MandelParallel(int row_count, int col_count, int max_iterations)
     : Mandel(row_count, col_count, max_iterations) { }
 
-  void Evaluate() {
+  double Evaluate() {
     // iterate over image and check if each point is in mandelbrot set
     MandelParameters p = GetParameters();
 
@@ -175,12 +173,21 @@ public:
 
     size_t image_size = rows * cols;
     auto b = data();
-    #pragma omp target map(from: b[0:image_size])
+    common::Duration kernel_time;
+
+    #pragma omp target data map(from: b[0:image_size]) map(to: p)
     {
-      #pragma omp teams distribute parallel for simd collapse(2) thread_limit(THREADS_PER_BLOCK_X*THREADS_PER_BLOCK_Y) 
+      common::MyTimer t_ker;
+
+      #pragma omp target teams distribute parallel for simd collapse(2) \
+        thread_limit(THREADS_PER_BLOCK_X*THREADS_PER_BLOCK_Y) 
       for (int i = 0; i < rows; i++)
         for (int j = 0; j < cols; j++)
           b[i * cols + j] = p.Point({p.ScaleRow(i), p.ScaleCol(j)});
+
+      kernel_time = t_ker.elapsed();
     }
+
+    return kernel_time.count();
   }
 };
