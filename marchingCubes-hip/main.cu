@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <random>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "tables.h"
 
@@ -52,7 +53,7 @@ __inline__ __device__ float transformToCoord(unsigned int x)
   return (int(x) - int(Nd2)) * (2.0f / N);
 }
 
-__global__ void computeMinMaxLv1(float*__restrict minMax)
+__global__ void computeMinMaxLv1(float*__restrict__ minMax)
 {
   __shared__ float sminMax[64];
   constexpr unsigned int threadNum(voxelXLv1 * voxelYLv1);
@@ -110,9 +111,9 @@ __global__ void computeMinMaxLv1(float*__restrict minMax)
 
 __global__ void compactLv1(
   float isoValue, 
-  const float*__restrict minMax,
-  unsigned int*__restrict blockIndices,
-  unsigned int*__restrict countedBlockNum)
+  const float*__restrict__ minMax,
+  unsigned int*__restrict__ blockIndices,
+  unsigned int*__restrict__ countedBlockNum)
 {
   __shared__ unsigned int sums[32];
   constexpr unsigned int warpNum(countingThreadNumLv1 / 32);
@@ -152,8 +153,8 @@ __global__ void compactLv1(
 }
 
 __global__ void computeMinMaxLv2(
-  const unsigned int*__restrict blockIndicesLv1,
-  float*__restrict minMax)
+  const unsigned int*__restrict__ blockIndicesLv1,
+  float*__restrict__ minMax)
 {
   unsigned int tid(threadIdx.x);
   unsigned int voxelOffset(threadIdx.y);
@@ -199,11 +200,11 @@ __global__ void computeMinMaxLv2(
 
 __global__ void compactLv2(
   float isoValue,
-  const float*__restrict minMax,
-  const unsigned int*__restrict blockIndicesLv1,
-  unsigned int*__restrict blockIndicesLv2,
+  const float*__restrict__ minMax,
+  const unsigned int*__restrict__ blockIndicesLv1,
+  unsigned int*__restrict__ blockIndicesLv2,
   unsigned int counterBlockNumLv1,
-  unsigned int*__restrict countedBlockNumLv2)
+  unsigned int*__restrict__ countedBlockNumLv2)
 {
   __shared__ unsigned int sums[32];
   constexpr unsigned int warpNum(countingThreadNumLv2 / 32);
@@ -270,17 +271,17 @@ __global__ void compactLv2(
 
 __global__ void generatingTriangles(
   float isoValue, 
-  const unsigned int*__restrict blockIndicesLv2,
-  const unsigned short *__restrict distinctEdgesTable,
-  const int *__restrict triTable,
-  const uchar4 *__restrict edgeIDTable,
-  unsigned int*__restrict countedVerticesNum,
-  unsigned int*__restrict countedTrianglesNum,
-  unsigned long long*__restrict triangles,
-  float*__restrict coordX,
-  float*__restrict coordY,
-  float*__restrict coordZ,
-  float*__restrict coordZP)
+  const unsigned int*__restrict__ blockIndicesLv2,
+  const unsigned short *__restrict__ distinctEdgesTable,
+  const int *__restrict__ triTable,
+  const uchar4 *__restrict__ edgeIDTable,
+  unsigned int*__restrict__ countedVerticesNum,
+  unsigned int*__restrict__ countedTrianglesNum,
+  unsigned long long*__restrict__ triangles,
+  float*__restrict__ coordX,
+  float*__restrict__ coordY,
+  float*__restrict__ coordZ,
+  float*__restrict__ coordZP)
 {
   __shared__ unsigned short vertexIndices[voxelZLv2][voxelYLv2][voxelXLv2];
   __shared__ float value[voxelZLv2 + 1][voxelYLv2 + 1][voxelXLv2 + 1];
@@ -433,7 +434,11 @@ __global__ void generatingTriangles(
 
 int main(int argc, char* argv[])
 {
-  unsigned int iterations = atoi(argv[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  unsigned int repeat = atoi(argv[1]);
 
   std::uniform_real_distribution<float>rd(0, 1);
   std::mt19937 mt(123);
@@ -488,7 +493,9 @@ int main(int argc, char* argv[])
   unsigned int countedVerticesNum;
   unsigned int countedTrianglesNum;
 
-  for (unsigned int c0(0); c0 < iterations; ++c0)
+  float time(0.f);
+
+  for (unsigned int c0(0); c0 < repeat; ++c0)
   {
     hipDeviceSynchronize();
     hipMemset(countedBlockNumLv1Device, 0, sizeof(unsigned int));
@@ -518,11 +525,18 @@ int main(int argc, char* argv[])
 
     hipMemcpy(&countedBlockNumLv2, countedBlockNumLv2Device, sizeof(unsigned int), hipMemcpyDeviceToHost);
 
+    auto start = std::chrono::steady_clock::now();
+
     hipLaunchKernelGGL(generatingTriangles, dim3(countedBlockNumLv2), BlockSizeGenerating, 0, 0, 
         isoValue, blockIndicesLv2Device,
         distinctEdgesTableDevice, triTableDevice, edgeIDTableDevice,
         countedVerticesNumDevice, countedTrianglesNumDevice, trianglesDevice,
         coordXDevice, coordYDevice, coordZDevice, coordZPDevice);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    time += ktime;
 
     hipMemcpy(&countedVerticesNum, countedVerticesNumDevice, sizeof(unsigned int), hipMemcpyDeviceToHost);
     hipMemcpy(&countedTrianglesNum, countedTrianglesNumDevice, sizeof(unsigned int), hipMemcpyDeviceToHost);
@@ -535,6 +549,7 @@ int main(int argc, char* argv[])
   printf("Vertices Size: %u\n", countedBlockNumLv2 * 304);
   printf("Triangles Size: %u\n", countedBlockNumLv2 * 315 * 3);
   printf("Vertices: %u\nTriangles: %u\n", countedVerticesNum, countedTrianglesNum);
+  printf("Average kernel execution time (generatingTriangles): %f (s)\n", (time * 1e-9f) / repeat);
 
   // specific to the problem size
   bool ok = (countedBlockNumLv1 == 8296 && countedBlockNumLv2 == 240380 &&
