@@ -1,5 +1,6 @@
+#include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 // minimal data needed to compute forces on a device
@@ -389,7 +390,6 @@ void force_kernel(
     const double *h_rbasis,
     d_atom *h_atom_list)
 {
-
   sycl::buffer<double, 1> d_basis (h_basis, 9);
   sycl::buffer<double, 1> d_rbasis (h_basis, 9);
   sycl::buffer<d_atom, 1> d_atom_list (h_atom_list, total_atoms);
@@ -397,6 +397,9 @@ void force_kernel(
   sycl::range<1> gws ( ceil((float)total_atoms/block_size) * block_size );
   sycl::range<1> lws ( block_size );
  
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (sycl::handler &cgh) {
     auto basis = d_basis.get_access<sycl_read>(cgh); 
     auto rbasis = d_rbasis.get_access<sycl_read>(cgh); 
@@ -416,5 +419,10 @@ void force_kernel(
                            polar_damp);
     });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
 }
 
