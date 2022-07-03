@@ -185,7 +185,6 @@ __global__ void Mul8(T *data, int nIters, T v) {
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
 
-
 template <class T>
 __global__ void MAdd1(T *data, int nIters, T v1, T v2) {
   int gid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -243,7 +242,6 @@ __global__ void MAdd8(T *data, int nIters, T v1, T v2) {
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
 
-
 template <class T>
 __global__ void MulMAdd1(T *data, int nIters, T v1, T v2) {
   int gid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -300,5 +298,3 @@ __global__ void MulMAdd8(T *data, int nIters, T v1, T v2) {
   }
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
-
-
