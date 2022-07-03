@@ -1,3 +1,6 @@
+#include <math.h>
+#include <stdio.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // minimal data needed to compute forces on a device
@@ -364,9 +367,17 @@ void force_kernel(
   int dimGrid = ceil((float)total_atoms / block_size);
   int dimBlock = block_size;
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   hipLaunchKernelGGL(calculateForceKernel, dim3(dimGrid), dim3(dimBlock), 0, 0, 
       d_atom_list, total_atoms, cutoff, d_basis, d_rbasis, pform, 
       ewald_alpha, ewald_kmax, kspace_option, polar_damp);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
 
   hipMemcpy(h_atom_list, d_atom_list, atoms_size, hipMemcpyDeviceToHost);
 
