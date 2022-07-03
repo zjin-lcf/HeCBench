@@ -74,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 50
+	./$(program) 5000

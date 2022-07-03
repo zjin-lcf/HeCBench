@@ -204,7 +204,6 @@ void Mul8(T *data, int nFloats, int nIters, T v) {
   }
 }
 
-
 template <class T>
 void MAdd1(T *data, int nFloats, int nIters, T v1, T v2) {
   #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
@@ -269,7 +268,6 @@ void MAdd8(T *data, int nFloats, int nIters, T v1, T v2) {
     data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
   }
 }
-
 
 template <class T>
 void MulMAdd1(T *data, int nFloats, int nIters, T v1, T v2) {

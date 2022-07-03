@@ -119,7 +119,6 @@ class mmadd4;
 template <class T>
 class mmadd8;
 
-
 template <class T>
 void Add1(nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
@@ -175,7 +174,6 @@ void Add8(nd_item<1> &item, T *data, int nIters, T v) {
   }
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
-
 
 template <class T>
 void Mul1(nd_item<1> &item, T *data, int nIters, T v) {
@@ -234,7 +232,6 @@ void Mul8(nd_item<1> &item, T *data, int nIters, T v) {
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
 
-
 template <class T>
 void MAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
@@ -292,7 +289,6 @@ void MAdd8(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
 
-
 template <class T>
 void MulMAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
@@ -349,5 +345,3 @@ void MulMAdd8(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   }
   data[gid] = ((s+s2)+(s3+s4))+((s5+s6)+(s7+s8));
 }
-
-
