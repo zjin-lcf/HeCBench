@@ -2,22 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 typedef float DTYPE;
 
 __global__ void
-maxpool3d(const DTYPE* i_img, DTYPE* o_img, 
-      const int Hstride,
-      const int Vstride,
-      const int pool_width,
-      const int pool_height,
-      const int i_img_width,
-      const int i_img_height,
-      const int o_img_width,
-      const int o_img_height )
+maxpool3d(
+  const DTYPE* i_img,
+        DTYPE* o_img,
+  const int Hstride,
+  const int Vstride,
+  const int pool_width,
+  const int pool_height,
+  const int i_img_width,
+  const int i_img_height,
+  const int o_img_width,
+  const int o_img_height )
 {
-
   const int x = blockDim.x * blockIdx.x + threadIdx.x;
   const int y = blockDim.y * blockIdx.y + threadIdx.y;
   const int z = blockDim.z * blockIdx.z + threadIdx.z;
@@ -39,11 +41,16 @@ maxpool3d(const DTYPE* i_img, DTYPE* o_img,
 
 int main(int argc, char** argv)
 {
-  srand(2);
-  int Hstride=2, Vstride=2;
+  if (argc != 5) {
+    printf("Usage: %s <image width> <image height> <image count> <repeat>\n", argv[0]);
+    return 1;
+  }
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
   int i_img_count = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
+
+  int Hstride=2, Vstride=2;
   int o_img_width  = i_img_width/Hstride;
   int o_img_height = i_img_height/Vstride;
 
@@ -56,6 +63,8 @@ int main(int argc, char** argv)
   int size_image = i_img_width*i_img_height;
   size_t mem_size_image = sizeof(DTYPE) * size_image;
   DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
+
+  srand(2);
 
   for(int j=0;j<i_img_count;j++)
   {
@@ -79,7 +88,6 @@ int main(int argc, char** argv)
   DTYPE* d_result;
   hipMalloc((void**)&d_result, mem_size_output*i_img_count);
 
-
   // assume output image dimensions are multiple of 16
   dim3 block_dim (16, 16, 1);
   dim3 grid_dim(o_img_width/16, o_img_height/16, i_img_count);
@@ -88,10 +96,19 @@ int main(int argc, char** argv)
   const int pool_width  = Hstride;
   const int pool_height = Vstride;
 
-  for (int n = 0; n < 100; n++) {
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(maxpool3d, grid_dim, block_dim, 0, 0, d_image, d_result, Hstride, Vstride, 
         pool_width, pool_height, i_img_width, i_img_height, o_img_width, o_img_height);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   hipMemcpy(d_output, d_result, mem_size_output*i_img_count, hipMemcpyDeviceToHost);
 
   // verification using the CPU results

@@ -7,11 +7,16 @@ typedef float DTYPE;
 
 int main(int argc, char** argv)
 {
-  srand(2);
-  int Hstride=2, Vstride=2;
+  if (argc != 5) {
+    printf("Usage: %s <image width> <image height> <image count> <repeat>\n", argv[0]);
+    return 1;
+  }
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
   int i_img_count = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
+
+  int Hstride=2, Vstride=2;
   int o_img_width  = i_img_width/Hstride;
   int o_img_height = i_img_height/Vstride;
 
@@ -24,6 +29,8 @@ int main(int argc, char** argv)
   int size_image = i_img_width*i_img_height;
   size_t mem_size_image = sizeof(DTYPE) * size_image;
   DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
+
+  srand(2);
 
   for(int j=0;j<i_img_count;j++)
   {

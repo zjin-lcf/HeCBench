@@ -2,17 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 typedef float DTYPE;
 
 int main(int argc, char** argv)
 {
-  srand(2);
-  int Hstride=2, Vstride=2;
+  if (argc != 5) {
+    printf("Usage: %s <image width> <image height> <image count> <repeat>\n", argv[0]);
+    return 1;
+  }
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
   int i_img_count = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
+
+  int Hstride=2, Vstride=2;
   int o_img_width  = i_img_width/Hstride;
   int o_img_height = i_img_height/Vstride;
 
@@ -25,6 +31,8 @@ int main(int argc, char** argv)
   int size_image = i_img_width * i_img_height;
   size_t mem_size_image = sizeof(DTYPE) * size_image;
   DTYPE *h_image  = (DTYPE*)malloc(mem_size_image * i_img_count);
+
+  srand(2);
 
   for(int j=0;j<i_img_count;j++)
   {
@@ -61,7 +69,10 @@ int main(int argc, char** argv)
   const int pool_width  = Hstride;
   const int pool_height = Vstride;
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &h) {
       auto i_img = d_image.get_access<sycl_read>(h);
       auto o_img = d_result.get_access<sycl_discard_write>(h);
@@ -86,6 +97,11 @@ int main(int argc, char** argv)
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   } // sycl scope
 
