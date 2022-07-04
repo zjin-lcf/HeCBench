@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cmath>
 #include <random>
+#include <chrono>
+#include <cuda.h>
 #include "kernels.h"
 
 // transpose
@@ -19,8 +21,12 @@ double* t(const double *idata, const int width, const int height)
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 3) {
+    printf("Usage: %s <path to filename> <repeat>\n", argv[0]);
+    return 1;
+  }
   char *filename = argv[1];
+  const int repeat = atoi(argv[2]);
 
   // n and K should match the dimension of the dataset in the csv file
   const int n = 26280, K = 21, M = 10000;
@@ -66,7 +72,18 @@ int main(int argc, char* argv[]) {
   dim3 blocks (ceil(n/threads_per_block));
 
   cudaMemset(d_probs, 0.0, alphas_size_byte);
-  compute_probs<<<blocks, threads>>>(d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    compute_probs<<<blocks, threads>>>(d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(probs, d_probs, alphas_size_byte, cudaMemcpyDeviceToHost);
   double s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];
@@ -79,8 +96,19 @@ int main(int argc, char* argv[]) {
   cudaMemcpy(d_alphas, t_alphas, alphas_size_byte, cudaMemcpyHostToDevice);
 
   cudaMemset(d_probs, 0.0, alphas_size_byte);
-  compute_probs_unitStrides<<<blocks, threads>>>(
-    d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    compute_probs_unitStrides<<<blocks, threads>>>(
+      d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(probs, d_probs, alphas_size_byte, cudaMemcpyDeviceToHost);
   s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];
@@ -93,8 +121,19 @@ int main(int argc, char* argv[]) {
 
   const int sm_size = sizeof(double) * K * threads_per_block * 2;
   cudaMemset(d_probs, 0.0, alphas_size_byte);
-  compute_probs_unitStrides_sharedMem<<<blocks2, threads2, sm_size, 0>>>(
-     d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    compute_probs_unitStrides_sharedMem<<<blocks2, threads2, sm_size, 0>>>(
+      d_alphas, d_rands, d_probs, n, K, M);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   cudaMemcpy(probs, d_probs, alphas_size_byte, cudaMemcpyDeviceToHost);
   s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];

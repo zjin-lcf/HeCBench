@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <random>
+#include <chrono>
 #include "common.h"
 #include "kernels.h"
 
@@ -20,8 +21,12 @@ double* t(const double *idata, const int width, const int height)
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 3) {
+    printf("Usage: %s <path to filename> <repeat>\n", argv[0]);
+    return 1;
+  }
   char *filename = argv[1];
+  const int repeat = atoi(argv[2]);
 
   // n and K should match the dimension of the dataset in the csv file
   const int n = 26280, K = 21, M = 10000;
@@ -64,22 +69,33 @@ int main(int argc, char* argv[]) {
   d_rands = (double*) sycl::malloc_device(rands_size_byte, q);
   d_alphas = (double*) sycl::malloc_device(alphas_size_byte, q);
   d_probs = (double*) sycl::malloc_device(alphas_size_byte, q);
-  auto e1 = q.memcpy(d_rands, rands, rands_size_byte);
-  auto e2 = q.memcpy(d_alphas, alphas, alphas_size_byte);
+  q.memcpy(d_rands, rands, rands_size_byte);
+  q.memcpy(d_alphas, alphas, alphas_size_byte);
 
   // kernel 1
   int threads_per_block = 192;
   range<1> lws (threads_per_block);
   range<1> gws (ceil(n/threads_per_block) * threads_per_block);
 
-  auto e3 = q.memset(d_probs, 0.0, alphas_size_byte);
-  auto e_k1 = q.submit([&] (handler &cgh) {
-    cgh.depends_on({e1, e2, e3});
-    cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      compute_probs(d_alphas, d_rands, d_probs, n, K, M, item);
+  q.memset(d_probs, 0.0, alphas_size_byte);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        compute_probs(d_alphas, d_rands, d_probs, n, K, M, item);
+      });
     });
-  });
-  q.memcpy(probs, d_probs, alphas_size_byte, e_k1).wait();
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(probs, d_probs, alphas_size_byte).wait();
 
   double s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];
@@ -88,17 +104,28 @@ int main(int argc, char* argv[]) {
   // kernel 2
   double *t_rands = t(rands, K, M);
   double *t_alphas = t(alphas, K, n);
-  e1 = q.memcpy(d_rands, t_rands, rands_size_byte);
-  e2 = q.memcpy(d_alphas, t_alphas, alphas_size_byte);
+  q.memcpy(d_rands, t_rands, rands_size_byte);
+  q.memcpy(d_alphas, t_alphas, alphas_size_byte);
 
-  e3 = q.memset(d_probs, 0.0, alphas_size_byte);
-  auto e_k2 = q.submit([&] (handler &cgh) {
-    cgh.depends_on({e1, e2, e3});
-    cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      compute_probs_unitStrides(d_alphas, d_rands, d_probs, n, K, M, item);
+  q.memset(d_probs, 0.0, alphas_size_byte);
+
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        compute_probs_unitStrides(d_alphas, d_rands, d_probs, n, K, M, item);
+      });
     });
-  });
-  q.memcpy(probs, d_probs, alphas_size_byte, e_k2).wait();
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(probs, d_probs, alphas_size_byte).wait();
 
   s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];
@@ -109,15 +136,26 @@ int main(int argc, char* argv[]) {
   range<1> lws2 (threads_per_block);
   range<1> gws2 (ceil(n/threads_per_block) * threads_per_block);
 
-  e3 = q.memset(d_probs, 0.0, alphas_size_byte);
-  auto e_k3 = q.submit([&] (handler &cgh) {
-    cgh.depends_on(e3);
-    accessor<double, 1, sycl_read_write, sycl_lmem> sm (K * threads_per_block * 2, cgh);
-    cgh.parallel_for<class k3>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
-      compute_probs_unitStrides_sharedMem(d_alphas, d_rands, d_probs, n, K, M, sm.get_pointer(), item);
+  q.memset(d_probs, 0.0, alphas_size_byte);
+
+  q.wait();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      accessor<double, 1, sycl_read_write, sycl_lmem> sm (K * threads_per_block * 2, cgh);
+      cgh.parallel_for<class k3>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+        compute_probs_unitStrides_sharedMem(d_alphas, d_rands, d_probs, n, K, M, sm.get_pointer(), item);
+      });
     });
-  });
-  q.memcpy(probs, d_probs, alphas_size_byte, e_k3).wait();
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(probs, d_probs, alphas_size_byte).wait();
 
   s = 0.0;
   for (int i = 0; i < alphas_size; i++) s += probs[i];

@@ -55,4 +55,4 @@ compress:
 	bzip2 -9 -z -k alphas.csv
 
 run: $(program)
-	./$(program) alphas.csv
+	./$(program) alphas.csv 10

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cmath>
 #include <random>
+#include <chrono>
 #include <omp.h>
 #include "kernels.h"
 
@@ -21,8 +22,12 @@ double* t(const double *idata, const int width, const int height)
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 3) {
+    printf("Usage: %s <path to filename> <repeat>\n", argv[0]);
+    return 1;
+  }
   char *filename = argv[1];
+  const int repeat = atoi(argv[2]);
 
   // n and K should match the dimension of the dataset in the csv file
   const int n = 26280, K = 21, M = 10000;
@@ -57,7 +62,6 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map (to: rands[0:rands_size], alphas[0:alphas_size]) \
                           map (alloc: probs[0:alphas_size])
   {
-
     // kernel 1
     int threads_per_block = 192;
     int num_blocks = ceil(n/threads_per_block);
@@ -65,7 +69,14 @@ int main(int argc, char* argv[]) {
     memset(probs, 0, alphas_size_byte);
     #pragma omp target update to (probs[0:alphas_size])
 
-    compute_probs(alphas, rands, probs, n, K, M, threads_per_block, num_blocks);
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      compute_probs(alphas, rands, probs, n, K, M, threads_per_block, num_blocks);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
     #pragma omp target update from (probs[0:alphas_size])
 
@@ -86,7 +97,15 @@ int main(int argc, char* argv[]) {
     memset(probs, 0, alphas_size_byte);
     #pragma omp target update to (probs[0:alphas_size])
 
-    compute_probs_unitStrides(alphas, rands, probs, n, K, M, threads_per_block, num_blocks);
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      compute_probs_unitStrides(alphas, rands, probs, n, K, M,
+                                threads_per_block, num_blocks);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
     #pragma omp target update from (probs[0:alphas_size])
 
@@ -101,7 +120,15 @@ int main(int argc, char* argv[]) {
     memset(probs, 0, alphas_size_byte);
     #pragma omp target update to (probs[0:alphas_size])
 
-    compute_probs_unitStrides_sharedMem(alphas, rands, probs, n, K, M, threads_per_block, num_blocks);
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      compute_probs_unitStrides_sharedMem(alphas, rands, probs, n, K, M,
+                                          threads_per_block, num_blocks);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
     #pragma omp target update from (probs[0:alphas_size])
 
