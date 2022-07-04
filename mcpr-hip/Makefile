@@ -51,4 +51,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../mcpr-cuda/alphas.csv
+	./$(program) ../mcpr-cuda/alphas.csv 10
