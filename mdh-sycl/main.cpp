@@ -207,7 +207,7 @@ void run_gpu_kernel(
 
   wkf_timer_stop(timer);
   double avg_kernel_time = wkf_timer_time(timer) / ((double) itmax);
-  printf("Average kernel time the device: %1.12g\n", avg_kernel_time);
+  printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
 
   // read output image
   q.submit([&] (handler &cgh) {
@@ -236,7 +236,6 @@ void run_cpu_kernel(
     const float pre1,
     float *val)
 {
-
   #pragma omp parallel for
   for(int igrid=0;igrid<ngrid;igrid++){
     float sum = 0.0f;

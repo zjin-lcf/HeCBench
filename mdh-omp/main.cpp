@@ -131,7 +131,6 @@ void run_cpu_kernel(
     const float pre1,
     float *val)
 {
-
   #pragma omp parallel for
   for(int igrid=0;igrid<ngrid;igrid++){
     float sum = 0.0f;
