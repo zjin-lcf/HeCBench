@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include "common.h"
 #include "shrUtils.h"
 #include "MedianFilter.cpp"
@@ -21,7 +22,8 @@
 extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOutputImage, 
                                  unsigned int uiWidth, unsigned int uiHeight);
 
-void MedianFilterGPU(queue &q,
+double MedianFilterGPU(
+    queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
     buffer<cl::sycl::uchar4> &cmDevBufIn,
@@ -31,15 +33,21 @@ void MedianFilterGPU(queue &q,
 
 int main(int argc, char** argv)
 {
+  if (argc != 3) {
+    printf("Usage: %s <image file> <repeat>\n", argv[0]);
+    return 1;
+  }
   // Image data file
   const char* cPathAndName = argv[1]; 
+
+  const int iCycles = atoi(argv[2]);
+
   unsigned int uiImageWidth = 1920;   // Image width
   unsigned int uiImageHeight = 1080;  // Image height
 
   size_t szBuffBytes;                 // Size of main image buffers
   size_t szBuffWords;                 
 
-  //char* cPathAndName = NULL;          // var for full paths to data, src, etc.
   unsigned int* uiInput;              // Host input buffer 
   unsigned int* uiOutput;             // Host output buffer
 
@@ -69,14 +77,16 @@ int main(int argc, char** argv)
   MedianFilterGPU (q, uiInput, uiOutput, cmDevBufIn, 
                    cmDevBufOut, uiImageWidth, uiImageHeight);
 
+  double time = 0.0;
+
   // Process n loops on the GPU
-  const int iCycles = 150;
   printf("\nRunning MedianFilterGPU for %d cycles...\n\n", iCycles);
   for (int i = 0; i < iCycles; i++)
   {
-    MedianFilterGPU (q, uiInput, uiOutput, cmDevBufIn, 
-                     cmDevBufOut, uiImageWidth, uiImageHeight);
+    time += MedianFilterGPU (q, uiInput, uiOutput, cmDevBufIn, 
+                             cmDevBufOut, uiImageWidth, uiImageHeight);
   }
+  printf("Average kernel execution time: %f (s)\n\n", (time * 1e-9f) / iCycles);
 
   // Compute on host 
   unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
@@ -103,7 +113,8 @@ int main(int argc, char** argv)
 
 // Copies input data from host buf to the device, runs kernel, 
 // copies output data back to output host buf
-void MedianFilterGPU(queue &q,
+double MedianFilterGPU(
+    queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
     buffer<cl::sycl::uchar4> &cmDevBufIn,
@@ -130,6 +141,9 @@ void MedianFilterGPU(queue &q,
   range<2> lws(szLocalWorkSize[1], szLocalWorkSize[0]);
   range<2> gws(szGlobalWorkSize[1], szGlobalWorkSize[0]);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto uc4Source = cmDevBufIn.get_access<sycl_read>(cgh);
     auto uiDest = cmDevBufOut.get_access<sycl_discard_write>(cgh);
@@ -141,11 +155,14 @@ void MedianFilterGPU(queue &q,
     });
   });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   q.submit([&] (handler &cgh) {
     auto acc = cmDevBufOut.get_access<sycl_read>(cgh);
     cgh.copy(acc, uiOutputImage);
-  });
+  }).wait();
 
-  q.wait();
+  return time;
 }
-

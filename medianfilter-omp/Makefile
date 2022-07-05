@@ -65,5 +65,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm
-
+	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm 1000
