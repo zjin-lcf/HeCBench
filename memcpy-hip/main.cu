@@ -1,15 +1,13 @@
 #include <iostream>
 #include <cstdlib>
-#include <cstring>
-#include <time.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define NUM_SIZE 16
-#define NUM_ITER (1 << 13)
 
 void setup(size_t *size) {
   for (int i = 0; i < NUM_SIZE; i++) {
-    size[i] = 1 << (i + 6);  // start at 8 bytes
+    size[i] = 1 << (i + 6);
   }
 }
 
@@ -20,7 +18,13 @@ void valSet(int* A, int val, size_t size) {
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <repeat>\n";
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int *d_A;
   size_t size[NUM_SIZE];
   hipError_t err;
@@ -40,29 +44,42 @@ int main() {
       free(A);
       return -1;
     }
-
-    clock_t start, end;
-    double uS;
-
-    start = clock();
-    for (int j = 0; j < NUM_ITER; j++) {
+    
+    // warmup
+    for (int j = 0; j < repeat; j++) {
       hipMemcpyAsync(d_A, A, size[i], hipMemcpyHostToDevice, 0);
     }
     hipDeviceSynchronize();
-    end = clock();
-    uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
-    std::cout << "Copy " << size[i] << " btyes from host to device takes " 
-      << uS <<  " us" << std::endl;
 
-    start = clock();
-    for (int j = 0; j < NUM_ITER; j++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int j = 0; j < repeat; j++) {
+      hipMemcpyAsync(d_A, A, size[i], hipMemcpyHostToDevice, 0);
+    }
+    hipDeviceSynchronize();
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Copy " << size[i] << " btyes from host to device takes " 
+              << (time * 1e-3f) / repeat <<  " us" << std::endl;
+
+    // warmup
+    for (int j = 0; j < repeat; j++) {
       hipMemcpyAsync(A, d_A, size[i], hipMemcpyDeviceToHost, 0);
     }
     hipDeviceSynchronize();
-    end = clock();
-    uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int j = 0; j < repeat; j++) {
+      hipMemcpyAsync(A, d_A, size[i], hipMemcpyDeviceToHost, 0);
+    }
+    hipDeviceSynchronize();
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     std::cout << "Copy " << size[i] << " btyes from device to host takes " 
-      << uS <<  " us" << std::endl;
+              << (time * 1e-3f) / repeat <<  " us" << std::endl;
 
     hipFree(d_A);
     free(A);
