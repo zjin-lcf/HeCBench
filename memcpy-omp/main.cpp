@@ -1,13 +1,13 @@
 #include <iostream>
 #include <cstdlib>
-#include <time.h>
+#include <chrono>
+#include <omp.h>
 
 #define NUM_SIZE 16
-#define NUM_ITER (1 << 13)
 
 void setup(size_t *size) {
   for (int i = 0; i < NUM_SIZE; i++) {
-    size[i] = 1 << (i + 6);  // start at 8 bytes
+    size[i] = 1 << (i + 6);
   }
 }
 
@@ -18,7 +18,13 @@ void valSet(int* A, int val, size_t size) {
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <repeat>\n";
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   size_t size[NUM_SIZE];
 
   setup(size);
@@ -32,30 +38,39 @@ int main() {
 
     size_t len = size[i] / sizeof(int);
 
-    double uS;
-    clock_t start, end;
-
     #pragma omp target data map(alloc: A[0:len])
     {
-      start = clock();
-      for (int j = 0; j < NUM_ITER; j++) {
-        #pragma omp target update to (A[0:len]) //nowait
+      // warmup
+      for (int j = 0; j < repeat; j++) {
+        #pragma omp target update to (A[0:len])
       }
-      end = clock();
-      uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
 
+      auto start = std::chrono::steady_clock::now();
+
+      for (int j = 0; j < repeat; j++) {
+        #pragma omp target update to (A[0:len])
+      }
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       std::cout << "Copy " << size[i] << " btyes from host to device takes " 
-                << uS <<  " us" << std::endl;
+                << (time * 1e-3f) / repeat <<  " us" << std::endl;
 
-      start = clock();
-      for (int j = 0; j < NUM_ITER; j++) {
-        #pragma omp target update from (A[0:len]) //nowait
+      // warmup
+      for (int j = 0; j < repeat; j++) {
+        #pragma omp target update from (A[0:len])
       }
-      end = clock();
-      uS = (double)(end - start) * 1000 / (NUM_ITER * CLOCKS_PER_SEC);
 
+      start = std::chrono::steady_clock::now();
+
+      for (int j = 0; j < repeat; j++) {
+        #pragma omp target update from (A[0:len])
+      }
+
+      end = std::chrono::steady_clock::now();
+      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       std::cout << "Copy " << size[i] << " btyes from device to host takes " 
-                << uS <<  " us" << std::endl;
+                << (time * 1e-3f) / repeat <<  " us" << std::endl;
     }
     free(A);
   }
