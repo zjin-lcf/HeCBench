@@ -67,17 +67,17 @@ __global__ void mdh (
     const int ngrid,
     const int natom,
     const int ngadj,
-    const float *ax, 
-    const float *ay,
-    const float *az,
-    const float *gx, 
-    const float *gy, 
-    const float *gz,
-    const float *charge, 
-    const float *size, 
+    const float *__restrict__ ax, 
+    const float *__restrict__ ay,
+    const float *__restrict__ az,
+    const float *__restrict__ gx, 
+    const float *__restrict__ gy, 
+    const float *__restrict__ gz,
+    const float *__restrict__ charge, 
+    const float *__restrict__ size, 
     const float xkappa, 
     const float pre1, 
-    float *val)
+    float *__restrict__ val)
 {
   HIP_DYNAMIC_SHARED(float, shared);
 
@@ -120,17 +120,17 @@ __global__ void mdh2 (
     const int ngrid,
     const int natom,
     const int ngadj,
-    const float *ax, 
-    const float *ay,
-    const float *az,
-    const float *gx, 
-    const float *gy, 
-    const float *gz,
-    const float *charge, 
-    const float *size, 
+    const float *__restrict__ ax, 
+    const float *__restrict__ ay,
+    const float *__restrict__ az,
+    const float *__restrict__ gx, 
+    const float *__restrict__ gy, 
+    const float *__restrict__ gz,
+    const float *__restrict__ charge, 
+    const float *__restrict__ size, 
     const float xkappa, 
     const float pre1, 
-    float *val)
+    float *__restrict__ val)
 {
   HIP_DYNAMIC_SHARED(float, shared);
 
@@ -274,7 +274,7 @@ void run_gpu_kernel(
 
   wkf_timer_stop(timer);
   double avg_kernel_time = wkf_timer_time(timer) / ((double) itmax);
-  printf("Average kernel time on the device: %1.12g\n", avg_kernel_time);
+  printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
 
   // read output image
   hipMemcpy(val, d_val, sizeof(float)*ngrid, hipMemcpyDeviceToHost);
@@ -309,7 +309,6 @@ void run_cpu_kernel(
     const float pre1,
     float *val)
 {
-
   #pragma omp parallel for
   for(int igrid=0;igrid<ngrid;igrid++){
     float sum = 0.0f;
