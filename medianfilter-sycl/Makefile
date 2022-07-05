@@ -79,4 +79,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ./data/SierrasRGB.ppm
+	./$(program) ./data/SierrasRGB.ppm 1000

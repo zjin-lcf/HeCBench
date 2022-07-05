@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include <omp.h>
 #include "shrUtils.h"
 
@@ -29,7 +30,7 @@ typedef struct __attribute__((__aligned__(4)))
 extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOutputImage, 
                                  unsigned int uiWidth, unsigned int uiHeight);
 
-void MedianFilterGPU(
+double MedianFilterGPU(
     uchar4* uiInputImage, 
     unsigned int* uiOutputImage, 
     const int uiImageWidth,
@@ -37,8 +38,15 @@ void MedianFilterGPU(
 
 int main(int argc, char** argv)
 {
+  if (argc != 3) {
+    printf("Usage: %s <image file> <repeat>\n", argv[0]);
+    return 1;
+  }
   // Image data file
   const char* cPathAndName = argv[1]; 
+
+  const int iCycles = atoi(argv[2]);
+
   unsigned int uiImageWidth = 1920;   // Image width
   unsigned int uiImageHeight = 1080;  // Image height
 
@@ -69,13 +77,15 @@ int main(int argc, char** argv)
   // Warmup call 
   MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
 
+  double time = 0.0;
+
   // Process n loops on the GPU
-  const int iCycles = 150;
   printf("\nRunning MedianFilterGPU for %d cycles...\n\n", iCycles);
   for (int i = 0; i < iCycles; i++)
   {
-    MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
+    time += MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
   }
+  printf("Average kernel execution time: %f (s)\n\n", (time * 1e-9f) / iCycles);
 }
 
   // Compute on host 
@@ -103,7 +113,7 @@ int main(int argc, char** argv)
 
 // Copies input data from host buf to the device, runs kernel, 
 // copies output data back to output host buf
-void MedianFilterGPU(
+double MedianFilterGPU(
     uchar4* uc4Source, 
     unsigned int* uiDest, 
     const int iImageWidth,
@@ -120,8 +130,11 @@ void MedianFilterGPU(
   szGlobalWorkSize[0] = shrRoundUp((int)szLocalWorkSize[0], iImageWidth); 
   szGlobalWorkSize[1] = shrRoundUp((int)szLocalWorkSize[1], iImageHeight);
 
+  auto start = std::chrono::steady_clock::now();
+
   int iTeamX = szGlobalWorkSize[0] / szLocalWorkSize[0];
   int iTeamY = szGlobalWorkSize[1] / szLocalWorkSize[1];
+
   int iNumTeams = iTeamX * iTeamY;
   int iNumThreads = iBlockDimX * iBlockDimY;
 
@@ -364,4 +377,8 @@ void MedianFilterGPU(
      }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  return time;
 }
