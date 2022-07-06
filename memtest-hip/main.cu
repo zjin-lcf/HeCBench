@@ -1,7 +1,7 @@
-#include "hip/hip_runtime.h"
 #include <stdio.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
-#include "kernels.cu"
+#include "kernels.h"
 
 // check the test result
 void check (const unsigned *err_cnt) {
@@ -9,7 +9,7 @@ void check (const unsigned *err_cnt) {
   // read error
   hipMemcpy(&err, err_cnt, sizeof(unsigned), hipMemcpyDeviceToHost);
 
-  printf("%s\n", (err != 0) ? "FAIL" : "PASS");
+  printf("%s", err ? "x" : ".");
 
   // reset
   hipMemset(&err, 0, sizeof(unsigned));
@@ -32,7 +32,7 @@ void moving_inversion (
 
   hipLaunchKernelGGL(kernel_write, grid, block, 0, 0, dev_mem, mem_size, p1);
 
-  for(int i = 0; i < 100; i++){
+  for(int i = 0; i < 10; i++){
     hipLaunchKernelGGL(kernel_read_write, grid, block, 0, 0, 
         dev_mem, 
         mem_size,
@@ -57,7 +57,14 @@ void moving_inversion (
   check(err_cnt);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
+  printf("Note: x indicates an error and . indicates no error when running each test\n");
 
   unsigned err_count = 0;
 
@@ -82,80 +89,98 @@ int main() {
   char *dev_mem;
   hipMalloc((void**)&dev_mem, mem_size);
 
-  printf("test0..\n\n");
+  printf("\ntest0: ");
   dim3 grid0 (1024);
   dim3 block0 (64);
 
-  hipLaunchKernelGGL(kernel0_write, grid0, block0, 0, 0, dev_mem, mem_size);
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(kernel0_write, grid0, block0, 0, 0, dev_mem, mem_size);
 
-  hipLaunchKernelGGL(kernel0_read, grid0, block0, 0, 0, dev_mem, mem_size,
-      err_cnt,
-      err_addr,
-      err_expect,
-      err_current,
-      err_second_read);
+    hipLaunchKernelGGL(kernel0_read, grid0, block0, 0, 0, dev_mem, mem_size,
+        err_cnt,
+        err_addr,
+        err_expect,
+        err_current,
+        err_second_read);
+  }
 
   check(err_cnt);
 
-  printf("test1..\n\n");
+  printf("\ntest1: ");
   dim3 grid1 (1024);
   dim3 block1 (64);
 
-  hipLaunchKernelGGL(kernel1_write, grid1, block1, 0, 0, dev_mem, mem_size);
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(kernel1_write, grid1, block1, 0, 0, dev_mem, mem_size);
 
-  hipLaunchKernelGGL(kernel1_read, grid1, block1, 0, 0, dev_mem, mem_size,
-      err_cnt,
-      err_addr,
-      err_expect,
-      err_current,
-      err_second_read);
+    hipLaunchKernelGGL(kernel1_read, grid1, block1, 0, 0, dev_mem, mem_size,
+        err_cnt,
+        err_addr,
+        err_expect,
+        err_current,
+        err_second_read);
+  }
 
   check(err_cnt);
 
-  printf("test2..\n\n");
-  unsigned long p1 = 0;
-  unsigned long p2 = ~p1;
-  moving_inversion (err_cnt, err_addr, err_expect, err_current,
-      err_second_read, dev_mem, mem_size, p1);
+  printf("\ntest2: ");
+  for (int i = 0; i < repeat; i++) {
+    unsigned long p1 = 0;
+    unsigned long p2 = ~p1;
+    moving_inversion (err_cnt, err_addr, err_expect, err_current,
+        err_second_read, dev_mem, mem_size, p1);
 
-  moving_inversion (err_cnt, err_addr, err_expect, err_current,
-      err_second_read, dev_mem, mem_size, p2);
+    moving_inversion (err_cnt, err_addr, err_expect, err_current,
+        err_second_read, dev_mem, mem_size, p2);
+  }
 
+  printf("\ntest3: ");
+  for (int i = 0; i < repeat; i++) {
+    unsigned long p1 = 0x8080808080808080;
+    unsigned long p2 = ~p1;
+    moving_inversion (err_cnt, err_addr, err_expect, err_current,
+        err_second_read, dev_mem, mem_size, p1);
 
-  printf("test3..\n\n");
-  p1 = 0x8080808080808080;
-  p2 = ~p1;
-  moving_inversion (err_cnt, err_addr, err_expect, err_current,
-      err_second_read, dev_mem, mem_size, p1);
+    moving_inversion (err_cnt, err_addr, err_expect, err_current,
+        err_second_read, dev_mem, mem_size, p2);
+  }
 
-  moving_inversion (err_cnt, err_addr, err_expect, err_current,
-      err_second_read, dev_mem, mem_size, p2);
-
-  printf("test4..\n\n");
+  printf("\ntest4: ");
   srand(123);
-  for (int i = 0; i < 20; i++) {
-    p1 = rand();
+  for (int i = 0; i < repeat; i++) {
+    unsigned long p1 = rand();
     p1 = (p1 << 32) | rand();
     moving_inversion (err_cnt, err_addr, err_expect, err_current,
         err_second_read, dev_mem, mem_size, p1);
   }
 
-  printf("test5..\n\n");
+  printf("\ntest5: ");
   dim3 grid5 (64*1024);
   dim3 block5 (64);
 
-  hipLaunchKernelGGL(kernel5_init, grid5, block5, 0, 0, dev_mem, mem_size);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(kernel5_init, grid5, block5, 0, 0, dev_mem, mem_size);
 
-  hipLaunchKernelGGL(kernel5_move, grid5, block5, 0, 0, dev_mem, mem_size);
+    hipLaunchKernelGGL(kernel5_move, grid5, block5, 0, 0, dev_mem, mem_size);
 
-  hipLaunchKernelGGL(kernel5_check, grid5, block5, 0, 0, dev_mem, mem_size,
-      err_cnt,
-      err_addr,
-      err_expect,
-      err_current,
-      err_second_read);
+    hipLaunchKernelGGL(kernel5_check, grid5, block5, 0, 0, dev_mem, mem_size,
+        err_cnt,
+        err_addr,
+        err_expect,
+        err_current,
+        err_second_read);
+  }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   
   check(err_cnt);
+
+  printf("\nAverage kernel execution time (test5): %f (s)\n", (time * 1e-9f) / repeat);
 
   hipFree(err_cnt);
   hipFree(err_addr);

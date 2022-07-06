@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <omp.h>
-#include "kernels.cpp"
+#include "kernels.h"
 
 // check the test result
 void check (unsigned *err_cnt) {
   // read error
   #pragma omp target update from (err_cnt[0:1])
 
-  printf("%s\n", (err_cnt[0] != 0) ? "FAIL" : "PASS");
+  printf("%s", err_cnt[0] ? "x" : ".");
 
   // reset
   #pragma omp target 
@@ -30,7 +31,7 @@ void moving_inversion (
 
   kernel_write(dev_mem, mem_size, p1);
 
-  for(int i = 0; i < 100; i++){
+  for(int i = 0; i < 10; i++){
     kernel_read_write(
         dev_mem, 
         mem_size,
@@ -55,7 +56,12 @@ void moving_inversion (
   check(err_cnt);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   unsigned err_cnt[1] = {0};
   unsigned long *err_addr = (unsigned long*) malloc (sizeof(unsigned long) * MAX_ERR_RECORD_COUNT);
@@ -74,74 +80,89 @@ int main() {
                                      err_second_read[0:MAX_ERR_RECORD_COUNT], \
                                      dev_mem[0:mem_size])
   {
-    printf("test0..\n\n");
+    printf("\ntest0: ");
 
-    kernel0_write(dev_mem, mem_size);
+    for (int i = 0; i < repeat; i++) {
+      kernel0_write(dev_mem, mem_size);
 
-    kernel0_read(dev_mem, mem_size,
-        err_cnt,
-        err_addr,
-        err_expect,
-        err_current,
-        err_second_read);
-
-    check(err_cnt);
-
-    printf("test1..\n\n");
-
-    kernel1_write(dev_mem, mem_size);
-
-    kernel1_read(dev_mem, mem_size,
-        err_cnt,
-        err_addr,
-        err_expect,
-        err_current,
-        err_second_read);
+      kernel0_read(dev_mem, mem_size,
+          err_cnt,
+          err_addr,
+          err_expect,
+          err_current,
+          err_second_read);
+    }
 
     check(err_cnt);
 
-    printf("test2..\n\n");
-    unsigned long p1 = 0;
-    unsigned long p2 = ~p1;
-    moving_inversion (err_cnt, err_addr, err_expect, err_current,
-        err_second_read, dev_mem, mem_size, p1);
+    printf("\ntest1: ");
 
-    moving_inversion (err_cnt, err_addr, err_expect, err_current,
-        err_second_read, dev_mem, mem_size, p2);
+    for (int i = 0; i < repeat; i++) {
+      kernel1_write(dev_mem, mem_size);
 
+      kernel1_read(dev_mem, mem_size,
+          err_cnt,
+          err_addr,
+          err_expect,
+          err_current,
+          err_second_read);
+    }
 
-    printf("test3..\n\n");
-    p1 = 0x8080808080808080;
-    p2 = ~p1;
-    moving_inversion (err_cnt, err_addr, err_expect, err_current,
-        err_second_read, dev_mem, mem_size, p1);
+    check(err_cnt);
 
-    moving_inversion (err_cnt, err_addr, err_expect, err_current,
-        err_second_read, dev_mem, mem_size, p2);
+    printf("\ntest2: ");
+    for (int i = 0; i < repeat; i++) {
+      unsigned long p1 = 0;
+      unsigned long p2 = ~p1;
+      moving_inversion (err_cnt, err_addr, err_expect, err_current,
+          err_second_read, dev_mem, mem_size, p1);
 
-    printf("test4..\n\n");
+      moving_inversion (err_cnt, err_addr, err_expect, err_current,
+          err_second_read, dev_mem, mem_size, p2);
+    }
+
+    printf("\ntest3: ");
+    for (int i = 0; i < repeat; i++) {
+      unsigned long p1 = 0x8080808080808080;
+      unsigned long p2 = ~p1;
+      moving_inversion (err_cnt, err_addr, err_expect, err_current,
+          err_second_read, dev_mem, mem_size, p1);
+  
+      moving_inversion (err_cnt, err_addr, err_expect, err_current,
+          err_second_read, dev_mem, mem_size, p2);
+    }
+  
+    printf("\ntest4: ");
     srand(123);
-    for (int i = 0; i < 20; i++) {
-      p1 = rand();
+    for (int i = 0; i < repeat; i++) {
+      unsigned long p1 = rand();
       p1 = (p1 << 32) | rand();
       moving_inversion (err_cnt, err_addr, err_expect, err_current,
           err_second_read, dev_mem, mem_size, p1);
     }
 
-    printf("test5..\n\n");
+    printf("\ntest5: ");
 
-    kernel5_init(dev_mem, mem_size);
+    auto start = std::chrono::steady_clock::now();
+    
+    for (int i = 0; i < repeat; i++) {
+      kernel5_init(dev_mem, mem_size);
 
-    kernel5_move(dev_mem, mem_size);
+      kernel5_move(dev_mem, mem_size);
 
-    kernel5_check(dev_mem, mem_size,
-        err_cnt,
-        err_addr,
-        err_expect,
-        err_current,
-        err_second_read);
+      kernel5_check(dev_mem, mem_size,
+          err_cnt,
+          err_addr,
+          err_expect,
+          err_current,
+          err_second_read);
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     
     check(err_cnt);
+
+    printf("\nAverage kernel execution time (test5): %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   free(err_addr);
