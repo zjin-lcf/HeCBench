@@ -93,7 +93,6 @@ void kernel0_read(
   }
 }
 
-
 void kernel1_write(nd_item<1> &item, char* ptr, unsigned long size)
 {
   int idx = item.get_global_id(0);
@@ -136,7 +135,6 @@ void kernel_write(nd_item<1> &item, char* ptr, unsigned long size, TYPE p1)
   for (int i = idx; i < n; i+= total_num_threads)
     buf[i] = p1;
 }
-
 
 void kernel_read_write(
     nd_item<1> &item,
@@ -236,7 +234,6 @@ void kernel5_move(nd_item<1> &item, char* ptr, unsigned long size)
   }
 }
 
-
 void kernel5_check(
     nd_item<1> &item,
     const char* ptr, unsigned long size,
@@ -256,4 +253,3 @@ void kernel5_check(
       RECORD_ERR(err_count, &buf[2*i], buf[2*i+1], buf[2*i]);
   }
 }
-

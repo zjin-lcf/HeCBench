@@ -90,7 +90,6 @@ void kernel0_read(
   }
 }
 
-
 __global__
 void kernel1_write(char* ptr, unsigned long size)
 {
@@ -135,7 +134,6 @@ void kernel_write(char* ptr, unsigned long size, TYPE p1)
   for (int i = idx; i < n; i+= total_num_threads)
     buf[i] = p1;
 }
-
 
 __global__
 void kernel_read_write(
@@ -237,7 +235,6 @@ void kernel5_move(char* ptr, unsigned long size)
   }
 }
 
-
 __global__
 void kernel5_check(
     const char*__restrict__ ptr, unsigned long size,
@@ -257,4 +254,3 @@ void kernel5_check(
       RECORD_ERR(err_count, &buf[2*i], buf[2*i+1], buf[2*i]);
   }
 }
-
