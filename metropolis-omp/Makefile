@@ -66,5 +66,3 @@ dbg: $(program)
 
 run: $(program)
 	./$(program) -l 32 11 -t 4.7 0.1 -a 10 2 2000 10 -h 1.0 -z 7919
-
-

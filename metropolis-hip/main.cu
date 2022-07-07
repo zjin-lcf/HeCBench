@@ -23,12 +23,10 @@
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 
-
 #include "utils.h"
 #include "kernel_prng.h"
 #include "kernel_metropolis.h"
 #include "kernel_reduction.h"
-
 
 int main(int argc, char **argv){
 
@@ -149,7 +147,7 @@ int main(int argc, char **argv){
     hipMalloc(&apcga[k], (N/4) * sizeof(uint64_t));
     hipMalloc(&apcgb[k], (N/4) * sizeof(uint64_t));
     // offset and sequence approach
-    hipLaunchKernelGGL(kernel_gpupcg_setup, dim3(prng_grid), dim3(prng_block), 0, 0, apcga[k], apcgb[k], N/4, 
+    hipLaunchKernelGGL(kernel_gpupcg_setup, prng_grid, prng_block, 0, 0, apcga[k], apcgb[k], N/4, 
         seed + N/4 * k, k);
 #ifdef DEBUG
     printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
@@ -171,7 +169,6 @@ int main(int argc, char **argv){
     ++count;
   }
 
-
   /* print parameters */
   printf("\tparameters:{\n");
   printf("\t\tL:                            %i\n", L);
@@ -181,7 +178,6 @@ int main(int argc, char **argv){
   printf("\t\tmag_field h:                  %f\n", h);
   printf("\t\treplicas:                     %i\n", R);
   printf("\t\tseed:                         %lu\n", seed);
-
 
   /* find good temperature distribution */
   FILE *fw = fopen("trials.dat", "w");
@@ -193,6 +189,7 @@ int main(int argc, char **argv){
   printf("\n\n");
 #endif
 
+  double total_ktime = 0.0;
 
   double start = rtclock();
 
@@ -203,7 +200,7 @@ int main(int argc, char **argv){
     printf("[trial %i of %i]\n", trial+1, atrials); fflush(stdout);
 
     /* distribution for H */
-    hipLaunchKernelGGL(kernel_reset_random_gpupcg, dim3(lgrid), dim3(lblock), 0, 0, dH, N, apcga[0], apcgb[0]);  
+    hipLaunchKernelGGL(kernel_reset_random_gpupcg, lgrid, lblock, 0, 0, dH, N, apcga[0], apcgb[0]);  
     
 #ifdef DEBUG
     hipMemcpy(hH, dH, N*sizeof(int), hipMemcpyDeviceToHost);
@@ -223,12 +220,11 @@ int main(int argc, char **argv){
     printf("new seed [%lu]\n", seed);
 #endif
 
-
     for (int k = 0; k < ar; ++k) {
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<int>), dim3(lgrid), dim3(lblock ), 0, 0, mdlat[k], N, 1);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<int>), lgrid, lblock , 0, 0, mdlat[k], N, 1);
       cudaCheckErrors("kernel: reset spins up");
 
-      hipLaunchKernelGGL(kernel_gpupcg_setup, dim3(prng_grid), dim3(prng_block), 0, 0, apcga[k], apcgb[k], N/4, 
+      hipLaunchKernelGGL(kernel_gpupcg_setup, prng_grid, prng_block, 0, 0, apcga[k], apcgb[k], N/4, 
           seed + (uint64_t)(N/4 * k), k);
       cudaCheckErrors("kernel: prng reset");
 #ifdef DEBUG
@@ -241,10 +237,14 @@ int main(int argc, char **argv){
 
     /* parallel tempering */
     for(int p = 0; p < apts; ++p) {
+
+      double k_start = rtclock();
+
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
-          hipLaunchKernelGGL(kernel_metropolis, dim3(mcgrid), dim3(mcblock ), 0, 0, N, L, mdlat[k], dH, h, 
+
+          hipLaunchKernelGGL(kernel_metropolis, mcgrid, mcblock , 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
 #ifdef DEBUG
           hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
@@ -259,7 +259,7 @@ int main(int argc, char **argv){
         cudaCheckErrors("mcmc: kernel metropolis white launch");
 
         for(int k = 0; k < ar; ++k) {
-          hipLaunchKernelGGL(kernel_metropolis, dim3(mcgrid), dim3(mcblock ), 0, 0, N, L, mdlat[k], dH, h, 
+          hipLaunchKernelGGL(kernel_metropolis, mcgrid, mcblock , 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
 #ifdef DEBUG
           hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
@@ -274,6 +274,9 @@ int main(int argc, char **argv){
         cudaCheckErrors("mcmc: kernel metropolis black launch");
       }
 
+      double k_end = rtclock();
+      total_ktime += k_end - k_start; 
+
 #ifdef DEBUG
       for(int k = 0; k < ar; ++k) {
       }
@@ -281,7 +284,7 @@ int main(int argc, char **argv){
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<float>), dim3((ar + BLOCKSIZE1D - 1)/BLOCKSIZE1D), dim3(BLOCKSIZE1D ), 0, 0, dE, ar, 0.0f);
+      kernel_reset<float><<< (ar + BLOCKSIZE1D - 1)/BLOCKSIZE1D, BLOCKSIZE1D >>> (dE, ar, 0.0f);
       hipDeviceSynchronize();
 
       /* compute one energy reduction for each replica */
@@ -290,7 +293,7 @@ int main(int argc, char **argv){
 
       for(int k = 0; k < ar; ++k){
         /* launch reduction kernel for k-th replica */
-        hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_redenergy<float>), dim3(grid), dim3(block), 0, 0, mdlat[k], L, dE + k, dH, h);
+        hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_redenergy<float>), grid, block, 0, 0, mdlat[k], L, dE + k, dH, h);
         hipDeviceSynchronize();
         cudaCheckErrors("kernel_redenergy");
       }
@@ -378,7 +381,7 @@ int main(int argc, char **argv){
 
   double end = rtclock();
   printf("Total trial time %.2f secs\n", end-start);
-
+  printf("Total kernel time (metropolis simulation) %.2f secs\n", total_ktime);
 
   fclose(fw);
   for(int i = 0; i < rpool; ++i) {
@@ -408,4 +411,4 @@ int main(int argc, char **argv){
   free(aT);
 
   return 0;
-}  
+}
