@@ -120,7 +120,6 @@ __global__ void target_pml_3d_kernel(
 
     if (i > x4-1 || j > y4-1 || k > z4-1) { return; }
 
-
     float lap = coef0 * s_u[sui][suj][suk] + 
               coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
               coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
@@ -136,7 +135,6 @@ __global__ void target_pml_3d_kernel(
               coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
 
     const float s_eta_c = eta[IDX3_eta1(i,j,k)];
-
 
     v[IDX3_l(i,j,k)] = ((2.f*s_eta_c + 2.f - s_eta_c*s_eta_c)*s_u[sui][suj][suk] + 
 		    (vp[IDX3(i,j,k)] * (lap + phi[IDX3(i,j,k)]) - v[IDX3_l(i,j,k)])) / 
@@ -199,15 +197,20 @@ void target(
 
     dim3 threadsPerBlock(NDIM, NDIM, NDIM);
 
+    #ifdef DEBUG
     const uint npo = 100;
+    #endif
+
+    hipDeviceSynchronize();
+    clock_gettime(CLOCK_REALTIME, &start);
+
     for (uint istep = 1; istep <= nsteps; ++istep) {
-        clock_gettime(CLOCK_REALTIME, &start);
 
         dim3 n_block_front(
             (z2-z1+NDIM-1) / NDIM,
             (ny+NDIM-1) / NDIM,
             (nx+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_front), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_front, threadsPerBlock, 0, 0, nx,ny,nz,
             xmin,xmax,ymin,ymax,z1,z2,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -222,7 +225,7 @@ void target(
             (z4-z3+NDIM-1) / NDIM,
             (y2-y1+NDIM-1) / NDIM,
             (nx+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_top), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_top, threadsPerBlock, 0, 0, nx,ny,nz,
             xmin,xmax,y1,y2,z3,z4,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -237,7 +240,7 @@ void target(
             (z4-z3+NDIM-1) / NDIM,
             (y4-y3+NDIM-1) / NDIM,
             (x2-x1+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_left), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_left, threadsPerBlock, 0, 0, nx,ny,nz,
             x1,x2,y3,y4,z3,z4,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -252,7 +255,7 @@ void target(
             (z4-z3+NDIM-1) / NDIM,
             (y4-y3+NDIM-1) / NDIM,
             (x4-x3+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_inner_3d_kernel, dim3(n_block_center), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_inner_3d_kernel, n_block_center, threadsPerBlock, 0, 0, nx,ny,nz,
             x3,x4,y3,y4,z3,z4,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -267,7 +270,7 @@ void target(
             (z4-z3+NDIM-1) / NDIM,
             (y4-y3+NDIM-1) / NDIM,
             (x6-x5+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_right), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_right, threadsPerBlock, 0, 0, nx,ny,nz,
             x5,x6,y3,y4,z3,z4,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -282,7 +285,7 @@ void target(
             (z4-z3+NDIM-1) / NDIM,
             (y6-y5+NDIM-1) / NDIM,
             (nx+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_bottom), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_bottom, threadsPerBlock, 0, 0, nx,ny,nz,
             xmin,xmax,y5,y6,z3,z4,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -297,7 +300,7 @@ void target(
             (z6-z5+NDIM-1) / NDIM,
             (ny+NDIM-1) / NDIM,
             (nx+NDIM-1) / NDIM);
-        hipLaunchKernelGGL(target_pml_3d_kernel, dim3(n_block_back), dim3(threadsPerBlock), 0, 0, nx,ny,nz,
+        hipLaunchKernelGGL(target_pml_3d_kernel, n_block_back, threadsPerBlock, 0, 0, nx,ny,nz,
             xmin,xmax,ymin,ymax,z5,z6,
             lx,ly,lz,
             hdx_2, hdy_2, hdz_2,
@@ -308,21 +311,22 @@ void target(
             d_u, d_v, d_vp,
             d_phi, d_eta);
 
-        hipLaunchKernelGGL(kernel_add_source_kernel, dim3(1), dim3(1), 0, 0, d_v, IDX3_l(sx,sy,sz), source[istep]);
-
-        clock_gettime(CLOCK_REALTIME, &end);
-        *time_kernel += (end.tv_sec  - start.tv_sec) +
-                        (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
+        hipLaunchKernelGGL(kernel_add_source_kernel, 1, 1, 0, 0, d_v, IDX3_l(sx,sy,sz), source[istep]);
 
         float *t = d_u;
         d_u = d_v;
         d_v = t;
 
         // Print out
-        if (istep % npo == 0) {
-            printf("time step %u / %u\n", istep, nsteps);
-        }
+        #ifdef DEBUG
+        if (istep % npo == 0) printf("time step %u / %u\n", istep, nsteps);
+        #endif
     }
+
+    hipDeviceSynchronize();
+    clock_gettime(CLOCK_REALTIME, &end);
+    *time_kernel = (end.tv_sec  - start.tv_sec) +
+                   (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
 
     hipMemcpy(u, d_u, sizeof(float) * size_u, hipMemcpyDeviceToHost);
     hipFree(d_u);
