@@ -222,7 +222,11 @@ int main( int argc, char** argv )
 
   buffer<P, 1> d_vslocal(n / sizeof(P));
 
+  // measure host and device execution time
+  double ktime = 0.0;
+  double k_start, k_end;
   double t1 = get_time();
+
   for(int iteration=0; iteration<niterations; ++iteration )
   {
     // compute the value of next step
@@ -288,6 +292,9 @@ int main( int argc, char** argv )
       range<2> wave_block(64, 4);
 
       if (is_first_step) {
+
+        k_start = get_time();
+
         q.submit([&] (handler &cgh) {
           auto acc = d_vo.get_access<sycl_discard_write>(cgh);
           cgh.fill(acc, (P)0);
@@ -380,6 +387,11 @@ int main( int argc, char** argv )
       });
 
       if (is_last_step) { 
+
+        q.wait();
+        k_end = get_time();
+        ktime += k_end - k_start;
+
         q.submit([&] (handler &cgh) {
           auto acc = d_vo.get_access<sycl_read>(cgh);
           cgh.copy(acc, vo);
@@ -411,13 +423,16 @@ int main( int argc, char** argv )
       * Quantities_flops_per_solve( dims )
       + Dimensions_size_state( dims, NU ) * NOCTANT * 2. * dims.na );
 
-  double floprate = (time <= 0) ?  0 : flops / time / 1e9;
+  double floprate_h = (time <= 0) ?  0 : flops / (time * 1e-6) / 1e9;
+  double floprate_d = (ktime <= 0) ?  0 : flops / (ktime * 1e-6) / 1e9;
 
-  printf( "Normsq result: %.8e  diff: %.3e  %s  time: %.3f  GF/s: %.3f\n",
-      normsq, normsqdiff,
-      normsqdiff== (P)0 ? "PASS" : "FAIL",
-      time, floprate );
+  printf( "Normsq result: %.8e  diff: %.3e  verify: %s  host time: %.3f (s) kernel time: %.3f (s)\n",
+          normsq,
+          normsqdiff,
+          normsqdiff== (P)0 ? "PASS" : "FAIL",
+          time * 1e-6, ktime * 1e-6);
 
+  printf( "GF/s (host): %.3f\nGF/s (device): %.3f\n", floprate_h, floprate_d );
 
   /*---Deallocations---*/
 

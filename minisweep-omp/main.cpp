@@ -211,7 +211,7 @@ int main( int argc, char** argv )
   n = vslocal_size * sizeof(P);
   P* vslocal = (P*) malloc ( n ); 
 
-  double t1, t2, time;
+  double time, ktime = 0.0;
 
   #pragma omp target data map(to: a_from_m[0:a_from_m_size],\
                                   m_from_a[0:a_from_m_size],\
@@ -222,8 +222,10 @@ int main( int argc, char** argv )
                                      vslocal[0:vslocal_size],\
                                      vo[0:v_size]) 
 {
+  // measure host and device execution time
+  double k_start, k_end;
+  double t1 = get_time();
 
-  t1 = get_time();
   for(int iteration=0; iteration<niterations; ++iteration )
   {
     // compute the value of next step
@@ -271,6 +273,8 @@ int main( int argc, char** argv )
       const int is_last_step = nstep - 1 == step;
 
       if (is_first_step) {
+         k_start = get_time();
+
          memset(vo, 0, v_size * sizeof(P));
          #pragma omp target update to(vo[0:v_size])
 
@@ -420,6 +424,9 @@ int main( int argc, char** argv )
       } /*--- wavefront ---*/
 
       if (is_last_step) { 
+
+        k_end = get_time();
+        ktime += k_end - k_start;
        
         #pragma omp target update from (vo[0:v_size])
 #ifdef DEBUG
@@ -432,9 +439,10 @@ int main( int argc, char** argv )
     vo = vi;
     vi = tmp;
   }
-  t2 = get_time();
+
+  double t2 = get_time();
   time = t2 - t1;
-} 
+}
 
   // Verification (input and output vectors are equal) 
   P normsq = (P)0;
@@ -449,13 +457,16 @@ int main( int argc, char** argv )
       * Quantities_flops_per_solve( dims )
       + Dimensions_size_state( dims, NU ) * NOCTANT * 2. * dims.na );
 
-  double floprate = (time <= 0) ?  0 : flops / time / 1e9;
+  double floprate_h = (time <= 0) ?  0 : flops / (time * 1e-6) / 1e9;
+  double floprate_d = (ktime <= 0) ?  0 : flops / (ktime * 1e-6) / 1e9;
 
-  printf( "Normsq result: %.8e  diff: %.3e  %s  time: %.3f  GF/s: %.3f\n",
-      normsq, normsqdiff,
-      normsqdiff== (P)0 ? "PASS" : "FAIL",
-      time, floprate );
+  printf( "Normsq result: %.8e  diff: %.3e  verify: %s  host time: %.3f (s) kernel time: %.3f (s)\n",
+          normsq,
+          normsqdiff,
+          normsqdiff== (P)0 ? "PASS" : "FAIL",
+          time * 1e-6, ktime * 1e-6);
 
+  printf( "GF/s (host): %.3f\nGF/s (device): %.3f\n", floprate_h, floprate_d );
 
   /*---Deallocations---*/
 
@@ -472,4 +483,3 @@ int main( int argc, char** argv )
 
   return 0;
 } /*---main---*/
-
