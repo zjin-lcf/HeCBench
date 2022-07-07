@@ -24,7 +24,6 @@ struct Params {
 
   size_t iterations;
 
-  // XXX bring this back once all SYCL implementations implement 2020 spec
   //  size_t posesPerWI;
   size_t wgSize;
   std::string deckDir;
@@ -59,7 +58,6 @@ __global__ void fasten_main(
     const FFParams *__restrict__ forcefield,
     float *__restrict__ etotals);
 
-
 double elapsedMillis( const TimePoint &start, const TimePoint &end){
   auto elapsedNs = static_cast<double>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count());
@@ -85,8 +83,8 @@ void printTimings(const Params &params, double millis) {
   // Print stats
   std::cout.precision(3);
   std::cout << std::fixed;
-  std::cout << "- Kernel time:    " << (millis) << " ms\n";
-  std::cout << "- Average time:   " << ms << " ms\n";
+  std::cout << "- Total kernel time:    " << (millis) << " ms\n";
+  std::cout << "- Average kernel time:   " << ms << " ms\n";
   std::cout << "- Interactions/s: " << (interactions_per_sec / 1e9) << " billion\n";
   std::cout << "- GFLOP/s:        " << gflops << "\n";
 }
