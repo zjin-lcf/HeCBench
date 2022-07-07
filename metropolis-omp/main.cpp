@@ -23,12 +23,10 @@
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 
-
 #include "utils.h"
 #include "kernel_prng.h"
 #include "kernel_metropolis.h"
 #include "kernel_reduction.h"
-
 
 int main(int argc, char **argv){
 
@@ -177,6 +175,7 @@ int main(int argc, char **argv){
   printf("\n\n");
 #endif
 
+  double total_ktime = 0.0;
 
   double start = rtclock();
 
@@ -207,7 +206,6 @@ int main(int argc, char **argv){
     printf("new seed [%lu]\n", seed);
 #endif
 
-
     for (int k = 0; k < ar; ++k) {
       kernel_reset<int>(mdlat + k * N, N, 1);
       kernel_gpupcg_setup(pcga + k * N/4, pcgb + k * N/4, N/4, seed + (uint64_t)(N/4 * k), k);
@@ -229,6 +227,9 @@ int main(int argc, char **argv){
 
     /* parallel tempering */
     for(int p = 0; p < apts; ++p) {
+
+      double k_start = rtclock();
+
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
@@ -272,6 +273,9 @@ int main(int argc, char **argv){
         }
 #endif
       }
+
+      double k_end = rtclock();
+      total_ktime += k_end - k_start; 
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
@@ -364,6 +368,7 @@ int main(int argc, char **argv){
 
   double end = rtclock();
   printf("Total trial time %.2f secs\n", end-start);
+  printf("Total kernel time (metropolis simulation) %.2f secs\n", total_ktime);
 
   fclose(fw);
 }
@@ -380,4 +385,4 @@ int main(int argc, char **argv){
   free(aT);
 
   return 0;
-}  
+}

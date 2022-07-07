@@ -23,12 +23,10 @@
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 
-
 #include "utils.h"
 #include "kernel_prng.h"
 #include "kernel_metropolis.h"
 #include "kernel_reduction.h"
-
 
 int main(int argc, char **argv){
 
@@ -171,7 +169,6 @@ int main(int argc, char **argv){
     ++count;
   }
 
-
   /* print parameters */
   printf("\tparameters:{\n");
   printf("\t\tL:                            %i\n", L);
@@ -181,7 +178,6 @@ int main(int argc, char **argv){
   printf("\t\tmag_field h:                  %f\n", h);
   printf("\t\treplicas:                     %i\n", R);
   printf("\t\tseed:                         %lu\n", seed);
-
 
   /* find good temperature distribution */
   FILE *fw = fopen("trials.dat", "w");
@@ -193,6 +189,7 @@ int main(int argc, char **argv){
   printf("\n\n");
 #endif
 
+  double total_ktime = 0.0;
 
   double start = rtclock();
 
@@ -223,7 +220,6 @@ int main(int argc, char **argv){
     printf("new seed [%lu]\n", seed);
 #endif
 
-
     for (int k = 0; k < ar; ++k) {
       kernel_reset<int><<< lgrid, lblock >>>(mdlat[k], N, 1);
       cudaCheckErrors("kernel: reset spins up");
@@ -241,9 +237,13 @@ int main(int argc, char **argv){
 
     /* parallel tempering */
     for(int p = 0; p < apts; ++p) {
+
+      double k_start = rtclock();
+
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
+
           kernel_metropolis<<< mcgrid, mcblock >>>(N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
 #ifdef DEBUG
@@ -273,6 +273,9 @@ int main(int argc, char **argv){
         cudaDeviceSynchronize();
         cudaCheckErrors("mcmc: kernel metropolis black launch");
       }
+
+      double k_end = rtclock();
+      total_ktime += k_end - k_start; 
 
 #ifdef DEBUG
       for(int k = 0; k < ar; ++k) {
@@ -378,7 +381,7 @@ int main(int argc, char **argv){
 
   double end = rtclock();
   printf("Total trial time %.2f secs\n", end-start);
-
+  printf("Total kernel time (metropolis simulation) %.2f secs\n", total_ktime);
 
   fclose(fw);
   for(int i = 0; i < rpool; ++i) {
@@ -408,4 +411,4 @@ int main(int argc, char **argv){
   free(aT);
 
   return 0;
-}  
+}
