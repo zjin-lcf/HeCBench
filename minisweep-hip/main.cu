@@ -228,8 +228,12 @@ int main( int argc, char** argv )
   P* d_vslocal = NULL;
   hipMalloc((void**)&d_vslocal, n );
 
+  // measure host and device execution time
+  double ktime = 0.0;
+  double k_start, k_end;
 
   double t1 = get_time();
+
   for(int iteration=0; iteration<niterations; ++iteration )
   {
     // compute the value of next step
@@ -295,9 +299,12 @@ int main( int argc, char** argv )
       dim3 wave_block(4, 64);
 
       if (is_first_step) {
+        
+        k_start = get_time();
+
         hipMemset(d_vo, 0, v_size);  // must reset output for each iteration
 
-        hipLaunchKernelGGL(init_facexy, dim3(xy_grid), dim3(xy_block), 0, 0,  
+        hipLaunchKernelGGL(init_facexy, xy_grid, xy_block, 0, 0,  
           ix_base, iy_base, dims_b_ne, dims_b_na, dims_b_ncell_x, 
           dims_b_ncell_y, dims_b_ncell_z, dims_ncell_z, d_facexy);
 
@@ -308,7 +315,7 @@ int main( int argc, char** argv )
 #endif
       }
 
-      hipLaunchKernelGGL(init_facexz, dim3(xz_grid), dim3(xz_block), 0, 0, 
+      hipLaunchKernelGGL(init_facexz, xz_grid, xz_block, 0, 0, 
           ix_base, iy_base, dims_b_ne, dims_b_na, 
           dims_b_ncell_x, dims_b_ncell_y, dims_ncell_z, 
           1, //proc_x_min, 
@@ -321,7 +328,7 @@ int main( int argc, char** argv )
         printf("facexz: %d %f\n", i, facexz[i]);
 #endif
 
-      hipLaunchKernelGGL(init_faceyz, dim3(yz_grid), dim3(yz_block), 0, 0, 
+      hipLaunchKernelGGL(init_faceyz, yz_grid, yz_block, 0, 0, 
           ix_base, iy_base, dims_b_ne, dims_b_na, 
           dims_b_ncell_x, dims_b_ncell_y, dims_ncell_z, 
           1, //proc_y_min, 
@@ -334,7 +341,7 @@ int main( int argc, char** argv )
         printf("faceyz: %d %f\n", i, faceyz[i]);
 #endif
 
-      hipLaunchKernelGGL(wavefronts, dim3(wave_grid), dim3(wave_block), 0, 0, 
+      hipLaunchKernelGGL(wavefronts, wave_grid, wave_block, 0, 0, 
           num_wavefronts,  
           ix_base, iy_base, 
           v_b_size,
@@ -348,15 +355,19 @@ int main( int argc, char** argv )
           d_m_from_a,
           d_vi,
           d_vo,
-          d_vslocal
-          );
+          d_vslocal);
 
       if (is_last_step) { 
+
+        hipDeviceSynchronize();
+        k_end = get_time();
+        ktime += k_end - k_start;
+
         hipMemcpy(vo, d_vo, v_size, hipMemcpyDeviceToHost);
 #ifdef DEBUG
         for (int i = 0; i < v_size/sizeof(P); i++) printf("vo %d %f\n", i, vo[i]);
 #endif
-      } 
+      }
     } // step
 
     P* tmp = vo;
@@ -379,13 +390,16 @@ int main( int argc, char** argv )
       * Quantities_flops_per_solve( dims )
       + Dimensions_size_state( dims, NU ) * NOCTANT * 2. * dims.na );
 
-  double floprate = (time <= 0) ?  0 : flops / time / 1e9;
+  double floprate_h = (time <= 0) ?  0 : flops / (time * 1e-6) / 1e9;
+  double floprate_d = (ktime <= 0) ?  0 : flops / (ktime * 1e-6) / 1e9;
 
-  printf( "Normsq result: %.8e  diff: %.3e  %s  time: %.3f  GF/s: %.3f\n",
-      normsq, normsqdiff,
-      normsqdiff== (P)0 ? "PASS" : "FAIL",
-      time, floprate );
+  printf( "Normsq result: %.8e  diff: %.3e  verify: %s  host time: %.3f (s) kernel time: %.3f (s)\n",
+          normsq,
+          normsqdiff,
+          normsqdiff== (P)0 ? "PASS" : "FAIL",
+          time * 1e-6, ktime * 1e-6);
 
+  printf( "GF/s (host): %.3f\nGF/s (device): %.3f\n", floprate_h, floprate_d );
 
   /*---Deallocations---*/
 
@@ -411,4 +425,3 @@ int main( int argc, char** argv )
 
   return 0;
 } /*---main---*/
-

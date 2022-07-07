@@ -426,8 +426,7 @@ double get_time()
 {
   struct timeval tv;
   int i = gettimeofday( &tv, NULL );
-  double result = ( (double) tv.tv_sec +
-                    (double) tv.tv_usec * 1.e-6 );
+  double result = ( (double) tv.tv_sec * 1.e6 + (double) tv.tv_usec ); 
   return result;
 }
 
@@ -448,4 +447,3 @@ size_t Dimensions_size_state_angles( const Dimensions dims, int nu )
        * ( (size_t)nu )
        * ( (size_t)NOCTANT );
 }
-

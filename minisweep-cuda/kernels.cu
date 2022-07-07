@@ -1,4 +1,3 @@
-
 __device__
 int Quantities_scalefactor_space_acceldir(int ix_g, int iy_g, int iz_g)
 {
@@ -187,13 +186,12 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
                                   P* __restrict__ faceyz,
                                   const P* __restrict__ a_from_m,
                                   const P* __restrict__ m_from_a,
-                                  const P* vi,
-                                  P* vo,
-                                  P* vs_local,
+                                  const P* __restrict__ vi,
+                                  P* __restrict__ vo,
+                                  P* __restrict__ vs_local,
                                   int octant_in_block,
                                   int noctant_per_block,
-                                  int ie
-                                  )
+                                  int ie)
 {
   /*---Declarations---*/
 //  int iz = 0;
@@ -403,8 +401,7 @@ __global__ void init_facexz(
     const int proc_y_min,
     const int proc_y_max,
     StepInfoAll stepinfoall,
-    P* facexz
-    ) 
+    P* facexz) 
 {
   int ix = blockDim.x * blockIdx.x + threadIdx.x; 
   int iz = blockDim.y * blockIdx.y + threadIdx.y; 
@@ -488,14 +485,14 @@ __global__ void wavefronts(
     const int noctant_per_block,
     const Dimensions dims_b,
     StepInfoAll stepinfoall,
-    P* facexy, 
-    P* facexz, 
-    P* faceyz, 
-    P* a_from_m,
-    P* m_from_a,
-    P* vi,
-    P* vo,
-    P* vs_local)
+    P*__restrict__ facexy, 
+    P*__restrict__ facexz, 
+    P*__restrict__ faceyz, 
+    P*__restrict__ a_from_m,
+    P*__restrict__ m_from_a,
+    P*__restrict__ vi,
+    P*__restrict__ vo,
+    P*__restrict__ vs_local)
 {
   int octant = blockDim.x * blockIdx.x + threadIdx.x; 
   int ie = blockDim.y * blockIdx.y + threadIdx.y; 
@@ -548,5 +545,3 @@ __global__ void wavefronts(
 
   } /*--- wavefront ---*/
 } 
-
-

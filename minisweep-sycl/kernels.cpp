@@ -1,5 +1,3 @@
-
-
 int Quantities_scalefactor_space_acceldir(int ix_g, int iy_g, int iz_g)
 {
   int result = 0;
@@ -44,11 +42,15 @@ P Quantities_init_face_acceldir(int ia, int ie, int iu, int scalefactor_space, i
 }
 
 
-void Quantities_solve_acceldir(P* vs_local, Dimensions dims, P* facexy, P* facexz, P* faceyz,
-                             int ix, int iy, int iz,
-                             int ix_g, int iy_g, int iz_g,
-                             int ie, int ia,
-                             int octant, int octant_in_block, int noctant_per_block)
+void Quantities_solve_acceldir(P* __restrict vs_local,
+                               Dimensions dims,
+                               P*__restrict facexy,
+                               P*__restrict facexz,
+                               P*__restrict faceyz,
+                               int ix, int iy, int iz,
+                               int ix_g, int iy_g, int iz_g,
+                               int ie, int ia,
+                               int octant, int octant_in_block, int noctant_per_block)
 {
   const int dir_x = Dir_x( octant );
   const int dir_y = Dir_y( octant );
@@ -87,7 +89,6 @@ void Quantities_solve_acceldir(P* vs_local, Dimensions dims, P* facexy, P* facex
 #endif
   for( iu=0; iu<NU; ++iu )
     {
-
       int vs_local_index = ia + dims.na * (
                            iu + NU  * (
                            ie + dims.ne * (
@@ -175,25 +176,23 @@ void Quantities_solve_acceldir(P* vs_local, Dimensions dims, P* facexy, P* facex
     } /*---for---*/
 }
 
-
 void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
                                   int wavefront,
                                   int octant,
                                   int ix, int iy,
                                   int ix_g, int iy_g, int iz_g,
                                   int dir_x, int dir_y, int dir_z,
-                                  P* __restrict__ facexy,
-                                  P* __restrict__ facexz,
-                                  P* __restrict__ faceyz,
-                                  const P* __restrict__ a_from_m,
-                                  const P* __restrict__ m_from_a,
-                                  const P* vi,
-                                  P* vo,
-                                  P* vs_local,
+                                  P* __restrict facexy,
+                                  P* __restrict facexz,
+                                  P* __restrict faceyz,
+                                  const P* __restrict a_from_m,
+                                  const P* __restrict m_from_a,
+                                  const P* __restrict vi,
+                                  P* __restrict vo,
+                                  P* __restrict vs_local,
                                   int octant_in_block,
                                   int noctant_per_block,
-                                  int ie
-                                  )
+                                  int ie)
 {
   /*---Declarations---*/
 //  int iz = 0;
@@ -354,6 +353,7 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
 
     } /*--- iz ---*/
 }
+
 void init_facexy(
     const int ix_base, 
     const int iy_base,
@@ -494,14 +494,14 @@ void wavefronts(
     const int noctant_per_block,
     const Dimensions dims_b,
     StepInfoAll stepinfoall,
-    P* facexy, 
-    P* facexz, 
-    P* faceyz, 
-    P* a_from_m,
-    P* m_from_a,
-    P* vi,
-    P* vo,
-    P* vs_local,
+    P* __restrict facexy, 
+    P* __restrict facexz, 
+    P* __restrict faceyz, 
+    P* __restrict a_from_m,
+    P* __restrict m_from_a,
+    P* __restrict vi,
+    P* __restrict vo,
+    P* __restrict vs_local,
     nd_item<2> &item)
 {
   int octant = item.get_global_id(1);
@@ -554,6 +554,4 @@ void wavefronts(
       } /*---octant/ix/iy---*/
 
   } /*--- wavefront ---*/
-} 
-
-
+}

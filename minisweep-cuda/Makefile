@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -44,10 +43,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.cu utils.cu utils.h
+%.o: %.cu kernels.cu utils.cu utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -56,4 +55,3 @@ clean:
 run: $(program)
 	./$(program) --niterations 100
 	./$(program) --niterations 1 --ncell_x 32 --ncell_y 32 --ncell_z 64 --ne 64 --na 32 --nblock_z 64
-
