@@ -48,16 +48,16 @@ __global__ void fasten_main(
     const size_t nposes,
     const size_t natlig,
     const size_t natpro,
-    const Atom *__restrict protein_molecule,
-    const Atom *__restrict ligand_molecule,
-    const float *__restrict transforms_0,
-    const float *__restrict transforms_1,
-    const float *__restrict transforms_2,
-    const float *__restrict transforms_3,
-    const float *__restrict transforms_4,
-    const float *__restrict transforms_5,
-    const FFParams *__restrict forcefield,
-    float *__restrict etotals);
+    const Atom *__restrict__ protein_molecule,
+    const Atom *__restrict__ ligand_molecule,
+    const float *__restrict__ transforms_0,
+    const float *__restrict__ transforms_1,
+    const float *__restrict__ transforms_2,
+    const float *__restrict__ transforms_3,
+    const float *__restrict__ transforms_4,
+    const float *__restrict__ transforms_5,
+    const FFParams *__restrict__ forcefield,
+    float *__restrict__ etotals);
 
 
 double elapsedMillis( const TimePoint &start, const TimePoint &end){
