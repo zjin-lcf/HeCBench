@@ -390,9 +390,9 @@ __global__ void init_rand_state(unsigned int seed, unsigned int *state)
 }
 
 __global__ void random_init(
-    unsigned int *state,
+    unsigned int *__restrict__ state,
     int state_size,
-    half *array,
+    half *__restrict__ array,
     long long array_size,
     long long k, 
     float scale)
@@ -494,7 +494,10 @@ __global__ void init_rand_state(unsigned int seed, unsigned int *state, int size
 }
 
 
-__global__ void transform_half(half *gpu_half_feature, float *gpu_float_feature, long long vec_size)
+__global__ void transform_half(
+  const half *__restrict__ gpu_half_feature,
+  float *__restrict__ gpu_float_feature,
+  long long vec_size)
 {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
   int number_threads = gridDim.x*blockDim.x;
@@ -505,7 +508,8 @@ __global__ void transform_half(half *gpu_half_feature, float *gpu_float_feature,
   }
 }
 
-void transform_feature_vector(short *half_feature, float *float_feature, int m, int grid, long long seg, int k)
+void transform_feature_vector(short *half_feature, float *float_feature,
+                              int m, int grid, long long seg, int k)
 {
   half *gpu_half_feature;
   float *gpu_float_feature;
