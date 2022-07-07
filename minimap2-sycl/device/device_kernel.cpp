@@ -45,7 +45,6 @@ score_dt chain_dp_score(
   return sc;
 }
 
-
 void device_chain_tiled(
   return_dt *__restrict ret,
   const anchor_dt *__restrict a,
@@ -73,7 +72,6 @@ void device_chain_tiled(
     max_tracker[id] = max_tracker_g[ofs * BACK_SEARCH_COUNT_GPU + id];
     j_tracker[id] = j_tracker_g[ofs * BACK_SEARCH_COUNT_GPU + id];
   }
-
 
   for (int i = BACK_SEARCH_COUNT_GPU, curr_idx = 0; curr_idx < TILE_SIZE; i++, curr_idx++) {
 
