@@ -53,5 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --grid 100 --nsteps 1000
-
+	./$(program) --warm-up --niters 1 --grid 100 --nsteps 1000

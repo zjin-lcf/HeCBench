@@ -196,9 +196,13 @@ void target(
   llint xmax = nx;
   llint ymax = ny;
 
+  #ifdef DEBUG
   const uint npo = 100;
+  #endif
+
+  clock_gettime(CLOCK_REALTIME, &start);
+
   for (uint istep = 1; istep <= nsteps; ++istep) {
-    clock_gettime(CLOCK_REALTIME, &start);
 
     target_pml_3d_kernel(nx,ny,nz,
         xmin,xmax,ymin,ymax,z1,z2,
@@ -279,20 +283,21 @@ void target(
 
     kernel_add_source_kernel(v, IDX3_l(sx,sy,sz), source[istep]);
 
-    clock_gettime(CLOCK_REALTIME, &end);
-    *time_kernel += (end.tv_sec  - start.tv_sec) +
-      (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
-
     float *t = u;
     u = v;
     v = t;
 
+    #ifdef DEBUG
     // Print out
     if (istep % npo == 0) {
       printf("time step %u / %u\n", istep, nsteps);
     }
+    #endif
   }
 
-  if (nsteps % 2 == 1) memcpy(v, u, size_u * sizeof(float));
+  clock_gettime(CLOCK_REALTIME, &end);
+  *time_kernel = (end.tv_sec  - start.tv_sec) +
+                 (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
 
+  if (nsteps % 2 == 1) memcpy(v, u, size_u * sizeof(float));
 }

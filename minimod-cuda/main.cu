@@ -120,8 +120,8 @@ int main(int argc, char *argv[])
     }
   }
 
-  double time_kernel = 0.0;
-  double time_modeling = 0.0;
+  double total_kernel_time = 0.0;
+  double total_modeling_time = 0.0;
   bool warm_up_iter = !disable_warm_up_iter;
 
   for (uint iiter = 0; iiter < (disable_warm_up_iter ? niters : niters+1); iiter++) {
@@ -172,24 +172,22 @@ int main(int argc, char *argv[])
     }
     (void) gaussian_source(nsteps,dt_sch,source);
     // Init PML
-    init_eta(nx, ny, nz, grid, dt_sch,
-        eta);
+    init_eta(nx, ny, nz, grid, dt_sch, eta);
 
     const float hdx_2 = 1.f / (4.f * POW2(grid.dx));
     const float hdy_2 = 1.f / (4.f * POW2(grid.dy));
     const float hdz_2 = 1.f / (4.f * POW2(grid.dz));
 
-    struct timespec start,end,start_m,end_m;
-    const uint npo = 100;
-    const bool l_snapshot = false;
-    const uint nsnapshot_freq = 100;
-
     target_init(grid,nsteps,u,v,phi,eta,coefx,coefy,coefz,vp,source);
 
     // Time loop
+    struct timespec start_m, end_m;
     clock_gettime(CLOCK_REALTIME, &start_m);
+
+    double kernel_time;
+
     target(
-        nsteps, &time_kernel,
+        nsteps, &kernel_time,
         nx, ny, nz,
         grid.x1, grid.x2, grid.x3, grid.x4, grid.x5, grid.x6,
         grid.y1, grid.y2, grid.y3, grid.y4, grid.y5, grid.y6,
@@ -199,22 +197,23 @@ int main(int argc, char *argv[])
         hdx_2, hdy_2, hdz_2,
         coefx, coefy, coefz,
         u, v, vp,
-        phi, eta, source
-          );
+        phi, eta, source);
 
     if (warm_up_iter) {
-      time_kernel = 0;
+      kernel_time = 0;
     }
 
     clock_gettime(CLOCK_REALTIME, &end_m);
     if (!warm_up_iter) {
-      time_modeling += (end_m.tv_sec  - start_m.tv_sec) +
-        (double)(end_m.tv_nsec - start_m.tv_nsec) / 1.0e9;
+      total_modeling_time += (end_m.tv_sec  - start_m.tv_sec) +
+                             (double)(end_m.tv_nsec - start_m.tv_nsec) / 1.0e9;
+      total_kernel_time += kernel_time;
     }
 
     float min_u, max_u;
     find_min_max_u(grid, u, &min_u, &max_u);
-    // --grids 100 --nsteps 1000
+
+    // check for the specific problem size: --grids 100 --nsteps 1000
     printf("FINAL min_u,  max_u = %f, %f\n", min_u, max_u);
     if ( fabsf(fabsf(min_u) - 0.2058f) < 1e-4f && 
          fabsf(max_u - 0.1401f) < 1e-4f )
@@ -236,6 +235,8 @@ int main(int argc, char *argv[])
     warm_up_iter = false;
   }
 
-  printf("Time kernel: %g s\n", time_kernel / niters);
-  printf("Time modeling: %g s\n", time_modeling / niters);
+  printf("Average kernel time per iteration: %g s\n", total_kernel_time / niters);
+  printf("Average modeling time per iteration: %g s\n", total_modeling_time / niters);
+
+  return 0;
 }

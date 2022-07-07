@@ -120,7 +120,6 @@ __global__ void target_pml_3d_kernel(
 
     if (i > x4-1 || j > y4-1 || k > z4-1) { return; }
 
-
     float lap = coef0 * s_u[sui][suj][suk] + 
               coefx_1 * (s_u[sui+1][suj][suk] + s_u[sui-1][suj][suk]) +
               coefy_1 * (s_u[sui][suj+1][suk] + s_u[sui][suj-1][suk]) +
@@ -136,7 +135,6 @@ __global__ void target_pml_3d_kernel(
               coefz_4 * (s_u[sui][suj][suk+4] + s_u[sui][suj][suk-4]);
 
     const float s_eta_c = eta[IDX3_eta1(i,j,k)];
-
 
     v[IDX3_l(i,j,k)] = ((2.f*s_eta_c + 2.f - s_eta_c*s_eta_c)*s_u[sui][suj][suk] + 
 		    (vp[IDX3(i,j,k)] * (lap + phi[IDX3(i,j,k)]) - v[IDX3_l(i,j,k)])) / 
@@ -199,9 +197,14 @@ void target(
 
     dim3 threadsPerBlock(NDIM, NDIM, NDIM);
 
+    #ifdef DEBUG
     const uint npo = 100;
+    #endif
+
+    cudaDeviceSynchronize();
+    clock_gettime(CLOCK_REALTIME, &start);
+
     for (uint istep = 1; istep <= nsteps; ++istep) {
-        clock_gettime(CLOCK_REALTIME, &start);
 
         dim3 n_block_front(
             (z2-z1+NDIM-1) / NDIM,
@@ -310,19 +313,20 @@ void target(
 
         kernel_add_source_kernel<<<1, 1>>>(d_v, IDX3_l(sx,sy,sz), source[istep]);
 
-        clock_gettime(CLOCK_REALTIME, &end);
-        *time_kernel += (end.tv_sec  - start.tv_sec) +
-                        (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
-
         float *t = d_u;
         d_u = d_v;
         d_v = t;
 
         // Print out
-        if (istep % npo == 0) {
-            printf("time step %u / %u\n", istep, nsteps);
-        }
+        #ifdef DEBUG
+        if (istep % npo == 0) printf("time step %u / %u\n", istep, nsteps);
+        #endif
     }
+
+    cudaDeviceSynchronize();
+    clock_gettime(CLOCK_REALTIME, &end);
+    *time_kernel = (end.tv_sec  - start.tv_sec) +
+                   (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
 
     cudaMemcpy(u, d_u, sizeof(float) * size_u, cudaMemcpyDeviceToHost);
     cudaFree(d_u);

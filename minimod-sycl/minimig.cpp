@@ -155,7 +155,6 @@ void target_pml_3d_kernel(
       (s_u[sui][suj][suk+1]-s_u[sui][suj][suk-1]) * hdz_2)) / (1.f + s_eta_c);
 }
 
-
 void minimod( queue &q,
     uint nsteps, double *time_kernel,
     llint nx, llint ny, llint nz,
@@ -165,9 +164,9 @@ void minimod( queue &q,
     llint lx, llint ly, llint lz,
     llint sx, llint sy, llint sz,
     float hdx_2, float hdy_2, float hdz_2,
-    const float *__restrict__ coefx, const float *__restrict__ coefy, const float *__restrict__ coefz,
-    float *__restrict__ u, const float *__restrict__ v, const float *__restrict__ vp,
-    const float *__restrict__ phi, const float *__restrict__ eta, const float *__restrict__ source
+    const float *__restrict coefx, const float *__restrict coefy, const float *__restrict coefz,
+    float *__restrict u, const float *__restrict v, const float *__restrict vp,
+    const float *__restrict phi, const float *__restrict eta, const float *__restrict source
      ) {
   struct timespec start, end;
 
@@ -181,7 +180,6 @@ void minimod( queue &q,
     * ((((ny+NDIM-1) / NDIM + 1) * NDIM) + 2 * ly)
     * ((((nz+NDIM-1) / NDIM + 1) * NDIM) + 2 * lz);
 
-
   buffer<float, 1> d_u (size_u);
   buffer<float, 1> d_v (size_u);
   buffer<float, 1> d_vp (vp, size_vp);
@@ -189,14 +187,14 @@ void minimod( queue &q,
   buffer<float, 1> d_eta (eta, size_eta);
 
   q.submit([&] (handler &h) {
-      auto du = d_u.get_access<sycl_write>(h, range<1>(size_u));
-      h.copy(u, du);
-      });
-  q.submit([&] (handler &h) {
-      auto dv = d_v.get_access<sycl_write>(h, range<1>(size_v));
-      h.copy(v, dv);
-      });
+    auto du = d_u.get_access<sycl_write>(h, range<1>(size_u));
+    h.copy(u, du);
+  });
 
+  q.submit([&] (handler &h) {
+    auto dv = d_v.get_access<sycl_write>(h, range<1>(size_v));
+    h.copy(v, dv);
+  });
 
   const llint xmin = 0; const llint xmax = nx;
   const llint ymin = 0; const llint ymax = ny;
@@ -216,237 +214,231 @@ void minimod( queue &q,
   const float coefz_3 = coefz[3];
   const float coefz_4 = coefz[4];
 
+  #ifdef DEBUG
   const uint npo = 100;
+  #endif
+
+  q.wait();
+  clock_gettime(CLOCK_REALTIME, &start);
+
   for (uint istep = 1; istep <= nsteps; ++istep) {
-    clock_gettime(CLOCK_REALTIME, &start);
 
-    range<3> n_block_front(
-        (nx+NDIM-1) / NDIM * NDIM,
-        (ny+NDIM-1) / NDIM * NDIM,
-        (z2-z1+NDIM-1) / NDIM * NDIM
-	);
+    range<3> n_block_front((nx+NDIM-1) / NDIM * NDIM,
+                           (ny+NDIM-1) / NDIM * NDIM,
+                           (z2-z1+NDIM-1) / NDIM * NDIM);
 
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class front>(nd_range<3>(n_block_front,threadsPerBlock), [=] (nd_item<3> item) {
-
-            target_pml_3d_kernel(nx,ny,nz,
-                xmin,xmax,ymin,ymax,z1,z2,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
-            });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class front>(nd_range<3>(n_block_front,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            xmin,xmax,ymin,ymax,z1,z2,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
-    range<3> n_block_top(
-        (nx+NDIM-1) / NDIM * NDIM,
-        (y2-y1+NDIM-1) / NDIM * NDIM,
-        (z4-z3+NDIM-1) / NDIM * NDIM
-	);
+    range<3> n_block_top((nx+NDIM-1) / NDIM * NDIM,
+                         (y2-y1+NDIM-1) / NDIM * NDIM,
+                         (z4-z3+NDIM-1) / NDIM * NDIM);
 
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class top>(nd_range<3>(n_block_top,threadsPerBlock), [=] (nd_item<3> item) {
-
-            target_pml_3d_kernel(nx,ny,nz,
-                xmin,xmax,y1,y2,z3,z4,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
-            });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class top>(nd_range<3>(n_block_top,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            xmin,xmax,y1,y2,z3,z4,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
-    range<3> n_block_left(
-        (x2-x1+NDIM-1) / NDIM * NDIM,
-        (y4-y3+NDIM-1) / NDIM * NDIM,
-        (z4-z3+NDIM-1) / NDIM * NDIM
-	);
-    q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class left>(nd_range<3>(n_block_left,threadsPerBlock), [=] (nd_item<3> item) {
-            target_pml_3d_kernel(nx,ny,nz,
-                x1,x2,y3,y4,z3,z4,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
+    range<3> n_block_left((x2-x1+NDIM-1) / NDIM * NDIM,
+                          (y4-y3+NDIM-1) / NDIM * NDIM,
+                          (z4-z3+NDIM-1) / NDIM * NDIM);
 
-            });
+    q.submit([&] (handler &h) {
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class left>(nd_range<3>(n_block_left,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            x1,x2,y3,y4,z3,z4,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
+    range<3> n_block_center ((x4-x3+NDIM-1) / NDIM * NDIM ,
+                             (y4-y3+NDIM-1) / NDIM * NDIM ,
+                             (z4-z3+NDIM-1) / NDIM * NDIM);
 
-    range<3> n_block_center (
-        (x4-x3+NDIM-1) / NDIM * NDIM ,
-        (y4-y3+NDIM-1) / NDIM * NDIM ,
-        (z4-z3+NDIM-1) / NDIM * NDIM 
-	);
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class center>(nd_range<3>(n_block_center,threadsPerBlock), [=] (nd_item<3> item) {
-            target_inner_3d_kernel(nx,ny,nz,
-                x3,x4,y3,y4,z3,z4,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, eta);
-            });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class center>(nd_range<3>(n_block_center,threadsPerBlock), [=] (nd_item<3> item) {
+        target_inner_3d_kernel(nx,ny,nz,
+            x3,x4,y3,y4,z3,z4,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, eta);
+      });
     });
 
-    range<3> n_block_right(
-        (x6-x5+NDIM-1) / NDIM * NDIM,
-        (y4-y3+NDIM-1) / NDIM * NDIM,
-        (z4-z3+NDIM-1) / NDIM * NDIM
-	);
+    range<3> n_block_right((x6-x5+NDIM-1) / NDIM * NDIM,
+                           (y4-y3+NDIM-1) / NDIM * NDIM,
+                           (z4-z3+NDIM-1) / NDIM * NDIM);
+
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class right>(nd_range<3>(n_block_right,threadsPerBlock), [=] (nd_item<3> item) {
-            target_pml_3d_kernel(nx,ny,nz,
-                x5,x6,y3,y4,z3,z4,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
-            });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class right>(nd_range<3>(n_block_right,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            x5,x6,y3,y4,z3,z4,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
-    range<3> n_block_bottom(
-        (nx+NDIM-1) / NDIM * NDIM,
-        (y6-y5+NDIM-1) / NDIM * NDIM,
-        (z4-z3+NDIM-1) / NDIM * NDIM
-	);
+    range<3> n_block_bottom((nx+NDIM-1) / NDIM * NDIM,
+                            (y6-y5+NDIM-1) / NDIM * NDIM,
+                            (z4-z3+NDIM-1) / NDIM * NDIM);
+
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class bottom>(nd_range<3>(n_block_bottom,threadsPerBlock), [=] (nd_item<3> item) {
-            target_pml_3d_kernel(nx,ny,nz,
-                xmin,xmax,y5,y6,z3,z4,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
-            });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class bottom>(nd_range<3>(n_block_bottom,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            xmin,xmax,y5,y6,z3,z4,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
-    range<3> n_block_back(
-        (nx+NDIM-1) / NDIM * NDIM,
-        (ny+NDIM-1) / NDIM * NDIM,
-        (z6-z5+NDIM-1) / NDIM * NDIM
-	);
+    range<3> n_block_back((nx+NDIM-1) / NDIM * NDIM,
+                          (ny+NDIM-1) / NDIM * NDIM,
+                          (z6-z5+NDIM-1) / NDIM * NDIM);
+
     q.submit([&] (handler &h) {
-        auto u = d_u.get_access<sycl_read>(h);
-        auto vp = d_vp.get_access<sycl_read>(h);
-        auto eta = d_eta.get_access<sycl_read>(h);
-        auto v = d_v.get_access<sycl_read_write>(h);
-        auto phi = d_phi.get_access<sycl_read_write>(h);
-        accessor <float, 3, sycl_read_write, access::target::local> s_u ({
-            NDIM+2*R,
-            NDIM+2*R,
-            NDIM+2*R}, h);
-        h.parallel_for<class back>(nd_range<3>(n_block_back,threadsPerBlock), [=] (nd_item<3> item) {
-            target_pml_3d_kernel(nx,ny,nz,
-                xmin,xmax,ymin,ymax,z5,z6,
-                lx,ly,lz,
-                hdx_2, hdy_2, hdz_2,
-                coef0,
-                coefx_1, coefx_2, coefx_3, coefx_4,
-                coefy_1, coefy_2, coefy_3, coefy_4,
-                coefz_1, coefz_2, coefz_3, coefz_4, 
-                item, s_u, u, v, vp, phi, eta);
-        });
+      auto u = d_u.get_access<sycl_read>(h);
+      auto vp = d_vp.get_access<sycl_read>(h);
+      auto eta = d_eta.get_access<sycl_read>(h);
+      auto v = d_v.get_access<sycl_read_write>(h);
+      auto phi = d_phi.get_access<sycl_read_write>(h);
+      accessor <float, 3, sycl_read_write, access::target::local> s_u ({
+          NDIM+2*R,
+          NDIM+2*R,
+          NDIM+2*R}, h);
+      h.parallel_for<class back>(nd_range<3>(n_block_back,threadsPerBlock), [=] (nd_item<3> item) {
+        target_pml_3d_kernel(nx,ny,nz,
+            xmin,xmax,ymin,ymax,z5,z6,
+            lx,ly,lz,
+            hdx_2, hdy_2, hdz_2,
+            coef0,
+            coefx_1, coefx_2, coefx_3, coefx_4,
+            coefy_1, coefy_2, coefy_3, coefy_4,
+            coefz_1, coefz_2, coefz_3, coefz_4, 
+            item, s_u, u, v, vp, phi, eta);
+      });
     });
 
     llint idx = IDX3_l(sx,sy,sz);
     float s = source[istep];
     q.submit([&] (handler &h) {
-        auto g_u = d_v.get_access<sycl_read_write>(h);
-        h.single_task<class add_source>([=]() {
-            g_u[idx] += s;
-        });
+      auto g_u = d_v.get_access<sycl_read_write>(h);
+      h.single_task<class add_source>([=]() {
+        g_u[idx] += s;
+      });
     });
-
-    clock_gettime(CLOCK_REALTIME, &end);
-    *time_kernel += (end.tv_sec  - start.tv_sec) +
-      (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
 
     auto t = std::move(d_u);
     d_u = std::move(d_v);
     d_v = std::move(t);
 
     // Print out
+    #ifdef DEBUG
     if (istep % npo == 0) {
       printf("time step %u / %u\n", istep, nsteps);
     }
+    #endif
   }
 
-  q.submit([&] (handler &h) {
-      auto du = d_u.get_access<sycl_read>(h, range<1>(size_u));
-      h.copy(du, u);
-  });
   q.wait();
+  clock_gettime(CLOCK_REALTIME, &end);
+  *time_kernel = (end.tv_sec  - start.tv_sec) +
+                 (double)(end.tv_nsec - start.tv_nsec) / 1.0e9;
+
+  q.submit([&] (handler &h) {
+    auto du = d_u.get_access<sycl_read>(h, range<1>(size_u));
+    h.copy(du, u);
+  }).wait();
 }
