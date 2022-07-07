@@ -371,7 +371,6 @@ float LCG_random(unsigned int * seed) {
   return (float) (*seed) / (float) m;
 }
 
-
 void LCG_random_init(unsigned int * seed) {
   const unsigned int m = 2147483648;
   const unsigned int a = 26757677;
@@ -387,7 +386,8 @@ void init_rand_state(unsigned int seed, unsigned int *state,
   LCG_random_init(state+i);
 }
 
-void random_init(unsigned int *state, int state_size, sycl::half *array,
+void random_init(unsigned int *__restrict state,
+                 int state_size, sycl::half *__restrict array,
                  long long array_size, long long k, float scale,
                  sycl::nd_item<1> &item)
 {
@@ -500,7 +500,8 @@ void init_rand_state(unsigned int seed, unsigned int *state, int size,
   if(i < size) LCG_random_init(state+i);
 }
 
-void transform_half(sycl::half *gpu_half_feature, float *gpu_float_feature,
+void transform_half(const sycl::half *__restrict gpu_half_feature,
+                    float *__restrict gpu_float_feature,
                     long long vec_size, sycl::nd_item<1> &item)
 {
   int tid = item.get_global_id(0);
