@@ -58,4 +58,3 @@ void VerifyResult(float (*a_host)[N], float (*b_host)[P],
   }
 }
 #endif
-

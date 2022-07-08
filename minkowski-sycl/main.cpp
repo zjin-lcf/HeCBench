@@ -1,6 +1,7 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <chrono>
 #include "common.h"
 
 using namespace std;
@@ -19,7 +20,13 @@ constexpr int P = m_size / 2;
 
 #include "verify.cpp"
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int i, j;
 
   // 2D arrays on host side.
@@ -74,7 +81,9 @@ int main() {
     const float p = (float)k;
     const float one_over_p = 1.f / p;
 
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       q.submit([&](handler &h) {
         auto A = a.get_access<sycl_read>(h);
         auto B = b.get_access<sycl_read>(h);
@@ -92,6 +101,12 @@ int main() {
         });
       });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
     q.submit([&](handler &h) {
       auto C = c.get_access<sycl_read>(h);
       h.copy(C, reinterpret_cast<float*>(c_back));
@@ -108,4 +123,3 @@ int main() {
   delete[] c_back;
   return 0;
 }
-
