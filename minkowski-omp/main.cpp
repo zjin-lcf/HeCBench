@@ -1,6 +1,8 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <chrono>
+#include <omp.h>
 
 using namespace std;
 
@@ -17,7 +19,13 @@ constexpr int P = m_size / 2;
 
 #include "verify.cpp"
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int i, j;
 
   // 2D arrays on host side.
@@ -59,7 +67,9 @@ int main() {
       const float p = (float)m;
       const float one_over_p = 1.f / p;
 
-      for (int i = 0; i < 100; i++) {
+      auto start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++) {
         #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
         for (int i = 0; i < M; i++) {
           for (int j = 0; j < P; j++) {
@@ -71,6 +81,11 @@ int main() {
           }
         }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
       #pragma omp target update from (c_back[0:M][0:P]) 
       #ifdef VERIFY
       VerifyResult(a_host, b_host, c_host, c_back, p, one_over_p);

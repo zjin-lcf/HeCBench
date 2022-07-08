@@ -1,7 +1,7 @@
-
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <chrono>
 #include <cuda.h>
 
 using namespace std;
@@ -23,27 +23,33 @@ constexpr int P = m_size / 2;
 
 __global__ 
 void minkowski(
-  const float *__restrict a, 
-  const float *__restrict b, 
-        float *__restrict c, 
+  const float *__restrict__ a,
+  const float *__restrict__ b,
+        float *__restrict__ c,
   const float p,
   const float one_over_p,
   const int m, const int n, const int k)
 {
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    if( col < k && row < m)
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+  if( col < k && row < m)
+  {
+    float sum = 0;
+    for(int i = 0; i < n; i++)
     {
-        float sum = 0;
-        for(int i = 0; i < n; i++)
-        {
-            sum += powf(fabsf(a[row * n + i] - b[i * k + col]), p);
-        }
-        c[row * k + col] = powf(sum, one_over_p);
+      sum += powf(fabsf(a[row * n + i] - b[i * k + col]), p);
     }
+    c[row * k + col] = powf(sum, one_over_p);
+  }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int i, j;
 
   // 2D arrays on host side.
@@ -93,8 +99,16 @@ int main() {
     const float p = (float)k;
     const float one_over_p = 1.f / p;
 
-    for (int i = 0; i < 100; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       minkowski<<<dimGrid, dimBlock>>>(a_device, b_device, c_device, p, one_over_p, M, N, P);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
     cudaMemcpy(c_back, c_device, sizeof(int)*M*P, cudaMemcpyDeviceToHost);
 
     #ifdef VERIFY
@@ -111,4 +125,3 @@ int main() {
   cudaFree(c_device);
   return 0;
 }
-
