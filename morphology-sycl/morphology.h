@@ -3,11 +3,11 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include "common.h"
 
 #define BLACK 0
 #define WHITE 255
-
 
 /*!
  * \file morphology.h
@@ -20,7 +20,6 @@
  * http://www.leptonica.com/binary-morphology.html
  *
  */
-
 
 inline int roundUp(const int x, const int y)
 {
@@ -38,7 +37,7 @@ inline int roundUp(const int x, const int y)
  * \param[in]       vsize: ditto
  */
 extern "C"
-void erode(
+double erode(
         queue &q,
         buffer<unsigned char,1> &img_d,
         buffer<unsigned char,1> &tmp_d,
@@ -58,7 +57,7 @@ void erode(
  * \param[in]       vsize: ditto
  */
 extern "C"
-void dilate(
+double dilate(
         queue &q,
         buffer<unsigned char,1> &img_d,
         buffer<unsigned char,1> &tmp_d,
