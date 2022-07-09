@@ -2,9 +2,9 @@
 
 void mr32_sf(
   nd_item<1> &item,
-  const uint32_t *__restrict__ bases,
-  const uint32_t *__restrict__ n32,
-  int *__restrict__ val,
+  const uint32_t *__restrict bases,
+  const uint32_t *__restrict n32,
+  int *__restrict val,
   int iter)
 {
   int j = item.get_global_id(0);
@@ -23,9 +23,9 @@ void mr32_sf(
 
 void mr32_eff(
   nd_item<1> &item,
-  const uint32_t *__restrict__ bases,
-  const uint32_t *__restrict__ n32,
-  int *__restrict__ val,
+  const uint32_t *__restrict bases,
+  const uint32_t *__restrict n32,
+  int *__restrict val,
   int iter)
 {
   int j = item.get_global_id(0);
@@ -41,4 +41,3 @@ void mr32_eff(
     }
   }
 }
-

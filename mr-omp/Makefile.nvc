@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wno-narrowing -Wall -I. -I../mr-cuda
+CFLAGS := -Wall -I. -I../mr-cuda
 
 # Linker Flags
 LDFLAGS = 

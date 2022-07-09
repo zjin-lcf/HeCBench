@@ -27,4 +27,3 @@ __global__ void mr32_eff(
     }
   }
 }
-
