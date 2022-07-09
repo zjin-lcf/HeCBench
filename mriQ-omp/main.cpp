@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <chrono>
-#include "common.h"
+#include <omp.h>
 #include "file.h"
 #include "computeQ.cpp"
 
@@ -58,22 +58,27 @@ int main (int argc, char *argv[]) {
   /* Create CPU data structures */
   createDataStructsCPU(numK, numX, &phiMag, &Qr, &Qi);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-
-  queue q(dev_sel);
-
   /* GPU section 1 (precompute PhiMag) */
-  {
-    /* Mirror several data structures on the device */
-    buffer<float, 1> phiR_d (phiR, numK);
-    buffer<float, 1> phiI_d (phiI, numK);
-    buffer<float, 1> phiMag_d (phiMag, numK);
+  int phiMagBlocks = numK / KERNEL_PHI_MAG_THREADS_PER_BLOCK;
+  if (numK % KERNEL_PHI_MAG_THREADS_PER_BLOCK)
+    phiMagBlocks++;
 
-    computePhiMag_GPU(q, numK, phiR_d, phiI_d, phiMag_d);
+  #pragma omp target data map(to: phiR[0:numK], phiI[0:numK]) \
+                          map(from: phiMag[0:numK])
+  {
+    auto start = std::chrono::steady_clock::now();
+
+    #pragma omp target teams distribute parallel for \
+      num_teams(phiMagBlocks) thread_limit(KERNEL_PHI_MAG_THREADS_PER_BLOCK)
+    for (int indexK = 0; indexK < numK; indexK++) {
+      float real = phiR[indexK];
+      float imag = phiI[indexK];
+      phiMag[indexK] = real*real + imag*imag;
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("computePhiMag execution time: %f s\n", time * 1e-9f);
   }
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
@@ -85,24 +90,19 @@ int main (int argc, char *argv[]) {
   }
 
   /* GPU section 2 */
+  kValues ck [KERNEL_Q_K_ELEMS_PER_GRID];
+
+  #pragma omp target data map(to: x[0:numX], y[0:numX], z[0:numX]) \
+                          map(from: Qr[0:numX], Qi[0:numX]) \
+                          map(alloc: ck[0:KERNEL_Q_K_ELEMS_PER_GRID])
   {
-    buffer<float, 1> x_d (x, numX);
-    buffer<float, 1> y_d (y, numX);
-    buffer<float, 1> z_d (z, numX);
-    buffer<float, 1> Qr_d (Qr, numX);
-    buffer<float, 1> Qi_d (Qi, numX);
+    #pragma omp target teams distribute parallel for thread_limit(256)
+    for (int i = 0; i < numX; i++) {
+      Qr[i] = 0.f;
+      Qi[i] = 0.f;
+    }
 
-    q.submit([&] (handler &cgh) {
-      auto acc = Qr_d.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = Qi_d.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    computeQ_GPU(q, numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
+    computeQ_GPU(numK, numX, x, y, z, kVals, ck, Qr, Qi);
   }
 
   outputData(outputFileName, Qr, Qi, numX);

@@ -27,17 +27,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <sys/time.h>
 #include <malloc.h>
+#include <chrono>
 #include <cuda.h>
 #include "file.h"
 #include "computeQ.cu"
-
-long long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 static void
 setupMemoryGPU(int num, int size, float*& dev_ptr, float*& host_ptr)
@@ -110,8 +104,6 @@ int main (int argc, char *argv[]) {
 
   /* GPU section 2 */
   {
-    auto start = get_time();
-
     float *x_d, *y_d, *z_d;
     float *Qr_d, *Qi_d;
 
@@ -126,9 +118,6 @@ int main (int argc, char *argv[]) {
     cudaMemset((void *)Qi_d, 0, numX * sizeof(float));
 
     computeQ_GPU(numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
-
-    auto end = get_time();
-    printf("computeQ execution time: %.2f s\n", (end - start) / 1e6f);
 
     cudaFree(x_d);
     cudaFree(y_d);
