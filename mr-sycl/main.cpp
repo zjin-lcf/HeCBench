@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include <chrono>
 #include "common.h"
 #include "benchmark.h"
 #include "kernels.h"
@@ -22,6 +23,9 @@ void run_benchmark(queue &q)
   range<1> lws (256);
 
   printf("Starting benchmark...\n");
+
+  bool ok = true;
+  double mr32_sf_time = 0.0, mr32_eff_time = 0.0;
 
   for (i = 0; i < SIZES_CNT32; i++) {
     val_ref = val_eff = 0;
@@ -52,9 +56,13 @@ void run_benchmark(queue &q)
 
     // verify the results of simple and efficient versions on a host
     if (val_ref != val_eff) {
+      ok = false;
       fprintf(stderr, "Results mismatch: val_ref = %d, val_eff = %d\n", val_ref, val_eff);
       break;
     }
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     // the efficient version is faster than the simple version on a device
     q.submit([&] (handler &cgh) {
@@ -67,12 +75,18 @@ void run_benchmark(queue &q)
       });
     });
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    mr32_sf_time += time;
+
     q.submit([&] (handler &cgh) {
       auto acc = d_val.get_access<sycl_read>(cgh);
       cgh.copy(acc, &val_dev);
     }).wait();
 
     if (val_ref != val_dev) {
+      ok = false;
       fprintf(stderr, "Results mismatch: val_dev = %d, val_ref = %d\n", val_dev, val_ref);
       break;
     }
@@ -81,6 +95,9 @@ void run_benchmark(queue &q)
       auto acc = d_val.get_access<sycl_discard_write>(cgh);
       cgh.fill(acc, 0);
     });
+
+    q.wait();
+    start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto b = d_bases32.get_access<sycl_read>(cgh);
@@ -92,16 +109,26 @@ void run_benchmark(queue &q)
       });
     });
 
+    q.wait();
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    mr32_eff_time += time;
+
     q.submit([&] (handler &cgh) {
       auto acc = d_val.get_access<sycl_read>(cgh);
       cgh.copy(acc, &val_dev);
     }).wait();
 
     if (val_ref != val_dev) {
+      ok = false;
       fprintf(stderr, "Results mismatch: val_dev = %d, val_ref = %d\n", val_dev, val_ref);
       break;
     }
   }
+
+  printf("Total kernel execution time (mr32_simple  ): %f (s)\n", mr32_sf_time * 1e-9f);
+  printf("Total kernel execution time (mr32_efficent): %f (s)\n", mr32_eff_time * 1e-9f);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   // device results are not included
   print_results(bits32, SIZES_CNT32, BASES_CNT32, time_vals);

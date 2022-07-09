@@ -1,7 +1,7 @@
 void mr32_sf(
-  const uint32_t *__restrict__ bases,
-  const uint32_t *__restrict__ n32,
-  int *__restrict__ val,
+  const uint32_t *__restrict bases,
+  const uint32_t *__restrict n32,
+  int *__restrict val,
   int iter)
 {
   #pragma omp target teams distribute parallel for thread_limit(256)
@@ -15,9 +15,9 @@ void mr32_sf(
 }
 
 void mr32_eff(
-  const uint32_t *__restrict__ bases,
-  const uint32_t *__restrict__ n32,
-  int *__restrict__ val,
+  const uint32_t *__restrict bases,
+  const uint32_t *__restrict n32,
+  int *__restrict val,
   int iter)
 {
   #pragma omp target teams distribute parallel for thread_limit(256)
@@ -29,4 +29,3 @@ void mr32_eff(
     }
   }
 }
-
