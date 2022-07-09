@@ -4,11 +4,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <chrono>
 #include <omp.h>
 
 #define BLACK 0
 #define WHITE 255
-
 
 /*!
  * \file morphology.h
@@ -21,7 +21,6 @@
  * http://www.leptonica.com/binary-morphology.html
  *
  */
-
 
 inline int roundUp(const int x, const int y)
 {
@@ -39,12 +38,12 @@ inline int roundUp(const int x, const int y)
  * \param[in]       vsize: ditto
  */
 extern "C"
-void erode(unsigned char* img_d,
-        unsigned char* tmp_d,
-        const int width,
-        const int height,
-        const int hsize,
-        const int vsize);
+double erode(unsigned char* img_d,
+             unsigned char* tmp_d,
+             const int width,
+             const int height,
+             const int hsize,
+             const int vsize);
 
 
 /*!
@@ -57,11 +56,11 @@ void erode(unsigned char* img_d,
  * \param[in]       vsize: ditto
  */
 extern "C"
-void dilate(unsigned char* img_d,
-        unsigned char* tmp_d,
-        const int width,
-        const int height,
-        const int hsize,
-        const int vsize);
+double dilate(unsigned char* img_d,
+              unsigned char* tmp_d,
+              const int width,
+              const int height,
+              const int hsize,
+              const int vsize);
 
 #endif /* MORPHOLOGY_H */

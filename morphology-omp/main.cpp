@@ -12,10 +12,17 @@ void display(unsigned char *img, const int height, const int width)
 
 int main(int argc, char* argv[])
 {
-  int hsize = atoi(argv[1]);  // kernel width (32 is maximum without adjusting the share memory size)
-  int vsize = atoi(argv[2]);  // kernel height (32 is maximum without adjusting the share memory size)
+  if (argc != 6) {
+    printf("Usage: %s <kernel width> <kernel height> ", argv[0]);
+    printf("<image width> <image height> <repeat>\n");
+    return 1;
+  }
+
+  int hsize = atoi(argv[1]);  // kernel width
+  int vsize = atoi(argv[2]);  // kernel height
   int width = atoi(argv[3]);  // image width
   int height = atoi(argv[4]); // image height
+  int repeat = atoi(argv[5]);
 
   unsigned int memSize = width * height * sizeof(unsigned char);
 
@@ -27,15 +34,19 @@ int main(int argc, char* argv[])
       srcImg[i*width+j] = (i == (height/2 - 1) && 
                            j == (width/2 - 1)) ? WHITE : BLACK;
 
-#pragma omp target data map(tofrom: srcImg[0:memSize]) \
-                        map(alloc: tmpImg[0:memSize])
-{
-  for (int n = 0; n < 100; n++) {
-    dilate(srcImg, tmpImg, width, height, hsize, vsize);
-    erode(srcImg, tmpImg, width, height, hsize, vsize);
-  }
+  #pragma omp target data map(tofrom: srcImg[0:memSize]) \
+                          map(alloc: tmpImg[0:memSize])
+  {
+    double dilate_time = 0.0, erode_time = 0.0;
 
-}
+    for (int n = 0; n < repeat; n++) {
+      dilate_time += dilate(srcImg, tmpImg, width, height, hsize, vsize);
+      erode_time += erode(srcImg, tmpImg, width, height, hsize, vsize);
+    }
+
+    printf("Average kernel execution time (dilate): %f (s)\n", (dilate_time * 1e-9f) / repeat);
+    printf("Average kernel execution time (erode): %f (s)\n", (erode_time * 1e-9f) / repeat);
+  }
 
   int s = 0;
   for (unsigned int i = 0; i < memSize; i++) s += srcImg[i];

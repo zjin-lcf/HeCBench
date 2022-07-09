@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define BLACK 0
@@ -21,7 +22,6 @@
  *
  */
 
-
 inline int roundUp(const int x, const int y)
 {
     return (x + y - 1) / y; 
@@ -38,13 +38,12 @@ inline int roundUp(const int x, const int y)
  * \param[in]       vsize: ditto
  */
 extern "C"
-void erode(unsigned char* img_d,
-        unsigned char* tmp_d,
-        const int width,
-        const int height,
-        const int hsize,
-        const int vsize);
-
+double erode(unsigned char* img_d,
+             unsigned char* tmp_d,
+             const int width,
+             const int height,
+             const int hsize,
+             const int vsize);
 
 /*!
  * \brief dilate()
@@ -56,11 +55,11 @@ void erode(unsigned char* img_d,
  * \param[in]       vsize: ditto
  */
 extern "C"
-void dilate(unsigned char* img_d,
-        unsigned char* tmp_d,
-        const int width,
-        const int height,
-        const int hsize,
-        const int vsize);
+double dilate(unsigned char* img_d,
+              unsigned char* tmp_d,
+              const int width,
+              const int height,
+              const int hsize,
+              const int vsize);
 
 #endif /* MORPHOLOGY_H */
