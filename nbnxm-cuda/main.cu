@@ -353,7 +353,7 @@ __global__ void nbnxmKernelTest(
     } // for (int jm = 0; jm < c_nbnxnGpuJgroupSize; jm++)
   } // for (int j4 = cij4Start; j4 < cij4End; j4 += 1)
 
-  {  
+  {
     const nbnxn_sci_t nbSci = a_plistSci[bidx];
     const int sci = nbSci.sci;
 
@@ -389,7 +389,13 @@ nbnxn_excl_t get_excl(int id) {
   return value;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const dim3 blocks ( block_x, block_y, 1 );
   const dim3 grids ( 1, 1, grid_z );
 
@@ -467,7 +473,8 @@ int main() {
   cudaDeviceSynchronize();
 
   auto start = std::chrono::steady_clock::now();
-  for (int i = 0; i < 100; ++i) {
+
+  for (int i = 0; i < repeat; ++i) {
     nbnxmKernelTest<<<grids, blocks>>>(
         a_xq,
         a_f,
@@ -483,11 +490,12 @@ int main() {
         3.12341,
         138.935,
         0);
-    cudaDeviceSynchronize();
   }
+
+  cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  std::cout << "Total kernel time (w/o shift): " << time.count() << std::endl;
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (w/o shift): %f (s)\n", (time * 1e-9f) / repeat);
 
 #ifdef DEBUG
   float f0 = 0, f1 = 0, f2 = 0; 
@@ -536,7 +544,8 @@ int main() {
   }
 
   start = std::chrono::steady_clock::now();
-  for (int i = 0; i < 100; ++i) {
+
+  for (int i = 0; i < repeat; ++i) {
     nbnxmKernelTest<<<grids, blocks>>>(
         a_xq,
         a_f,
@@ -552,11 +561,12 @@ int main() {
         3.12341,
         138.935,
         1);  // compute shift
-    cudaDeviceSynchronize();
   }
+
+  cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
-  time = end - start;
-  std::cout << "Total kernel time (w/ shift): " << time.count() << std::endl;
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (w/ shift): %f (s)\n", (time * 1e-9f) / repeat);
 
 #ifdef DEBUG
   f0 = 0, f1 = 0, f2 = 0; 
