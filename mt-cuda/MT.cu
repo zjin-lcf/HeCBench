@@ -36,9 +36,9 @@ using namespace std::chrono;
 //Load twister configurations
 ///////////////////////////////////////////////////////////////////////////////
 void loadMTGPU(const char *fname, 
-    const unsigned int seed, 
-    mt_struct_stripped *h_MT,
-    const size_t size)
+               const unsigned int seed, 
+               mt_struct_stripped *h_MT,
+               const size_t size)
 {
   // open the file for binary read
   FILE* fd = fopen(fname, "rb");
@@ -55,7 +55,6 @@ void loadMTGPU(const char *fname,
   for(unsigned int i = 0; i < size; i++)
     h_MT[i].seed = seed;
 }
-
 
 __device__
 void BoxMullerTrans(float *u1, float *u2)
@@ -127,6 +126,12 @@ __global__ void mt (const mt_struct_stripped* MT, float* Rand, const int nPerRng
 ///////////////////////////////////////////////////////////////////////////////
 int main(int argc, const char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  int numIterations = atoi(argv[1]);
+  
   size_t globalWorkSize = {MT_RNG_COUNT};  // 1D var for Total # of work items
   size_t localWorkSize = {128};            // 1D var for # of work items in the work group  
   dim3 gridBlocks (globalWorkSize/localWorkSize);
@@ -152,15 +157,17 @@ int main(int argc, const char **argv)
   printf("Allocate memory...\n"); 
 
   mt_struct_stripped* d_MT;
-  float* d_Rand;
   cudaMalloc((void**)&d_MT, sizeof(mt_struct_stripped)*MT_RNG_COUNT);
   cudaMemcpy(d_MT, h_MT, sizeof(mt_struct_stripped)*MT_RNG_COUNT, cudaMemcpyHostToDevice);
+
+  float* d_Rand;
   cudaMalloc((void**)&d_Rand, sizeof(float)*nRand);
 
-  int numIterations = 100;
   printf("Call Mersenne Twister kernel... (%d iterations)\n\n", numIterations); 
+
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  for (int i = -1; i < numIterations; i++)
+
+  for (int i = 0; i < numIterations; i++)
   {
     mt<<<gridBlocks, threadBlocks>>>(d_MT, d_Rand, nPerRng);
 
@@ -168,38 +175,35 @@ int main(int argc, const char **argv)
     boxmuller<<<gridBlocks, threadBlocks>>>(d_Rand, nPerRng);
 #endif
   }
-  cudaDeviceSynchronize();
 
+  cudaDeviceSynchronize();
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
   double gpuTime = time_span.count() / (double)numIterations;
   printf("MersenneTwister, Throughput = %.4f GNumbers/s, "
-      "Time = %.5f s, Size = %u Numbers, Workgroup = %lu\n", 
-      ((double)nRand * 1.0E-9 / gpuTime), gpuTime, nRand, localWorkSize);    
+         "Time = %.5f s, Size = %u Numbers, Workgroup = %lu\n", 
+         ((double)nRand * 1.0E-9 / gpuTime), gpuTime, nRand, localWorkSize);    
 
   printf("\nRead back results...\n"); 
   cudaMemcpy(h_RandGPU, d_Rand, sizeof(float)*nRand, cudaMemcpyDeviceToHost);
 
   printf("Compute CPU reference solution...\n");
-  {
-    RandomRef(h_RandCPU, nPerRng, seed);
+  RandomRef(h_RandCPU, nPerRng, seed);
 #ifdef DO_BOXMULLER
-    BoxMullerRef(h_RandCPU, nPerRng);
+  BoxMullerRef(h_RandCPU, nPerRng);
 #endif
-  }
 
   printf("Compare CPU and GPU results...\n");
   double sum_delta = 0;
   double sum_ref   = 0;
-  {
-    for(int i = 0; i < MT_RNG_COUNT; i++)
-      for(int j = 0; j < nPerRng; j++) {
-        double rCPU = h_RandCPU[i * nPerRng + j];
-        double rGPU = h_RandGPU[i + j * MT_RNG_COUNT];
-        double delta = std::fabs(rCPU - rGPU);
-        sum_delta += delta;
-        sum_ref   += std::fabs(rCPU);
-      }
+  for(int i = 0; i < MT_RNG_COUNT; i++) {
+    for(int j = 0; j < nPerRng; j++) {
+      double rCPU = h_RandCPU[i * nPerRng + j];
+      double rGPU = h_RandGPU[i + j * MT_RNG_COUNT];
+      double delta = std::fabs(rCPU - rGPU);
+      sum_delta += delta;
+      sum_ref   += std::fabs(rCPU);
+    }
   }
   double L1norm = sum_delta / sum_ref;
   printf("L1 norm: %E\n\n", L1norm);
@@ -211,10 +215,7 @@ int main(int argc, const char **argv)
   cudaFree(d_Rand);
 
   // finish
-  if (L1norm < 1e-6)
-    printf("PASSED\n");
-  else
-    printf("FAILED\n");
+  printf("%s\n", (L1norm < 1e-6) ? "PASS" : "FAIL");
 
   return 0;
 }
