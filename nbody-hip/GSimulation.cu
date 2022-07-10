@@ -120,15 +120,18 @@ void GSimulation::Start() {
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
+
     hipLaunchKernelGGL(accelerate_particles, grids, threads, 0, 0, p, n, kSofteningSquared, kG);
     hipLaunchKernelGGL(update_particles, grids, threads, 0, 0, p, e, n, dt);
     hipLaunchKernelGGL(accumulate_energy, 1, 1, 0, 0, e, n);
+
+    hipDeviceSynchronize();
+    double elapsed_seconds = ts0.Elapsed();
 
     hipMemcpy(energy.data(), e, sizeof(RealType), hipMemcpyDeviceToHost);
 
     kenergy_ = 0.5 * energy[0];
     energy[0] = 0;
-    double elapsed_seconds = ts0.Elapsed();
     if ((s % get_sfreq()) == 0) {
       nf += 1;
       std::cout << " " << std::left << std::setw(8) << s << std::left

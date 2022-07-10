@@ -120,15 +120,18 @@ void GSimulation::Start() {
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
+
     accelerate_particles<<<grids, threads>>>(p, n, kSofteningSquared, kG);
     update_particles<<<grids, threads>>>(p, e, n, dt);
     accumulate_energy<<<1,1>>>(e, n);
+
+    cudaDeviceSynchronize();
+    double elapsed_seconds = ts0.Elapsed();
 
     cudaMemcpy(energy.data(), e, sizeof(RealType), cudaMemcpyDeviceToHost);
 
     kenergy_ = 0.5 * energy[0];
     energy[0] = 0;
-    double elapsed_seconds = ts0.Elapsed();
     if ((s % get_sfreq()) == 0) {
       nf += 1;
       std::cout << " " << std::left << std::setw(8) << s << std::left

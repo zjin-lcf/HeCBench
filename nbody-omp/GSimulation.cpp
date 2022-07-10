@@ -111,6 +111,7 @@ void GSimulation::Start() {
     // Looping across integration steps
     for (int s = 1; s <= nsteps; ++s) {
       TimeInterval ts0;
+
       // computes acceleration of all particles
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int i = 0; i < n; i++) {
@@ -165,10 +166,11 @@ void GSimulation::Start() {
       #pragma omp target 
       for (int i = 1; i < n; i++) e[0] += e[i];
 
+      double elapsed_seconds = ts0.Elapsed();
+
       #pragma omp target update from (e[0:1])
       kenergy_ = 0.5 * e[0];
       e[0] = 0;
-      double elapsed_seconds = ts0.Elapsed();
       if ((s % get_sfreq()) == 0) {
         nf += 1;
         std::cout << " " << std::left << std::setw(8) << s << std::left

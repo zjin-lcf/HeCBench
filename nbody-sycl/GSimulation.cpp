@@ -119,6 +119,7 @@ void GSimulation::Start() {
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
+
     // Submitting first kernel to device which computes acceleration of all
     // particles
     q.submit([&](handler& h) {
@@ -184,14 +185,16 @@ void GSimulation::Start() {
        });
     });
 
+    q.wait();
+    double elapsed_seconds = ts0.Elapsed();
+
     q.submit([&](handler& h) {
       auto e = ebuf.get_access<sycl_read>(h, range<1>(1));
       h.copy(e, energy.data());
-    });
-    q.wait();
+    }).wait();
+
     kenergy_ = 0.5 * energy[0];
     energy[0] = 0;
-    double elapsed_seconds = ts0.Elapsed();
     if ((s % get_sfreq()) == 0) {
       nf += 1;
       std::cout << " " << std::left << std::setw(8) << s << std::left
