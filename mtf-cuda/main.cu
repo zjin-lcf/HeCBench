@@ -72,11 +72,10 @@ int main(int argc, char *argv[])
 
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    mtf(word, false);
+  for (int i = 0; i < repeat; i++) mtf(word, false);
 
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  std::cout << "Total execution time: " << time.count() << std::endl;
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time: " << (time * 1e-9f) / repeat << " (s)\n";
   return 0;
 }
