@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <chrono>
 #include <math.h>
 #include <stdio.h>
@@ -15,8 +14,18 @@ void cp_to_host(char *to, char*from, size_t size) {
   hipMemcpy(to, from, size, hipMemcpyDeviceToHost);
   hipFree(from);
 }
-__global__ void ccc_loop1(const int * __restrict imaterial, const int * __restrict nextfrac, const double * __restrict rho_compact, const double * __restrict rho_compact_list, 
-    const double * __restrict  Vf_compact_list, const double * __restrict  V, double * __restrict rho_ave_compact, int sizex, int sizey, int * __restrict mmc_index) {
+
+__global__ void ccc_loop1(
+  const int * __restrict__ imaterial,
+  const int * __restrict__ nextfrac,
+  const double * __restrict__ rho_compact,
+  const double * __restrict__ rho_compact_list, 
+  const double * __restrict__ Vf_compact_list,
+  const double * __restrict__ V,
+  double * __restrict__ rho_ave_compact,
+  int sizex, int sizey,
+  int * __restrict__ mmc_index)
+{
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j = threadIdx.y + blockIdx.y * blockDim.y;
   if (i >= sizex || j >= sizey) return;
@@ -48,8 +57,17 @@ __global__ void ccc_loop1(const int * __restrict imaterial, const int * __restri
 #endif
 }
 
-
-__global__ void ccc_loop1_2(const double * __restrict rho_compact_list, const double * __restrict  Vf_compact_list, const double * __restrict  V, double * __restrict rho_ave_compact, const int * __restrict mmc_index,  const int  mmc_cells,  const int * __restrict mmc_i,  const int * __restrict mmc_j, int sizex, int sizey) {
+__global__ void ccc_loop1_2(
+  const double * __restrict__ rho_compact_list,
+  const double * __restrict__  Vf_compact_list,
+  const double * __restrict__  V,
+  double * __restrict__ rho_ave_compact,
+  const int * __restrict__ mmc_index,
+  const int  mmc_cells,
+  const int * __restrict__ mmc_i,
+  const int * __restrict__ mmc_j,
+  int sizex, int sizey)
+{
   int c = threadIdx.x + blockIdx.x * blockDim.x;
   if (c >= mmc_cells) return;
   double ave = 0.0;
@@ -59,9 +77,21 @@ __global__ void ccc_loop1_2(const double * __restrict rho_compact_list, const do
   rho_ave_compact[mmc_i[c]+sizex*mmc_j[c]] = ave/V[mmc_i[c]+sizex*mmc_j[c]];
 }
 
-__global__ void ccc_loop2(const int * __restrict imaterial, const int * __restrict matids, const int * __restrict nextfrac, const double * __restrict rho_compact, const double * __restrict rho_compact_list, 
-    const double * __restrict t_compact, const double * __restrict t_compact_list, 
-    const double * __restrict  Vf_compact_list, const double * __restrict n, double * __restrict  p_compact, double * __restrict p_compact_list, int sizex, int sizey, int * __restrict mmc_index) {
+__global__ void ccc_loop2(
+  const int * __restrict__ imaterial,
+  const int * __restrict__ matids,
+  const int * __restrict__ nextfrac,
+  const double * __restrict__ rho_compact,
+  const double * __restrict__ rho_compact_list, 
+  const double * __restrict__ t_compact,
+  const double * __restrict__ t_compact_list, 
+  const double * __restrict__  Vf_compact_list,
+  const double * __restrict__ n,
+  double * __restrict__  p_compact,
+  double * __restrict__ p_compact_list,
+  int sizex, int sizey,
+  int * __restrict__ mmc_index)
+{
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j = threadIdx.y + blockIdx.y * blockDim.y;
   if (i >= sizex || j >= sizey) return;
@@ -94,25 +124,39 @@ __global__ void ccc_loop2(const int * __restrict imaterial, const int * __restri
     p_compact[i+sizex*j] = n[mat] * rho_compact[i+sizex*j] * t_compact[i+sizex*j];;
   }
 }
-__global__ void ccc_loop2_2(const int * __restrict matids, const double * __restrict rho_compact_list, 
-    const double * __restrict t_compact_list, const double * __restrict  Vf_compact_list, const double * __restrict n, double * __restrict p_compact_list, int * __restrict mmc_index, int mmc_cells) {
+
+__global__ void ccc_loop2_2(
+  const int * __restrict__ matids,
+  const double * __restrict__ rho_compact_list, 
+  const double * __restrict__ t_compact_list,
+  const double * __restrict__ Vf_compact_list,
+  const double * __restrict__ n,
+  double * __restrict__ p_compact_list,
+  int * __restrict__ mmc_index,
+  int mmc_cells)
+{
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
   if (idx >= mmc_cells) return;
   double nm = n[matids[idx]];
   p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
 }
 
-__global__ void ccc_loop3(const int * __restrict imaterial, const int * __restrict nextfrac, const int * __restrict matids,
-    const double * __restrict rho_compact, 
-    const double * __restrict rho_compact_list, 
-    double * __restrict rho_mat_ave_compact, 
-    double * __restrict rho_mat_ave_compact_list, 
-    const double * __restrict x, const double * __restrict y,
-    int sizex, int sizey, int * __restrict mmc_index) {
+__global__ void ccc_loop3(
+  const int * __restrict__ imaterial,
+  const int * __restrict__ nextfrac,
+  const int * __restrict__ matids,
+  const double * __restrict__ rho_compact, 
+  const double * __restrict__ rho_compact_list, 
+  double * __restrict__ rho_mat_ave_compact, 
+  double * __restrict__ rho_mat_ave_compact_list, 
+  const double * __restrict__ x,
+  const double * __restrict__ y,
+  int sizex, int sizey,
+  int * __restrict__ mmc_index)
+{
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j = threadIdx.y + blockIdx.y * blockDim.y;
   if (i >= sizex-1 || j >= sizey-1 || i < 1 || j < 1) return;
-
 
   // o: outer
   double xo = x[i+sizex*j];
@@ -250,9 +294,7 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 
           rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
         } // end else
-
       }
-
 
       struct full_data
       {
@@ -300,10 +342,8 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
         int mmc_cells;
       };
 
-
       void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv)
       {
-
         int sizex = cc.sizex;
         int sizey = cc.sizey;
         int Nmats = cc.Nmats;
@@ -336,16 +376,15 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
         dim3 threads(thx,thy,1);
         dim3 blocks((sizex-1)/thx+1, (sizey-1)/thy+1, 1);
 
-
         // Cell-centric algorithms
         // Computational loop 1 - average density in cell
 #ifdef DEBUG
         hipDeviceSynchronize();
         auto t0 = std::chrono::system_clock::now();
 #endif
-        hipLaunchKernelGGL(ccc_loop1, dim3(dim3(blocks)), dim3(dim3(threads) ), 0, 0, d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
+        hipLaunchKernelGGL(ccc_loop1, dim3(blocks), dim3(threads), 0, 0, d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
 #ifndef FUSED
-        hipLaunchKernelGGL(ccc_loop1_2, dim3(dim3((mmc_cells-1)/(thx*thy)+1)), dim3(dim3((thx*thy)) ), 0, 0, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, d_mmc_index, mmc_cells, d_mmc_i, d_mmc_j, sizex, sizey);
+        hipLaunchKernelGGL(ccc_loop1_2, dim3((mmc_cells-1)/(thx*thy)+1), dim3((thx*thy)), 0, 0, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, d_mmc_index, mmc_cells, d_mmc_i, d_mmc_j, sizex, sizey);
 #endif
 #ifdef DEBUG
         hipDeviceSynchronize();
@@ -354,9 +393,9 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
         // Computational loop 2 - Pressure for each cell and each material
         t0 = std::chrono::system_clock::now();
 #endif
-        hipLaunchKernelGGL(ccc_loop2, dim3(dim3(blocks)), dim3(dim3(threads) ), 0, 0, d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
+        hipLaunchKernelGGL(ccc_loop2, dim3(blocks), dim3(threads), 0, 0, d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
 #ifndef FUSED
-        hipLaunchKernelGGL(ccc_loop2_2, dim3(dim3((mm_len-1)/(thx*thy)+1)), dim3(dim3((thx*thy)) ), 0, 0, d_matids, d_rho_compact_list, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact_list, d_mmc_index, mm_len);
+        hipLaunchKernelGGL(ccc_loop2_2, dim3((mm_len-1)/(thx*thy)+1), dim3((thx*thy)), 0, 0, d_matids, d_rho_compact_list, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact_list, d_mmc_index, mm_len);
 #endif
 #ifdef DEBUG
         hipDeviceSynchronize();
@@ -365,7 +404,7 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
         // Computational loop 3 - Average density of each material over neighborhood of each cell
         t0 = std::chrono::system_clock::now();
 #endif
-        hipLaunchKernelGGL(ccc_loop3, dim3(dim3(blocks)), dim3(dim3(threads) ), 0, 0, d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
+        hipLaunchKernelGGL(ccc_loop3, dim3(blocks), dim3(threads), 0, 0, d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
 #ifdef DEBUG
         hipDeviceSynchronize();
         std::chrono::duration<double> t3 = std::chrono::system_clock::now() - t0;
@@ -398,7 +437,6 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
         //int mmc_cells = ccc.mmc_cells;
         //int mm_len = ccc.mm_len;
 
-
         printf("Checking results of compact representation... ");
 
         for (int j = 0; j < sizey; j++) {
@@ -413,39 +451,39 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 #ifdef LINKED
               for (ix = -ix; ix >= 0; ix = ccc.nextfrac[ix]) {
 #else
-                for (int ix = ccc.mmc_index[-ccc.imaterial[i+sizex*j]]; ix < ccc.mmc_index[-ccc.imaterial[i+sizex*j]+1]; ix++) {
+              for (int ix = ccc.mmc_index[-ccc.imaterial[i+sizex*j]]; ix < ccc.mmc_index[-ccc.imaterial[i+sizex*j]+1]; ix++) {
 #endif
-                  int mat = ccc.matids[ix];
-                  if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact_list[ix]) > 0.0001) {
-                    printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-                        cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact_list[ix], i, j, mat);
-                    return false;
-                  }
-
-                  if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - ccc.rho_mat_ave_compact_list[ix]) > 0.0001) {
-                    printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-                        cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], ccc.rho_mat_ave_compact_list[ix], i, j, mat);
-                    return false;
-                  }
-                }
-              }
-              else {
-                // NOTE: HACK: we index materials from zero, but zero can be a list index
-                int mat = ix - 1;
-                if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact[i+sizex*j]) > 0.0001) {
+                int mat = ccc.matids[ix];
+                if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact_list[ix]) > 0.0001) {
                   printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-                      cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact[i+sizex*j], i, j, mat);
+                      cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact_list[ix], i, j, mat);
                   return false;
                 }
 
-                if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - ccc.rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
+                if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - ccc.rho_mat_ave_compact_list[ix]) > 0.0001) {
                   printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-                      cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], ccc.rho_mat_ave_compact[i+sizex*j], i, j, mat);
+                      cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], ccc.rho_mat_ave_compact_list[ix], i, j, mat);
                   return false;
                 }
               }
             }
+            else {
+              // NOTE: HACK: we index materials from zero, but zero can be a list index
+              int mat = ix - 1;
+              if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact[i+sizex*j]) > 0.0001) {
+                printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
+                    cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact[i+sizex*j], i, j, mat);
+                return false;
+              }
+
+              if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - ccc.rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
+                printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
+                    cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], ccc.rho_mat_ave_compact[i+sizex*j], i, j, mat);
+                return false;
+              }
+            }
           }
-          printf("All tests passed!\n");
-          return true;
         }
+        printf("All tests passed!\n");
+        return true;
+      }
