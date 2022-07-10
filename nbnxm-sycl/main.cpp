@@ -402,7 +402,13 @@ nbnxn_excl_t get_excl(int id) {
   return value;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   sycl::queue q(sycl::gpu_selector{});
 
   const sycl::range<3>    blockSize{ 1, block_y, block_x };
@@ -470,7 +476,7 @@ int main() {
   q.wait();
 
   auto start = std::chrono::steady_clock::now();
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < repeat; ++i) {
     q.submit([&](sycl::handler& cgh) {
         auto kernel = nbnxmKernelTest(
             cgh,
@@ -490,11 +496,12 @@ int main() {
             0);
         cgh.parallel_for(range, kernel);
     });
-    q.wait();
   }
+
+  q.wait();
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  std::cout << "Total kernel time (w/o shift): " << time.count() << std::endl;
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (w/o shift): %f (s)\n", (time * 1e-9f) / repeat);
 
 #ifdef DEBUG
   float f0 = 0, f1 = 0, f2 = 0; 
@@ -543,7 +550,8 @@ int main() {
   }
 
   start = std::chrono::steady_clock::now();
-  for (int i = 0; i < 100; ++i) {
+
+  for (int i = 0; i < repeat; ++i) {
     q.submit([&](sycl::handler& cgh) {
         auto kernel = nbnxmKernelTest(
             cgh,
@@ -563,11 +571,12 @@ int main() {
             1);
         cgh.parallel_for(range, kernel);
     });
-    q.wait();
   }
+
+  q.wait();
   end = std::chrono::steady_clock::now();
-  time = end - start;
-  std::cout << "Total kernel time (w/ shift): " << time.count() << std::endl;
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (w/ shift): %f (s)\n", (time * 1e-9f) / repeat);
 
 #ifdef DEBUG
   f0 = 0, f1 = 0, f2 = 0; 
