@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 typedef struct __attribute__((__aligned__(16)))
@@ -95,13 +96,14 @@ inline float4 normalEstimate(const float3 *points, int idx, int width, int heigh
 #pragma omp end declare target
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
-
   const int width = atoi(argv[1]);
   const int height = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
+
   const int numPts = width * height;
   const int size = numPts * sizeof(float3);
   const int normal_size = numPts * sizeof(float4);
@@ -118,11 +120,17 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map (to: points[0:numPts]) \
                           map (from: normal_points[0:numPts])
   {
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int idx = 0; idx < numPts; idx++)
         normal_points[idx] = normalEstimate(points, idx, width, height);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   float sx, sy, sz, sw;

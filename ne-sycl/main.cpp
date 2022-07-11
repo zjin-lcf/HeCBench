@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 #ifndef SYCL_Geometric
@@ -86,12 +87,12 @@ inline float4 normalEstimate(const float3 *points, int idx, int width, int heigh
 }
 
 void ne (
-    nd_item<1> &item,
-    const float3 *__restrict points,
-          float4 *__restrict normal_points,
-    int width,
-    int height,
-    int numPts)
+  nd_item<1> &item,
+  const float3 *__restrict points,
+        float4 *__restrict normal_points,
+  const int width,
+  const int height,
+  const int numPts)
 {
   int idx = item.get_global_id(0);
   if (idx < numPts) 
@@ -99,13 +100,14 @@ void ne (
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
-
   const int width = atoi(argv[1]);
   const int height = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
+
   const int numPts = width * height;
   const int size = numPts * sizeof(float3);
   const int normal_size = numPts * sizeof(float4);
@@ -133,7 +135,10 @@ int main(int argc, char* argv[]) {
   range<1> gws ((numPts + 255)/256*256);
   range<1> lws  (256);
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto p = d_points.get_access<sycl_read>(cgh);
       auto np = d_normal_points.get_access<sycl_discard_write>(cgh);
@@ -141,6 +146,12 @@ int main(int argc, char* argv[]) {
         ne(item, p.get_pointer(), np.get_pointer(), width, height, numPts); 
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   float sx, sy, sz, sw;
@@ -157,5 +168,3 @@ int main(int argc, char* argv[]) {
   free(points);
   return 0;
 }
-
-
