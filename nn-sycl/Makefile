@@ -89,4 +89,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) filelist.txt -r 5 -lat 30 -lng 90 -t
+	./$(program) filelist.txt -r 5 -lat 30 -lng 90 -i 10000 -t

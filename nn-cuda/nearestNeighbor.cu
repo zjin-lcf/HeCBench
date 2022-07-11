@@ -1,12 +1,6 @@
-#include <sys/time.h>
 #include <cuda.h>
+#include <chrono>
 #include "nearestNeighbor.h"
-
-long long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) +tv.tv_usec;
-}
 
 int main(int argc, char *argv[]) {
   std::vector<Record> records;
@@ -15,10 +9,11 @@ int main(int argc, char *argv[]) {
   int i;
   char filename[100];
   int resultsCount=10,quiet=0,timing=0;
+  int repeat=1;
   float lat=0.0,lng=0.0;
 
-  if (parseCommandline(argc, argv, filename,&resultsCount,&lat,&lng,
-        &quiet, &timing)) {
+  if (parseCommandline(argc, argv, filename, &resultsCount,
+                       &lat, &lng, &repeat, &quiet, &timing)) {
     printUsage();
     return 0;
   }
@@ -32,12 +27,15 @@ int main(int argc, char *argv[]) {
 
   if (resultsCount > numRecords) resultsCount = numRecords;
 
-  long long offload_start = get_time();
+  auto start = std::chrono::steady_clock::now();
+
   recordDistances = (float *)malloc(sizeof(float) * numRecords);
-  FindNearestNeighbors(numRecords,locations,lat,lng,recordDistances,timing);
-  long long offload_end = get_time();
+  FindNearestNeighbors(numRecords,locations,lat,lng,recordDistances,repeat,timing);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   if (timing)
-    printf("Device offloading time %lld (us)\n", offload_end - offload_start);
+    printf("Device offloading time %f (s)\n", time * 1e-9);
 
   // find the resultsCount least distances
   findLowest(records,recordDistances,numRecords,resultsCount);
@@ -70,6 +68,7 @@ void FindNearestNeighbors(
     float lat,
     float lng,
     float* distances,
+    int   repeat,
     int timing) {
 
   LatLong* d_locations;
@@ -81,8 +80,16 @@ void FindNearestNeighbors(
   dim3 gridDim((numRecords + 63)/64);
   dim3 blockDim(64);
 
-  for (int i = 0; i < 10000; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     nn<<<gridDim, blockDim>>> (numRecords, lat, lng, d_locations, d_distances);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaMemcpy(distances, d_distances, numRecords * sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(d_locations);
@@ -169,8 +176,8 @@ void findLowest(std::vector<Record> &records,float *distances,int numRecords,int
   }
 }
 
-int parseCommandline(int argc, char *argv[], char* filename,int *r,float *lat,float *lng,
-    int *q, int *t) {
+int parseCommandline(int argc, char *argv[], char* filename,
+                     int *r, float *lat, float *lng, int *repeat, int *q, int *t) {
   int i;
   if (argc < 2) return 1; // error
   strncpy(filename,argv[1],100);
@@ -191,6 +198,10 @@ int parseCommandline(int argc, char *argv[], char* filename,int *r,float *lat,fl
           else {//lng
             *lng = atof(argv[i+1]);
           }
+          i++;
+          break;
+        case 'i': // i
+          *repeat = atoi(argv[i+1]);
           i++;
           break;
         case 'h': // help
@@ -214,10 +225,11 @@ void printUsage(){
   printf("nearestNeighbor [filename] -r [int] -lat [float] -lng [float] [-hqt] \n");
   printf("\n");
   printf("example:\n");
-  printf("$ ./nearestNeighbor filelist.txt -r 5 -lat 30 -lng 90\n");
+  printf("$ ./nearestNeighbor filelist.txt -r 5 -lat 30 -lng 90 -i 100\n");
   printf("\n");
   printf("filename     the filename that lists the data input files\n");
   printf("-r [int]     the number of records to return (default: 10)\n");
+  printf("-i [int]     kernel execution count (default: 1)\n");
   printf("-lat [float] the latitude for nearest neighbors (default: 0)\n");
   printf("-lng [float] the longitude for nearest neighbors (default: 0)\n");
   printf("\n");
@@ -228,4 +240,3 @@ void printUsage(){
   printf("\n");
   printf("Notes: 1. The filename is required as the first parameter.\n");
 }
-

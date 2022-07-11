@@ -7,13 +7,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-// All OpenCL headers
-
+#include <math.h>
 #include <algorithm>
 
-
-	
 #define REC_LENGTH 49 // size of a record in db
 
 typedef struct latLong
@@ -29,14 +25,17 @@ typedef struct record
 } Record;
 
 void FindNearestNeighbors(
-	int numRecords,
-	std::vector<LatLong> &locations,float lat,float lng,
-	float* distances,
-	int timing);
+    int numRecords,
+    std::vector<LatLong> &locations,
+    float lat,
+    float lng,
+    float* distances,
+    int repeat,
+    int timing);
 
 int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &locations);
-void findLowest(std::vector<Record> &records,float *distances,int numRecords,int topN);
+void findLowest(std::vector<Record> &records, float *distances, int numRecords, int topN);
 void printUsage();
-int parseCommandline(int argc, char *argv[], char* filename,int *r,float *lat,float *lng,
-                     int *q, int *t);
+int parseCommandline(int argc, char *argv[], char* filename,
+                     int *r, float *lat, float *lng, int *repeat, int *q, int *t);
 #endif
