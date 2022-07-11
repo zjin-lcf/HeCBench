@@ -1,16 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <sys/time.h>
+#include <chrono>
 #include <vector>
 #include <oneapi/mkl.hpp>
 #include "common.h"
-
-long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -67,7 +61,7 @@ int main(int argc, char *argv[]) {
     }
     gold = sqrt(gold);
 
-    long start = get_time();
+    auto start = std::chrono::steady_clock::now();
 
     d_a = (float *)sycl::malloc_device(size, q);
     if (d_a == nullptr) {
@@ -78,22 +72,28 @@ int main(int argc, char *argv[]) {
 
     q.memcpy(d_a, a, size).wait();
 
+    auto kstart = std::chrono::steady_clock::now();
+
     try {
       for (j = 0; j < repeat; j++) {
         status[j] = oneapi::mkl::blas::column_major::nrm2(q, n, d_a, 1, d_result+j);
+        q.memcpy(h_result, d_result, repeat * sizeof(float), status[j]);
       }
     } catch(sycl::exception const& e) {
       std::cout << "\t\tCaught synchronous SYCL exception during NRM2:\n"
                 << e.what() << std::endl;
     }
 
-    q.memcpy(h_result, d_result, repeat * sizeof(float), status).wait();
+    q.wait();
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    printf("Average mkl::blas::column_major::nrm2 execution time: %f (us)\n", (ktime * 1e-3f) / repeat);
 
     sycl::free(d_a, q);
 
-    long end = get_time();
-    printf("#elements = %.2f M, measured time = %.3f s\n", 
-            n / (1024.f*1024.f), (end-start) / 1e6f);
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("#elements = %.2f M, measured time = %.3f s\n", n / (1024.f*1024.f), time * 1e-9f);
 
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 

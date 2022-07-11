@@ -1,15 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <sys/time.h>
+#include <chrono>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-
-long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 int main (int argc, char* argv[]){
   if (argc != 2) {
@@ -58,7 +52,7 @@ int main (int argc, char* argv[]){
     }
     gold = sqrt(gold);
 
-    long start = get_time();
+    auto start = std::chrono::steady_clock::now();
 
     cudaStat = cudaMalloc((void**)&d_a, size);
     if (cudaStat != cudaSuccess) {
@@ -79,6 +73,8 @@ int main (int argc, char* argv[]){
     //   incx |        | input | stride between consecutive elements of x.
     // result | host or device | output | the resulting norm, which is 0.0 if n,incx<=0.
     //-------------------------------------------------------------------
+    auto kstart = std::chrono::steady_clock::now();
+    
     for (j = 0; j < repeat; j++) {
       cublasStat = cublasSnrm2(handle, n, d_a, 1, result+j);
       if (cublasStat != CUBLAS_STATUS_SUCCESS) {
@@ -86,15 +82,19 @@ int main (int argc, char* argv[]){
       }
     }
 
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    printf("Average cublasSnrm2 execution time: %f (us)\n", (ktime * 1e-3f) / repeat);
+
     cudaStat = cudaFree(d_a);
     if (cudaStat != cudaSuccess) {
       printf ("device memory deallocation failed");
     }
 
-    long end = get_time();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    printf("#elements = %.2f M, measured time = %.3f s\n", 
-            n / (1024.f*1024.f), (end-start) / 1e6f);
+    printf("#elements = %.2f M, measured time = %.3f s\n", n / (1024.f*1024.f), time * 1e-9f);
 
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 
