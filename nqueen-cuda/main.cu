@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
 #define _QUEENS_BLOCK_SIZE_   128
@@ -177,7 +178,10 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
 
   printf("\n### Regular BP-DFS search. ###\n");
 
-  for (int i = 0; i < repeat; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     BP_queens_root_dfs<<< num_blocks,_QUEENS_BLOCK_SIZE_>>> (
       size,
       n_explorers,
@@ -185,6 +189,12 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
       root_prefixes_d,
       vector_of_tree_size_d,
       sols_d);
+  }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(vector_of_tree_size_h, vector_of_tree_size_d, n_explorers*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
   cudaMemcpy(sols_h, sols_d, n_explorers*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -197,6 +207,10 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
 
 int main(int argc, char *argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <size> <initial depth> <repeat>\n", argv[0]);
+    return 1;
+  }
   const short size = atoi(argv[1]);  // 15 - 17 for a short run
   const int initialDepth = atoi(argv[2]); // 6 or 7
   const int repeat = atoi(argv[3]); // kernel execution times
