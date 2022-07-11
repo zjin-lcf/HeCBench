@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 #define _QUEENS_BLOCK_SIZE_   128
@@ -172,7 +173,10 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
   range<1> gws (num_blocks * _QUEENS_BLOCK_SIZE_);
   range<1> lws (_QUEENS_BLOCK_SIZE_);
 
-  for (int i = 0; i < repeat; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto root_prefixes = root_prefixes_d.get_access<sycl_read>(cgh);
       auto vector_of_tree_size = vector_of_tree_size_d.get_access<sycl_discard_write>(cgh);
@@ -187,11 +191,21 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
                            sols.get_pointer());
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 }
 
 
 int main(int argc, char *argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <size> <initial depth> <repeat>\n", argv[0]);
+    return 1;
+  }
   const short size = atoi(argv[1]);  // 15 - 17 for a short run
   const int initialDepth = atoi(argv[2]); // 6 or 7
   const int repeat = atoi(argv[3]); // kernel execution times

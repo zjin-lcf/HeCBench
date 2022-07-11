@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <omp.h>
 
 #define _QUEENS_BLOCK_SIZE_   128
@@ -161,19 +162,30 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
                         map (from: vector_of_tree_size_h[0:n_explorers], \
                                    sols_h[0:n_explorers])
   {
-    for (int i = 0; i < repeat; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       BP_queens_root_dfs(size,
                          n_explorers,
                          initial_depth,
                          root_prefixes_h,
                          vector_of_tree_size_h,
                          sols_h);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 }
 
 
 int main(int argc, char *argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <size> <initial depth> <repeat>\n", argv[0]);
+    return 1;
+  }
   const short size = atoi(argv[1]);  // 15 - 17 for a short run
   const int initialDepth = atoi(argv[2]); // 6 or 7
   const int repeat = atoi(argv[3]); // kernel execution times
