@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 #define MAX_DETECTIONS  4096
@@ -28,18 +29,17 @@ void print_help()
 {
   printf("\nUsage: nmstest  <detections.txt>  <output.txt>\n\n");
   printf("               detections.txt -> Input file containing the coordinates, width, and scores of detected objects\n");
-  printf("               output.txt     -> Output file after performing NMS\n\n");
+  printf("               output.txt     -> Output file after performing NMS\n");
+  printf("               repeat         -> Kernel execution count\n\n");
 }
 
-
-/* Gets the optimal X or Y dimension for a given CUDA block */
+/* Gets the optimal X or Y dimension for a given thread block */
 int get_optimal_dim(int val)
 {
   int div, neg, cntneg, cntpos;
 
-
   /* We start figuring out if 'val' is divisible by 16 
-     (e.g. optimal 16x16 CUDA block of maximum GPU occupancy */
+     (e.g. optimal 16x16 thread block of maximum GPU occupancy */
 
   neg = 1;
   div = 16;
@@ -60,7 +60,6 @@ int get_optimal_dim(int val)
       div = cntneg;
       neg = 0;
     }
-
     else
     {
       cntpos++;
@@ -71,7 +70,6 @@ int get_optimal_dim(int val)
 
   return 16;
 }
-
 
 /* Gets an upper limit for 'val' multiple of the 'mul' integer */
 int get_upper_limit(int val, int mul)
@@ -95,7 +93,7 @@ int main(int argc, char *argv[])
   int x, y, w;
   float score;
 
-  if(argc != 3)
+  if(argc != 4)
   {
     print_help();
     return 0;
@@ -123,13 +121,13 @@ int main(int argc, char *argv[])
 
   while(!feof(fp))
   {
-     int cnt = fscanf(fp, "%d,%d,%d,%f\n", &x, &y, &w, &score);
+    int cnt = fscanf(fp, "%d,%d,%d,%f\n", &x, &y, &w, &score);
 
-     if (cnt !=4)
-     {
-	printf("Error: Invalid file format in line %d when reading %s\n", ndetections, argv[1]);
-        return -1;
-     }
+    if (cnt !=4)
+    {
+       printf("Error: Invalid file format in line %d when reading %s\n", ndetections, argv[1]);
+       return -1;
+    }
  
     cpu_points[ndetections].x() = (float) x;       // x coordinate
     cpu_points[ndetections].y() = (float) y;       // y coordinate
@@ -147,7 +145,6 @@ int main(int argc, char *argv[])
   unsigned char* cpu_pointsbitmap;
   cpu_pointsbitmap = (unsigned char*) malloc(sizeof(unsigned char) * MAX_DETECTIONS);
   memset(cpu_pointsbitmap, 0, sizeof(unsigned char) * MAX_DETECTIONS);
-
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -176,14 +173,17 @@ int main(int argc, char *argv[])
     cgh.fill(pointsbitmap, (unsigned char)0);
   });
 
-
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
   // generate_nms_bitmap<<<pkgrid, pkthreads>>>(points, nmsbitmap, 0.3f);
+  int repeat = atoi(argv[3]);
   int limit = get_upper_limit(ndetections, 16);
   range<2> gen_gws(limit, limit);
   range<2> gen_lws(get_optimal_dim(limit), get_optimal_dim(limit));
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
       auto rects = d_points.get_access<sycl_read>(cgh);
       auto nmsbitmap = d_nmsbitmap.get_access<sycl_discard_write>(cgh);
@@ -203,13 +203,19 @@ int main(int argc, char *argv[])
     });
   }
 
- 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (generate_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
+
   /* Then we perform a reduction for generating a point bitmap vector */
   // reduce_nms_bitmap<<<pkgrid, pkthreads>>>(nmsbitmap, pointsbitmap, ndetections);
   range<1> reduce_gws (ndetections * MAX_DETECTIONS / N_PARTITIONS); 
   range<1> reduce_lws (MAX_DETECTIONS / N_PARTITIONS); 
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
       auto nmsbitmap= d_nmsbitmap.get_access<sycl_read>(cgh);
       auto pointsbitmap= d_pointsbitmap.get_access<sycl_read_write>(cgh);
@@ -231,6 +237,11 @@ int main(int argc, char *argv[])
       });
     });
   }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (reduce_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
 
   /* Dump detections after having performed the NMS */
   q.submit([&] (handler &cgh) {
@@ -267,4 +278,3 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-

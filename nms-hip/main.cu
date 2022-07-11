@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define MAX_DETECTIONS  4096
@@ -28,15 +29,16 @@ void print_help()
 {
   printf("\nUsage: nmstest  <detections.txt>  <output.txt>\n\n");
   printf("               detections.txt -> Input file containing the coordinates, width, and scores of detected objects\n");
-  printf("               output.txt     -> Output file after performing NMS\n\n");
+  printf("               output.txt     -> Output file after performing NMS\n");
+  printf("               repeat         -> Kernel execution count\n\n");
 }
 
 /* NMS Map kernel */
-__global__ void generate_nms_bitmap(const float4* rects, unsigned char* nmsbitmap, const float othreshold)
+__global__
+void generate_nms_bitmap(const float4* rects, unsigned char* nmsbitmap, const float othreshold)
 {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int j = blockIdx.y * blockDim.y + threadIdx.y;
-
 
   if(rects[i].w < rects[j].w)
   {
@@ -44,16 +46,15 @@ __global__ void generate_nms_bitmap(const float4* rects, unsigned char* nmsbitma
     float w = fmaxf(0.0f, fminf(rects[i].x + rects[i].z, rects[j].x + rects[j].z) - fmaxf(rects[i].x, rects[j].x) + 1.0f);
     float h = fmaxf(0.0f, fminf(rects[i].y + rects[i].z, rects[j].y + rects[j].z) - fmaxf(rects[i].y, rects[j].y) + 1.0f);
     nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < othreshold) && (rects[j].z != 0);
-  }
+  } 
 }
 
-
 /* NMS Reduce kernel */
-__device__ __inline__ void compute_nms_point_mask(unsigned char* pointsbitmap, int cond, int idx, int ndetections)
+__device__ __inline__
+void compute_nms_point_mask(unsigned char* pointsbitmap, int cond, int idx, int ndetections)
 {
   *pointsbitmap = __syncthreads_and(cond);
 }
-
 
 __global__ void reduce_nms_bitmap(unsigned char* nmsbitmap, unsigned char* pointsbitmap, int ndetections)
 {
@@ -68,14 +69,13 @@ __global__ void reduce_nms_bitmap(unsigned char* nmsbitmap, unsigned char* point
   }
 } 
 
-/* Gets the optimal X or Y dimension for a given CUDA block */
+/* Gets the optimal X or Y dimension for a given thread block */
 int get_optimal_dim(int val)
 {
   int div, neg, cntneg, cntpos;
 
-
   /* We start figuring out if 'val' is divisible by 16 
-     (e.g. optimal 16x16 CUDA block of maximum GPU occupancy */
+     (e.g. optimal 16x16 thread block of maximum GPU occupancy */
 
   neg = 1;
   div = 16;
@@ -96,7 +96,6 @@ int get_optimal_dim(int val)
       div = cntneg;
       neg = 0;
     }
-
     else
     {
       cntpos++;
@@ -131,7 +130,7 @@ int main(int argc, char *argv[])
   int x, y, w;
   float score;
 
-  if(argc != 3)
+  if(argc != 4)
   {
     print_help();
     return 0;
@@ -186,67 +185,25 @@ int main(int argc, char *argv[])
 
   /* GPU array for storing the coordinates, dimensions and score of each detected object */
 
-  hipError_t err;
-
   float4* points;
-  err = hipMalloc((void**) &points, sizeof(float4) * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
-
-  err = hipMemset(points, 0, sizeof(float4) * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
+  hipMalloc((void**) &points, sizeof(float4) * MAX_DETECTIONS);
+  hipMemset(points, 0, sizeof(float4) * MAX_DETECTIONS);
 
   /* GPU array for storing the non-maximum supression bitmap */
   unsigned char* nmsbitmap;
-  err = hipMalloc((void**) &nmsbitmap, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
+  hipMalloc((void**) &nmsbitmap, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
+  hipMemset(nmsbitmap, 1, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
 
   /* GPU array for storing the detection bitmap */
   unsigned char* pointsbitmap;
-  err = hipMalloc((void**) &pointsbitmap, sizeof(unsigned char) * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
-
-  err = hipMemset(nmsbitmap, 1, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
-
-  err = hipMemset(pointsbitmap, 0, sizeof(unsigned char) * MAX_DETECTIONS);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
-
+  hipMalloc((void**) &pointsbitmap, sizeof(unsigned char) * MAX_DETECTIONS);
+  hipMemset(pointsbitmap, 0, sizeof(unsigned char) * MAX_DETECTIONS);
 
   /* Transfer detection coordinates read from the input text file to the GPU */
-  err = hipMemcpy(points, cpu_points, sizeof(float4) * MAX_DETECTIONS, hipMemcpyHostToDevice);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
-
+  hipMemcpy(points, cpu_points, sizeof(float4) * MAX_DETECTIONS, hipMemcpyHostToDevice);
 
   /* Execute NMS on the GPU */
-
+  int repeat = atoi(argv[3]);
   int limit = get_upper_limit(ndetections, 16);
   int pkthreads_x = get_optimal_dim(limit);
   int pkthreads_y = get_optimal_dim(limit);
@@ -256,42 +213,38 @@ int main(int argc, char *argv[])
   dim3 pkthreads(pkthreads_x, pkthreads_y, 1);
   dim3 pkgrid(pkgrid_x, pkgrid_y, 1);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
-  for (int n = 0; n < 100; n++)
-    hipLaunchKernelGGL(generate_nms_bitmap, dim3(pkgrid), dim3(pkthreads), 0, 0, points, nmsbitmap, 0.3f);
+  for (int n = 0; n < repeat; n++)
+    hipLaunchKernelGGL(generate_nms_bitmap, pkgrid, pkthreads, 0, 0, points, nmsbitmap, 0.3f);
 
-  err = hipGetLastError();
-  if(err != hipSuccess)
-  {
-    printf("CUDA Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
- 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (generate_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
+
   pkthreads.x = MAX_DETECTIONS / N_PARTITIONS; 
   pkthreads.y = 1;
   pkgrid.x = ndetections;
   pkgrid.y = 1;
 
-  /* Then we perform a reduction for generating a point bitmap vector */
-  for (int n = 0; n < 100; n++)
-    hipLaunchKernelGGL(reduce_nms_bitmap, dim3(pkgrid), dim3(pkthreads), 0, 0, nmsbitmap, pointsbitmap, ndetections);
+  start = std::chrono::steady_clock::now();
 
-  err = hipGetLastError();
-  if(err != hipSuccess)
-  {
-    printf("CUDA Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
+  /* Then we perform a reduction for generating a point bitmap vector */
+  for (int n = 0; n < repeat; n++)
+    hipLaunchKernelGGL(reduce_nms_bitmap, pkgrid, pkthreads, 0, 0, nmsbitmap, pointsbitmap, ndetections);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (reduce_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
 
   /* Dump detections after having performed the NMS */
 
-  err = hipMemcpy(cpu_pointsbitmap, pointsbitmap, sizeof(unsigned char) * MAX_DETECTIONS, hipMemcpyDeviceToHost);
-  if(err != hipSuccess)
-  {
-    printf("Error: %s\n", hipGetErrorString(err));
-    return -1;
-  }
+  hipMemcpy(cpu_pointsbitmap, pointsbitmap, sizeof(unsigned char) * MAX_DETECTIONS, hipMemcpyDeviceToHost);
+
   fp = fopen(argv[2], "w");
   if (!fp)
   {
@@ -323,4 +276,3 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-
