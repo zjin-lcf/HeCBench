@@ -21,30 +21,29 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <chrono>
 #include <omp.h>
 
 typedef struct { float x; float y; float z; float w; } float4 ;
 
 #define MAX_DETECTIONS  4096
 #define N_PARTITIONS    32
-#define ITER            100
 
 void print_help()
 {
   printf("\nUsage: nmstest  <detections.txt>  <output.txt>\n\n");
   printf("               detections.txt -> Input file containing the coordinates, width, and scores of detected objects\n");
-  printf("               output.txt     -> Output file after performing NMS\n\n");
+  printf("               output.txt     -> Output file after performing NMS\n");
+  printf("               repeat         -> Kernel execution count\n\n");
 }
 
-
-/* Gets the optimal X or Y dimension for a given CUDA block */
+/* Gets the optimal X or Y dimension for a given thread block */
 int get_optimal_dim(int val)
 {
   int div, neg, cntneg, cntpos;
 
-
   /* We start figuring out if 'val' is divisible by 16 
-     (e.g. optimal 16x16 CUDA block of maximum GPU occupancy */
+     (e.g. optimal 16x16 thread block of maximum GPU occupancy */
 
   neg = 1;
   div = 16;
@@ -65,7 +64,6 @@ int get_optimal_dim(int val)
       div = cntneg;
       neg = 0;
     }
-
     else
     {
       cntpos++;
@@ -100,7 +98,7 @@ int main(int argc, char *argv[])
   int x, y, w;
   float score;
 
-  if(argc != 3)
+  if(argc != 4)
   {
     print_help();
     return 0;
@@ -156,6 +154,7 @@ int main(int argc, char *argv[])
   memset(nmsbitmap, 1, sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS);
 
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
+  const int repeat = atoi(argv[3]);
   const int limit = get_upper_limit(ndetections, 16);
   const int threads = get_optimal_dim(limit) * get_optimal_dim(limit);
 
@@ -163,7 +162,9 @@ int main(int argc, char *argv[])
                                   nmsbitmap[0:MAX_DETECTIONS * MAX_DETECTIONS]) \
                           map(tofrom: pointsbitmap[0:MAX_DETECTIONS])
   {
-    for (int n = 0; n < ITER; n++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
       #pragma omp target teams distribute parallel for collapse(2) thread_limit(threads)
       for (int i = 0; i < limit; i++) {
         for (int j = 0; j < limit; j++) {
@@ -180,45 +181,54 @@ int main(int argc, char *argv[])
       }
     }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (generate_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
     /* Then we perform a reduction for generating a point bitmap vector */
-    for (int n = 0; n < ITER; n++) {
-#pragma omp target teams num_teams(ndetections) thread_limit(MAX_DETECTIONS / N_PARTITIONS)
+    for (int n = 0; n < repeat; n++) {
+      #pragma omp target teams num_teams(ndetections) thread_limit(MAX_DETECTIONS / N_PARTITIONS)
       {
-#ifdef BYTE_ATOMIC
+        #ifdef BYTE_ATOMIC
         unsigned char s;
-#else
+        #else
         unsigned s;
-#endif
-#pragma omp parallel 
+        #endif
+        #pragma omp parallel 
         {
           int bid = omp_get_team_num();
           int lid = omp_get_thread_num();
           int idx = bid * MAX_DETECTIONS + lid;
 
           if (lid == 0) s = 1;
-#pragma omp barrier
+          #pragma omp barrier
 
-#pragma omp atomic update  
+          #pragma omp atomic update  
           s &= 
-#ifndef BYTE_ATOMIC
+            #ifndef BYTE_ATOMIC
             (unsigned int)
-#endif
+            #endif
             nmsbitmap[idx];
-#pragma omp barrier
+            #pragma omp barrier
 
           for(int i=0; i<(N_PARTITIONS-1); i++)
           {
             idx += MAX_DETECTIONS / N_PARTITIONS;
-#pragma omp atomic update  
+            #pragma omp atomic update  
             s &= nmsbitmap[idx];
-#pragma omp barrier
+            #pragma omp barrier
           }
           pointsbitmap[bid] = s;
         }
       }
     }
-  }
 
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (reduce_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
+  }
 
   fp = fopen(argv[2], "w");
   if (!fp)
@@ -249,4 +259,3 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-
