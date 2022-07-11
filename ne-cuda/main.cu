@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
 inline __device__ float3 operator*(const float3 &a, const float b)
@@ -81,11 +82,11 @@ float4 normalEstimate(const float3 *points, int idx, int width, int height)
 }
 
 __global__ void ne (
-    const float3 *__restrict__ points,
-    float4 *__restrict__ normal_points,
-    int width,
-    int height,
-    int numPts)
+  const float3 *__restrict__ points,
+        float4 *__restrict__ normal_points,
+  const int width,
+  const int height,
+  const int numPts)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < numPts) 
@@ -93,13 +94,14 @@ __global__ void ne (
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s <width> <height>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
     return 1;
   }
-
   const int width = atoi(argv[1]);
   const int height = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
+
   const int numPts = width * height;
   const int size = numPts * sizeof(float3);
   const int normal_size = numPts * sizeof(float4);
@@ -122,8 +124,16 @@ int main(int argc, char* argv[]) {
   dim3 grids ((numPts + 255)/256);
   dim3 blocks (256);
 
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     ne <<< grids, blocks >>> (d_points, d_normal_points, width, height, numPts); 
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(normal_points, d_normal_points, normal_size, cudaMemcpyDeviceToHost);
 
@@ -143,5 +153,3 @@ int main(int argc, char* argv[]) {
   free(points);
   return 0;
 }
-
-
