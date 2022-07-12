@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <omp.h>
 
 #define  bidx  omp_get_team_num()
@@ -52,7 +53,13 @@ void intt_3_64k_modcrt(
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const int nttLen = 64 * 1024;
   uint64 *ntt = (uint64*) malloc (nttLen*sizeof(uint64));
   uint32 *res = (uint32*) malloc (nttLen*sizeof(uint32));
@@ -67,8 +74,14 @@ int main() {
   #pragma omp target data map (to: ntt[0:nttLen]) \
                           map (from: res[0:nttLen])
   {
-    for (int i = 0; i < 100; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       intt_3_64k_modcrt(nttLen/512, res, ntt);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
 
   uint64 checksum = 0;
