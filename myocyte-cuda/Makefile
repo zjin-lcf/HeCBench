@@ -56,7 +56,6 @@ $(program): $(obj) Makefile
 	kernel_cam.cu \
 	kernel_fin.cu \
 	file.c \
-	timer.c \
 	Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -65,5 +64,3 @@ clean:
 
 run: $(program)
 	./$(program) 100
-
-

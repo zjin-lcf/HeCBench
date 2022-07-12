@@ -1,10 +1,7 @@
-#CC        = xlc
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-
-
 
 # Standard flags
 #CFLAGS := -std=c++11 -Wall
@@ -14,8 +11,7 @@ CFLAGS :=  -Wall
 LDFLAGS = -lm
 
 ifeq ($(DEVICE),gpu)
-  #CFLAGS +=-qsmp -qoffload 
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -31,30 +27,22 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 
-# ========================================================================================================================================================================================================200
 #	EXECUTABLES (LINK OBJECTS TOGETHER INTO BINARY)
-# ========================================================================================================================================================================================================200
 
 ./myocyte.out:	./main.o \
 	./kernel/kernel_wrapper.o \
 	./util/file/file.o \
 	./util/num/num.o \
-	./util/timer/timer.o 
 	$(CC) $(CFLAGS) ./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/file/file.o \
-		./util/num/num.o \
-		./util/timer/timer.o \
+		./util/num/num.o
 		$(LDFLAGS) \
 		-o myocyte.out
 
-# ======================================================================================================================================================150
 #	MAIN FUNCTION
-# ======================================================================================================================================================150
 
-./main.o:	./common.h \
-	./main.h \
-	./main.c
+./main.o:	./common.h ./main.c
 	$(CC) $(CFLAGS) ./main.c \
 		-c \
 		-o ./main.o \
@@ -76,10 +64,6 @@ endif
 		-c \
 		-o ./kernel/kernel_wrapper.o 
 
-# ======================================================================================================================================================150
-#	UTILITIES
-# ======================================================================================================================================================150
-
 ./util/file/file.o:	./common.h \
 	./util/file/file.h \
 	./util/file/file.c
@@ -96,15 +80,6 @@ endif
 		-o ./util/num/num.o \
 		-O3
 
-./util/timer/timer.o:	./common.h \
-	./util/timer/timer.h \
-	./util/timer/timer.c
-	$(CC)	./util/timer/timer.c \
-		-c \
-		-o ./util/timer/timer.o \
-		-O3
-
-
 run: myocyte.out
 	./myocyte.out -time 100
 
@@ -112,6 +87,5 @@ clean:
 	rm -rf	*.o *.out \
 		./kernel/*.o \
 		./util/file/*.o \
-		./util/timer/*.o \
 		./util/num/*.o \
 		./output.txt

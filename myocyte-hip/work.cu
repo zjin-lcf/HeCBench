@@ -1,7 +1,3 @@
-//====================================================================================================100
-//	DEFINE / INCLUDE
-//====================================================================================================100
-
 #include <hip/hip_runtime.h>
 #include "kernel_ecc.cu"
 #include "kernel_cam.cu"
@@ -11,56 +7,45 @@
 #include "embedded_fehlberg_7_8.cu"
 #include "solver.cu"
 
-//====================================================================================================100
-//	MAIN FUNCTION
-//====================================================================================================100
+int work(int xmax, int workload)
+{
 
-int work(	int xmax,
-    int workload){
+  //============================================================
+  //		VARIABLE
+  //============================================================
 
-  //================================================================================80
-  //		VARIABLES
-  //================================================================================80
-
-  //============================================================60
+  //============================================================
   //		TIME
-  //============================================================60
+  //============================================================
 
-  long long time0;
-  long long time1;
-  long long time2;
-  long long time3;
-  long long time4;
-  long long time5;
+  auto time0 = std::chrono::steady_clock::now();
 
-  time0 = get_time();
-
-  //============================================================60
+  //===========================================================
   //		COUNTERS
-  //============================================================60
+  //===========================================================
 
   long long memory;
   int i,j;
   int status;
 
-  //============================================================60
+  //==========================================================
   //		DATA
-  //============================================================60
+  //==========================================================
 
   fp*** y;
   fp** x;
   fp** params;
   fp* com;
 
-  time1 = get_time();
+  auto time1 = std::chrono::steady_clock::now();
 
-  //================================================================================80
-  // 	ALLOCATE MEMORY
-  //================================================================================80
+  //==========================================================
+  // 	ALLOCATE MEMOR
+  //==========================================================
 
-  //============================================================60
+  //==========================================================
   //		MEMORY CHECK
-  //============================================================60
+  //==========================================================
 
   memory = workload*(xmax+1)*EQUATIONS*4;
   if(memory>1000000000){
@@ -68,9 +53,9 @@ int work(	int xmax,
     return 0;
   }
 
-  //============================================================60
+  //=========================================================
   // 	ALLOCATE ARRAYS
-  //============================================================60
+  //=========================================================
 
   y = (fp ***) malloc(workload* sizeof(fp **));
   for(i=0; i<workload; i++){
@@ -92,9 +77,9 @@ int work(	int xmax,
 
   com = (fp*)malloc(3 * sizeof(fp));
 
-  //============================================================60
+  //=========================================================
   // 	ALLOCATE CUDA ARRAYS
-  //============================================================60
+  //=========================================================
 
   int d_initvalu_mem;
   d_initvalu_mem = EQUATIONS * sizeof(fp);
@@ -116,15 +101,15 @@ int work(	int xmax,
   fp* d_com;
   hipMalloc((void **)&d_com, d_com_mem);
 
-  time2 = get_time();
+  auto time2 = std::chrono::steady_clock::now();
 
-  //================================================================================80
+  //==========================================================
   // 	INITIAL VALUES
-  //================================================================================80
+  //==========================================================
 
   // y
   for(i=0; i<workload; i++){
-    read(	"../data/myocyte/y.txt", y[i][0], EQUATIONS, 1, 0);
+    read("../data/myocyte/y.txt", y[i][0], EQUATIONS, 1, 0);
   }
 
   // params
@@ -132,20 +117,20 @@ int work(	int xmax,
     read("../data/myocyte/params.txt", params[i], PARAMETERS, 1, 0);
   }
 
-  time3 = get_time();
+  auto time3 = std::chrono::steady_clock::now();
 
-  //================================================================================80
+  //==========================================================
   //	EXECUTION
-  //================================================================================80
+  //==========================================================
 
   for(i=0; i<workload; i++){
 
-    status = solver(	y[i],
+    status = solver(
+        y[i],
         x[i],
         xmax,
         params[i],
         com,
-
         d_initvalu,
         d_finavalu,
         d_params,
@@ -154,18 +139,17 @@ int work(	int xmax,
     if(status !=0){
       printf("STATUS: %d\n", status);
     }
-
   }
-
 
   // print results to output.txt
   FILE * pFile;
   pFile = fopen ("output.txt","w");
   if (pFile==NULL)
   {
-    fputs ("fopen example",pFile);
+    fprintf (stderr, "ERROR: failed to open output.txt for writing.\n");
     return -1;
   }
+
   int k;
   for(i=0; i<workload; i++){
     fprintf(pFile, "WORKLOAD %d:\n", i);
@@ -179,13 +163,11 @@ int work(	int xmax,
 
   fclose (pFile);
 
+  auto time4 = std::chrono::steady_clock::now();
 
-
-  time4 = get_time();
-
-  //================================================================================80
+  //========================================================
   //	DEALLOCATION
-  //================================================================================80
+  //========================================================
 
   // y values
   for (i= 0; i< workload; i++){
@@ -208,7 +190,7 @@ int work(	int xmax,
   }
   free(params);
 
-  time5= get_time();
+  auto time5 = std::chrono::steady_clock::now();
 
   // com
   free(com);
@@ -219,23 +201,28 @@ int work(	int xmax,
   hipFree(d_params);
   hipFree(d_com);
 
-  //		DISPLAY TIMING
+  // DISPLAY TIMING
+
+  auto etime1 = std::chrono::duration_cast<std::chrono::nanoseconds>(time1 - time0).count();
+  auto etime2 = std::chrono::duration_cast<std::chrono::nanoseconds>(time2 - time1).count();
+  auto etime3 = std::chrono::duration_cast<std::chrono::nanoseconds>(time3 - time2).count();
+  auto etime4 = std::chrono::duration_cast<std::chrono::nanoseconds>(time4 - time3).count();
+  auto etime5 = std::chrono::duration_cast<std::chrono::nanoseconds>(time5 - time4).count();
+  auto etime6 = std::chrono::duration_cast<std::chrono::nanoseconds>(time5 - time0).count();
 
   printf("Time spent in different stages of the application:\n");
   printf("%.12f s, %.12f %% : SETUP VARIABLES\n", 
-      (float) (time1-time0) / 1000000, (float) (time1-time0) / (float) (time5-time0) * 100);
+      etime1 * 1e-9, (float) (etime1) / (float) (etime6) * 100);
   printf("%.12f s, %.12f %% : ALLOCATE CPU MEMORY AND GPU MEMORY\n",
-      (float) (time2-time1) / 1000000, (float) (time2-time1) / (float) (time5-time0) * 100);
+      etime2 * 1e-9, (float) (etime2) / (float) (etime6) * 100);
   printf("%.12f s, %.12f %% : READ DATA FROM FILES\n",
-      (float) (time3-time2) / 1000000, (float) (time3-time2) / (float) (time5-time0) * 100);
+      etime3 * 1e-9, (float) (etime3) / (float) (etime6) * 100);
   printf("%.12f s, %.12f %% : RUN COMPUTATION\n",
-      (float) (time4-time3) / 1000000, (float) (time4-time3) / (float) (time5-time0) * 100);
+      etime4 * 1e-9, (float) (etime4) / (float) (etime6) * 100);
   printf("%.12f s, %.12f %% : FREE MEMORY\n",
-      (float) (time5-time4) / 1000000, (float) (time5-time4) / (float) (time5-time0) * 100);
+      etime5 * 1e-9, (float) (etime5) / (float) (etime6) * 100);
   printf("Total time:\n");
-  printf("%.12f s\n", (float) (time5-time0) / 1000000);
-
+  printf("%.12f s\n", etime6 * 1e-9);
 
   return 0;
-
 }

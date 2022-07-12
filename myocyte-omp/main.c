@@ -28,7 +28,6 @@
 //8) Application reads initial data and parameters from text files: y.txt and params.txt respectively that need to be located in the same folder as source files. 
 //     For simplicity and testing purposes only, when multiple number of simulation instances is specified, application still reads initial data from the same input files. That//     can be modified in this source code.
 
-// This is the CUDA version of Myocyte code.
 
 // The original single-threaded code was written in MATLAB and used MATLAB ode45 ODE solver. In the process of accelerating this code, we arrived with the 
 // intermediate versions that used single-threaded Sundials CVODE solver which evaluated model parallelized with CUDA at each time step. In order to convert entire 
@@ -66,13 +65,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "./common.h"
 #include "./util/file/file.h"
-#include "./util/timer/timer.h"
 #include "./util/num/num.h"
 #include "./kernel/kernel_wrapper.h"
-#include "./main.h"
 
 int main(int argc, char *argv []){
 
@@ -173,30 +169,25 @@ int main(int argc, char *argv []){
     // y
     char* ytext = (char*) "../data/myocyte/y.txt";
     for(i=0; i<workload; i++){
-      if (!read_file( ytext, y[i][0], EQUATIONS, 1, 0)) return -1; // exit on file i/o error
+      read_file(ytext, y[i][0], EQUATIONS, 1, 0);
     }
 
     // params
     char* params_text = (char*) "../data/myocyte/params.txt";
     for(i=0; i<workload; i++){
-      if (!read_file( params_text, params[i], PARAMETERS, 1, 0)) return -1;
+      read_file(params_text, params[i], PARAMETERS, 1, 0);
     }
 
     //	COMPUTATION
 
-    kernel_wrapper(	xmax,					// span
-        workload,				// # of workloads
-        y,
-        x,
-        params,
-        com);
+    kernel_wrapper(xmax, workload, y, x, params, com);
 
 
     FILE * pFile;
     pFile = fopen ("output.txt","w");
     if (pFile==NULL)
     {
-      fputs ("fopen example",pFile);
+      fprintf (stderr, "ERROR: failed to fopen output.txt for writing");
       return -1;
     }
     // print results
@@ -212,7 +203,6 @@ int main(int argc, char *argv []){
     }
 
     fclose (pFile);
-
 
     //	FREE SYSTEM MEMORY
 
@@ -236,15 +226,8 @@ int main(int argc, char *argv []){
       free(params[i]);
     }
     free(params);
-
-    // com
     free(com);
   }
 
-
   return 0;
-
-
 }
-
-

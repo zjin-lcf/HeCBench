@@ -5,26 +5,18 @@
 #include "kernel_ecc.h"
 #include "kernel_cam.h"
 
-void 
-master(  fp timeinst,
+void master(
+    fp timeinst,
     fp *initvalu,
     fp *params,
     fp *finavalu,
     fp *com,
-    long long *timecopyin,
-    long long *timekernel,
-    long long *timecopyout)
+    double *timecopyin,
+    double *timekernel,
+    double *timecopyout)
 {
 
-  //======================================================================================================================================================150
   //  VARIABLES
-  //======================================================================================================================================================150
-
-  //timer
-  long long time0;
-  long long time1;
-  long long time2;
-  long long time3;
 
   // counters
   int i;
@@ -36,11 +28,9 @@ master(  fp timeinst,
   int initvalu_offset_Cyt;                                // 15 poitns
 
   // common variables
-  time0 = get_time();
+  auto time0 = std::chrono::steady_clock::now();
 
-  //======================================================================================================================================================150
   //  COPY DATA TO GPU MEMORY
-  //======================================================================================================================================================150
 
   //====================================================================================================100
   //  initvalu
@@ -57,8 +47,7 @@ master(  fp timeinst,
 #pragma omp target update to (initvalu[0:EQUATIONS]) 
 #pragma omp target update to (params[0:PARAMETERS]) 
 
-
-  time1 = get_time();
+  auto time1 = std::chrono::steady_clock::now();
 
   //  GPU: KERNEL
 
@@ -161,8 +150,8 @@ master(  fp timeinst,
       }
     }
   }
-  time2 = get_time();
 
+  auto time2 = std::chrono::steady_clock::now();
 
 #pragma omp target update from (finavalu[0:EQUATIONS]) 
 #pragma omp target update from (com[0:3]) 
@@ -176,31 +165,21 @@ master(  fp timeinst,
 
 #endif
 
+  auto time3 = std::chrono::steady_clock::now();
 
-  time3 = get_time();
+  *timecopyin += std::chrono::duration_cast<std::chrono::nanoseconds>(time1-time0).count();
+  *timekernel += std::chrono::duration_cast<std::chrono::nanoseconds>(time2-time1).count();
+  *timecopyout += std::chrono::duration_cast<std::chrono::nanoseconds>(time3-time2).count();
 
-  //======================================================================================================================================================150
   //  CPU: FINAL KERNEL
-  //======================================================================================================================================================150
 
-  // *copyin_time,
-  // *kernel_time,
-  // *copyout_time)
+  initvalu_offset_ecc = 0;
+  initvalu_offset_Dyad = 46;
+  initvalu_offset_SL = 61;
+  initvalu_offset_Cyt = 76;
 
-  timecopyin[0] = timecopyin[0] + (time1-time0);
-  timekernel[0] = timekernel[0] + (time2-time1);
-  timecopyout[0] = timecopyout[0] + (time3-time2);
-
-  //======================================================================================================================================================150
-  //  CPU: FINAL KERNEL
-  //======================================================================================================================================================150
-
-  initvalu_offset_ecc = 0;                        // 46 points
-  initvalu_offset_Dyad = 46;                        // 15 points
-  initvalu_offset_SL = 61;                        // 15 points
-  initvalu_offset_Cyt = 76;                        // 15 poitns
-
-  kernel_fin(  initvalu,
+  kernel_fin(
+      initvalu,
       initvalu_offset_ecc,
       initvalu_offset_Dyad,
       initvalu_offset_SL,
@@ -211,9 +190,7 @@ master(  fp timeinst,
       com[1],
       com[2]);
 
-  //======================================================================================================================================================150
   //  COMPENSATION FOR NANs and INFs
-  //======================================================================================================================================================150
 
   for(i=0; i<EQUATIONS; i++){
     if (std::isnan(finavalu[i])){ 
@@ -224,4 +201,3 @@ master(  fp timeinst,
     }
   }
 }
-
