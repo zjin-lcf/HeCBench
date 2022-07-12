@@ -1,28 +1,28 @@
 /*
- ** The MIT License (MIT)
- **
- ** Copyright (c) 2014, Erick Lavoie, Faiz Khan, Sujay Kathrotia, Vincent
- ** Foley-Bourgon, Laurie Hendren
- **
- ** Permission is hereby granted, free of charge, to any person obtaining a copy
- **of this software and associated documentation files (the "Software"), to deal
- ** in the Software without restriction, including without limitation the rights
- ** to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- ** copies of the Software, and to permit persons to whom the Software is
- ** furnished to do so, subject to the following conditions:
- **
- ** The above copyright notice and this permission notice shall be included in all
- ** copies or substantial portions of the Software.
- **
- ** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- ** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- ** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- ** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- ** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- ** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- ** SOFTWARE.
- **
- **/
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2014, Erick Lavoie, Faiz Khan, Sujay Kathrotia, Vincent
+ * Foley-Bourgon, Laurie Hendren
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ *of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,11 +39,14 @@
 
 // default values 
 const int max_iter = 1000;
-const float threshold= 0.00001f;
+const float threshold= 1e-16f;
 
-
-  __global__ 
-void map( int *pages, float *page_ranks, float *maps, unsigned int *noutlinks, int n)
+__global__
+void map(const int *__restrict__ pages,
+         const float *__restrict__ page_ranks,
+               float *__restrict__ maps,
+         const unsigned int *__restrict__ noutlinks,
+         const int n)
 {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   int j;
@@ -55,9 +58,11 @@ void map( int *pages, float *page_ranks, float *maps, unsigned int *noutlinks, i
   }
 }
 
-
-  __global__ 
-void reduce( float *page_ranks, float *maps, int n, float *dif)
+__global__
+void reduce(      float *__restrict__ page_ranks,
+            const float *__restrict__ maps,
+            const int n,
+                  float *__restrict__ dif)
 {
 
   int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -77,7 +82,6 @@ void reduce( float *page_ranks, float *maps, int n, float *dif)
     page_ranks[j] = new_rank;
   }
 }
-
 
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
@@ -117,7 +121,7 @@ void init_array(float *a, int n, float val){
 
 void usage(char *argv[]){
   fprintf(stderr, "Usage: %s [-n number of pages] [-i max iterations]"
-      " [-t threshold] [-q divsor for zero density]\n", argv[0]);
+                  " [-t threshold] [-q divisor for zero density]\n", argv[0]);
 }
 
 static struct option size_opts[] =
@@ -138,6 +142,7 @@ float maximum_dif(float *difs, int n){
   }
   return max;
 }
+
 int main(int argc, char *argv[]) {
   int *pages;
   float *maps;
@@ -193,26 +198,23 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  float *diffs, *nzeros;
+  float *diffs;
   diffs  = (float*) malloc(sizeof(float)*n);
-  nzeros = (float*) malloc(sizeof(float)*n);
   for(i = 0; i < n; ++i){
     diffs[i] = 0.0f;
-    nzeros[i] = 0.0f;
   }
 
-  auto start = std::chrono::high_resolution_clock::now();
   int *d_pages;
   float *d_maps;
   float *d_page_ranks;
   float *d_diffs;
   unsigned int *d_noutlinks;
 
-  cudaMalloc((void**)&d_pages, sizeof(*pages)*n*n);
-  cudaMalloc((void**)&d_page_ranks, sizeof(*page_ranks)*n);
-  cudaMalloc((void**)&d_maps, sizeof(*maps)*n*n);
-  cudaMalloc((void**)&d_noutlinks, sizeof(*noutlinks)*n);
-  cudaMalloc((void**)&d_diffs, sizeof(*diffs)*n);
+  cudaMalloc((void**)&d_pages, sizeof(int)*n*n);
+  cudaMalloc((void**)&d_page_ranks, sizeof(float)*n);
+  cudaMalloc((void**)&d_maps, sizeof(float)*n*n);
+  cudaMalloc((void**)&d_noutlinks, sizeof(unsigned int)*n);
+  cudaMalloc((void**)&d_diffs, sizeof(float)*n);
 
   cudaMemcpy(d_pages, pages, sizeof(int)*n*n, cudaMemcpyHostToDevice);
   cudaMemcpy(d_page_ranks, page_ranks, sizeof(float)*n, cudaMemcpyHostToDevice);
@@ -221,17 +223,26 @@ int main(int argc, char *argv[]) {
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t num_blocks = (n+block_size-1) / block_size;
 
+  double ktime = 0.0;
+ 
   for (t=1; t<=iter && max_diff>=thresh; ++t) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     map <<< dim3(num_blocks), dim3(block_size) >>> (
-        d_pages, d_page_ranks, d_maps, d_noutlinks, n);
+      d_pages, d_page_ranks, d_maps, d_noutlinks, n);
 
     reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
+    
+    cudaDeviceSynchronize();
+    auto end = std::chrono::high_resolution_clock::now();
+    ktime += std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
+
     cudaMemcpy(diffs, d_diffs, sizeof(float)*n, cudaMemcpyDeviceToHost);
+    cudaMemset(d_diffs, 0, sizeof(float)*n);
     max_diff = maximum_dif(diffs, n);
-    cudaMemcpy(d_diffs, nzeros, sizeof(*nzeros)*n, cudaMemcpyHostToDevice);
   }
-  cudaMemcpy(maps, d_maps, sizeof(float)*n*n, cudaMemcpyDeviceToHost);
-  cudaMemcpy(page_ranks, d_page_ranks, sizeof(float)*n, cudaMemcpyDeviceToHost);
+  //cudaMemcpy(maps, d_maps, sizeof(float)*n*n, cudaMemcpyDeviceToHost);
+  //cudaMemcpy(page_ranks, d_page_ranks, sizeof(float)*n, cudaMemcpyDeviceToHost);
 
   cudaFree(d_pages);
   cudaFree(d_maps);
@@ -239,23 +250,15 @@ int main(int argc, char *argv[]) {
   cudaFree(d_noutlinks);
   cudaFree(d_diffs);
 
-  auto end = std::chrono::high_resolution_clock::now();
-  double seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-
-  cudaDeviceProp props;
-  cudaGetDeviceProperties(&props, 0);
-  printf("Device name: %s\n", props.name);
   fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"time\": %f }\n", 1, n, iter, thresh, seconds);
+  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
+         1, n, iter, thresh, ktime);
 
   free(pages);
   free(maps);
   free(page_ranks);
   free(noutlinks);
-  free(nzeros);
   free(diffs);
 
   return 0;
 }
-
-

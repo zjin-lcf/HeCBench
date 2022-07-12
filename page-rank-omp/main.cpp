@@ -38,8 +38,7 @@
 
 // default values 
 const int max_iter = 1000;
-const float threshold= 0.00001f;
-
+const float threshold= 1e-16f;
 
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
@@ -155,64 +154,64 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  float *diffs, *nzeros;
+  float *diffs;
   diffs  = (float*) malloc(sizeof(float)*n);
-  nzeros = (float*) malloc(sizeof(float)*n);
   for(i = 0; i < n; ++i){
     diffs[i] = 0.0f;
-    nzeros[i] = 0.0f;
   }
-
-  auto start = std::chrono::high_resolution_clock::now();
-
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
 
-#pragma omp target data map(to: pages[0:n*n]) \
-  map(to: page_ranks[0:n]) \
-  map(to:noutlinks[0:n]) \
-  map(alloc: diffs[0:n]) \
-  map(to: nzeros[0:n]) \
-  map(alloc: maps[0:n*n]) 
+  double ktime = 0.0;
 
-  for (t=1; t<=iter && max_diff>=thresh; ++t) {
-#pragma omp target teams distribute parallel for thread_limit(block_size) 
-    for (int i = 0; i < n; i++) {
-      float outbound_rank = page_ranks[i]/(float)noutlinks[i];
-      for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
-    }
-
-#pragma omp target teams distribute parallel for thread_limit(block_size) 
-    for (int j = 0; j < n; j++) {
-      float new_rank;
-      float old_rank;
-      old_rank = page_ranks[j];
-      new_rank = 0.0f;
-      for(int i=0; i< n; ++i) new_rank += maps[i*n + j];
-      new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
-      diffs[j] = fabsf(new_rank - old_rank) > diffs[j] ? fabsf(new_rank - old_rank) : diffs[j];
-      page_ranks[j] = new_rank;
-    }
-#pragma omp target update from(diffs[0:n])
-    max_diff = maximum_dif(diffs, n);
-
-
-#pragma omp target teams distribute parallel for thread_limit(block_size) 
-    for (int i = 0; i < n; i++)
-      diffs[i] = nzeros[i];
+   #pragma omp target data map(to: pages[0:n*n], \
+                                   page_ranks[0:n], \
+                                   noutlinks[0:n]) \
+                           map(alloc: diffs[0:n]) \
+                           map(alloc: maps[0:n*n]) 
+   {
+     for (t=1; t<=iter && max_diff>=thresh; ++t) {
+       auto start = std::chrono::high_resolution_clock::now();
+   
+       #pragma omp target teams distribute parallel for thread_limit(block_size) 
+       for (int i = 0; i < n; i++) {
+         float outbound_rank = page_ranks[i]/(float)noutlinks[i];
+         for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
+       }
+   
+       #pragma omp target teams distribute parallel for thread_limit(block_size) 
+       for (int j = 0; j < n; j++) {
+         float new_rank;
+         float old_rank;
+         old_rank = page_ranks[j];
+         new_rank = 0.0f;
+         for(int i=0; i< n; ++i) new_rank += maps[i*n + j];
+         new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
+         diffs[j] = fabsf(new_rank - old_rank) > diffs[j] ? fabsf(new_rank - old_rank) : diffs[j];
+         page_ranks[j] = new_rank;
+       }
+   
+       auto end = std::chrono::high_resolution_clock::now();
+       ktime += std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
+   
+       #pragma omp target update from(diffs[0:n])
+       max_diff = maximum_dif(diffs, n);
+   
+   
+       #pragma omp target teams distribute parallel for thread_limit(block_size) 
+       for (int i = 0; i < n; i++)
+         diffs[i] = 0.f;
+     }
+   
+     fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
+     printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
+            1, n, iter, thresh, ktime);
   }
-
-  auto end = std::chrono::high_resolution_clock::now();
-  double seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-
-  fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"time\": %f }\n", 1, n, iter, thresh, seconds);
 
   free(pages);
   free(maps);
   free(page_ranks);
   free(noutlinks);
-  free(nzeros);
   free(diffs);
   return 0;
 }
