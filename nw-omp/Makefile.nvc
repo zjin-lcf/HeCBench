@@ -65,4 +65,3 @@ clean:
 
 run: $(program)
 	./$(program) 16384 10
-

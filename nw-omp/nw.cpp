@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <chrono>
 #include <omp.h>
 #include "reference.cpp"
 
@@ -73,12 +73,6 @@ void usage(int argc, char **argv)
   fprintf(stderr, "\t<penalty> - penalty(positive integer)\n");
   fprintf(stderr, "\t<file> - filename\n");
   exit(1);
-}
-
-double get_time() {
-  struct timeval t;
-  gettimeofday(&t,NULL);
-  return t.tv_sec+t.tv_usec*1e-6;
 }
 
 int main(int argc, char **argv){
@@ -142,7 +136,7 @@ int main(int argc, char **argv){
   for( int j = 1; j< max_cols ; j++)
     h_input_itemsets[j] = input_itemsets[j] = -j * penalty;
 
-  double offload_start = get_time();
+  auto offload_start = std::chrono::steady_clock::now();
 
   int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
@@ -164,168 +158,177 @@ int main(int argc, char **argv){
   const int offset_c = 0;
   const int block_width = worksize/BLOCK_SIZE ;
 
-#pragma omp target data map(tofrom: input_itemsets[0:max_cols * max_rows]) \
-                        map(to: reference[0:max_cols * max_rows])
-{
-#ifdef DEBUG
-  printf("Processing upper-left matrix\n");
-#endif
-  for(int blk = 1 ; blk <= block_width ; blk++){
-    global_work = blk;
-    #pragma omp target teams num_teams(global_work) thread_limit(local_work)
-    {
-      int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
-      int reference_l [BLOCK_SIZE*BLOCK_SIZE];
-      #pragma omp parallel
+  #pragma omp target data map(tofrom: input_itemsets[0:max_cols * max_rows]) \
+                          map(to: reference[0:max_cols * max_rows])
+  {
+  #ifdef DEBUG
+    printf("Processing upper-left matrix\n");
+  #endif
+    for(int blk = 1 ; blk <= block_width ; blk++){
+      global_work = blk;
+      #pragma omp target teams num_teams(global_work) thread_limit(local_work)
       {
-        int bx = omp_get_team_num(); 
-        int tx = omp_get_thread_num();
-        
-        // Base elements
-        int base = offset_r * max_cols + offset_c;
-        
-        int b_index_x = bx;
-        int b_index_y = blk - 1 - bx;
-        
-        int index   =   base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( max_cols + 1 );
-        int index_n   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( 1 );
-        int index_w   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + ( max_cols );
-        int index_nw =  base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x;
-        
-        if (tx == 0) SCORE(tx, 0) = input_itemsets[index_nw + tx];
-        
-        #pragma omp barrier
-        
-        for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)  {
-          REF(ty, tx) =  reference[index + max_cols * ty];
-        }
-        #pragma omp barrier
-        
-        SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
-        
-        #pragma omp barrier
-        
-        SCORE(0, (tx + 1)) = input_itemsets[index_n];
-        
-        #pragma omp barrier
-    
-        for( int m = 0 ; m < BLOCK_SIZE ; m++){
-           if ( tx <= m ){
-              int t_index_x =  tx + 1;
-              int t_index_y =  m - tx + 1;
-        
-              SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
-                    SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
-                    SCORE((t_index_y-1), (t_index_x))   - (penalty));
-           }
-           #pragma omp barrier
-        }
-        
-        #pragma omp barrier
-        
-        for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-        
-           if ( tx <= m){
-        
-              int t_index_x =  tx + BLOCK_SIZE - m ;
-              int t_index_y =  BLOCK_SIZE - tx;
-        
-              SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
-                    SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
-                    SCORE((t_index_y-1), (t_index_x))   - (penalty));
-        
-           }
-        
-           #pragma omp barrier
-        }
-        
-        
-        for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++) {
-           input_itemsets[index + max_cols * ty] = SCORE((ty+1), (tx+1));
+        int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
+        int reference_l [BLOCK_SIZE*BLOCK_SIZE];
+        #pragma omp parallel
+        {
+          int bx = omp_get_team_num(); 
+          int tx = omp_get_thread_num();
+          
+          // Base elements
+          int base = offset_r * max_cols + offset_c;
+          
+          int b_index_x = bx;
+          int b_index_y = blk - 1 - bx;
+          
+          int index   =   base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( max_cols + 1 );
+          int index_n   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( 1 );
+          int index_w   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + ( max_cols );
+          int index_nw =  base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x;
+          
+          if (tx == 0) SCORE(tx, 0) = input_itemsets[index_nw + tx];
+          
+          #pragma omp barrier
+          
+          for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)  {
+            REF(ty, tx) =  reference[index + max_cols * ty];
+          }
+          #pragma omp barrier
+          
+          SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
+          
+          #pragma omp barrier
+          
+          SCORE(0, (tx + 1)) = input_itemsets[index_n];
+          
+          #pragma omp barrier
+      
+          for( int m = 0 ; m < BLOCK_SIZE ; m++){
+             if ( tx <= m ){
+                int t_index_x =  tx + 1;
+                int t_index_y =  m - tx + 1;
+          
+                SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+                      SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
+                      SCORE((t_index_y-1), (t_index_x))   - (penalty));
+             }
+             #pragma omp barrier
+          }
+          
+          #pragma omp barrier
+          
+          for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
+          
+             if ( tx <= m){
+          
+                int t_index_x =  tx + BLOCK_SIZE - m ;
+                int t_index_y =  BLOCK_SIZE - tx;
+          
+                SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+                      SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
+                      SCORE((t_index_y-1), (t_index_x))   - (penalty));
+          
+             }
+          
+             #pragma omp barrier
+          }
+          
+          
+          for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++) {
+             input_itemsets[index + max_cols * ty] = SCORE((ty+1), (tx+1));
+          }
         }
       }
     }
-  }
-
-#ifdef DEBUG
-  printf("Processing lower-right matrix\n");
-#endif
-  for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
-    global_work = blk;
-    #pragma omp target teams num_teams(global_work) thread_limit(local_work)
-    {
-      int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
-      int reference_l [BLOCK_SIZE*BLOCK_SIZE];
-      #pragma omp parallel
+  
+  #ifdef DEBUG
+    printf("Processing lower-right matrix\n");
+  #endif
+  
+    auto start = std::chrono::steady_clock::now();
+  
+    for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
+      global_work = blk;
+      #pragma omp target teams num_teams(global_work) thread_limit(local_work)
       {
-        int bx = omp_get_team_num(); 
-        int tx = omp_get_thread_num();
-
-       // Base elements
-       int base = offset_r * max_cols + offset_c;
-
-       int b_index_x = bx + block_width - blk  ;
-       int b_index_y = block_width - bx -1;
-
-
-       int index   =   base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( max_cols + 1 );
-       int index_n   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( 1 );
-       int index_w   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + ( max_cols );
-       int index_nw =  base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x;
-
-       if (tx == 0)
-          SCORE(tx, 0) = input_itemsets[index_nw];
-
-       for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
-          REF(ty, tx) =  reference[index + max_cols * ty];
-
-       #pragma omp barrier
-
-       SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
-
-       #pragma omp barrier
-
-       SCORE(0, (tx + 1)) = input_itemsets[index_n];
-
-       #pragma omp barrier
-
-       for( int m = 0 ; m < BLOCK_SIZE ; m++){
-
-          if ( tx <= m ){
-
-             int t_index_x =  tx + 1;
-             int t_index_y =  m - tx + 1;
-
-             SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
-                   SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
-                   SCORE((t_index_y-1), (t_index_x))   - (penalty));
-          }
-          #pragma omp barrier
-       }
-
-       for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-
-          if ( tx <= m){
-
-             int t_index_x =  tx + BLOCK_SIZE - m ;
-             int t_index_y =  BLOCK_SIZE - tx;
-
-             SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
-                   SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
-                   SCORE((t_index_y-1), (t_index_x))   - (penalty));
-
-          }
-          #pragma omp barrier
-       }
-
-       for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
-          input_itemsets[index + ty * max_cols] = SCORE((ty+1), (tx+1));
+        int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
+        int reference_l [BLOCK_SIZE*BLOCK_SIZE];
+        #pragma omp parallel
+        {
+          int bx = omp_get_team_num(); 
+          int tx = omp_get_thread_num();
+  
+         // Base elements
+         int base = offset_r * max_cols + offset_c;
+  
+         int b_index_x = bx + block_width - blk  ;
+         int b_index_y = block_width - bx -1;
+  
+  
+         int index   =   base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( max_cols + 1 );
+         int index_n   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + tx + ( 1 );
+         int index_w   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + ( max_cols );
+         int index_nw =  base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x;
+  
+         if (tx == 0)
+            SCORE(tx, 0) = input_itemsets[index_nw];
+  
+         for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
+            REF(ty, tx) =  reference[index + max_cols * ty];
+  
+         #pragma omp barrier
+  
+         SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
+  
+         #pragma omp barrier
+  
+         SCORE(0, (tx + 1)) = input_itemsets[index_n];
+  
+         #pragma omp barrier
+  
+         for( int m = 0 ; m < BLOCK_SIZE ; m++){
+  
+            if ( tx <= m ){
+  
+               int t_index_x =  tx + 1;
+               int t_index_y =  m - tx + 1;
+  
+               SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+                     SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
+                     SCORE((t_index_y-1), (t_index_x))   - (penalty));
+            }
+            #pragma omp barrier
+         }
+  
+         for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
+  
+            if ( tx <= m){
+  
+               int t_index_x =  tx + BLOCK_SIZE - m ;
+               int t_index_y =  BLOCK_SIZE - tx;
+  
+               SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
+                     SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
+                     SCORE((t_index_y-1), (t_index_x))   - (penalty));
+  
+            }
+            #pragma omp barrier
+         }
+  
+         for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
+            input_itemsets[index + ty * max_cols] = SCORE((ty+1), (tx+1));
+        }
       }
     }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Total kernel execution time (kernel2): %f (s)\n", time * 1e-9f);
   }
-}
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+  printf("Device offloading time = %f (s)\n", offload_time * 1e-9);
 
   // verify
   nw_host(h_input_itemsets, reference, max_cols, penalty);
