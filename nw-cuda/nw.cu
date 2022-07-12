@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <chrono>
 #include <cuda.h>
 #include "reference.cpp"
 
@@ -75,15 +75,15 @@ void usage(int argc, char **argv)
   exit(1);
 }
 
-double get_time() {
-  struct timeval t;
-  gettimeofday(&t,NULL);
-  return t.tv_sec+t.tv_usec*1e-6;
-}
-
 __global__ void 
-kernel1 (int*__restrict d_input_itemsets, const int*__restrict d_reference, const int offset_r, 
-         const int offset_c, const int max_cols, const int blk, const int penalty) {
+kernel1 (int*__restrict__ d_input_itemsets,
+         const int*__restrict__ d_reference,
+         const int offset_r,
+         const int offset_c,
+         const int max_cols,
+         const int blk,
+         const int penalty)
+{
   __shared__ int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
   __shared__ int reference_l [BLOCK_SIZE*BLOCK_SIZE];
 
@@ -156,9 +156,15 @@ kernel1 (int*__restrict d_input_itemsets, const int*__restrict d_reference, cons
 }
 
 __global__ void 
-kernel2 (int*__restrict d_input_itemsets, const int*__restrict d_reference, const int block_width, 
-    const int offset_r, const int offset_c, const int max_cols, const int blk, const int penalty) {
-
+kernel2 (int*__restrict__ d_input_itemsets,
+         const int*__restrict__ d_reference,
+         const int block_width,
+         const int offset_r,
+         const int offset_c,
+         const int max_cols,
+         const int blk,
+         const int penalty)
+{
    __shared__ int input_itemsets_l [(BLOCK_SIZE + 1) *(BLOCK_SIZE+1)];
    __shared__ int reference_l [BLOCK_SIZE*BLOCK_SIZE];
    int bx = blockIdx.x;
@@ -223,8 +229,6 @@ kernel2 (int*__restrict d_input_itemsets, const int*__restrict d_reference, cons
       d_input_itemsets[index + ty * max_cols] = SCORE((ty+1), (tx+1));
 }
 
-
-
 int main(int argc, char **argv){
 
   printf("WG size of kernel = %d \n", BLOCK_SIZE);
@@ -288,7 +292,7 @@ int main(int argc, char **argv){
   for( int j = 1; j< max_cols ; j++)
     input_itemsets[j] = -j * penalty;
 
-  double offload_start = get_time();
+  auto offload_start = std::chrono::steady_clock::now();
 
   int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
@@ -329,14 +333,23 @@ int main(int argc, char **argv){
 #ifdef DEBUG
   printf("Processing lower-right matrix\n");
 #endif
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
     global_work = blk;
     kernel2<<<global_work, local_work>>>(d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
   }
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (kernel2): %f (s)\n", time * 1e-9f);
+
   cudaMemcpy(output_itemsets, d_input_itemsets, max_cols * max_rows * sizeof(int), cudaMemcpyDeviceToHost);
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+  printf("Device offloading time = %f (s)\n", offload_time * 1e-9);
 
   // verify
   nw_host(input_itemsets, reference, max_cols, penalty);

@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <string>
-#include <sys/time.h>
+#include <chrono>
 #include "common.h"
 #include "reference.cpp"
 
@@ -73,12 +73,6 @@ void usage(int argc, char **argv)
   fprintf(stderr, "\t<dimension>  - x and y dimensions\n");
   fprintf(stderr, "\t<penalty> - penalty(positive integer)\n");
   exit(1);
-}
-
-double get_time() {
-  struct timeval t;
-  gettimeofday(&t,NULL);
-  return t.tv_sec+t.tv_usec*1e-6;
 }
 
 int main(int argc, char **argv){
@@ -145,7 +139,8 @@ int main(int argc, char **argv){
     input_itemsets[j] = -j * penalty;
 
 
-  double offload_start = get_time();
+  auto offload_start = std::chrono::steady_clock::now();
+
   { // SYCL scope
 #ifdef USE_GPU
     gpu_selector dev_sel;
@@ -156,9 +151,9 @@ int main(int argc, char **argv){
 
     int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
-    if(workgroupsize < 0){
-	    printf("ERROR: invalid or missing <num_work_items>[/<work_group_size>]\n"); 
-	    return -1;
+    if (workgroupsize < 0) {
+      printf("ERROR: invalid or missing <num_work_items>[/<work_group_size>]\n"); 
+      return -1;
     }
 #endif
     // set global and local workitems
@@ -191,37 +186,49 @@ int main(int argc, char **argv){
       printf("global size: %d local size: %d\n", global_work, local_work);
 #endif
       q.submit([&](handler& cgh) {
-          auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
-          auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
-          cgh.parallel_for<class kernel1>(
-            nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
-#include "kernel1.sycl"
-          });
+        auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
+        auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+        cgh.parallel_for<class kernel1>(
+          nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+            #include "kernel1.sycl"
+        });
       });
     }
+
 
 #ifdef DEBUG
     printf("Processing lower-right matrix\n");
 #endif
-    for( int blk = block_width - 1 ; blk >= 1 ; blk--){	   
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    for(int blk = block_width - 1 ; blk >= 1 ; blk--){	   
       global_work = BLOCK_SIZE * blk;
       q.submit([&](handler& cgh) {
-          auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
-          auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
-          cgh.parallel_for<class kernel2>(
-            nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
-#include "kernel2.sycl"
-            });
-          });
+        auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
+        auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+        cgh.parallel_for<class kernel2>(
+          nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+            #include "kernel2.sycl"
+        });
+      });
     }
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Total kernel execution time (kernel2): %f (s)\n", time * 1e-9f);
+
   } // SYCL scope
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+  printf("Device offloading time = %f (s)\n", offload_time * 1e-9);
 
   // verify
   nw_host(input_itemsets, reference, max_cols, penalty);
