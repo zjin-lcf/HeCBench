@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 #define  bidx  item.get_group(0)
@@ -46,7 +47,13 @@ void intt_3_64k_modcrt(
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const int nttLen = 64 * 1024;
   uint64 *ntt = (uint64*) malloc (nttLen*sizeof(uint64));
   uint32 *res = (uint32*) malloc (nttLen*sizeof(uint32));
@@ -72,7 +79,10 @@ int main() {
   range<1> gws (nttLen/512 * 64);
   range<1> lws (64);
   
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto dst = d_res.get_access<sycl_discard_write>(cgh);
       auto src = d_ntt.get_access<sycl_read>(cgh);
@@ -81,6 +91,12 @@ int main() {
         intt_3_64k_modcrt(item, sm.get_pointer(), dst.get_pointer(), src.get_pointer());
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
 
   uint64_t checksum = 0;
