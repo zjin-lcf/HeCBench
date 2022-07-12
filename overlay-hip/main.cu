@@ -23,8 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
-
 #include "reference.h"
 
 template<typename T>
@@ -58,13 +58,16 @@ __global__ void DetectionOverlayBox(
 }
 
 template<typename T>
-hipError_t DetectionOverlay(
+int DetectionOverlay(
   T* input, T* output, uint32_t width, uint32_t height, 
   Box *detections, int numDetections, float4 colors )
 {
   if( !input || !output || width == 0 || height == 0 || !detections || numDetections == 0)
-    return hipErrorInvalidValue;
+    return 1;
   		
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   for( int n=0; n < numDetections; n++ )
   {
     const int boxWidth = detections[n].width;
@@ -78,7 +81,13 @@ hipError_t DetectionOverlay(
     hipLaunchKernelGGL(HIP_KERNEL_NAME(DetectionOverlayBox<T>), gridDim, blockDim, 0, 0, 
       input, output, width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
   }
-  return hipGetLastError();
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
+
+  return 0;
 }
 
 int main(int argc, char* argv[]) {
