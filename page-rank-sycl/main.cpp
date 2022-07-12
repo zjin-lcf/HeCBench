@@ -39,8 +39,7 @@
 
 // default values 
 const int max_iter = 1000;
-const float threshold= 0.00001f;
-
+const float threshold= 1e-16f;
 
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
@@ -80,7 +79,7 @@ void init_array(float *a, int n, float val){
 
 void usage(char *argv[]){
   fprintf(stderr, "Usage: %s [-n number of pages] [-i max iterations]"
-      " [-t threshold] [-q divsor for zero density]\n", argv[0]);
+                  " [-t threshold] [-q divsor for zero density]\n", argv[0]);
 }
 
 static struct option size_opts[] =
@@ -157,102 +156,105 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  float *diffs, *nzeros;
+  float *diffs;
   diffs  = (float*) malloc(sizeof(float)*n);
-  nzeros = (float*) malloc(sizeof(float)*n);
   for(i = 0; i < n; ++i){
     diffs[i] = 0.0f;
-    nzeros[i] = 0.0f;
   }
-
-  auto start = std::chrono::high_resolution_clock::now();
-  {
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
+  const property_list props = property::buffer::use_host_ptr();
 
-    buffer<int, 1> d_pages (pages, n*n, props);
-    buffer<float, 1> d_page_ranks (page_ranks, n, props);
-    buffer<float, 1> d_maps (maps, n*n, props);
-    buffer<unsigned int, 1> d_noutlinks (noutlinks, n, props);
-    buffer<float, 1> d_diffs (diffs, n, props);
-    d_diffs.set_final_data(nullptr);
+  buffer<int, 1> d_pages (pages, n*n, props);
+  buffer<float, 1> d_page_ranks (page_ranks, n, props);
+  buffer<float, 1> d_maps (maps, n*n, props);
+  buffer<unsigned int, 1> d_noutlinks (noutlinks, n, props);
+  buffer<float, 1> d_diffs (diffs, n, props);
 
-    size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
-    size_t global_work_size = (n+block_size-1) / block_size * block_size;
+  d_page_ranks.set_final_data(nullptr);
+  d_maps.set_final_data(nullptr);
+  d_diffs.set_final_data(nullptr);
 
-    for (t=1; t<=iter && max_diff>=thresh; ++t) {
-      //map <<< dim3(num_blocks), dim3(block_size) >>> ( d_pages, d_page_ranks, d_maps, d_noutlinks, n);
-      q.submit([&](handler& cgh) { 
-          auto pages = d_pages.get_access<sycl_read>(cgh);
-          auto page_ranks = d_page_ranks.get_access<sycl_read>(cgh);
-          auto maps = d_maps.get_access<sycl_discard_write>(cgh);
-          auto noutlinks = d_noutlinks.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class map>( 
-              nd_range<1>(range<1>(global_work_size), range<1>(block_size)), [=] (nd_item<1> item) {
-              int i = item.get_global_id(0);
-              if (i < n) {
-              float outbound_rank = page_ranks[i]/(float)noutlinks[i];
-              for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
-              }
-              });
-          });
+  size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
+  size_t global_work_size = (n+block_size-1) / block_size * block_size;
 
-      //reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
-      q.submit([&](handler& cgh) { 
-          auto page_ranks = d_page_ranks.get_access<sycl_discard_read_write>(cgh);
-          auto maps = d_maps.get_access<sycl_discard_read_write>(cgh);
-          auto dif = d_diffs.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class reduce>( 
-              nd_range<1>(range<1>(global_work_size), range<1>(block_size)), [=] (nd_item<1> item) {
-              int j = item.get_global_id(0);
-              float new_rank;
-              float old_rank;
-              if (j < n) {
-              old_rank = page_ranks[j];
-              new_rank = 0.0f;
-              for(int i=0; i< n; ++i) new_rank += maps[i*n + j];
-              new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
-              dif[j] = fabs(new_rank - old_rank) > dif[j] ? fabs(new_rank - old_rank) : dif[j];
-              page_ranks[j] = new_rank;
-              }
-              });
-          });
+  range<1> gws (global_work_size);
+  range<1> lws (block_size);
 
-      q.submit([&](handler& cgh) { 
-          auto diffs_acc = d_diffs.get_access<sycl_read>(cgh);
-          cgh.copy(diffs_acc, diffs);
-          });
-      q.wait();
-      max_diff = maximum_dif(diffs, n);
+  double ktime = 0.0;
 
-      q.submit([&](handler& cgh) { 
-          auto diffs_acc = d_diffs.get_access<sycl_write>(cgh);
-          cgh.copy(nzeros, diffs_acc);
-          });
-    }
+  for (t=1; t<=iter && max_diff>=thresh; ++t) {
+    auto start = std::chrono::high_resolution_clock::now();
 
+    //map <<< dim3(num_blocks), dim3(block_size) >>> ( d_pages, d_page_ranks, d_maps, d_noutlinks, n);
+    q.submit([&](handler& cgh) { 
+      auto pages = d_pages.get_access<sycl_read>(cgh);
+      auto page_ranks = d_page_ranks.get_access<sycl_read>(cgh);
+      auto maps = d_maps.get_access<sycl_discard_write>(cgh);
+      auto noutlinks = d_noutlinks.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class map>( 
+        nd_range<1>(range<1>(global_work_size), range<1>(block_size)), [=] (nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) {
+          float outbound_rank = page_ranks[i]/(float)noutlinks[i];
+          for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
+        }
+      });
+    });
+
+    //reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
+    q.submit([&](handler& cgh) { 
+      auto page_ranks = d_page_ranks.get_access<sycl_discard_read_write>(cgh);
+      auto maps = d_maps.get_access<sycl_discard_read_write>(cgh);
+      auto dif = d_diffs.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class reduce>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int j = item.get_global_id(0);
+        float new_rank;
+        float old_rank;
+        if (j < n) {
+          old_rank = page_ranks[j];
+          new_rank = 0.0f;
+          for(int i=0; i< n; ++i) new_rank += maps[i*n + j];
+          new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
+          dif[j] = sycl::fabs(new_rank - old_rank) > dif[j] ? 
+                   sycl::fabs(new_rank - old_rank) : dif[j];
+          page_ranks[j] = new_rank;
+        }
+      });
+    });
+
+    q.wait();
+    auto end = std::chrono::high_resolution_clock::now();
+    ktime += std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
+
+    q.submit([&](handler& cgh) { 
+      auto diffs_acc = d_diffs.get_access<sycl_read>(cgh);
+      cgh.copy(diffs_acc, diffs);
+    }).wait();
+
+    q.submit([&](handler& cgh) { 
+      auto diffs_acc = d_diffs.get_access<sycl_discard_write>(cgh);
+      cgh.fill(diffs_acc, 0.f);
+    });
+
+    max_diff = maximum_dif(diffs, n);
   }
 
-  auto end = std::chrono::high_resolution_clock::now();
-  double seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-
   fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"time\": %f }\n", 1, n, iter, thresh, seconds);
+  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
+         1, n, iter, thresh, ktime);
 
   free(pages);
   free(maps);
   free(page_ranks);
   free(noutlinks);
-  free(nzeros);
   free(diffs);
   return 0;
 }
-
 
