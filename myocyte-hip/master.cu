@@ -2,7 +2,7 @@
 //  MAIN FUNCTION
 //=====================================================================
 
-void master(fp timeinst,
+double master(fp timeinst,
     fp* initvalu,
     fp* parameter,
     fp* finavalu,
@@ -11,7 +11,8 @@ void master(fp timeinst,
     fp* d_initvalu,
     fp* d_finavalu,
     fp* d_params,
-    fp* d_com){
+    fp* d_com)
+{
 
   //=====================================================================
   //  VARIABLES
@@ -21,12 +22,11 @@ void master(fp timeinst,
   int i;
 
   // offset pointers
-  int initvalu_offset_ecc;                                // 46 points
-  int initvalu_offset_Dyad;                              // 15 points
-  int initvalu_offset_SL;                                // 15 points
-  int initvalu_offset_Cyt;                                // 15 poitns
+  int initvalu_offset_ecc;
+  int initvalu_offset_Dyad;
+  int initvalu_offset_SL;
+  int initvalu_offset_Cyt;
 
-  // cuda
   dim3 threads;
   dim3 blocks;
 
@@ -51,7 +51,6 @@ void master(fp timeinst,
   printf("\n");
 #endif
 
-
   hipMemcpy(d_initvalu, initvalu, d_initvalu_mem, hipMemcpyHostToDevice);
   hipMemcpy(d_params, parameter, d_params_mem, hipMemcpyHostToDevice);
 
@@ -59,11 +58,20 @@ void master(fp timeinst,
   threads.y = 1;
   blocks.x = 2;
   blocks.y = 1;
-  hipLaunchKernelGGL(kernel, dim3(blocks), dim3(threads), 0, 0,   timeinst,
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  hipLaunchKernelGGL(kernel, blocks, threads, 0, 0, 
+      timeinst,
       d_initvalu,
       d_finavalu,
       d_params,
       d_com);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   hipMemcpy(finavalu, d_finavalu, d_finavalu_mem, hipMemcpyDeviceToHost);
   hipMemcpy(com, d_com, d_com_mem, hipMemcpyDeviceToHost);
@@ -81,12 +89,13 @@ void master(fp timeinst,
   //  FINAL KERNEL
   //=====================================================================
 
-  initvalu_offset_ecc = 0;                        // 46 points
-  initvalu_offset_Dyad = 46;                      // 15 points
-  initvalu_offset_SL = 61;                      // 15 points
-  initvalu_offset_Cyt = 76;                        // 15 poitns
+  initvalu_offset_ecc = 0;
+  initvalu_offset_Dyad = 46;
+  initvalu_offset_SL = 61;
+  initvalu_offset_Cyt = 76;
 
-  kernel_fin(      initvalu,
+  kernel_fin(
+      initvalu,
       initvalu_offset_ecc,
       initvalu_offset_Dyad,
       initvalu_offset_SL,
@@ -110,4 +119,5 @@ void master(fp timeinst,
     }
   }
 
+  return time;
 }

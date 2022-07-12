@@ -98,8 +98,8 @@
 //  PARTICULAR SOLVER FUNCTION
 //========================================================================================================================================================================================================200
 
-void 
-embedded_fehlberg_7_8(  FP timeinst,
+void embedded_fehlberg_7_8(
+    FP timeinst,
     FP h,
     FP *initvalu,
     FP *finavalu,
@@ -114,14 +114,11 @@ embedded_fehlberg_7_8(  FP timeinst,
 
     queue &command_queue,
 
-    long long *timecopyin,
-    long long *timecopykernel,
-    long long *timecopyout) 
+    double *timecopyin,
+    double *timecopykernel,
+    double *timecopyout) 
 {
-
-  //======================================================================================================================================================
   //  VARIABLES
-  //======================================================================================================================================================
 
   static const FP c_1_11 = 41.0 / 840.0;
   static const FP c6 = 34.0 / 105.0;
@@ -202,9 +199,7 @@ embedded_fehlberg_7_8(  FP timeinst,
 
   int i;
 
-  //======================================================================================================================================================
   //    TEMPORARY STORAGE ALLOCATION
-  //======================================================================================================================================================
 
   initvalu_temp= (FP *) malloc(EQUATIONS* sizeof(FP));
 
@@ -213,9 +208,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     finavalu_temp[i]= (FP *) malloc(EQUATIONS* sizeof(FP));
   }
 
-  //======================================================================================================================================================
-  //    EVALUATIONS  [UNROLLED LOOP] [SEQUENTIAL DEPENDENCY]
-  //======================================================================================================================================================
+  //    EVALUATIONS
 
   //===================================================================================================
   //    1
@@ -227,7 +220,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     //printf("initvalu[%d] = %f\n", i, initvalu[i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[0],
@@ -253,7 +246,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h2_7 * (finavalu_temp[0][i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[1],
@@ -279,7 +272,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b31*finavalu_temp[0][i] + b32*finavalu_temp[1][i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[2],
@@ -305,7 +298,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b41*finavalu_temp[0][i] + b43*finavalu_temp[2][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[3],
@@ -331,7 +324,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b51*finavalu_temp[0][i] + b53*finavalu_temp[2][i] + b54*finavalu_temp[3][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[4],
@@ -357,7 +350,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b61*finavalu_temp[0][i] + b64*finavalu_temp[3][i] + b65*finavalu_temp[4][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[5],
@@ -383,7 +376,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b71*finavalu_temp[0][i] + b74*finavalu_temp[3][i] + b75*finavalu_temp[4][i] + b76*finavalu_temp[5][i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[6],
@@ -408,7 +401,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b81*finavalu_temp[0][i] + b85*finavalu_temp[4][i] + b86*finavalu_temp[5][i] + b87*finavalu_temp[6][i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[7],
@@ -434,7 +427,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b91*finavalu_temp[0][i] + b94*finavalu_temp[3][i] + b95*finavalu_temp[4][i] + b96*finavalu_temp[5][i] + b97*finavalu_temp[6][i]+ b98*finavalu_temp[7][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[8],
@@ -460,7 +453,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b10_1*finavalu_temp[0][i] + b10_4*finavalu_temp[3][i] + b10_5*finavalu_temp[4][i] + b10_6*finavalu_temp[5][i] + b10_7*finavalu_temp[6][i] + b10_8*finavalu_temp[7][i] + b10_9*finavalu_temp[8] [i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[9],
@@ -486,7 +479,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b11_1*finavalu_temp[0][i] + b11_4*finavalu_temp[3][i] + b11_5*finavalu_temp[4][i] + b11_6*finavalu_temp[5][i] + b11_7*finavalu_temp[6][i] + b11_8*finavalu_temp[7][i] + b11_9*finavalu_temp[8][i]+ b11_10 * finavalu_temp[9][i]);
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[10],
@@ -512,7 +505,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b12_1*finavalu_temp[0][i] + b12_6*finavalu_temp[5][i] + b12_7*finavalu_temp[6][i] + b12_8*finavalu_temp[7][i] + b12_9*finavalu_temp[8][i] + b12_10 * finavalu_temp[9][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[11],
@@ -538,7 +531,7 @@ embedded_fehlberg_7_8(  FP timeinst,
     initvalu_temp[i] = initvalu[i] + h * ( b13_1*finavalu_temp[0][i] + b13_4*finavalu_temp[3][i] + b13_5*finavalu_temp[4][i] + b13_6*finavalu_temp[5][i] + b13_7*finavalu_temp[6][i] + b13_8*finavalu_temp[7][i] + b13_9*finavalu_temp[8][i] + b13_10*finavalu_temp[9][i] + finavalu_temp[11][i]) ;
   }
 
-  master(  timeinst_temp,
+  master(timeinst_temp,
       initvalu_temp,
       parameter,
       finavalu_temp[12],
@@ -555,25 +548,19 @@ embedded_fehlberg_7_8(  FP timeinst,
       timecopykernel,
       timecopyout);
 
-  //======================================================================================================================================================
   //    FINAL VALUE
-  //======================================================================================================================================================
 
   for(i=0; i<EQUATIONS; i++){
     finavalu[i]= initvalu[i] +  h * (c_1_11 * (finavalu_temp[0][i] + finavalu_temp[10][i])  + c6 * finavalu_temp[5][i] + c_7_8 * (finavalu_temp[6][i] + finavalu_temp[7][i]) + c_9_10 * (finavalu_temp[8][i] + finavalu_temp[9][i]) );
   }
 
-  //======================================================================================================================================================
   //    RETURN
-  //======================================================================================================================================================
 
   for(i=0; i<EQUATIONS; i++){
     error[i] = std::fabs(err_factor * (finavalu_temp[0][i] + finavalu_temp[10][i] - finavalu_temp[11][i] - finavalu_temp[12][i]));
   }
 
-  //======================================================================================================================================================
   //    DEALLOCATION
-  //======================================================================================================================================================
 
   free(initvalu_temp);
   free(finavalu_temp);

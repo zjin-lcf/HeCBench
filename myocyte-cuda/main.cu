@@ -1,12 +1,4 @@
-//====================================================================================================100
-//		UPDATE
-//====================================================================================================100
-
 // Lukasz G. Szafaryn 24 JAN 09
-
-//====================================================================================================100
-//		DESCRIPTION
-//====================================================================================================100
 
 // Myocyte application models cardiac myocyte (heart muscle cell) and simulates its behavior according to the work by Saucerman and Bers [8]. The model integrates 
 // cardiac myocyte electrical activity with the calcineurin pathway, which is a key aspect of the development of heart failure. The model spans large number of temporal 
@@ -20,26 +12,22 @@
 // (usually reduced) time step. Since the ODEs are stiff (exhibit fast rate of change within short time intervals), they need to be simulated at small time scales with an 
 // adaptive step size solver. 
 
-//	1) The original version of the current solver code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html). The solver has been 
+//  1) The original version of the current solver code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html). The solver has been 
 //      somewhat modified to tailor it to our needs. However, it can be reverted back to original form or modified to suit other simulations.
 // 2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
-//	3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is 
+//  3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is 
 //      incremented by 1 time unit (h_init).
-//	4) Function assumes that simulation starts at some point of time (whatever time the initial values are provided for) and runs for the number of miliseconds (xmax) 
+//  4) Function assumes that simulation starts at some point of time (whatever time the initial values are provided for) and runs for the number of miliseconds (xmax) 
 //      specified by the uses as a parameter on command line.
 // 5) The appropriate amount of memory is previousely allocated for that range (y).
-//	6) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
-//	7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to 
+//  6) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
+//  7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to 
 //      make sure that no NAN and INF are returned.
 // 8) Application reads initial data and parameters from text files: y.txt and params.txt respectively that need to be located in the same folder as source files. 
 //     For simplicity and testing purposes only, when multiple number of simulation instances is specified, application still reads initial data from the same input files. That 
 //     can be modified in this source code.
 
-//====================================================================================================100
-//		IMPLEMENTATION-SPECIFIC DESCRIPTION (CUDA)
-//====================================================================================================100
-
-// This is the CUDA version of Myocyte code.
+//    IMPLEMENTATION-SPECIFIC DESCRIPTION
 
 // The original single-threaded code was written in MATLAB and used MATLAB ode45 ODE solver. In the process of accelerating this code, we arrived with the 
 // intermediate versions that used single-threaded Sundials CVODE solver which evaluated model parallelized with CUDA at each time step. In order to convert entire 
@@ -75,76 +63,35 @@
 // Example:
 // a.out 100 100 1
 
-//====================================================================================================100
-//		DEFINE / INCLUDE
-//====================================================================================================100
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-
+#include <chrono>
 #include "define.c"
-
 #include "file.c"
-#include "timer.c"
-
 #include "work.cu"
-
-//====================================================================================================100
-//		MAIN FUNCTION
-//====================================================================================================100
 
 int main(int argc, char *argv []){
 
-	//================================================================================80
-	//		VARIABLES
-	//================================================================================80
+  int xmax;
+  int workload = 1;
 
-	//============================================================60
-	//		COMMAND LINE PARAMETERS
-	//============================================================60
+  if(argc!=2){
+    printf("%s <simulation interval (default is 100)>\n", argv[0]);
+    return 0;
+  }
 
-	int xmax;
-	int workload = 1;
+  else{
 
-	//================================================================================80
-	// 	GET INPUT PARAMETERS
-	//================================================================================80
+    xmax = atoi(argv[1]);
+    if(xmax<0){
+      printf("ERROR: %d is the incorrect end of simulation interval, use numbers > 0\n", xmax);
+      return 0;
+    }
+  }
 
-	//============================================================60
-	//		CHECK NUMBER OF ARGUMENTS
-	//============================================================60
+  work(xmax, workload);
 
-	if(argc!=2){
-		printf("%s <simulation interval (default is 100)>\n", argv[0]);
-		return 0;
-	}
-
-	//============================================================60
-	//		GET AND CHECK PARTICULAR ARGUMENTS
-	//============================================================60
-
-	else{
-
-		//========================================40
-		//		SPAN
-		//========================================40
-
-		xmax = atoi(argv[1]);
-		if(xmax<0){
-			printf("ERROR: %d is the incorrect end of simulation interval, use numbers > 0\n", xmax);
-			return 0;
-		}
-	}
-
-	work(xmax, workload);
-
-
-//====================================================================================================100
-//		END OF FILE
-//====================================================================================================100
-
-	return 0;
-
+  return 0;
 }

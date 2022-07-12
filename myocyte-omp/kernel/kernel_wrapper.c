@@ -1,39 +1,26 @@
 #include <stdio.h>
 #include <string.h>
+#include <chrono>
 #include "../common.h"
-#include "../util/timer/timer.h"
 #include "solver.c"
 #include "kernel_wrapper.h"
 
-
-
-int 
-kernel_wrapper(  int xmax,
+int kernel_wrapper(
+    int xmax,
     int workload,
-
     fp ***y,
     fp **x,
     fp **params,
     fp *com)
 {
 
-  //======================================================================================================================================================150
   //  VARIABLES
-  //======================================================================================================================================================150
 
-  long long time0;
-  long long time4;
-  long long timecopyin;
-  long long timekernel;
-  long long timecopyout;
+  double timecopyin;
+  double timekernel;
+  double timecopyout;
 
-  time0 = get_time();
-
-
-
-  //======================================================================================================================================================150
-  //  EXECUTION
-  //======================================================================================================================================================150
+  auto offload_start = std::chrono::steady_clock::now();
 
   int status;
   int i;
@@ -41,7 +28,8 @@ kernel_wrapper(  int xmax,
   // workload = 1
   for(i=0; i<workload; i++){
 
-    status = solver(  y[i],
+    status = solver(
+        y[i],
         x[i],
         xmax,
         params[i],
@@ -53,15 +41,15 @@ kernel_wrapper(  int xmax,
     if(status !=0){
       printf("STATUS: %d\n", status);
     }
-
   }
 
-  time4 = get_time();
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
 
-  printf("Device offloading time:\n");
-  printf("%.12f s\n", (float) (time4-time0) / 1000000);
+  printf("Total kernel execution time %f (s)\n\n", timekernel * 1e-9f);
+  printf("Total host to device time %f (s)\n\n", timecopyin * 1e-9f);
+  printf("Total device to host time %f (s)\n\n", timecopyout * 1e-9f);
+  printf("Device offloading time: %f (s)\n", offload_time * 1e-9);
 
   return 0;
-
 }
-

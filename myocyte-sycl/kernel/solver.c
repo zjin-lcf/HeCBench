@@ -1,34 +1,22 @@
-// #ifdef __cplusplus
-// extern "C" {
-// #endif
+//  Summary of changes by Lukasz G. Szafaryn:
 
-//========================================================================================================================================================================================================200
-//	DESCRIPTION
-//========================================================================================================================================================================================================200
+//  1) The original code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html)
+//  2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
 
-//======================================================================================================================================================150
-//	UPDATE
-//======================================================================================================================================================150
+//  3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is incremented by 1 time unit (h_init).
+//  4) Function assumes that time interval starts at 0 (xmin) and ends at integer value (xmax) specified by the uses as a parameter on command line.
+//  5) The appropriate amount of memory is previousely allocated for that range (y).
 
-//	Summary of changes by Lukasz G. Szafaryn:
+//  5) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
 
-//	1) The original code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html)
-//	2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
+//  6) Solver also takes parameters (params) that it then passes to the equations.
 
-//	3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is incremented by 1 time unit (h_init).
-//	4) Function assumes that time interval starts at 0 (xmin) and ends at integer value (xmax) specified by the uses as a parameter on command line.
-//	5) The appropriate amount of memory is previousely allocated for that range (y).
+//  7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to make sure that no NAN and INF are returned.
 
-//	5) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
-
-//	6) Solver also takes parameters (params) that it then passes to the equations.
-
-//	7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to make sure that no NAN and INF are returned.
-
-//	Last update: 15 DEC 09
+//  Last update: 15 DEC 09
 
 //======================================================================================================================================================150
-//	DESCRIPTION
+//  DESCRIPTION
 //======================================================================================================================================================150
 
 // int solver( fp (*f)(fp, fp), fp y[],        //
@@ -62,17 +50,17 @@
 //    -3   Memory limit allocated for results was reached                     //
 
 //========================================================================================================================================================================================================200
-//	DEFINE/INCLUDE
+//  DEFINE/INCLUDE
 //========================================================================================================================================================================================================200
 
 //======================================================================================================================================================150
-//	COMMON
+//  COMMON
 //======================================================================================================================================================150
 
-#include "../common.h"								// (in path provided here)
+#include "../common.h"                // (in path provided here)
 
 //======================================================================================================================================================150
-//	DEFINE
+//  DEFINE
 //======================================================================================================================================================150
 
 #define max(x,y) ( (x) < (y) ? (y) : (x) )
@@ -83,280 +71,266 @@
 #define MAX_SCALE_FACTOR 4.0
 
 //======================================================================================================================================================150
-//	KERNEL
+//  KERNEL
 //======================================================================================================================================================150
 
-#include "./embedded_fehlberg_7_8.c"				// (in path provided here)
+#include "./embedded_fehlberg_7_8.c"        // (in path provided here)
 
 //======================================================================================================================================================150
-//	LIBRARIES
+//  LIBRARIES
 //======================================================================================================================================================150
 
-#include <stdlib.h>									// (in path known to compiler)	needed by malloc, free
-#include <math.h>									// (in path known to compiler)	needed by pow, fabs
+#include <stdlib.h>                  // (in path known to compiler)  needed by malloc, free
+#include <math.h>                  // (in path known to compiler)  needed by pow, fabs
 
 //======================================================================================================================================================150
-//	END
+//  END
 //======================================================================================================================================================150
 
 //========================================================================================================================================================================================================200
-//	FUNCTION
+//  FUNCTION
 //========================================================================================================================================================================================================200
 
 int 
-solver(	FP **y,
-		FP *x,
-		int xmax,
-		FP *params,
-		FP *com,
+solver(  FP **y,
+    FP *x,
+    int xmax,
+    FP *params,
+    FP *com,
 
-		buffer<FP,1>& d_initvalu,
-		buffer<FP,1>& d_finavalu,
-		buffer<FP,1>& d_params,
-		buffer<FP,1>& d_com,
+    buffer<FP,1>& d_initvalu,
+    buffer<FP,1>& d_finavalu,
+    buffer<FP,1>& d_params,
+    buffer<FP,1>& d_com,
 
-		queue &command_queue,
+    queue &command_queue,
 
-		long long *timecopyin,
-		long long *timecopykernel,
-		long long *timecopyout)
+    double *timecopyin,
+    double *timecopykernel,
+    double *timecopyout)
 {
 
-	//========================================================================================================================
-	//	VARIABLES
-	//========================================================================================================================
+  //========================================================================================================================
+  //  VARIABLES
+  //========================================================================================================================
 
-	// solver parameters
-	FP err_exponent;
-	int error;
-	int outside;
-	FP h;
-	FP h_init;
-	FP tolerance;
-	int xmin;
+  // solver parameters
+  FP err_exponent;
+  int error;
+  int outside;
+  FP h;
+  FP h_init;
+  FP tolerance;
+  int xmin;
 
-	// memory
-	FP scale_min;
-	FP scale_fina;
-	FP* err= (FP *) malloc(EQUATIONS* sizeof(FP));
-	FP* scale= (FP *) malloc(EQUATIONS* sizeof(FP));
-	FP* yy= (FP *) malloc(EQUATIONS* sizeof(FP));
+  // memory
+  FP scale_min;
+  FP scale_fina;
+  FP* err= (FP *) malloc(EQUATIONS* sizeof(FP));
+  FP* scale= (FP *) malloc(EQUATIONS* sizeof(FP));
+  FP* yy= (FP *) malloc(EQUATIONS* sizeof(FP));
 
-	// counters
-	int i, j, k;
+  // counters
+  int i, j, k;
 
-	//========================================================================================================================
-	//		INITIAL SETUP
-	//========================================================================================================================
+  //========================================================================================================================
+  //    INITIAL SETUP
+  //========================================================================================================================
 
-	// solver parameters
-	err_exponent = 1.0 / 7.0;
-	h_init = 1;
-	h = h_init;
-	xmin = 0;
-	tolerance = 10 / (FP)(xmax-xmin);
+  // solver parameters
+  err_exponent = 1.0 / 7.0;
+  h_init = 1;
+  h = h_init;
+  xmin = 0;
+  tolerance = 10 / (FP)(xmax-xmin);
 
-	// save value for initial time instance
-	x[0] = 0;
+  // save value for initial time instance
+  x[0] = 0;
 
-	//========================================================================================================================
-	//		CHECKING
-	//========================================================================================================================
+  //========================================================================================================================
+  //    CHECKING
+  //========================================================================================================================
 
-	// Verify that the step size is positive and that the upper endpoint of integration is greater than the initial enpoint.               //
-	if (xmax < xmin || h <= 0.0){
-		return -2;
-	}
+  // Verify that the step size is positive and that the upper endpoint of integration is greater than the initial enpoint.               //
+  if (xmax < xmin || h <= 0.0){
+    return -2;
+  }
 
-	// If the upper endpoint of the independent variable agrees with the initial value of the independent variable.  Set the value of the dependent variable and return success. //
-	if (xmax == xmin){
-		return 0; 
-	}
+  // If the upper endpoint of the independent variable agrees with the initial value of the independent variable.  Set the value of the dependent variable and return success. //
+  if (xmax == xmin){
+    return 0; 
+  }
 
-	// Insure that the step size h is not larger than the length of the integration interval.                                            //
-	if (h > (xmax - xmin) ) { 
-		h = (FP)xmax - (FP)xmin; 
-	}
+  // Insure that the step size h is not larger than the length of the integration interval.                                            //
+  if (h > (xmax - xmin) ) { 
+    h = (FP)xmax - (FP)xmin; 
+  }
 
-	//========================================================================================================================
-	//		SOLVING
-	//========================================================================================================================
-
-#ifdef DEBUG
-	printf("Time Steps: ");
-	fflush(0);
-#endif
-
-	for(k=1; k<=xmax; k++) {											// start after initial value
-
-		x[k] = k-1;
-		h = h_init;
-
-		//==========================================================================================
-		//		REINITIALIZE VARIABLES
-		//==========================================================================================
-
-		scale_fina = 1.0;
-
-		//==========================================================================================
-		//		MAKE ATTEMPTS TO MINIMIZE ERROR
-		//==========================================================================================
-
-		// make attempts to minimize error
-		for (j = 0; j < ATTEMPTS; j++) {
-
-			//============================================================
-			//		REINITIALIZE VARIABLES
-			//============================================================
-
-			error = 0;
-			outside = 0;
-			scale_min = MAX_SCALE_FACTOR;
-
-			//============================================================
-			//		EVALUATE ALL EQUATIONS
-			//============================================================
-
-			embedded_fehlberg_7_8(	x[k],
-									h,
-									y[k-1],
-									y[k],
-									err,
-									params,
-									com,
-
-									d_initvalu,
-									d_finavalu,
-									d_params,
-									d_com,
-
-									command_queue,
-
-									timecopyin,
-									timecopykernel,
-									timecopyout);
-
-			//============================================================
-			//		IF THERE WAS NO ERROR FOR ANY OF EQUATIONS, SET SCALE AND LEAVE THE LOOP
-			//============================================================
-
-			for(i=0; i<EQUATIONS; i++){
-				if(err[i] > 0){
-					error = 1;
-				}
-			}
-			if (error != 1) {
-				scale_fina = MAX_SCALE_FACTOR; 
-				break;
-			}
-
-			//============================================================
-			//		FIGURE OUT SCALE AS THE MINIMUM OF COMPONENT SCALES
-			//============================================================
-
-			for(i=0; i<EQUATIONS; i++){
-				if(y[k-1][i] == 0.0){
-					yy[i] = tolerance;
-				}
-				else{
-					yy[i] = std::fabs(y[k-1][i]);
-				}
-				scale[i] = 0.8 * std::pow( tolerance * yy[i] / err[i] , err_exponent );
-				if(scale[i]<scale_min){
-					scale_min = scale[i];
-				}
-			}
-			scale_fina = min( max(scale_min,MIN_SCALE_FACTOR), MAX_SCALE_FACTOR);
-
-			//============================================================
-			//		IF WITHIN TOLERANCE, FINISH ATTEMPTS...
-			//============================================================
-
-			for(i=0; i<EQUATIONS; i++){
-				if ( err[i] > ( tolerance * yy[i] ) ){
-					outside = 1;
-				}
-			}
-			if (outside == 0){
-				break;
-			}
-
-			//============================================================
-			//		...OTHERWISE, ADJUST STEP FOR NEXT ATTEMPT
-			//============================================================
-
-			// scale next step in a default way
-			h = h * scale_fina;
-
-			// limit step to 0.9, because when it gets close to 1, it no longer makes sense, as 1 is already the next time instance (added to original algorithm)
-			if (h >= 0.9) {
-				h = 0.9;
-			}
-
-			// if instance+step exceeds range limit, limit to that range
-			if ( x[k] + h > (FP)xmax ){
-				h = (FP)xmax - x[k];
-			}
-
-			// if getting closer to range limit, decrease step
-			else if ( x[k] + h + 0.5 * h > (FP)xmax ){
-				h = 0.5 * h;
-			}
-
-		}
-
-		//==========================================================================================
-		//		SAVE TIME INSTANCE THAT SOLVER ENDED UP USING
-		//==========================================================================================
-
-		x[k] = x[k] + h;
-
-		//==========================================================================================
-		//		IF MAXIMUM NUMBER OF ATTEMPTS REACHED AND CANNOT GIVE SOLUTION, EXIT PROGRAM WITH ERROR
-		//==========================================================================================
-
-		if ( j >= ATTEMPTS ) {
-			return -1; 
-		}
+  //========================================================================================================================
+  //    SOLVING
+  //========================================================================================================================
 
 #ifdef DEBUG
-		printf("%d ", k);
-		fflush(0);
+  printf("Time Steps: ");
+  fflush(0);
 #endif
 
-	}
+  for(k=1; k<=xmax; k++) {                      // start after initial value
+
+    x[k] = k-1;
+    h = h_init;
+
+    //==========================================================================================
+    //    REINITIALIZE VARIABLES
+    //==========================================================================================
+
+    scale_fina = 1.0;
+
+    //==========================================================================================
+    //    MAKE ATTEMPTS TO MINIMIZE ERROR
+    //==========================================================================================
+
+    // make attempts to minimize error
+    for (j = 0; j < ATTEMPTS; j++) {
+
+      //============================================================
+      //    REINITIALIZE VARIABLES
+      //============================================================
+
+      error = 0;
+      outside = 0;
+      scale_min = MAX_SCALE_FACTOR;
+
+      //============================================================
+      //    EVALUATE ALL EQUATIONS
+      //============================================================
+
+      embedded_fehlberg_7_8(
+          x[k],
+          h,
+          y[k-1],
+          y[k],
+          err,
+          params,
+          com,
+
+          d_initvalu,
+          d_finavalu,
+          d_params,
+          d_com,
+
+          command_queue,
+
+          timecopyin,
+          timecopykernel,
+          timecopyout);
+
+      //============================================================
+      //    IF THERE WAS NO ERROR FOR ANY OF EQUATIONS, SET SCALE AND LEAVE THE LOOP
+      //============================================================
+
+      for(i=0; i<EQUATIONS; i++){
+        if(err[i] > 0){
+          error = 1;
+        }
+      }
+      if (error != 1) {
+        scale_fina = MAX_SCALE_FACTOR; 
+        break;
+      }
+
+      //============================================================
+      //    FIGURE OUT SCALE AS THE MINIMUM OF COMPONENT SCALES
+      //============================================================
+
+      for(i=0; i<EQUATIONS; i++){
+        if(y[k-1][i] == 0.0){
+          yy[i] = tolerance;
+        }
+        else{
+          yy[i] = std::fabs(y[k-1][i]);
+        }
+        scale[i] = 0.8 * std::pow( tolerance * yy[i] / err[i] , err_exponent );
+        if(scale[i]<scale_min){
+          scale_min = scale[i];
+        }
+      }
+      scale_fina = min( max(scale_min,MIN_SCALE_FACTOR), MAX_SCALE_FACTOR);
+
+      //============================================================
+      //    IF WITHIN TOLERANCE, FINISH ATTEMPTS...
+      //============================================================
+
+      for(i=0; i<EQUATIONS; i++){
+        if ( err[i] > ( tolerance * yy[i] ) ){
+          outside = 1;
+        }
+      }
+      if (outside == 0){
+        break;
+      }
+
+      //============================================================
+      //    ...OTHERWISE, ADJUST STEP FOR NEXT ATTEMPT
+      //============================================================
+
+      // scale next step in a default way
+      h = h * scale_fina;
+
+      // limit step to 0.9, because when it gets close to 1, it no longer makes sense, as 1 is already the next time instance (added to original algorithm)
+      if (h >= 0.9) {
+        h = 0.9;
+      }
+
+      // if instance+step exceeds range limit, limit to that range
+      if ( x[k] + h > (FP)xmax ){
+        h = (FP)xmax - x[k];
+      }
+
+      // if getting closer to range limit, decrease step
+      else if ( x[k] + h + 0.5 * h > (FP)xmax ){
+        h = 0.5 * h;
+      }
+
+    }
+
+    //==========================================================================================
+    //    SAVE TIME INSTANCE THAT SOLVER ENDED UP USING
+    //==========================================================================================
+
+    x[k] = x[k] + h;
+
+    //==========================================================================================
+    //    IF MAXIMUM NUMBER OF ATTEMPTS REACHED AND CANNOT GIVE SOLUTION, EXIT PROGRAM WITH ERROR
+    //==========================================================================================
+
+    if ( j >= ATTEMPTS ) {
+      return -1; 
+    }
 
 #ifdef DEBUG
-	printf("\n");
-	fflush(0);
+    printf("%d ", k);
+    fflush(0);
 #endif
 
-	//========================================================================================================================
-	//		FREE MEMORY
-	//========================================================================================================================
+  }
 
-	free(err);
-	free(scale);
-	free(yy);
+#ifdef DEBUG
+  printf("\n");
+  fflush(0);
+#endif
 
-	//========================================================================================================================
-	//		FINAL RETURN
-	//========================================================================================================================
+  //========================================================================================================================
+  //    FREE MEMORY
+  //========================================================================================================================
 
-	return 0;
+  free(err);
+  free(scale);
+  free(yy);
 
-//======================================================================================================================================================
-//======================================================================================================================================================
-//		END OF SOLVER FUNCTION
-//======================================================================================================================================================
-//======================================================================================================================================================
+  //========================================================================================================================
+  //    FINAL RETURN
+  //========================================================================================================================
 
+  return 0;
 } 
-
-//========================================================================================================================================================================================================200
-//	END
-//========================================================================================================================================================================================================200
-
-// #ifdef __cplusplus
-// }
-// #endif

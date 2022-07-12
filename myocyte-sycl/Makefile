@@ -77,17 +77,15 @@ endif
 ./myocyte.out:./main.o \
               ./kernel/kernel_wrapper.o \
               ./util/file/file.o \
-              ./util/num/num.o \
-              ./util/timer/timer.o 
+              ./util/num/num.o
 	$(CC) $(CFLAGS)	./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/file/file.o \
 		./util/num/num.o \
-		./util/timer/timer.o \
 		$(LDFLAGS) \
 		-o myocyte.out
 
-./main.o:./common.h ./main.h ./main.c
+./main.o:./common.h ./main.c
 	$(CC) $(CFLAGS)	./main.c \
 		-c \
 		-o ./main.o 
@@ -120,19 +118,10 @@ endif
 		-o ./util/num/num.o \
 		-O3
 
-./util/timer/timer.o:./common.h \
-	./util/timer/timer.h \
-	./util/timer/timer.c
-	$(CC)	./util/timer/timer.c \
-		-c \
-		-o ./util/timer/timer.o \
-		-O3
-
 clean:
 	rm	*.o *.out \
 		./kernel/*.o \
 		./util/file/*.o \
-		./util/timer/*.o \
 		./util/num/*.o \
 		./output.txt
 
