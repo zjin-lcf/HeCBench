@@ -23,8 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
-
 #include "reference.h"
 
 template<typename T>
@@ -58,13 +58,16 @@ __global__ void DetectionOverlayBox(
 }
 
 template<typename T>
-cudaError_t DetectionOverlay(
+int DetectionOverlay(
   T* input, T* output, uint32_t width, uint32_t height, 
   Box *detections, int numDetections, float4 colors )
 {
   if( !input || !output || width == 0 || height == 0 || !detections || numDetections == 0)
-    return cudaErrorInvalidValue;
+    return 1;
   		
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+  
   for( int n=0; n < numDetections; n++ )
   {
     const int boxWidth = detections[n].width;
@@ -78,7 +81,13 @@ cudaError_t DetectionOverlay(
     DetectionOverlayBox<T><<<gridDim, blockDim>>>(
       input, output, width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
   }
-  return cudaGetLastError();
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
+
+  return 0;
 }
 
 int main(int argc, char* argv[]) {

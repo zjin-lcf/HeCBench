@@ -23,8 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
-
 #include "reference.h"
 
 template<typename T>
@@ -66,6 +66,8 @@ int DetectionOverlay(
   if( !input || !output || width == 0 || height == 0 || !detections || numDetections == 0)
     return 1;
   		
+  auto start = std::chrono::steady_clock::now();
+
   for( int n=0; n < numDetections; n++ )
   {
     const int boxWidth = detections[n].width;
@@ -77,6 +79,11 @@ int DetectionOverlay(
     DetectionOverlayBox<T>(
       input, output, width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
+
   return 0;
 }
 
