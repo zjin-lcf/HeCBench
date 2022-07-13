@@ -24,7 +24,6 @@ inline void ComparatorPrivate(
   }
 }
 
-
 inline void ComparatorLocal(
     unsigned int* keyA,
     unsigned int* valA,
@@ -44,10 +43,10 @@ inline void ComparatorLocal(
 // Monolithic bitonic sort kernel for short arrays fitting into local memory
 ////////////////////////////////////////////////////////////////////////////////
 void bitonicSortLocal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict d_DstKey,
+    unsigned int*__restrict d_DstVal,
+    const unsigned int*__restrict d_SrcKey,
+    const unsigned int*__restrict d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int dir,
     const unsigned int teams,
@@ -113,10 +112,10 @@ void bitonicSortLocal(
 //of even / odd subarrays (of LOCAL_SIZE_LIMIT points) being
 //sorted in opposite directions
 void bitonicSortLocal1(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict d_DstKey,
+    unsigned int*__restrict d_DstVal,
+    const unsigned int*__restrict d_SrcKey,
+    const unsigned int*__restrict d_SrcVal,
     const unsigned int teams,
     const unsigned int threads)
 {
@@ -149,8 +148,7 @@ void bitonicSortLocal1(
           ComparatorLocal(
               &l_key[pos +      0], &l_val[pos +      0],
               &l_key[pos + stride], &l_val[pos + stride],
-              ddd
-                   );
+              ddd);
         }
       }
 
@@ -164,8 +162,7 @@ void bitonicSortLocal1(
           ComparatorLocal(
               &l_key[pos +      0], &l_val[pos +      0],
               &l_key[pos + stride], &l_val[pos + stride],
-              ddd
-                   );
+              ddd);
         }
       }
 
@@ -180,10 +177,10 @@ void bitonicSortLocal1(
 
 //Bitonic merge iteration for 'stride' >= LOCAL_SIZE_LIMIT
 void bitonicMergeGlobal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict d_DstKey,
+    unsigned int*__restrict d_DstVal,
+    const unsigned int*__restrict d_SrcKey,
+    const unsigned int*__restrict d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int size,
     const unsigned int stride,
@@ -212,8 +209,7 @@ void bitonicMergeGlobal(
       ComparatorPrivate(
           &keyA, &valA,
           &keyB, &valB,
-          ddd
-          );
+          ddd);
 
       d_DstKey[pos +      0] = keyA;
       d_DstVal[pos +      0] = valA;
@@ -226,10 +222,10 @@ void bitonicMergeGlobal(
 //Combined bitonic merge steps for
 //'size' > LOCAL_SIZE_LIMIT and 'stride' = [1 .. LOCAL_SIZE_LIMIT / 2]
 void bitonicMergeLocal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict d_DstKey,
+    unsigned int*__restrict d_DstVal,
+    const unsigned int*__restrict d_SrcKey,
+    const unsigned int*__restrict d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int size,
     unsigned int stride,
@@ -263,8 +259,7 @@ void bitonicMergeLocal(
         ComparatorLocal(
             &l_key[pos +      0], &l_val[pos +      0],
             &l_key[pos + stride], &l_val[pos + stride],
-            ddd
-                 );
+            ddd);
       }
 
       #pragma omp barrier

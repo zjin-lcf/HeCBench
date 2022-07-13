@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -9,6 +8,7 @@
  * is strictly prohibited.
  *
  */
+#include "hip/hip_runtime.h"
 
 __device__
 inline void ComparatorPrivate(
@@ -44,10 +44,10 @@ inline void ComparatorLocal(
 // Monolithic bitonic sort kernel for short arrays fitting into local memory
 ////////////////////////////////////////////////////////////////////////////////
 __global__ void bitonicSortLocal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict__ d_DstKey,
+    unsigned int*__restrict__ d_DstVal,
+    const unsigned int*__restrict__ d_SrcKey,
+    const unsigned int*__restrict__ d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int dir)
 {
@@ -104,10 +104,10 @@ __global__ void bitonicSortLocal(
 //of even / odd subarrays (of LOCAL_SIZE_LIMIT points) being
 //sorted in opposite directions
 __global__ void bitonicSortLocal1(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal)
+    unsigned int*__restrict__ d_DstKey,
+    unsigned int*__restrict__ d_DstVal,
+    const unsigned int*__restrict__ d_SrcKey,
+    const unsigned int*__restrict__ d_SrcVal)
 {
   __shared__ unsigned int l_key[LOCAL_SIZE_LIMIT];
   __shared__ unsigned int l_val[LOCAL_SIZE_LIMIT];
@@ -162,10 +162,10 @@ __global__ void bitonicSortLocal1(
 
 //Bitonic merge iteration for 'stride' >= LOCAL_SIZE_LIMIT
 __global__ void bitonicMergeGlobal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict__ d_DstKey,
+    unsigned int*__restrict__ d_DstVal,
+    const unsigned int*__restrict__ d_SrcKey,
+    const unsigned int*__restrict__ d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int size,
     const unsigned int stride,
@@ -186,8 +186,7 @@ __global__ void bitonicMergeGlobal(
   ComparatorPrivate(
       &keyA, &valA,
       &keyB, &valB,
-      ddd
-      );
+      ddd);
 
   d_DstKey[pos +      0] = keyA;
   d_DstVal[pos +      0] = valA;
@@ -198,10 +197,10 @@ __global__ void bitonicMergeGlobal(
 //Combined bitonic merge steps for
 //'size' > LOCAL_SIZE_LIMIT and 'stride' = [1 .. LOCAL_SIZE_LIMIT / 2]
 __global__ void bitonicMergeLocal(
-    unsigned int* d_DstKey,
-    unsigned int* d_DstVal,
-    unsigned int* d_SrcKey,
-    unsigned int* d_SrcVal,
+    unsigned int*__restrict__ d_DstKey,
+    unsigned int*__restrict__ d_DstVal,
+    const unsigned int*__restrict__ d_SrcKey,
+    const unsigned int*__restrict__ d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int size,
     unsigned int stride,
@@ -228,8 +227,7 @@ __global__ void bitonicMergeLocal(
     ComparatorLocal(
         &l_key[pos +      0], &l_val[pos +      0],
         &l_key[pos + stride], &l_val[pos + stride],
-        ddd
-             );
+        ddd);
   }
 
   __syncthreads();

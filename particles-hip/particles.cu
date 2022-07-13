@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -19,7 +20,6 @@
 
 static const size_t wgSize = 64;
 
-
 static size_t uSnap(size_t a, size_t b){
   return ((a % b) == 0) ? a : (a - (a % b) + b);
 }
@@ -35,7 +35,7 @@ void integrateSystem(
   dim3 gws (globalWorkSize/wgSize);
   dim3 lws (wgSize);
 
-  hipLaunchKernelGGL(integrateSystemK, dim3(gws), dim3(lws), 0, 0, d_Pos, d_Vel, params, deltaTime, numParticles);
+  hipLaunchKernelGGL(integrateSystemK, gws, lws, 0, 0, d_Pos, d_Vel, params, deltaTime, numParticles);
 }
 
 void calcHash(
@@ -49,7 +49,7 @@ void calcHash(
   dim3 gws (globalWorkSize/wgSize);
   dim3 lws (wgSize);
 
-  hipLaunchKernelGGL(calcHashK, dim3(gws), dim3(lws), 0, 0, d_Hash, d_Index, d_Pos, params, numParticles);
+  hipLaunchKernelGGL(calcHashK, gws, lws, 0, 0, d_Hash, d_Index, d_Pos, params, numParticles);
 }
 
 void memSet(
@@ -62,7 +62,7 @@ void memSet(
   dim3 gws (globalWorkSize/wgSize);
   dim3 lws (wgSize);
 
-  hipLaunchKernelGGL(memSetK, dim3(gws), dim3(lws), 0, 0, d_Data, val, N);
+  hipLaunchKernelGGL(memSetK, gws, lws, 0, 0, d_Data, val, N);
 }
 
 void findCellBoundsAndReorder(
@@ -83,7 +83,7 @@ void findCellBoundsAndReorder(
   dim3 gws (globalWorkSize/wgSize);
   dim3 lws (wgSize);
 
-  hipLaunchKernelGGL(findCellBoundsAndReorderK, dim3(gws), dim3(lws), (wgSize+1)*sizeof(unsigned int), 0, 
+  hipLaunchKernelGGL(findCellBoundsAndReorderK, gws, lws, (wgSize+1)*sizeof(unsigned int), 0, 
       d_CellStart,
       d_CellEnd, 
       d_ReorderedPos,
@@ -111,7 +111,7 @@ void collide(
   dim3 gws (globalWorkSize/wgSize);
   dim3 lws (wgSize);
 
-  hipLaunchKernelGGL(collideK, dim3(gws), dim3(lws), 0, 0, d_Vel, d_ReorderedPos, d_ReorderedVel, 
+  hipLaunchKernelGGL(collideK, gws, lws, 0, 0, d_Vel, d_ReorderedPos, d_ReorderedVel, 
       d_Index, d_CellStart, d_CellEnd, 
       params, numParticles);
 }

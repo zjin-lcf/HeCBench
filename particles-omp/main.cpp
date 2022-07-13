@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "particles.h"
 
 // Simulation parameters
@@ -68,9 +69,12 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
   }
 }
 
-
 int main(int argc, char** argv) 
 {
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
   const int iterations = atoi(argv[1]);               // Number of iterations
   unsigned int numParticles = NUM_PARTICLES;
   unsigned int gridDim = GRID_SIZE;
@@ -137,6 +141,8 @@ int main(int argc, char** argv)
                                 dCellStart[0:numGridCells], \
                                 dCellEnd[0:numGridCells])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
   {
     integrateSystem(
@@ -180,6 +186,11 @@ int main(int argc, char** argv)
         numParticles,
         numGridCells);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total execution time of %d loop iterations: %f (s)\n", iterations, time * 1e-9f);
+  printf("Average execution time of a loop iteration: %f (us)\n", (time * 1e-3f) / iterations);
 
 #ifdef DEBUG
   // results should not differ much from those in CUDA SDK 5_Simulation/particles

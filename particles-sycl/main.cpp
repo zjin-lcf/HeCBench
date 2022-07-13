@@ -34,7 +34,7 @@ const float fColliderRadius = 0.17f;      // Radius of collider for interacting 
 // Forward Function declarations
 //*****************************************************************************
 inline float frand(void){
-    return (float)rand() / (float)RAND_MAX;
+  return (float)rand() / (float)RAND_MAX;
 }
 
 void initGrid(float *hPos, float *hVel, float particleRadius, float spacing, 
@@ -69,161 +69,164 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
   }
 }
 
-
-
-// Main program
-//*****************************************************************************
 int main(int argc, char** argv) 
 {
-    const int iterations = atoi(argv[1]);               // Number of iterations
-    unsigned int numParticles = NUM_PARTICLES;
-    unsigned int gridDim = GRID_SIZE;
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
+  const int iterations = atoi(argv[1]);               // Number of iterations
+  unsigned int numParticles = NUM_PARTICLES;
+  unsigned int gridDim = GRID_SIZE;
 
-    // Set and log grid size and particle count, after checking optional command-line inputs
-    cl::sycl::uint3 gridSize;
-    gridSize.x() = gridSize.y() = gridSize.z() = gridDim;
+  // Set and log grid size and particle count, after checking optional command-line inputs
+  sycl::uint3 gridSize;
+  gridSize.x() = gridSize.y() = gridSize.z() = gridDim;
 
-    unsigned int numGridCells = gridSize.x() * gridSize.y() * gridSize.z();
-    //float3 worldSize = {2.0f, 2.0f, 2.0f};
+  unsigned int numGridCells = gridSize.x() * gridSize.y() * gridSize.z();
+  //float3 worldSize = {2.0f, 2.0f, 2.0f};
 
-    simParams_t params;
+  simParams_t params;
 
-    // set simulation parameters
-    params.gridSize = gridSize;
-    params.numCells = numGridCells;
-    params.numBodies = numParticles;
-    params.particleRadius = fParticleRadius; 
-    params.colliderPos = {1.2f, -0.8f, 0.8f};
-    params.colliderRadius = fColliderRadius;
+  // set simulation parameters
+  params.gridSize = gridSize;
+  params.numCells = numGridCells;
+  params.numBodies = numParticles;
+  params.particleRadius = fParticleRadius; 
+  params.colliderPos = {1.2f, -0.8f, 0.8f};
+  params.colliderRadius = fColliderRadius;
 
-    params.worldOrigin = {1.0f, -1.0f, -1.0f};
-    float cellSize = params.particleRadius * 2.0f;  // cell size equal to particle diameter
-    params.cellSize = {cellSize, cellSize, cellSize};
+  params.worldOrigin = {1.0f, -1.0f, -1.0f};
+  float cellSize = params.particleRadius * 2.0f;  // cell size equal to particle diameter
+  params.cellSize = {cellSize, cellSize, cellSize};
 
-    params.spring = 0.5f;
-    params.damping = 0.02f;
-    params.shear = 0.1f;
-    params.attraction = 0.0f;
-    params.boundaryDamping = -0.5f;
+  params.spring = 0.5f;
+  params.damping = 0.02f;
+  params.shear = 0.1f;
+  params.attraction = 0.0f;
+  params.boundaryDamping = -0.5f;
 
-    params.gravity = {0.0f, -0.0003f, 0.0f};
-    params.globalDamping = 1.0f;
+  params.gravity = {0.0f, -0.0003f, 0.0f};
+  params.globalDamping = 1.0f;
 
-    printf(" grid: %d x %d x %d = %d cells\n", gridSize.x(), gridSize.y(), gridSize.z(), numGridCells);
-    printf(" particles: %d\n\n", numParticles);
+  printf(" grid: %d x %d x %d = %d cells\n", gridSize.x(), gridSize.y(), gridSize.z(), numGridCells);
+  printf(" particles: %d\n\n", numParticles);
 
-    float* hPos          = (float*)malloc(numParticles * 4 * sizeof(float));
-    float* hVel          = (float*)malloc(numParticles * 4 * sizeof(float));
-    float* hReorderedPos = (float*)malloc(numParticles * 4 * sizeof(float));
-    float* hReorderedVel = (float*)malloc(numParticles * 4 * sizeof(float));
-    unsigned int* hHash      = (unsigned int*)malloc(numParticles * sizeof(unsigned int));
-    unsigned int* hIndex     = (unsigned int*)malloc(numParticles * sizeof(unsigned int));
-    unsigned int* hCellStart = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
-    unsigned int* hCellEnd   = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
+  float* hPos          = (float*)malloc(numParticles * 4 * sizeof(float));
+  float* hVel          = (float*)malloc(numParticles * 4 * sizeof(float));
+  float* hReorderedPos = (float*)malloc(numParticles * 4 * sizeof(float));
+  float* hReorderedVel = (float*)malloc(numParticles * 4 * sizeof(float));
+  unsigned int* hHash      = (unsigned int*)malloc(numParticles * sizeof(unsigned int));
+  unsigned int* hIndex     = (unsigned int*)malloc(numParticles * sizeof(unsigned int));
+  unsigned int* hCellStart = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
+  unsigned int* hCellEnd   = (unsigned int*)malloc(numGridCells * sizeof(unsigned int));
 
-    // configure grid
-    initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, numParticles);
+  // configure grid
+  initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, numParticles);
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    buffer<cl::sycl::float4, 1> dPos ((cl::sycl::float4*)hPos, numParticles);
-    buffer<cl::sycl::float4, 1> dVel ((cl::sycl::float4*)hVel, numParticles);
-    buffer<cl::sycl::float4, 1> dReorderedPos (numParticles);
-    buffer<cl::sycl::float4, 1> dReorderedVel (numParticles);
-    buffer<unsigned int, 1> dHash (numParticles);
-    buffer<unsigned int, 1> dIndex (numParticles);
-    buffer<unsigned int, 1> dCellStart (numGridCells);
-    buffer<unsigned int, 1> dCellEnd (numGridCells);
-    dPos.set_final_data(nullptr);
-    dVel.set_final_data(nullptr);
-    
-    for (int i = 0; i < iterations; i++)
-    {
-      integrateSystem(
-          q,
-          dPos,
-          dVel,
-          params,
-          timestep,
-          numParticles
-      );
+  buffer<sycl::float4, 1> dPos ((sycl::float4*)hPos, numParticles);
+  buffer<sycl::float4, 1> dVel ((sycl::float4*)hVel, numParticles);
+  buffer<sycl::float4, 1> dReorderedPos (numParticles);
+  buffer<sycl::float4, 1> dReorderedVel (numParticles);
+  buffer<unsigned int, 1> dHash (numParticles);
+  buffer<unsigned int, 1> dIndex (numParticles);
+  buffer<unsigned int, 1> dCellStart (numGridCells);
+  buffer<unsigned int, 1> dCellEnd (numGridCells);
+  dPos.set_final_data(nullptr);
+  dVel.set_final_data(nullptr);
 
-      calcHash(
-          q,
-          dHash,
-          dIndex,
-          dPos,
-          params,
-          numParticles
-      );
+  auto start = std::chrono::steady_clock::now();
 
-      bitonicSort(q, dHash, dIndex, dHash, dIndex, 1, numParticles, 0);
+  for (int i = 0; i < iterations; i++)
+  {
+    integrateSystem(
+        q,
+        dPos,
+        dVel,
+        params,
+        timestep,
+        numParticles);
 
-      //Find start and end of each cell and
-      //Reorder particle data for better cache coherency
-      findCellBoundsAndReorder(
-          q,
-          dCellStart,
-          dCellEnd,
-          dReorderedPos,
-          dReorderedVel,
-          dHash,
-          dIndex,
-          dPos,
-          dVel,
-          numParticles,
-          numGridCells
-      );
+    calcHash(
+        q,
+        dHash,
+        dIndex,
+        dPos,
+        params,
+        numParticles);
 
-      collide(
-          q,
-          dVel,
-          dReorderedPos,
-          dReorderedVel,
-          dIndex,
-          dCellStart,
-          dCellEnd,
-          params,
-          numParticles,
-          numGridCells
-      );
-    }
+    bitonicSort(q, dHash, dIndex, dHash, dIndex, 1, numParticles, 0);
 
-    q.wait();
+    //Find start and end of each cell and
+    //Reorder particle data for better cache coherency
+    findCellBoundsAndReorder(
+        q,
+        dCellStart,
+        dCellEnd,
+        dReorderedPos,
+        dReorderedVel,
+        dHash,
+        dIndex,
+        dPos,
+        dVel,
+        numParticles,
+        numGridCells);
+
+    collide(
+        q,
+        dVel,
+        dReorderedPos,
+        dReorderedVel,
+        dIndex,
+        dCellStart,
+        dCellEnd,
+        params,
+        numParticles,
+        numGridCells);
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total execution time of %d loop iterations: %f (s)\n", iterations, time * 1e-9f);
+  printf("Average execution time of a loop iteration: %f (us)\n", (time * 1e-3f) / iterations);
 
 #ifdef DEBUG
-    q.submit([&] (handler &cgh) {
-      auto acc = dPos.get_access<sycl_read>(cgh);
-      cgh.copy(acc, (cl::sycl::float4*)hPos);
-    });
-    q.submit([&] (handler &cgh) {
-      auto acc = dVel.get_access<sycl_read>(cgh);
-      cgh.copy(acc, (cl::sycl::float4*)hVel);
-    });
-    q.wait();
-    for (unsigned int i = 0; i < numParticles; i++) {
-      printf("%d: ", i);
-      printf("pos: (%.4f, %.4f, %.4f, %.4f)\n",
-          hPos[4*i], hPos[4*i+1], hPos[4*i+2], hPos[4*i+3]);
-      printf("vel: (%.4f, %.4f, %.4f, %.4f)\n",
-          hVel[4*i], hVel[4*i+1], hVel[4*i+2], hVel[4*i+3]);
-    }
+  q.submit([&] (handler &cgh) {
+    auto acc = dPos.get_access<sycl_read>(cgh);
+    cgh.copy(acc, (sycl::float4*)hPos);
+  });
+
+  q.submit([&] (handler &cgh) {
+    auto acc = dVel.get_access<sycl_read>(cgh);
+    cgh.copy(acc, (sycl::float4*)hVel);
+  });
+
+  q.wait();
+  for (unsigned int i = 0; i < numParticles; i++) {
+    printf("%d: ", i);
+    printf("pos: (%.4f, %.4f, %.4f, %.4f)\n",
+        hPos[4*i], hPos[4*i+1], hPos[4*i+2], hPos[4*i+3]);
+    printf("vel: (%.4f, %.4f, %.4f, %.4f)\n",
+        hVel[4*i], hVel[4*i+1], hVel[4*i+2], hVel[4*i+3]);
+  }
 #endif
 
+  free(hPos         );
+  free(hVel         );
+  free(hReorderedPos);
+  free(hReorderedVel);
+  free(hHash        );
+  free(hIndex       );
+  free(hCellStart   );
+  free(hCellEnd     );
 
-    free(hPos         );
-    free(hVel         );
-    free(hReorderedPos);
-    free(hReorderedVel);
-    free(hHash        );
-    free(hIndex       );
-    free(hCellStart   );
-    free(hCellEnd     );
-
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }

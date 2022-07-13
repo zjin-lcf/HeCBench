@@ -57,7 +57,6 @@ inline void operator*=(float4 &a, const float b)
     a.w *= b;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Save particle grid cell hashes and indices
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +79,6 @@ unsigned int getGridHash(int4 gridPos, const simParams_t &params)
   gridPos.z = gridPos.z & (params.gridSize.z - 1);
   return UMAD( UMAD(gridPos.z, params.gridSize.y, gridPos.y), params.gridSize.x, gridPos.x );
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process collisions (calculate accelerations)

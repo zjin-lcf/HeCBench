@@ -15,8 +15,8 @@ inline void ComparatorPrivate(
     unsigned int *valA,
     unsigned int *keyB,
     unsigned int *valB,
-    unsigned int dir
-){
+    unsigned int dir)
+{
     if( (*keyA > *keyB) == dir ){
         unsigned int t;
         t = *keyA; *keyA = *keyB; *keyB = t;
@@ -29,8 +29,8 @@ inline void ComparatorLocal(
     unsigned int* valA,
     unsigned int* keyB,
     unsigned int* valB,
-    const unsigned int dir
-){
+    const unsigned int dir)
+{
     if( (*keyA > *keyB) == dir ){
         unsigned int t;
         t = *keyA; *keyA = *keyB; *keyB = t;
@@ -50,8 +50,8 @@ void bitonicSortLocal(
     local_ptr<unsigned int> l_key,
     local_ptr<unsigned int> l_val,
     const unsigned int arrayLength,
-    const unsigned int dir
-){
+    const unsigned int dir)
+{
     //Offset to the beginning of subbatch and load data
     d_SrcKey += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
     d_SrcVal += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
@@ -110,8 +110,8 @@ void bitonicSortLocal1(
     global_ptr<unsigned int> d_SrcKey,
     global_ptr<unsigned int> d_SrcVal,
     local_ptr<unsigned int> l_key,
-    local_ptr<unsigned int> l_val
-){
+    local_ptr<unsigned int> l_val)
+{
     //Offset to the beginning of subarray and load data
     d_SrcKey += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
     d_SrcVal += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
@@ -170,8 +170,8 @@ void bitonicMergeGlobal(
     const unsigned int arrayLength,
     const unsigned int size,
     const unsigned int stride,
-    const unsigned int dir
-){
+    const unsigned int dir)
+{
     unsigned int global_comparatorI = item.get_global_id(0);
     unsigned int        comparatorI = global_comparatorI & (arrayLength / 2 - 1);
 
@@ -187,8 +187,7 @@ void bitonicMergeGlobal(
     ComparatorPrivate(
         &keyA, &valA,
         &keyB, &valB,
-        ddd
-    );
+        ddd);
 
     d_DstKey[pos +      0] = keyA;
     d_DstVal[pos +      0] = valA;
@@ -209,8 +208,8 @@ void bitonicMergeLocal(
     const unsigned int arrayLength,
     const unsigned int size,
     unsigned int stride,
-    const unsigned int dir
-){
+    const unsigned int dir)
+{
     d_SrcKey += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
     d_SrcVal += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
     d_DstKey += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
