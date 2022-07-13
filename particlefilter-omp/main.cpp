@@ -36,52 +36,18 @@
 //int C = 12345;
 
 
-
 #ifndef FLT_MAX
 #define FLT_MAX 3.40282347e+38
 #endif
 
-/*
-   void ocl_print_float_array(cl_command_queue cmd_q, cl_mem array_GPU, size_t size) {
-//allocate temporary array for printing
-float* mem = (float*) calloc(size, sizeof(float));
-
-//transfer data from device
-cl_int err = clEnqueueReadBuffer(cmd_q, array_GPU, 1, 0, sizeof (float) *size, mem, 0, 0, 0);
-if (err != CL_SUCCESS) {
-printf("ERROR: Memcopy Out\n");
-return;
-}
-
-
-printf("PRINTING ARRAY VALUES\n");
-//print values in memory
-for (size_t i = 0; i < size; ++i) {
-printf("[%d]:%0.6f\n", i, mem[i]);
-}
-printf("FINISHED PRINTING ARRAY VALUES\n");
-
-//clean up memory
-free(mem);
-mem = NULL;
-}
-*/
-
-
-/*
-   @brief cleans up the OpenCL framework
-   */
-/*****************************
- *GET_TIME
- *returns a long int representing the time
- *****************************/
+// returns a long int representing the time
 long long get_time() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) +tv.tv_usec;
+  return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
-/* Returns the number of seconds elapsed between the two specified times */
+// Returns the number of seconds elapsed between the two specified times
 float elapsed_time(long long start_time, long long end_time) {
   return (float) (end_time - start_time) / (1000 * 1000);
 }
@@ -430,13 +396,14 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
           I[0:IszX * IszY * Nfr], \
           objxy[0:2*countOnes])
   {
+    long long start = get_time();
 
     for (k = 1; k < Nfr; k++) {
       /****************** L I K E L I H O O D ************************************/
-#pragma omp target teams num_teams(num_blocks) thread_limit(BLOCK_SIZE)
+      #pragma omp target teams num_teams(num_blocks) thread_limit(BLOCK_SIZE)
       {
         float weights_local[BLOCK_SIZE];
-#pragma omp parallel
+        #pragma omp parallel
         {
           int block_id = omp_get_team_num();
           int thread_id = omp_get_thread_num();
@@ -463,7 +430,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
             arrayY[i] += -2.0f + 2.0f*(sqrtf(-2.0f*logf(u))*cosf(2.0f*PI*v));
           }
 
-#pragma omp barrier
+          #pragma omp barrier
 
           if(i < Nparticles)
           {
@@ -492,13 +459,13 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 
           weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
 
-#pragma omp barrier
+          #pragma omp barrier
 
           if(i < Nparticles){
             weights_local[thread_id] = weights[i];
           }
 
-#pragma omp barrier
+          #pragma omp barrier
 
           for(unsigned int s=block_dim/2; s>0; s>>=1)
           {
@@ -506,7 +473,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
             {
               weights_local[thread_id] += weights_local[thread_id + s];
             }
-#pragma omp barrier
+          #pragma omp barrier
           }
           if(thread_id == 0)
           {
@@ -515,7 +482,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
         }
       }
 
-#pragma omp target
+      #pragma omp target
       {
         float sum = 0;
         int num_blocks = (Nparticles + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -532,21 +499,23 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
           k, partial_sums[0]);
 #endif
 
-#pragma omp target teams num_teams(num_blocks) thread_limit(BLOCK_SIZE)
+      #pragma omp target teams num_teams(num_blocks) thread_limit(BLOCK_SIZE)
       {
         float u1;
         float sumWeights; 
-#pragma omp parallel
+        #pragma omp parallel
         {
           int local_id = omp_get_thread_num();
           int i = omp_get_team_num() * omp_get_num_threads() + local_id;
           if(0 == local_id)
             sumWeights = partial_sums[0];
-#pragma omp barrier
+
+          #pragma omp barrier
           if(i < Nparticles) {
             weights[i] = weights[i]/sumWeights;
           }
-#pragma omp barrier
+
+          #pragma omp barrier
           if(i == 0) {
             CDF[0] = weights[0];
             for(int x = 1; x < Nparticles; x++){
@@ -561,11 +530,12 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
               (sqrtf(-2.0f*logf(p))*cosf(2.0f*PI*q));
             // do this to allow all threads in all blocks to use the same u1
           }
-#pragma omp barrier
+
+          #pragma omp barrier
           if(0 == local_id)
             u1 = u[0];
 
-#pragma omp barrier
+          #pragma omp barrier
           if(i < Nparticles)
           {
             u[i] = u1 + i/((float)(Nparticles));
@@ -595,7 +565,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
       printf("distance: %lf\n", distance);
 #endif
 
-#pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
       for (int i = 0; i < Nparticles; i++)
       {
         int index = -1;
@@ -615,9 +585,14 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
         yj[i] = arrayY[index];
       }
     }//end loop
-  } // #pragma 
-  long long offload_end = get_time();
 
+    long long end = get_time();
+    printf("Average execution time of kernels: %f (s)\n",
+           elapsed_time(start, end) / (Nfr-1));
+
+  } // #pragma 
+
+  long long offload_end = get_time();
   printf("Device offloading time: %lf (s)\n", elapsed_time(offload_start, offload_end));
 
   xe = 0;
@@ -724,19 +699,22 @@ int main(int argc, char * argv[]) {
   int i;
   for (i = 0; i < Nparticles; i++)
     seed[i] = i+1;
-  //        seed[i] = time(0) * i;
+
   //calloc matrix
   unsigned char * I = (unsigned char *) calloc(IszX * IszY * Nfr, sizeof(unsigned char));
   long long start = get_time();
+
   //call video sequence
   videoSequence(I, IszX, IszY, Nfr, seed);
   long long endVideoSequence = get_time();
-  printf("VIDEO SEQUENCE TOOK %f\n", elapsed_time(start, endVideoSequence));
+  printf("VIDEO SEQUENCE TOOK %f (s)\n", elapsed_time(start, endVideoSequence));
+
   //call particle filter
   particleFilter(I, IszX, IszY, Nfr, seed, Nparticles);
   long long endParticleFilter = get_time();
-  printf("PARTICLE FILTER TOOK %f\n", elapsed_time(endVideoSequence, endParticleFilter));
-  printf("ENTIRE PROGRAM TOOK %f\n", elapsed_time(start, endParticleFilter));
+  printf("PARTICLE FILTER TOOK %f (s)\n", elapsed_time(endVideoSequence, endParticleFilter));
+
+  printf("ENTIRE PROGRAM TOOK %f (s)\n", elapsed_time(start, endParticleFilter));
 
   free(seed);
   free(I);

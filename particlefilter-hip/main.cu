@@ -34,8 +34,7 @@
 
 
 /*****************************
- *GET_TIME
- *returns a long int representing the time
+ * Returns a long int representing the time
  *****************************/
 long long get_time() {
   struct timeval tv;
@@ -235,7 +234,7 @@ void getneighbors(int * se, int numOnes, int * neighbors, int radius) {
  * The motion here is a linear motion
  * the foreground intensity and the backgrounf intensity is known
  * the image is corrupted with zero mean Gaussian noise
- * @param I The video itself
+ * @param I The video itsef
  * @param IszX The x dimension of the video
  * @param IszY The y dimension of the video
  * @param Nfr The number of frames of the video
@@ -360,7 +359,6 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   //  are set equal to xj before every iteration, so effectively, arrayX and
   //  arrayY will be set to xe and ye before the first iteration.
   for (x = 0; x < Nparticles; x++) {
-
     xj[x] = xe;
     yj[x] = ye;
   }
@@ -419,9 +417,12 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   hipMalloc((void**)&objxy_GPU, 2*countOnes*sizeof(int));
   hipMemcpy(objxy_GPU, objxy, 2*countOnes*sizeof(int), hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  long long start = get_time();
+  
   for (int k = 1; k < Nfr; k++) {
     /****************** L I K E L I H O O D ************************************/
-    hipLaunchKernelGGL(kernel_likelihood, dim3(num_blocks), dim3(BLOCK_SIZE), 0, 0, 
+    hipLaunchKernelGGL(kernel_likelihood, num_blocks, BLOCK_SIZE, 0, 0, 
         arrayX_GPU, arrayY_GPU, xj_GPU, yj_GPU, ind_GPU,
         objxy_GPU, likelihood_GPU, I_GPU, weights_GPU, seed_GPU, partial_sums_GPU,
         Nparticles, countOnes, IszY, Nfr, k, max_size);
@@ -434,7 +435,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     printf("\n");
 #endif
 
-    hipLaunchKernelGGL(kernel_sum, dim3(1), dim3(1), 0, 0, partial_sums_GPU, Nparticles);
+    hipLaunchKernelGGL(kernel_sum, 1, 1, 0, 0, partial_sums_GPU, Nparticles);
 
 #ifdef DEBUG
     // this shows the sum of all partial_sum results
@@ -442,7 +443,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
 #endif
 
-    hipLaunchKernelGGL(kernel_normalize_weights, dim3(num_blocks), dim3(BLOCK_SIZE), 0, 0, 
+    hipLaunchKernelGGL(kernel_normalize_weights, num_blocks, BLOCK_SIZE, 0, 0, 
         weights_GPU,
         partial_sums_GPU,
         CDF_GPU,
@@ -450,7 +451,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
         seed_GPU,
         Nparticles );
 
-    hipLaunchKernelGGL(kernel_find_index, dim3(num_blocks), dim3(BLOCK_SIZE), 0, 0, 
+    hipLaunchKernelGGL(kernel_find_index, num_blocks, BLOCK_SIZE, 0, 0, 
         arrayX_GPU,
         arrayY_GPU,
         CDF_GPU,
@@ -458,7 +459,12 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
         xj_GPU,
         yj_GPU,
         Nparticles );
-  }//end loop
+  } //end loop
+
+  hipDeviceSynchronize();
+  long long end = get_time();
+  printf("Average execution time of kernels: %f (s)\n",
+         elapsed_time(start, end) / (Nfr-1));
 
   hipMemcpy(arrayX, arrayX_GPU, Nparticles*sizeof(float), hipMemcpyDeviceToHost);
   hipMemcpy(arrayY, arrayY_GPU, Nparticles*sizeof(float), hipMemcpyDeviceToHost);
@@ -479,8 +485,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
   hipFree(I_GPU);
 
   long long offload_end = get_time();
-
-  printf("Device offloading time: %lf (s)\n", elapsed_time(offload_start, offload_end));
+  printf("Device offloading time: %f (s)\n", elapsed_time(offload_start, offload_end));
 
   xe = 0;
   ye = 0;
@@ -498,9 +503,9 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     printf( "The file was not opened for writing\n" );
     return -1;
   }
-  fprintf(fid, "XE: %lf\n", xe);
-  fprintf(fid, "YE: %lf\n", ye);
-  fprintf(fid, "distance: %lf\n", distance);
+  fprintf(fid, "XE: %f\n", xe);
+  fprintf(fid, "YE: %f\n", ye);
+  fprintf(fid, "distance: %f\n", distance);
   fclose(fid);
 
   //free regular memory
@@ -585,19 +590,22 @@ int main(int argc, char * argv[]) {
   int i;
   for (i = 0; i < Nparticles; i++)
     seed[i] = i+1;
-  //        seed[i] = time(0) * i;
+
   //calloc matrix
   unsigned char * I = (unsigned char *) calloc(IszX * IszY * Nfr, sizeof(unsigned char));
   long long start = get_time();
+
   //call video sequence
   videoSequence(I, IszX, IszY, Nfr, seed);
   long long endVideoSequence = get_time();
-  printf("VIDEO SEQUENCE TOOK %f\n", elapsed_time(start, endVideoSequence));
+  printf("VIDEO SEQUENCE TOOK %f (s)\n", elapsed_time(start, endVideoSequence));
+
   //call particle filter
   particleFilter(I, IszX, IszY, Nfr, seed, Nparticles);
   long long endParticleFilter = get_time();
-  printf("PARTICLE FILTER TOOK %f\n", elapsed_time(endVideoSequence, endParticleFilter));
-  printf("ENTIRE PROGRAM TOOK %f\n", elapsed_time(start, endParticleFilter));
+  printf("PARTICLE FILTER TOOK %f (s)\n", elapsed_time(endVideoSequence, endParticleFilter));
+
+  printf("ENTIRE PROGRAM TOOK %f (s)\n", elapsed_time(start, endParticleFilter));
 
   free(seed);
   free(I);
