@@ -232,6 +232,9 @@ int main(int argc, char** argv)
   dim3 gridDim (size/lws);
   dim3 blockDim (lws);
 
+  cudaDeviceSynchronize();
+  double kstart = get_time();
+
   for (int t = 0; t < rows - 1; t += pyramid_height)
   {
     // Calculate this for the kernel argument...
@@ -246,6 +249,10 @@ int main(int argc, char** argv)
     d_gpuSrc = temp;
   }
 
+  cudaDeviceSynchronize();
+  double kend = get_time();
+  printf("Total kernel execution time: %lf (s)\n", kend - kstart);
+
   cudaMemcpy(result, d_gpuSrc, sizeof(int)*cols, cudaMemcpyDeviceToHost);
   cudaMemcpy(outputBuffer, d_outputBuffer, sizeof(int)*16348, cudaMemcpyDeviceToHost);
 
@@ -255,7 +262,7 @@ int main(int argc, char** argv)
   cudaFree(d_outputBuffer);
 
   double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+  printf("Device offloading time = %lf (s)\n", offload_end - offload_start);
 
   // add a null terminator at the end of the string.
   outputBuffer[16383] = '\0';

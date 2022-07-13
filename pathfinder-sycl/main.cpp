@@ -122,42 +122,54 @@ int main(int argc, char** argv)
     buffer<int,1> d_gpuWall (data + cols, size-cols, props);
     buffer<int,1> d_gpuSrc (data, cols, props);
     buffer<int,1> d_gpuResult (cols);
+    buffer<int,1> d_outputBuffer (h_outputBuffer, 16384, props);
+
     d_gpuSrc.set_final_data(nullptr);
     d_gpuResult.set_final_data(nullptr);
-    buffer<int,1> d_outputBuffer (h_outputBuffer, 16384, props);
+
+    double kstart = 0.0;
 
     for (int t = 0; t < rows - 1; t += pyramid_height)
     {
+      // exclude host-to-device data transfer in the first iteration
+      if (t == pyramid_height) {
+        q.wait();
+        kstart = get_time();
+      }
+
       // Calculate this for the kernel argument...
       int iteration = MIN(pyramid_height, rows-t-1);
 
       q.submit([&](handler& cgh) {
-          auto gpuWall_acc = d_gpuWall.get_access<sycl_read>(cgh);
-          auto gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
-          auto gpuResult_acc = d_gpuResult.get_access<sycl_write>(cgh);
-          auto outputBuffer_acc = d_outputBuffer.get_access<sycl_write>(cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> prev (lws, cgh);
-          accessor <int, 1, sycl_read_write, access::target::local> result (lws, cgh);
+        auto gpuWall_acc = d_gpuWall.get_access<sycl_read>(cgh);
+        auto gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
+        auto gpuResult_acc = d_gpuResult.get_access<sycl_write>(cgh);
+        auto outputBuffer_acc = d_outputBuffer.get_access<sycl_discard_write>(cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> prev (lws, cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> result (lws, cgh);
 
-          // Set the kernel arguments.
-          cgh.parallel_for<class dynproc_kernel>(
-              nd_range<1>(range<1>(size), range<1>(lws)), [=] (nd_item<1> item) {
-#include "kernel.sycl"
-              });
-          });
+        // Set the kernel arguments.
+        cgh.parallel_for<class dynproc_kernel>(
+            nd_range<1>(range<1>(size), range<1>(lws)), [=] (nd_item<1> item) {
+            #include "kernel.sycl"
+        });
+      });
 
       auto temp = std::move(d_gpuResult) ;
       d_gpuResult = std::move(d_gpuSrc);
       d_gpuSrc = std::move(temp);
     } // for
 
+    q.wait();
+    double kend = get_time();
+    printf("Total kernel execution time: %lf (s)\n", kend - kstart);
+
     // Copy results back to host.
     q.submit([&](handler& cgh) {
       auto d_gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
       cgh.copy(d_gpuSrc_acc, result);
-    });
+    }).wait();
 
-    q.wait();
   } // SYCL scope
 
   double offload_end = get_time();
