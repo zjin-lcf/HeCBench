@@ -34,7 +34,6 @@ int maximum( int a, int b, int c){
     return(k);
 }
 
-
 //global variables
 
 int blosum62[24][24] = {
@@ -136,8 +135,6 @@ int main(int argc, char **argv){
   for( int j = 1; j< max_cols ; j++)
     h_input_itemsets[j] = input_itemsets[j] = -j * penalty;
 
-  auto offload_start = std::chrono::steady_clock::now();
-
   int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
   if(workgroupsize < 0){
@@ -164,6 +161,9 @@ int main(int argc, char **argv){
   #ifdef DEBUG
     printf("Processing upper-left matrix\n");
   #endif
+    
+    auto start = std::chrono::steady_clock::now();
+  
     for(int blk = 1 ; blk <= block_width ; blk++){
       global_work = blk;
       #pragma omp target teams num_teams(global_work) thread_limit(local_work)
@@ -245,8 +245,6 @@ int main(int argc, char **argv){
     printf("Processing lower-right matrix\n");
   #endif
   
-    auto start = std::chrono::steady_clock::now();
-  
     for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
       global_work = blk;
       #pragma omp target teams num_teams(global_work) thread_limit(local_work)
@@ -323,12 +321,8 @@ int main(int argc, char **argv){
   
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total kernel execution time (kernel2): %f (s)\n", time * 1e-9f);
+    printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   }
-
-  auto offload_end = std::chrono::steady_clock::now();
-  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
-  printf("Device offloading time = %f (s)\n", offload_time * 1e-9);
 
   // verify
   nw_host(h_input_itemsets, reference, max_cols, penalty);
