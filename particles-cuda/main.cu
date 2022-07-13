@@ -9,16 +9,17 @@
  *
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <chrono>
+#include <cuda.h>
+#include "particles.h"
+
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
 #define GRID_SIZE         64
 #define NUM_PARTICLES     16384
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <cuda.h>
-#include "particles.h"
 
 // Simulation parameters
 const float timestep = 0.5f;              // Time slice for re-computation iteration
@@ -68,12 +69,13 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
   }
 }
 
-
-
 // Main program
-//*****************************************************************************
 int main(int argc, char** argv) 
 {
+  if (argc != 2) {
+    printf("Usage: %s <iterations>\n", argv[0]);
+    return 1;
+  }
   const int iterations = atoi(argv[1]);               // Number of iterations
   unsigned int numParticles = NUM_PARTICLES;
   unsigned int gridDim = GRID_SIZE;
@@ -81,9 +83,7 @@ int main(int argc, char** argv)
   // Set and log grid size and particle count, after checking optional command-line inputs
   uint3 gridSize;
   gridSize.x = gridSize.y = gridSize.z = gridDim;
-
   unsigned int numGridCells = gridSize.x * gridSize.y * gridSize.z;
-  //float3 worldSize = {2.0f, 2.0f, 2.0f};
 
   // set simulation parameters
   simParams_t params;
@@ -151,6 +151,8 @@ int main(int argc, char** argv)
   unsigned int* dCellEnd;
   cudaMalloc((void**)&dCellEnd, numGridCells * sizeof(unsigned int));
 
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < iterations; i++)
   {
     integrateSystem(
@@ -158,16 +160,14 @@ int main(int argc, char** argv)
         dVel,
         params,
         timestep,
-        numParticles
-             );
+        numParticles);
 
     calcHash(
         dHash,
         dIndex,
         dPos,
         params,
-        numParticles
-      );
+        numParticles);
 
     bitonicSort(dHash, dIndex, dHash, dIndex, 1, numParticles, 0);
 
@@ -183,8 +183,7 @@ int main(int argc, char** argv)
         dPos,
         dVel,
         numParticles,
-        numGridCells
-        );
+        numGridCells);
 
     collide(
         dVel,
@@ -195,11 +194,14 @@ int main(int argc, char** argv)
         dCellEnd,
         params,
         numParticles,
-        numGridCells
-           );
+        numGridCells);
   }
 
   cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total execution time of %d loop iterations: %f (s)\n", iterations, time * 1e-9f);
+  printf("Average execution time of a loop iteration: %f (us)\n", (time * 1e-3f) / iterations);
 
 #ifdef DEBUG
   // results should not differ much from those in CUDA SDK 5_Simulation/particles

@@ -34,8 +34,7 @@ void bitonicSort(
     unsigned int *d_srcVal,
     unsigned int batch,
     unsigned int arrayLength,
-    unsigned int dir
-    )
+    unsigned int dir)
 {
   if(arrayLength < 2) return;
 

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -34,8 +35,7 @@ void bitonicSort(
     unsigned int *d_srcVal,
     unsigned int batch,
     unsigned int arrayLength,
-    unsigned int dir
-    )
+    unsigned int dir)
 {
   if(arrayLength < 2) return;
 
@@ -58,7 +58,7 @@ void bitonicSort(
     dim3 bs_gws (globalWorkSize/localWorkSize);
     dim3 bs_lws (localWorkSize);
 
-    hipLaunchKernelGGL(bitonicSortLocal, dim3(bs_gws), dim3(bs_lws), 0, 0, 
+    hipLaunchKernelGGL(bitonicSortLocal, bs_gws, bs_lws, 0, 0, 
         d_dstKey,  
         d_dstVal,  
         d_srcKey,  
@@ -73,7 +73,7 @@ void bitonicSort(
     globalWorkSize = batch * arrayLength / 2;
     dim3 bs1_gws (globalWorkSize/localWorkSize);
     dim3 bs1_lws (localWorkSize);
-    hipLaunchKernelGGL(bitonicSortLocal1, dim3(bs1_gws), dim3(bs1_lws), 0, 0, 
+    hipLaunchKernelGGL(bitonicSortLocal1, bs1_gws, bs1_lws, 0, 0, 
         d_dstKey,
         d_dstVal,
         d_srcKey,
@@ -91,7 +91,7 @@ void bitonicSort(
           dim3 bmg_gws (globalWorkSize/localWorkSize);
           dim3 bmg_lws (localWorkSize);
 
-          hipLaunchKernelGGL(bitonicMergeGlobal, dim3(bmg_gws), dim3(bmg_lws), 0, 0, 
+          hipLaunchKernelGGL(bitonicMergeGlobal, bmg_gws, bmg_lws, 0, 0, 
               d_dstKey,
               d_dstVal,
               d_dstKey,
@@ -111,7 +111,7 @@ void bitonicSort(
           dim3 bml_lws (localWorkSize);
 
           assert(stride < LOCAL_SIZE_LIMIT);
-          hipLaunchKernelGGL(bitonicMergeLocal, dim3(bml_gws), dim3(bml_lws), 0, 0, 
+          hipLaunchKernelGGL(bitonicMergeLocal, bml_gws, bml_lws, 0, 0, 
               d_dstKey,
               d_dstVal,
               d_dstKey,

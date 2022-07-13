@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -9,60 +8,14 @@
  * is strictly prohibited.
  *
  */
-inline __device__ void operator+=(float4 &a, float4 b)
-{
-    a.x += b.x;
-    a.y += b.y;
-    a.z += b.z;
-    a.w += b.w;
-}
-
-inline __device__ float4 operator+(float4 a, float4 b)
-{
-    return make_float4(a.x + b.x, a.y + b.y, a.z + b.z,  a.w + b.w);
-}
-
-inline __device__ int4 operator+(int4 a, int4 b)
-{
-    return make_int4(a.x + b.x, a.y + b.y, a.z + b.z,  a.w + b.w);
-}
-
-inline __device__ float4 operator*(float4 a, float4 b)
-{
-    return make_float4(a.x * b.x, a.y * b.y, a.z * b.z,  a.w * b.w);
-}
-
-inline __device__ float4 operator-(float4 a, float4 b)
-{
-    return make_float4(a.x - b.x, a.y - b.y, a.z - b.z,  a.w - b.w);
-}
-
-inline __device__ float4 operator*(float4 a, float b)
-{
-    return make_float4(a.x * b, a.y * b, a.z * b,  a.w * b);
-}
-
-inline __device__ float4 operator*(float b, float4 a)
-{
-    return make_float4(b * a.x, b * a.y, b * a.z, b * a.w);
-}
-
-inline __device__ void operator*=(float4 &a, const float b)
-{
-    a.x *= b;
-    a.y *= b;
-    a.z *= b;
-    a.w *= b;
-}
-
-
+#include "hip/hip_runtime.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Euler integration
 ////////////////////////////////////////////////////////////////////////////////
 __global__ void integrateSystemK(
-    float4* d_Pos,  //input/output
-    float4* d_Vel,  //input/output
+    float4*__restrict__ d_Pos,  //input/output
+    float4*__restrict__ d_Vel,  //input/output
     const simParams_t params,
     const float deltaTime,
     const unsigned int numParticles)
@@ -120,7 +73,6 @@ __global__ void integrateSystemK(
   //printf("after %d %3.f %3.f %3.f\n", index, pos.x, pos.y, pos.z);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Save particle grid cell hashes and indices
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,12 +98,11 @@ unsigned int getGridHash(int4 gridPos, const simParams_t &params)
   return UMAD( UMAD(gridPos.z, params.gridSize.y, gridPos.y), params.gridSize.x, gridPos.x );
 }
 
-
 //Calculate grid hash value for each particle
 __global__ void calcHashK(
-    unsigned int* d_Hash, //output
-    unsigned int* d_Index, //output
-    const float4* d_Pos, //input: positions
+    unsigned int*__restrict__ d_Hash, //output
+    unsigned int*__restrict__ d_Index, //output
+    const float4*__restrict__ d_Pos, //input: positions
     const simParams_t params,
     unsigned int numParticles)
 {
@@ -169,8 +120,6 @@ __global__ void calcHashK(
   d_Index[index] = index;
 }
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // Find cell bounds and reorder positions+velocities by sorted indices
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,26 +129,25 @@ __global__ void memSetK(
     const unsigned int N)
 {
   unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if(i < N)
-    d_Data[i] = val;
+  if(i < N) d_Data[i] = val;
 }
 
 __global__ void findCellBoundsAndReorderK(
-    unsigned int* d_CellStart,     //output: cell start index
-    unsigned int* d_CellEnd,       //output: cell end index
-    float4* d_ReorderedPos,  //output: reordered by cell hash positions
-    float4* d_ReorderedVel,  //output: reordered by cell hash velocities
-    const unsigned int* d_Hash,    //input: sorted grid hashes
-    const unsigned int* d_Index,   //input: particle indices sorted by hash
-    const float4* d_Pos,     //input: positions array sorted by hash
-    const float4* d_Vel,     //input: velocity array sorted by hash
-    const unsigned int    numParticles)
+    unsigned int*__restrict__ d_CellStart,     //output: cell start index
+    unsigned int*__restrict__ d_CellEnd,       //output: cell end index
+    float4*__restrict__ d_ReorderedPos,  //output: reordered by cell hash positions
+    float4*__restrict__ d_ReorderedVel,  //output: reordered by cell hash velocities
+    const unsigned int*__restrict__ d_Hash,    //input: sorted grid hashes
+    const unsigned int*__restrict__ d_Index,   //input: particle indices sorted by hash
+    const float4*__restrict__ d_Pos,     //input: positions array sorted by hash
+    const float4*__restrict__ d_Vel,     //input: velocity array sorted by hash
+    const unsigned int numParticles)
 {
   unsigned int hash;
   const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
   const unsigned int lid = threadIdx.x;
 
-  HIP_DYNAMIC_SHARED( unsigned int, localHash)
+  extern __shared__ unsigned int localHash[];
 
   //Handle case when no. of particles not multiple of block size
   if(index < numParticles){
@@ -242,8 +190,6 @@ __global__ void findCellBoundsAndReorderK(
     d_ReorderedVel[index] = vel;
   }
 }
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process collisions (calculate accelerations)
@@ -291,21 +237,18 @@ float4 collideSpheres(
   return force;
 }
 
-
-
 __global__ void collideK(
-    float4* d_Vel,          //output: new velocity
-    const float4* d_ReorderedPos, //input: reordered positions
-    const float4* d_ReorderedVel, //input: reordered velocities
-    const unsigned int* d_Index,        //input: reordered particle indices
-    const unsigned int* d_CellStart,    //input: cell boundaries
-    const unsigned int* d_CellEnd,
+    float4*__restrict__ d_Vel,          //output: new velocity
+    const float4*__restrict__ d_ReorderedPos, //input: reordered positions
+    const float4*__restrict__ d_ReorderedVel, //input: reordered velocities
+    const unsigned int*__restrict__ d_Index,        //input: reordered particle indices
+    const unsigned int*__restrict__ d_CellStart,    //input: cell boundaries
+    const unsigned int*__restrict__ d_CellEnd,
     const simParams_t params,
     const unsigned int numParticles)
 {
   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-  if(index >= numParticles)
-    return;
+  if(index >= numParticles) return;
 
   float4   pos = d_ReorderedPos[index];
   float4   vel = d_ReorderedVel[index];
@@ -339,8 +282,7 @@ __global__ void collideK(
               pos, pos2,
               vel, vel2,
               params.particleRadius, params.particleRadius, 
-              params.spring, params.damping, params.shear, params.attraction
-              );
+              params.spring, params.damping, params.shear, params.attraction);
         }
       }
 
@@ -349,8 +291,7 @@ __global__ void collideK(
       pos, {params.colliderPos.x, params.colliderPos.y, params.colliderPos.z, 0},
       vel, {0, 0, 0, 0},
       params.particleRadius, params.colliderRadius,
-      params.spring, params.damping, params.shear, params.attraction
-      );
+      params.spring, params.damping, params.shear, params.attraction);
 
   //Write new velocity back to original unsorted location
   d_Vel[d_Index[index]] = vel + force;

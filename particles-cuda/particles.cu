@@ -19,7 +19,6 @@
 
 static const size_t wgSize = 64;
 
-
 static size_t uSnap(size_t a, size_t b){
   return ((a % b) == 0) ? a : (a - (a % b) + b);
 }

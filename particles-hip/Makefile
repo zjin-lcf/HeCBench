@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../particles-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -32,7 +32,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -46,18 +45,17 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cu particles.h
+main.o: main.cu ../particles-cuda/particles.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-bitonicSort.o : bitonicSort.cu bitonicSort_kernels.cu particles.h
+bitonicSort.o : bitonicSort.cu bitonicSort_kernels.cu ../particles-cuda/particles.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-particles.o : particles.cu particles_kernels.cu particles.h
+particles.o : particles.cu particles_kernels.cu ../particles-cuda/particles.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100
-
+	./$(program) 10000
