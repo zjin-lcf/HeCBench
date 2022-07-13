@@ -292,8 +292,6 @@ int main(int argc, char **argv){
   for( int j = 1; j< max_cols ; j++)
     input_itemsets[j] = -j * penalty;
 
-  auto offload_start = std::chrono::steady_clock::now();
-
   int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
   if(workgroupsize < 0){
@@ -322,6 +320,9 @@ int main(int argc, char **argv){
   cudaMemcpy(d_input_itemsets, input_itemsets, max_cols * max_rows * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_reference, reference, max_cols * max_rows * sizeof(int), cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
 #ifdef DEBUG
   printf("Processing upper-left matrix\n");
 #endif
@@ -333,9 +334,6 @@ int main(int argc, char **argv){
 #ifdef DEBUG
   printf("Processing lower-right matrix\n");
 #endif
-  cudaDeviceSynchronize();
-  auto start = std::chrono::steady_clock::now();
-  
   for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
     global_work = blk;
     kernel2<<<global_work, local_work>>>(d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
@@ -344,12 +342,9 @@ int main(int argc, char **argv){
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Total kernel execution time (kernel2): %f (s)\n", time * 1e-9f);
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
 
   cudaMemcpy(output_itemsets, d_input_itemsets, max_cols * max_rows * sizeof(int), cudaMemcpyDeviceToHost);
-  auto offload_end = std::chrono::steady_clock::now();
-  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
-  printf("Device offloading time = %f (s)\n", offload_time * 1e-9);
 
   // verify
   nw_host(input_itemsets, reference, max_cols, penalty);
