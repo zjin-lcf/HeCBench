@@ -207,12 +207,13 @@ int main(int argc, char** argv)
      pyramid_height, cols, borderCols, NUMBER_THREADS, blockCols, smallBlockCol); */
 
   int size = rows * cols; // the size (global work size) is a multiple of lws 
+
   // running the opencl application shows lws=4000 (cpu) and lws=250 (gpu)
   int lws = 250;
+  int* outputBuffer = (int*)calloc(16384, sizeof(int));
   int theHalo = HALO;
 
   double offload_start = get_time();
-  int* outputBuffer = (int*)calloc(16384, sizeof(int));
 
   int* d_gpuWall;
   hipMalloc((void**)&d_gpuWall, sizeof(int)*(size-cols));
@@ -231,8 +232,15 @@ int main(int argc, char** argv)
   dim3 gridDim (size/lws);
   dim3 blockDim (lws);
 
+  double kstart = 0.0;
+
   for (int t = 0; t < rows - 1; t += pyramid_height)
   {
+    if (t == pyramid_height) {
+      hipDeviceSynchronize();
+      kstart = get_time();
+    }
+
     // Calculate this for the kernel argument...
     int iteration = MIN(pyramid_height, rows-t-1);
 
@@ -245,6 +253,10 @@ int main(int argc, char** argv)
     d_gpuSrc = temp;
   }
 
+  hipDeviceSynchronize();
+  double kend = get_time();
+  printf("Total kernel execution time: %lf (s)\n", kend - kstart);
+
   hipMemcpy(result, d_gpuSrc, sizeof(int)*cols, hipMemcpyDeviceToHost);
   hipMemcpy(outputBuffer, d_outputBuffer, sizeof(int)*16348, hipMemcpyDeviceToHost);
 
@@ -252,6 +264,9 @@ int main(int argc, char** argv)
   hipFree(d_gpuSrc);
   hipFree(d_gpuWall);
   hipFree(d_outputBuffer);
+
+  double offload_end = get_time();
+  printf("Device offloading time = %lf (s)\n", offload_end - offload_start);
 
   // add a null terminator at the end of the string.
   outputBuffer[16383] = '\0';
@@ -270,9 +285,6 @@ int main(int argc, char** argv)
   delete[] wall;
   delete[] result;
   free(outputBuffer);
-
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
   return EXIT_SUCCESS;
 }

@@ -120,8 +120,14 @@ int main(int argc, char** argv)
                         map(to: gpuWall[0:size-cols]) \
                         map(from: outputBuffer[0:16384])
   {
+    double kstart = 0.0;
+
     for (int t = 0; t < rows - 1; t += pyramid_height)
     {
+      if (t == pyramid_height) {
+        kstart = get_time();
+      }
+
       // Calculate this for the kernel argument...
       int iteration = MIN(pyramid_height, rows-t-1);
 
@@ -231,7 +237,11 @@ int main(int argc, char** argv)
       int *temp = gpuResult;
       gpuResult = gpuSrc;
       gpuSrc = temp;
-    } 
+    }
+
+    double kend = get_time();
+    printf("Total kernel execution time: %lf (s)\n", kend - kstart);
+
     #pragma omp target update from(gpuSrc[0:cols])
   }
 
