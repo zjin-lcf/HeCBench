@@ -1,3 +1,4 @@
+#include <chrono>
 #include <new>
 #include <string>
 #include <stdio.h>
@@ -114,6 +115,11 @@ void KernelPool2DGrad(
 
 int main(int argc, char* argv[])
 {
+  if (argc != 8) {
+    printf("Usage: %s <batch> <input channels> <input height> ", argv[0]);
+    printf("<input width> <output height> <output width> <repeat>\n");
+    return 1;
+  }
   // input
   const int batch_size = atoi(argv[1]);
   const int input_channels = atoi(argv[2]);
@@ -123,6 +129,10 @@ int main(int argc, char* argv[])
   // output
   const int output_height = atoi(argv[5]);
   const int output_width = atoi(argv[6]);
+
+  // repeat
+  const int repeat = atoi(argv[7]);
+
   const int input_numel = batch_size*input_channels*input_height*input_width;
   const int output_numel = batch_size*input_channels*output_height*output_width;
 
@@ -165,12 +175,25 @@ int main(int argc, char* argv[])
                                   output_grad[0:output_numel]) \
                           map(from: input_grad[0:input_numel])
   {
-    for (int i = 0; i < 100; i++) 
+    // warmup
+    KernelPool2DGrad<AvgPoolGrad<float>, float>(
+      nthreads, input, output, output_grad, input_channels,
+      input_height, input_width, output_height, output_width, ksize_height,
+      ksize_width, stride_height, stride_width, padding_height, padding_width,
+      pool_process, exclusive, input_grad, channel_last);
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) 
       KernelPool2DGrad<AvgPoolGrad<float>, float>(
         nthreads, input, output, output_grad, input_channels,
         input_height, input_width, output_height, output_width, ksize_height,
         ksize_width, stride_height, stride_width, padding_height, padding_width,
         pool_process, exclusive, input_grad, channel_last);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verify
@@ -196,4 +219,3 @@ int main(int argc, char* argv[])
   delete[] output_grad;
   return 0;
 }
-
