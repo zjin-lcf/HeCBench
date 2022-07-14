@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <math.h>
 #include "common.h"
 
 typedef struct {
@@ -99,7 +100,8 @@ void init (nd_item<1> &item, float* data, int size) {
   data[index] = LCG_random(&seed);
 }
 
-void test(queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum &cs) {
+void test(queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers,
+          checksum &cs, double &time) {
 
   // Input/output data
   int numElements = hiddenSize * miniBatch;
@@ -167,6 +169,8 @@ void test(queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
   range<1> gws_p ((numElements + 255)/256*256);
   
+  double ktime = 0.0;
+
   while (true) {
     // Many layer "scheduling".
     if (lEnd == 0) {
@@ -205,7 +209,9 @@ void test(queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers,
     rEnd = rStart + recurBatchSize;
     if (rEnd > seqLength) rEnd = seqLength;
 
-    for (int layer = lStart; layer < lEnd; layer++) {         
+    auto start = std::chrono::steady_clock::now();
+
+    for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
         q.submit([&] (handler &cgh) {
           auto tmp_h = d_tmp_h.get_access<sycl_read>(cgh);
@@ -230,7 +236,14 @@ void test(queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers,
 	  });
         });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  time += ktime;
+  //printf("Kernel execution time: %f (s)\n", ktime * 1e-9f);
 
   float *testOutputi = (float*)malloc(numElements * seqLength * sizeof(float));
   float *testOutputh = (float*)malloc(numElements * numLayers * sizeof(float));
@@ -292,12 +305,14 @@ int main(int argc, char* argv[]) {
   int numLayers;
   int hiddenSize;
   int miniBatch; 
+  int numRuns;
 
-  if (argc == 5) {
+  if (argc == 6) {
     seqLength = atoi(argv[1]);
     numLayers = atoi(argv[2]);
     hiddenSize = atoi(argv[3]);
     miniBatch = atoi(argv[4]);   
+    numRuns = atoi(argv[5]);   
   }
   else if (argc == 1) {
     printf("Running with default settings\n");
@@ -305,16 +320,16 @@ int main(int argc, char* argv[]) {
     numLayers = 4;
     hiddenSize = 512;
     miniBatch = 64;
+    numRuns = 1;
   }
   else {
-    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch>\n", argv[1]);
+    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch> <repeat>\n", argv[0]);
     return 1;      
   }
 
   printf("seqLength %d, numLayers %d, hiddenSize %d, miniBatch %d\n",
          seqLength, numLayers, hiddenSize, miniBatch);  
 
-  int numRuns = 100;
   checksum cs;
 
 #ifdef USE_GPU
@@ -324,10 +339,13 @@ int main(int argc, char* argv[]) {
 #endif
   queue q(dev_sel);
 
+  double time = 0.0;
+
   for (int run = 0; run < numRuns; run++) {
-    test(q, hiddenSize, miniBatch, seqLength, numLayers, cs);
+    test(q, hiddenSize, miniBatch, seqLength, numLayers, cs, time);
   }
 
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / numRuns);
   printf("i checksum %E     ", cs.i);
   printf("c checksum %E     ", cs.c);
   printf("h checksum %E\n", cs.h);
