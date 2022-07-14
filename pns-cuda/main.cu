@@ -56,7 +56,7 @@ void* AllocateDeviceMemory(int size);
 void CopyFromDeviceMemory(void* h_p, void* d_p, int size);
 void CopyFromHostMemory(void* d_p, void* h_p, int size);
 void FreeDeviceMemory(void* mem);
-void PetrinetOnDevice();
+void PetrinetOnDevice(long long &ktime);
 void compute_statistics();
 
 float results[4];
@@ -98,11 +98,15 @@ int main(int argc, char** argv)
   h_maxs = (int*)malloc(t*sizeof(int));
   
   // compute the simulation on the GPU
-  auto start = get_time();
+  long long ktime = 0;
 
-  PetrinetOnDevice();
+  auto start = get_time();
+  
+  PetrinetOnDevice(ktime);
 
   auto end = get_time();
+
+  printf("Total kernel execution time: %.2f s\n", ktime / 1e6f);
   printf("Total device execution time: %.2f s\n", (end - start) / 1e6f);
 
   compute_statistics();
@@ -137,7 +141,7 @@ void compute_statistics()
   results[3] = sum_max_vars/t - results[2]*results[2];
 }
 
-void PetrinetOnDevice()
+void PetrinetOnDevice(long long &time)
 {
   // Allocate memory
   int i;
@@ -170,24 +174,34 @@ void PetrinetOnDevice()
 
   // Launch the device computation threads!
   for (i = 0; i<t-block_num; i+=block_num) 
-    {
-      PetrinetKernel<<<grid, threads>>>
-	(g_places, g_vars, g_maxs, N, s, 5489*(i+1));
-      CUDA_ERRCK
+  {
+    auto start = get_time();
 
-      CopyFromDeviceMemory(p_hmaxs, g_maxs, block_num*sizeof(int));
-      CUDA_ERRCK
-      CopyFromDeviceMemory(p_hvars, g_vars, block_num*sizeof(float));
-      CUDA_ERRCK
+    PetrinetKernel<<<grid, threads>>>
+      (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
 
-      p_hmaxs += block_num;
-      p_hvars += block_num;
-    }
+    cudaDeviceSynchronize();
+    auto end = get_time();
+    time += end - start;
+
+    CopyFromDeviceMemory(p_hmaxs, g_maxs, block_num*sizeof(int));
+    CUDA_ERRCK
+    CopyFromDeviceMemory(p_hvars, g_vars, block_num*sizeof(float));
+    CUDA_ERRCK
+
+    p_hmaxs += block_num;
+    p_hvars += block_num;
+  }
 	
   dim3 grid1(t-i);
+  auto start = get_time();
+
   PetrinetKernel<<<grid1, threads>>>
     (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
-  CUDA_ERRCK
+
+  cudaDeviceSynchronize();
+  auto end = get_time();
+  time += end - start;
 
   // Read result from the device
   CopyFromDeviceMemory(p_hmaxs, g_maxs, (t-i)*sizeof(int));

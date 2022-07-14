@@ -47,7 +47,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 static int N, S, T, NSQUARE2;
 uint32 host_mt[MERS_N];
 
-void PetrinetOnDevice();
+void PetrinetOnDevice(long long &ktime);
 void compute_statistics();
 
 float results[4];
@@ -89,10 +89,11 @@ int main(int argc, char** argv)
   h_maxs = (int*)malloc(T*sizeof(int));
   
   // compute the simulation on the GPU
+  long long ktime = 0;
 
   auto start = get_time();
 
-  PetrinetOnDevice();
+  PetrinetOnDevice(ktime);
 
   auto end = get_time();
   printf("Total device execution time: %.2f s\n", (end - start) / 1e6f);
@@ -129,7 +130,7 @@ void compute_statistics()
   results[3] = sum_max_vars/T - results[2]*results[2];
 }
 
-void PetrinetOnDevice()
+void PetrinetOnDevice(long long &time)
 {
   // Allocate memory
   int i;
@@ -153,6 +154,8 @@ void PetrinetOnDevice()
   {
     // Launch the device computation threads!
     for (i = 0; i<T-block_num; i+=block_num) {
+      auto start = get_time();
+
       #pragma omp target teams num_teams(block_num) thread_limit(256)
       {
         uint32 mt [MERS_N];
@@ -161,6 +164,9 @@ void PetrinetOnDevice()
           PetrinetKernel(mt, g_places, g_vars, g_maxs, N, S, 5489*(i+1));
         }
       }
+
+      auto end = get_time();
+      time += end - start;
 
       #pragma omp target update to (g_maxs[0:block_num])
       #pragma omp target update to (g_vars[0:block_num])
@@ -171,6 +177,8 @@ void PetrinetOnDevice()
       p_hvars += block_num;
     }
           
+    auto start = get_time();
+
     #pragma omp target teams num_teams(T-i) thread_limit(256)
     {
       uint32 mt [MERS_N];
@@ -179,6 +187,9 @@ void PetrinetOnDevice()
         PetrinetKernel(mt, g_places, g_vars, g_maxs, N, S, 5489*(i+1));
       }
     }
+
+    auto end = get_time();
+    time += end - start;
 
     #pragma omp target update to (g_maxs[0:T-i])
     #pragma omp target update to (g_vars[0:T-i])
