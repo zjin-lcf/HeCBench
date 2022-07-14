@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -38,7 +39,6 @@
 #include <random>       // std::default_random_engine
 #include <hip/hip_runtime.h>
 
-#define ITERATION 100
 typedef unsigned char uint8_t;
 
 static const uint8_t sbox[16] = {
@@ -297,14 +297,14 @@ void present_rounds(const uint8_t *plain, const uint8_t *key,
 __global__ void present(
     const int num,
     const int rounds,
-    const uint8_t *plains, 
-    const uint8_t *keys, 
-    uint8_t *ciphers, 
-    const uint8_t *sbox, 
-    const uint8_t *sbox_pmt_0, 
-    const uint8_t *sbox_pmt_1, 
-    const uint8_t *sbox_pmt_2, 
-    const uint8_t *sbox_pmt_3) 
+    const uint8_t *__restrict__ plains, 
+    const uint8_t *__restrict__ keys, 
+          uint8_t *__restrict__ ciphers, 
+    const uint8_t *__restrict__ sbox, 
+    const uint8_t *__restrict__ sbox_pmt_0, 
+    const uint8_t *__restrict__ sbox_pmt_1, 
+    const uint8_t *__restrict__ sbox_pmt_2, 
+    const uint8_t *__restrict__ sbox_pmt_3) 
 { 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   if (gid >= num) return;
@@ -478,8 +478,12 @@ __global__ void present(
 }
 
 int main(int argc, char** argv) {
-
-  int num = atoi(argv[1]); // number of plain texts 
+  if (argc != 3) {
+    printf("Usage: %s <number of plain texts> <repeat>\n", argv[0]); 
+    return 1;
+  }
+  const int num = atoi(argv[1]); // number of plain texts 
+  const int repeat = atoi(argv[2]);
 
   uint seed = 8;
   srand(seed);
@@ -510,14 +514,12 @@ int main(int argc, char** argv) {
 
   // use checksum for verification
   size_t h_checksum = 0;
-  for (int n = 0; n < ITERATION; n++) {
+  for (int n = 0; n <= repeat; n++) {
     for (int i = 0; i < num; i++) {
       present_rounds(h_plain+i*8, h_key+i*10, rounds, h_cipher+i*8);
       for (int k = 0; k < 8; k++) h_checksum += h_cipher[i*8+k];
     }
   }
-
-
 
   uint8_t* d_plain;
   uint8_t* d_key;
@@ -529,41 +531,49 @@ int main(int argc, char** argv) {
   uint8_t* d_sbox_pmt_0;
 
   hipMalloc((void**)&d_plain, 8*num);
-  hipMemcpyAsync(d_plain, h_plain, 8*num, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_plain, h_plain, 8*num, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_key, 10*num);
-  hipMemcpyAsync(d_key, h_key, 10*num, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_key, h_key, 10*num, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_cipher, 8*num);
 
   hipMalloc((void**)&d_sbox, 16);
-  hipMemcpyAsync(d_sbox, sbox, 16, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_sbox, sbox, 16, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_sbox_pmt_3, 256);
-  hipMemcpyAsync(d_sbox_pmt_3, sbox_pmt_3, 256, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_sbox_pmt_3, sbox_pmt_3, 256, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_sbox_pmt_2, 256);
-  hipMemcpyAsync(d_sbox_pmt_2, sbox_pmt_2, 256, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_sbox_pmt_2, sbox_pmt_2, 256, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_sbox_pmt_1, 256);
-  hipMemcpyAsync(d_sbox_pmt_1, sbox_pmt_1, 256, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_sbox_pmt_1, sbox_pmt_1, 256, hipMemcpyHostToDevice);
   hipMalloc((void**)&d_sbox_pmt_0, 256);
-  hipMemcpyAsync(d_sbox_pmt_0, sbox_pmt_0, 256, hipMemcpyHostToDevice, 0);
-
+  hipMemcpy(d_sbox_pmt_0, sbox_pmt_0, 256, hipMemcpyHostToDevice);
 
   dim3 grid ((num+255)/256);
   dim3 block (256);
 
   size_t d_checksum = 0;
+  double time = 0.0;
 
-  for (int n = 0; n < ITERATION; n++) {
-    hipLaunchKernelGGL(present, dim3(grid), dim3(block), 0, 0, num, rounds, d_plain, d_key, d_cipher, d_sbox, 
+  for (int n = 0; n <= repeat; n++) {
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    hipLaunchKernelGGL(present, grid, block, 0, 0, num, rounds, d_plain, d_key, d_cipher, d_sbox, 
         d_sbox_pmt_0, d_sbox_pmt_1, d_sbox_pmt_2, d_sbox_pmt_3);
 
-    hipMemcpy(h_cipher, d_cipher, num * 8, hipMemcpyDeviceToHost);
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    if (n > 0)
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
+    hipMemcpy(h_cipher, d_cipher, num * 8, hipMemcpyDeviceToHost);
     for (int i = 0; i < num*8; i++) d_checksum += h_cipher[i];
   }
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   if (h_checksum != d_checksum)
-    printf("FAILED\n");
+    printf("FAIL\n");
   else
-    printf("SUCCESS\n");
+    printf("PASS\n");
 
   free(h_plain);
   free(h_key);
@@ -577,4 +587,3 @@ int main(int argc, char** argv) {
   hipFree(d_sbox_pmt_1);
   hipFree(d_sbox_pmt_0);
 }
-

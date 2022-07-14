@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -37,7 +38,6 @@
 #include <array>        // std::array
 #include <random>       // std::default_random_engine
 
-#define ITERATION 100
 typedef unsigned char uint8_t;
 
 static const uint8_t sbox[16] = {
@@ -293,10 +293,13 @@ void present_rounds(const uint8_t *plain, const uint8_t *key,
   }
 }
 
-
 int main(int argc, char** argv) {
-
-  int num = atoi(argv[1]); // number of plain texts 
+  if (argc != 3) {
+    printf("Usage: %s <number of plain texts> <repeat>\n", argv[0]); 
+    return 1;
+  }
+  const int num = atoi(argv[1]); // number of plain texts 
+  const int repeat = atoi(argv[2]);
 
   uint seed = 8;
   srand(seed);
@@ -327,7 +330,7 @@ int main(int argc, char** argv) {
 
   // use checksum for verification
   size_t h_checksum = 0;
-  for (int n = 0; n < ITERATION; n++) {
+  for (int n = 0; n <= repeat; n++) {
     for (int i = 0; i < num; i++) {
       present_rounds(h_plain+i*8, h_key+i*10, rounds, h_cipher+i*8);
       for (int k = 0; k < 8; k++) h_checksum += h_cipher[i*8+k];
@@ -349,7 +352,11 @@ int main(int argc, char** argv) {
                                 sbox_pmt_0[0:256]) \
                         map(alloc: ciphers[0:8*num])
   {
-    for (int n = 0; n < ITERATION; n++) {
+    double time = 0.0;
+
+    for (int n = 0; n <= repeat; n++) {
+      auto start = std::chrono::steady_clock::now();
+
       #pragma omp target teams distribute parallel for thread_limit(256) 
       for (int i = 0; i < num; i++) {
         const uint8_t *plain = plains + i * 8;
@@ -520,15 +527,20 @@ int main(int argc, char** argv) {
           cipher[7] ^= rounh_key[7];
         }
       }
-#pragma omp target update from (ciphers[0:num*8])
+      auto end = std::chrono::steady_clock::now();
+      if (n > 0)
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+      #pragma omp target update from (ciphers[0:num*8])
       for (int i = 0; i < num*8; i++) d_checksum += ciphers[i];
     }
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
 
   if (h_checksum != d_checksum)
-    printf("FAILED\n");
+    printf("FAIL\n");
   else
-    printf("SUCCESS\n");
+    printf("PASS\n");
 
   free(h_plain);
   free(h_key);
