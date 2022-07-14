@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 
 #define m1  0x5555555555555555
 #define m2  0x3333333333333333 
@@ -34,7 +35,13 @@ void checkResults(const unsigned long *d, const int *r, const int length)
 
 int main(int argc, char* argv[])
 {
-  unsigned long length = atol(argv[1]);
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
   unsigned long *data = NULL;
   int *result = NULL;
   int s1 = posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
@@ -53,12 +60,11 @@ int main(int argc, char* argv[])
     data[i] = t | rand();
   }
 
-  // run each popcount implementation 100 times
 #pragma omp target data map(to: data[0:length]) \
                         map(alloc: result[0:length])
 {
-
-  for (int n = 0; n < 100; n++) {
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
        unsigned long x = data[i];
@@ -71,11 +77,16 @@ int main(int argc, char* argv[])
        result[i] = x & 0x7f;
     }
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc1): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
       unsigned long x = data[i];
@@ -85,11 +96,16 @@ int main(int argc, char* argv[])
       result[i] = (x * h01) >> 56;  //returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... 
     }
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc2): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
         char count;
@@ -98,11 +114,16 @@ int main(int argc, char* argv[])
         result[i] = count;
     }
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc3): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
         unsigned long x = data[i];
@@ -115,11 +136,16 @@ int main(int argc, char* argv[])
         result[i] = cnt;
     }
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc4): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
       unsigned long x = data[i];
@@ -139,16 +165,25 @@ int main(int argc, char* argv[])
       result[i] = (i1+i2)+(i3+i4)+(i5+i6)+(i7+i8);
     }
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc5): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
     for (int i = 0; i < length; i++) {
         result[i] = __builtin_popcountll(data[i]);
     }
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc6): %f (us)\n", (time * 1e-3) / repeat);
+
   #pragma omp target update from (result[0:length])
   checkResults(data, result, length);
 }
@@ -157,5 +192,3 @@ int main(int argc, char* argv[])
   free(result);
   return 0;
 }
-
-

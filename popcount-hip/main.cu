@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define m1  0x5555555555555555
@@ -113,7 +114,13 @@ void checkResults(const unsigned long *d, const int *r, const int length)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
   unsigned long *data = NULL;
   int *result = NULL;
   int s1 = posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
@@ -132,7 +139,7 @@ int main(int argc, char* argv[])
     data[i] = t | rand();
   }
 
-  // run each popcount implementation 100 times
+  // run each popcount implementation repeat times
 
   unsigned long* d_data;
   hipMalloc((void**)&d_data, sizeof(unsigned long)*length);
@@ -144,44 +151,80 @@ int main(int argc, char* argv[])
   dim3 grids ((length+BLOCK_SIZE-1)/BLOCK_SIZE);
   dim3 threads (BLOCK_SIZE);
 
-  for (int n = 0; n < 100; n++) {
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc1, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc1): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc2, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc2): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc3, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc3): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc4, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc4): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc5, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc5): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     hipLaunchKernelGGL(pc6, grids, threads, 0, 0, d_data, d_result, length);
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc6): %f (us)\n", (time * 1e-3) / repeat);
+
   hipMemcpy(result, d_result, sizeof(int)*length, hipMemcpyDeviceToHost);
   checkResults(data, result, length);
   //========================================================================================

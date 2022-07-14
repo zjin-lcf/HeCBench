@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -fsycl -save-temps
 
 # Linker Flags
 LDFLAGS = 
@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 16777216
+	./$(program) 16777216 1000
