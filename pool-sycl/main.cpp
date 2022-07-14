@@ -1,3 +1,4 @@
+#include <chrono>
 #include <new>
 #include <string>
 #include <stdio.h>
@@ -27,6 +28,9 @@ class MaxPoolGrad {
 // forward declaration
 template <typename T>
 class k;
+
+template <typename T>
+class k_warmup;
 
 template <typename PoolProcess, typename T>
 void KernelPool2DGrad(
@@ -115,6 +119,11 @@ void KernelPool2DGrad(
 
 int main(int argc, char* argv[])
 {
+  if (argc != 8) {
+    printf("Usage: %s <batch> <input channels> <input height> ", argv[0]);
+    printf("<input width> <output height> <output width> <repeat>\n");
+    return 1;
+  }
   // input
   const int batch_size = atoi(argv[1]);
   const int input_channels = atoi(argv[2]);
@@ -124,6 +133,10 @@ int main(int argc, char* argv[])
   // output
   const int output_height = atoi(argv[5]);
   const int output_width = atoi(argv[6]);
+
+  // repeat
+  const int repeat = atoi(argv[7]);
+
   const int input_numel = batch_size*input_channels*input_height*input_width;
   const int output_numel = batch_size*input_channels*output_height*output_width;
 
@@ -179,7 +192,26 @@ int main(int argc, char* argv[])
   range<1> gws (blocks * BSIZE);
   range<1> lws (BSIZE);
 
-  for (int i = 0; i < 100; i++) 
+  // warmup
+  q.submit([&] (handler &cgh) {
+    auto idata = d_input.get_access<sycl_read>(cgh);
+    auto odata = d_output.get_access<sycl_read>(cgh);
+    auto ograd = d_output_grad.get_access<sycl_read>(cgh);
+    auto igrad = d_input_grad.get_access<sycl_write>(cgh);
+    cgh.parallel_for<class k_warmup<float>>(
+      nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      KernelPool2DGrad<AvgPoolGrad<float>, float>(
+        item, nthreads, idata.get_pointer(), odata.get_pointer(), ograd.get_pointer(), 
+        input_channels, input_height, input_width, output_height, output_width, ksize_height,
+        ksize_width, stride_height, stride_width, padding_height, padding_width,
+        pool_process, exclusive, igrad.get_pointer(), channel_last);
+    });
+  });
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) { 
     q.submit([&] (handler &cgh) {
       auto idata = d_input.get_access<sycl_read>(cgh);
       auto odata = d_output.get_access<sycl_read>(cgh);
@@ -194,6 +226,13 @@ int main(int argc, char* argv[])
           pool_process, exclusive, igrad.get_pointer(), channel_last);
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   }
 
   // verify

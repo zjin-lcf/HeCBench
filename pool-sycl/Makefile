@@ -74,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 128 48 224 224 54 54
+	./$(program) 128 48 224 224 54 54 100
