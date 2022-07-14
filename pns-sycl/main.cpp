@@ -48,7 +48,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 static int N, S, T, NSQUARE2;
 uint32 host_mt[MERS_N];
 
-void PetrinetOnDevice(queue &q);
+void PetrinetOnDevice(queue &q, long long &time);
 void compute_statistics();
 
 float results[4];
@@ -96,11 +96,15 @@ int main(int argc, char** argv)
 #endif
   queue q(dev_sel);
 
+  long long ktime = 0;
+
   auto start = get_time();
 
-  PetrinetOnDevice(q);
+  PetrinetOnDevice(q, ktime);
 
   auto end = get_time();
+
+  printf("Total kernel execution time: %.2f s\n", ktime / 1e6f);
   printf("Total device execution time: %.2f s\n", (end - start) / 1e6f);
 
   compute_statistics();
@@ -135,7 +139,7 @@ void compute_statistics()
   results[3] = sum_max_vars/T - results[2]*results[2];
 }
 
-void PetrinetOnDevice(queue &q)
+void PetrinetOnDevice(queue &q, long long &time)
 {
   // Allocate memory
   int i;
@@ -162,38 +166,49 @@ void PetrinetOnDevice(queue &q)
 
   // Launch the device computation threads!
   for (i = 0; i<T-block_num; i+=block_num) 
-    {
-      q.submit([&] (handler &cgh) {
-        auto p = g_places.get_access<sycl_read_write>(cgh);
-        auto v = g_vars.get_access<sycl_write>(cgh);
-        auto m = g_maxs.get_access<sycl_write>(cgh);
-        accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
-        cgh.parallel_for<class pn_loop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          PetrinetKernel(
-            item, 
-            mt.get_pointer(),
-            p.get_pointer(),
-            v.get_pointer(),
-            m.get_pointer(),
-            n, s, 5489*(i+1));
-        });
-      });
+  {
+    q.wait();
+    auto start = get_time(); 
 
-      q.submit([&] (handler &cgh) {
-        auto acc = g_maxs.get_access<sycl_read>(cgh);
-        cgh.copy(acc, p_hmaxs);
+    q.submit([&] (handler &cgh) {
+      auto p = g_places.get_access<sycl_read_write>(cgh);
+      auto v = g_vars.get_access<sycl_write>(cgh);
+      auto m = g_maxs.get_access<sycl_write>(cgh);
+      accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
+      cgh.parallel_for<class pn_loop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        PetrinetKernel(
+          item, 
+          mt.get_pointer(),
+          p.get_pointer(),
+          v.get_pointer(),
+          m.get_pointer(),
+          n, s, 5489*(i+1));
       });
+    });
+    
+    q.wait();
+    auto end = get_time();
+    time += end - start;
 
-      q.submit([&] (handler &cgh) {
-        auto acc = g_vars.get_access<sycl_read>(cgh);
-        cgh.copy(acc, p_hvars);
-      });
+    q.submit([&] (handler &cgh) {
+      auto acc = g_maxs.get_access<sycl_read>(cgh);
+      cgh.copy(acc, p_hmaxs);
+    });
 
-      p_hmaxs += block_num;
-      p_hvars += block_num;
-    }
+    q.submit([&] (handler &cgh) {
+      auto acc = g_vars.get_access<sycl_read>(cgh);
+      cgh.copy(acc, p_hvars);
+    });
+
+    p_hmaxs += block_num;
+    p_hvars += block_num;
+  }
 	
   range<1> gws1 (256*(T-i));
+
+  q.wait();
+  auto start = get_time();
+
   q.submit([&] (handler &cgh) {
     auto p = g_places.get_access<sycl_read_write>(cgh);
     auto v = g_vars.get_access<sycl_write>(cgh);
@@ -209,6 +224,10 @@ void PetrinetOnDevice(queue &q)
         n, s, 5489*(i+1));
     });
   });
+
+  q.wait();
+  auto end = get_time();
+  time += end - start;
 
   // Read result from the device
   q.submit([&] (handler &cgh) {
