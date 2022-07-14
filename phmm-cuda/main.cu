@@ -6,7 +6,12 @@
 #include "constants_types.h"
 #include "kernel.h"
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   fArray *d_cur_forward;
   fArray *d_next_forward;
@@ -90,7 +95,7 @@ int main() {
 
   auto t1 = std::chrono::high_resolution_clock::now();
 
-  for(int count = 0; count < 100; count++) {
+  for(int count = 0; count < repeat; count++) {
     for (int i = 1; i < x_dim + 1; i++) {
       for (int j = 1; j < y_dim + 1; j++) {
         pair_HMM_forward<<<dimGrid, dimBlock>>>(i, j, d_cur_forward, d_trans, d_emis, d_like, d_start, d_next_forward);

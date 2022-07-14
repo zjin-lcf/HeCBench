@@ -5,10 +5,12 @@
 #include "common.h"
 #include "constants_types.h"
 
-int main() {
-
-  range<1> gws (batch * (states-1));
-  range<1> lws (batch);
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   size_t forward_matrix_elem = (x_dim+1)*(y_dim+1)*batch*(states-1);
   size_t emissions_elem = (x_dim+1)*(y_dim+1)*batch*(states-1);
@@ -88,10 +90,13 @@ int main() {
   auto d_like_re = d_like.reinterpret<lArray>(range<1>(2));
   auto d_start_re = d_start.reinterpret<sArray>(range<1>(batch));
 
+  range<1> gws (batch * (states-1));
+  range<1> lws (batch);
+
   q.wait();
   auto t1 = std::chrono::high_resolution_clock::now();
 
-  for(int count = 0; count < 100; count++) {
+  for(int count = 0; count < repeat; count++) {
     for (int cur_i = 1; cur_i < x_dim + 1; cur_i++) {
       for (int cur_j = 1; cur_j < y_dim + 1; cur_j++) {
         q.submit([&] (handler &cgh) {
