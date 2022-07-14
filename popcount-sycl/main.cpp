@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 #define m1  0x5555555555555555
@@ -35,7 +36,13 @@ void checkResults(const unsigned long *d, const int *r, const int length)
 
 int main(int argc, char* argv[])
 {
-  unsigned long length = atol(argv[1]);
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
   unsigned long *data = NULL;
   int *result = NULL;
   int s1 = posix_memalign((void**)&data, 1024, length*sizeof(unsigned long));
@@ -49,12 +56,12 @@ int main(int argc, char* argv[])
 
   // initialize input
   srand(2);
-  for (int i = 0; i < length; i++) {
+  for (unsigned long i = 0; i < length; i++) {
     unsigned long t = (unsigned long)rand() << 32;
     data[i] = t | rand();
   }
 
-  // run each popcount implementation 100 times
+  // run each popcount implementation repeat times
 #ifdef USE_GPU 
   gpu_selector dev_sel;
 #else
@@ -68,7 +75,9 @@ int main(int argc, char* argv[])
   range<1> gws ((length+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
   range<1> lws (BLOCK_SIZE);
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -86,6 +95,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc1): %f (us)\n", (time * 1e-3) / repeat);
+
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
@@ -93,7 +107,8 @@ int main(int argc, char* argv[])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -108,6 +123,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc2): %f (us)\n", (time * 1e-3) / repeat);
+  
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
@@ -115,7 +135,8 @@ int main(int argc, char* argv[])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -129,6 +150,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc3): %f (us)\n", (time * 1e-3) / repeat);
+
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
@@ -136,7 +162,8 @@ int main(int argc, char* argv[])
   checkResults(data, result, length);
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -154,14 +181,21 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc4): %f (us)\n", (time * 1e-3) / repeat);
+
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
   }).wait();
   checkResults(data, result, length);
+
   //========================================================================================
 
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -186,6 +220,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc5): %f (us)\n", (time * 1e-3) / repeat);
+
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
@@ -194,7 +233,8 @@ int main(int argc, char* argv[])
   //========================================================================================
 
   // the kernel performance is slightly better than the kernel at line 95
-  for (int n = 0; n < 100; n++) {
+  start = std::chrono::steady_clock::now();
+  for (int n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto data = d_data.get_access<sycl_read>(h);
       auto r = d_result.get_access<sycl_discard_write>(h);
@@ -205,6 +245,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pc6): %f (us)\n", (time * 1e-3) / repeat);
+
   q.submit([&](handler &h) {
       auto r = d_result.get_access<sycl_read>(h);
       h.copy(r, result);
@@ -215,5 +260,3 @@ int main(int argc, char* argv[])
   free(result);
   return 0;
 }
-
-
