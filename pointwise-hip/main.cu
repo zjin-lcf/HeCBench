@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // Define some error checking macros.
@@ -108,7 +109,8 @@ void init (float* data, int size) {
   data[index] = LCG_random(&seed);
 }
 
-void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum &cs) {
+void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
+          checksum &cs, double &time) {
   float *h_data;
   float *i_data;
   float *c_data;
@@ -145,10 +147,10 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
   dim3 grids_tmp_h ((tmp_h_size + 255)/256);
   dim3 grids_tmp_i ((tmp_i_size + 255)/256);
           
-  hipLaunchKernelGGL(init, grids_tmp_h, blocks, 0, 0, tmp_h, tmp_h_size);
-  hipLaunchKernelGGL(init, grids_tmp_i, blocks, 0, 0, tmp_i, tmp_i_size);
-  hipLaunchKernelGGL(init, grids_hc, blocks, 0, 0, c_data, hc_size);
-  hipLaunchKernelGGL(init, grids_b, blocks, 0, 0, bias, bias_size);
+  hipLaunchKernelGGL(init, grids_tmp_h, blocks , 0, 0, tmp_h, tmp_h_size);
+  hipLaunchKernelGGL(init, grids_tmp_i, blocks , 0, 0, tmp_i, tmp_i_size);
+  hipLaunchKernelGGL(init, grids_hc, blocks , 0, 0, c_data, hc_size);
+  hipLaunchKernelGGL(init, grids_b, blocks , 0, 0, bias, bias_size);
 
   hipDeviceSynchronize();
 
@@ -160,6 +162,8 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
 
   dim3 grids_p ((numElements + 255)/256);
   
+  double ktime = 0.0;
+
   while (true) {
     // Many layer "scheduling".
     if (lEnd == 0) {
@@ -198,9 +202,11 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
     rEnd = rStart + recurBatchSize;
     if (rEnd > seqLength) rEnd = seqLength;
 
-    for (int layer = lStart; layer < lEnd; layer++) {         
+    auto start = std::chrono::steady_clock::now();
+
+    for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        hipLaunchKernelGGL(elementWise_fp, grids_p, blocks, 0, 0, hiddenSize, miniBatch,
+        hipLaunchKernelGGL(elementWise_fp, grids_p, blocks , 0, 0, hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 
          bias + 8 * layer * hiddenSize,
@@ -211,7 +217,14 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
          c_data + (i + 1) * numElements + layer * (seqLength + 1) * numElements);
       hipErrCheck(hipGetLastError());
     }
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  time += ktime;
+  //printf("Kernel execution time: %f (s)\n", ktime * 1e-9f);
 
   float *testOutputi = (float*)malloc(numElements * seqLength * sizeof(float));
   float *testOutputh = (float*)malloc(numElements * numLayers * sizeof(float));
@@ -230,9 +243,9 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
       numElements * sizeof(float), hipMemcpyDeviceToHost));
   }
 
-  double checksumi = 0.;
-  double checksumh = 0.;
-  double checksumc = 0.;
+  double checksumi = 0.0;
+  double checksumh = 0.0;
+  double checksumc = 0.0;
 
   for (int m = 0; m < miniBatch; m++) {
     for (int j = 0; j < seqLength; j++) {
@@ -267,18 +280,19 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
   cs.h = checksumh;
 }
 
-
 int main(int argc, char* argv[]) {
   int seqLength;
   int numLayers;
   int hiddenSize;
   int miniBatch; 
+  int numRuns; 
 
-  if (argc == 5) {
+  if (argc == 6) {
     seqLength = atoi(argv[1]);
     numLayers = atoi(argv[2]);
     hiddenSize = atoi(argv[3]);
     miniBatch = atoi(argv[4]);   
+    numRuns = atoi(argv[5]);   
   }
   else if (argc == 1) {
     printf("Running with default settings\n");
@@ -286,27 +300,27 @@ int main(int argc, char* argv[]) {
     numLayers = 4;
     hiddenSize = 512;
     miniBatch = 64;
+    numRuns = 1;
   }
   else {
-    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch>\n", argv[1]);
+    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch> <repeat>\n", argv[0]);
     return 1;      
   }
 
   printf("seqLength %d, numLayers %d, hiddenSize %d, miniBatch %d\n",
          seqLength, numLayers, hiddenSize, miniBatch);  
 
-  int numRuns = 100;
   checksum cs;
   
+  double time = 0.0;
+
   for (int run = 0; run < numRuns; run++) {
-    test(hiddenSize, miniBatch, seqLength, numLayers, cs);
+    test(hiddenSize, miniBatch, seqLength, numLayers, cs, time);
   }
 
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / numRuns);
   printf("i checksum %E     ", cs.i);
   printf("c checksum %E     ", cs.c);
   printf("h checksum %E\n", cs.h);
-
-
   return 0;
 }
-

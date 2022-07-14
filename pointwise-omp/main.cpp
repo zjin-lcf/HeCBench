@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <chrono>
 #include <omp.h>
 
 typedef struct {
@@ -102,7 +103,8 @@ void init (float* data, int size) {
   }
 }
 
-void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum &cs) {
+void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
+          checksum &cs, double &time) {
   float *h_data;
   float *i_data;
   float *c_data;
@@ -151,6 +153,8 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
   int rEnd = 0;
   int recurBatchSize = 2;
 
+  double ktime = 0.0;
+
   while (true) {
     // Many layer "scheduling".
     if (lEnd == 0) {
@@ -189,7 +193,9 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
     rEnd = rStart + recurBatchSize;
     if (rEnd > seqLength) rEnd = seqLength;
 
-    for (int layer = lStart; layer < lEnd; layer++) {         
+    auto start = std::chrono::steady_clock::now();
+
+    for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
         elementWise_fp
         (hiddenSize, miniBatch,
@@ -202,7 +208,13 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers, checksum 
          c_data + i * numElements + layer * (seqLength + 1) * numElements,
          c_data + (i + 1) * numElements + layer * (seqLength + 1) * numElements);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  time += ktime;
+  //printf("Kernel execution time: %f (s)\n", ktime * 1e-9f);
 
   #pragma omp target update from (i_data[0:i_size])
   #pragma omp target update from (h_data[0:hc_size])
@@ -266,12 +278,14 @@ int main(int argc, char* argv[]) {
   int numLayers;
   int hiddenSize;
   int miniBatch; 
+  int numRuns;
 
-  if (argc == 5) {
+  if (argc == 6) {
     seqLength = atoi(argv[1]);
     numLayers = atoi(argv[2]);
     hiddenSize = atoi(argv[3]);
     miniBatch = atoi(argv[4]);   
+    numRuns = atoi(argv[5]);   
   }
   else if (argc == 1) {
     printf("Running with default settings\n");
@@ -279,26 +293,27 @@ int main(int argc, char* argv[]) {
     numLayers = 4;
     hiddenSize = 512;
     miniBatch = 64;
+    numRuns = 1;
   }
   else {
-    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch>\n", argv[1]);
+    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch> <repeat>\n", argv[0]);
     return 1;      
   }
 
   printf("seqLength %d, numLayers %d, hiddenSize %d, miniBatch %d\n",
          seqLength, numLayers, hiddenSize, miniBatch);  
 
-  int numRuns = 100;
   checksum cs;
   
+  double time = 0.0;
+
   for (int run = 0; run < numRuns; run++) {
-    test(hiddenSize, miniBatch, seqLength, numLayers, cs);
+    test(hiddenSize, miniBatch, seqLength, numLayers, cs, time);
   }
 
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / numRuns);
   printf("i checksum %E     ", cs.i);
   printf("c checksum %E     ", cs.c);
   printf("h checksum %E\n", cs.h);
   return 0;
 }
-
-
