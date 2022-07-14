@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -38,7 +39,6 @@
 #include <random>       // std::default_random_engine
 #include "common.h"
 
-#define ITERATION 100
 typedef unsigned char uint8_t;
 
 static const uint8_t sbox[16] = {
@@ -296,8 +296,12 @@ void present_rounds(const uint8_t *plain, const uint8_t *key,
 
 
 int main(int argc, char** argv) {
-
-  int num = atoi(argv[1]); // number of plain texts 
+  if (argc != 3) {
+    printf("Usage: %s <number of plain texts> <repeat>\n", argv[0]); 
+    return 1;
+  }
+  const int num = atoi(argv[1]); // number of plain texts 
+  const int repeat = atoi(argv[2]);
 
   uint seed = 8;
   srand(seed);
@@ -328,7 +332,7 @@ int main(int argc, char** argv) {
 
   // use checksum for verification
   size_t h_checksum = 0;
-  for (int n = 0; n < ITERATION; n++) {
+  for (int n = 0; n <= repeat; n++) {
     for (int i = 0; i < num; i++) {
       present_rounds(h_plain+i*8, h_key+i*10, rounds, h_cipher+i*8);
       for (int k = 0; k < 8; k++) h_checksum += h_cipher[i*8+k];
@@ -356,203 +360,212 @@ int main(int argc, char** argv) {
   range<1> lws (256);
 
   size_t d_checksum = 0;
+  double time = 0.0;
 
-  for (int n = 0; n < ITERATION; n++) {
+  for (int n = 0; n <= repeat; n++) {
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     q.submit([&] (handler &cgh) {
-        auto plains = d_plain.get_access<sycl_read>(cgh);
-        auto keys = d_key.get_access<sycl_read>(cgh);
-        auto ciphers = d_cipher.get_access<sycl_discard_write>(cgh);
-        auto sbox = d_sbox.get_access<sycl_read>(cgh);
-        auto sbox_pmt_0 = d_sbox_pmt_0.get_access<sycl_read>(cgh);
-        auto sbox_pmt_1 = d_sbox_pmt_1.get_access<sycl_read>(cgh);
-        auto sbox_pmt_2 = d_sbox_pmt_2.get_access<sycl_read>(cgh);
-        auto sbox_pmt_3 = d_sbox_pmt_3.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class present>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int gid = item.get_global_id(0);
-            if (gid >= num) return;
-            const uint8_t *plain = plains.get_pointer() + gid * 8;
-            const uint8_t *key = keys.get_pointer() + gid * 10;
-            uint8_t *cipher = ciphers.get_pointer() + gid * 8;
-            uint8_t rounh_counter = 1;
+      auto plains = d_plain.get_access<sycl_read>(cgh);
+      auto keys = d_key.get_access<sycl_read>(cgh);
+      auto ciphers = d_cipher.get_access<sycl_discard_write>(cgh);
+      auto sbox = d_sbox.get_access<sycl_read>(cgh);
+      auto sbox_pmt_0 = d_sbox_pmt_0.get_access<sycl_read>(cgh);
+      auto sbox_pmt_1 = d_sbox_pmt_1.get_access<sycl_read>(cgh);
+      auto sbox_pmt_2 = d_sbox_pmt_2.get_access<sycl_read>(cgh);
+      auto sbox_pmt_3 = d_sbox_pmt_3.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class present>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int gid = item.get_global_id(0);
+        if (gid >= num) return;
+        const uint8_t *plain = plains.get_pointer() + gid * 8;
+        const uint8_t *key = keys.get_pointer() + gid * 10;
+        uint8_t *cipher = ciphers.get_pointer() + gid * 8;
+        uint8_t rounh_counter = 1;
 
-            uint8_t state[8];
-            uint8_t rounh_key[10];
+        uint8_t state[8];
+        uint8_t rounh_key[10];
 
-            // add key
-            state[0] = plain[0] ^ key[0];
-            state[1] = plain[1] ^ key[1];
-            state[2] = plain[2] ^ key[2];
-            state[3] = plain[3] ^ key[3];
-            state[4] = plain[4] ^ key[4];
-            state[5] = plain[5] ^ key[5];
-            state[6] = plain[6] ^ key[6];
-            state[7] = plain[7] ^ key[7];
+        // add key
+        state[0] = plain[0] ^ key[0];
+        state[1] = plain[1] ^ key[1];
+        state[2] = plain[2] ^ key[2];
+        state[3] = plain[3] ^ key[3];
+        state[4] = plain[4] ^ key[4];
+        state[5] = plain[5] ^ key[5];
+        state[6] = plain[6] ^ key[6];
+        state[7] = plain[7] ^ key[7];
 
-            // update key
-            rounh_key[9] = key[6] << 5 | key[7] >> 3;
-            rounh_key[8] = key[5] << 5 | key[6] >> 3;
-            rounh_key[7] = key[4] << 5 | key[5] >> 3;
-            rounh_key[6] = key[3] << 5 | key[4] >> 3;
-            rounh_key[5] = key[2] << 5 | key[3] >> 3;
-            rounh_key[4] = key[1] << 5 | key[2] >> 3;
-            rounh_key[3] = key[0] << 5 | key[1] >> 3;
-            rounh_key[2] = key[9] << 5 | key[0] >> 3;
-            rounh_key[1] = key[8] << 5 | key[9] >> 3;
-            rounh_key[0] = key[7] << 5 | key[8] >> 3;
+        // update key
+        rounh_key[9] = key[6] << 5 | key[7] >> 3;
+        rounh_key[8] = key[5] << 5 | key[6] >> 3;
+        rounh_key[7] = key[4] << 5 | key[5] >> 3;
+        rounh_key[6] = key[3] << 5 | key[4] >> 3;
+        rounh_key[5] = key[2] << 5 | key[3] >> 3;
+        rounh_key[4] = key[1] << 5 | key[2] >> 3;
+        rounh_key[3] = key[0] << 5 | key[1] >> 3;
+        rounh_key[2] = key[9] << 5 | key[0] >> 3;
+        rounh_key[1] = key[8] << 5 | key[9] >> 3;
+        rounh_key[0] = key[7] << 5 | key[8] >> 3;
 
-            rounh_key[0] = (rounh_key[0] & 0x0F) | sbox[rounh_key[0] >> 4];
+        rounh_key[0] = (rounh_key[0] & 0x0F) | sbox[rounh_key[0] >> 4];
 
-            rounh_key[7] ^= rounh_counter >> 1;
-            rounh_key[8] ^= rounh_counter << 7;
+        rounh_key[7] ^= rounh_counter >> 1;
+        rounh_key[8] ^= rounh_counter << 7;
 
-            // substitution and permutation
-            cipher[0] = 
-              (sbox_pmt_3[state[0]] & 0xC0) | 
-              (sbox_pmt_2[state[1]] & 0x30) |
-              (sbox_pmt_1[state[2]] & 0x0C) |
-              (sbox_pmt_0[state[3]] & 0x03);
-            cipher[1] = 
-              (sbox_pmt_3[state[4]] & 0xC0) | 
-              (sbox_pmt_2[state[5]] & 0x30) |
-              (sbox_pmt_1[state[6]] & 0x0C) | 
-              (sbox_pmt_0[state[7]] & 0x03);
+        // substitution and permutation
+        cipher[0] = 
+          (sbox_pmt_3[state[0]] & 0xC0) | 
+          (sbox_pmt_2[state[1]] & 0x30) |
+          (sbox_pmt_1[state[2]] & 0x0C) |
+          (sbox_pmt_0[state[3]] & 0x03);
+        cipher[1] = 
+          (sbox_pmt_3[state[4]] & 0xC0) | 
+          (sbox_pmt_2[state[5]] & 0x30) |
+          (sbox_pmt_1[state[6]] & 0x0C) | 
+          (sbox_pmt_0[state[7]] & 0x03);
 
-            cipher[2] = 
-              (sbox_pmt_0[state[0]] & 0xC0) | 
-              (sbox_pmt_3[state[1]] & 0x30) |
-              (sbox_pmt_2[state[2]] & 0x0C) |
-              (sbox_pmt_1[state[3]] & 0x03);
-            cipher[3] = 
-              (sbox_pmt_0[state[4]] & 0xC0) | 
-              (sbox_pmt_3[state[5]] & 0x30) |
-              (sbox_pmt_2[state[6]] & 0x0C) |
-              (sbox_pmt_1[state[7]] & 0x03);
+        cipher[2] = 
+          (sbox_pmt_0[state[0]] & 0xC0) | 
+          (sbox_pmt_3[state[1]] & 0x30) |
+          (sbox_pmt_2[state[2]] & 0x0C) |
+          (sbox_pmt_1[state[3]] & 0x03);
+        cipher[3] = 
+          (sbox_pmt_0[state[4]] & 0xC0) | 
+          (sbox_pmt_3[state[5]] & 0x30) |
+          (sbox_pmt_2[state[6]] & 0x0C) |
+          (sbox_pmt_1[state[7]] & 0x03);
 
-            cipher[4] = 
-              (sbox_pmt_1[state[0]] & 0xC0) | 
-              (sbox_pmt_0[state[1]] & 0x30) |
-              (sbox_pmt_3[state[2]] & 0x0C) |
-              (sbox_pmt_2[state[3]] & 0x03);
-            cipher[5] = 
-              (sbox_pmt_1[state[4]] & 0xC0) | 
-              (sbox_pmt_0[state[5]] & 0x30) |
-              (sbox_pmt_3[state[6]] & 0x0C) |
-              (sbox_pmt_2[state[7]] & 0x03);
+        cipher[4] = 
+          (sbox_pmt_1[state[0]] & 0xC0) | 
+          (sbox_pmt_0[state[1]] & 0x30) |
+          (sbox_pmt_3[state[2]] & 0x0C) |
+          (sbox_pmt_2[state[3]] & 0x03);
+        cipher[5] = 
+          (sbox_pmt_1[state[4]] & 0xC0) | 
+          (sbox_pmt_0[state[5]] & 0x30) |
+          (sbox_pmt_3[state[6]] & 0x0C) |
+          (sbox_pmt_2[state[7]] & 0x03);
 
-            cipher[6] = 
-              (sbox_pmt_2[state[0]] & 0xC0) | 
-              (sbox_pmt_1[state[1]] & 0x30) |
-              (sbox_pmt_0[state[2]] & 0x0C) |
-              (sbox_pmt_3[state[3]] & 0x03);
-            cipher[7] = 
-              (sbox_pmt_2[state[4]] & 0xC0) | 
-              (sbox_pmt_1[state[5]] & 0x30) |
-              (sbox_pmt_0[state[6]] & 0x0C) |
-              (sbox_pmt_3[state[7]] & 0x03);
+        cipher[6] = 
+          (sbox_pmt_2[state[0]] & 0xC0) | 
+          (sbox_pmt_1[state[1]] & 0x30) |
+          (sbox_pmt_0[state[2]] & 0x0C) |
+          (sbox_pmt_3[state[3]] & 0x03);
+        cipher[7] = 
+          (sbox_pmt_2[state[4]] & 0xC0) | 
+          (sbox_pmt_1[state[5]] & 0x30) |
+          (sbox_pmt_0[state[6]] & 0x0C) |
+          (sbox_pmt_3[state[7]] & 0x03);
 
-            for (rounh_counter = 2; rounh_counter <= rounds; rounh_counter++) {
-              state[0] = cipher[0] ^ rounh_key[0];
-              state[1] = cipher[1] ^ rounh_key[1];
-              state[2] = cipher[2] ^ rounh_key[2];
-              state[3] = cipher[3] ^ rounh_key[3];
-              state[4] = cipher[4] ^ rounh_key[4];
-              state[5] = cipher[5] ^ rounh_key[5];
-              state[6] = cipher[6] ^ rounh_key[6];
-              state[7] = cipher[7] ^ rounh_key[7];
+        for (rounh_counter = 2; rounh_counter <= rounds; rounh_counter++) {
+          state[0] = cipher[0] ^ rounh_key[0];
+          state[1] = cipher[1] ^ rounh_key[1];
+          state[2] = cipher[2] ^ rounh_key[2];
+          state[3] = cipher[3] ^ rounh_key[3];
+          state[4] = cipher[4] ^ rounh_key[4];
+          state[5] = cipher[5] ^ rounh_key[5];
+          state[6] = cipher[6] ^ rounh_key[6];
+          state[7] = cipher[7] ^ rounh_key[7];
 
-              cipher[0] = 
-                (sbox_pmt_3[state[0]] & 0xC0) | 
-                (sbox_pmt_2[state[1]] & 0x30) |
-                (sbox_pmt_1[state[2]] & 0x0C) |
-                (sbox_pmt_0[state[3]] & 0x03);
-              cipher[1] = 
-                (sbox_pmt_3[state[4]] & 0xC0) | 
-                (sbox_pmt_2[state[5]] & 0x30) |
-                (sbox_pmt_1[state[6]] & 0x0C) | 
-                (sbox_pmt_0[state[7]] & 0x03);
+          cipher[0] = 
+            (sbox_pmt_3[state[0]] & 0xC0) | 
+            (sbox_pmt_2[state[1]] & 0x30) |
+            (sbox_pmt_1[state[2]] & 0x0C) |
+            (sbox_pmt_0[state[3]] & 0x03);
+          cipher[1] = 
+            (sbox_pmt_3[state[4]] & 0xC0) | 
+            (sbox_pmt_2[state[5]] & 0x30) |
+            (sbox_pmt_1[state[6]] & 0x0C) | 
+            (sbox_pmt_0[state[7]] & 0x03);
 
-              cipher[2] = 
-                (sbox_pmt_0[state[0]] & 0xC0) | 
-                (sbox_pmt_3[state[1]] & 0x30) |
-                (sbox_pmt_2[state[2]] & 0x0C) |
-                (sbox_pmt_1[state[3]] & 0x03);
-              cipher[3] = 
-                (sbox_pmt_0[state[4]] & 0xC0) | 
-                (sbox_pmt_3[state[5]] & 0x30) |
-                (sbox_pmt_2[state[6]] & 0x0C) |
-                (sbox_pmt_1[state[7]] & 0x03);
+          cipher[2] = 
+            (sbox_pmt_0[state[0]] & 0xC0) | 
+            (sbox_pmt_3[state[1]] & 0x30) |
+            (sbox_pmt_2[state[2]] & 0x0C) |
+            (sbox_pmt_1[state[3]] & 0x03);
+          cipher[3] = 
+            (sbox_pmt_0[state[4]] & 0xC0) | 
+            (sbox_pmt_3[state[5]] & 0x30) |
+            (sbox_pmt_2[state[6]] & 0x0C) |
+            (sbox_pmt_1[state[7]] & 0x03);
 
-              cipher[4] = 
-                (sbox_pmt_1[state[0]] & 0xC0) | 
-                (sbox_pmt_0[state[1]] & 0x30) |
-                (sbox_pmt_3[state[2]] & 0x0C) |
-                (sbox_pmt_2[state[3]] & 0x03);
-              cipher[5] = 
-                (sbox_pmt_1[state[4]] & 0xC0) | 
-                (sbox_pmt_0[state[5]] & 0x30) |
-                (sbox_pmt_3[state[6]] & 0x0C) |
-                (sbox_pmt_2[state[7]] & 0x03);
+          cipher[4] = 
+            (sbox_pmt_1[state[0]] & 0xC0) | 
+            (sbox_pmt_0[state[1]] & 0x30) |
+            (sbox_pmt_3[state[2]] & 0x0C) |
+            (sbox_pmt_2[state[3]] & 0x03);
+          cipher[5] = 
+            (sbox_pmt_1[state[4]] & 0xC0) | 
+            (sbox_pmt_0[state[5]] & 0x30) |
+            (sbox_pmt_3[state[6]] & 0x0C) |
+            (sbox_pmt_2[state[7]] & 0x03);
 
-              cipher[6] = 
-                (sbox_pmt_2[state[0]] & 0xC0) | 
-                (sbox_pmt_1[state[1]] & 0x30) |
-                (sbox_pmt_0[state[2]] & 0x0C) |
-                (sbox_pmt_3[state[3]] & 0x03);
-              cipher[7] = 
-                (sbox_pmt_2[state[4]] & 0xC0) | 
-                (sbox_pmt_1[state[5]] & 0x30) |
-                (sbox_pmt_0[state[6]] & 0x0C) |
-                (sbox_pmt_3[state[7]] & 0x03);
+          cipher[6] = 
+            (sbox_pmt_2[state[0]] & 0xC0) | 
+            (sbox_pmt_1[state[1]] & 0x30) |
+            (sbox_pmt_0[state[2]] & 0x0C) |
+            (sbox_pmt_3[state[3]] & 0x03);
+          cipher[7] = 
+            (sbox_pmt_2[state[4]] & 0xC0) | 
+            (sbox_pmt_1[state[5]] & 0x30) |
+            (sbox_pmt_0[state[6]] & 0x0C) |
+            (sbox_pmt_3[state[7]] & 0x03);
 
-              rounh_key[5] ^= rounh_counter << 2; // do this first, which may be faster
+          rounh_key[5] ^= rounh_counter << 2; // do this first, which may be faster
 
-              // use state[] for temporary storage
-              state[2] = rounh_key[9];
-              state[1] = rounh_key[8];
-              state[0] = rounh_key[7];
+          // use state[] for temporary storage
+          state[2] = rounh_key[9];
+          state[1] = rounh_key[8];
+          state[0] = rounh_key[7];
 
-              rounh_key[9] = rounh_key[6] << 5 | rounh_key[7] >> 3;
-              rounh_key[8] = rounh_key[5] << 5 | rounh_key[6] >> 3;
-              rounh_key[7] = rounh_key[4] << 5 | rounh_key[5] >> 3;
-              rounh_key[6] = rounh_key[3] << 5 | rounh_key[4] >> 3;
-              rounh_key[5] = rounh_key[2] << 5 | rounh_key[3] >> 3;
-              rounh_key[4] = rounh_key[1] << 5 | rounh_key[2] >> 3;
-              rounh_key[3] = rounh_key[0] << 5 | rounh_key[1] >> 3;
-              rounh_key[2] = state[2] << 5 | rounh_key[0] >> 3;
-              rounh_key[1] = state[1] << 5 | state[2] >> 3;
-              rounh_key[0] = state[0] << 5 | state[1] >> 3;
+          rounh_key[9] = rounh_key[6] << 5 | rounh_key[7] >> 3;
+          rounh_key[8] = rounh_key[5] << 5 | rounh_key[6] >> 3;
+          rounh_key[7] = rounh_key[4] << 5 | rounh_key[5] >> 3;
+          rounh_key[6] = rounh_key[3] << 5 | rounh_key[4] >> 3;
+          rounh_key[5] = rounh_key[2] << 5 | rounh_key[3] >> 3;
+          rounh_key[4] = rounh_key[1] << 5 | rounh_key[2] >> 3;
+          rounh_key[3] = rounh_key[0] << 5 | rounh_key[1] >> 3;
+          rounh_key[2] = state[2] << 5 | rounh_key[0] >> 3;
+          rounh_key[1] = state[1] << 5 | state[2] >> 3;
+          rounh_key[0] = state[0] << 5 | state[1] >> 3;
 
-              rounh_key[0] = (rounh_key[0] & 0x0F) | sbox[rounh_key[0] >> 4];
-            }
+          rounh_key[0] = (rounh_key[0] & 0x0F) | sbox[rounh_key[0] >> 4];
+        }
 
-            // if round is not equal to 31, then do not perform the last adding key operation
-            // this can be used in constructing PRESENT based algorithm, such as MAC
-            if (31 == rounds) {
-              cipher[0] ^= rounh_key[0];
-              cipher[1] ^= rounh_key[1];
-              cipher[2] ^= rounh_key[2];
-              cipher[3] ^= rounh_key[3];
-              cipher[4] ^= rounh_key[4];
-              cipher[5] ^= rounh_key[5];
-              cipher[6] ^= rounh_key[6];
-              cipher[7] ^= rounh_key[7];
-            }
-        });
+        // if round is not equal to 31, then do not perform the last adding key operation
+        // this can be used in constructing PRESENT based algorithm, such as MAC
+        if (31 == rounds) {
+          cipher[0] ^= rounh_key[0];
+          cipher[1] ^= rounh_key[1];
+          cipher[2] ^= rounh_key[2];
+          cipher[3] ^= rounh_key[3];
+          cipher[4] ^= rounh_key[4];
+          cipher[5] ^= rounh_key[5];
+          cipher[6] ^= rounh_key[6];
+          cipher[7] ^= rounh_key[7];
+        }
+      });
     });
 
-    q.submit([&] (handler &cgh) {
-        auto acc = d_cipher.get_access<sycl_read>(cgh);
-        cgh.copy(acc, h_cipher);
-        });
     q.wait();
+    auto end = std::chrono::steady_clock::now();
+    if (n > 0)
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    q.submit([&] (handler &cgh) {
+      auto acc = d_cipher.get_access<sycl_read>(cgh);
+      cgh.copy(acc, h_cipher);
+    }).wait();
 
     for (int i = 0; i < num*8; i++) d_checksum += h_cipher[i];
   }
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   if (h_checksum != d_checksum)
-    printf("FAILED\n");
+    printf("FAIL\n");
   else
-    printf("SUCCESS\n");
+    printf("PASS\n");
 
   free(h_plain);
   free(h_key);
