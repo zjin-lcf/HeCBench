@@ -18,11 +18,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <chrono>
 #include <vector>
 #include <omp.h>
 
 #include "reference.cpp"
-
 
 template <typename value_idx, typename value_t>
 void perplexity_search(const value_t* __restrict distances,
@@ -31,9 +31,13 @@ void perplexity_search(const value_t* __restrict distances,
                        const int epochs,
                        const float tol,
                        const value_idx n,
-                       const int k)
+                       const int k,
+                       double &time)
 {
   const float desired_entropy = logf(perplexity);
+
+  auto start = std::chrono::steady_clock::now();
+
   #pragma omp target teams distribute parallel for thread_limit(256)
   for (int i = 0; i < n; i++) {
     value_t beta_min = -INFINITY, beta_max = INFINITY;
@@ -80,12 +84,20 @@ void perplexity_search(const value_t* __restrict distances,
       }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 4) {
+    printf("Usage: %s <number of points> <perplexity> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int n = atoi(argv[1]); // points
   const int p = atoi(argv[2]); // perplexity
+  const int repeat = atoi(argv[3]);
+
   const int n_nbrs = 4 * p;    // neighbors
   const int max_iter = 100;    // maximum number of iterations
   const float tol = 1e-8f;     // tolerance
@@ -101,11 +113,15 @@ int main(int argc, char* argv[]) {
   float *d_data = data.data();
   const float *d_distance = distance.data();
 
-#pragma omp target data map (from: d_data[0:n*n_nbrs]) map(to: d_distance[0:n*n_nbrs])
-{
-  for (int i = 0; i < 100; i++)
-    perplexity_search(d_distance, d_data, p, max_iter, tol, n, n_nbrs);
-}
+  #pragma omp target data map (from: d_data[0:n*n_nbrs]) map(to: d_distance[0:n*n_nbrs])
+  {
+    double time = 0.0;
+  
+    for (int i = 0; i < repeat; i++)
+      perplexity_search(d_distance, d_data, p, max_iter, tol, n, n_nbrs, time);
+  
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  }
 
   // verify
   reference(distance.data(), h_data.data(), p, max_iter, tol, n, n_nbrs);
@@ -122,4 +138,3 @@ int main(int argc, char* argv[]) {
   
   return 0;
 }
-
