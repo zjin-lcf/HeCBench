@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include <omp.h>
 
 #define VERTICES 600
@@ -50,19 +51,78 @@ int main(int argc, char* argv[]) {
                          map (from: bitmap_ref[0:nPoints], \
                                     bitmap_opt[0:nPoints])
   {
-    // performance tuning with tile sizes
-    for (int i = 0; i < repeat; i++) {
-      pnpoly_opt<1>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<2>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<4>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<8>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<16>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<32>(bitmap_opt, point, vertex, nPoints);
-      pnpoly_opt<64>(bitmap_opt, point, vertex, nPoints);
-    }
+    auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
       pnpoly_base(bitmap_ref, point, vertex, nPoints);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_base): %f (s)\n", (time * 1e-9f) / repeat);
+
+    // performance tuning with tile sizes
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<1>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<1>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<2>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<2>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<4>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<4>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<8>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<8>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<16>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<16>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<32>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<32>): %f (s)\n", (time * 1e-9f) / repeat);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      pnpoly_opt<64>(bitmap_opt, point, vertex, nPoints);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (pnpoly_opt<64>): %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // compare against reference kernel for verification

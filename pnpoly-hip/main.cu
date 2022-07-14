@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define VERTICES 600
@@ -56,23 +57,92 @@ int main(int argc, char* argv[]) {
   hipMemcpy(d_point, point, nPoints*sizeof(float2), hipMemcpyHostToDevice);
   hipMemcpy(d_vertex, vertex, vertices*sizeof(float2), hipMemcpyHostToDevice);
 
-  // performance tuning with tile sizes
-  for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<1>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<2>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<4>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<8>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<16>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<32>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<64>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
-  }
-
-  hipMemcpy(bitmap_opt, d_bitmap_opt, nPoints*sizeof(int), hipMemcpyDeviceToHost);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
     hipLaunchKernelGGL(pnpoly_base, grid, threads, 0, 0, d_bitmap_ref, d_point, d_vertex, nPoints);
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_base): %f (s)\n", (time * 1e-9f) / repeat);
+
   hipMemcpy(bitmap_ref, d_bitmap_ref, nPoints*sizeof(int), hipMemcpyDeviceToHost);
+
+  // performance tuning with tile sizes
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<1>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<1>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<2>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<2>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<4>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<4>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<8>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<8>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<16>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<16>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<32>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<32>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(pnpoly_opt<64>), grid, threads, 0, 0, d_bitmap_opt, d_point, d_vertex, nPoints);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<64>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  hipMemcpy(bitmap_opt, d_bitmap_opt, nPoints*sizeof(int), hipMemcpyDeviceToHost);
 
   // compare against reference kernel for verification
   int error = memcmp(bitmap_opt, bitmap_ref, nPoints*sizeof(int)); 

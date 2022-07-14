@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include "common.h"
 
 #define VERTICES 600
@@ -56,78 +57,10 @@ int main(int argc, char* argv[]) {
   range<1> lws (BLOCK_SIZE_X);
   range<1> gws ((nPoints+BLOCK_SIZE_X-1) / BLOCK_SIZE_X * BLOCK_SIZE_X);
 
-  // performance tuning with tile sizes
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<1>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<2>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<4>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<8>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t5>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<16>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t6>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<32>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class optimized_t7>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<64>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
-      });
-    });
-  }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bitmap_opt.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bitmap_opt);
-  });
-
-  for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
       auto bm = d_bitmap_ref.get_access<sycl_discard_write>(cgh);
       auto p = d_point.get_access<sycl_read>(cgh);
@@ -136,13 +69,149 @@ int main(int argc, char* argv[]) {
         pnpoly_base(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_base): %f (s)\n", (time * 1e-9f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_bitmap_ref.get_access<sycl_read>(cgh);
     cgh.copy(acc, bitmap_ref);
-  });
+  }).wait();
+
+  // performance tuning with tile sizes
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<1>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
 
   q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<1>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<2>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<2>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<4>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<4>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<8>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<8>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt5>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<16>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<16>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt6>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<32>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<32>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
+      auto p = d_point.get_access<sycl_read>(cgh);
+      auto v = d_vertex.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class opt7>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        pnpoly_opt<64>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (pnpoly_opt<64>): %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.submit([&] (handler &cgh) {
+    auto acc = d_bitmap_opt.get_access<sycl_read>(cgh);
+    cgh.copy(acc, bitmap_opt);
+  }).wait();
 
   // compare against reference kernel for verification
   int error = memcmp(bitmap_opt, bitmap_ref, nPoints*sizeof(int)); 
