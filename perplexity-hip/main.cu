@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <chrono>
 #include <vector>
 #include <hip/hip_runtime.h>
 
@@ -25,14 +26,15 @@
 
 // Find the best Gaussian bandwidth for each row in the dataset 
 template <typename value_idx, typename value_t>
-__global__ void sigmas_kernel(const value_t* __restrict distances,
-                              value_t* __restrict P,
-                              const float perplexity,
-                              const float desired_entropy,
-                              const int epochs,
-                              const float tol,
-                              const value_idx n,
-                              const int k)
+__global__
+void sigmas_kernel(const value_t* __restrict__ distances,
+                         value_t* __restrict__ P,
+                   const float perplexity,
+                   const float desired_entropy,
+                   const int epochs,
+                   const float tol,
+                   const value_idx n,
+                   const int k)
 {
   // For every item in row
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -83,27 +85,40 @@ __global__ void sigmas_kernel(const value_t* __restrict distances,
   }
 }
 
-
 /****************************************/
 template <typename value_idx, typename value_t>
-void perplexity_search(const value_t* __restrict distances,
-                       value_t* __restrict P,
+void perplexity_search(const value_t* __restrict__ distances,
+                       value_t* __restrict__ P,
                        const float perplexity,
                        const int epochs,
                        const float tol,
                        const value_idx n,
-                       const int dim)
+                       const int dim,
+                       double &time)
 {
   const float desired_entropy = logf(perplexity);
   dim3 grid ((n+255)/256);
   dim3 block (256);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   hipLaunchKernelGGL(sigmas_kernel, grid, block, 0, 0, distances, P, perplexity, desired_entropy, epochs, tol, n, dim);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 4) {
+    printf("Usage: %s <number of points> <perplexity> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int n = atoi(argv[1]); // points
   const int p = atoi(argv[2]); // perplexity
+  const int repeat = atoi(argv[3]);
+
   const int n_nbrs = 4 * p;    // neighbors
   const int max_iter = 100;    // maximum number of iterations
   const float tol = 1e-8f;     // tolerance
@@ -124,8 +139,12 @@ int main(int argc, char* argv[]) {
 
   hipMemcpy(d_distance, distance.data(), sizeof(float)*n*n_nbrs, hipMemcpyHostToDevice); 
 
-  for (int i = 0; i < 100; i++)
-    perplexity_search(d_distance, d_data, p, max_iter, tol, n, n_nbrs);
+  double time = 0.0;
+
+  for (int i = 0; i < repeat; i++)
+    perplexity_search(d_distance, d_data, p, max_iter, tol, n, n_nbrs, time);
+
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(data.data(), d_data, sizeof(float)*n*n_nbrs, hipMemcpyDeviceToHost); 
 
@@ -146,4 +165,3 @@ int main(int argc, char* argv[]) {
   hipFree(d_data);
   return 0;
 }
-

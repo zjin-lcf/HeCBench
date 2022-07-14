@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <chrono>
 #include <vector>
 #include "common.h"
 
@@ -36,11 +37,15 @@ void perplexity_search(queue &q,
                        const int epochs,
                        const float tol,
                        const value_idx n,
-                       const int k)
+                       const int k,
+                       double &time)
 {
   const float desired_entropy = logf(perplexity);
   range<1> gws ((n+255)/256*256);
   range<1> lws  (256);
+
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto distances = d_distances.template get_access<sycl_read>(cgh); 
     auto data = d_data.template get_access<sycl_discard_write>(cgh); 
@@ -94,12 +99,21 @@ void perplexity_search(queue &q,
       }
     });
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 }
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 4) {
+    printf("Usage: %s <number of points> <perplexity> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int n = atoi(argv[1]); // points
   const int p = atoi(argv[2]); // perplexity
+  const int repeat = atoi(argv[3]);
+
   const int n_nbrs = 4 * p;    // neighbors
   const int max_iter = 100;    // maximum number of iterations
   const float tol = 1e-8f;     // tolerance
@@ -123,8 +137,12 @@ int main(int argc, char* argv[]) {
   buffer<float, 1> d_data(data.data(), n*n_nbrs);
   buffer<const float, 1> d_distances(distance.data(), n*n_nbrs);
 
-  for (int i = 0; i < 100; i++) 
-    perplexity_search(q, d_distances, d_data, p, max_iter, tol, n, n_nbrs);
+  double time = 0.0;
+
+  for (int i = 0; i < repeat; i++) 
+    perplexity_search(q, d_distances, d_data, p, max_iter, tol, n, n_nbrs, time);
+
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   } // sycl scope
 
