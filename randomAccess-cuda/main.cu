@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <chrono>
+#include <cuda.h>
 
 typedef unsigned long long int u64Int;
 typedef long long int s64Int;
@@ -66,7 +67,10 @@ __global__ void initRan (u64Int* ran, const u64Int TableSize) {
   ran[j] = HPCC_starts ((NUPDATE/128) * j);
 }
 
-__global__ void update (u64Int* Table, u64Int* ran, const u64Int TableSize) {
+__global__ void update (u64Int*__restrict__ Table,
+                        u64Int*__restrict__ ran,
+                        const u64Int TableSize)
+{
   int j = threadIdx.x;
   for (u64Int i=0; i<NUPDATE/128; i++) {
     ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
@@ -74,14 +78,16 @@ __global__ void update (u64Int* Table, u64Int* ran, const u64Int TableSize) {
   }
 }
 
-
 int main(int argc, char** argv) {
-  //double GUPs;
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int failure;
   u64Int i;
   u64Int temp;
-  //double cputime;               /* CPU time to update table */
-  //double realtime;              /* Real time to update table */
   double totalMem;
   u64Int *Table = NULL;
   u64Int logTableSize, TableSize;
@@ -101,13 +107,13 @@ int main(int argc, char** argv) {
    posix_memalign((void**)&Table, 1024, TableSize * sizeof(u64Int));
 
   if (! Table ) {
-    fprintf( stderr, "Failed to allocate memory for the update table %llu\n", TableSize);
+    fprintf(stderr, "Failed to allocate memory for the update table %llu\n", TableSize);
     return 1;
   }
 
   /* Print parameters for run */
-  fprintf( stdout, "Main table size   = 2^%llu = %llu words\n", logTableSize,TableSize);
-  fprintf( stdout, "Number of updates = %llu\n", NUPDATE);
+  fprintf(stdout, "Main table size   = 2^%llu = %llu words\n", logTableSize,TableSize);
+  fprintf(stdout, "Number of updates = %llu\n", NUPDATE);
 
   u64Int* d_Table;
   cudaMalloc((void**)&d_Table, TableSize * sizeof(u64Int));
@@ -115,14 +121,23 @@ int main(int argc, char** argv) {
   u64Int *d_ran;
   cudaMalloc((void**)&d_ran, 128 * sizeof(u64Int));
 
-  /* initialize the table */
-  initTable<<<(TableSize+K1_BLOCKSIZE-1) / K1_BLOCKSIZE, K1_BLOCKSIZE>>>(d_Table, TableSize);
+  auto start = std::chrono::steady_clock::now();
 
-  /* initialize the ran structure */
-  initRan<<<1, K2_BLOCKSIZE>>>(d_ran, TableSize);
+  for (int i = 0; i < repeat; i++) {
+    /* initialize the table */
+    initTable<<<(TableSize+K1_BLOCKSIZE-1) / K1_BLOCKSIZE, K1_BLOCKSIZE>>>(d_Table, TableSize);
 
-  /* update the table */
-  update<<<1, K3_BLOCKSIZE>>>(d_Table, d_ran, TableSize);
+    /* initialize the ran structure */
+    initRan<<<1, K2_BLOCKSIZE>>>(d_ran, TableSize);
+
+    /* update the table */
+    update<<<1, K3_BLOCKSIZE>>>(d_Table, d_ran, TableSize);
+  }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(Table, d_Table, TableSize * sizeof(u64Int), cudaMemcpyDeviceToHost);
 
@@ -139,8 +154,8 @@ int main(int argc, char** argv) {
       temp++;
     }
 
-  fprintf( stdout, "Found %llu errors in %llu locations (%s).\n",
-           temp, TableSize, (temp <= 0.01*TableSize) ? "passed" : "failed");
+  fprintf(stdout, "Found %llu errors in %llu locations (%s).\n",
+          temp, TableSize, (temp <= 0.01*TableSize) ? "PASS" : "FAIL");
   if (temp <= 0.01*TableSize) failure = 0;
   else failure = 1;
 
@@ -148,7 +163,4 @@ int main(int argc, char** argv) {
   cudaFree(d_Table);
   cudaFree(d_ran);
   return failure;
-
 }
-
-
