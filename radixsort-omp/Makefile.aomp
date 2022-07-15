@@ -31,7 +31,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -gline-tables-only
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g 
 endif
 
@@ -62,6 +62,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
-
-
+	./$(program) 1000

@@ -102,10 +102,8 @@ uint4 rank4(const uint4 preds, unsigned int* sMem, unsigned int* numtrue)
 
 
 __global__ void radixSortBlocksKeysK(
-   // __global uint4* keysIn, 
-   unsigned int* keysIn, 
-   //__global uint4* keysOut,
-   unsigned int* keysOut,
+   const unsigned int*__restrict__ keysIn,
+         unsigned int*__restrict__ keysOut,
    const unsigned int nbits,
    const unsigned int startbit)
 {
@@ -113,7 +111,7 @@ __global__ void radixSortBlocksKeysK(
   __shared__ unsigned int numtrue[1];
   __shared__ unsigned int sMem[4*CTA_SIZE];
 
-  uint4 key = reinterpret_cast<uint4*>(keysIn)[globalId];
+  uint4 key = reinterpret_cast<const uint4*>(keysIn)[globalId];
 
   __syncthreads();
 
@@ -151,7 +149,6 @@ __global__ void radixSortBlocksKeysK(
 
   //keysOut[globalId] = key;
   reinterpret_cast<uint4*>(keysOut)[globalId] = key;  
-  
 }
 
 //----------------------------------------------------------------------------
@@ -174,10 +171,9 @@ __global__ void radixSortBlocksKeysK(
 //                                
 //----------------------------------------------------------------------------
 __global__ void findRadixOffsetsK(
-    //__global uint2* keys,
-    unsigned int*  keys,
-    unsigned int*  counters,
-    unsigned int*  blockOffsets,
+    const unsigned int*__restrict__ keys,
+          unsigned int*__restrict__ counters,
+          unsigned int*__restrict__ blockOffsets,
     const unsigned int startbit,
     const unsigned int totalBlocks)
 {
@@ -189,9 +185,7 @@ __global__ void findRadixOffsetsK(
   unsigned int groupSize = blockDim.x;
   unsigned int globalId = groupId * groupSize + localId;
 
-  // uint2 radix2;
-  // radix2 = keys[get_global_id(0)];
-  uint2 radix2 = reinterpret_cast<uint2*>(keys)[globalId];
+  uint2 radix2 = reinterpret_cast<const uint2*>(keys)[globalId];
 
   sRadix1[2 * localId]     = (radix2.x >> startbit) & 0xF;
   sRadix1[2 * localId + 1] = (radix2.y >> startbit) & 0xF;
@@ -269,14 +263,10 @@ __global__ void findRadixOffsetsK(
 // GPUs than it is on compute version 1.2 GPUs.
 //----------------------------------------------------------------------------
 __global__ void reorderDataKeysOnlyK(
-    //__global unsigned int  *outKeys, 
-    unsigned int*   outKeys, 
-    //__global uint2  *keys, 
-    unsigned int*   keys, 
-    //__global unsigned int  *blockOffsets, 
-    unsigned int*   blockOffsets, 
-    //__global unsigned int  *offsets, 
-    unsigned int*   offsets, 
+          unsigned int*__restrict__ outKeys,
+    const unsigned int*__restrict__ keys,
+          unsigned int*__restrict__ blockOffsets,
+    const unsigned int*__restrict__ offsets,
     const unsigned int startbit,
     const unsigned int numElements,
     const unsigned int totalBlocks)
@@ -285,7 +275,6 @@ __global__ void reorderDataKeysOnlyK(
   __shared__ unsigned int sBlockOffsets[16];
   __shared__ uint2 sKeys2[CTA_SIZE];
 
-  //__local unsigned int *sKeys1 = (__local unsigned int*)sKeys2; 
   unsigned int *sKeys1 = (unsigned int*)sKeys2;
 
   unsigned int groupId = blockIdx.x;
@@ -293,7 +282,7 @@ __global__ void reorderDataKeysOnlyK(
   unsigned int groupSize = blockDim.x;
   unsigned int globalId = groupId * groupSize + localId;
  
-  sKeys2[localId] = reinterpret_cast<uint2*>(keys)[globalId];
+  sKeys2[localId] = reinterpret_cast<const uint2*>(keys)[globalId];
 
   if(localId < 16)
   {

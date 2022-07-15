@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include "RadixSort.h"
 #include "Scan.h"
 
@@ -20,6 +21,12 @@ bool verifySortUint(unsigned int *keysSorted,
 
 int main(int argc, const char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int numIterations = atoi(argv[1]);
+
   const unsigned int numElements = 128*128*128*2; // 1048576; 
   const int keybits = 32;  // bit size of uint 
   const int batchSize = 1; // only support a batch size of 1
@@ -65,12 +72,17 @@ int main(int argc, const char **argv)
                  		   h_blockOffsets[0:WARP_SIZE*numBlocks], \
                  		   h_buffer[0:arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE])
 {
-  int numIterations = 100;
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
   {
     radixSortKeys(h_keys, h_tempKeys, h_counters, h_blockOffsets, h_countersSum, 
                   h_buffer, numElements, keybits, batchSize);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of radixsort: %f (s)\n", (time * 1e-9f) / numIterations);
 }
 
 

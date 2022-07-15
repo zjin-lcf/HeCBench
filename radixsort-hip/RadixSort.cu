@@ -30,7 +30,7 @@ void radixSortBlocksKeysOnly(
   printf("nbits: %d startbit: %d\n", nbits, startbit);
 #endif
 
-  hipLaunchKernelGGL(radixSortBlocksKeysK, dim3(gws), dim3(lws), 0, 0, d_keys, d_tempKeys, nbits, startbit);
+  hipLaunchKernelGGL(radixSortBlocksKeysK, gws, lws , 0, 0, d_keys, d_tempKeys, nbits, startbit);
 }
 
 void findRadixOffsets(
@@ -45,7 +45,7 @@ void findRadixOffsets(
   dim3 gws (totalBlocks);
   dim3 lws (CTA_SIZE);
 
-  hipLaunchKernelGGL(findRadixOffsetsK, dim3(gws), dim3(lws), 0, 0, d_tempKeys, d_counters, d_blockOffsets, startbit, totalBlocks);
+  hipLaunchKernelGGL(findRadixOffsetsK, gws, lws , 0, 0, d_tempKeys, d_counters, d_blockOffsets, startbit, totalBlocks);
 }
 
 void reorderDataKeysOnly(
@@ -60,7 +60,7 @@ void reorderDataKeysOnly(
   dim3 gws (totalBlocks);
   dim3 lws (CTA_SIZE);
 
-  hipLaunchKernelGGL(reorderDataKeysOnlyK, dim3(gws), dim3(lws), 0, 0, 
+  hipLaunchKernelGGL(reorderDataKeysOnlyK, gws, lws , 0, 0, 
                         d_keys,
                         d_tempKeys,
                         d_blockOffsets,

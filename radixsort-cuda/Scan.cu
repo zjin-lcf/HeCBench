@@ -24,7 +24,7 @@ void scanExclusiveLocal1(
   dim3 gws (globalWorkSize/localWorkSize);
   dim3 lws (localWorkSize);
 
-  scanExclusiveLocal1K<<<gws, lws>>>(d_Dst, d_Src, size);
+  scanExclusiveLocal1K <<< gws, lws >>> (d_Dst, d_Src, size);
 }
 
 void scanExclusiveLocal2(
@@ -40,7 +40,7 @@ void scanExclusiveLocal2(
   dim3 gws (globalWorkSize/localWorkSize);
   dim3 lws (localWorkSize);
 
-  scanExclusiveLocal2K<<<gws, lws>>>(d_Buffer, d_Dst, d_Src, elements, size);
+  scanExclusiveLocal2K <<< gws, lws >>> (d_Buffer, d_Dst, d_Src, elements, size);
 }
 
 void uniformUpdate(
@@ -51,7 +51,7 @@ void uniformUpdate(
   dim3 gws (n);
   dim3 lws (WORKGROUP_SIZE);
 
-  uniformUpdateK<<<gws, lws>>>(d_Dst, d_Buf);
+  uniformUpdateK <<< gws, lws >>> (d_Dst, d_Buf);
 }
 
 // main exclusive scan routine

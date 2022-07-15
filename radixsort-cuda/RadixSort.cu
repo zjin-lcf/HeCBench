@@ -30,7 +30,7 @@ void radixSortBlocksKeysOnly(
   printf("nbits: %d startbit: %d\n", nbits, startbit);
 #endif
 
-  radixSortBlocksKeysK<<<gws, lws>>>(d_keys, d_tempKeys, nbits, startbit);
+  radixSortBlocksKeysK <<< gws, lws >>> (d_keys, d_tempKeys, nbits, startbit);
 }
 
 void findRadixOffsets(
@@ -45,7 +45,7 @@ void findRadixOffsets(
   dim3 gws (totalBlocks);
   dim3 lws (CTA_SIZE);
 
-  findRadixOffsetsK<<<gws, lws>>>(d_tempKeys, d_counters, d_blockOffsets, startbit, totalBlocks);
+  findRadixOffsetsK <<< gws, lws >>> (d_tempKeys, d_counters, d_blockOffsets, startbit, totalBlocks);
 }
 
 void reorderDataKeysOnly(
@@ -60,7 +60,7 @@ void reorderDataKeysOnly(
   dim3 gws (totalBlocks);
   dim3 lws (CTA_SIZE);
 
-  reorderDataKeysOnlyK<<<gws, lws>>>(
+  reorderDataKeysOnlyK <<< gws, lws >>> (
                         d_keys,
                         d_tempKeys,
                         d_blockOffsets,
@@ -94,7 +94,6 @@ void radixSortStepKeysOnly(unsigned int* d_keys,
   for (int i = 0; i < numElements; i++) printf("temp key %d: %x\n", i, h_tempKeys[i]);
   free(h_tempKeys);
 #endif
-
 
   findRadixOffsets(d_tempKeys, d_counters, d_blockOffsets, startbit, numElements);
 
@@ -142,7 +141,6 @@ void radixSortKeys(unsigned int* d_keys,
   {
     radixSortStepKeysOnly(d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum,
                           d_buffer, bitStep, i*bitStep, numElements, batchSize);
-break;
     i++;
   }
 }

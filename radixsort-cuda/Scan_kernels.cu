@@ -9,8 +9,6 @@
  *
  */
 
-
-
 static unsigned int iSnapUp(const unsigned int dividend, const unsigned int divisor)
 {
   return ((dividend % divisor) == 0) ? dividend : (dividend - dividend % divisor + divisor);
@@ -156,33 +154,29 @@ inline uint4 scan4Exclusive(uint4 data4,
 ////////////////////////////////////////////////////////////////////////////////
 // Scan kernels
 ////////////////////////////////////////////////////////////////////////////////
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
 __global__  void scanExclusiveLocal1K(
-      //__global uint4 *d_Dst,
-      unsigned int*  d_Dst,
-      //__global uint4 *d_Src,
-      unsigned int*  d_Src,
+            unsigned int*__restrict__ d_Dst,
+      const unsigned int*__restrict__ d_Src,
       const unsigned int size)
 {
     __shared__ unsigned int l_Data[2 * WORKGROUP_SIZE];
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     //Load data
-    uint4 idata4 = reinterpret_cast<uint4*>(d_Src)[i];
+    uint4 idata4 = reinterpret_cast<const uint4*>(d_Src)[i];
 
     //Calculate exclusive scan
     uint4 odata4 = scan4Exclusive(idata4, l_Data, size);
 
     //Write back
     reinterpret_cast<uint4*>(d_Dst)[i] = odata4;
-  }
+}
 
 //Exclusive scan of top elements of bottom-level scans (4 * THREADBLOCK_SIZE)
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
 __global__ void scanExclusiveLocal2K(
-      unsigned int*  d_Buf,
-      unsigned int*  d_Dst,
-      unsigned int*  d_Src,
+            unsigned int*__restrict__ d_Buf,
+            unsigned int*__restrict__ d_Dst,
+      const unsigned int*__restrict__ d_Src,
       const unsigned int N,
       const unsigned int arrayLength)
 {
@@ -202,18 +196,15 @@ __global__ void scanExclusiveLocal2K(
 
     //Avoid out-of-bound access
     if(i < N) d_Buf[i] = odata;
-  }
+}
 
 //Final step of large-array scan: combine basic inclusive scan with exclusive scan of top elements of input arrays
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
 __global__ void uniformUpdateK(
-      // uint4 *d_Data,
-      unsigned int*  d_Data,
-      unsigned int*  d_Buf)
+      unsigned int*__restrict__ d_Data,
+      unsigned int*__restrict__ d_Buf)
 {
     __shared__ unsigned int buf[1];
 
-    //uint4 data4 = d_Data[get_global_id(0)];
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     uint4 data4 = reinterpret_cast<uint4*>(d_Data)[i];
     if(threadIdx.x == 0)
@@ -222,6 +213,5 @@ __global__ void uniformUpdateK(
     __syncthreads();
     data4 += make_uint4(buf[0]);
 
-    //d_Data[i] = data4;
     reinterpret_cast<uint4*>(d_Data)[i] = data4;
 }
