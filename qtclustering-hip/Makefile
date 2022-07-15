@@ -73,4 +73,3 @@ clean:
 run: $(program)
 	./$(program) --Verbose
 	#./$(program) --SaveOutput
-
