@@ -4,10 +4,10 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
+#include <chrono>
 #include <vector>
 #include <cuda.h>
 #include "Projectile.hpp"
-
 
 #ifdef DEBUG
 static const int num_elements = 100;
@@ -23,10 +23,10 @@ const int BLOCK_SIZE = 256;
 
 __global__ void CalculateRange(const Projectile *obj, Projectile *pObj) {  
   
-  unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+  int i = blockDim.x*blockIdx.x + threadIdx.x;
+  if (i >= num_elements) return;
   float proj_angle = obj[i].getangle();
   float proj_vel = obj[i].getvelocity();
-  // for trignometric functions use cl::sycl::sin/cos
   float sin_value = sin(proj_angle * kPIValue / 180.0f);
   float cos_value = cos(proj_angle * kPIValue / 180.0f);
   float total_time = fabs((2 * proj_vel * sin_value)) / kGValue;
@@ -39,27 +39,48 @@ __global__ void CalculateRange(const Projectile *obj, Projectile *pObj) {
 
 // in_vect and out_vect are the vectors with N Projectile numbers and are inputs to the
 // parallel function
-void GpuParallel( std::vector<Projectile>& in_vect, std::vector<Projectile>& out_vect) {
+void GpuParallel(std::vector<Projectile>& in_vect,
+                 std::vector<Projectile>& out_vect,
+                 const int repeat)
+{
   Projectile *bufin_vect, *bufout_vect;
 
   cudaMalloc((void**)&bufin_vect, sizeof(Projectile) * num_elements);
   cudaMalloc((void**)&bufout_vect, sizeof(Projectile) * num_elements);
   cudaMemcpy(bufin_vect, in_vect.data(), sizeof(Projectile) * num_elements, cudaMemcpyHostToDevice);
-  for (int i = 0; i < 100; i++)
-    CalculateRange<<< dim3((num_elements + BLOCK_SIZE - 1) / BLOCK_SIZE), 
-                      dim3(BLOCK_SIZE) >>> (bufin_vect, bufout_vect);
+
+  dim3 grids ((num_elements + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  dim3 blocks (BLOCK_SIZE);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    CalculateRange <<< grids, blocks >>> (bufin_vect, bufout_vect);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(out_vect.data(), bufout_vect, sizeof(Projectile) * num_elements, cudaMemcpyDeviceToHost);
   cudaFree(bufin_vect);
   cudaFree(bufout_vect);
 }
 
-int main() {
-  srand(2);
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   float init_angle = 0.0f;
   float init_vel = 0.0f;
   vector<Projectile> input_vect1, out_parallel_vect2, out_scalar_vect3;
+
   // Initialize the Input and Output vectors
+  srand(2);
   for (int i = 0; i < num_elements; i++) {
     init_angle = rand() % 90 + 10;
     init_vel = rand() % 400 + 10;
@@ -69,13 +90,13 @@ int main() {
   }
 
   // Call the DpcppParallel with the required inputs and outputs
-  GpuParallel(input_vect1, out_parallel_vect2);
+  GpuParallel(input_vect1, out_parallel_vect2, repeat);
       
 #ifdef DEBUG
   for (int i = 0; i < num_elements; i++)
   {
-        // Displaying the Parallel computation results.
-        cout << "Parallel " << out_parallel_vect2[i];
+    // Displaying the Parallel computation results.
+    cout << "Parallel " << out_parallel_vect2[i];
   } 
 #endif
   return 0;
