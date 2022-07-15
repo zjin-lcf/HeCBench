@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <chrono>
+#include <omp.h>
 
 typedef unsigned long long int u64Int;
 typedef long long int s64Int;
@@ -55,12 +56,15 @@ HPCC_starts(s64Int n)
 
 
 int main(int argc, char** argv) {
-  //double GUPs;
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   int failure;
   u64Int i;
   u64Int temp;
-  //double cputime;               /* CPU time to update table */
-  //double realtime;              /* Real time to update table */
   double totalMem;
   u64Int *Table = NULL;
   u64Int logTableSize, TableSize;
@@ -85,30 +89,39 @@ int main(int argc, char** argv) {
   }
 
   /* Print parameters for run */
-  fprintf( stdout, "Main table size   = 2^%llu = %llu words\n", logTableSize,TableSize);
-  fprintf( stdout, "Number of updates = %llu\n", NUPDATE);
+  fprintf(stdout, "Main table size   = 2^%llu = %llu words\n", logTableSize,TableSize);
+  fprintf(stdout, "Number of updates = %llu\n", NUPDATE);
 
   u64Int ran[128];
 
 #pragma omp target enter data map(alloc:Table[0:TableSize], ran[0:128])
 {
-  /* Initialize main table */
-  #pragma omp target teams distribute parallel for thread_limit (256)
-  for (i=0; i<TableSize; i++) {
-    Table[i] = i;
-  }
-  #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
-  for (int j=0; j<128; j++)
-    ran[j] = HPCC_starts ((NUPDATE/128) * j);
+  auto start = std::chrono::steady_clock::now();
 
-  #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
-  for (int j=0; j<128; j++) {
-    for (u64Int i=0; i<NUPDATE/128; i++) {
-      ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
-      #pragma omp atomic update
-      Table[ran[j] & (TableSize-1)] ^= ran[j];
+  for (int i = 0; i < repeat; i++) {
+    /* Initialize main table */
+    #pragma omp target teams distribute parallel for thread_limit (256)
+    for (i=0; i<TableSize; i++) {
+      Table[i] = i;
+    }
+    #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
+    for (int j=0; j<128; j++)
+      ran[j] = HPCC_starts ((NUPDATE/128) * j);
+
+    #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
+    for (int j=0; j<128; j++) {
+      for (u64Int i=0; i<NUPDATE/128; i++) {
+        ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
+        #pragma omp atomic update
+        Table[ran[j] & (TableSize-1)] ^= ran[j];
+      }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
 }
 #pragma omp target exit data map(from: Table[0:TableSize]) map(delete: ran[0:128]) 
 
