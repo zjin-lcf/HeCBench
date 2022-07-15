@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "qrg.h"
 
@@ -96,7 +97,7 @@ float MoroInvCNDgpu(unsigned int x)
 #pragma omp end declare target
 
 // size of output random array
-unsigned int N = 1048576;
+const unsigned int N = 1048576;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Wrapper for Niederreiter quasirandom number generator kernel
@@ -105,18 +106,8 @@ void QuasirandomGeneratorGPU(float* output,
                              const unsigned int* table,
                              const unsigned int seed,
                              const unsigned int N,
-                             const size_t szWgXDim)
+                             const size_t szWorkgroup)
 {
-  #pragma omp target teams distribute parallel for collapse(2) thread_limit(szWgXDim)
-  for (unsigned int pos = 0; pos < N; pos++) {
-    for (unsigned int y = 0; y < QRNG_DIMENSIONS; y++) {
-      unsigned int result = 0;
-      unsigned int data = seed + pos;
-      for(int bit = 0; bit < QRNG_RESOLUTION; bit++, data >>= 1)
-        if(data & 1) result ^= table[bit + y * QRNG_RESOLUTION];
-      output[y * N + pos] = (float)(result + 1) * INT_SCALE;
-    }
-  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -124,19 +115,18 @@ void QuasirandomGeneratorGPU(float* output,
 ///////////////////////////////////////////////////////////////////////////////
 void InverseCNDGPU(float* output, 
                    const unsigned int pathN,
-                   const size_t szWgXDim)
+                   const size_t szWorkgroup)
 {
-  const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
-
-  #pragma omp target teams distribute parallel for thread_limit(szWgXDim)
-  for(unsigned int pos = 0; pos < pathN; pos++){
-    unsigned int d = (pos + 1) * distance;
-    output[pos] = MoroInvCNDgpu(d);
-  }
 }
 
 int main(int argc, const char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   unsigned int dim, pos;
   double delta, ref, sumDelta, sumRef, L1norm;
   unsigned int table[QRNG_DIMENSIONS*QRNG_RESOLUTION];
@@ -151,19 +141,34 @@ int main(int argc, const char **argv)
 
   size_t szWorkgroup = 64 * (256 / QRNG_DIMENSIONS)/64;
 
-  int numIterations = 100;
-
-#pragma omp target data map(alloc: output[0:QRNG_DIMENSIONS*N]) \
-                        map(to: table[0:QRNG_DIMENSIONS*QRNG_RESOLUTION])
+  #pragma omp target data map(alloc: output[0:QRNG_DIMENSIONS*N]) \
+                          map(to: table[0:QRNG_DIMENSIONS*QRNG_RESOLUTION])
   {
-    for (int i = 0; i< numIterations; i++)
+    // seed is fixed at zero
+    const unsigned int seed = 0;
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
     {
-      // seed is fixed at zero
-      QuasirandomGeneratorGPU(output, table, 0, N, szWorkgroup);    
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(szWorkgroup)
+      for (unsigned int pos = 0; pos < N; pos++) {
+        for (unsigned int y = 0; y < QRNG_DIMENSIONS; y++) {
+          unsigned int result = 0;
+          unsigned int data = seed + pos;
+          for(int bit = 0; bit < QRNG_RESOLUTION; bit++, data >>= 1)
+            if(data & 1) result ^= table[bit + y * QRNG_RESOLUTION];
+          output[y * N + pos] = (float)(result + 1) * INT_SCALE;
+        }
+      }
     }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (qrng): %f (us)\n", (time * 1e-3f) / repeat);
+
     printf("\nRead back results...\n"); 
-#pragma omp target update from (output[0: QRNG_DIMENSIONS*N])
+    #pragma omp target update from (output[0: QRNG_DIMENSIONS*N])
 
     printf("Comparing to the CPU results...\n\n");
     sumDelta = 0;
@@ -187,38 +192,49 @@ int main(int argc, const char **argv)
 
     // determine work group sizes for each device
     szWorkgroup = 128;
-    for (int i = 0; i< numIterations; i++)
+    const unsigned int pathN = QRNG_DIMENSIONS * N;
+    const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
+
+    start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
     {
-      InverseCNDGPU(output, QRNG_DIMENSIONS * N, szWorkgroup);
+      #pragma omp target teams distribute parallel for thread_limit(szWorkgroup)
+      for(unsigned int pos = 0; pos < pathN; pos++){
+        unsigned int d = (pos + 1) * distance;
+        output[pos] = MoroInvCNDgpu(d);
+      }
     }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (icnd): %f (us)\n", (time * 1e-3f) / repeat);
     printf("\nRead back results...\n"); 
 
-#pragma omp target update from (output[0: QRNG_DIMENSIONS*N])
+    #pragma omp target update from (output[0: QRNG_DIMENSIONS*N])
+
+    printf("Comparing to the CPU results...\n\n");
+
+    sumDelta = 0;
+    sumRef   = 0;
+    for(pos = 0; pos < QRNG_DIMENSIONS * N; pos++){
+      unsigned int d = (pos + 1) * distance;
+      ref       = MoroInvCNDcpu(d);
+      delta     = (double)output[pos] - ref;
+      sumDelta += fabs(delta);
+      sumRef   += fabs(ref);
+    }
+    L1norm = sumDelta / sumRef;
+    printf("  L1 norm: %E\n", L1norm);
+    printf("  ckInverseCNDGPU deviations %s Allowable Tolerance\n\n\n", (L1norm < 1e-6) ? "WITHIN" : "ABOVE");
+    bPassFlag &= (L1norm < 1e-6);
+
+    if (bPassFlag)
+      printf("PASS\n");
+    else
+      printf("FAIL\n");
+
+    free(output);
   }
-
-  printf("Comparing to the CPU results...\n\n");
-
-  sumDelta = 0;
-  sumRef   = 0;
-  unsigned int distance = ((unsigned int)-1) / (QRNG_DIMENSIONS * N + 1);
-  for(pos = 0; pos < QRNG_DIMENSIONS * N; pos++){
-    unsigned int d = (pos + 1) * distance;
-    ref       = MoroInvCNDcpu(d);
-    delta     = (double)output[pos] - ref;
-    sumDelta += fabs(delta);
-    sumRef   += fabs(ref);
-  }
-  L1norm = sumDelta / sumRef;
-  printf("  L1 norm: %E\n", L1norm);
-  printf("  ckInverseCNDGPU deviations %s Allowable Tolerance\n\n\n", (L1norm < 1e-6) ? "WITHIN" : "ABOVE");
-  bPassFlag &= (L1norm < 1e-6);
-
-  if (bPassFlag)
-    printf("PASS\n");
-  else
-    printf("FAIL\n");
-
-  free(output);
   return 0;
 }
-

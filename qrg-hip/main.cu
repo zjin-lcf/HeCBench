@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "qrg.h"
 
@@ -108,7 +109,7 @@ float MoroInvCNDgpu(unsigned int x)
 }
 
 // size of output random array
-unsigned int N = 1048576;
+const unsigned int N = 1048576;
 
 __global__ void  
 qrng (float* output, const unsigned int* table, const unsigned int seed, const unsigned int N)
@@ -138,43 +139,14 @@ icnd (float* output, const unsigned int pathN, const unsigned int distance)
   }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Wrapper for Niederreiter quasirandom number generator kernel
-///////////////////////////////////////////////////////////////////////////////
-void QuasirandomGeneratorGPU(float* d_Output,
-                             unsigned int* d_Table,
-                             const unsigned int seed,
-                             const unsigned int N,
-                             size_t szWgXDim)
-{
-  size_t globalWorkSize[2] = {shrRoundUp(szWgXDim, 128*128), QRNG_DIMENSIONS};
-  size_t localWorkSize[2] = {szWgXDim, QRNG_DIMENSIONS};
-  dim3 grid (globalWorkSize[0] / localWorkSize[0], globalWorkSize[1] / localWorkSize[1]);
-  dim3 block (localWorkSize[0], localWorkSize[1]);
-
-  hipLaunchKernelGGL(qrng, dim3(grid), dim3(block), 0, 0, d_Output, d_Table, seed, N);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Wrapper for Inverse Cumulative Normal Distribution generator kernel
-///////////////////////////////////////////////////////////////////////////////
-void InverseCNDGPU(float* d_Output,
-    const unsigned int pathN,
-    const size_t szWgXDim)
-{
-  size_t globalWorkSize[1] = {shrRoundUp(szWgXDim, 128*128)};
-  size_t localWorkSize[1] = {szWgXDim};
-
-  dim3 grid (globalWorkSize[0] / localWorkSize[0]);
-  dim3 block (localWorkSize[0]);
-
-  const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
-
-  hipLaunchKernelGGL(icnd, dim3(grid), dim3(block), 0, 0, d_Output, pathN, distance);
-}
-
 int main(int argc, const char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   unsigned int dim, pos;
   double delta, ref, sumDelta, sumRef, L1norm;
   unsigned int tableCPU[QRNG_DIMENSIONS*QRNG_RESOLUTION];
@@ -196,13 +168,27 @@ int main(int argc, const char **argv)
   printf(">>>Launch QuasirandomGenerator kernel...\n\n"); 
 
   size_t szWorkgroup = 64 * (256 / QRNG_DIMENSIONS)/64;
+  size_t globalWorkSize[2] = {shrRoundUp(szWorkgroup, 128*128), QRNG_DIMENSIONS};
+  size_t localWorkSize[2] = {szWorkgroup, QRNG_DIMENSIONS};
+  dim3 grid (globalWorkSize[0] / localWorkSize[0], globalWorkSize[1] / localWorkSize[1]);
+  dim3 block (localWorkSize[0], localWorkSize[1]);
 
-  int numIterations = 100;
-  for (int i = 0; i< numIterations; i++)
+  // seed is fixed at zero
+  const unsigned int seed = 0;
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
   {
-    // seed is fixed at zero
-    QuasirandomGeneratorGPU(d_Output, d_Table, 0, N, szWorkgroup);    
+    hipLaunchKernelGGL(qrng, grid, block, 0, 0, d_Output, d_Table, seed, N);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (qrng): %f (us)\n", (time * 1e-3f) / repeat);
+
   printf("\nRead back results...\n"); 
   hipMemcpy(h_OutputGPU, d_Output, sizeof(float)*QRNG_DIMENSIONS*N, hipMemcpyDeviceToHost);
 
@@ -226,19 +212,36 @@ int main(int argc, const char **argv)
 
   printf(">>>Launch InverseCND kernel...\n\n"); 
 
-  // determine work group sizes for each device
+  // reuse variables for work-group sizes
   szWorkgroup = 128;
-  for (int i = 0; i< numIterations; i++)
+  globalWorkSize[0] = shrRoundUp(szWorkgroup, 128*128);
+  localWorkSize[0] = szWorkgroup;
+
+  dim3 grid2 (globalWorkSize[0] / localWorkSize[0]);
+  dim3 block2 (localWorkSize[0]);
+
+  const unsigned int pathN = QRNG_DIMENSIONS * N;
+  const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
+
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
   {
-    InverseCNDGPU(d_Output, QRNG_DIMENSIONS * N, szWorkgroup);
+    hipLaunchKernelGGL(icnd, grid2, block2, 0, 0, d_Output, pathN, distance);
   }
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (icnd): %f (us)\n", (time * 1e-3f) / repeat);
+
   printf("\nRead back results...\n"); 
   hipMemcpy(h_OutputGPU, d_Output, sizeof(float)*QRNG_DIMENSIONS*N, hipMemcpyDeviceToHost);
 
   printf("Comparing to the CPU results...\n\n");
   sumDelta = 0;
   sumRef   = 0;
-  unsigned int distance = ((unsigned int)-1) / (QRNG_DIMENSIONS * N + 1);
   for(pos = 0; pos < QRNG_DIMENSIONS * N; pos++){
     unsigned int d = (pos + 1) * distance;
     ref       = MoroInvCNDcpu(d);
@@ -261,4 +264,3 @@ int main(int argc, const char **argv)
   hipFree(d_Table);
   return 0;
 }
-
