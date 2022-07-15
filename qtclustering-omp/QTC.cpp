@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <chrono>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -14,7 +15,6 @@
 #define _USE_MATH_DEFINES
 #include <float.h>
 #include "comm.h"
-
 
 using namespace std;
 
@@ -66,8 +66,6 @@ void RunBenchmark(OptionParser &op){
   runTest("QTC", op);
 }
 
-
-
 // ****************************************************************************
 // Function: calculate_participants
 //
@@ -113,8 +111,6 @@ void calculate_participants(int point_count, int node_count, int cwrank,
   }
 
   *active_node_count  = ac_nd_cnt;
-  *thread_block_count = thr_blc_cnt;
-  *total_thread_block_count = total_thr_blc_cnt;
 
   return;
 }
@@ -256,39 +252,22 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
   //allocDeviceBuffer(&result,              point_count*sizeof(int));
 
 #pragma omp target data map(to: dist_source[0:dst_matrix_elems], \
-    indr_mtrx_host[0:point_count*max_degree], \
-    ungrpd_pnts_indr_host[0:point_count]) \
+                                indr_mtrx_host[0:point_count*max_degree], \
+                                ungrpd_pnts_indr_host[0:point_count]) \
   map(alloc: degrees[0:point_count], \
-      Ai_mask[0:thread_block_count*point_count], \
-      dist_to_clust[0:max_degree*thread_block_count], \
-      clustered_pnts_mask[0:point_count], \
-      cardnl[0:thread_block_count*2], \
-      result[0:point_count])
+              Ai_mask[0:thread_block_count*point_count], \
+              dist_to_clust[0:max_degree*thread_block_count], \
+              clustered_pnts_mask[0:point_count], \
+              cardnl[0:thread_block_count*2], \
+              result[0:point_count])
   {
-
-    /*
-       buffer<float, 1> distance_matrix (dist_source, dst_matrix_elems);
-       buffer<int, 1> indr_mtrx (indr_mtrx_host, point_count*max_degree);
-       buffer<int, 1> degrees (point_count);
-       buffer<int, 1> ungrpd_pnts_indr (ungrpd_pnts_indr_host, point_count);
-       buffer<char, 1> Ai_mask (thread_block_count*point_count);
-       buffer<float,1 > dist_to_clust (max_degree*thread_block_count);
-       buffer<char,1 > clustered_pnts_mask (point_count);
-       buffer<int, 1> cardnl (thread_block_count*2);
-       buffer<int, 1> result (point_count);
-
-       distance_matrix.set_final_data(nullptr);
-       indr_mtrx.set_final_data(nullptr);
-       ungrpd_pnts_indr.set_final_data(nullptr);
-       */
-
     //cudaMemset(clustered_pnts_mask, 0, point_count*sizeof(char));
-#pragma omp target teams distribute parallel for 
+    #pragma omp target teams distribute parallel for 
     for (int i = 0; i < point_count; i++)
       clustered_pnts_mask[i] = 0;
 
     //cudaMemset(dist_to_clust, 0, max_degree*thread_block_count*sizeof(float));
-#pragma omp target teams distribute parallel for 
+    #pragma omp target teams distribute parallel for 
     for (int i = 0; i < max_degree*thread_block_count; i++)
       dist_to_clust[i] = 0;
 
@@ -297,10 +276,9 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
     printf("compute degrees\n");
     //compute_degrees<<<grid2D(thread_block_count), tpb>>>((int *)indr_mtrx, (int *)degrees, point_count, max_degree);
 
-
-#pragma omp target teams num_teams(thread_block_count) thread_limit(tpb)
+    #pragma omp target teams num_teams(thread_block_count) thread_limit(tpb)
     {
-#pragma omp parallel 
+      #pragma omp parallel 
       {
         int curThreadCount = omp_get_num_threads();
         int tid = omp_get_thread_num();
@@ -352,6 +330,8 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
     tpb = THREADSPERBLOCK;
 
     // Kernel execution
+    double qtc_time = 0.0, trim_time = 0.0, update_time = 0.0;
+
     do{
       stringstream ss;
       int winner_node=-1;
@@ -371,20 +351,20 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         break;
       cwrank = comm_get_rank();
 
-      printf("QTC\n");
+      auto start = std::chrono::steady_clock::now();
+
       //QTC_device<<<grid, tpb>>>((float*)distance_matrix, (char *)Ai_mask, (char *)clustered_pnts_mask,
       //(int *)indr_mtrx, (int *)cardnl, (int *)ungrpd_pnts_indr,
       //(float *)dist_to_clust, (int *)degrees, point_count, max_point_count,
       //max_degree, threshold, cwrank, active_node_count,
       //total_thread_block_count);
 
-#pragma omp target teams num_teams(thread_block_count) thread_limit(tpb)
+      #pragma omp target teams num_teams(thread_block_count) thread_limit(tpb)
       {
         float dist_array[THREADSPERBLOCK];
         int point_index_array[THREADSPERBLOCK];
-#pragma omp parallel 
+        #pragma omp parallel 
         {
-
           int max_cardinality = -1;
           int max_cardinality_index;
 
@@ -424,9 +404,12 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         }
       }
 
+      auto end = std::chrono::steady_clock::now();
+      qtc_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
 #ifdef DEBUG
       printf("iteration %d: cardinalities\n", iter);
-#pragma omp target update from (cardnl[0:thread_block_count*2])
+      #pragma omp target update from (cardnl[0:thread_block_count*2])
       for (int i = 0; i < 576*2; i++)
         printf("%d %d\n", i, cardnl[i]);
 #endif
@@ -451,7 +434,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       }
 
       //copyFromDevice( cardinalities, cardnl, 2*sizeof(int) );
-#pragma omp target update from (cardnl[0:2])
+      #pragma omp target update from (cardnl[0:2])
 
       max_card     = cardnl[0];
       winner_index = cardnl[1];
@@ -470,16 +453,17 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       // point_count, max_point_count, max_degree, threshold);
       //printf("point count: %d\n", point_count);
 
-#pragma omp target teams num_teams(1) thread_limit(tpb)
+      start = std::chrono::steady_clock::now();
+
+      #pragma omp target teams num_teams(1) thread_limit(tpb)
       {
         int tmp_pnts[THREADSPERBLOCK];
         int cnt_sh;
         bool flag_sh;
         float dist_array[THREADSPERBLOCK];
         int point_index_array[THREADSPERBLOCK];
-#pragma omp parallel 
+        #pragma omp parallel 
         {
-
           int cnt;
           int tid = omp_get_thread_num();
           int curThreadCount = omp_get_num_threads();
@@ -500,7 +484,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
             cnt_sh = 0;
             flag_sh = false;
           }
-#pragma omp barrier
+          #pragma omp barrier
 
           for(int i = 0; i+tid < point_count; i+=curThreadCount){
             // Have all threads make a coalesced read of contiguous global memory and copy the points assuming they are all good.
@@ -514,7 +498,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
               ungrpd_pnts_indr_host[cnt_sh+tid] = pnt;
             }
 
-#pragma omp barrier
+            #pragma omp barrier
 
             if( 0 == tid ){
               if( flag_sh ){
@@ -531,10 +515,13 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
               }
               flag_sh  = false;
             }
-#pragma omp barrier
+            #pragma omp barrier
           }
         }
       }
+
+      end = std::chrono::steady_clock::now();
+      trim_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
       if( cwrank == winner_node){ // for non-parallel cases, these should both be zero.
         if( save_clusters ){
@@ -543,7 +530,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         }
 
         //copyFromDevice(output, (void *)result, max_card*sizeof(int) );
-#pragma omp target update from (result[0:max_card])
+        #pragma omp target update from (result[0:max_card])
 
         if( save_clusters ){
           for(int i=0; i<max_card; i++){
@@ -554,10 +541,12 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         }
       }
 
+      start = std::chrono::steady_clock::now();
+
       //update_clustered_pnts_mask<<<grid2D(1), tpb>>>((char *)clustered_pnts_mask, (char *)Ai_mask, max_point_count);
-#pragma omp target teams num_teams(1) thread_limit(tpb)
+      #pragma omp target teams num_teams(1) thread_limit(tpb)
       {
-#pragma omp parallel 
+        #pragma omp parallel 
         {
           int tid = omp_get_thread_num();
           int curThreadCount = omp_get_num_threads();
@@ -570,6 +559,9 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         }
       }
 
+      end = std::chrono::steady_clock::now();
+      update_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
       point_count -= max_card;
 
     }while( max_card > 1 && point_count );
@@ -578,13 +570,15 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       seeds_out.close();
     }
 
-  }
-  //
-  ////////////////////////////////////////////////////////////////////////////////
-
-  if( cwrank == 0){
-    cout << "QTC is complete. Clustering iteration count: " << iter << std::endl;
-    cout.flush();
+    if( cwrank == 0){
+      cout << "QTC is complete. Clustering iteration count: " << iter << std::endl;
+      cout << "\nKernel execution time\n";
+      cout << "qtc: " << qtc_time * 1e-9f << " (s)\n";
+      cout << "trim: " << trim_time * 1e-9f << " (s)\n";
+      cout << "update: " << update_time * 1e-9f << " (s)\n";
+      cout << "total: " << (qtc_time + trim_time + update_time) * 1e-9f << " (s)\n";
+      cout.flush();
+    }
   }
 
   free(dist_source);
