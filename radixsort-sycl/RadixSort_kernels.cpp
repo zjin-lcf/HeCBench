@@ -37,12 +37,12 @@ uint scanwarp(nd_item<1> &item, uint val, volatile uint* sData, const int maxlev
 // scan4 scans 4*RadixSort::CTA_SIZE numElements in a block (4 per thread), using 
 // a warp-scan algorithm
 //----------------------------------------------------------------------------
-cl::sycl::uint4 scan4(nd_item<1> item, const cl::sycl::uint4 idata, uint* ptr)
+sycl::uint4 scan4(nd_item<1> item, const sycl::uint4 idata, uint* ptr)
 {    
 
   uint idx = item.get_local_id(0);
 
-  cl::sycl::uint4 val4 = idata;
+  sycl::uint4 val4 = idata;
   uint sum[3];
   sum[0] = val4.x();
   sum[1] = val4.y() + sum[0];
@@ -74,12 +74,12 @@ cl::sycl::uint4 scan4(nd_item<1> item, const cl::sycl::uint4 idata, uint* ptr)
   return val4;
 }
 
-cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem, local_ptr<uint> numtrue)
+sycl::uint4 rank4(nd_item<1> &item, const sycl::uint4 preds, uint* sMem, local_ptr<uint> numtrue)
 {
   int localId = item.get_local_id(0);
   int localSize = item.get_local_range(0);
 
-  cl::sycl::uint4 address = scan4(item, preds, sMem);
+  sycl::uint4 address = scan4(item, preds, sMem);
 
   if (localId == localSize - 1) 
   {
@@ -87,7 +87,7 @@ cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem,
   }
   item.barrier(access::fence_space::local_space);
 
-  cl::sycl::uint4 rank;
+  sycl::uint4 rank;
   int idx = localId*4;
   rank.x() = (preds.x()) ? address.x() : numtrue[0] + idx - address.x();
   rank.y() = (preds.y()) ? address.y() : numtrue[0] + idx + 1 - address.y();
@@ -100,9 +100,7 @@ cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem,
 
 void radixSortBlocksKeysK(
     nd_item<1> &item,
-   //__global cl::sycl::uint4* keysIn, 
     global_ptr<uint> keysIn,
-    //cl::sycl::uint4* keysOut,
     global_ptr<uint> keysOut,
     const uint nbits,
     const uint startbit,
@@ -110,10 +108,7 @@ void radixSortBlocksKeysK(
     local_ptr<uint> numtrue)
 {
   int globalId = item.get_global_id(0);
-  //__local uint numtrue[1];
 
-  //cl::sycl::uint4 key;
-  //key = keysIn[globalId];
   vec<uint, 4> key;
   key.load(globalId, keysIn);
 
@@ -125,13 +120,13 @@ void radixSortBlocksKeysK(
 
   for(uint shift = startbit; shift < (startbit + nbits); ++shift)
   {
-    cl::sycl::uint4 lsb;
+    sycl::uint4 lsb;
     lsb.x() = !((key.x() >> shift) & 0x1);
     lsb.y() = !((key.y() >> shift) & 0x1);
     lsb.z() = !((key.z() >> shift) & 0x1);
     lsb.w() = !((key.w() >> shift) & 0x1);
 
-    cl::sycl::uint4 r;
+    sycl::uint4 r;
 
     r = rank4(item, lsb, sMem, numtrue);
 
@@ -151,7 +146,6 @@ void radixSortBlocksKeysK(
     item.barrier(access::fence_space::local_space);
   }
 
-  //keysOut[globalId] = key;
   key.store(globalId, keysOut);
 }
 
@@ -176,7 +170,6 @@ void radixSortBlocksKeysK(
 //----------------------------------------------------------------------------
 void findRadixOffsetsK(
     nd_item<1> &item,
-    //__global uint2* keys,
     global_ptr<uint> keys,
     global_ptr<uint> counters,
     global_ptr<uint> blockOffsets,
@@ -185,14 +178,11 @@ void findRadixOffsetsK(
     const uint startbit,
     const uint totalBlocks)
 {
-  //__local uint  sStartPointers[16];
-
   uint groupId = item.get_group(0);
   uint localId = item.get_local_id(0);
   uint groupSize = item.get_local_range(0);
 
   // uint2 radix2;
-  // radix2 = keys[get_global_id(0)];
   vec<uint, 2> radix2;
   radix2.load(item.get_global_id(0), keys);
 
@@ -236,7 +226,6 @@ void findRadixOffsetsK(
       localId + groupSize - sStartPointers[sRadix1[localId + groupSize - 1]];
   }
 
-
   if(localId == groupSize - 1) 
   {
     sStartPointers[sRadix1[2 * groupSize - 1]] = 
@@ -249,42 +238,6 @@ void findRadixOffsetsK(
     counters[localId * totalBlocks + groupId] = sStartPointers[localId];
   }
 }
-
-// a naive scan routine that works only for array that
-// can fit into a single block, just for debugging purpose,
-// not used in the sort now
-/*
-__kernel void scanNaive(__global uint *g_odata, 
-    __global uint *g_idata, 
-    uint n,
-    __local uint* temp)
-{
-
-  int localId = get_local_id(0);
-
-  int pout = 0;
-  int pin = 1;
-
-  // Cache the computational window in shared memory
-  temp[pout*n + localId] = (localId > 0) ? g_idata[localId-1] : 0;
-
-  for (int offset = 1; offset < n; offset *= 2)
-  {
-    pout = 1 - pout;
-    pin  = 1 - pout;
-    item.barrier(access::fence_space::local_space);
-
-    temp[pout*n+localId] = temp[pin*n+localId];
-
-    if (localId >= offset)
-      temp[pout*n+localId] += temp[pin*n+localId - offset];
-  }
-
-  item.barrier(access::fence_space::local_space);
-
-  g_odata[localId] = temp[pout*n+localId];
-}
-*/
 
 //----------------------------------------------------------------------------
 // reorderData shuffles data in the array globally after the radix offsets 
@@ -311,15 +264,10 @@ __kernel void scanNaive(__global uint *g_odata,
 //----------------------------------------------------------------------------
 void reorderDataKeysOnlyK(
     nd_item<1>        &item,
-    //__global uint  *outKeys, 
     global_ptr<uint>  outKeys, 
-    //__global uint2  *keys, 
     global_ptr<uint>  keys, 
-    //__global uint  *blockOffsets, 
     global_ptr<uint>  blockOffsets, 
-    //__global uint  *offsets, 
     global_ptr<uint>  offsets, 
-    //__local uint2* sKeys2)
     local_ptr<uint> sKeys1, 
     local_ptr<uint> sOffsets, 
     local_ptr<uint> sBlockOffsets,
@@ -327,10 +275,6 @@ void reorderDataKeysOnlyK(
     const uint numElements,
     const uint totalBlocks)
 {
-  //__local uint sOffsets[16];
-  //__local uint sBlockOffsets[16];
-  //__local uint *sKeys1 = (__local uint*)sKeys2; 
-
   uint groupId = item.get_group(0);
   uint globalId = item.get_global_id(0);
   uint localId = item.get_local_id(0);

@@ -149,20 +149,15 @@ inline uint4 scan4Exclusive(nd_item<1> &item, const uint4 data4,
 ////////////////////////////////////////////////////////////////////////////////
 // Scan kernels
 ////////////////////////////////////////////////////////////////////////////////
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
-  void scanExclusiveLocal1K(
+void scanExclusiveLocal1K(
       nd_item<1> &item,
-      //__global uint4 *d_Dst,
       global_ptr<uint> d_Dst,
-      //__global uint4 *d_Src,
       global_ptr<uint> d_Src,
-      //__local uint* l_Data,
       local_ptr<uint> l_Data,
       const uint size)
 {
     int i = item.get_global_id(0);
     //Load data
-    //uint4 idata4 = d_Src[get_global_id(0)];
     vec<uint, 4> idata4;
     idata4.load(i, d_Src);
 
@@ -170,13 +165,11 @@ inline uint4 scan4Exclusive(nd_item<1> &item, const uint4 data4,
     uint4 odata4 = scan4Exclusive(item, idata4, l_Data, size);
 
     //Write back
-    //d_Dst[get_global_id(0)] = odata4;
     odata4.store(i, d_Dst);
-  }
+}
 
 //Exclusive scan of top elements of bottom-level scans (4 * THREADBLOCK_SIZE)
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
-  void scanExclusiveLocal2K(
+void scanExclusiveLocal2K(
       nd_item<1> &item,
       global_ptr<uint> d_Buf,
       global_ptr<uint> d_Dst,
@@ -199,11 +192,10 @@ inline uint4 scan4Exclusive(nd_item<1> &item, const uint4 data4,
 
     //Avoid out-of-bound access
     if(i < N) d_Buf[i] = odata;
-  }
+}
 
 //Final step of large-array scan: combine basic inclusive scan with exclusive scan of top elements of input arrays
-//__kernel __attribute__((reqd_work_group_size(WORKGROUP_SIZE, 1, 1)))
-  void uniformUpdateK(
+void uniformUpdateK(
       // uint4 *d_Data,
       nd_item<1> &item,
       global_ptr<uint> d_Data,

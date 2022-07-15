@@ -11,9 +11,9 @@
 #ifndef _SCAN_H_
 #define _SCAN_H_
 
-#include <cuda.h>
 #include <assert.h>
 #include <stdio.h>
+#include <cuda.h>
 
 #define MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE 1024
 #define MAX_LOCAL_GROUP_SIZE 256

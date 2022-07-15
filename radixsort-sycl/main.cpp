@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include "RadixSort.h"
 #include "Scan.h"
 
@@ -20,6 +21,12 @@ bool verifySortUint(unsigned int *keysSorted,
 
 int main(int argc, const char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int numIterations = atoi(argv[1]);
+
   const unsigned int numElements = 128*128*128*2; //1048576; 
   const int keybits = 32; // bit size of uint 
   const int batchSize = 1; // only support a batch size of 1
@@ -60,19 +67,24 @@ int main(int argc, const char **argv)
   buffer<unsigned int, 1> d_buffer (arrayLength/MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE);
   d_keys.set_final_data(nullptr);
 
-  int numIterations = 100;
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
   {
     radixSortKeys(q, d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum, 
                   d_buffer, numElements, keybits, batchSize);
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of radixsort: %f (s)\n", (time * 1e-9f) / numIterations);
+
   // copy sorted keys to CPU 
   q.submit([&] (handler &cgh) {
     auto acc = d_keys.get_access<sycl_read>(cgh);
     cgh.copy(acc, h_keysSorted);
-  });
-  q.wait();
+  }).wait();
 
   // Check results
   bool passed = true;

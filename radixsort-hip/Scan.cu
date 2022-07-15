@@ -24,7 +24,7 @@ void scanExclusiveLocal1(
   dim3 gws (globalWorkSize/localWorkSize);
   dim3 lws (localWorkSize);
 
-  hipLaunchKernelGGL(scanExclusiveLocal1K, dim3(gws), dim3(lws), 0, 0, d_Dst, d_Src, size);
+  hipLaunchKernelGGL(scanExclusiveLocal1K, gws, lws , 0, 0, d_Dst, d_Src, size);
 }
 
 void scanExclusiveLocal2(
@@ -40,7 +40,7 @@ void scanExclusiveLocal2(
   dim3 gws (globalWorkSize/localWorkSize);
   dim3 lws (localWorkSize);
 
-  hipLaunchKernelGGL(scanExclusiveLocal2K, dim3(gws), dim3(lws), 0, 0, d_Buffer, d_Dst, d_Src, elements, size);
+  hipLaunchKernelGGL(scanExclusiveLocal2K, gws, lws , 0, 0, d_Buffer, d_Dst, d_Src, elements, size);
 }
 
 void uniformUpdate(
@@ -51,7 +51,7 @@ void uniformUpdate(
   dim3 gws (n);
   dim3 lws (WORKGROUP_SIZE);
 
-  hipLaunchKernelGGL(uniformUpdateK, dim3(gws), dim3(lws), 0, 0, d_Dst, d_Buf);
+  hipLaunchKernelGGL(uniformUpdateK, gws, lws , 0, 0, d_Dst, d_Buf);
 }
 
 // main exclusive scan routine

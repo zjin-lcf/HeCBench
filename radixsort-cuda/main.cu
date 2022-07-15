@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include "RadixSort.h"
 #include "Scan.h"
 
@@ -20,25 +21,30 @@ bool verifySortUint(unsigned int *keysSorted,
 
 int main(int argc, const char **argv)
 {
-  const unsigned int numElements = 128*128*2; //128*128*128*2; // 1048576; 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int numIterations = atoi(argv[1]);
+
+  const unsigned int numElements = 128*128*128*2;
   const int keybits = 32;  // bit size of uint 
   const int batchSize = 1; // only support a batch size of 1
   const unsigned int numBlocks = ((numElements % (CTA_SIZE * 4)) == 0) ? 
     (numElements / (CTA_SIZE * 4)) : (numElements / (CTA_SIZE * 4) + 1);
 
-
   // Check power-of-two factorization before the scan operations start
   unsigned int arrayLength = numElements/2/CTA_SIZE*16;
   unsigned int log2L;
   unsigned int factorizationRemainder = factorRadix2(log2L, arrayLength);
-  //assert(factorizationRemainder == 1);
+  assert(factorizationRemainder == 1);
 
   //Check supported size range
-  //assert((arrayLength >= MIN_LARGE_ARRAY_SIZE) && (arrayLength <= MAX_LARGE_ARRAY_SIZE));
-  //assert(arrayLength > MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE);
+  assert((arrayLength >= MIN_LARGE_ARRAY_SIZE) && (arrayLength <= MAX_LARGE_ARRAY_SIZE));
+  assert(arrayLength > MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE);
 
   //Check total batch size limit
-  //assert((batchSize * arrayLength) <= MAX_BATCH_ELEMENTS);
+  assert((batchSize * arrayLength) <= MAX_BATCH_ELEMENTS);
 
   // Alloc and init some data on the host, then alloc and init GPU buffer  
   unsigned int* h_keys       = (unsigned int*)malloc(numElements * sizeof(unsigned int));
@@ -49,7 +55,6 @@ int main(int argc, const char **argv)
   printf("#elements: %u  #blocks: %u\n", numElements, numBlocks);
   for (int i = 0; i < numElements; i++) printf("init key %d: %x\n", i, h_keys[i]);
 #endif
-
 
   unsigned int* d_keys;
   cudaMalloc((void**)&d_keys, numElements*sizeof(unsigned int));
@@ -72,12 +77,18 @@ int main(int argc, const char **argv)
   cudaMalloc((void**)&d_buffer, sizeof(unsigned int) * 
              (arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE));
 
-  int numIterations = 1;
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
   {
     radixSortKeys(d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum, 
                   d_buffer, numElements, keybits, batchSize);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of radixsort: %f (s)\n", (time * 1e-9f) / numIterations);
 
   // copy sorted keys to CPU 
   cudaMemcpy(h_keysSorted, d_keys, numElements*sizeof(unsigned int), cudaMemcpyDeviceToHost);

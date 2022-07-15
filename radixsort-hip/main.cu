@@ -9,6 +9,7 @@
  *
  */
 
+#include <chrono>
 #include "RadixSort.h"
 #include "Scan.h"
 
@@ -20,12 +21,17 @@ bool verifySortUint(unsigned int *keysSorted,
 
 int main(int argc, const char **argv)
 {
-  const unsigned int numElements = 128*128*128*2; // 1048576; 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int numIterations = atoi(argv[1]);
+
+  const unsigned int numElements = 128*128*128*2;
   const int keybits = 32;  // bit size of uint 
   const int batchSize = 1; // only support a batch size of 1
   const unsigned int numBlocks = ((numElements % (CTA_SIZE * 4)) == 0) ? 
     (numElements / (CTA_SIZE * 4)) : (numElements / (CTA_SIZE * 4) + 1);
-
 
   // Check power-of-two factorization before the scan operations start
   unsigned int arrayLength = numElements/2/CTA_SIZE*16;
@@ -71,12 +77,18 @@ int main(int argc, const char **argv)
   hipMalloc((void**)&d_buffer, sizeof(unsigned int) * 
              (arrayLength / MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE));
 
-  int numIterations = 100;
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
   {
     radixSortKeys(d_keys, d_tempKeys, d_counters, d_blockOffsets, d_countersSum, 
                   d_buffer, numElements, keybits, batchSize);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of radixsort: %f (s)\n", (time * 1e-9f) / numIterations);
 
   // copy sorted keys to CPU 
   hipMemcpy(h_keysSorted, d_keys, numElements*sizeof(unsigned int), hipMemcpyDeviceToHost);
