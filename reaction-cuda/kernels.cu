@@ -2,13 +2,13 @@
  * @brief      Calculate Gray-Scott reaction rate
  */
 __global__ void reaction_gray_scott(
-    const float *__restrict fx, 
-    const float *__restrict fy, 
-    float *__restrict drx, 
-    float *__restrict dry,
+    const float *__restrict__ fx,
+    const float *__restrict__ fy,
+    float *__restrict__ drx,
+    float *__restrict__ dry,
     const unsigned int ncells,
     const float d_c1,
-    const float d_c2) 
+    const float d_c2)
 {
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = blockDim.x * gridDim.x;
@@ -24,11 +24,11 @@ __global__ void reaction_gray_scott(
  * @brief      Calculate second derivative in x direction with periodic boundary conditions
  */
 __global__ void derivative_x2_pbc(
-    const float *__restrict f,
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
   extern __shared__ float s_f[]; // 2-wide halo
@@ -60,8 +60,8 @@ __global__ void derivative_x2_pbc(
  * @brief      Calculate second derivative in x direction with zero-flux boundary conditions
  */
 __global__ void derivative_x2_zeroflux(
-    const float *__restrict f, 
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my)
 {
@@ -91,11 +91,11 @@ __global__ void derivative_x2_zeroflux(
  * @brief      Calculate second derivative in y direction with periodic boundary conditions
  */
 __global__ void derivative_y2_pbc(
-    const float *__restrict f, 
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
   extern __shared__ float s_f[]; // 2-wide halo
@@ -127,11 +127,11 @@ __global__ void derivative_y2_pbc(
  * @brief      Calculate second derivative in y direction with zero-flux  boundary conditions
  */
 __global__ void derivative_y2_zeroflux(
-    const float *__restrict f, 
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   extern __shared__ float s_f[];
 
@@ -159,12 +159,12 @@ __global__ void derivative_y2_zeroflux(
  * @brief      Calculate second derivative in z direction with periodic boundary conditions
  */
 __global__ void derivative_z2_pbc(
-    const float *__restrict f,
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my,
     const unsigned int mz,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
   extern __shared__ float s_f[]; // 2-wide halo
@@ -196,12 +196,12 @@ __global__ void derivative_z2_pbc(
  * @brief      Calculate second derivative in z direction with zero-flux boundary conditions
  */
 __global__ void derivative_z2_zeroflux(
-    const float *__restrict f, 
-    float *__restrict df,
+    const float *__restrict__ f,
+    float *__restrict__ df,
     const unsigned int mx,
     const unsigned int my,
     const unsigned int mz,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   extern __shared__ float s_f[]; // 2-wide halo
 
@@ -229,12 +229,12 @@ __global__ void derivative_z2_zeroflux(
  * @brief      Construct the Laplacian for a component 
  */
 __global__ void construct_laplacian(
-    float *__restrict df, 
-    const float *__restrict dfx, 
-    const float *__restrict dfy, 
-    const float *__restrict dfz,
-    const unsigned int ncells, 
-    const float d_diffcon) 
+    float *__restrict__ df,
+    const float *__restrict__ dfx,
+    const float *__restrict__ dfy,
+    const float *__restrict__ dfz,
+    const unsigned int ncells,
+    const float d_diffcon)
 {
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = blockDim.x * gridDim.x;
@@ -255,12 +255,12 @@ __global__ void construct_laplacian(
  * @param[in]  dry   reaction of component B
  */
 __global__ void update(
-    float *__restrict x, 
-    float *__restrict y, 
-    const float *__restrict ddx, 
-    const float *__restrict ddy, 
-    const float *__restrict drx, 
-    const float *__restrict dry,
+    float *__restrict__ x,
+    float *__restrict__ y,
+    const float *__restrict__ ddx,
+    const float *__restrict__ ddy,
+    const float *__restrict__ drx,
+    const float *__restrict__ dry,
     const unsigned int ncells,
     const float d_dt)
 {

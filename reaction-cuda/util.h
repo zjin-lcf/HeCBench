@@ -1,6 +1,5 @@
 static float uniform_dist() {
   static std::mt19937 rng(123);
-  // center at zero and scale is 0.05
   static std::uniform_real_distribution<> nd(0.0, 1.0);
   return nd(rng);
 }
