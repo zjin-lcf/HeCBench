@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 
 #define CLAMP_TO_EDGE 
 #define MAC
@@ -8,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "main.h"
 #include "shrUtils.h"
@@ -42,7 +42,7 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 //*****************************************************************
 __global__ 
 void Transpose(const unsigned int* uiDataIn, 
-               unsigned int* uiDataOut, 
+                     unsigned int* uiDataOut, 
                const int iWidth, const int iHeight)
 {
     // read the matrix tile into LMEM
@@ -82,7 +82,7 @@ void Transpose(const unsigned int* uiDataIn,
 //*****************************************************************
 __global__ void SimpleRecursiveRGBA(
   const unsigned int* uiDataIn,
-  unsigned int* uiDataOut,
+        unsigned int* uiDataOut,
   const int iWidth, const int iHeight, const float a)
 {
     // compute X pixel location and check in-bounds
@@ -98,7 +98,7 @@ __global__ void SimpleRecursiveRGBA(
   for (int Y = 0; Y < iHeight; Y++) 
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
-    float4 yc = xc + (yp - xc) * make_float4(a,a,a,a);   
+    float4 yc = xc + (yp - xc) * make_float4(a, a, a, a);   
     *uiDataOut = rgbaFloat4ToUint(yc);
     yp = yc;
     uiDataIn += iWidth;     // move to next row
@@ -114,7 +114,7 @@ __global__ void SimpleRecursiveRGBA(
   for (int Y = iHeight - 1; Y > -1; Y--) 
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
-    float4 yc = xc + (yp - xc) * make_float4(a,a,a,a);
+    float4 yc = xc + (yp - xc) * make_float4(a, a, a, a);
     *uiDataOut = rgbaFloat4ToUint((rgbaUintToFloat4(*uiDataOut) + yc) * 0.5f);
     yp = yc;
     uiDataIn -= iWidth;   // move to previous row
@@ -134,13 +134,13 @@ __global__ void SimpleRecursiveRGBA(
 //      If used, CLAMP_TO_EDGE is passed in via OpenCL clBuildProgram call options string at app runtime
 //*****************************************************************
 __global__ void RecursiveRGBA(
-                   const unsigned int* uiDataIn, 
-                   unsigned int* uiDataOut, 
-                   const int iWidth, const int iHeight, 
-                   const float a0, const float a1, 
-                   const float a2, const float a3, 
-                   const float b1, const float b2, 
-                   const float coefp, const float coefn)
+  const unsigned int* uiDataIn, 
+  unsigned int* uiDataOut, 
+  const int iWidth, const int iHeight, 
+  const float a0, const float a1, 
+  const float a2, const float a3, 
+  const float b1, const float b2, 
+  const float coefp, const float coefn)
 {
     // compute X pixel location and check in-bounds
     //unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
@@ -158,7 +158,7 @@ __global__ void RecursiveRGBA(
 
 #ifdef CLAMP_TO_EDGE
     xp = rgbaUintToFloat4(*uiDataIn); 
-    yb = xp * make_float4(coefp, coefp, coefp, coefp); 
+    yb = xp * make_float4(coefp,coefp,coefp,coefp); 
     yp = yb;
 #endif
 
@@ -187,7 +187,7 @@ __global__ void RecursiveRGBA(
 #ifdef CLAMP_TO_EDGE
     xn = rgbaUintToFloat4(*uiDataIn);
     xa = xn; 
-    yn = xn * make_float4(coefn, coefn, coefn, coefn); 
+    yn = xn * make_float4(coefn,coefn,coefn,coefn); 
     ya = yn;
 #endif
 
@@ -205,14 +205,14 @@ __global__ void RecursiveRGBA(
     }
 }
 
-void GPUGaussianFilterRGBA(const unsigned int* uiInput,
-                           unsigned int* uiOutput,
-                           unsigned int* d_BufIn,
-                           unsigned int* d_BufTmp,
-                           unsigned int* d_BufOut,
-                           const unsigned int uiImageWidth,
-                           const unsigned int uiImageHeight, 
-                           const GaussParms* pGP)
+double GPUGaussianFilterRGBA(const unsigned int* uiInput,
+                             unsigned int* uiOutput,
+                             unsigned int* d_BufIn,
+                             unsigned int* d_BufTmp,
+                             unsigned int* d_BufOut,
+                             const unsigned int uiImageWidth,
+                             const unsigned int uiImageHeight, 
+                             const GaussParms* pGP)
 {
 #if USE_SIMPLE_FILTER
   float ema = pGP->ema;
@@ -230,6 +230,8 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   unsigned int szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
   hipMemcpy(d_BufIn, uiInput, szBuffBytes, hipMemcpyHostToDevice); 
 
+  auto start = std::chrono::steady_clock::now();
+  
   // const int iTransposeBlockDim = 16; // initial height and width dimension of 2D transpose workgroup 
   size_t szGaussLocalWork = 256;
   size_t szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageWidth);
@@ -237,9 +239,9 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   dim3 g_block (szGaussLocalWork);
  
 #if USE_SIMPLE_FILTER
-  hipLaunchKernelGGL(SimpleRecursiveRGBA, dim3(g_grid), dim3(g_block), 0, 0, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight, ema);
+  hipLaunchKernelGGL(SimpleRecursiveRGBA, g_grid, g_block, 0, 0, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight, ema);
 #else
-        hipLaunchKernelGGL(RecursiveRGBA, dim3(g_grid), dim3(g_block), 0, 0, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight, 
+        hipLaunchKernelGGL(RecursiveRGBA, g_grid, g_block, 0, 0, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight, 
                     a0, a1, a2, a3, b1, b2, coefp, coefn);
 #endif
 
@@ -252,7 +254,7 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
                 szTransposeGlobalWork[1] / szTransposeLocalWork[1]);
   dim3 t1_block (szTransposeLocalWork[0], szTransposeLocalWork[1]);
 
-  hipLaunchKernelGGL(Transpose, dim3(t1_grid), dim3(t1_block), 0, 0, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight);
+  hipLaunchKernelGGL(Transpose, t1_grid, t1_block, 0, 0, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight);
     
   // Reset Gaussian global work dimensions and variable args, then process in 2nd dimension
   // note width and height parameters flipped due to transpose
@@ -261,9 +263,9 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   dim3 g2_grid (szGaussGlobalWork / szGaussLocalWork);
 
 #if USE_SIMPLE_FILTER
-  hipLaunchKernelGGL(SimpleRecursiveRGBA, dim3(g2_grid), dim3(g_block), 0, 0, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth, ema);
+  hipLaunchKernelGGL(SimpleRecursiveRGBA, g2_grid, g_block, 0, 0, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth, ema);
 #else
-        hipLaunchKernelGGL(RecursiveRGBA, dim3(g2_grid), dim3(g_block), 0, 0, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth, 
+        hipLaunchKernelGGL(RecursiveRGBA, g2_grid, g_block, 0, 0, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth, 
                     a0, a1, a2, a3, b1, b2, coefp, coefn);
 #endif
 
@@ -276,67 +278,85 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
                 szTransposeGlobalWork[1] / szTransposeLocalWork[1]);
   //range<1> t2_lws (szTransposeLocalWork[1], szTransposeLobalWork[0]);
   // Launch transpose kernel in 2nd direction
-  hipLaunchKernelGGL(Transpose, dim3(t2_grid), dim3(t1_block), 0, 0, d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth);
+  hipLaunchKernelGGL(Transpose, t2_grid, t1_block, 0, 0, d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   hipMemcpy(uiOutput, d_BufOut, szBuffBytes, hipMemcpyDeviceToHost); 
+  return time;
 }
 
 int main(int argc, char** argv)
 {
-    const float fSigma = 10.0f;         // filter sigma (blur factor)
-    const int iOrder = 0;               // filter order
-    unsigned int uiImageWidth = 1920;   // Image width
-    unsigned int uiImageHeight = 1080;  // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
+  if (argc != 3) {
+    printf("Usage: %s <path to image> <repeat>\n", argv[0]);
+    return 1;
+  }
 
-    shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  const float fSigma = 10.0f;         // filter sigma (blur factor)
+  const int iOrder = 0;               // filter order
+  unsigned int uiImageWidth = 1920;   // Image width
+  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int* uiInput = NULL;       // Host buffer to hold input image data
+  unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-    // Allocate intermediate and output host image buffers
-    unsigned int szBuff = uiImageWidth * uiImageHeight;
-    unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
-    uiTemp = (unsigned int*)malloc(szBuffBytes);
-    uiOutput = (unsigned int*)malloc(szBuffBytes);
-    printf("Allocate Host Image Buffers...\n"); 
+  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  const int iCycles = atoi(argv[2]);
 
-    // Allocate the source, intermediate and result buffer memory objects on the device GMEM
-    unsigned int* d_BufIn;
-    unsigned int* d_BufTmp;
-    unsigned int* d_BufOut;
-    hipMalloc((void**)&d_BufIn, szBuffBytes);
-    hipMalloc((void**)&d_BufTmp, szBuffBytes);
-    hipMalloc((void**)&d_BufOut, szBuffBytes);
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
-    // init filter coefficients
-    PreProcessGaussParms (fSigma, iOrder, &GP);
+  // Allocate intermediate and output host image buffers
+  unsigned int szBuff = uiImageWidth * uiImageHeight;
+  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  uiTemp = (unsigned int*)malloc(szBuffBytes);
+  uiOutput = (unsigned int*)malloc(szBuffBytes);
+  printf("Allocate Host Image Buffers...\n"); 
 
-    // Warmup call to assure OpenCL driver is awake
-    GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  // Allocate the source, intermediate and result buffer memory objects on the device GMEM
+  unsigned int* d_BufIn;
+  unsigned int* d_BufTmp;
+  unsigned int* d_BufOut;
+  hipMalloc((void**)&d_BufIn, szBuffBytes);
+  hipMalloc((void**)&d_BufTmp, szBuffBytes);
+  hipMalloc((void**)&d_BufOut, szBuffBytes);
 
-    // Start round-trip timer and process iCycles loops on the GPU
-    const int iCycles = 150;
-    printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
-    for (int i = 0; i < iCycles; i++)
-    {
-       GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
-    }
+  // init filter coefficients
+  PreProcessGaussParms (fSigma, iOrder, &GP);
 
-    // Compute on host 
-    unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
-    HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+  // Warmup call to assure OpenCL driver is awake
+  GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp,
+                        d_BufOut, uiImageWidth, uiImageHeight, &GP);
 
-    printf("Comparing GPU Result to CPU Result...\n"); 
-    shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
-    printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+  // Start round-trip timer and process iCycles loops on the GPU
+  printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
+  double time = 0.0;
 
-    free(uiGolden);
-    free(uiInput);
-    free(uiTemp);
-    free(uiOutput);
-    hipFree(d_BufIn);
-    hipFree(d_BufTmp);
-    hipFree(d_BufOut);
-    return 0;
+  for (int i = 0; i < iCycles; i++)
+  {
+     time += GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp,
+                                   d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  }
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / iCycles);
+
+  // Compute on host 
+  unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
+  HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+
+  printf("Comparing GPU Result to CPU Result...\n"); 
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+
+  free(uiGolden);
+  free(uiInput);
+  free(uiTemp);
+  free(uiOutput);
+  hipFree(d_BufIn);
+  hipFree(d_BufTmp);
+  hipFree(d_BufOut);
+  return 0;
 }

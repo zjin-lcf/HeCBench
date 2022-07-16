@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm
+	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm 1000

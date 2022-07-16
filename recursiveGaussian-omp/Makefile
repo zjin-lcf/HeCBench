@@ -14,7 +14,7 @@ DEVICE    = gpu
 
 program = main
 
-source = main.cpp RecursiveGaussianHost.cpp  shrUtils.cpp    
+source = main.cpp RecursiveGaussianHost.cpp  shrUtils.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -59,5 +58,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm
+	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm 1000
 
