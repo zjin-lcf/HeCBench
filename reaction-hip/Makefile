@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -46,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.cu ../reaction-cuda/util.h Makefile
+%.o: %.cu ../reaction-cuda/kernels.cu ../reaction-cuda/util.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -54,4 +53,3 @@ clean:
 
 run: $(program)
 	./$(program) 10000
-

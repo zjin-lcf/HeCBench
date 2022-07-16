@@ -6,8 +6,12 @@
 #include "kernels.cpp"
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 2) {
+    printf("Usage: %s <timesteps>\n", argv[0]);
+    return 1;
+  }
   unsigned int timesteps = atoi(argv[1]);
+
   unsigned int mx = 128;
   unsigned int my = 128;
   unsigned int mz = 128;
@@ -113,6 +117,7 @@ int main(int argc, char* argv[]) {
   }
 
   // keep track of time
+  q.wait();
   auto start = std::chrono::system_clock::now();
 
   for(unsigned int t=0; t<timesteps; t++) {
@@ -305,8 +310,8 @@ int main(int argc, char* argv[]) {
       });
     });
   }
-  q.wait();
 
+  q.wait();
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end-start;
   printf("timesteps: %d\n", timesteps);

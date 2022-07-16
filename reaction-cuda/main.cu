@@ -6,8 +6,12 @@
 #include "kernels.cu"
 
 int main(int argc, char* argv[]) {
-
+  if (argc != 2) {
+    printf("Usage: %s <timesteps>\n", argv[0]);
+    return 1;
+  }
   unsigned int timesteps = atoi(argv[1]);
+
   unsigned int mx = 128;
   unsigned int my = 128;
   unsigned int mz = 128;
@@ -80,6 +84,7 @@ int main(int argc, char* argv[]) {
   }
 
   // keep track of time
+  cudaDeviceSynchronize();
   auto start = std::chrono::system_clock::now();
 
   for(unsigned int t=0; t<timesteps; t++) {
@@ -138,8 +143,8 @@ int main(int argc, char* argv[]) {
     // update
     update<<<grid,block>>>(d_a, d_b, d_da, d_db, d_ra, d_rb, ncells, dt);
   }
-  cudaDeviceSynchronize();
 
+  cudaDeviceSynchronize();
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end-start;
   printf("timesteps: %d\n", timesteps);
@@ -166,4 +171,3 @@ int main(int argc, char* argv[]) {
   delete [] b;
   return 0;
 }
-
