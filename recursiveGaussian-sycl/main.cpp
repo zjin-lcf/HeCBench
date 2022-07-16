@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <chrono>
 #include "common.h"
 #include "main.h"
 #include "shrUtils.h"
@@ -59,9 +60,9 @@ void Transpose(nd_item<2> &item,
 
     // write the transposed matrix tile to global memory
     // mul24(get_group_id(1), get_local_size(1)) + get_local_id(0);
-    xIndex = cl::sycl::mul24((unsigned)item.get_group(0), (unsigned)item.get_local_range(0)) + item.get_local_id(1); 
+    xIndex = sycl::mul24((unsigned)item.get_group(0), (unsigned)item.get_local_range(0)) + item.get_local_id(1); 
     //mul24(get_group_id(0), get_local_size(0)) + get_local_id(1);
-    yIndex = cl::sycl::mul24((unsigned)item.get_group(1), (unsigned)item.get_local_range(1)) + item.get_local_id(0); 
+    yIndex = sycl::mul24((unsigned)item.get_group(1), (unsigned)item.get_local_range(1)) + item.get_local_id(0); 
     if((xIndex < iHeight) && (yIndex < iWidth))
     {
         uiDataOut[(yIndex * iHeight) + xIndex] = 
@@ -206,15 +207,15 @@ void RecursiveRGBA(nd_item<1> &item,
     }
 }
 
-void GPUGaussianFilterRGBA(queue &q,
-                           const unsigned int* uiInput,
-                           unsigned int* uiOutput,
-                           buffer<unsigned int, 1> &d_BufIn,
-                           buffer<unsigned int, 1> &d_BufTmp,
-                           buffer<unsigned int, 1> &d_BufOut,
-                           const unsigned int uiImageWidth,
-                           const unsigned int uiImageHeight, 
-                           const GaussParms* pGP)
+double GPUGaussianFilterRGBA(queue &q,
+                             const unsigned int* uiInput,
+                             unsigned int* uiOutput,
+                             buffer<unsigned int, 1> &d_BufIn,
+                             buffer<unsigned int, 1> &d_BufTmp,
+                             buffer<unsigned int, 1> &d_BufOut,
+                             const unsigned int uiImageWidth,
+                             const unsigned int uiImageHeight, 
+                             const GaussParms* pGP)
 {
 #if USE_SIMPLE_FILTER
   float ema = pGP->ema;
@@ -232,7 +233,9 @@ void GPUGaussianFilterRGBA(queue &q,
   q.submit([&] (handler &cgh) {
     auto acc = d_BufIn.get_access<sycl_write>(cgh);
     cgh.copy(uiInput, acc);
-  });
+  }).wait();
+
+  auto start = std::chrono::steady_clock::now();
 
   const int iTransposeBlockDim = 16;        // initial height and width dimension of 2D transpose workgroup 
   size_t szGaussLocalWork = 256;
@@ -273,7 +276,6 @@ void GPUGaussianFilterRGBA(queue &q,
     });
   });
 
-    
   // Reset Gaussian global work dimensions and variable args, then process in 2nd dimension
   // note width and height parameters flipped due to transpose
   szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageHeight); 
@@ -313,69 +315,86 @@ void GPUGaussianFilterRGBA(queue &q,
     });
   });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   q.submit([&] (handler &cgh) {
     auto acc = d_BufOut.get_access<sycl_read>(cgh);
     cgh.copy(acc, uiOutput);
   });
+
+  return time;
 }
 
 int main(int argc, char** argv)
 {
-    const float fSigma = 10.0f;         // filter sigma (blur factor)
-    const int iOrder = 0;               // filter order
-    unsigned int uiImageWidth = 1920;   // Image width
-    unsigned int uiImageHeight = 1080;  // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
+  if (argc != 3) {
+    printf("Usage: %s <path to image> <repeat>\n", argv[0]);
+    return 1;
+  }
 
-    shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  const float fSigma = 10.0f;         // filter sigma (blur factor)
+  const int iOrder = 0;               // filter order
+  unsigned int uiImageWidth = 1920;   // Image width
+  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int* uiInput = NULL;       // Host buffer to hold input image data
+  unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-    // Allocate intermediate and output host image buffers
-    unsigned int szBuff = uiImageWidth * uiImageHeight;
-    unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
-    uiTemp = (unsigned int*)malloc(szBuffBytes);
-    uiOutput = (unsigned int*)malloc(szBuffBytes);
-    printf("Allocate Host Image Buffers...\n"); 
+  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  const int iCycles = atoi(argv[2]);
+
+  // Allocate intermediate and output host image buffers
+  unsigned int szBuff = uiImageWidth * uiImageHeight;
+  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  uiTemp = (unsigned int*)malloc(szBuffBytes);
+  uiOutput = (unsigned int*)malloc(szBuffBytes);
+  printf("Allocate Host Image Buffers...\n"); 
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    // Allocate the source, intermediate and result buffer memory objects on the device GMEM
-    buffer<unsigned int, 1> d_BufIn(szBuff);
-    buffer<unsigned int, 1> d_BufTmp(szBuff);
-    buffer<unsigned int, 1> d_BufOut(szBuff);
+  // Allocate the source, intermediate and result buffer memory objects on the device GMEM
+  buffer<unsigned int, 1> d_BufIn(szBuff);
+  buffer<unsigned int, 1> d_BufTmp(szBuff);
+  buffer<unsigned int, 1> d_BufOut(szBuff);
 
-    // init filter coefficients
-    PreProcessGaussParms (fSigma, iOrder, &GP);
+  // init filter coefficients
+  PreProcessGaussParms (fSigma, iOrder, &GP);
 
-    // Warmup call to assure OpenCL driver is awake
-    GPUGaussianFilterRGBA(q, uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  // Warmup call to assure OpenCL driver is awake
+  GPUGaussianFilterRGBA(q, uiInput, uiOutput, d_BufIn, d_BufTmp,
+                        d_BufOut, uiImageWidth, uiImageHeight, &GP);
 
-    // Start round-trip timer and process iCycles loops on the GPU
-    const int iCycles = 150;
-    printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
-    for (int i = 0; i < iCycles; i++)
-    {
-       GPUGaussianFilterRGBA(q, uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
-    }
+  // Start round-trip timer and process iCycles loops on the GPU
+  printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
+  double time = 0.0;
 
-    // Compute on host 
-    unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
-    HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+  for (int i = 0; i < iCycles; i++)
+  {
+     time += GPUGaussianFilterRGBA(q, uiInput, uiOutput, d_BufIn, d_BufTmp,
+                                   d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  }
 
-    printf("Comparing GPU Result to CPU Result...\n"); 
-    shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
-    printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / iCycles);
 
-    free(uiGolden);
-    free(uiInput);
-    free(uiTemp);
-    free(uiOutput);
-    return 0;
+  // Compute on host 
+  unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
+  HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+
+  printf("Comparing GPU Result to CPU Result...\n"); 
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+
+  free(uiGolden);
+  free(uiInput);
+  free(uiTemp);
+  free(uiOutput);
+  return 0;
 }

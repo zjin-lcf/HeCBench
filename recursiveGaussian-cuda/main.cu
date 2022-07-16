@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <chrono>
 #include <cuda.h>
 #include "helper_math.h"
 #include "main.h"
@@ -42,7 +43,7 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 //*****************************************************************
 __global__ 
 void Transpose(const unsigned int* uiDataIn, 
-               unsigned int* uiDataOut, 
+                     unsigned int* uiDataOut, 
                const int iWidth, const int iHeight)
 {
     // read the matrix tile into LMEM
@@ -82,7 +83,7 @@ void Transpose(const unsigned int* uiDataIn,
 //*****************************************************************
 __global__ void SimpleRecursiveRGBA(
   const unsigned int* uiDataIn,
-  unsigned int* uiDataOut,
+        unsigned int* uiDataOut,
   const int iWidth, const int iHeight, const float a)
 {
     // compute X pixel location and check in-bounds
@@ -134,13 +135,13 @@ __global__ void SimpleRecursiveRGBA(
 //      If used, CLAMP_TO_EDGE is passed in via OpenCL clBuildProgram call options string at app runtime
 //*****************************************************************
 __global__ void RecursiveRGBA(
-                   const unsigned int* uiDataIn, 
-                   unsigned int* uiDataOut, 
-                   const int iWidth, const int iHeight, 
-                   const float a0, const float a1, 
-                   const float a2, const float a3, 
-                   const float b1, const float b2, 
-                   const float coefp, const float coefn)
+  const unsigned int* uiDataIn, 
+  unsigned int* uiDataOut, 
+  const int iWidth, const int iHeight, 
+  const float a0, const float a1, 
+  const float a2, const float a3, 
+  const float b1, const float b2, 
+  const float coefp, const float coefn)
 {
     // compute X pixel location and check in-bounds
     //unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
@@ -205,14 +206,14 @@ __global__ void RecursiveRGBA(
     }
 }
 
-void GPUGaussianFilterRGBA(const unsigned int* uiInput,
-                           unsigned int* uiOutput,
-                           unsigned int* d_BufIn,
-                           unsigned int* d_BufTmp,
-                           unsigned int* d_BufOut,
-                           const unsigned int uiImageWidth,
-                           const unsigned int uiImageHeight, 
-                           const GaussParms* pGP)
+double GPUGaussianFilterRGBA(const unsigned int* uiInput,
+                             unsigned int* uiOutput,
+                             unsigned int* d_BufIn,
+                             unsigned int* d_BufTmp,
+                             unsigned int* d_BufOut,
+                             const unsigned int uiImageWidth,
+                             const unsigned int uiImageHeight, 
+                             const GaussParms* pGP)
 {
 #if USE_SIMPLE_FILTER
   float ema = pGP->ema;
@@ -230,6 +231,8 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   unsigned int szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
   cudaMemcpy(d_BufIn, uiInput, szBuffBytes, cudaMemcpyHostToDevice); 
 
+  auto start = std::chrono::steady_clock::now();
+  
   // const int iTransposeBlockDim = 16; // initial height and width dimension of 2D transpose workgroup 
   size_t szGaussLocalWork = 256;
   size_t szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageWidth);
@@ -278,65 +281,83 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   // Launch transpose kernel in 2nd direction
   Transpose<<<t2_grid, t1_block>>>(d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth);
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   cudaMemcpy(uiOutput, d_BufOut, szBuffBytes, cudaMemcpyDeviceToHost); 
+  return time;
 }
 
 int main(int argc, char** argv)
 {
-    const float fSigma = 10.0f;         // filter sigma (blur factor)
-    const int iOrder = 0;               // filter order
-    unsigned int uiImageWidth = 1920;   // Image width
-    unsigned int uiImageHeight = 1080;  // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
+  if (argc != 3) {
+    printf("Usage: %s <path to image> <repeat>\n", argv[0]);
+    return 1;
+  }
 
-    shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  const float fSigma = 10.0f;         // filter sigma (blur factor)
+  const int iOrder = 0;               // filter order
+  unsigned int uiImageWidth = 1920;   // Image width
+  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int* uiInput = NULL;       // Host buffer to hold input image data
+  unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-    // Allocate intermediate and output host image buffers
-    unsigned int szBuff = uiImageWidth * uiImageHeight;
-    unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
-    uiTemp = (unsigned int*)malloc(szBuffBytes);
-    uiOutput = (unsigned int*)malloc(szBuffBytes);
-    printf("Allocate Host Image Buffers...\n"); 
+  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  const int iCycles = atoi(argv[2]);
 
-    // Allocate the source, intermediate and result buffer memory objects on the device GMEM
-    unsigned int* d_BufIn;
-    unsigned int* d_BufTmp;
-    unsigned int* d_BufOut;
-    cudaMalloc((void**)&d_BufIn, szBuffBytes);
-    cudaMalloc((void**)&d_BufTmp, szBuffBytes);
-    cudaMalloc((void**)&d_BufOut, szBuffBytes);
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
-    // init filter coefficients
-    PreProcessGaussParms (fSigma, iOrder, &GP);
+  // Allocate intermediate and output host image buffers
+  unsigned int szBuff = uiImageWidth * uiImageHeight;
+  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  uiTemp = (unsigned int*)malloc(szBuffBytes);
+  uiOutput = (unsigned int*)malloc(szBuffBytes);
+  printf("Allocate Host Image Buffers...\n"); 
 
-    // Warmup call to assure OpenCL driver is awake
-    GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  // Allocate the source, intermediate and result buffer memory objects on the device GMEM
+  unsigned int* d_BufIn;
+  unsigned int* d_BufTmp;
+  unsigned int* d_BufOut;
+  cudaMalloc((void**)&d_BufIn, szBuffBytes);
+  cudaMalloc((void**)&d_BufTmp, szBuffBytes);
+  cudaMalloc((void**)&d_BufOut, szBuffBytes);
 
-    // Start round-trip timer and process iCycles loops on the GPU
-    const int iCycles = 150;
-    printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
-    for (int i = 0; i < iCycles; i++)
-    {
-       GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, &GP);
-    }
+  // init filter coefficients
+  PreProcessGaussParms (fSigma, iOrder, &GP);
 
-    // Compute on host 
-    unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
-    HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+  // Warmup call to assure OpenCL driver is awake
+  GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp,
+                        d_BufOut, uiImageWidth, uiImageHeight, &GP);
 
-    printf("Comparing GPU Result to CPU Result...\n"); 
-    shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
-    printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+  // Start round-trip timer and process iCycles loops on the GPU
+  printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
+  double time = 0.0;
 
-    free(uiGolden);
-    free(uiInput);
-    free(uiTemp);
-    free(uiOutput);
-    cudaFree(d_BufIn);
-    cudaFree(d_BufTmp);
-    cudaFree(d_BufOut);
-    return 0;
+  for (int i = 0; i < iCycles; i++)
+  {
+     time += GPUGaussianFilterRGBA(uiInput, uiOutput, d_BufIn, d_BufTmp,
+                                   d_BufOut, uiImageWidth, uiImageHeight, &GP);
+  }
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / iCycles);
+
+  // Compute on host 
+  unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
+  HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+
+  printf("Comparing GPU Result to CPU Result...\n"); 
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+
+  free(uiGolden);
+  free(uiInput);
+  free(uiTemp);
+  free(uiOutput);
+  cudaFree(d_BufIn);
+  cudaFree(d_BufTmp);
+  cudaFree(d_BufOut);
+  return 0;
 }

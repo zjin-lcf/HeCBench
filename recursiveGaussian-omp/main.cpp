@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <chrono>
 #include <omp.h>
 #include "main.h"
 #include "shrUtils.h"
@@ -252,12 +253,12 @@ void RecursiveRGBA(const unsigned int* uiDataIn,
   }
 }
 
-void GPUGaussianFilterRGBA(const unsigned int* uiInput,
-                           unsigned int* uiTmp,
-                           unsigned int* uiOutput,
-                           const unsigned int uiImageWidth,
-                           const unsigned int uiImageHeight, 
-                           const GaussParms* pGP)
+double GPUGaussianFilterRGBA(const unsigned int* uiInput,
+                             unsigned int* uiTmp,
+                             unsigned int* uiOutput,
+                             const unsigned int uiImageWidth,
+                             const unsigned int uiImageHeight, 
+                             const GaussParms* pGP)
 {
 #if USE_SIMPLE_FILTER
   float ema = pGP->ema;
@@ -275,6 +276,8 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   unsigned int szBuff = uiImageWidth * uiImageHeight;
 
   #pragma omp target update to(uiInput[0:szBuff])
+
+  auto start = std::chrono::steady_clock::now();
 
 #if USE_SIMPLE_FILTER
   SimpleRecursiveRGBA(uiInput, uiTmp, uiImageWidth, uiImageHeight, ema);
@@ -300,59 +303,73 @@ void GPUGaussianFilterRGBA(const unsigned int* uiInput,
   // Launch transpose kernel in 2nd direction
   Transpose(uiTmp, uiOutput, uiImageHeight, uiImageWidth);
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   #pragma omp target update from (uiOutput[0:szBuff])
+  return time;
 }
 
 int main(int argc, char** argv)
 {
-    const float fSigma = 10.0f;         // filter sigma (blur factor)
-    const int iOrder = 0;               // filter order
-    unsigned int uiImageWidth = 1920;   // Image width
-    unsigned int uiImageHeight = 1080;  // Image height
-    unsigned int* uiInput = NULL;       // Host buffer to hold input image data
-    unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-    unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
+  if (argc != 3) {
+    printf("Usage: %s <path to image> <repeat>\n", argv[0]);
+    return 1;
+  }
 
-    shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-    printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  const float fSigma = 10.0f;         // filter sigma (blur factor)
+  const int iOrder = 0;               // filter order
+  unsigned int uiImageWidth = 1920;   // Image width
+  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int* uiInput = NULL;       // Host buffer to hold input image data
+  unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
+  unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-    // Allocate intermediate and output host image buffers
-    unsigned int szBuff = uiImageWidth * uiImageHeight;
-    unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
-    uiTmp = (unsigned int*)malloc(szBuffBytes);
-    uiOutput = (unsigned int*)malloc(szBuffBytes);
-    printf("Allocate Host Image Buffers...\n"); 
+  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  const int iCycles = atoi(argv[2]);
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
-    // init filter coefficients
-    PreProcessGaussParms (fSigma, iOrder, &GP);
+  // Allocate intermediate and output host image buffers
+  unsigned int szBuff = uiImageWidth * uiImageHeight;
+  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiOutput = (unsigned int*)malloc(szBuffBytes);
+  printf("Allocate Host Image Buffers...\n"); 
+
+  // init filter coefficients
+  PreProcessGaussParms (fSigma, iOrder, &GP);
 
 #pragma omp target data map(alloc: uiInput[0:szBuff]) \
                         map(alloc: uiTmp[0:szBuff]) \
                         map(alloc: uiOutput[0:szBuff])
 {
-    // Warmup call to assure OpenCL driver is awake
-    GPUGaussianFilterRGBA(uiInput, uiTmp, uiOutput, uiImageWidth, uiImageHeight, &GP);
+  // Warmup call to assure OpenCL driver is awake
+  GPUGaussianFilterRGBA(uiInput, uiTmp, uiOutput, uiImageWidth, uiImageHeight, &GP);
 
-    // Start round-trip timer and process iCycles loops on the GPU
-    const int iCycles = 100;
-    printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
-    for (int i = 0; i < iCycles; i++)
-    {
-       GPUGaussianFilterRGBA(uiInput, uiTmp, uiOutput, uiImageWidth, uiImageHeight, &GP);
-    }
+  // Start round-trip timer and process iCycles loops on the GPU
+  printf("\nRunning GPUGaussianFilterRGBA for %d cycles...\n\n", iCycles);
+  double time = 0.0;
+
+  for (int i = 0; i < iCycles; i++)
+  {
+    time += GPUGaussianFilterRGBA(uiInput, uiTmp, uiOutput,
+                                  uiImageWidth, uiImageHeight, &GP);
+  }
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / iCycles);
 }
 
-    // Compute on host 
-    unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
-    HostRecursiveGaussianRGBA(uiInput, uiTmp, uiGolden, uiImageWidth, uiImageHeight, &GP);
+  // Compute on host 
+  unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
+  HostRecursiveGaussianRGBA(uiInput, uiTmp, uiGolden, uiImageWidth, uiImageHeight, &GP);
 
-    printf("Comparing GPU Result to CPU Result...\n"); 
-    shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
-    printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+  printf("Comparing GPU Result to CPU Result...\n"); 
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
 
-    free(uiGolden);
-    free(uiInput);
-    free(uiTmp);
-    free(uiOutput);
-    return 0;
+  free(uiGolden);
+  free(uiInput);
+  free(uiTmp);
+  free(uiOutput);
+  return 0;
 }

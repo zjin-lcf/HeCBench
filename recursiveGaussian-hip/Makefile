@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -53,5 +52,4 @@ clean:
 	rm -rf $(program) $(obj) *.txt
 
 run: $(program)
-	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm
-
+	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm 1000
