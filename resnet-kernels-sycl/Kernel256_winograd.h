@@ -1,6 +1,6 @@
 #ifndef __KERNEL256_WINOGRAD_H__
 #define __KERNEL256_WINOGRAD_H__
 
-int kernel_256(queue &q);
+void kernel_256(queue &q, double&, double&);
 
 #endif

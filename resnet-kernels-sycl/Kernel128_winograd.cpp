@@ -219,10 +219,9 @@ void kernel_128_OuterProduct_128(
   C[T_offset] = out[c_input];
 }
 
-int kernel_128(queue &q) {
+void kernel_128(queue &q, double &time, double &ktime) {
   float *input_ = get_parameter(inputName128, 16*16*128);
   float *bias = get_parameter(biasName128, 128);
-  uint64_t nT1 = 0, nT2 = 0;
 
   float *kernel = get_parameter(weight_winograd_Name128, 36*128*128);
   float *bnBias, *bnScale;
@@ -235,7 +234,7 @@ int kernel_128(queue &q) {
 
   float result[nOutput];
 
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   buffer<float, 1> input(input_, nInput);
   buffer<float, 1> l_weights(kernel, nWeights);
@@ -261,8 +260,12 @@ int kernel_128(queue &q) {
   buffer<float, 1> l_bnBias (bnBias, nBias);
   buffer<float, 1> l_bnScale (bnScale, nBias);
 
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
+
   range<2> gws (4*6, 4*128);
   range<2> lws (6, 128);
+
   q.submit([&] (handler &cgh) {
     auto i = input.get_access<sycl_read>(cgh);
     auto t = t_input.get_access<sycl_write>(cgh);
@@ -302,12 +305,17 @@ int kernel_128(queue &q) {
     });
   });
 
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+
   q.submit([&] (handler &cgh) {
     auto acc = output.get_access<sycl_read>(cgh);
     cgh.copy(acc, result);
   }).wait();
 
-  nT2 = getTimeMicroseconds64();
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;
@@ -322,6 +330,4 @@ int kernel_128(queue &q) {
   free(bnBias);
   free(bias);
   free(input_);
-
-  return ((nT2-nT1) << 16);
 }

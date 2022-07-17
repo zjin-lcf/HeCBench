@@ -8,13 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 float* get_parameter(const char* filename, int size);
 
 float* transpose(float* weight, int h, int w);
-
-uint64_t getTimeMicroseconds64();
 
 void output_checker(float* A, float* B, int len, int channel, int shift);
 

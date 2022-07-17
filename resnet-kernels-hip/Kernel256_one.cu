@@ -82,7 +82,7 @@ __global__ void kernel_256_one_1024(
   C_start[line * 1024 + in_channel] = scale[in_channel] * output[ind] + bias[in_channel];
 }
 
-int kernel_256_1_in() {
+void kernel_256_1_in(double &time, double &ktime) {
   float *input = get_parameter(inputName256one, 14*14*1024);
   float *weight = get_parameter(weightName256one, 256*1024);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name256one, 256);
@@ -93,7 +93,7 @@ int kernel_256_1_in() {
   int nInput = 14*14*1024, nOutput = 14*14*256, nWeights = 256*1024;
   float result[nOutput];
 
-  uint64_t nT1 = 0, nT2 = 0;
+  auto start = std::chrono::steady_clock::now();
 
   hipMalloc((void **) &input_, nInput<<2);
   hipMalloc((void **) &output_, nOutput<<2);
@@ -106,16 +106,26 @@ int kernel_256_1_in() {
   hipMemcpy(bnBias_, bnBias_myKernel, 256<<2, hipMemcpyHostToDevice);
   hipMemcpy(bnScale_, bnScale_myKernel, 256<<2, hipMemcpyHostToDevice);
 
-  nT1 = getTimeMicroseconds64();
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
 
   kernel_1024_one_256 <<<dim3(49), dim3(256, 4), (4*1024 + 16*256 + 4*256 + 2*256)<<2 >>> (
     input_, weight_, bnBias_, bnScale_, output_);
 
   hipDeviceSynchronize();
-
-  nT2 = getTimeMicroseconds64();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
   hipMemcpy(result, output_, nOutput<<2, hipMemcpyDeviceToHost);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  hipFree(input_);
+  hipFree(output_);
+  hipFree(weight_);
+  hipFree(bnScale_);
+  hipFree(bnBias_);
 
   #ifdef DEBUG
   double s = 0;
@@ -129,17 +139,9 @@ int kernel_256_1_in() {
   free(weight);
   free(bnBias_myKernel);
   free(bnScale_myKernel);
-
-  hipFree(input_);
-  hipFree(output_);
-  hipFree(weight_);
-  hipFree(bnScale_);
-  hipFree(bnBias_);
-
-  return ((nT2-nT1) << 16);
 }
 
-int kernel_256_1_out() {
+void kernel_256_1_out(double &time, double &ktime) {
   float *input = get_parameter(inputName256one, 14*14*256);
   float *weight = get_parameter(weightName256one, 256*1024);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name256one, 1024);
@@ -150,7 +152,7 @@ int kernel_256_1_out() {
   int nInput = 14*14*256, nOutput = 14*14*1024, nWeights = 256*1024;
   float result[nOutput];
 
-  uint64_t nT1 = 0, nT2 = 0;
+  auto start = std::chrono::steady_clock::now();
 
   hipMalloc((void **) &input_, nInput<<2);
   hipMalloc((void **) &output_, nOutput<<2);
@@ -163,16 +165,26 @@ int kernel_256_1_out() {
   hipMemcpy(bnBias_, bnBias_myKernel, 1024<<2, hipMemcpyHostToDevice);
   hipMemcpy(bnScale_, bnScale_myKernel, 1024<<2, hipMemcpyHostToDevice);
 
-  nT1 = getTimeMicroseconds64();
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
 
   kernel_256_one_1024 <<<dim3(49, 4), dim3(256, 4), (4*256 + 32*256 + 4*256 + 2*256)<<2 >>>(
     input_, weight_, bnBias_, bnScale_, output_);
 
   hipDeviceSynchronize();
-
-  nT2 = getTimeMicroseconds64();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
   hipMemcpy(result, output_, nOutput<<2, hipMemcpyDeviceToHost);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  hipFree(input_);
+  hipFree(output_);
+  hipFree(weight_);
+  hipFree(bnScale_);
+  hipFree(bnBias_);
 
   #ifdef DEBUG
   double s = 0;
@@ -186,12 +198,4 @@ int kernel_256_1_out() {
   free(bnScale_myKernel);
   free(input);
   free(weight);
-
-  hipFree(input_);
-  hipFree(output_);
-  hipFree(weight_);
-  hipFree(bnScale_);
-  hipFree(bnBias_);
-
-  return ((nT2-nT1) << 16);
 }

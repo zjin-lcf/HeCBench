@@ -221,10 +221,9 @@ __global__ void kernel_256_OuterProduct_256(
   C[T_offset+1024] = out[c_input+1024];
 }
 
-int kernel_256() {
+void kernel_256(double &time, double &ktime) {
   float *input_ = get_parameter(inputName256, 16*16*256);
   float *input, *output, *l_weights;
-  uint64_t nT1 = 0, nT2 = 0;
 
   float *kernel = get_parameter(weight_winograd_Name256, 36*256*256), *t_input, *ip;
   int nInput = 16*16*256, nOutput = 16*16*256, nWeights = 36*256*256, nBias = 256,
@@ -235,7 +234,7 @@ int kernel_256() {
   bnBias = get_parameter(bnBias_winograd_Name256, 256);
   bnScale = get_parameter(bnScale_winograd_Name256, 256);
 
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   cudaMalloc((void **) &input, nInput<<2);
   cudaMalloc((void **) &output, nOutput<<2);
@@ -254,21 +253,21 @@ int kernel_256() {
   cudaMemcpy(l_bnBias, bnBias, nBias<<2, cudaMemcpyHostToDevice);
   cudaMemcpy(l_bnScale, bnScale, nBias<<2, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+
   kernel_256_winograd_BtdB <<<dim3(4, 4, 2), dim3(128, 6), (6*6*128)<<2 >>> (input, t_input);
   kernel_256_OuterProduct_256<<<dim3(36, 2), dim3(256, 4), (8*256 + 32*256 + 8*256)<<2 >>> (t_input, l_weights, ip);
   kernel_256_winograd_AtIA <<<dim3(4, 4, 256), dim3(6, 6), ((6*6)<<2)>>> (ip, l_bnBias, l_bnScale, output);
 
+  cudaDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+
   cudaMemcpy(result, output, nOutput<<2, cudaMemcpyDeviceToHost);
 
-  nT2 = getTimeMicroseconds64();
-
-  #ifdef DEBUG
-  double s = 0;
-  for (int i = 0; i < nOutput; i++) {
-    s += result[i];
-  }
-  printf("Check sum: %lf\n", s);
-  #endif
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   cudaFree(t_input);
   cudaFree(ip);
@@ -278,10 +277,16 @@ int kernel_256() {
   cudaFree(l_bnScale);
   cudaFree(l_bnBias);
 
+  #ifdef DEBUG
+  double s = 0;
+  for (int i = 0; i < nOutput; i++) {
+    s += result[i];
+  }
+  printf("Check sum: %lf\n", s);
+  #endif
+
   free(kernel);
   free(bnScale);
   free(bnBias);
   free(input_);
-
-  return ((nT2-nT1) << 16);
 }
