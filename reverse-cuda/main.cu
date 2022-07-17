@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <random>
+#include <chrono>
 #include <cuda.h>
 
 __global__ void reverse (int *d, const int len)
@@ -47,13 +48,22 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100, 9999);
 
+  double time = 0.0;
+
   for (int i = 0; i < iteration; i++) {
     const int count = distribution(generator);
 
     cudaMemcpy(d_test, gold_even, elem_size, cudaMemcpyHostToDevice);
 
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     for (int j = 0; j < count; j++)
       reverse<<<1, len>>> (d_test, len);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     cudaMemcpy(test, d_test, elem_size, cudaMemcpyDeviceToHost);
 
@@ -65,6 +75,7 @@ int main(int argc, char* argv[]) {
     if (error) break;
   }
   
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
 
   cudaFree(d_test);

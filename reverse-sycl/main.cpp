@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <random>
+#include <chrono>
 #include "common.h"
 
 int main(int argc, char* argv[]) {
@@ -46,15 +47,19 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100,9999);
 
+  double time = 0.0;
+
   for (int i = 0; i < iteration; i++) {
     const int count = distribution(generator);
 
     q.submit([&](handler &cgh) {
       auto acc = d_test.get_access<sycl_discard_write>(cgh);
       cgh.copy(gold_even, acc);
-    });
+    }).wait();
       
-    for (int j = 0; j < count; j++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int j = 0; j < count; j++) {
       q.submit([&](handler &cgh) {
         accessor <int, 1, sycl_read_write, access::target::local> s (len, cgh);
         auto acc = d_test.get_access<sycl_read_write>(cgh);
@@ -65,6 +70,11 @@ int main(int argc, char* argv[]) {
           acc[t] = s[len-t-1];
         });
       });
+    }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     q.submit([&](handler &cgh) {
       auto acc = d_test.get_access<sycl_read>(cgh);
@@ -79,6 +89,7 @@ int main(int argc, char* argv[]) {
     if (error) break;
   }
   
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
 
   return 0;

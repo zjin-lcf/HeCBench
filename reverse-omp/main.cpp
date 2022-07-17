@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <random>
+#include <chrono>
 #include <omp.h>
 
 int main(int argc, char* argv[]) {
@@ -35,6 +36,8 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100, 9999);
 
+  double time = 0.0;
+
   #pragma omp target data map(alloc: test[0:len]) 
   {
     for (int i = 0; i < iteration; i++) {
@@ -42,6 +45,8 @@ int main(int argc, char* argv[]) {
 
       memcpy(test, gold_even, elem_size);
       #pragma omp target update to (test[0:len])
+
+      auto start = std::chrono::steady_clock::now();
 
       for (int j = 0; j < count; j++) {
         #pragma omp target teams num_teams(1) thread_limit(len)
@@ -57,6 +62,9 @@ int main(int argc, char* argv[]) {
         }
       }
 
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
       #pragma omp target update from (test[0:len])
 
       if (count % 2 == 0)
@@ -68,6 +76,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
 
   return 0;
