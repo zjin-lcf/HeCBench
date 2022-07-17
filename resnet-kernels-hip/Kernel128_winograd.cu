@@ -210,11 +210,10 @@ __global__ void kernel_128_OuterProduct_128(
   C[T_offset] = out[c_input];
 }
 
-int kernel_128() {
+void kernel_128(double &time, double &ktime) {
   float *input_ = get_parameter(inputName128, 16*16*128);
   float *bias = get_parameter(biasName128, 128);
   float *input, *output, *l_weights;
-  uint64_t nT1 = 0, nT2 = 0;
 
   float *t_input, *ip;
   float *kernel = get_parameter(weight_winograd_Name128, 36*128*128);
@@ -228,7 +227,7 @@ int kernel_128() {
   bnBias = get_parameter(bnBias_winograd_Name128, 128);
   bnScale = get_parameter(bnScale_winograd_Name128, 128);
 
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   hipMalloc((void **) &input, nInput<<2);
   hipMalloc((void **) &output, nOutput<<2);
@@ -248,21 +247,21 @@ int kernel_128() {
   hipMemcpy(l_bnBias, bnBias, nBias<<2, hipMemcpyHostToDevice);
   hipMemcpy(l_bnScale, bnScale, nBias<<2, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+
   kernel_128_winograd_BtdB <<<dim3(4, 4), dim3(128, 6), (6*6*128)<<2 >>> (input, t_input);
   kernel_128_OuterProduct_128<<<dim3(36, 2), dim3(128, 8), (8*128 + 64*128 + 8*128)<<2 >>> (t_input, l_weights, ip);
   kernel_128_winograd_AtIA <<<dim3(4, 4, 128), dim3(6, 6), ((6*6)<<2)>>> (ip, l_bnBias, l_bnScale, output);
 
+  hipDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+
   hipMemcpy(result, output, nOutput<<2, hipMemcpyDeviceToHost);
 
-  nT2 = getTimeMicroseconds64();
-
-  #ifdef DEBUG
-  double s = 0;
-  for (int i = 0; i < nOutput; i++) {
-    s += result[i];
-  }
-  printf("Check sum: %lf\n", s);
-  #endif
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   hipFree(t_input);
   hipFree(output);
@@ -272,11 +271,17 @@ int kernel_128() {
   hipFree(l_bnScale);
   hipFree(l_bnBias);
 
+  #ifdef DEBUG
+  double s = 0;
+  for (int i = 0; i < nOutput; i++) {
+    s += result[i];
+  }
+  printf("Check sum: %lf\n", s);
+  #endif
+
   free(kernel);
   free(bnScale);
   free(bnBias);
   free(bias);
   free(input_);
-
-  return ((nT2-nT1) << 16);
 }

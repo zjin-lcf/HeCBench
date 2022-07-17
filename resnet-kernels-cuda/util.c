@@ -1,15 +1,4 @@
-#include <time.h>
 #include "util.h"
-
-uint64_t getTimeMicroseconds64() {
-  uint64_t nTime;
-  struct timespec tSpec;
-
-  clock_gettime(CLOCK_REALTIME, &tSpec);
-
-  nTime = (uint64_t)tSpec.tv_sec * 1000000 + (uint64_t)tSpec.tv_nsec / 1000;
-  return nTime;
-}
 
 float* transpose(float* weight, int h, int w) {
   float* new_weight = (float*)malloc(w * h * 4);

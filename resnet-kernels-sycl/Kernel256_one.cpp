@@ -89,7 +89,7 @@ void kernel_256_one_1024(
   C_start[line * 1024 + in_channel] = scale[in_channel] * output[ind] + bias[in_channel];
 }
 
-int kernel_256_1_in(queue &q) {
+void kernel_256_1_in(queue &q, double &time, double &ktime) {
   float *input = get_parameter(inputName256one, 14*14*1024);
   float *weight = get_parameter(weightName256one, 256*1024);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name256one, 256);
@@ -98,15 +98,16 @@ int kernel_256_1_in(queue &q) {
   int nInput = 14*14*1024, nOutput = 14*14*256, nWeights = 256*1024;
   float result[nOutput];
 
-  uint64_t nT1 = 0, nT2 = 0;
-
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   buffer<float, 1> input_(input, nInput);
   buffer<float, 1> output_(nOutput);
   buffer<float, 1> weight_(weight, nWeights);
   buffer<float, 1> bnBias_(bnBias_myKernel, 256);
   buffer<float, 1> bnScale_(bnScale_myKernel, 256);
+
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
 
   range<2> gws (4, 256*49);
   range<2> lws (4, 256);
@@ -125,12 +126,17 @@ int kernel_256_1_in(queue &q) {
     });
   });
 
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+
   q.submit([&] (handler &cgh) {
     auto acc = output_.get_access<sycl_read>(cgh);
     cgh.copy(acc, result);
   }).wait();
 
-  nT2 = getTimeMicroseconds64();
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;
@@ -144,11 +150,9 @@ int kernel_256_1_in(queue &q) {
   free(weight);
   free(bnBias_myKernel);
   free(bnScale_myKernel);
-
-  return ((nT2-nT1) << 16);
 }
 
-int kernel_256_1_out(queue &q) {
+void kernel_256_1_out(queue &q, double &time, double &ktime) {
   float *input = get_parameter(inputName256one, 14*14*256);
   float *weight = get_parameter(weightName256one, 256*1024);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name256one, 1024);
@@ -157,15 +161,16 @@ int kernel_256_1_out(queue &q) {
   int nInput = 14*14*256, nOutput = 14*14*1024, nWeights = 256*1024;
   float result[nOutput];
 
-  uint64_t nT1 = 0, nT2 = 0;
-
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   buffer<float, 1> input_(input, nInput);
   buffer<float, 1> output_(nOutput);
   buffer<float, 1> weight_(weight, nWeights);
   buffer<float, 1> bnBias_(bnBias_myKernel, 1024);
   buffer<float, 1> bnScale_(bnScale_myKernel, 1024);
+
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
 
   range<2> gws (4*4, 256*49);
   range<2> lws (4, 256);
@@ -182,14 +187,19 @@ int kernel_256_1_out(queue &q) {
       kernel_256_one_1024 (item, sm.get_pointer(), i.get_pointer(),
         w.get_pointer(), b.get_pointer(), s.get_pointer(), o.get_pointer());
     });
-  }).wait();
+  });
 
-  nT2 = getTimeMicroseconds64();
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
   q.submit([&] (handler &cgh) {
     auto acc = output_.get_access<sycl_read>(cgh);
     cgh.copy(acc, result);
   }).wait();
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;
@@ -203,6 +213,4 @@ int kernel_256_1_out(queue &q) {
   free(bnScale_myKernel);
   free(input);
   free(weight);
-
-  return ((nT2-nT1) << 16);
 }

@@ -225,9 +225,8 @@ void kernel_256_OuterProduct_256(
   C[T_offset+1024] = out[c_input+1024];
 }
 
-int kernel_256(queue &q) {
+void kernel_256(queue &q, double &time, double &ktime) {
   float *input_ = get_parameter(inputName256, 16*16*256);
-  uint64_t nT1 = 0, nT2 = 0;
 
   float *kernel = get_parameter(weight_winograd_Name256, 36*256*256);
   int nInput = 16*16*256, nOutput = 16*16*256, nWeights = 36*256*256, nBias = 256,
@@ -239,7 +238,7 @@ int kernel_256(queue &q) {
 
   float result[nOutput];
 
-  nT1 = getTimeMicroseconds64();
+  auto start = std::chrono::steady_clock::now();
 
   buffer<float, 1> input(input_, nInput);
   buffer<float, 1> l_weights(kernel, nWeights);
@@ -268,6 +267,9 @@ int kernel_256(queue &q) {
   //kernel_256_winograd_BtdB <<<dim3(4, 4, 2), dim3(128, 6), (6*6*128)<<2 >>> (input, t_input);
   //kernel_256_OuterProduct_256<<<dim3(36, 2), dim3(256, 4), (8*256 + 32*256 + 8*256)<<2 >>> (t_input, l_weights, ip);
   //kernel_256_winograd_AtIA <<<dim3(4, 4, 256), dim3(6, 6), ((6*6)<<2)>>> (ip, l_bnBias, l_bnScale, output);
+
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
 
   range<3> gws (2, 4*6, 4*128);
   range<3> lws (1, 6, 128);
@@ -310,12 +312,17 @@ int kernel_256(queue &q) {
     });
   });
 
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+
   q.submit([&] (handler &cgh) {
     auto acc = output.get_access<sycl_read>(cgh);
     cgh.copy(acc, result);
   }).wait();
 
-  nT2 = getTimeMicroseconds64();
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;
@@ -329,6 +336,4 @@ int kernel_256(queue &q) {
   free(bnScale);
   free(bnBias);
   free(input_);
-
-  return ((nT2-nT1) << 16);
 }
