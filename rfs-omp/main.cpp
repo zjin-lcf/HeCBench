@@ -3,6 +3,7 @@
 #include <string.h>
 #include <float.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 // Copyright 2004-present Facebook. All Rights Reserved.
@@ -50,8 +51,8 @@ truncateWithRoundingFactor(float roundingFactor, float x) {
 void sumArray (
   const float factor, 
   const   int length,
-  const float *__restrict__ x,
-        float *__restrict__ r)
+  const float *__restrict x,
+        float *__restrict r)
 {
   #pragma omp target teams distribute parallel for num_teams(256) thread_limit(256)
   for (int i = 0; i < length; i++) {
@@ -64,12 +65,12 @@ void sumArray (
 void sumArrays (
   const int nArrays,
   const int length,
-  const float *__restrict__ x,
-        float *__restrict__ r,
-  const float *__restrict__ maxVal)
+  const float *__restrict x,
+        float *__restrict r,
+  const float *__restrict maxVal)
 {
   #pragma omp target teams distribute parallel for num_teams(256) thread_limit(256)
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < nArrays; i++) {
     x += i * length;
     float factor = createRoundingFactor(maxVal[i], length);
     float s = 0;
@@ -136,17 +137,30 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < nArrays; i++)
       result[i] = 0.f;
 
+    auto start = std::chrono::steady_clock::now();
+
     for (int n = 0; n < nArrays; n++) {
       // sum over each array
       sumArray (factor[n], nElems, arrays + n * nElems, result + n);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time (sumArray): %f (s)\n", (time * 1e-9f) / nArrays);
+
     // bit accurate sum
     #pragma omp target update from (result[0:nArrays])
     ok = !memcmp(result_ref, result, narray_size);
     printf("%s\n", ok ? "PASS" : "FAIL");
     
+    start = std::chrono::steady_clock::now();
+
     // sum over arrays
     sumArrays (nArrays, nElems, arrays, result, maxVal);
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Kernel execution time (sumArrays): %f (s)\n", time * 1e-9f);
 
     // bit accurate sum
     #pragma omp target update from (result[0:nArrays])

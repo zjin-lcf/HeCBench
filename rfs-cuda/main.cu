@@ -3,6 +3,7 @@
 #include <string.h>
 #include <float.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 // Copyright 2004-present Facebook. All Rights Reserved.
@@ -140,17 +141,33 @@ int main(int argc, char* argv[]) {
   cudaMemset(d_result, 0, narray_size);
   cudaMemcpy(d_arrays, arrays, array_size, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < nArrays; n++) {
     // sum over each array
     sumArray <<<grids, blocks>>> (factor[n], nElems, d_arrays + n * nElems, d_result + n);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (sumArray): %f (s)\n", (time * 1e-9f) / nArrays);
+
   // bit accurate sum
   cudaMemcpy(result, d_result, narray_size, cudaMemcpyDeviceToHost);
   bool ok = !memcmp(result_ref, result, narray_size);
   printf("%s\n", ok ? "PASS" : "FAIL");
   
+  start = std::chrono::steady_clock::now();
+
   // sum over arrays
   sumArrays <<<grids, blocks>>> (nArrays, nElems, d_arrays, d_result, d_maxVal);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (sumArrays): %f (s)\n", time * 1e-9f);
 
   // bit accurate sum
   cudaMemcpy(result, d_result, narray_size, cudaMemcpyDeviceToHost);
