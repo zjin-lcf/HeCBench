@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <random>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 __global__ void reverse (int *d, const int len)
@@ -30,7 +31,7 @@ int main(int argc, char* argv[]) {
   // save device result
   int test[len];
 
-  // save expected results after performing reverse operations even/odd times
+  // save expected results after performing preverse operations even/odd times
   int error = 0;
   int gold_odd[len];
   int gold_even[len];
@@ -47,13 +48,22 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100, 9999);
 
+  double time = 0.0;
+
   for (int i = 0; i < iteration; i++) {
     const int count = distribution(generator);
 
     hipMemcpy(d_test, gold_even, elem_size, hipMemcpyHostToDevice);
 
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     for (int j = 0; j < count; j++)
-      hipLaunchKernelGGL(reverse, dim3(1), dim3(len), 0, 0, d_test, len);
+      hipLaunchKernelGGL(reverse, 1, len, 0, 0, d_test, len);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     hipMemcpy(test, d_test, elem_size, hipMemcpyDeviceToHost);
 
@@ -65,6 +75,7 @@ int main(int argc, char* argv[]) {
     if (error) break;
   }
   
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
 
   hipFree(d_test);
