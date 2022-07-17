@@ -3,6 +3,7 @@
 #include <string.h>
 #include <float.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // Copyright 2004-present Facebook. All Rights Reserved.
@@ -140,17 +141,33 @@ int main(int argc, char* argv[]) {
   hipMemset(d_result, 0, narray_size);
   hipMemcpy(d_arrays, arrays, array_size, hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < nArrays; n++) {
     // sum over each array
     hipLaunchKernelGGL(sumArray, grids, blocks, 0, 0, factor[n], nElems, d_arrays + n * nElems, d_result + n);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (sumArray): %f (s)\n", (time * 1e-9f) / nArrays);
+
   // bit accurate sum
   hipMemcpy(result, d_result, narray_size, hipMemcpyDeviceToHost);
   bool ok = !memcmp(result_ref, result, narray_size);
   printf("%s\n", ok ? "PASS" : "FAIL");
   
+  start = std::chrono::steady_clock::now();
+
   // sum over arrays
   hipLaunchKernelGGL(sumArrays, grids, blocks, 0, 0, nArrays, nElems, d_arrays, d_result, d_maxVal);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (sumArrays): %f (s)\n", time * 1e-9f);
 
   // bit accurate sum
   hipMemcpy(result, d_result, narray_size, hipMemcpyDeviceToHost);

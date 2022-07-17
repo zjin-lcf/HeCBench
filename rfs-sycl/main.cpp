@@ -1,9 +1,9 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 // Copyright 2004-present Facebook. All Rights Reserved.
@@ -151,6 +151,9 @@ int main(int argc, char* argv[]) {
     cgh.fill(acc, 0.f);
   });
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < nArrays; n++) {
     // sum over each array
     const float f = factor[n];
@@ -163,6 +166,11 @@ int main(int argc, char* argv[]) {
     });
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time (sumArray): %f (s)\n", (time * 1e-9f) / nArrays);
+
   // bit accurate sum
   q.submit([&] (handler &cgh) {
     auto acc = d_result.get_access<sycl_read>(cgh);
@@ -172,6 +180,8 @@ int main(int argc, char* argv[]) {
   bool ok = !memcmp(result_ref, result, narray_size);
   printf("%s\n", ok ? "PASS" : "FAIL");
   
+  start = std::chrono::steady_clock::now();
+
   // sum over arrays
   q.submit([&] (handler &cgh) {
     auto arr = d_arrays.get_access<sycl_read>(cgh);
@@ -181,7 +191,11 @@ int main(int argc, char* argv[]) {
       sumArrays (item, nArrays, nElems, arr.get_pointer(), 
                  out.get_pointer(), max.get_pointer());
     });
-  });
+  }).wait();
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (sumArrays): %f (s)\n", time * 1e-9f);
 
   // bit accurate sum
   q.submit([&] (handler &cgh) {
