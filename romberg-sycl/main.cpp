@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "reference.h"
 
@@ -84,10 +85,17 @@ void romberg(double a, double b, double *result, double *smem, nd_item<1> &item)
 
 int main( int argc, char** argv)
 {
-  const int numBlocks = 128;
-  const int numThreadsPerBlock = 64;
+  if (argc != 4) {
+    printf("Usage: %s <number of work-groups> ", argv[0]);
+    printf("<work-group size> <repeat>\n");
+    return 1;
+  }
+  const int nwg = atoi(argv[1]);
+  const int wgs = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  double *h_result = (double*) malloc (sizeof(double) * numBlocks);
+  const int result_size_byte = nwg * sizeof(double);
+  double *h_result = (double*) malloc (result_size_byte);
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -96,32 +104,41 @@ int main( int argc, char** argv)
 #endif
   queue q(dev_sel);
 
-  buffer<double, 1> d_result (numBlocks);
+  buffer<double, 1> d_result (nwg);
 
-  double sum;
-  range<1> gws (numBlocks * numThreadsPerBlock);
-  range<1> lws (numThreadsPerBlock);
-  for (int i = 0; i < 100; i++) {
+  range<1> gws (nwg * wgs);
+  range<1> lws (wgs);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto result = d_result.get_access<sycl_discard_write>(cgh);
-      accessor<double, 1, sycl_read_write, access::target::local> smem (ROW_SIZE*numThreadsPerBlock, cgh);
+      accessor<double, 1, sycl_read_write, access::target::local> smem (ROW_SIZE*wgs, cgh);
       cgh.parallel_for<class k>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         romberg(A, B, result.get_pointer(), smem.get_pointer(), item);
       });
     });
-    q.submit([&] (handler &cgh) {
-      auto result = d_result.get_access<sycl_read>(cgh);
-      cgh.copy(result, h_result);
-    }).wait();
-    sum = 0.0;
-    for(int k = 0; k < numBlocks; k++) sum += h_result[k];
   }
+  
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", time * 1e-9f / repeat);
 
   // verify
+
+  q.submit([&] (handler &cgh) {
+    auto result = d_result.get_access<sycl_read>(cgh);
+    cgh.copy(result, h_result);
+  }).wait();
+
+  double sum = 0.0;
+  for(int k = 0; k < nwg; k++) sum += h_result[k];
+  
   double ref_sum = reference(f, A, B, ROW_SIZE, EPS);
   printf("%s\n", (fabs(sum - ref_sum) > EPS) ? "FAIL" : "PASS");
 
   free(h_result);
   return 0;
 }
-
