@@ -1,5 +1,5 @@
 #include "rsbench.h"
-using namespace cl::sycl;
+using namespace sycl;
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
@@ -15,23 +15,18 @@ using namespace cl::sycl;
 
 void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vhash_result, double * kernel_init_time )
 {
+  printf("Beginning event based simulation...\n");
   
   // Let's create an extra verification array to reduce manually later on
   printf("Allocating an additional %.1lf MB of memory for verification arrays...\n", in.lookups * sizeof(int) /1024.0/1024.0);
   int * verification_host = (int *) malloc(in.lookups * sizeof(int));
   
-  // Timers
-  double start = get_time();
-  double stop;
-
   // Scope here is important, as when we exit this blocl we will automatically sync with device
   // to ensure all work is done and that we can read from verification_host array.
   {
     // create a queue using the default device for the platform (cpu, gpu)
-
     queue sycl_q{default_selector()};
-    //queue sycl_q{gpu_selector()};
-    //queue sycl_q{cpu_selector()};
+
     printf("Running on: %s\n", sycl_q.get_device().get_info<cl::sycl::info::device::name>().c_str());
     printf("Initializing device buffers and JIT compiling kernel...\n");
   
@@ -52,74 +47,75 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
     ////////////////////////////////////////////////////////////////////////////////
     // Define Device Kernel
     ////////////////////////////////////////////////////////////////////////////////
+    // Timers
+    double start = get_time();
 
     // queue a kernel to be run, as a lambda
-    sycl_q.submit([&](handler &cgh)
-        {
-        ////////////////////////////////////////////////////////////////////////////////
-        // Create Device Accessors for Device Buffers
-        ////////////////////////////////////////////////////////////////////////////////
-        auto num_nucs = num_nucs_d.get_access<access::mode::read>(cgh);
-        auto concs = concs_d.get_access<access::mode::read>(cgh);
-        auto mats = mats_d.get_access<access::mode::read>(cgh);
-        auto verification = verification_d.get_access<access::mode::write>(cgh);
-        auto n_windows = n_windows_d.get_access<access::mode::read>(cgh);
-        auto poles = poles_d.get_access<access::mode::read>(cgh);
-        auto windows = windows_d.get_access<access::mode::read>(cgh);
-        auto pseudo_K0RS = pseudo_K0RS_d.get_access<access::mode::read>(cgh);
+    sycl_q.submit([&](handler &cgh) {
+      ////////////////////////////////////////////////////////////////////////////////
+      // Create Device Accessors for Device Buffers
+      ////////////////////////////////////////////////////////////////////////////////
+      auto num_nucs = num_nucs_d.get_access<access::mode::read>(cgh);
+      auto concs = concs_d.get_access<access::mode::read>(cgh);
+      auto mats = mats_d.get_access<access::mode::read>(cgh);
+      auto verification = verification_d.get_access<access::mode::write>(cgh);
+      auto n_windows = n_windows_d.get_access<access::mode::read>(cgh);
+      auto poles = poles_d.get_access<access::mode::read>(cgh);
+      auto windows = windows_d.get_access<access::mode::read>(cgh);
+      auto pseudo_K0RS = pseudo_K0RS_d.get_access<access::mode::read>(cgh);
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // XS Lookup Simulation Loop
-        ////////////////////////////////////////////////////////////////////////////////
-        //cgh.parallel_for<kernel>(range<1>(in.lookups), [=](id<1> idx)
-        cgh.parallel_for<kernel>(nd_range<1>(range<1>((in.lookups+255)/256*256), range<1>(256)), [=](nd_item<1> idx)
+      ////////////////////////////////////////////////////////////////////////////////
+      // XS Lookup Simulation Loop
+      ////////////////////////////////////////////////////////////////////////////////
+      //cgh.parallel_for<kernel>(range<1>(in.lookups), [=](id<1> idx)
+      cgh.parallel_for<kernel>(nd_range<1>(range<1>((in.lookups+255)/256*256), range<1>(256)), [=](nd_item<1> idx)
+      {
+        // get the index to operate on, first dimemsion
+        size_t i = idx.get_global_id(0);
+
+        if (i < in.lookups) {
+
+          // Set the initial seed value
+          uint64_t seed = STARTING_SEED;  
+
+          // Forward seed to lookup index (we need 2 samples per lookup)
+          seed = fast_forward_LCG(seed, 2*i);
+
+          // Randomly pick an energy and material for the particle
+          double p_energy = LCG_random_double(&seed);
+          int mat         = pick_mat(&seed); 
+
+          // debugging
+          //printf("E = %lf mat = %d\n", p_energy, mat);
+
+          double macro_xs_vector[4] = {0};
+
+          // Perform macroscopic Cross Section Lookup
+          calculate_macro_xs( macro_xs_vector, mat, p_energy, in, num_nucs, mats, SD.max_num_nucs, concs, n_windows, pseudo_K0RS, windows, poles, SD.max_num_windows, SD.max_num_poles );
+
+          // For verification, and to prevent the compiler from optimizing
+          // all work out, we interrogate the returned macro_xs_vector array
+          // to find its maximum value index, then increment the verification
+          // value by that index. In this implementation, we store to a global
+          // array that will get tranferred back and reduced on the host.
+          double max = -DBL_MAX;
+          int max_idx = 0;
+          for(int j = 0; j < 4; j++ )
           {
-          // get the index to operate on, first dimemsion
-          size_t i = idx.get_global_id(0);
-
-          if (i < in.lookups) {
-
-            // Set the initial seed value
-            uint64_t seed = STARTING_SEED;  
-
-            // Forward seed to lookup index (we need 2 samples per lookup)
-            seed = fast_forward_LCG(seed, 2*i);
-
-            // Randomly pick an energy and material for the particle
-            double p_energy = LCG_random_double(&seed);
-            int mat         = pick_mat(&seed); 
-
-            // debugging
-            //printf("E = %lf mat = %d\n", p_energy, mat);
-
-            double macro_xs_vector[4] = {0};
-
-            // Perform macroscopic Cross Section Lookup
-            calculate_macro_xs( macro_xs_vector, mat, p_energy, in, num_nucs, mats, SD.max_num_nucs, concs, n_windows, pseudo_K0RS, windows, poles, SD.max_num_windows, SD.max_num_poles );
-
-            // For verification, and to prevent the compiler from optimizing
-            // all work out, we interrogate the returned macro_xs_vector array
-            // to find its maximum value index, then increment the verification
-            // value by that index. In this implementation, we store to a global
-            // array that will get tranferred back and reduced on the host.
-            double max = -DBL_MAX;
-            int max_idx = 0;
-            for(int j = 0; j < 4; j++ )
+            if( macro_xs_vector[j] > max )
             {
-              if( macro_xs_vector[j] > max )
-              {
-                max = macro_xs_vector[j];
-                max_idx = j;
-              }
+              max = macro_xs_vector[j];
+              max_idx = j;
             }
-            verification[i] = max_idx+1;
-	  }
+          }
+          verification[i] = max_idx+1;
+        }
+      });
+    }).wait();
 
-          });
-        });
-    stop = get_time();
+    double stop = get_time();
+    *kernel_init_time = stop-start;
     printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
-    printf("Beginning event based simulation...\n");
   }
 
   // Host reduces the verification array
@@ -128,7 +124,6 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
     verification_scalar += verification_host[i];
 
   *vhash_result = verification_scalar;
-  *kernel_init_time = stop-start;
 }
 
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >

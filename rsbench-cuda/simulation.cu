@@ -12,20 +12,19 @@
 // line argument.
 ////////////////////////////////////////////////////////////////////////////////////
 
-
 __global__ void lookup ( 
-    int* num_nucs, 
-    double* concs, 
-    int* mats, 
-    int* verification,
-    int* n_windows, 
-    double* pseudo_K0RS, 
-    Window* windows, 
-    Pole* poles, 
-    int n_lookups, 
-    int input_doppler, 
-    int input_numL, 
-    int max_num_windows, 
+    const int*__restrict__ num_nucs,
+    const double*__restrict__ concs,
+    const int*__restrict__ mats,
+          int*__restrict__ verification,
+    const int*__restrict__ n_windows,
+    const double*__restrict__ pseudo_K0RS,
+    const Window*__restrict__ windows,
+    const Pole*__restrict__ poles,
+    int n_lookups,
+    int input_doppler,
+    int input_numL,
+    int max_num_windows,
     int max_num_poles,
     int max_num_nucs ) {
 
@@ -50,7 +49,8 @@ __global__ void lookup (
     double macro_xs_vector[4] = {0};
 
     // Perform macroscopic Cross Section Lookup
-    calculate_macro_xs( macro_xs_vector, mat, p_energy, 
+    calculate_macro_xs(
+        macro_xs_vector, mat, p_energy, 
         input_doppler, //in, 
         input_numL,
         num_nucs, mats, 
@@ -79,106 +79,101 @@ __global__ void lookup (
 
 void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vhash_result, double * kernel_init_time )
 {
+  printf("Beginning event based simulation...\n");
 
   // Let's create an extra verification array to reduce manually later on
   printf("Allocating an additional %.1lf MB of memory for verification arrays...\n", in.lookups * sizeof(int) /1024.0/1024.0);
   int * verification_host = (int *) malloc(in.lookups * sizeof(int));
 
-  // Timers
-  double start = get_time();
-  double stop;
-
   // Scope here is important, as when we exit this blocl we will automatically sync with device
   // to ensure all work is done and that we can read from verification_host array.
-  {
-    // create a queue using the default device for the platform (cpu, gpu)
+  
+  // create a queue using the default device for the platform (cpu, gpu)
 
-    cudaDeviceProp devProp;
-    cudaGetDeviceProperties(&devProp, 0);
-    printf("Running on: %s\n", devProp.name);
-    printf("Initializing device buffers and JIT compiling kernel...\n");
+  cudaDeviceProp devProp;
+  cudaGetDeviceProperties(&devProp, 0);
+  printf("Running on: %s\n", devProp.name);
+  printf("Initializing device buffers and JIT compiling kernel...\n");
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Create Device Buffers
-    ////////////////////////////////////////////////////////////////////////////////
-    int *verification_d = nullptr;
-    int *mats_d = nullptr ;
-    int *num_nucs_d = nullptr;
-    int *n_windows_d = nullptr;
-    double *concs_d = nullptr;
-    double *pseudo_K0RS_d = nullptr;
-    Window *windows_d = nullptr;
-    Pole *poles_d = nullptr;
+  ////////////////////////////////////////////////////////////////////////////////
+  // Create Device Buffers
+  ////////////////////////////////////////////////////////////////////////////////
+  int *verification_d = nullptr;
+  int *mats_d = nullptr ;
+  int *num_nucs_d = nullptr;
+  int *n_windows_d = nullptr;
+  double *concs_d = nullptr;
+  double *pseudo_K0RS_d = nullptr;
+  Window *windows_d = nullptr;
+  Pole *poles_d = nullptr;
 
-    // assign SYCL buffer to existing memory
-    //buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
-    cudaMalloc((void**)&num_nucs_d, sizeof(int) * SD.length_num_nucs);
-    cudaMemcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs, cudaMemcpyHostToDevice);
+  // assign SYCL buffer to existing memory
+  //buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
+  cudaMalloc((void**)&num_nucs_d, sizeof(int) * SD.length_num_nucs);
+  cudaMemcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs, cudaMemcpyHostToDevice);
 
-    //buffer<double, 1> concs_d(SD.concs, SD.length_concs);
-    cudaMalloc((void**)&concs_d, sizeof(double) * SD.length_concs);
-    cudaMemcpy(concs_d, SD.concs, sizeof(double) * SD.length_concs, cudaMemcpyHostToDevice);
+  //buffer<double, 1> concs_d(SD.concs, SD.length_concs);
+  cudaMalloc((void**)&concs_d, sizeof(double) * SD.length_concs);
+  cudaMemcpy(concs_d, SD.concs, sizeof(double) * SD.length_concs, cudaMemcpyHostToDevice);
 
-    //buffer<int, 1> mats_d(SD.mats, SD.length_mats);
-    cudaMalloc((void**)&mats_d, sizeof(int) * SD.length_mats);
-    cudaMemcpy(mats_d, SD.mats, sizeof(int) * SD.length_mats, cudaMemcpyHostToDevice);
+  //buffer<int, 1> mats_d(SD.mats, SD.length_mats);
+  cudaMalloc((void**)&mats_d, sizeof(int) * SD.length_mats);
+  cudaMemcpy(mats_d, SD.mats, sizeof(int) * SD.length_mats, cudaMemcpyHostToDevice);
 
-    //buffer<int, 1> n_windows_d(SD.n_windows, SD.length_n_windows);
-    cudaMalloc((void**)&n_windows_d, sizeof(int) * SD.length_n_windows);
-    cudaMemcpy(n_windows_d, SD.n_windows, sizeof(int) * SD.length_n_windows, cudaMemcpyHostToDevice);
+  //buffer<int, 1> n_windows_d(SD.n_windows, SD.length_n_windows);
+  cudaMalloc((void**)&n_windows_d, sizeof(int) * SD.length_n_windows);
+  cudaMemcpy(n_windows_d, SD.n_windows, sizeof(int) * SD.length_n_windows, cudaMemcpyHostToDevice);
 
-    //buffer<Pole, 1> poles_d(SD.poles, SD.length_poles);
-    cudaMalloc((void**)&poles_d, sizeof(Pole) * SD.length_poles);
-    cudaMemcpy(poles_d, SD.poles, sizeof(Pole) * SD.length_poles, cudaMemcpyHostToDevice);
+  //buffer<Pole, 1> poles_d(SD.poles, SD.length_poles);
+  cudaMalloc((void**)&poles_d, sizeof(Pole) * SD.length_poles);
+  cudaMemcpy(poles_d, SD.poles, sizeof(Pole) * SD.length_poles, cudaMemcpyHostToDevice);
 
-    //buffer<Window, 1> windows_d(SD.windows, SD.length_windows);
-    cudaMalloc((void**)&windows_d, sizeof(Window) * SD.length_windows);
-    cudaMemcpy(windows_d, SD.windows, sizeof(Window) * SD.length_windows, cudaMemcpyHostToDevice);
-    //buffer<double, 1> pseudo_K0RS_d(SD.pseudo_K0RS, SD.length_pseudo_K0RS);
-    cudaMalloc((void**)&pseudo_K0RS_d, sizeof(double) * SD.length_pseudo_K0RS);
-    cudaMemcpy(pseudo_K0RS_d, SD.pseudo_K0RS, sizeof(double) * SD.length_pseudo_K0RS, cudaMemcpyHostToDevice);
+  //buffer<Window, 1> windows_d(SD.windows, SD.length_windows);
+  cudaMalloc((void**)&windows_d, sizeof(Window) * SD.length_windows);
+  cudaMemcpy(windows_d, SD.windows, sizeof(Window) * SD.length_windows, cudaMemcpyHostToDevice);
+  //buffer<double, 1> pseudo_K0RS_d(SD.pseudo_K0RS, SD.length_pseudo_K0RS);
+  cudaMalloc((void**)&pseudo_K0RS_d, sizeof(double) * SD.length_pseudo_K0RS);
+  cudaMemcpy(pseudo_K0RS_d, SD.pseudo_K0RS, sizeof(double) * SD.length_pseudo_K0RS, cudaMemcpyHostToDevice);
 
-    //buffer<int, 1> verification_d(verification_host, in.lookups);
-    cudaMalloc((void**)&verification_d, sizeof(int) * in.lookups);
-    cudaMemcpy(verification_d, verification_host, sizeof(int) * in.lookups, cudaMemcpyHostToDevice);
+  //buffer<int, 1> verification_d(verification_host, in.lookups);
+  cudaMalloc((void**)&verification_d, sizeof(int) * in.lookups);
+  cudaMemcpy(verification_d, verification_host, sizeof(int) * in.lookups, cudaMemcpyHostToDevice);
 
+  double start = get_time();
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // XS Lookup Simulation Loop
-    ////////////////////////////////////////////////////////////////////////////////
-    lookup<<< dim3((in.lookups + 255) / 256), dim3(256) >>> (
-        num_nucs_d, 
-        concs_d, 
-        mats_d, 
-        verification_d, 
-        n_windows_d, 
-        pseudo_K0RS_d,
-        windows_d,
-        poles_d,
-        in.lookups, 
-        in.doppler,
-        in.numL,
-        SD.max_num_windows,
-        SD.max_num_poles,
-        SD.max_num_nucs 
-        );
+  ////////////////////////////////////////////////////////////////////////////////
+  // XS Lookup Simulation Loop
+  ////////////////////////////////////////////////////////////////////////////////
+  lookup<<< dim3((in.lookups + 255) / 256), dim3(256) >>> (
+      num_nucs_d, 
+      concs_d, 
+      mats_d, 
+      verification_d, 
+      n_windows_d, 
+      pseudo_K0RS_d,
+      windows_d,
+      poles_d,
+      in.lookups, 
+      in.doppler,
+      in.numL,
+      SD.max_num_windows,
+      SD.max_num_poles,
+      SD.max_num_nucs );
 
-    stop = get_time();
-    printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
-    printf("Beginning event based simulation...\n");
+  cudaDeviceSynchronize();
+  double stop = get_time();
+  printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
 
-    cudaMemcpy(verification_host, verification_d, sizeof(int) * in.lookups, cudaMemcpyDeviceToHost);
+  cudaMemcpy(verification_host, verification_d, sizeof(int) * in.lookups, cudaMemcpyDeviceToHost);
 
-    cudaFree(verification_d);
-    cudaFree(mats_d);
-    cudaFree(num_nucs_d);
-    cudaFree(concs_d);
-    cudaFree(n_windows_d);
-    cudaFree(windows_d);
-    cudaFree(poles_d);
-    cudaFree(pseudo_K0RS_d);
-
-  }
+  cudaFree(verification_d);
+  cudaFree(mats_d);
+  cudaFree(num_nucs_d);
+  cudaFree(concs_d);
+  cudaFree(n_windows_d);
+  cudaFree(windows_d);
+  cudaFree(poles_d);
+  cudaFree(pseudo_K0RS_d);
 
   // Host reduces the verification array
   unsigned long long verification_scalar = 0;
@@ -190,8 +185,18 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
 }
 
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
-  __device__
-void calculate_macro_xs( double * macro_xs, int mat, double E, int input_doppler, int input_numL, INT_T num_nucs, INT_T mats, int max_num_nucs, DOUBLE_T concs, INT_T n_windows, DOUBLE_T pseudo_K0Rs, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles ) 
+__device__
+void calculate_macro_xs(double * macro_xs, int mat, double E,
+                        int input_doppler, int input_numL,
+                        INT_T num_nucs, INT_T mats,
+                        int max_num_nucs,
+                        DOUBLE_T concs,
+                        INT_T n_windows,
+                        DOUBLE_T pseudo_K0Rs,
+                        WINDOW_T windows,
+                        POLE_T poles,
+                        int max_num_windows,
+                        int max_num_poles ) 
 {
   // zero out macro vector
   for( int i = 0; i < 4; i++ )
@@ -228,8 +233,10 @@ void calculate_macro_xs( double * macro_xs, int mat, double E, int input_doppler
 
 // No Temperature dependence (i.e., 0K evaluation)
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
-  __device__
-void calculate_micro_xs( double * micro_xs, int nuc, double E, int input_numL, INT_T n_windows, DOUBLE_T pseudo_K0RS, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles)
+__device__
+void calculate_micro_xs(double * micro_xs, int nuc, double E, int input_numL,
+                        INT_T n_windows, DOUBLE_T pseudo_K0RS, WINDOW_T windows,
+                        POLE_T poles, int max_num_windows, int max_num_poles)
 {
   // MicroScopic XS's to Calculate
   double sigT;
@@ -281,8 +288,11 @@ void calculate_micro_xs( double * micro_xs, int nuc, double E, int input_numL, I
 // (This involves using the Complex Faddeeva function to
 // Doppler broaden the poles within the window)
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
-  __device__
-void calculate_micro_xs_doppler( double * micro_xs, int nuc, double E, int input_numL, INT_T n_windows, DOUBLE_T pseudo_K0RS, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles )
+__device__
+void calculate_micro_xs_doppler(double * micro_xs, int nuc, double E,
+                                int input_numL, INT_T n_windows,
+                                DOUBLE_T pseudo_K0RS, WINDOW_T windows,
+                                POLE_T poles, int max_num_windows, int max_num_poles )
 {
   // MicroScopic XS's to Calculate
   double sigT;
@@ -336,7 +346,7 @@ void calculate_micro_xs_doppler( double * micro_xs, int nuc, double E, int input
 }
 
 // picks a material based on a probabilistic distribution
-  __device__
+__device__
 int pick_mat( uint64_t * seed )
 {
   // I have a nice spreadsheet supporting these numbers. They are
@@ -374,7 +384,7 @@ int pick_mat( uint64_t * seed )
 }
 
 template <class DOUBLE_T>
-  __device__
+__device__
 void calculate_sig_T( int nuc, double E, int input_numL, DOUBLE_T pseudo_K0RS, RSComplex * sigTfactors )
 {
   double phi;
@@ -400,7 +410,7 @@ void calculate_sig_T( int nuc, double E, int input_numL, DOUBLE_T pseudo_K0RS, R
 // This function uses a combination of the Abrarov Approximation
 // and the QUICK_W three term asymptotic expansion.
 // Only expected to use Abrarov ~0.5% of the time.
-  __device__
+__device__
 RSComplex fast_nuclear_W( RSComplex Z )
 {
   // Abrarov 
@@ -484,7 +494,7 @@ RSComplex fast_nuclear_W( RSComplex Z )
   }
 }
 
-  __host__ __device__
+__host__ __device__
 double LCG_random_double(uint64_t * seed)
 {
   const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -503,7 +513,7 @@ uint64_t LCG_random_int(uint64_t * seed)
   return *seed;
 }  
 
-  __device__
+__device__
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
   const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -533,7 +543,7 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 
 // Complex arithmetic functions
 
-  __device__
+__device__
 RSComplex c_add( RSComplex A, RSComplex B)
 {
   RSComplex C;
@@ -542,7 +552,7 @@ RSComplex c_add( RSComplex A, RSComplex B)
   return C;
 }
 
-  __device__
+__device__
 RSComplex c_sub( RSComplex A, RSComplex B)
 {
   RSComplex C;
@@ -551,7 +561,7 @@ RSComplex c_sub( RSComplex A, RSComplex B)
   return C;
 }
 
-  __host__ __device__
+__host__ __device__
 RSComplex c_mul( RSComplex A, RSComplex B)
 {
   double a = A.r;
@@ -564,7 +574,7 @@ RSComplex c_mul( RSComplex A, RSComplex B)
   return C;
 }
 
-  __device__
+__device__
 RSComplex c_div( RSComplex A, RSComplex B)
 {
   double a = A.r;
@@ -578,7 +588,7 @@ RSComplex c_div( RSComplex A, RSComplex B)
   return C;
 }
 
-  __device__
+__device__
 double c_abs( RSComplex A)
 {
   return sqrt(A.r*A.r + A.i * A.i);
@@ -591,7 +601,7 @@ double c_abs( RSComplex A)
 // We use our own to avoid small differences in compiler specific
 // exp() intrinsic implementations that make it difficult to verify
 // if the code is working correctly or not.
-  __device__
+__device__
 double fast_exp(double x)
 {
   x = 1.0 + x * 0.000244140625;
@@ -604,7 +614,7 @@ double fast_exp(double x)
 // Implementation based on:
 // z = x + iy
 // cexp(z) = e^x * (cos(y) + i * sin(y))
-  __device__
+__device__
 RSComplex fast_cexp( RSComplex z )
 {
   double x = z.r;
