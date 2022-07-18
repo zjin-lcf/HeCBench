@@ -72,7 +72,7 @@ void RunBenchmark(OptionParser &op)
   printf("Total time %lf secs \n", total_time / 1.0e6);
 }
 
-template <class real>
+  template <class real>
 void RunTest(string testName, OptionParser &op)
 {
   // Number of grid points (specified in header file)
@@ -152,217 +152,215 @@ void RunTest(string testName, OptionParser &op)
                                   EG[0:EG_SIZE*n]) \
                         map(from: WDOT[0:WDOT_SIZE*n])
   {
+    auto start = std::chrono::high_resolution_clock::now();
 
-  for (unsigned int i = 0; i < passes; i++)
-  {
-    //  ratt_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, tconv);
+    for (unsigned int i = 0; i < passes; i++)
+    {
+      //  ratt_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt.h"
-    }
+      }
 
-    //rdsmh_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_eg, tconv);
+      //rdsmh_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "rdsmh.h"
-        }
+      }
 
-    // gr_base <<< dim3(blks2), dim3(thrds2), 0, s2 >>> ( gpu_p, gpu_t, gpu_y, gpu_c, tconv, pconv);
+      // gr_base <<< dim3(blks2), dim3(thrds2), 0, s2 >>> ( gpu_p, gpu_t, gpu_y, gpu_c, tconv, pconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "gr_base.h"
-        }
+      }
 
-    //  ratt2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
+      //  ratt2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt2.h"
-        }
+      }
 
-
-    //ratt3_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
+      //ratt3_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt3.h"
-        }
+      }
 
-    //ratt4_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
-
+      //ratt4_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt4.h"
-        }
+      }
 
-    //ratt5_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
-
+      //ratt5_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt5.h"
-        }
+      }
 
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt6.h"
-        }
-    //  ratt7_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
+      }
+      //  ratt7_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt7.h"
-        }
-    //ratt8_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
+      }
+      //ratt8_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt8.h"
-        }
-    //ratt9_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
+      }
+      //ratt9_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, gpu_rb, gpu_eg, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt9.h"
-        }
-    //ratt10_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rklow, tconv);
+      }
+      //ratt10_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rklow, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds2)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratt10.h"
-        }
+      }
 
-    //ratx_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_t, gpu_c, gpu_rf, gpu_rb, gpu_rklow, tconv);
+      //ratx_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_t, gpu_c, gpu_rf, gpu_rb, gpu_rklow, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratx.h"
-        }
+      }
 
-    //ratxb_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_t, gpu_c, gpu_rf, gpu_rb, gpu_rklow, tconv);
+      //ratxb_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_t, gpu_c, gpu_rf, gpu_rb, gpu_rklow, tconv);
 #pragma omp target teams distribute parallel for thread_limit(thrds)
-    for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
 #include "ratxb.h"
-        }
+      }
 
-    //ratx2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_c, gpu_rf, gpu_rb);
+      //ratx2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_c, gpu_rf, gpu_rb);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "ratx2.h"
-	    }
-    }
+        }
+      }
 
-    //ratx4_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_c, gpu_rf, gpu_rb);
+      //ratx4_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_c, gpu_rf, gpu_rb);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "ratx4.h"
-	    }
-    }
+        }
+      }
 
-    //qssa_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
+      //qssa_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "qssa.h"
-	    }
-    }
+        }
+      }
 
-
-    //qssab_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
+      //qssab_kernel <<< dim3(blks), dim3(thrds), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "qssab.h"
-	    }
-    }
-    //qssa2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
+        }
+      }
+      //qssa2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_a);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "qssa2.h"
-	    }
-    }
+        }
+      }
 
-    //  rdwdot_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //  rdwdot_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot.h"
-	    }
-    }
+        }
+      }
 
-
-    //  rdwdot2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //  rdwdot2_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot2.h"
-	    }
-    }
+        }
+      }
 
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot3.h"
-	    }
-    }
+        }
+      }
 
-    //rdwdot6_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //rdwdot6_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot6.h"
-	    }
-    }
+        }
+      }
 
-    //  rdwdot7_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //  rdwdot7_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot7.h"
-	    }
-    }
+        }
+      }
 
-    //rdwdot8_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //rdwdot8_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot8.h"
-	    }
-    }
+        }
+      }
 
-   //  rdwdot9_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      //  rdwdot9_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot9.h"
-	    }
-    }
+        }
+      }
 
-    // rdwdot10_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
+      // rdwdot10_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_rf, gpu_rb, gpu_wdot, rateconv, gpu_molwt);
 #pragma omp target teams num_teams(n/thrds2) thread_limit(thrds2)
-    {
+      {
 #pragma omp parallel
-	    {
+        {
 #include "rdwdot10.h"
-	    }
+        }
+      }
+      // Approximately 10k flops per grid point (estimated by Ramanan)
     }
-    // Approximately 10k flops per grid point (estimated by Ramanan)
-  }
-
+    auto end  = std::chrono::high_resolution_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    printf("\nAverage time of executing s3d kernels: %lf (us)\n", (time * 1e-3) / passes);
   }
 
   // Print out answers for verification
   for (int i=0; i<WDOT_SIZE; i++) {
-      printf("% 23.16E ", WDOT[i*n]);
-      if (i % 3 == 2)
-          printf("\n");
+    printf("% 23.16E ", WDOT[i*n]);
+    if (i % 3 == 2)
+      printf("\n");
   }
   printf("\n");
 

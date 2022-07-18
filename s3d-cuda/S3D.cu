@@ -98,7 +98,7 @@ void RunBenchmark(OptionParser &op)
   printf("Total time %lf secs \n", total_time / 1.0e6);
 }
 
-  template <class real>
+template <class real>
 void RunTest(string testName, OptionParser &op)
 {
   // Number of grid points (specified in header file)
@@ -203,6 +203,10 @@ void RunTest(string testName, OptionParser &op)
         cudaMemcpyHostToDevice, 0));
 
   unsigned int passes = op.getOptionInt("passes");
+
+  cudaDeviceSynchronize();
+  auto start  = std::chrono::high_resolution_clock::now();
+
   for (unsigned int i = 0; i < passes; i++)
   {
     ratt_kernel <<< dim3(blks2), dim3(thrds2) >>> ( gpu_t, gpu_rf, tconv);
@@ -258,6 +262,12 @@ void RunTest(string testName, OptionParser &op)
     rdwdot10_kernel <<< dim3(blks2), dim3(thrds2) >>> ( gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
   }
+
+  cudaDeviceSynchronize();
+  auto end  = std::chrono::high_resolution_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("\nAverage time of executing s3d kernels: %lf (us)\n", (time * 1e-3) / passes);
+
   // Copy back result
   CUDA_SAFE_CALL(cudaMemcpy(host_wdot, gpu_wdot,
         WDOT_SIZE * n * sizeof(real), cudaMemcpyDeviceToHost));
