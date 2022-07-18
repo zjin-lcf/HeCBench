@@ -2,30 +2,36 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 #include "rand_helpers.h"
 #include "constants.h"
 
 void Hadamard4x4a(float &p, float &q, float &r, float &s)
 {
-	float t = (p + q + r + s) / 2;
-	p = p - t;
-	q = q - t;
-	r = t - r;
-	s = t - s;
+  float t = (p + q + r + s) / 2;
+  p = p - t;
+  q = q - t;
+  r = t - r;
+  s = t - s;
 }
 
 void Hadamard4x4b(float &p, float &q, float &r, float &s)
 {
-	float t = (p + q + r + s) / 2;
-	p = t - p;
-	q = t - q;
-	r = r - t;
-	s = s - t;
+  float t = (p + q + r + s) / 2;
+  p = t - p;
+  q = t - q;
+  r = r - t;
+  s = s - t;
 }
 
-int main() 
-{
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   // host buffers
   float *hostPool = (float *) malloc(4 * WALLACE_TOTAL_POOL_SIZE);
   for (unsigned i = 0; i < WALLACE_TOTAL_POOL_SIZE; i++)
@@ -57,7 +63,9 @@ int main()
   range<1> rng_wallace_threads(WALLACE_NUM_THREADS);
   const unsigned m_seed = 1;
   
-  for (int i = 0; i < 100; i++) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &h) {
       auto globalPool = devPool.get_access<sycl_read_write>(h);
       auto generatedRandomNumberPool = device_randomNumbers.get_access<sycl_write>(h);
@@ -84,7 +92,6 @@ int main()
         // Loop generating generatedRandomNumberPools repeatedly
         for (unsigned loop = 0; loop < WALLACE_NUM_OUTPUTS_PER_RUN; loop++)
         {
-
           t_seed = (1664525U * t_seed + 1013904223U) & 0xFFFFFFFF;
 
           unsigned intermediate_address = mul24(loop, 8 * WALLACE_TOTAL_NUM_THREADS) + 
@@ -147,19 +154,23 @@ int main()
           globalPool[offset + lid + WALLACE_NUM_THREADS * i] = pool[lid + WALLACE_NUM_THREADS * i];
       });
     });
+  }
 
-    q.submit([&] (handler &h) {
-      auto d_rng_acc = device_randomNumbers.get_access<sycl_read>(h);
-      h.copy(d_rng_acc, randomNumbers);
-    });
-    q.wait();
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", time * 1e-9f / repeat);
+
+  q.submit([&] (handler &h) {
+    auto d_rng_acc = device_randomNumbers.get_access<sycl_read>(h);
+    h.copy(d_rng_acc, randomNumbers);
+  }).wait();
 
 #ifdef DEBUG
-    // random numbers are different for each i iteration 
-    for (unsigned int n = 0; n < WALLACE_OUTPUT_SIZE; n++) 
-    	printf("%.3f\n", randomNumbers[n]);
+  // random numbers are different for each i iteration 
+  for (unsigned int n = 0; n < WALLACE_OUTPUT_SIZE; n++) 
+    printf("%.3f\n", randomNumbers[n]);
 #endif
-  }
   
   free(rngChi2Corrections);
   free(randomNumbers);
