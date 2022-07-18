@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 #include "reference.h"
 
@@ -24,18 +25,26 @@ inline unsigned int getFirstSetBitPos(int n)
 
 int main( int argc, char** argv)
 {
-  const int numBlocks = 128;
-  const int numThreadsPerBlock = 64;
+  if (argc != 4) {
+    printf("Usage: %s <number of work-groups> ", argv[0]);
+    printf("<work-group size> <repeat>\n");
+    return 1;
+  }
+  const int nwg = atoi(argv[1]);
+  const int wgs = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  double *result = (double*) malloc (sizeof(double) * numBlocks);
+  double *result = (double*) malloc (sizeof(double) * nwg);
 
   double d_sum;
   double a = A;
   double b = B;
-  #pragma omp target data map (from: result[0:numBlocks])
+  #pragma omp target data map (from: result[0:nwg])
   {
-    for (int i = 0; i < 1; i++) {
-      #pragma omp target teams num_teams(numBlocks) thread_limit(numThreadsPerBlock) 
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target teams num_teams(nwg) thread_limit(wgs) 
       {
         double smem[ROW_SIZE * 64];
         #pragma omp parallel
@@ -96,10 +105,14 @@ int main( int argc, char** argv)
           }
         }
       }
-      #pragma omp target update from (result[0:numBlocks])
+      #pragma omp target update from (result[0:nwg])
       d_sum = 0.0;
-      for(int k = 0; k < numBlocks; k++) d_sum += result[k];
+      for(int k = 0; k < nwg; k++) d_sum += result[k];
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", time * 1e-9f / repeat);
   }
 
   // verify
@@ -109,4 +122,3 @@ int main( int argc, char** argv)
   free(result);
   return 0;
 }
-

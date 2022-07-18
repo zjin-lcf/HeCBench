@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "reference.h"
 
@@ -80,24 +81,41 @@ __global__ void romberg(double a, double b, double *result)
 
 int main( int argc, char** argv)
 {
-  const int numBlocks = 128;
-  const int numThreadsPerBlock = 64;
+  if (argc != 4) {
+    printf("Usage: %s <number of work-groups> ", argv[0]);
+    printf("<work-group size> <repeat>\n");
+    return 1;
+  }
+  const int nwg = atoi(argv[1]);
+  const int wgs = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  double *h_result = (double*) malloc (sizeof(double) * numBlocks);
+  const int result_size_byte = nwg * sizeof(double);
+  double *h_result = (double*) malloc (result_size_byte);
 
   double *d_result;
-  hipMalloc( (void**) &d_result, numBlocks*sizeof(double) );
+  hipMalloc((void**) &d_result, result_size_byte);
 
-  double sum;
-  for (int i = 0; i < 100; i++) {
-    hipLaunchKernelGGL(romberg, dim3(numBlocks), dim3(numThreadsPerBlock), 
-                       ROW_SIZE*numThreadsPerBlock*sizeof(double) , 0, A,B,d_result);
-    hipMemcpy( h_result, d_result, numBlocks*sizeof(double), hipMemcpyDeviceToHost );
-    sum = 0.0;
-    for(int k = 0; k < numBlocks; k++) sum += h_result[k];
+  dim3 grids (nwg);
+  dim3 blocks (wgs);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    romberg <<< grids, blocks, ROW_SIZE*wgs*sizeof(double) >>> (A,B,d_result);
   }
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", time * 1e-9f / repeat);
+
   // verify
+
+  hipMemcpy(h_result, d_result, result_size_byte, hipMemcpyDeviceToHost);
+  double sum = 0.0;
+  for(int k = 0; k < nwg; k++) sum += h_result[k];
+
   double ref_sum = reference(f, A, B, ROW_SIZE, EPS);
   printf("%s\n", (fabs(sum - ref_sum) > EPS) ? "FAIL" : "PASS");
 
@@ -105,4 +123,3 @@ int main( int argc, char** argv)
   free(h_result);
   return 0;
 }
-
