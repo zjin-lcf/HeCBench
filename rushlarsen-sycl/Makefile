@@ -74,4 +74,3 @@ clean:
 
 run: $(program)
 	./$(program) 100 10000
-
