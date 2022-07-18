@@ -53,5 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) coins.bmp coin.bmp
-
+	./$(program) coins.bmp coin.bmp 100

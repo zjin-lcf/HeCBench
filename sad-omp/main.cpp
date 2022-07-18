@@ -11,16 +11,19 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 void compute_sad_array(
-                    int*__restrict__ sad_array,
-    const unsigned char*__restrict__ image,
-    const unsigned char*__restrict__ kernel,
+                    int*__restrict sad_array,
+    const unsigned char*__restrict image,
+    const unsigned char*__restrict kernel,
     int sad_array_size,
     int& min_mse,
     int& num_occurrences,
     int image_width, int image_height,
     int kernel_width, int kernel_height,
-    int kernel_size)
+    int kernel_size,
+    double &kernel_time)
 {
+  auto kbegin = std::chrono::steady_clock::now();
+
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(BLOCK_SIZE)
   for (int row = 0; row < image_height; row++) {
     for (int col = 0; col < image_width; col++) {
@@ -66,18 +69,22 @@ void compute_sad_array(
     if (sad_array[i] == m) n++;
   }
 
+  auto kend = std::chrono::steady_clock::now();
+  kernel_time += std::chrono::duration_cast<std::chrono::milliseconds> (kend - kbegin).count();
+
   min_mse = m;
   num_occurrences = n;
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    std::cerr << "Usage: ./main <image> <template image>\n";
+  if (argc != 4) {
+    std::cerr << "Usage: ./main <image> <template image> <repeat>\n";
     return 1;
   }
 
   bitmap_image main_image(argv[1]);
   bitmap_image template_image(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   const int main_width = main_image.width();
   const int main_height = main_image.height();
@@ -125,28 +132,32 @@ int main(int argc, char* argv[]) {
                                   h_template_image[0:3*template_size]) \
                           map(alloc: h_sad_array[0:sad_array_size])
   {
-
     // Measure device execution time
+    double kernel_time = 0.0;
+
     auto begin = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < repeat; i++) {
 
       compute_sad_array(
           h_sad_array, h_main_image, h_template_image, sad_array_size, 
           h_min_mse, h_num_occurances,
-          main_width, main_height, template_width, template_height, template_size);
+          main_width, main_height,
+          template_width, template_height, template_size,
+          kernel_time);
     }
 
     auto end = std::chrono::steady_clock::now();
     elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count();
-  }
 
-  std::cout << "Parallel Computation Results: " << std::endl;
-  std::cout << "Elapsed time in msec = " << elapsed_time << std::endl; 
-  std::cout << "Main Image Dimensions: " << main_width << "*" << main_height << std::endl;
-  std::cout << "Template Image Dimensions: " << template_width << "*" << template_height << std::endl;
-  std::cout << "Found Minimum:  " << h_min_mse << std::endl;
-  std::cout << "Number of Occurances: " << h_num_occurances << std::endl;
+    std::cout << "Parallel Computation Results: " << std::endl;
+    std::cout << "Kernel time in msec: " << kernel_time << std::endl; 
+    std::cout << "Elapsed time in msec = " << elapsed_time << std::endl; 
+    std::cout << "Main Image Dimensions: " << main_width << "*" << main_height << std::endl;
+    std::cout << "Template Image Dimensions: " << template_width << "*" << template_height << std::endl;
+    std::cout << "Found Minimum:  " << h_min_mse << std::endl;
+    std::cout << "Number of Occurances: " << h_num_occurances << std::endl;
+  }
 
   delete[] h_main_image;
   delete[] h_template_image;
