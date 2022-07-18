@@ -185,6 +185,10 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
   buffer<real, 1> gpu_eg (EG_SIZE*n);
 
   unsigned int passes = op.getOptionInt("passes");
+
+  q.wait();
+  auto start  = std::chrono::high_resolution_clock::now();
+
   for (unsigned int i = 0; i < passes; i++)
   {
     //  ratt_kernel <<< dim3(blks2), dim3(thrds2), 0, s1 >>> ( gpu_t, gpu_rf, tconv);
@@ -468,7 +472,11 @@ void RunTest(string testName, cl::sycl::queue &q, OptionParser &op)
 
     // Approximately 10k flops per grid point (estimated by Ramanan)
   }
+
   q.wait();
+  auto end  = std::chrono::high_resolution_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("\nAverage time of executing s3d kernels: %lf (us)\n", (time * 1e-3) / passes);
 
   }
 

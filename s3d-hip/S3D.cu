@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <hip/hip_runtime.h>
+#include "hipcommon.h"
 #include "OptionParser.h"
 #include "S3D.h"
 #include "gr_base.h"
@@ -97,7 +98,7 @@ void RunBenchmark(OptionParser &op)
   printf("Total time %lf secs \n", total_time / 1.0e6);
 }
 
-  template <class real>
+template <class real>
 void RunTest(string testName, OptionParser &op)
 {
   // Number of grid points (specified in header file)
@@ -131,11 +132,11 @@ void RunTest(string testName, OptionParser &op)
   real* gpu_molwt;
 
   // Malloc host memory
-  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_t,        n*sizeof(real)));
-  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_p,        n*sizeof(real)));
-  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_y, Y_SIZE*n*sizeof(real)));
-  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_wdot,WDOT_SIZE*n*sizeof(real)));
-  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_molwt,WDOT_SIZE*sizeof(real)));
+  CUDA_SAFE_CALL(hipMallocHost((void**)&host_t,        n*sizeof(real)));
+  CUDA_SAFE_CALL(hipMallocHost((void**)&host_p,        n*sizeof(real)));
+  CUDA_SAFE_CALL(hipMallocHost((void**)&host_y, Y_SIZE*n*sizeof(real)));
+  CUDA_SAFE_CALL(hipMallocHost((void**)&host_wdot,WDOT_SIZE*n*sizeof(real)));
+  CUDA_SAFE_CALL(hipMallocHost((void**)&host_molwt,WDOT_SIZE*sizeof(real)));
 
   // Initialize Test Problem
 
@@ -191,7 +192,6 @@ void RunTest(string testName, OptionParser &op)
   dim3 thrds2(BLOCK_SIZE2,1,1);
   dim3 blks2(n / BLOCK_SIZE2,1,1);
 
-
   // Download of gpu_t, gpu_p, gpu_y, gpu_molwt
   CUDA_SAFE_CALL(hipMemcpyAsync(gpu_t, host_t, n*sizeof(real),
         hipMemcpyHostToDevice, 0));
@@ -203,61 +203,71 @@ void RunTest(string testName, OptionParser &op)
         hipMemcpyHostToDevice, 0));
 
   unsigned int passes = op.getOptionInt("passes");
+
+  hipDeviceSynchronize();
+  auto start  = std::chrono::high_resolution_clock::now();
+
   for (unsigned int i = 0; i < passes; i++)
   {
-    hipLaunchKernelGGL(ratt_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, tconv);
+    hipLaunchKernelGGL(ratt_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, tconv);
 
-    hipLaunchKernelGGL(rdsmh_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_eg, tconv);
+    hipLaunchKernelGGL(rdsmh_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_eg, tconv);
 
-    hipLaunchKernelGGL(gr_base, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_p, gpu_t, gpu_y,
+    hipLaunchKernelGGL(gr_base, dim3(blks2), dim3(thrds2), 0, 0,  gpu_p, gpu_t, gpu_y,
         gpu_c, tconv, pconv);
 
-    hipLaunchKernelGGL(ratt2_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt2_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt3_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt3_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt4_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt4_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt5_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt5_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt6_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt6_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt7_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt7_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt8_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt8_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt9_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratt9_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rf, gpu_rb,
         gpu_eg, tconv);
-    hipLaunchKernelGGL(ratt10_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_t, gpu_rklow, tconv);
+    hipLaunchKernelGGL(ratt10_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_t, gpu_rklow, tconv);
 
-    hipLaunchKernelGGL(ratx_kernel, dim3(dim3(blks)), dim3(dim3(thrds) ), 0, 0,  gpu_t, gpu_c, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratx_kernel, dim3(blks), dim3(thrds), 0, 0,  gpu_t, gpu_c, gpu_rf, gpu_rb,
         gpu_rklow, tconv);
-    hipLaunchKernelGGL(ratxb_kernel, dim3(dim3(blks)), dim3(dim3(thrds) ), 0, 0,  gpu_t, gpu_c, gpu_rf, gpu_rb,
+    hipLaunchKernelGGL(ratxb_kernel, dim3(blks), dim3(thrds), 0, 0,  gpu_t, gpu_c, gpu_rf, gpu_rb,
         gpu_rklow, tconv);
-    hipLaunchKernelGGL(ratx2_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_c, gpu_rf, gpu_rb);
-    hipLaunchKernelGGL(ratx4_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_c, gpu_rf, gpu_rb);
+    hipLaunchKernelGGL(ratx2_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_c, gpu_rf, gpu_rb);
+    hipLaunchKernelGGL(ratx4_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_c, gpu_rf, gpu_rb);
 
-    hipLaunchKernelGGL(qssa_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_a);
-    hipLaunchKernelGGL(qssab_kernel, dim3(dim3(blks)), dim3(dim3(thrds) ), 0, 0,  gpu_rf, gpu_rb, gpu_a);
-    hipLaunchKernelGGL(qssa2_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_a);
+    hipLaunchKernelGGL(qssa_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_a);
+    hipLaunchKernelGGL(qssab_kernel, dim3(blks), dim3(thrds), 0, 0,  gpu_rf, gpu_rb, gpu_a);
+    hipLaunchKernelGGL(qssa2_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_a);
 
-    hipLaunchKernelGGL(rdwdot_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot2_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot2_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot3_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot3_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot6_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot6_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot7_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot7_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot8_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot8_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot9_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot9_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
-    hipLaunchKernelGGL(rdwdot10_kernel, dim3(dim3(blks2)), dim3(dim3(thrds2) ), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
+    hipLaunchKernelGGL(rdwdot10_kernel, dim3(blks2), dim3(thrds2), 0, 0,  gpu_rf, gpu_rb, gpu_wdot,
         rateconv, gpu_molwt);
   }
+
+  hipDeviceSynchronize();
+  auto end  = std::chrono::high_resolution_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("\nAverage time of executing s3d kernels: %lf (us)\n", (time * 1e-3) / passes);
+
   // Copy back result
   CUDA_SAFE_CALL(hipMemcpy(host_wdot, gpu_wdot,
         WDOT_SIZE * n * sizeof(real), hipMemcpyDeviceToHost));
@@ -281,7 +291,6 @@ void RunTest(string testName, OptionParser &op)
       printf("\n");
   }
   printf("\n");
-
 
   // Free host memory
   CUDA_SAFE_CALL(hipHostFree(host_t));
