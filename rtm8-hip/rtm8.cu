@@ -5,7 +5,6 @@
 #include <vector>
 #include <hip/hip_runtime.h>
 
-#define nt 30
 #define nx 680
 #define ny 134
 #define nz 450
@@ -66,8 +65,16 @@ void rtm8_cpu(float* vsq, float* current_s, float* current_r, float* next_s, flo
 }
   
 
- __global__ void
-rtm8(float* vsq, float* current_s, float* current_r, float* next_s, float* next_r, float* image, float* a, size_t N)
+__global__
+void rtm8(
+  const float*__restrict__ vsq,
+  const float*__restrict__ current_s,
+  const float*__restrict__ current_r,
+        float*__restrict__ next_s,
+        float*__restrict__ next_r,
+        float*__restrict__ image,
+  const float*__restrict__ a,
+  size_t N)
 {
   unsigned x = blockIdx.x * blockDim.x + threadIdx.x;
   unsigned y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -114,7 +121,13 @@ rtm8(float* vsq, float* current_s, float* current_r, float* next_s, float* next_
 }
 
 
-int main() {
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   const int ArraySize = nx * ny * nz;
   float* next_s = (float*)malloc(ArraySize * sizeof(float));
   float* current_s = (float*)malloc(ArraySize * sizeof(float));
@@ -125,15 +138,14 @@ int main() {
   float* image_cpu = (float*)malloc(ArraySize * sizeof(float));
 
   float a[5];
-  double pts, t0, t1, dt, flops, pt_rate, flop_rate, speedup, memory;
+  double pts, t0, t1, k0, k1, dt, flops, pt_rate, flop_rate, speedup, memory;
 
   memory = ArraySize*sizeof(float)*6;
-  pts = nt;
-  pts = pts*(nx-8)*(ny-8)*(nz-8);
+  pts = (double)repeat*(nx-8)*(ny-8)*(nz-8);
   flops = 67*pts;
-  printf("memory (MB) = %f\n", memory/1e6);
-  printf("pts (billions) = %f\n", pts/1e9);
-  printf("Tflops = %f\n", flops/1e12);
+  printf("memory (MB) = %lf\n", memory/1e6);
+  printf("pts (billions) = %lf\n", pts/1e9);
+  printf("Tflops = %lf\n", flops/1e12);
 
   // Initialization of matrix
   a[0] = -1./560.;
@@ -186,36 +198,51 @@ int main() {
   int ny_pad = (ny + groupSize - 1) / groupSize ;
   int nz_pad = nz;
 
-  // Launch the kernel nt times
-  for (int t = 0; t < nt; t++) {
-    hipLaunchKernelGGL(rtm8, dim3(nx_pad, ny_pad, nz_pad), dim3(groupSize, groupSize, 1), 
-        0, 0, vsq_d, current_s_d, next_s_d, current_r_d, next_r_d, image_d, a_d, ArraySize);
+  dim3 grids (nx_pad, ny_pad, nz_pad);
+  dim3 blocks (groupSize, groupSize, 1);
+
+  k0 = mysecond();
+
+  // Launch the kernel repeatedly
+  for (int t = 0; t < repeat; t++) {
+    hipLaunchKernelGGL(rtm8, grids, blocks, 0, 0, vsq_d, current_s_d, next_s_d, current_r_d,
+                              next_r_d, image_d, a_d, ArraySize);
   }
+
+  hipDeviceSynchronize();
+  k1 = mysecond();
 
   //copy back image value
   hipMemcpy(image_gpu, image_d, ArraySize * sizeof(float), hipMemcpyDeviceToHost);
   t1 = mysecond();
   dt = t1 - t0;
 
+  // CPU execution
   t0 = mysecond();
-  for (int t = 0; t < nt; t++) {
+  for (int t = 0; t < repeat; t++) {
     rtm8_cpu(vsq, current_s, next_s, current_r, next_r, image_cpu, a, ArraySize);
   }
   t1 = mysecond();
 
   // verification
-  for (int i = 0; i < ArraySize; i++) 
+  bool ok = true;
+  for (int i = 0; i < ArraySize; i++) {
     if (fabsf(image_cpu[i] - image_gpu[i]) > 0.1) {
-      printf("@index %d cpu: %f gpu %f\n", i, image_cpu[i], image_gpu[i]);
+      printf("@index %d host: %f device %f\n", i, image_cpu[i], image_gpu[i]);
+      ok = false;
       break;
     }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   pt_rate = pts/dt;
   flop_rate = flops/dt;
-  printf("dt = %f\n", dt);
-  printf("pt_rate (millions/sec) = %f\n", pt_rate/1e6);
-  printf("flop_rate (Gflops) = %f\n", flop_rate/1e9);
-  printf("speedup over cpu = %f\n", (t1 - t0) / dt);
+  speedup = (t1 - t0) / dt;
+  printf("dt = %lf\n", dt);
+  printf("pt_rate (millions/sec) = %lf\n", pt_rate/1e6);
+  printf("flop_rate (Gflops) = %lf\n", flop_rate/1e9);
+  printf("speedup over cpu = %lf\n", speedup);
+  printf("average kernel execution time = %lf (s)\n", (k1 - k0) / repeat);
 
   //release arrays
   free(vsq);
@@ -235,4 +262,3 @@ int main() {
 
   return 0;
 }
-
