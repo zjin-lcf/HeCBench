@@ -63,7 +63,6 @@ __global__ void compute_sad_array(
   }
 }
 
-
 __global__ void find_min_in_sad_array(
     const int sad_array_size,
     const int* __restrict__ sad_array,
@@ -105,6 +104,7 @@ __global__ void get_num_of_occurrences(
           int*__restrict__ num_occurrences)
 {
   unsigned int gid = threadIdx.x + blockIdx.x * blockDim.x;
+
   __shared__ int s;
 
   if (gid < sad_array_size) {
@@ -125,13 +125,14 @@ __global__ void get_num_of_occurrences(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    std::cerr << "Usage: ./main <image> <template image>\n";
+  if (argc != 4) {
+    std::cerr << "Usage: ./main <image> <template image> <repeat>\n";
     return 1;
   }
 
   bitmap_image main_image(argv[1]);
   bitmap_image template_image(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   const int main_width = main_image.width();
   const int main_height = main_image.height();
@@ -195,27 +196,38 @@ int main(int argc, char* argv[]) {
   dim3 grids_2((unsigned int)ceil((float)sad_array_size) / BLOCK_SIZE, 1, 1);
   dim3 blocks_2(BLOCK_SIZE, 1, 1);
 
-  check(hipMemcpy(d_main_image, h_main_image, 3 * main_size * sizeof(unsigned char), hipMemcpyHostToDevice));
-  check(hipMemcpy(d_template_image, h_template_image, 3 * template_size * sizeof(unsigned char), hipMemcpyHostToDevice));
+  check(hipMemcpy(d_main_image, h_main_image,
+                   3 * main_size * sizeof(unsigned char), hipMemcpyHostToDevice));
+  check(hipMemcpy(d_template_image, h_template_image,
+                   3 * template_size * sizeof(unsigned char), hipMemcpyHostToDevice));
 
   // Measure device execution time
+  double kernel_time = 0.0;
+
   auto begin = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < repeat; i++) {
 
     h_min_mse = THRESHOLD;
     check(hipMemset(d_num_occurances, 0, sizeof(int)));
     check(hipMemcpy(d_min_mse, &h_min_mse, sizeof(int), hipMemcpyHostToDevice));
 
-    hipLaunchKernelGGL(compute_sad_array, grids, blocks, 0, 0, 
+    hipDeviceSynchronize();
+    auto kbegin = std::chrono::steady_clock::now();
+
+    hipLaunchKernelGGL(compute_sad_array, grids, blocks , 0, 0, 
         d_sad_array, d_main_image, d_template_image, sad_array_size, 
         main_width, main_height, template_width, template_height, template_size);
 
-    hipLaunchKernelGGL(find_min_in_sad_array, grids_2, blocks_2, 0, 0, 
+    hipLaunchKernelGGL(find_min_in_sad_array, grids_2, blocks_2 , 0, 0, 
         sad_array_size, d_sad_array, d_min_mse);
 
-    hipLaunchKernelGGL(get_num_of_occurrences, grids_2, blocks_2, 0, 0, 
+    hipLaunchKernelGGL(get_num_of_occurrences, grids_2, blocks_2 , 0, 0, 
         sad_array_size, d_sad_array, d_min_mse, d_num_occurances);
+
+    hipDeviceSynchronize();
+    auto kend = std::chrono::steady_clock::now();
+    kernel_time += std::chrono::duration_cast<std::chrono::milliseconds> (kend - kbegin).count();
 
     check(hipMemcpy(&h_min_mse, d_min_mse, sizeof(int), hipMemcpyDeviceToHost));
     check(hipMemcpy(&h_num_occurances, d_num_occurances, sizeof(int), hipMemcpyDeviceToHost));
@@ -225,10 +237,11 @@ int main(int argc, char* argv[]) {
   float elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count();
 
   std::cout << "Parallel Computation Results: " << std::endl;
-  std::cout << "Elapsed time in msec = " << elapsed_time << std::endl; 
+  std::cout << "Kernel time in msec: " << kernel_time << std::endl; 
+  std::cout << "Elapsed time in msec: " << elapsed_time << std::endl; 
   std::cout << "Main Image Dimensions: " << main_width << "*" << main_height << std::endl;
   std::cout << "Template Image Dimensions: " << template_width << "*" << template_height << std::endl;
-  std::cout << "Found Minimum:  " << h_min_mse << std::endl;
+  std::cout << "Found Minimum: " << h_min_mse << std::endl;
   std::cout << "Number of Occurances: " << h_num_occurances << std::endl;
 
   check(hipFree(d_main_image));

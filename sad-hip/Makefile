@@ -30,7 +30,7 @@ LDFLAGS =
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g
+  LDFLAGS += -g
 endif
 
 # Optimization Flags
@@ -52,5 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp
-
+	./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp 100

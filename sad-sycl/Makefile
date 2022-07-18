@@ -74,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp
+	./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp 100

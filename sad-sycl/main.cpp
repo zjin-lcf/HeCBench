@@ -141,13 +141,14 @@ void get_num_of_occurrences(
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    std::cerr << "Usage: ./main <image> <template image>\n";
+  if (argc != 4) {
+    std::cerr << "Usage: ./main <image> <template image> <repeat>\n";
     return 1;
   }
 
   bitmap_image main_image(argv[1]);
   bitmap_image template_image(argv[2]);
+  const int repeat = atoi(argv[3]);
 
   const int main_width = main_image.width();
   const int main_height = main_image.height();
@@ -211,11 +212,12 @@ int main(int argc, char* argv[]) {
   range<1> gws2 ((sad_array_size + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
   range<1> lws2 (BLOCK_SIZE);
 
-
   // Measure device execution time
+  double kernel_time = 0.0;
+
   auto begin = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < repeat; i++) {
     
     q.submit([&] (handler &cgh) {
       auto acc = d_num_occurances.get_access<sycl_discard_write>(cgh);
@@ -228,6 +230,9 @@ int main(int argc, char* argv[]) {
       auto acc = d_min_mse.get_access<sycl_discard_write>(cgh);
       cgh.copy(&h_min_mse, acc);
     });
+
+    q.wait();
+    auto kbegin = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto sad_array = d_sad_array.get_access<sycl_discard_write>(cgh);
@@ -276,6 +281,10 @@ int main(int argc, char* argv[]) {
       });
     });
 
+    q.wait();
+    auto kend = std::chrono::steady_clock::now();
+    kernel_time += std::chrono::duration_cast<std::chrono::milliseconds> (kend - kbegin).count();
+
     q.submit([&] (handler &cgh) {
       auto acc = d_min_mse.get_access<sycl_read>(cgh);
       cgh.copy(acc, &h_min_mse);
@@ -292,6 +301,7 @@ int main(int argc, char* argv[]) {
   float elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count();
 
   std::cout << "Parallel Computation Results: " << std::endl;
+  std::cout << "Kernel time in msec: " << kernel_time << std::endl; 
   std::cout << "Elapsed time in msec = " << elapsed_time << std::endl; 
   std::cout << "Main Image Dimensions: " << main_width << "*" << main_height << std::endl;
   std::cout << "Template Image Dimensions: " << template_width << "*" << template_height << std::endl;
