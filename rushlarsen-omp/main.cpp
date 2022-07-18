@@ -46,31 +46,32 @@ int main(int argc, char *argv[])
   struct timespec timestamp_start, timestamp_now;
   double time_elapsed;
 
-  printf("CPU: Rush Larsen (exp integrator on all gates)\n");
+  printf("Host: Rush Larsen (exp integrator on all gates)\n");
   for (int it = 0; it < num_timesteps; it++) {
     forward_rush_larsen(states, t, dt, parameters, num_nodes);
     t += dt;
   }
 
-  printf("GPU: Rush Larsen (exp integrator on all gates)\n");
+  printf("Device: Rush Larsen (exp integrator on all gates)\n");
 
-#pragma omp target data map(tofrom: states2[0:total_num_states]),\
-                        map(to: parameters[0:total_num_parameters])
-{
-  // All nodes run the same kernel
-  clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
-
-  t = t_start;
-  for (int it = 0; it < num_timesteps; it++) {
-    k_forward_rush_larsen(states2, t, dt, parameters, num_nodes); 
-    t += dt;
+  #pragma omp target data map(tofrom: states2[0:total_num_states]),\
+                          map(to: parameters[0:total_num_parameters])
+  {
+    // All nodes run the same kernel
+    t = t_start;
+  
+    clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
+  
+    for (int it = 0; it < num_timesteps; it++) {
+      k_forward_rush_larsen(states2, t, dt, parameters, num_nodes); 
+      t += dt;
+    }
+  
+    clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_now);
+    time_elapsed = timestamp_now.tv_sec - timestamp_start.tv_sec + 1E-9 * (timestamp_now.tv_nsec - timestamp_start.tv_nsec);
+    printf("Device: computed %d time steps in %g s. Time steps per second: %g\n\n",
+        num_timesteps, time_elapsed, num_timesteps/time_elapsed);
   }
-  clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_now);
-  time_elapsed = timestamp_now.tv_sec - timestamp_start.tv_sec + 1E-9 * (timestamp_now.tv_nsec - timestamp_start.tv_nsec);
-  printf("Computed %d time steps in %g s. Time steps per second: %g\n",
-      num_timesteps, time_elapsed, num_timesteps/time_elapsed);
-  printf("\n");
-}
 
   double rmse = 0.0;
   for (size_t i = 0; i < total_num_states; i++) {

@@ -44,13 +44,13 @@ int main(int argc, char *argv[])
   struct timespec timestamp_start, timestamp_now;
   double time_elapsed;
 
-  printf("CPU: Rush Larsen (exp integrator on all gates)\n");
+  printf("Host: Rush Larsen (exp integrator on all gates)\n");
   for (int it = 0; it < num_timesteps; it++) {
     forward_rush_larsen(states, t, dt, parameters, num_nodes);
     t += dt;
   }
 
-  printf("GPU: Rush Larsen (exp integrator on all gates)\n");
+  printf("Device: Rush Larsen (exp integrator on all gates)\n");
   double* d_states;
   cudaMalloc((void**)&d_states, states_size);
   cudaMemcpy(d_states, states2, states_size, cudaMemcpyHostToDevice);
@@ -60,20 +60,23 @@ int main(int argc, char *argv[])
   cudaMemcpy(d_parameters, parameters, parameters_size, cudaMemcpyHostToDevice);
 
   // All nodes run the same kernel
-  clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
   dim3 grid ((num_nodes + 255)/256);
   dim3 block (256);
 
   t = t_start;
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
+
   for (int it = 0; it < num_timesteps; it++) {
     k_forward_rush_larsen<<<grid, block>>>(d_states, t, dt, d_parameters, num_nodes);  // run with a single node 
     t += dt;
   }
+
+  cudaDeviceSynchronize();
   clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_now);
   time_elapsed = timestamp_now.tv_sec - timestamp_start.tv_sec + 1E-9 * (timestamp_now.tv_nsec - timestamp_start.tv_nsec);
-  printf("Computed %d time steps in %g s. Time steps per second: %g\n",
+  printf("Device: computed %d time steps in %g s. Time steps per second: %g\n\n",
       num_timesteps, time_elapsed, num_timesteps/time_elapsed);
-  printf("\n");
 
   cudaMemcpy(states2, d_states, states_size, cudaMemcpyDeviceToHost);
 
