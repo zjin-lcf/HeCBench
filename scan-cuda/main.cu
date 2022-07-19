@@ -1,9 +1,8 @@
-#include <assert.h>
 #include <stdio.h>
+#include <chrono>
 #include <cuda.h>
 
 #define N 512
-#define ITERATION 100000
 
 template<typename dataType>
 __global__ void prescan(
@@ -47,7 +46,7 @@ __global__ void prescan(
 }
 
 template <typename dataType>
-void runTest (dataType *in, dataType *out, int n) 
+void runTest (const dataType *in, dataType *out, const int n, const int repeat) 
 {
   dataType *d_in;
   dataType *d_out;
@@ -57,41 +56,53 @@ void runTest (dataType *in, dataType *out, int n)
 
   dim3 grids (1);
   dim3 blocks (n/2);
-  for (int i = 0; i < ITERATION; i++) {
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     prescan<<<grids, blocks>>>(d_out, d_in, n);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of block scan: %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaMemcpy(out, d_out, n*sizeof(dataType), cudaMemcpyDeviceToHost);
   cudaFree(d_in);
   cudaFree(d_out);
 }
 
-int main() 
+int main(int argc, char* argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+    
   float in[N];
   float cpu_out[N];
   float gpu_out[N];
-  int error = 0;
-
   for (int i = 0; i < N; i++) in[i] = (i % 5)+1;
 
-  runTest(in, gpu_out, N);
+  runTest(in, gpu_out, N, repeat);
+
+  bool ok = true;
+  if (gpu_out[0] != 0) {
+    ok = false;
+  }
 
   cpu_out[0] = 0;
-  if (gpu_out[0] != 0) {
-    error++;
-    printf("gpu = %f at index 0\n", gpu_out[0]);
-  }
   for (int i = 1; i < N; i++) 
   {
     cpu_out[i] = cpu_out[i-1] + in[i-1];
-    if (cpu_out[i] != gpu_out[i]) {
-      error++;
-      printf("cpu = %f gpu = %f at index %d\n",
-          cpu_out[i], gpu_out[i], i);
+    if (cpu_out[i] != gpu_out[i]) { 
+      ok = false;
+      break;
     }
   }
-
-  if (error == 0) printf("PASS\n");
-  return 0;
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  return 0; 
 }
