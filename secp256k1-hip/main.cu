@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 
@@ -684,8 +685,6 @@ void secp256k1_ge_set_gej(secp256k1_ge *r, secp256k1_gej *a) {
 
 __global__ void secp256k1(const secp256k1_ge_storage *prec, unsigned char* result)
 {
-
-  if (blockDim.x * blockIdx.x + threadIdx.x) return;
   secp256k1_ge ge[512];
   secp256k1_gej sum;
 
@@ -704,6 +703,11 @@ __global__ void secp256k1(const secp256k1_ge_storage *prec, unsigned char* resul
 
 
 int main(int argc, char **argv) {
+  if(argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   secp256k1_ge_storage prec[512] = {
     SC(983487347u, 1861041900u, 2599115456u, 565528146u, 1451326239u, 148794576u, 4224640328u, 3120843701u, 2076989736u, 3184115747u, 3754320824u, 2656004457u, 2876577688u, 2388659905u, 3527541004u, 1170708298u),
@@ -1229,9 +1233,17 @@ int main(int argc, char **argv) {
   unsigned char *d_output;
   hipMalloc((void**)&d_output, 32);
 
-  for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(secp256k1, dim3(1), dim3(32), 0, 0, d_prec, d_output); 
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
+    hipLaunchKernelGGL(secp256k1, 1, 1, 0, 0, d_prec, d_output); 
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   hipMemcpy(output, d_output, 32, hipMemcpyDeviceToHost);
   hipFree(d_prec);
   hipFree(d_output);

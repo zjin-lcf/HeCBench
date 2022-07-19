@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <chrono>
 #include "common.h"
 
 
@@ -670,6 +671,11 @@ void secp256k1_ge_set_gej(secp256k1_ge *r, secp256k1_gej *a) {
 
 
 int main(int argc, char **argv) {
+  if(argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   secp256k1_ge_storage prec[512] = {
     SC(983487347u, 1861041900u, 2599115456u, 565528146u, 1451326239u, 148794576u, 4224640328u, 3120843701u, 2076989736u, 3184115747u, 3754320824u, 2656004457u, 2876577688u, 2388659905u, 3527541004u, 1170708298u),
@@ -1200,18 +1206,19 @@ int main(int argc, char **argv) {
     buffer<secp256k1_ge_storage, 1> prec_buffer(prec, 512);
     buffer<unsigned char, 1> output_buffer(output, 32);
 
-    size_t global_work_size = 32;
-    size_t local_work_size = 32;
+    size_t global_work_size = 1;
+    size_t local_work_size = 1;
     range<1> gws(global_work_size);
     range<1> lws(local_work_size);
 
-    for (int n = 0; n < 100; n++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
       q.submit([&] (handler &cgh) {
         auto result = output_buffer.get_access<sycl_discard_write>(cgh);
         auto prec = prec_buffer.get_access<sycl_read>(cgh);
         cgh.parallel_for<class secp256k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
 
-          if (item.get_global_id(0)) return;
           secp256k1_ge ge[512];
           secp256k1_gej sum;
 
@@ -1229,6 +1236,11 @@ int main(int argc, char **argv) {
         });
       });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   char result[64];
