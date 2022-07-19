@@ -1,4 +1,20 @@
 /*
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
 * Kernel distributes exact part of the kernel shap dataset
 * Each block scatters the data of a row of `observations` into the (number of rows of
 * background) in `dataset`, based on the row of `X`.
@@ -19,9 +35,16 @@
 */
 
 template <typename DataT, typename IdxT>
-__global__ void exact_rows_kernel(float* X, const IdxT nrows_X, const IdxT ncols,
-                                  const DataT* background, const IdxT nrows_background,
-                                  DataT* dataset, const DataT* observation) {
+__global__
+void exact_rows_kernel(
+  float*__restrict__ X,
+  const IdxT nrows_X,
+  const IdxT ncols,
+  const DataT*__restrict__ background,
+  const IdxT nrows_background,
+  DataT*__restrict__ dataset,
+  const DataT*__restrict__ observation)
+{
   // Each block processes one row of X. Columns are iterated over by blockDim.x at a time to ensure data coelescing
   int col = threadIdx.x;
   int row = blockIdx.x * ncols;
@@ -80,10 +103,18 @@ double LCG_random_double(uint64_t * seed)
 }  
 
 template <typename DataT, typename IdxT>
-__global__ void sampled_rows_kernel(const IdxT* nsamples, float* X, const IdxT nrows_X,
-                                    const IdxT ncols, DataT* background,
-                                    const IdxT nrows_background, DataT* dataset,
-                                    const DataT* observation, uint64_t seed) {
+__global__
+void sampled_rows_kernel(
+  const IdxT*__restrict__ nsamples,
+  float*__restrict__ X,
+  const IdxT nrows_X,
+  const IdxT ncols,
+  DataT*__restrict__ background,
+  const IdxT nrows_background,
+  DataT*__restrict__ dataset,
+  const DataT*__restrict__ observation,
+  uint64_t seed)
+{
   // int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // see what k this block will generate
   int k_blk = nsamples[blockIdx.x];
@@ -145,7 +176,8 @@ void kernel_dataset(float* X,
                     int* nsamples,
                     const int len_samples, 
                     const int maxsample, 
-                    const uint64_t seed) 
+                    const uint64_t seed,
+                    double &time) 
 {
 
   IdxT nblks;
@@ -153,25 +185,27 @@ void kernel_dataset(float* X,
 
   nthreads = std::min(256, ncols);
   nblks = nrows_X - len_samples;
-  printf("nblks = %d len_samples = %d\n", nblks, len_samples );
+  //printf("nblks = %d len_samples = %d\n", nblks, len_samples );
+
+  auto start = std::chrono::steady_clock::now();
 
   if (nblks > 0) {
-    hipLaunchKernelGGL(exact_rows_kernel, dim3(nblks), dim3(nthreads), 0, 0, 
+    hipLaunchKernelGGL(exact_rows_kernel, nblks, nthreads, 0, 0, 
       X, nrows_X, ncols, background, nrows_background, dataset, observation);
   }
-
-  //CUDA_CHECK(hipPeekAtLastError());
 
   // check if random part of the dataset is needed
   if (len_samples > 0) {
     nblks = len_samples / 2;
     // each block does a sample and its compliment
-    hipLaunchKernelGGL(sampled_rows_kernel, dim3(nblks), dim3(nthreads), 0, 0, 
+    hipLaunchKernelGGL(sampled_rows_kernel, nblks, nthreads, 0, 0, 
       nsamples, &X[(nrows_X - len_samples) * ncols], len_samples, ncols,
       background, nrows_background,
       &dataset[(nrows_X - len_samples) * nrows_background * ncols], observation,
       seed);
   }
 
-  //CUDA_CHECK(hipPeekAtLastError());
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 }

@@ -35,9 +35,16 @@
 */
 
 template <typename DataT, typename IdxT>
-__global__ void exact_rows_kernel(float* X, const IdxT nrows_X, const IdxT ncols,
-                                  const DataT* background, const IdxT nrows_background,
-                                  DataT* dataset, const DataT* observation) {
+__global__
+void exact_rows_kernel(
+  float*__restrict__ X,
+  const IdxT nrows_X,
+  const IdxT ncols,
+  const DataT*__restrict__ background,
+  const IdxT nrows_background,
+  DataT*__restrict__ dataset,
+  const DataT*__restrict__ observation)
+{
   // Each block processes one row of X. Columns are iterated over by blockDim.x at a time to ensure data coelescing
   int col = threadIdx.x;
   int row = blockIdx.x * ncols;
@@ -96,10 +103,18 @@ double LCG_random_double(uint64_t * seed)
 }  
 
 template <typename DataT, typename IdxT>
-__global__ void sampled_rows_kernel(const IdxT* nsamples, float* X, const IdxT nrows_X,
-                                    const IdxT ncols, DataT* background,
-                                    const IdxT nrows_background, DataT* dataset,
-                                    const DataT* observation, uint64_t seed) {
+__global__
+void sampled_rows_kernel(
+  const IdxT*__restrict__ nsamples,
+  float*__restrict__ X,
+  const IdxT nrows_X,
+  const IdxT ncols,
+  DataT*__restrict__ background,
+  const IdxT nrows_background,
+  DataT*__restrict__ dataset,
+  const DataT*__restrict__ observation,
+  uint64_t seed)
+{
   // int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // see what k this block will generate
   int k_blk = nsamples[blockIdx.x];
@@ -151,7 +166,7 @@ __global__ void sampled_rows_kernel(const IdxT* nsamples, float* X, const IdxT n
 }
 
 template <typename DataT, typename IdxT>
-void kernel_dataset(float* X, 
+void kernel_dataset(float* X,
                     const IdxT nrows_X,
                     const IdxT ncols,
                     DataT* background,
@@ -159,24 +174,24 @@ void kernel_dataset(float* X,
                     DataT* dataset,
                     DataT* observation,
                     int* nsamples,
-                    const int len_samples, 
-                    const int maxsample, 
-                    const uint64_t seed) 
+                    const int len_samples,
+                    const int maxsample,
+                    const uint64_t seed,
+                    double &time) 
 {
-
   IdxT nblks;
   IdxT nthreads;
 
   nthreads = std::min(256, ncols);
   nblks = nrows_X - len_samples;
-  printf("nblks = %d len_samples = %d\n", nblks, len_samples );
+  //printf("nblks = %d len_samples = %d\n", nblks, len_samples );
+
+  auto start = std::chrono::steady_clock::now();
 
   if (nblks > 0) {
     exact_rows_kernel<<<nblks, nthreads>>>(
       X, nrows_X, ncols, background, nrows_background, dataset, observation);
   }
-
-  //CUDA_CHECK(cudaPeekAtLastError());
 
   // check if random part of the dataset is needed
   if (len_samples > 0) {
@@ -189,5 +204,7 @@ void kernel_dataset(float* X,
       seed);
   }
 
-  //CUDA_CHECK(cudaPeekAtLastError());
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 }
