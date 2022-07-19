@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
+#include <chrono>
 #include <utility>  // std::swap
 #include "common.h"
 #include "utils.h"
@@ -17,7 +18,7 @@
 
 int main(int argc, char **argv) {
   if(argc < 3){
-    printf("usage: %s <file> <number of seams to remove> [options]\n"
+    printf("Usage: %s <file> <number of seams to remove> [options]\n"
         "valid options:\n-u\tupdate costs instead of recomputing them\n"
         "-a\tapproximate computation\n", argv[0]);
     return 1;
@@ -110,6 +111,9 @@ int main(int argc, char **argv) {
     compute_costs(q, current_w, w, h, d_pixels, d_costs_left, d_costs_up, d_costs_right);
 
   int num_iterations = 0;
+
+  auto start = std::chrono::steady_clock::now();
+
   while(num_iterations < (int)seams_to_remove){
 
     if(mode == SEAM_CARVER_STANDARD_MODE)
@@ -142,7 +146,14 @@ int main(int argc, char **argv) {
     current_w--;
     num_iterations++;
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Execution time of seam carver kernels: %f (ms)\n", time * 1e-6f);
+
   }  // sycl scope
+
   unsigned char* output = flatten_pixels(h_pixels, w, h, current_w); 
   printf("Image resized\n");
 

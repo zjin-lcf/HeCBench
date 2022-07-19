@@ -52,6 +52,5 @@ clean:
 	rm -rf $(program) $(obj) *.bmp
 
 run: $(program)
-	./$(program) Broadway_tower.jpg 10 -u 
-	#./$(program) Broadway_tower.jpg 10 -a
-
+	./$(program) Broadway_tower.jpg 100 -u 
+	#./$(program) Broadway_tower.jpg 100 -a
