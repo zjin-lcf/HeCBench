@@ -1,11 +1,11 @@
 #include <stdio.h>
+#include <chrono>
 #include "common.h"
 
 #define N 512
-#define ITERATION 100000
 
 template <typename dataType>
-void runTest (const dataType *in, dataType *out, const int n) 
+void runTest (const dataType *in, dataType *out, const int n, const int repeat) 
 {
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -19,7 +19,11 @@ void runTest (const dataType *in, dataType *out, const int n)
 
   range<1> lws (n/2);
   range<1> gws (n/2);
-  for (int i = 0; i < ITERATION; i++) {
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto g_odata = d_out.template get_access<sycl_discard_write>(cgh);
       auto g_idata = d_in.template get_access<sycl_read>(cgh);
@@ -60,33 +64,42 @@ void runTest (const dataType *in, dataType *out, const int n)
       });
     });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of block scan: %f (us)\n", (time * 1e-3f) / repeat);
 }
 
-int main() 
+int main(int argc, char* argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+    
   float in[N];
   float cpu_out[N];
   float gpu_out[N];
-  int error = 0;
   for (int i = 0; i < N; i++) in[i] = (i % 5)+1;
-  runTest(in, gpu_out, N); 
-  cpu_out[0] = 0;
+
+  runTest(in, gpu_out, N, repeat);
+
+  bool ok = true;
   if (gpu_out[0] != 0) {
-   error++;
-   printf("gpu = %f at index 0\n", gpu_out[0]);
+    ok = false;
   }
+
+  cpu_out[0] = 0;
   for (int i = 1; i < N; i++) 
   {
     cpu_out[i] = cpu_out[i-1] + in[i-1];
     if (cpu_out[i] != gpu_out[i]) { 
-     error++;
-     printf("cpu = %f gpu = %f at index %d\n",
-     cpu_out[i], gpu_out[i], i);
+      ok = false;
+      break;
     }
   }
-  if (error == 0) printf("PASS\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0; 
 }
-
-
