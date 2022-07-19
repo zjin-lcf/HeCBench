@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include "common.h"
 
 
@@ -78,7 +78,8 @@ struct Species
 /** FUNCTION PROTOTYPES **/
 double rnd();
 double SampleVel(double v_th);
-void ScatterSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu, float* den, buffer<float,1> &den_gpu);
+void ScatterSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu,
+                    float* den, buffer<float,1> &den_gpu, double &time);
 void ComputeRho(Species* ions, Species* electrons);
 bool SolvePotential(double* phi, double* rho);
 bool SolvePotentialDirect(double* phi, double* rho);
@@ -102,6 +103,7 @@ int main(int argc, char* argv[])
 {
   int p;
   int ts; // time step
+  double sp_time = 0.0; // total time of the scatter-particle kernel
 
   domain.phi = new double[domain.ni]; // potential
   domain.rho = new double[domain.ni]; // charge density
@@ -178,8 +180,8 @@ int main(int argc, char* argv[])
   electrons_part_gpu.set_final_data(nullptr);
 
   /*compute number density*/
-  ScatterSpecies(q, &ions, ions_part_gpu, ndi, ndi_gpu);
-  ScatterSpecies(q, &electrons, electrons_part_gpu, nde, nde_gpu);
+  ScatterSpecies(q, &ions, ions_part_gpu, ndi, ndi_gpu, sp_time);
+  ScatterSpecies(q, &electrons, electrons_part_gpu, nde, nde_gpu, sp_time);
 
   /*compute charge density and solve potential*/
   ComputeRho(&ions, &electrons);
@@ -196,14 +198,14 @@ int main(int argc, char* argv[])
   fprintf(file_res, "VARIABLES = x nde ndi rho phi ef\n");
   WriteResults(0);
 
-  clock_t start = clock(); // grab starting clock time
+  auto start = std::chrono::steady_clock::now();
 
   /* MAIN LOOP*/
   for (ts = 1; ts <= NUM_TS; ts++)
   {
     /*compute number density*/
-    ScatterSpecies(q, &ions, ions_part_gpu, ndi, ndi_gpu);
-    ScatterSpecies(q, &electrons, electrons_part_gpu, nde, nde_gpu);
+    ScatterSpecies(q, &ions, ions_part_gpu, ndi, ndi_gpu, sp_time);
+    ScatterSpecies(q, &electrons, electrons_part_gpu, nde, nde_gpu, sp_time);
 
     ComputeRho(&ions, &electrons);
     SolvePotential(phi, rho);
@@ -231,7 +233,8 @@ int main(int argc, char* argv[])
       WriteResults(ts);
   }
 
-  clock_t end = clock();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   fclose(file_res);
 
@@ -241,12 +244,14 @@ int main(int argc, char* argv[])
   delete ef;
   delete nde;
   delete ndi;
+
   /*free particles*/
   delete ions.part;
   delete electrons.part;
 
-  printf("Time per time step: %.3g ms\n",
-      1000 * (end - start) / (double)(CLOCKS_PER_SEC * NUM_TS));
+  printf("Total kernel execution time (scatter particles) : %.3g (s)\n", sp_time * 1e-9f),
+  printf("Total time for %d time steps: %.3g (s)\n", NUM_TS, time * 1e-9f);
+  printf("Time per time step: %.3g (ms)\n", (time * 1e-6f) / NUM_TS);
 
   return 0;
 }
@@ -276,7 +281,8 @@ void ScatterSpecies(queue &q,
                     Species* species, 
                     buffer<Particle,1> &species_part_gpu,
                     float* den,
-                    buffer<float,1> &den_gpu)
+                    buffer<float,1> &den_gpu,
+                    double &time)
 {
   /*initialize densities to zero*/
   q.submit([&] (handler &cgh) {
@@ -288,9 +294,13 @@ void ScatterSpecies(queue &q,
 
   /*scatter particles to the mesh*/
   int nblocks = 1 + size / THREADS_PER_BLOCK;
+
   range<1> gws (nblocks * THREADS_PER_BLOCK);
   range<1> lws (THREADS_PER_BLOCK);
   
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto particles = species_part_gpu.get_access<sycl_read>(cgh);
     auto den = den_gpu.get_access<sycl_read_write>(cgh);
@@ -302,7 +312,10 @@ void ScatterSpecies(queue &q,
         scatter(lc, 1.f, den.get_pointer());
       }
     });
-  });
+  }).wait();
+
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   /*copy density back to CPU*/
   q.submit([&] (handler &cgh) {
