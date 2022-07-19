@@ -61,5 +61,3 @@ clean:
 
 run: $(program)
 	./$(program) 1000
-
-

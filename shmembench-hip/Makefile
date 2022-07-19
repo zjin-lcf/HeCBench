@@ -22,7 +22,7 @@ obj = main.o shmem_kernels.o
 # Sets Flags
 #===============================================================================
 
-CFLAGS := -std=c++14 -Xcompiler -Wall
+CFLAGS := -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -56,5 +56,3 @@ clean:
 
 run: $(program)
 	./$(program) 1000
-
-

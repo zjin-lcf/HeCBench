@@ -6,8 +6,12 @@
 #define VECTOR_SIZE (1024*1024)
 
 int main(int argc, char* argv[]) {
-  printf("shared memory bandwidth microbenchmark\n");
+  printf("Shared memory bandwidth microbenchmark\n");
 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
   int n = atoi(argv[1]); // launch kernel n times
 
   unsigned int datasize = VECTOR_SIZE*sizeof(double);
