@@ -21,6 +21,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <chrono>
 
 #include "bb_bin.dp.hpp"
 #include "bb_comput_s.dp.hpp"
@@ -323,6 +324,8 @@ int bb_segsort(queue &q, K *&keys_d, T *&vals_d, const int num_elements,
 
     sycl::event event;
 
+    auto start = std::chrono::steady_clock::now();
+
     bb_segsort_run(
         keys_d, vals_d, keysB_d, valsB_d,
         d_seg_begins, d_seg_ends, num_segs,
@@ -330,6 +333,9 @@ int bb_segsort(queue &q, K *&keys_d, T *&vals_d, const int num_elements,
         &q, event);
 
     q.wait();
+    auto end = std::chrono::steady_clock::now();
+    float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Kernel execution time: %f (s)\n", time * 1e-9f);
 
     std::swap(keys_d, keysB_d);
     std::swap(vals_d, valsB_d);
