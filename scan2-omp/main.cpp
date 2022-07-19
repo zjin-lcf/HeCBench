@@ -14,6 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
+#include <chrono>
 #include <omp.h>
 #include "scan.h"
 
@@ -25,7 +26,6 @@ void bScan(const unsigned int blockSize,
 {
   #pragma omp target teams num_teams(len/blockSize) thread_limit(blockSize/2)
   {
-    // float block[blockSize];
     float block[256];
     #pragma omp parallel 
     {
@@ -162,13 +162,17 @@ void scanLargeArraysCPUReference(
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    std::cout << "Usage: " << argv[0] << " <repeat> <input length> <block size>\n";
+    return 1;
+  }
   int iterations = atoi(argv[1]);
   int length = atoi(argv[2]);
   int blockSize = atoi(argv[3]);
 
   if(iterations < 1)
   {
-    std::cout<<"Error, iterations cannot be 0 or negative. Exiting..\n";
+    std::cout << "Error, iterations cannot be 0 or negative. Exiting..\n";
     return -1;
   }
   if(!isPowerOf2(length))
@@ -213,7 +217,6 @@ int main(int argc, char * argv[])
 
   float* outputBuffer = (float*) malloc (sizeof(float) * outputBufferSize);
 
-
   // Allocate 1D blockSumBuffer
   int blockSumBufferSize = 0;
   int* blockSumBufferSizeOffset = (int*) malloc (sizeof(int) * pass);
@@ -228,16 +231,16 @@ int main(int argc, char * argv[])
   int tempLength = (int)(length / std::pow((float)blockSize, (float)pass));
   float* tempBuffer = (float*) malloc (sizeof(float) * tempLength);
 
-  std::cout << "Executing kernel for " <<
-    iterations << " iterations" << std::endl;
-  std::cout << "-------------------------------------------" <<
-    std::endl;
+  std::cout << "Executing kernel for " << iterations << " iterations\n";
+  std::cout << "-------------------------------------------\n";
 
 #pragma omp target data map(to: inputBuffer[0:length]) \
                         map(alloc: tempBuffer[0:tempLength], \
                                    blockSumBuffer[0:blockSumBufferSize], \
                                    outputBuffer[0:outputBufferSize])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for(int n = 0; n < iterations; n++)
   {
     // Do block-wise sum
@@ -270,6 +273,11 @@ int main(int argc, char * argv[])
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time of scan kernels: " << time * 1e-3f / iterations
+            << " (us)\n";
+
   #pragma omp target update from (outputBuffer[0: \
      (pass==1) ? outputBufferSize : outputBufferSizeOffset[1]])
 }
@@ -283,9 +291,9 @@ int main(int argc, char * argv[])
 
   // compare the results and see if they match
   if (compare<float>(outputBuffer, verificationOutput, length, (float)0.001))
-    std::cout << "Passed!\n" << std::endl;
+    std::cout << "PASS" << std::endl;
   else
-    std::cout << "Failed\n" << std::endl;
+    std::cout << "FAIL" << std::endl;
 
   free(verificationOutput);
   free(inputBuffer);

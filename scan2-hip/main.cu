@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "scan.h"
 
@@ -33,7 +33,8 @@
  */
 
 __global__
-void blockAddition(const float* input, float* output)
+void blockAddition(const float*__restrict__ input,
+                         float*__restrict__ output)
 {  
   int bid = blockIdx.x;
   int tid = threadIdx.x;
@@ -51,13 +52,11 @@ void blockAddition(const float* input, float* output)
   output[gid] += value;
 }
 
-
 __global__
-void ScanLargeArrays(float *output,
-                     const float *input,
+void ScanLargeArrays(float *__restrict__ output,
+                     const float *__restrict__ input,
                      const unsigned int block_size,   // size of block
-                     float *sumBuffer)  // sum of blocks
-
+                     float *__restrict__ sumBuffer)  // sum of blocks
 {
   extern __shared__ float block[];   // Size : block_size
   int tid = threadIdx.x;
@@ -75,7 +74,6 @@ void ScanLargeArrays(float *output,
   /* build the sum in place up the tree */
   for(int stride = 1; stride < block_size; stride *=2)
   {
-
     if(2*tid>=stride)
     {
       cache0 = block[2*tid-stride]+block[2*tid];
@@ -103,12 +101,11 @@ void ScanLargeArrays(float *output,
     output[2*gid]     = block[2*tid-1];
     output[2*gid + 1] = block[2*tid];
   }
-
 }
 
 __global__ 
-void prefixSum(float *output, 
-               const float *input,
+void prefixSum(float *__restrict__ output, 
+               const float *__restrict__ input,
                const unsigned int block_size)
 {
   int tid = threadIdx.x;
@@ -165,7 +162,7 @@ void bScan(const unsigned int blockSize,
   dim3 grid (len / blockSize);
   dim3 block (blockSize / 2);
 
-  hipLaunchKernelGGL(ScanLargeArrays, dim3(grid), dim3(block), sizeof(float)*blockSize, 0, 
+  ScanLargeArrays<<<grid, block, sizeof(float)*blockSize>>>(
       outputBuffer, inputBuffer, blockSize, blockSumBuffer);
 }
 
@@ -176,7 +173,7 @@ void pScan(const unsigned int blockSize,
 {
   dim3 grid (1);
   dim3 block (len / 2);
-  hipLaunchKernelGGL(prefixSum, dim3(grid), dim3(block), (len+1)*sizeof(float), 0, outputBuffer, inputBuffer, blockSize);
+  hipLaunchKernelGGL(prefixSum, grid, block, (len+1)*sizeof(float), 0, outputBuffer, inputBuffer, blockSize);
 }
 
 void bAddition(const unsigned int blockSize,
@@ -187,7 +184,7 @@ void bAddition(const unsigned int blockSize,
   // set the block size
   dim3 grid (len / blockSize);
   dim3 block (blockSize);
-  hipLaunchKernelGGL(blockAddition, dim3(grid), dim3(block), 0, 0, inputBuffer, outputBuffer);
+  hipLaunchKernelGGL(blockAddition, grid, block, 0, 0, inputBuffer, outputBuffer);
 }
 
 
@@ -210,13 +207,17 @@ void scanLargeArraysCPUReference(
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    std::cout << "Usage: " << argv[0] << " <repeat> <input length> <block size>\n";
+    return 1;
+  }
   int iterations = atoi(argv[1]);
   int length = atoi(argv[2]);
   int blockSize = atoi(argv[3]);
 
   if(iterations < 1)
   {
-    std::cout<<"Error, iterations cannot be 0 or negative. Exiting..\n";
+    std::cout << "Error, iterations cannot be 0 or negative. Exiting..\n";
     return -1;
   }
   if(!isPowerOf2(length))
@@ -286,10 +287,11 @@ int main(int argc, char * argv[])
   float* tempBuffer; 
   hipMalloc((void**)&tempBuffer, tempLength * sizeof(float));
 
-  std::cout << "Executing kernel for " <<
-    iterations << " iterations" << std::endl;
-  std::cout << "-------------------------------------------" <<
-    std::endl;
+  std::cout << "Executing kernel for " << iterations << " iterations\n";
+  std::cout << "-------------------------------------------\n";
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for(int n = 0; n < iterations; n++)
   {
@@ -316,6 +318,12 @@ int main(int argc, char * argv[])
     }
   }
 
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time of scan kernels: " << time * 1e-3f / iterations
+            << " (us)\n";
+
   hipMemcpy(output, outputBuffers[0], sizeBytes, hipMemcpyDeviceToHost);
 
   hipFree(inputBuffer); 
@@ -337,9 +345,9 @@ int main(int argc, char * argv[])
 
   // compare the results and see if they match
   if (compare<float>(output, verificationOutput, length, (float)0.001))
-    std::cout << "Passed!\n" << std::endl;
+    std::cout << "PASS" << std::endl;
   else
-    std::cout << "Failed\n" << std::endl;
+    std::cout << "FAIL" << std::endl;
 
   free(input);
   free(output);

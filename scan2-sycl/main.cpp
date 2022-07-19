@@ -15,8 +15,9 @@
  ********************************************************************/
 
 
-#include "scan.h"
+#include <chrono>
 #include "common.h"
+#include "scan.h"
 
 void bScan(queue &q,
            const unsigned int blockSize,
@@ -129,7 +130,6 @@ void pScan(queue &q,
       }
     });
   });
-
 }
 
 void bAddition(queue &q,
@@ -181,13 +181,17 @@ void scanLargeArraysCPUReference(
 
 int main(int argc, char * argv[])
 {
+  if (argc != 4) {
+    std::cout << "Usage: " << argv[0] << " <repeat> <input length> <block size>\n";
+    return 1;
+  }
   int iterations = atoi(argv[1]);
   int length = atoi(argv[2]);
   int blockSize = atoi(argv[3]);
 
   if(iterations < 1)
   {
-    std::cout<<"Error, iterations cannot be 0 or negative. Exiting..\n";
+    std::cout << "Error, iterations cannot be 0 or negative. Exiting..\n";
     return -1;
   }
   if(!isPowerOf2(length))
@@ -257,10 +261,11 @@ int main(int argc, char * argv[])
 
   buffer<float, 1> tempBuffer (tempLength);
 
-  std::cout << "Executing kernel for " <<
-    iterations << " iterations" << std::endl;
-  std::cout << "-------------------------------------------" <<
-    std::endl;
+  std::cout << "Executing kernel for " << iterations << " iterations\n";
+  std::cout << "-------------------------------------------\n";
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   for(int n = 0; n < iterations; n++)
   {
@@ -287,6 +292,12 @@ int main(int argc, char * argv[])
     }
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time of scan kernels: " << time * 1e-3f / iterations
+            << " (us)\n";
+
   q.submit([&] (handler &cgh) {
     auto acc = outputBuffer[0].get_access<sycl_read>(cgh);
     cgh.copy(acc, output);
@@ -301,9 +312,9 @@ int main(int argc, char * argv[])
 
   // compare the results and see if they match
   if (compare<float>(output, verificationOutput, length, (float)0.001))
-    std::cout << "Passed!\n" << std::endl;
+    std::cout << "PASS" << std::endl;
   else
-    std::cout << "Failed\n" << std::endl;
+    std::cout << "FAIL" << std::endl;
 
   free(input);
   free(output);
