@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include <omp.h>
 
 
@@ -78,7 +78,7 @@ struct Species
 /** FUNCTION PROTOTYPES **/
 double rnd();
 double SampleVel(double v_th);
-void ScatterSpecies(Species* species, Particle* particles, float* den);
+void ScatterSpecies(Species* species, Particle* particles, float* den, double &time);
 void ComputeRho(Species* ions, Species* electrons);
 bool SolvePotential(double* phi, double* rho);
 bool SolvePotentialDirect(double* phi, double* rho);
@@ -102,6 +102,7 @@ int main(int argc, char* argv[])
 {
   int p;
   int ts; // time step
+  double sp_time = 0.0; // total time of the scatter-particle kernel
 
   domain.phi = new double[domain.ni]; // potential
   domain.rho = new double[domain.ni]; // charge density
@@ -169,8 +170,8 @@ int main(int argc, char* argv[])
   {
 
   /*compute number density*/
-  ScatterSpecies(&ions, ions_part, ndi);
-  ScatterSpecies(&electrons, electrons_part, nde);
+  ScatterSpecies(&ions, ions_part, ndi, sp_time);
+  ScatterSpecies(&electrons, electrons_part, nde, sp_time);
 
   /*compute charge density and solve potential*/
   ComputeRho(&ions, &electrons);
@@ -187,14 +188,14 @@ int main(int argc, char* argv[])
   fprintf(file_res, "VARIABLES = x nde ndi rho phi ef\n");
   WriteResults(0);
 
-  clock_t start = clock(); // grab starting clock time
+  auto start = std::chrono::steady_clock::now();
 
   /* MAIN LOOP*/
   for (ts = 1; ts <= NUM_TS; ts++)
   {
     /*compute number density*/
-    ScatterSpecies(&ions, ions_part, ndi);
-    ScatterSpecies(&electrons, electrons_part, nde);
+    ScatterSpecies(&ions, ions_part, ndi, sp_time);
+    ScatterSpecies(&electrons, electrons_part, nde, sp_time);
 
     ComputeRho(&ions, &electrons);
     SolvePotential(phi, rho);
@@ -222,7 +223,8 @@ int main(int argc, char* argv[])
       WriteResults(ts);
   }
 
-  clock_t end = clock();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   fclose(file_res);
 
@@ -237,10 +239,12 @@ int main(int argc, char* argv[])
   delete ions.part;
   delete electrons.part;
 
-  printf("Time per time step: %.3g ms\n",
-      1000 * (end - start) / (double)(CLOCKS_PER_SEC * NUM_TS));
+  printf("Total kernel execution time (scatter particles) : %.3g (s)\n", sp_time * 1e-9f),
+  printf("Total time for %d time steps: %.3g (s)\n", NUM_TS, time * 1e-9f);
+  printf("Time per time step: %.3g (ms)\n", (time * 1e-6f) / NUM_TS);
 
   } /* openmp */
+
   return 0;
 }
 
@@ -265,7 +269,7 @@ double SampleVel(double v_th)
 
 
 /*scatter particles of species to the mesh*/
-void ScatterSpecies(Species* species, Particle* particles, float* den)
+void ScatterSpecies(Species* species, Particle* particles, float* den, double &time)
 {
   /*initialize densities to zero*/
   int nodes = domain.ni;
@@ -277,6 +281,8 @@ void ScatterSpecies(Species* species, Particle* particles, float* den)
 
   int size = species->np_alloc;
 
+  auto start = std::chrono::steady_clock::now();
+
   /*scatter particles to the mesh*/
   #pragma omp target teams distribute parallel for thread_limit(THREADS_PER_BLOCK)
   for (long p = 0; p < size; p++)
@@ -285,6 +291,9 @@ void ScatterSpecies(Species* species, Particle* particles, float* den)
     double lc = XtoL(particles[p].x);
     scatter(lc, 1.f, den);
   }
+
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   /*copy density back to CPU*/
   #pragma omp target update from (den[0:nodes])
