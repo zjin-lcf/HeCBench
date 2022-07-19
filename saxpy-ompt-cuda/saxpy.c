@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     free(yhost); free(yaccl);
     exit(EXIT_FAILURE);
   }
-#pragma omp parallel for default(none) \
+  #pragma omp parallel for default(none) \
   shared(a, x, y, yhost, yaccl, n) private(i)
   for (i = 0; i < n; ++i) {
     x[i]     = rand() % 32 / 32.0f;
