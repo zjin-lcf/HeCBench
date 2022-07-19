@@ -91,7 +91,7 @@ void shmembenchGPU(double *c, const long size, const int n) {
   cudaDeviceSynchronize();
   auto end = high_resolution_clock::now();
   auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
-  printf("Average execution time : %8.2f (ns)\n", time_shmem_128b);
+  printf("Average kernel execution time : %8.2f (ns)\n", time_shmem_128b);
 
   // Copy results back to host memory
   cudaMemcpy(c, cd, size*sizeof(double), cudaMemcpyDeviceToHost);
@@ -107,7 +107,7 @@ void shmembenchGPU(double *c, const long size, const int n) {
   const long long operations_bytes  = (6LL+4*5*TOTAL_ITERATIONS+6)*size*sizeof(float);
   const long long operations_128bit = (6LL+4*5*TOTAL_ITERATIONS+6)*size/4;
 
-  printf("\tusing 128bit operations   :%8.2f GB/sec (%6.2f billion accesses/sec)\n", 
+  printf("\tusing 128bit operations : %8.2f GB/sec (%6.2f billion accesses/sec)\n", 
     (double)operations_bytes / time_shmem_128b,
     (double)operations_128bit / time_shmem_128b);
 }

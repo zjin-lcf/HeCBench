@@ -53,59 +53,58 @@ void shmembenchGPU(double *c, const long size, const int n) {
 
   double time_shmem_128b;
 
-#pragma omp target data map(from: c[0:size])
-{
-  auto start = high_resolution_clock::now();
-  for (int i = 0; i < n; i++) {
-    #pragma omp target teams num_teams(TOTAL_BLOCKS/4) thread_limit(BLOCK_SIZE)
-    {
-      float4 shm_buffer[BLOCK_SIZE*6];
-      #pragma omp parallel 
+  #pragma omp target data map(from: c[0:size])
+  {
+    auto start = high_resolution_clock::now();
+    for (int i = 0; i < n; i++) {
+      #pragma omp target teams num_teams(TOTAL_BLOCKS/4) thread_limit(BLOCK_SIZE)
       {
-        int tid = omp_get_thread_num();
-        int blk = omp_get_num_threads();
-        int gid = omp_get_team_num();
-        int globaltid = gid * blk + tid;
+        float4 shm_buffer[BLOCK_SIZE*6];
+        #pragma omp parallel 
+        {
+          int tid = omp_get_thread_num();
+          int blk = omp_get_num_threads();
+          int gid = omp_get_team_num();
+          int globaltid = gid * blk + tid;
 
-        set_vector(shm_buffer, tid+0*blk, init_val(tid));
-        set_vector(shm_buffer, tid+1*blk, init_val(tid+1));
-        set_vector(shm_buffer, tid+2*blk, init_val(tid+3));
-        set_vector(shm_buffer, tid+3*blk, init_val(tid+7));
-        set_vector(shm_buffer, tid+4*blk, init_val(tid+13));
-        set_vector(shm_buffer, tid+5*blk, init_val(tid+17));
-
-        #pragma omp barrier
-
-        #pragma unroll 32
-        for(int j=0; j<TOTAL_ITERATIONS; j++){
-          shmem_swap(shm_buffer+tid+0*blk, shm_buffer+tid+1*blk);
-          shmem_swap(shm_buffer+tid+2*blk, shm_buffer+tid+3*blk);
-          shmem_swap(shm_buffer+tid+4*blk, shm_buffer+tid+5*blk);
+          set_vector(shm_buffer, tid+0*blk, init_val(tid));
+          set_vector(shm_buffer, tid+1*blk, init_val(tid+1));
+          set_vector(shm_buffer, tid+2*blk, init_val(tid+3));
+          set_vector(shm_buffer, tid+3*blk, init_val(tid+7));
+          set_vector(shm_buffer, tid+4*blk, init_val(tid+13));
+          set_vector(shm_buffer, tid+5*blk, init_val(tid+17));
 
           #pragma omp barrier
 
-          shmem_swap(shm_buffer+tid+1*blk, shm_buffer+tid+2*blk);
-          shmem_swap(shm_buffer+tid+3*blk, shm_buffer+tid+4*blk);
+          #pragma unroll 32
+          for(int j=0; j<TOTAL_ITERATIONS; j++){
+            shmem_swap(shm_buffer+tid+0*blk, shm_buffer+tid+1*blk);
+            shmem_swap(shm_buffer+tid+2*blk, shm_buffer+tid+3*blk);
+            shmem_swap(shm_buffer+tid+4*blk, shm_buffer+tid+5*blk);
 
-          #pragma omp barrier
+            #pragma omp barrier
+
+            shmem_swap(shm_buffer+tid+1*blk, shm_buffer+tid+2*blk);
+            shmem_swap(shm_buffer+tid+3*blk, shm_buffer+tid+4*blk);
+
+            #pragma omp barrier
+          }
+
+          float4 *g_data = (float4*)c;
+          g_data[globaltid] = reduce_vector(shm_buffer[tid+0*blk], 
+                                            shm_buffer[tid+1*blk],
+                                            shm_buffer[tid+2*blk],
+                                            shm_buffer[tid+3*blk],
+                                            shm_buffer[tid+4*blk],
+                                            shm_buffer[tid+5*blk]);
         }
-
-        float4 *g_data = (float4*)c;
-	g_data[globaltid] = reduce_vector(shm_buffer[tid+0*blk], 
-                                          shm_buffer[tid+1*blk],
-                                          shm_buffer[tid+2*blk],
-                                          shm_buffer[tid+3*blk],
-                                          shm_buffer[tid+4*blk],
-                                          shm_buffer[tid+5*blk]);
       }
     }
+    auto end = high_resolution_clock::now();
+    time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
+    printf("Average kernel execution time : %8.2f (ns)\n", time_shmem_128b);
+    // Copy results back to host memory
   }
-  auto end = high_resolution_clock::now();
-  time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
-  printf("Average execution time : %8.2f (ns)\n", time_shmem_128b);
-
-  // Copy results back to host memory
-}
 
   // simple checksum
   double sum = 0;
@@ -117,8 +116,7 @@ void shmembenchGPU(double *c, const long size, const int n) {
   const long long operations_bytes  = (6LL+4*5*TOTAL_ITERATIONS+6)*size*sizeof(float);
   const long long operations_128bit = (6LL+4*5*TOTAL_ITERATIONS+6)*size/4;
 
-  printf("\tusing 128bit operations   :%8.2f GB/sec (%6.2f billion accesses/sec)\n", 
+  printf("\tusing 128bit operations : %8.2f GB/sec (%6.2f billion accesses/sec)\n", 
     (double)operations_bytes / time_shmem_128b,
     (double)operations_128bit / time_shmem_128b);
- 
 }
