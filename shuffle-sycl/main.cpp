@@ -16,6 +16,9 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
    THE SOFTWARE.
 */
+
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include "common.h"
 
@@ -49,7 +52,10 @@ void verifyBroadcast(const int *out, const int subGroupSize, int pattern = 0)
       break;
     }
   }
-  if (errors == 0) std::cout << "PASSED\n";
+  if (errors == 0)
+    std::cout << "PASS\n";
+  else
+    std::cout << "FAIL\n";
 }
 
 void verifyTransposeMatrix(const float *TransposeMatrix, const float* cpuTransposeMatrix, 
@@ -67,10 +73,19 @@ void verifyTransposeMatrix(const float *TransposeMatrix, const float* cpuTranspo
       break;
     }
   }
-  if (errors == 0) std::cout << "PASSED\n";
+  if (errors == 0)
+    std::cout << "PASS\n";
+  else
+    std::cout << "FAIL\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " <repeat> <repeat for matrix transpose>\n";
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+  const int repeat2 = atoi(argv[2]);
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -86,7 +101,22 @@ int main() {
   range<1> gws (BUF_SIZE);
   range<1> lws (BUF_SIZE);
 
-  for (int n = 0; n < 100; n++)
+  // warmup
+  for (int n = 0; n < repeat; n++)
+    q.submit([&] (handler &cgh) {
+      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class bc_shflxor_sg8_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int value = item.get_local_id(0) & 0x7;
+        for (int mask = 1; mask < 0x7; mask *= 2)
+          value += item.get_sub_group().shuffle_xor(value, mask);
+        out_acc[item.get_global_id(0)] = value;
+      });
+    });
+  q.wait();
+
+  auto begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -97,6 +127,11 @@ int main() {
       });
     });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_xor_sg8): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
@@ -105,7 +140,9 @@ int main() {
   verifyBroadcast(out, 8);
 
   //=====================================================================================================
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -116,6 +153,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_xor_sg16): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
@@ -123,7 +165,9 @@ int main() {
 
   verifyBroadcast(out, 16);
 
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -134,6 +178,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_xor_sg32): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
@@ -143,7 +192,9 @@ int main() {
   //=====================================================================================================
   std::cout << "Broadcast using the shuffle function (subgroup sizes 8, 16, and 32) \n";
   
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shfl_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -153,6 +204,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_sg8): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
@@ -161,7 +217,9 @@ int main() {
   verifyBroadcast(out, 8, PATTERN);
 
   //=====================================================================================================
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shfl_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -171,6 +229,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_sg16): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
@@ -179,7 +242,9 @@ int main() {
   verifyBroadcast(out, 16, PATTERN);
 
   //=====================================================================================================
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shfl_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
@@ -189,11 +254,15 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (bcast_shfl_sg32): " << time * 1e-9f << "(s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, out);
-  });
-  q.wait();
+  }).wait();
 
   verifyBroadcast(out, 32, PATTERN);
 
@@ -216,7 +285,9 @@ int main() {
   buffer<float, 1> gpuMatrix(Matrix, total);
   buffer<float, 1> gpuTransposeMatrix(total);
 
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat2; n++)
     q.submit([&] (handler &cgh) {
       auto in  = gpuMatrix.get_access<sycl_read>(cgh);
       auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
@@ -230,6 +301,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (transpose_shfl_sg8): " << time * 1e-9f << " (s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
@@ -238,7 +314,9 @@ int main() {
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/8, 8);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 8);
 
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat2; n++)
     q.submit([&] (handler &cgh) {
       auto in  = gpuMatrix.get_access<sycl_read>(cgh);
       auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
@@ -252,6 +330,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (transpose_shfl_sg16): " << time * 1e-9f << " (s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
@@ -260,7 +343,9 @@ int main() {
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/16, 16);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 16);
 
-  for (int n = 0; n < 100; n++)
+  begin = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat2; n++)
     q.submit([&] (handler &cgh) {
       auto in  = gpuMatrix.get_access<sycl_read>(cgh);
       auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
@@ -274,6 +359,11 @@ int main() {
       });
     });
 
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::cout << "Kernel time (transpose_shfl_sg32): " << time * 1e-9f << " (s)\n";
+
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
     cgh.copy(out_acc, TransposeMatrix);
@@ -281,7 +371,6 @@ int main() {
 
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/32, 32);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 32);
-
 
   free(Matrix);
   free(TransposeMatrix);
