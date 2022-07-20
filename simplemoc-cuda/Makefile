@@ -35,7 +35,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS +=-O3
@@ -60,4 +59,3 @@ clean:
 
 run: $(program)
 	./$(program) -s 5000000 -e 128 -n 10
-

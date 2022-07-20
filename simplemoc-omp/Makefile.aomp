@@ -16,7 +16,7 @@ VERIFY    = no
 
 program = main
 
-source = init.cpp  io.cpp  main.cpp
+source = init.cpp io.cpp main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -35,7 +35,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -70,4 +69,3 @@ clean:
 
 run: $(program)
 	./$(program) -s 5000000 -e 128 -n 10
-

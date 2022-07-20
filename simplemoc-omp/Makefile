@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -15,7 +15,7 @@ VERIFY    = no
 
 program = main
 
-source = init.cpp  io.cpp  main.cpp
+source = init.cpp io.cpp main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -35,14 +35,13 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS +=-O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -55,10 +54,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp SimpleMOC-kernel_header.h Makefile
+%.o: %.cpp SimpleMOC-kernel_header.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -66,4 +65,3 @@ clean:
 
 run: $(program)
 	./$(program) -s 5000000 -e 128 -n 10
-
