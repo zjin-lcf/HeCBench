@@ -84,13 +84,14 @@ inline int __clz( int x )
 
 int main(int argc, const char * const argv[])
 {
-  if (argc != 4){
-    printf("Incorrect arguments..\nUsage: ./%s [ReadLength] [ReadandRefFile] [#reads]\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: ./%s [ReadLength] [ReadandRefFile] [#reads] [repeat]\n", argv[0]);
     exit(-1);
   }
 
   int ReadLength = atoi(argv[1]);//in my inputs, it is always 100. Just for the generality we keep it as a variable
   int NumReads = atoi(argv[3]); // Number of reads
+  int repeat = atoi(argv[4]);
   int Size_of_uint_in_Bit = 32; //in Bits 
 
   FILE * fp;
@@ -184,12 +185,14 @@ int main(int argc, const char * const argv[])
 
     F_ErrorThreshold = (loopPar*ReadLength)/100;
 
-    high_resolution_clock::time_point t1 = high_resolution_clock::now();
-    for (int n = 0; n < 100; n++) {
+    auto t1 = high_resolution_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
       sneaky_snake(Number_of_blocks_inside_each_kernel, Concurrent_threads_In_Block,
                    ReadSeq, RefSeq, DFinal_Results, NumReads, F_ErrorThreshold);
     }
-    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+
+    auto t2 = high_resolution_clock::now();
     double elapsed_time = duration_cast<microseconds>(t2 - t1).count();
 
     #pragma omp target update from (DFinal_Results[0:NumReads])
@@ -203,8 +206,8 @@ int main(int argc, const char * const argv[])
     int D_accepted = 0;
     for(int i = 0; i < NumReads; i++) if(DFinal_Results[i] == 1) D_accepted++;
 
-    printf("Error threshold: \t %d \t Time (us): \t %5.4f \t Accepted: \t %10d \t Rejected: \t %10d\n", 
-          F_ErrorThreshold, elapsed_time / 100, D_accepted, NumReads - D_accepted);
+    printf("Error threshold: %2d | Average kernel time (us): %5.4f | Accepted: %10d | Rejected: %10d\n", 
+          F_ErrorThreshold, elapsed_time / repeat, D_accepted, NumReads - D_accepted);
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 

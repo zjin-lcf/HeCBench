@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -53,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 ../snake-cuda/Datasets/ERR240727_1_E2_30000Pairs.txt 30000
+	./$(program) 100 ../snake-cuda/Datasets/ERR240727_1_E2_30000Pairs.txt 30000 1000
