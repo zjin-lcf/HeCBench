@@ -38,12 +38,11 @@
 
 #define k_2powneg32 2.3283064E-10F
 
-
+inline
 int _ffs(const int x) {
-  for (int i = 0; i < 32; i++)
-    if ((x >> i) & 1) return (i+1);
-  return 0;
-};
+  if (x == 0) return 0;
+  return sycl::ctz(x) + 1;
+}
 
 void sobelGPU_kernel(nd_item<2> item, 
                      global_ptr<unsigned int> dir,
@@ -139,9 +138,8 @@ void sobelGPU_kernel(nd_item<2> item,
   }
 }
 
-void sobolGPU(queue &q,
-              int n_vectors, int n_dimensions, 
-              buffer<unsigned int> &d_directions, buffer<float> &d_output)
+double sobolGPU(queue &q, int repeat, int n_vectors, int n_dimensions, 
+                buffer<unsigned int> &d_directions, buffer<float> &d_output)
 {
     const int threadsperblock = 64;
 
@@ -187,8 +185,11 @@ void sobolGPU(queue &q,
     range<2> gws (dimGrid_y * dimBlock_y, dimGrid_x * dimBlock_x); 
     range<2> lws (dimBlock_y, dimBlock_x);
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     // Execute GPU kernel
-    for (int i = 0; i < 100; i++) 
+    for (int i = 0; i < repeat; i++) 
       q.submit([&] (handler &cgh) {
         auto dir = d_directions.get_access<sycl_read>(cgh);
         auto out = d_output.get_access<sycl_discard_write>(cgh);
@@ -199,5 +200,9 @@ void sobolGPU(queue &q,
                           v.get_pointer(), n_vectors, n_dimensions);
         });
       });
-}
 
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    return time;
+}

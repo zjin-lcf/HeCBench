@@ -36,8 +36,10 @@
 #ifndef SOBOL_GPU_H
 #define SOBOL_GPU_H
 
-void sobolGPU(queue &q, 
-              int n_vectors, int n_dimensions, 
-              buffer<unsigned int> &d_directions, buffer<float> &d_output);
+#include <chrono>
+#include "common.h"
+
+double sobolGPU(queue &q, int repeat, int n_vectors, int n_dimensions, 
+                buffer<unsigned int> &d_directions, buffer<float> &d_output);
 
 #endif

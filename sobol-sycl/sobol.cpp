@@ -34,7 +34,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <math.h>
-#include "common.h"
 #include "sobol.h"
 #include "sobol_gold.h"
 #include "sobol_gpu.h"
@@ -61,9 +60,14 @@ void printHelp(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+    if (argc != 4) {
+      printf("Usage: %s <number of vectors> <number of dimensions> <repeat>\n", argv[0]);
+      return 1;
+    }
     // We will generate n_vectors vectors of n_dimensions numbers
     int n_vectors = atoi(argv[1]); //100000;
     int n_dimensions = atoi(argv[2]); //100;
+    int repeat = atoi(argv[3]); //100;
 
     // Allocate memory for the arrays
     std::cout << "Allocating CPU memory..." << std::endl;
@@ -77,7 +81,7 @@ int main(int argc, char *argv[])
         h_outputCPU  = new float [n_vectors * n_dimensions];
         h_outputGPU  = new float [n_vectors * n_dimensions];
     }
-    catch (std::exception e)
+    catch (const std::exception &e)
     {
         std::cerr << "Caught exception: " << e.what() << std::endl;
         std::cerr << "Unable to allocate CPU memory (try running with fewer vectors/dimensions)" << std::endl;
@@ -90,19 +94,21 @@ int main(int argc, char *argv[])
 
     std::cout << "Executing QRNG on GPU..." << std::endl;
 
-{
+    {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+      gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+      cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+      queue q(dev_sel);
 
-    buffer<unsigned int, 1> d_directions(h_directions, n_dimensions * n_directions); 
-    buffer<float, 1> d_output(h_outputGPU, n_dimensions * n_vectors); 
+      buffer<unsigned int, 1> d_directions(h_directions, n_dimensions * n_directions); 
+      buffer<float, 1> d_output(h_outputGPU, n_dimensions * n_vectors); 
 
-    sobolGPU(q, n_vectors, n_dimensions, d_directions, d_output);
-}
+      double ktime = sobolGPU(q, repeat, n_vectors, n_dimensions, d_directions, d_output);
+
+      std::cout << "Average kernel execution time: " << (ktime * 1e-9f) / repeat << " (s)\n";
+    }
 
     std::cout << std::endl;
     // Execute the QRNG on the host
