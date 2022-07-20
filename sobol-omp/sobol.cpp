@@ -60,9 +60,14 @@ void printHelp(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+    if (argc != 4) {
+      printf("Usage: %s <number of vectors> <number of dimensions> <repeat>\n", argv[0]);
+      return 1;
+    }
     // We will generate n_vectors vectors of n_dimensions numbers
     int n_vectors = atoi(argv[1]);
     int n_dimensions = atoi(argv[2]);
+    int repeat = atoi(argv[3]); //100;
 
     // Allocate memory for the arrays
     std::cout << "Allocating CPU memory..." << std::endl;
@@ -76,7 +81,7 @@ int main(int argc, char *argv[])
         h_outputCPU  = new float [n_vectors * n_dimensions];
         h_outputGPU  = new float [n_vectors * n_dimensions];
     }
-    catch (std::exception e)
+    catch (const std::exception &e)
     {
         std::cerr << "Caught exception: " << e.what() << std::endl;
         std::cerr << "Unable to allocate CPU memory (try running with fewer vectors/dimensions)" << std::endl;
@@ -89,11 +94,13 @@ int main(int argc, char *argv[])
 
     std::cout << "Executing QRNG on GPU..." << std::endl;
 
-#pragma omp target data map(to: h_directions[0:n_dimensions * n_directions]) \
-                        map(from: h_outputGPU[0:n_dimensions * n_vectors])
-{
-    sobolGPU(n_vectors, n_dimensions, h_directions, h_outputGPU);
-}
+    #pragma omp target data map(to: h_directions[0:n_dimensions * n_directions]) \
+                            map(from: h_outputGPU[0:n_dimensions * n_vectors])
+    {
+      double ktime = sobolGPU(repeat, n_vectors, n_dimensions, h_directions, h_outputGPU);
+
+      std::cout << "Average kernel execution time: " << (ktime * 1e-9f) / repeat << " (s)\n";
+    }
 
     std::cout << std::endl;
     // Execute the QRNG on the host

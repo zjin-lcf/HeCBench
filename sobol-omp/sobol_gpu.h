@@ -36,7 +36,10 @@
 #ifndef SOBOL_GPU_H
 #define SOBOL_GPU_H
 
-void sobolGPU(int n_vectors, int n_dimensions, 
-              unsigned int* d_directions, float* d_output);
+#include <chrono>
+#include <omp.h>
+
+double sobolGPU(int repeat, int n_vectors, int n_dimensions, 
+                unsigned int* d_directions, float* d_output);
 
 #endif

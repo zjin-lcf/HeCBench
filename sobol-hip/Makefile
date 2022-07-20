@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -54,10 +53,8 @@ sobol_gpu.o:sobol_gpu.cu
 sobol_primitives.o:sobol_primitives.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
-
-run: $(program)
-	./$(program) 1000000 1000
-
 clean:
 	rm -rf $(program) $(obj)
 
+run: $(program)
+	./$(program) 1000000 1000 100

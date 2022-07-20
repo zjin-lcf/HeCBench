@@ -37,14 +37,10 @@
 
 #define k_2powneg32 2.3283064E-10F
 
-
-__device__ int _ffs(const int x) {
-  for (int i = 0; i < 32; i++)
-    if ((x >> i) & 1) return (i+1);
-  return 0;
-};
-
-__global__ void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions, unsigned *d_directions, float *d_output)
+__global__
+void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions,
+                     unsigned *__restrict__ d_directions,
+                     float *__restrict__ d_output)
 {
     // Handle to thread block group
     //cg::thread_block cta = cg::this_thread_block();
@@ -52,8 +48,8 @@ __global__ void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions, unsig
 
     // Offset into the correct dimension as specified by the
     // block y coordinate
-    d_directions = d_directions + n_directions * blockIdx.y;
-    d_output = d_output +  n_vectors * blockIdx.y;
+    d_directions += n_directions * blockIdx.y;
+    d_output += n_vectors * blockIdx.y;
 
     // Copy the direction numbers for this dimension into shared
     // memory - there are only 32 direction numbers so only the
@@ -84,7 +80,7 @@ __global__ void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions, unsig
     unsigned int X = 0;
     unsigned int mask;
 
-    for (unsigned int k = 0 ; k < _ffs(stride) - 1 ; k++)
+    for (unsigned int k = 0 ; k < __ffs(stride) - 1 ; k++)
     {
         // We want X ^= g_k * v[k], where g_k is one or zero.
         // We do this by setting a mask with all bits equal to
@@ -124,7 +120,7 @@ __global__ void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions, unsig
     // Note that all these indices count from 1, so we need to
     // subtract 1 from them all to account for C arrays counting
     // from zero.
-    unsigned int v_log2stridem1 = v[_ffs(stride) - 2];
+    unsigned int v_log2stridem1 = v[__ffs(stride) - 2];
     unsigned int v_stridemask = stride - 1;
 
     for (unsigned int i = i0 + stride ; i < n_vectors ; i += stride)
@@ -135,12 +131,13 @@ __global__ void sobolGPU_kernel(unsigned n_vectors, unsigned n_dimensions, unsig
         //  not including the bottom log2(stride) bits, minus 1
         //  for C array indexing
         // In the Bratley and Fox paper this is equation (**)
-        X ^= v_log2stridem1 ^ v[_ffs(~((i - stride) | v_stridemask)) - 1];
+        X ^= v_log2stridem1 ^ v[__ffs(~((i - stride) | v_stridemask)) - 1];
         d_output[i] = (float)X * k_2powneg32;
     }
 }
 
-void sobolGPU(int n_vectors, int n_dimensions, unsigned int *d_directions, float *d_output)
+double sobolGPU(int repeat, int n_vectors, int n_dimensions,
+                unsigned int *d_directions, float *d_output)
 {
     const int threadsperblock = 64;
 
@@ -178,13 +175,22 @@ void sobolGPU(int n_vectors, int n_dimensions, unsigned int *d_directions, float
     // Round up to a power of two, required for the algorithm so that
     // stride is a power of two.
     unsigned int targetDimGridX = dimGrid.x;
-
     for (dimGrid.x = 1 ; dimGrid.x < targetDimGridX ; dimGrid.x *= 2);
+
     // Fix the number of threads
     dimBlock.x = threadsperblock;
-
+  
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+  
     // Execute GPU kernel
-    for (int i = 0; i < 100; i++)
-      sobolGPU_kernel<<<dimGrid, dimBlock>>>(n_vectors, n_dimensions, d_directions, d_output);
+    for (int i = 0; i < repeat; i++)
+      sobolGPU_kernel <<<dimGrid, dimBlock>>> (
+        n_vectors, n_dimensions, d_directions, d_output);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    return time;
 }
 

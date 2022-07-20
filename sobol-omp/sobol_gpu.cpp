@@ -32,7 +32,6 @@
 *
 */
 
-#include <omp.h>
 #include "sobol.h"
 #include "sobol_gpu.h"
 
@@ -47,8 +46,8 @@ int _ffs(const int x) {
 };
 #pragma omp end declare target
 
-void sobolGPU(int n_vectors, int n_dimensions, 
-              unsigned int *dir, float *out)
+double sobolGPU(int repeat, int n_vectors, int n_dimensions, 
+                unsigned int *dir, float *out)
 {
     const int threadsperblock = 64;
 
@@ -90,8 +89,10 @@ void sobolGPU(int n_vectors, int n_dimensions,
     // Fix the number of threads
     size_t numTeam =  dimGrid_x * dimGrid_y;
 
+    auto start = std::chrono::steady_clock::now();
+
     // Execute GPU kernel
-    for (int i = 0; i < 100; i++) { 
+    for (int i = 0; i < repeat; i++) {
       #pragma omp target teams num_teams(numTeam) thread_limit(threadsperblock)
       {
 	unsigned int v[n_directions];
@@ -191,5 +192,8 @@ void sobolGPU(int n_vectors, int n_dimensions,
         }
       }
     }
-}
 
+    auto end = std::chrono::steady_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    return time;
+}

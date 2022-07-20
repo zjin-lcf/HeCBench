@@ -31,10 +31,9 @@
 * ACM Trans. on Math. Software, 29(1):49-57, 2003
 */
 
-#include <iostream>
-#include <cuda.h>
-#include <stdexcept>
 #include <math.h>
+#include <iostream>
+#include <stdexcept>
 #include "sobol.h"
 #include "sobol_gold.h"
 #include "sobol_gpu.h"
@@ -61,9 +60,14 @@ void printHelp(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+    if (argc != 4) {
+      printf("Usage: %s <number of vectors> <number of dimensions> <repeat>\n", argv[0]);
+      return 1;
+    }
     // We will generate n_vectors vectors of n_dimensions numbers
     int n_vectors = atoi(argv[1]); //100000;
     int n_dimensions = atoi(argv[2]); //100;
+    int repeat = atoi(argv[3]); //100;
 
     // Allocate memory for the arrays
     std::cout << "Allocating CPU memory..." << std::endl;
@@ -77,7 +81,7 @@ int main(int argc, char *argv[])
         h_outputCPU  = new float [n_vectors * n_dimensions];
         h_outputGPU  = new float [n_vectors * n_dimensions];
     }
-    catch (std::exception e)
+    catch (const std::exception &e)
     {
         std::cerr << "Caught exception: " << e.what() << std::endl;
         std::cerr << "Unable to allocate CPU memory (try running with fewer vectors/dimensions)" << std::endl;
@@ -88,8 +92,11 @@ int main(int argc, char *argv[])
     unsigned int *d_directions;
     float        *d_output;
 
-    cudaMalloc((void **)&d_directions, n_dimensions * n_directions * sizeof(unsigned int));
-    cudaMalloc((void **)&d_output, n_vectors * n_dimensions * sizeof(float));
+    size_t direction_size = n_dimensions * n_directions * sizeof(unsigned int);
+    size_t output_size = n_vectors * n_dimensions * sizeof(float);
+
+    cudaMalloc((void **)&d_directions, direction_size);
+    cudaMalloc((void **)&d_output, output_size);
 
     // Initialize the direction numbers (done on the host)
     std::cout << "Initializing direction numbers..." << std::endl;
@@ -97,13 +104,14 @@ int main(int argc, char *argv[])
 
     std::cout << "Executing QRNG on GPU..." << std::endl;
 
-    cudaMemcpy(d_directions, h_directions, 
-               n_dimensions * n_directions * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_directions, h_directions, direction_size, cudaMemcpyHostToDevice);
     cudaDeviceSynchronize();
 
-    sobolGPU(n_vectors, n_dimensions, d_directions, d_output);
+    double ktime = sobolGPU(repeat, n_vectors, n_dimensions, d_directions, d_output);
 
-    cudaMemcpy(h_outputGPU, d_output, n_vectors * n_dimensions * sizeof(float), cudaMemcpyDeviceToHost);
+    std::cout << "Average kernel execution time: " << (ktime * 1e-9f) / repeat << " (s)\n";
+
+    cudaMemcpy(h_outputGPU, d_output, output_size, cudaMemcpyDeviceToHost);
 
     std::cout << std::endl;
     // Execute the QRNG on the host
