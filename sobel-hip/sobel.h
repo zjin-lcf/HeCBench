@@ -1,6 +1,7 @@
 #ifndef SOBEL_H
 #define SOBEL_H
 
+#include <chrono>
 #include <cmath>
 #include <hip/hip_runtime.h>
 

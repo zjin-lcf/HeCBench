@@ -62,5 +62,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sobel-sycl/SobelFilter_Input.bmp 10000
-
+	./$(program) ../sobel-sycl/SobelFilter_Input.bmp 100000

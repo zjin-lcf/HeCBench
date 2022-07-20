@@ -1,8 +1,8 @@
 #ifndef SOBEL_H
 #define SOBEL_H
 
+#include <chrono>
 #include <cmath>
-
 #include "SDKBitMap.h"
 
 typedef unsigned char uchar;
