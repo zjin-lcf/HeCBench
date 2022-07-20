@@ -31,8 +31,8 @@ static bool compare(const float *refData, const float *data,
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =::sqrtf((float) ref);
-  if (::fabs((float) ref) < 1e-7f)
+  float normRef =sqrtf((float) ref);
+  if (fabs((float) ref) < 1e-7f)
   {
     return false;
   }
@@ -43,6 +43,10 @@ static bool compare(const float *refData, const float *data,
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int iterations = atoi(argv[2]);
 
@@ -111,10 +115,18 @@ int main(int argc, char * argv[])
   printf("Executing kernel for %d iterations", iterations);
   printf("-------------------------------------------\n");
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     sobel_filter<<<grid, block>>>(inputImageBuffer, outputImageBuffer, width, height);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 
   cudaMemcpy(outputImageData, outputImageBuffer, imageSize, cudaMemcpyDeviceToHost);
 
@@ -144,12 +156,11 @@ int main(int argc, char * argv[])
     outputReference[i * 4 + 3] = verificationOutput[i].w;
   }
 
-
   // compare the results and see if they match
   if(compare(outputReference, outputDevice, imageSize))
-    printf("Passed!\n");
+    printf("PASS\n");
   else
-    printf("Failed!\n");
+    printf("FAIL\n");
 
   free(outputDevice);
   free(outputReference);
@@ -159,5 +170,4 @@ int main(int argc, char * argv[])
   cudaFree(inputImageBuffer);
   cudaFree(outputImageBuffer);
   return SDK_SUCCESS;
-
 }

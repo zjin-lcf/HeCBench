@@ -28,12 +28,12 @@ static bool compare(const float *refData, const float *data,
   for(int i = 1; i < length; ++i)
   {
     float diff = refData[i] - data[i];
-    if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
+    //if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =::sqrtf((float) ref);
-  if (::fabs((float) ref) < 1e-7f)
+  float normRef =sqrtf((float) ref);
+  if (fabs((float) ref) < 1e-7f)
   {
     return false;
   }
@@ -44,6 +44,10 @@ static bool compare(const float *refData, const float *data,
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int iterations = atoi(argv[2]);
 
@@ -101,6 +105,8 @@ int main(int argc, char * argv[])
 #pragma omp target data map (to: inputImageData[0:width*height]) \
                         map(from: outputImageData[0:width*height])
 {
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
@@ -133,6 +139,10 @@ int main(int argc, char * argv[])
                                              sqrtf(Gx.w*Gx.w + Gy.w*Gy.w)/2.f});
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 }
 
   // reference implementation

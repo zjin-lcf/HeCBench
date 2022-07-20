@@ -15,6 +15,7 @@
  ********************************************************************/
 
 
+#include <chrono>
 #include <cmath>
 #include "common.h"
 #include "SDKBitMap.h"
@@ -34,12 +35,12 @@ static bool compare(const float *refData, const float *data,
   for(int i = 1; i < size; ++i)
   {
     float diff = refData[i] - data[i];
-    if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
+    //if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =::sqrtf((float) ref);
-  if (::fabs((float) ref) < 1e-7f)
+  float normRef =sqrtf((float) ref);
+  if (fabs((float) ref) < 1e-7f)
   {
     return false;
   }
@@ -50,6 +51,10 @@ static bool compare(const float *refData, const float *data,
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int iterations = atoi(argv[2]);
 
@@ -122,6 +127,9 @@ int main(int argc, char * argv[])
     printf("Executing kernel for %d iterations", iterations);
     printf("-------------------------------------------\n");
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++)
     {
       q.submit([&] (handler &cgh) {
@@ -133,6 +141,11 @@ int main(int argc, char * argv[])
         });
       });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
   }
 
   // reference implementation
