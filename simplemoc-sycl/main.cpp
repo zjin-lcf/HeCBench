@@ -2,25 +2,25 @@
 #include "common.h"
 
 // host 
-void attenuate_segment( Input * __restrict I, Source * __restrict S,
-    int QSR_id, int FAI_id, float * __restrict state_flux,
-    SIMD_Vectors * __restrict simd_vecs)
+void attenuate_segment( Input *I, Source *S,
+    int QSR_id, int FAI_id, float *state_flux,
+    SIMD_Vectors *simd_vecs)
 {
   // Unload local vector vectors
-  float * __restrict q0 =            simd_vecs->q0;
-  float * __restrict q1 =            simd_vecs->q1;
-  float * __restrict q2 =            simd_vecs->q2;
-  float * __restrict sigT =          simd_vecs->sigT;
-  float * __restrict tau =           simd_vecs->tau;
-  float * __restrict sigT2 =         simd_vecs->sigT2;
-  float * __restrict expVal =        simd_vecs->expVal;
-  float * __restrict reuse =         simd_vecs->reuse;
-  float * __restrict flux_integral = simd_vecs->flux_integral;
-  float * __restrict tally =         simd_vecs->tally;
-  float * __restrict t1 =            simd_vecs->t1;
-  float * __restrict t2 =            simd_vecs->t2;
-  float * __restrict t3 =            simd_vecs->t3;
-  float * __restrict t4 =            simd_vecs->t4;
+  float *q0 =            simd_vecs->q0;
+  float *q1 =            simd_vecs->q1;
+  float *q2 =            simd_vecs->q2;
+  float *sigT =          simd_vecs->sigT;
+  float *tau =           simd_vecs->tau;
+  float *sigT2 =         simd_vecs->sigT2;
+  float *expVal =        simd_vecs->expVal;
+  float *reuse =         simd_vecs->reuse;
+  float *flux_integral = simd_vecs->flux_integral;
+  float *tally =         simd_vecs->tally;
+  float *t1 =            simd_vecs->t1;
+  float *t2 =            simd_vecs->t2;
+  float *t3 =            simd_vecs->t3;
+  float *t4 =            simd_vecs->t4;
 
   // Some placeholder constants - In the full app some of these are
   // calculated based off position in geometry. This treatment
@@ -348,10 +348,12 @@ int main( int argc, char * argv[] )
   }
 
 #ifdef VERIFY
-    float* simd_vecs_debug = (float*) malloc (sizeof(float)*I->egroups*14);
+  float* simd_vecs_debug = (float*) malloc (sizeof(float)*I->egroups*14);
 #endif
 
+  double kstart, kstop;
   double start = get_time();
+
   { // SYCL scope
 
 #ifdef USE_GPU 
@@ -360,7 +362,6 @@ int main( int argc, char * argv[] )
     cpu_selector dev_sel;
 #endif
     queue q(dev_sel);
-
 
     buffer<int,1> d_QSR_id (QSR_id_arr, I->segments);
     buffer<int,1> d_FAI_id (FAI_id_arr, I->segments);
@@ -383,6 +384,8 @@ int main( int argc, char * argv[] )
     range<1> gws ((segments+127)/128*128);
     range<1> lws (128);
 
+    kstart = get_time();
+
     for (int n = 0; n < I->repeat; n++) 
       q.submit([&](handler &h) {
         auto FAI_id_acc = d_FAI_id.get_access<sycl_read>(h);
@@ -394,144 +397,146 @@ int main( int argc, char * argv[] )
         auto v_acc = d_simd_vecs.get_access<sycl_write>(h);
 
         h.parallel_for<class attenuate_segment>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-            int gid = item.get_global_id(0);
-            if (gid >= segments) return; 
+          int gid = item.get_global_id(0);
+          if (gid >= segments) return; 
 
-            const float dz = 0.1f;
-            const float zin = 0.3f; 
-            const float weight = 0.5f;
-            const float mu = 0.9f;
-            const float mu2 = 0.3f;
-            const float ds = 0.7f;
+          const float dz = 0.1f;
+          const float zin = 0.3f; 
+          const float weight = 0.5f;
+          const float mu = 0.9f;
+          const float mu2 = 0.3f;
+          const float ds = 0.7f;
 
-            int QSR_id = QSR_id_acc[gid];
-            int FAI_id = FAI_id_acc[gid];
+          int QSR_id = QSR_id_acc[gid];
+          int FAI_id = FAI_id_acc[gid];
 
-            // load fine source region flux vector
-            int offset = QSR_id * fine_axial_intervals * egroups;
+          // load fine source region flux vector
+          int offset = QSR_id * fine_axial_intervals * egroups;
 
-            float *FSR_flux = fine_flux_acc.get_pointer() + offset + FAI_id * egroups;
-            float *vptr = v_acc.get_pointer();
-            float *fptr = fine_source_acc.get_pointer();
+          float *FSR_flux = fine_flux_acc.get_pointer() + offset + FAI_id * egroups;
+          float *vptr = v_acc.get_pointer();
+          float *fptr = fine_source_acc.get_pointer();
 
-            float* q0 = vptr;
-            float* q1 = vptr + egroups;
-            float* q2 = vptr + egroups * 2;
-            float* sigT = vptr + egroups * 3;
-            float* tau = vptr + egroups * 4;
-            float* sigT2 = vptr + egroups * 5;
-            float* expVal = vptr + egroups * 6;
-            float* reuse = vptr + egroups * 7;
-            float* flux_integral = vptr + egroups * 8;
-            float* tally = vptr + egroups * 9;
-            float* t1 = vptr + egroups * 10;
-            float* t2 = vptr + egroups * 11;
-            float* t3 = vptr + egroups * 12;
-            float* t4 = vptr + egroups * 13;
+          float* q0 = vptr;
+          float* q1 = vptr + egroups;
+          float* q2 = vptr + egroups * 2;
+          float* sigT = vptr + egroups * 3;
+          float* tau = vptr + egroups * 4;
+          float* sigT2 = vptr + egroups * 5;
+          float* expVal = vptr + egroups * 6;
+          float* reuse = vptr + egroups * 7;
+          float* flux_integral = vptr + egroups * 8;
+          float* tally = vptr + egroups * 9;
+          float* t1 = vptr + egroups * 10;
+          float* t2 = vptr + egroups * 11;
+          float* t3 = vptr + egroups * 12;
+          float* t4 = vptr + egroups * 13;
 
-            if( FAI_id == 0 )
-            {
-              float * f2 = fptr + offset + FAI_id*egroups;
-              float * f3 = fptr + offset + (FAI_id+1)*egroups; 
-              // cycle over energy groups
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y2 = f2[g];
-                const float y3 = f3[g];
-
-                // do linear "fitting"
-                const float c0 = y2;
-                const float c1 = (y3 - y2) / dz;
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin;
-                q1[g] = c1;
-                q2[g] = 0;
-              }
-            }
-            else if ( FAI_id == fine_axial_intervals - 1 )
-            {
-              float * f1 = fptr + offset + (FAI_id-1)*egroups; 
-              float * f2 = fptr + offset + FAI_id*egroups; 
-
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y1 = f1[g];
-                const float y2 = f2[g];
-
-                // do linear "fitting"
-                const float c0 = y2;
-                const float c1 = (y2 - y1) / dz;
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin;
-                q1[g] = c1;
-                q2[g] = 0;
-              }
-            }
-            else
-            {
-              float * f1 = fptr + offset + (FAI_id-1)*egroups; 
-              float * f2 = fptr + offset + FAI_id*egroups; 
-              float * f3 = fptr + offset + (FAI_id+1)*egroups; 
-              // cycle over energy groups
-              for( int g = 0; g < egroups; g++)
-              {
-                // load neighboring sources
-                const float y1 = f1[g]; 
-                const float y2 = f2[g];
-                const float y3 = f3[g];
-
-                // do quadratic "fitting"
-                const float c0 = y2;
-                const float c1 = (y1 - y3) / (2.f*dz);
-                const float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
-
-                // calculate q0, q1, q2
-                q0[g] = c0 + c1*zin + c2*zin*zin;
-                q1[g] = c1 + 2.f*c2*zin;
-                q2[g] = c2;
-              }
-            }
-
-
+          if( FAI_id == 0 )
+          {
+            float * f2 = fptr + offset + FAI_id*egroups;
+            float * f3 = fptr + offset + (FAI_id+1)*egroups; 
             // cycle over energy groups
-            offset = QSR_id * egroups;
             for( int g = 0; g < egroups; g++)
             {
-              // load total cross section
-              sigT[g] = sigT_acc[offset + g];
+              // load neighboring sources
+              const float y2 = f2[g];
+              const float y3 = f3[g];
 
-              // calculate common values for efficiency
-              tau[g] = sigT[g] * ds;
-              sigT2[g] = sigT[g] * sigT[g];
+              // do linear "fitting"
+              const float c0 = y2;
+              const float c1 = (y3 - y2) / dz;
 
-              expVal[g] = 1.f - cl::sycl::exp( -tau[g] ); // exp is faster on many architectures
-              reuse[g] = tau[g] * (tau[g] - 2.f) + 2.f * expVal[g] / (sigT[g] * sigT2[g]); 
-
-              // add contribution to new source flux
-              flux_integral[g] = (q0[g] * tau[g] + (sigT[g] * state_flux_acc[g] - q0[g])
-                  * expVal[g]) / sigT2[g] + q1[g] * mu * reuse[g] + q2[g] * mu2 
-                * (tau[g] * (tau[g] * (tau[g] - 3.f) + 6.f) - 6.f * expVal[g]) 
-                / (3.f * sigT2[g] * sigT2[g]);
-
-              tally[g] = weight * flux_integral[g];
-              FSR_flux[g] += tally[g];
-              t1[g] = q0[g] * expVal[g] / sigT[g];  
-              t2[g] = q1[g] * mu * (tau[g] - expVal[g]) / sigT2[g]; 
-              t3[g] = q2[g] * mu2 * reuse[g];
-              t4[g] = state_flux_acc[g] * (1.f - expVal[g]);
-              state_flux_acc[g] = t1[g]+t2[g]+t3[g]+t4[g];
+              // calculate q0, q1, q2
+              q0[g] = c0 + c1*zin;
+              q1[g] = c1;
+              q2[g] = 0;
             }
+          }
+          else if ( FAI_id == fine_axial_intervals - 1 )
+          {
+            float * f1 = fptr + offset + (FAI_id-1)*egroups; 
+            float * f2 = fptr + offset + FAI_id*egroups; 
+
+            for( int g = 0; g < egroups; g++)
+            {
+              // load neighboring sources
+              const float y1 = f1[g];
+              const float y2 = f2[g];
+
+              // do linear "fitting"
+              const float c0 = y2;
+              const float c1 = (y2 - y1) / dz;
+
+              // calculate q0, q1, q2
+              q0[g] = c0 + c1*zin;
+              q1[g] = c1;
+              q2[g] = 0;
+            }
+          }
+          else
+          {
+            float * f1 = fptr + offset + (FAI_id-1)*egroups; 
+            float * f2 = fptr + offset + FAI_id*egroups; 
+            float * f3 = fptr + offset + (FAI_id+1)*egroups; 
+            // cycle over energy groups
+            for( int g = 0; g < egroups; g++)
+            {
+              // load neighboring sources
+              const float y1 = f1[g]; 
+              const float y2 = f2[g];
+              const float y3 = f3[g];
+
+              // do quadratic "fitting"
+              const float c0 = y2;
+              const float c1 = (y1 - y3) / (2.f*dz);
+              const float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
+
+              // calculate q0, q1, q2
+              q0[g] = c0 + c1*zin + c2*zin*zin;
+              q1[g] = c1 + 2.f*c2*zin;
+              q2[g] = c2;
+            }
+          }
+
+          // cycle over energy groups
+          offset = QSR_id * egroups;
+          for( int g = 0; g < egroups; g++)
+          {
+            // load total cross section
+            sigT[g] = sigT_acc[offset + g];
+
+            // calculate common values for efficiency
+            tau[g] = sigT[g] * ds;
+            sigT2[g] = sigT[g] * sigT[g];
+
+            expVal[g] = 1.f - cl::sycl::exp( -tau[g] ); // exp is faster on many architectures
+            reuse[g] = tau[g] * (tau[g] - 2.f) + 2.f * expVal[g] / (sigT[g] * sigT2[g]); 
+
+            // add contribution to new source flux
+            flux_integral[g] = (q0[g] * tau[g] + (sigT[g] * state_flux_acc[g] - q0[g])
+                * expVal[g]) / sigT2[g] + q1[g] * mu * reuse[g] + q2[g] * mu2 
+              * (tau[g] * (tau[g] * (tau[g] - 3.f) + 6.f) - 6.f * expVal[g]) 
+              / (3.f * sigT2[g] * sigT2[g]);
+
+            tally[g] = weight * flux_integral[g];
+            FSR_flux[g] += tally[g];
+            t1[g] = q0[g] * expVal[g] / sigT[g];  
+            t2[g] = q1[g] * mu * (tau[g] - expVal[g]) / sigT2[g]; 
+            t3[g] = q2[g] * mu2 * reuse[g];
+            t4[g] = state_flux_acc[g] * (1.f - expVal[g]);
+            state_flux_acc[g] = t1[g]+t2[g]+t3[g]+t4[g];
+          }
         });
-    });
-    q.wait();
+      });
+
+  q.wait();
+  kstop = get_time();
+
   }
 
-  printf("Simulation Complete.\n");
   double stop = get_time();
+  printf("Simulation Complete.\n");
 
 #ifdef VERIFY
   int egroups = I->egroups;
@@ -585,9 +590,11 @@ int main( int argc, char * argv[] )
   center_print("RESULTS SUMMARY", 79);
   border_print();
 
-  double tpi = ((double) (stop - start) /
-      (double)I->segments / (double) I->egroups) * 1.0e9;
-  printf("%-25s%.3lf seconds\n", "Runtime:", stop-start);
+  printf("%-25s%.3lf seconds\n", "Total kernel time:", kstop-kstart);
+  printf("%-25s%.3lf seconds\n", "Device offload time:", stop-start);
+
+  double tpi = ((double) (kstop - kstart) / (I->repeat) /
+                (double)I->segments / (double) I->egroups) * 1.0e9;
   printf("%-25s%.3lf ns\n", "Time per Intersection:", tpi);
   border_print();
 

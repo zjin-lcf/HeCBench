@@ -2,25 +2,26 @@
 #include "SimpleMOC-kernel_header.h"
 
 // host 
-void attenuate_segment( Input * __restrict I, Source * __restrict S,
-    int QSR_id, int FAI_id, float * __restrict state_flux,
-    SIMD_Vectors * __restrict simd_vecs)
+void attenuate_segment(
+    Input *I, Source *S,
+    int QSR_id, int FAI_id, float *state_flux,
+    SIMD_Vectors *simd_vecs)
 {
   // Unload local vector vectors
-  float * __restrict q0 =            simd_vecs->q0;
-  float * __restrict q1 =            simd_vecs->q1;
-  float * __restrict q2 =            simd_vecs->q2;
-  float * __restrict sigT =          simd_vecs->sigT;
-  float * __restrict tau =           simd_vecs->tau;
-  float * __restrict sigT2 =         simd_vecs->sigT2;
-  float * __restrict expVal =        simd_vecs->expVal;
-  float * __restrict reuse =         simd_vecs->reuse;
-  float * __restrict flux_integral = simd_vecs->flux_integral;
-  float * __restrict tally =         simd_vecs->tally;
-  float * __restrict t1 =            simd_vecs->t1;
-  float * __restrict t2 =            simd_vecs->t2;
-  float * __restrict t3 =            simd_vecs->t3;
-  float * __restrict t4 =            simd_vecs->t4;
+  float *q0 =            simd_vecs->q0;
+  float *q1 =            simd_vecs->q1;
+  float *q2 =            simd_vecs->q2;
+  float *sigT =          simd_vecs->sigT;
+  float *tau =           simd_vecs->tau;
+  float *sigT2 =         simd_vecs->sigT2;
+  float *expVal =        simd_vecs->expVal;
+  float *reuse =         simd_vecs->reuse;
+  float *flux_integral = simd_vecs->flux_integral;
+  float *tally =         simd_vecs->tally;
+  float *t1 =            simd_vecs->t1;
+  float *t2 =            simd_vecs->t2;
+  float *t3 =            simd_vecs->t3;
+  float *t4 =            simd_vecs->t4;
 
   // Some placeholder constants - In the full app some of these are
   // calculated based off position in geometry. This treatment
@@ -274,19 +275,19 @@ void attenuate_segment( Input * __restrict I, Source * __restrict S,
   }
 }  
 
-  __global__ void 
-att ( const int* QSR_id_acc,
-    const int* FAI_id_acc,
-    float* fine_flux_acc,
-    float* fine_source_acc,
-    float* sigT_acc,
-    float* state_flux_acc,
-    float* v_acc,
-    const int fine_axial_intervals,
-    const int egroups,
-    const int segments )
+__global__
+void att (
+  const int*__restrict__ QSR_id_acc,
+  const int*__restrict__ FAI_id_acc,
+  float*__restrict__ fine_flux_acc,
+  float*__restrict__ fine_source_acc,
+  float*__restrict__ sigT_acc,
+  float*__restrict__ state_flux_acc,
+  float*__restrict__ v_acc,
+  const int fine_axial_intervals,
+  const int egroups,
+  const int segments )
 {
-
   int gid = blockIdx.x*blockDim.x+threadIdx.x;
   if (gid >= segments) return; 
 
@@ -543,6 +544,8 @@ int main( int argc, char * argv[] )
   dim3 grids ((segments+127)/128*128);
   dim3 threads (128);
 
+  double kstart = get_time();
+
   for (int n = 0; n < I->repeat; n++) 
     att<<<grids, threads>>>(
         d_QSR_id,
@@ -555,6 +558,9 @@ int main( int argc, char * argv[] )
         fine_axial_intervals,
         egroups,
         segments );
+
+  cudaDeviceSynchronize();
+  double kstop = get_time();
 
   cudaMemcpy(state_flux_device, d_state_flux, 
       sizeof(float) * I->egroups,
@@ -578,8 +584,8 @@ int main( int argc, char * argv[] )
   cudaFree(d_state_flux);
   cudaFree(d_simd_vecs);
   
-  printf("Simulation Complete.\n");
   double stop = get_time();
+  printf("Simulation Complete.\n");
 
 #ifdef VERIFY
   const float* q0 = simd_vecs_debug;
@@ -632,9 +638,11 @@ int main( int argc, char * argv[] )
   center_print("RESULTS SUMMARY", 79);
   border_print();
 
-  double tpi = ((double) (stop - start) /
-    (double)I->segments / (double) I->egroups) * 1.0e9;
-  printf("%-25s%.3lf seconds\n", "Runtime:", stop-start);
+  printf("%-25s%.3lf seconds\n", "Total kernel time:", kstop-kstart);
+  printf("%-25s%.3lf seconds\n", "Device offload time:", stop-start);
+
+  double tpi = ((double) (kstop - kstart) / (I->repeat) /
+                (double)I->segments / (double) I->egroups) * 1.0e9;
   printf("%-25s%.3lf ns\n", "Time per Intersection:", tpi);
   border_print();
 

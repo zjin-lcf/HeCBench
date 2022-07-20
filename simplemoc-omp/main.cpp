@@ -1,25 +1,25 @@
 #include "SimpleMOC-kernel_header.h"
 
 // host 
-void attenuate_segment( Input * __restrict I, Source * __restrict S,
-    int QSR_id, int FAI_id, float * __restrict state_flux,
-    SIMD_Vectors * __restrict simd_vecs)
+void attenuate_segment( Input *I, Source *S,
+    int QSR_id, int FAI_id, float *state_flux,
+    SIMD_Vectors *simd_vecs)
 {
   // Unload local vector vectors
-  float * __restrict q0 =            simd_vecs->q0;
-  float * __restrict q1 =            simd_vecs->q1;
-  float * __restrict q2 =            simd_vecs->q2;
-  float * __restrict sigT =          simd_vecs->sigT;
-  float * __restrict tau =           simd_vecs->tau;
-  float * __restrict sigT2 =         simd_vecs->sigT2;
-  float * __restrict expVal =        simd_vecs->expVal;
-  float * __restrict reuse =         simd_vecs->reuse;
-  float * __restrict flux_integral = simd_vecs->flux_integral;
-  float * __restrict tally =         simd_vecs->tally;
-  float * __restrict t1 =            simd_vecs->t1;
-  float * __restrict t2 =            simd_vecs->t2;
-  float * __restrict t3 =            simd_vecs->t3;
-  float * __restrict t4 =            simd_vecs->t4;
+  float *q0 =            simd_vecs->q0;
+  float *q1 =            simd_vecs->q1;
+  float *q2 =            simd_vecs->q2;
+  float *sigT =          simd_vecs->sigT;
+  float *tau =           simd_vecs->tau;
+  float *sigT2 =         simd_vecs->sigT2;
+  float *expVal =        simd_vecs->expVal;
+  float *reuse =         simd_vecs->reuse;
+  float *flux_integral = simd_vecs->flux_integral;
+  float *tally =         simd_vecs->tally;
+  float *t1 =            simd_vecs->t1;
+  float *t2 =            simd_vecs->t2;
+  float *t3 =            simd_vecs->t3;
+  float *t4 =            simd_vecs->t4;
 
   // Some placeholder constants - In the full app some of these are
   // calculated based off position in geometry. This treatment
@@ -348,8 +348,8 @@ int main( int argc, char * argv[] )
 
   float* simd_vecs_debug = (float*) malloc (sizeof(float)*I->egroups*14);
 
+  double kstart, kstop;
   double start = get_time();
-
 
   int fine_axial_intervals = I->fine_axial_intervals;
   int egroups = I->egroups;
@@ -372,6 +372,7 @@ int main( int argc, char * argv[] )
                                     state_flux_acc[0:egroups]) \
                         map(alloc: v_acc[0:egroups*14])
   {
+    kstart = get_time();
 
     for (int n = 0; n < I->repeat; n++) {
 
@@ -506,6 +507,9 @@ int main( int argc, char * argv[] )
         }
       }
     }
+
+    kstop = get_time();
+
 #ifdef VERIFY
 #pragma omp target update from (v_acc[0:14*egroups])
 #endif
@@ -565,9 +569,11 @@ int main( int argc, char * argv[] )
   center_print("RESULTS SUMMARY", 79);
   border_print();
 
-  double tpi = ((double) (stop - start) /
-      (double)I->segments / (double) I->egroups) * 1.0e9;
-  printf("%-25s%.3lf seconds\n", "Runtime:", stop-start);
+  printf("%-25s%.3lf seconds\n", "Total kernel time:", kstop-kstart);
+  printf("%-25s%.3lf seconds\n", "Device offload time:", stop-start);
+
+  double tpi = ((double) (kstop - kstart) / (I->repeat) /
+                (double)I->segments / (double) I->egroups) * 1.0e9;
   printf("%-25s%.3lf ns\n", "Time per Intersection:", tpi);
   border_print();
 
