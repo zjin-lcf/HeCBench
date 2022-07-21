@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 ////////////////////////////////////////////////////////////////////////////
@@ -92,7 +93,7 @@ double boundaryGamma(double3 p_pos, double3 k_pos, double3 k_n, double h, double
 
 __device__
 double computeDensity(double3 p_pos, double3 p_v, double3 q_pos, double3 q_v,
-                      param *params)
+                      const param *params)
 {
     double v_x = (p_v.x - q_v.x);
     double v_y = (p_v.y - q_v.y);
@@ -110,7 +111,7 @@ double computeDensity(double3 p_pos, double3 p_v, double3 q_pos, double3 q_v,
 }
 
 __device__
-double computePressure(double p_density, param *params)
+double computePressure(double p_density, const param *params)
 {
     double gam = 7.0;
     double B = params->rest_density * params->speed_sound*params->speed_sound / gam;
@@ -120,7 +121,8 @@ double computePressure(double p_density, param *params)
 }
 
 __global__
-void updatePressures(fluid_particle *fluid_particles, param *params)
+void updatePressures(fluid_particle *__restrict__ fluid_particles,
+                     const param *__restrict__ params)
 {
     int num_fluid_particles = params->number_fluid_particles;
     int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -201,7 +203,8 @@ double3 computeAcceleration(double3 p_pos, double3 p_v, double p_density,
 
 // Update particle acclerations
 __global__
-void updateAccelerationsFP(fluid_particle *fluid_particles, param *params)
+void updateAccelerationsFP(fluid_particle *__restrict__ fluid_particles,
+                           const param *__restrict__ params)
 {
     int num_fluid_particles = params->number_fluid_particles;
 
@@ -239,9 +242,9 @@ void updateAccelerationsFP(fluid_particle *fluid_particles, param *params)
 }
 
 __global__
-void updateAccelerationsBP(fluid_particle *fluid_particles,
-                         boundary_particle *boundary_particles, 
-                         param *params)
+void updateAccelerationsBP(fluid_particle *__restrict__ fluid_particles,
+                           const boundary_particle *__restrict__ boundary_particles, 
+                           const param *__restrict__ params)
 {
     int num_fluid_particles = params->number_fluid_particles;
     int num_boundary_particles = params->number_boundary_particles;
@@ -272,7 +275,8 @@ void updateAccelerationsBP(fluid_particle *fluid_particles,
 // Update particle positions
 // Leap Frog integration with v(t+1) estimated
 __global__
-void updatePositions(fluid_particle *fluid_particles, param *params)
+void updatePositions(fluid_particle *__restrict__ fluid_particles,
+                     const param *__restrict__ params)
 {
     double dt = params->time_step;
 
@@ -472,14 +476,22 @@ int main(int argc, char *argv[])
     dim3 grid1D_FP((num_fluid_particles + 255)/256);
     dim3 grid1D_BP((num_boundary_particles + 255)/256);
 
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     // Main simulation loop
     for(int n=0; n<params.number_steps; n++) {
         hipLaunchKernelGGL(updatePressures, dim3(grid1D_FP), dim3(block1D), 0, 0, d_fluid_particles, d_params);
         hipLaunchKernelGGL(updateAccelerationsFP, dim3(grid1D_FP), dim3(block1D), 0, 0, d_fluid_particles, d_params);
         hipLaunchKernelGGL(updateAccelerationsBP, dim3(grid1D_BP), dim3(block1D), 0, 0, d_fluid_particles, d_boundary_particles, d_params);
         hipLaunchKernelGGL(updatePositions, dim3(grid1D_FP), dim3(block1D), 0, 0, d_fluid_particles, d_params);
-        //hipDeviceSynchronize();
     }
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
+
     hipMemcpy(fluid_particles, d_fluid_particles, 
         num_fluid_particles * sizeof(fluid_particle), hipMemcpyDeviceToHost);
 
@@ -491,4 +503,3 @@ int main(int argc, char *argv[])
     hipFree(d_params);
     return 0;
 }
-
