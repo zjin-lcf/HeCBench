@@ -540,5 +540,3 @@ int main(int argc, char** argv) {
   SAFE_CALL_MPI(MPI_Finalize());
   return 0;
 }
-
-//=============================================================================
