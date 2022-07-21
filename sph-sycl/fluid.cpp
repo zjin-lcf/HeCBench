@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "sph.h"
 
 ////////////////////////////////////////////////////////////////////////////
@@ -355,6 +356,9 @@ int main(int argc, char *argv[])
     size_t global_work_size_FP = (num_fluid_particles + 255)/256*256;
     size_t global_work_size_BP = (num_boundary_particles + 255)/256*256;
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     // Main simulation loop
     for(int n=0; n<params.number_steps; n++) {
       //updatePressures <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
@@ -371,14 +375,14 @@ int main(int argc, char *argv[])
               double density = fluid_particles[i].density;
 
               for(int j=0; j< num_fluid_particles; j++) {
-              cl::sycl::double3 q_pos = fluid_particles[j].pos;
-              cl::sycl::double3 q_v   = fluid_particles[j].v;
-              density += computeDensity(p_pos,p_v,q_pos,q_v, params.get_pointer());
+                cl::sycl::double3 q_pos = fluid_particles[j].pos;
+                cl::sycl::double3 q_v   = fluid_particles[j].v;
+                density += computeDensity(p_pos,p_v,q_pos,q_v, params.get_pointer());
               }
               fluid_particles[i].density = density;
               fluid_particles[i].pressure = computePressure(density, params.get_pointer());
-              });
           });
+      });
 
       //updateAccelerationsFP <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
       q.submit([&](handler& cgh) {
@@ -419,7 +423,7 @@ int main(int argc, char *argv[])
               fluid_particles[i].a.x() = ax;
               fluid_particles[i].a.y() = ay;
               fluid_particles[i].a.z() = az;
-              });
+          });
       });
       //updateAccelerationsBP ()<<< dim3(grid1D_BP), dim3(block1D) >>> (d_fluid_particles, d_boundary_particles, d_params);
       q.submit([&](handler& cgh) {
@@ -451,7 +455,7 @@ int main(int argc, char *argv[])
               fluid_particles[i].a.x() = ax;
               fluid_particles[i].a.y() = ay;
               fluid_particles[i].a.z() = az;
-              });
+          });
       });
       //updatePositions <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
       q.submit([&](handler& cgh) {
@@ -487,9 +491,14 @@ int main(int argc, char *argv[])
               fluid_particles[i].v_half = v_half;
               fluid_particles[i].v      = v;
               fluid_particles[i].pos    = pos;
-              });
+          });
       });
     }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
 
   }
 
@@ -498,4 +507,3 @@ int main(int argc, char *argv[])
   finalizeParticles(fluid_particles, boundary_particles);
   return 0;
 }
-

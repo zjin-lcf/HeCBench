@@ -16,7 +16,6 @@ program = sph
 build: $(program)
 
 
-
 #===============================================================================
 # Sets Flags
 #===============================================================================
@@ -32,7 +31,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -60,4 +58,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

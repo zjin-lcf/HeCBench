@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "sph.h"
 
 ////////////////////////////////////////////////////////////////////////////
@@ -344,8 +345,11 @@ int main(int argc, char *argv[])
 #pragma omp target data map(tofrom: fluid_particles[0:num_fluid_particles],\
                             boundary_particles[0:num_boundary_particles]) 
 {
-    // Main simulation loop
+  auto start = std::chrono::steady_clock::now();
+
+  // Main simulation loop
   for(int n=0; n<params.number_steps; n++) {
+
     //updatePressures <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
     #pragma omp target teams distribute parallel for simd thread_limit(256) 
     for (int i = 0; i < num_fluid_particles; i++) {
@@ -396,7 +400,6 @@ int main(int argc, char *argv[])
     }
 
     //updateAccelerationsBP ()<<< dim3(grid1D_BP), dim3(block1D) >>> (d_fluid_particles, d_boundary_particles, d_params);
-
     #pragma omp target teams distribute parallel for simd thread_limit(256) 
     for (int i = 0; i < num_particles; i++) {
       double ax = fluid_particles[i].a.x;
@@ -418,6 +421,7 @@ int main(int argc, char *argv[])
       fluid_particles[i].a.y = ay;
       fluid_particles[i].a.z = az;
     }
+
     //updatePositions <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
     #pragma omp target teams distribute parallel for simd thread_limit(256) 
     for (int i = 0; i < num_fluid_particles; i++) {
@@ -449,11 +453,13 @@ int main(int argc, char *argv[])
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
 }
 
   writeFile(fluid_particles, &params);
 
-    finalizeParticles(fluid_particles, boundary_particles);
-    return 0;
+  finalizeParticles(fluid_particles, boundary_particles);
+  return 0;
 }
-
