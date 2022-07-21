@@ -4,11 +4,11 @@
 #include <string.h>
 #include <math.h>
 #include <algorithm>
+#include <chrono>
 #include <cuda.h>
 
 #define NUM_THREADS 128
 #define NUM_BLOCKS 256
-#define REPEAT 100
 
 
 // interpolation
@@ -39,16 +39,15 @@ float interp(const int3 d, const unsigned char f[], float x, float y, float z)
 }
 
 __global__ void spm (
-  const float *__restrict M, 
+  const float *__restrict__ M, 
   const int data_size,
-  const unsigned char *__restrict g_d,
-  const unsigned char *__restrict f_d,
-  int3 dg,
-  int3 df,
-  unsigned char *__restrict ivf_d,
-  unsigned char *__restrict ivg_d,
-  bool *__restrict data_threshold_d)
-
+  const unsigned char *__restrict__ g_d,
+  const unsigned char *__restrict__ f_d,
+  const int3 dg,
+  const int3 df,
+  unsigned char *__restrict__ ivf_d,
+  unsigned char *__restrict__ ivg_d,
+  bool *__restrict__ data_threshold_d)
 {
   // 97 random values
   const float ran[] = {
@@ -102,16 +101,15 @@ __global__ void spm (
 }
 
 void spm_reference (
-  const float *__restrict M, 
+  const float *M, 
   const int data_size,
-  const unsigned char *__restrict g_d,
-  const unsigned char *__restrict f_d,
-  int3 dg,
-  int3 df,
-  unsigned char *__restrict ivf_d,
-  unsigned char *__restrict ivg_d,
-  bool *__restrict data_threshold_d)
-
+  const unsigned char *g_d,
+  const unsigned char *f_d,
+  const int3 dg,
+  const int3 df,
+  unsigned char *ivf_d,
+  unsigned char *ivg_d,
+  bool *data_threshold_d)
 {
   // 97 random values
   const float ran[] = {
@@ -164,7 +162,12 @@ void spm_reference (
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <dimension> <repeat>\n", argv[0]);
+    return 1;
+  }
   int v = atoi(argv[1]);
+  int repeat = atoi(argv[2]);
 
   int3 g_vol = {v,v,v};
   int3 f_vol = {v,v,v};
@@ -211,9 +214,17 @@ int main(int argc, char* argv[])
   bool *data_threshold_d;
   cudaMalloc((void**)&data_threshold_d,vol_size*sizeof(bool));
 
-  for (int i = 0; i < REPEAT; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     spm<<<NUM_BLOCKS,NUM_THREADS>>>(M_d, vol_size, g_d, f_d, g_vol, f_vol,
-		  ivf_d,ivg_d,data_threshold_d);
+                                    ivf_d,ivg_d,data_threshold_d);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(ivf_h,ivf_d,vol_size*sizeof(unsigned char),cudaMemcpyDeviceToHost);
   cudaMemcpy(ivg_h,ivg_d,vol_size*sizeof(unsigned char),cudaMemcpyDeviceToHost);

@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <stdbool.h>
+#include <string.h>
+#include <math.h>
+#include <algorithm>
+#include <chrono>
 #include "common.h"
 
 #define NUM_THREADS 128
 #define NUM_BLOCKS 256
-#define REPEAT 100
 
 
 // interpolation
@@ -49,8 +51,8 @@ void spm (
   const int data_size,
   const unsigned char *__restrict g_d,
   const unsigned char *__restrict f_d,
-  int3 dg,
-  int3 df,
+  const int3 dg,
+  const int3 df,
   unsigned char *__restrict ivf_d,
   unsigned char *__restrict ivg_d,
   bool *__restrict data_threshold_d,
@@ -108,16 +110,15 @@ void spm (
 }
 
 void spm_reference (
-  const float *__restrict M, 
+  const float *M, 
   const int data_size,
-  const unsigned char *__restrict g_d,
-  const unsigned char *__restrict f_d,
-  int3 dg,
-  int3 df,
-  unsigned char *__restrict ivf_d,
-  unsigned char *__restrict ivg_d,
-  bool *__restrict data_threshold_d)
-
+  const unsigned char *g_d,
+  const unsigned char *f_d,
+  const int3 dg,
+  const int3 df,
+  unsigned char *ivf_d,
+  unsigned char *ivg_d,
+  bool *data_threshold_d)
 {
   // 97 random values
   const float ran[] = {
@@ -170,7 +171,12 @@ void spm_reference (
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <dimension> <repeat>\n", argv[0]);
+    return 1;
+  }
   int v = atoi(argv[1]);
+  int repeat = atoi(argv[2]);
 
   int3 g_vol = {v,v,v};
   int3 f_vol = {v,v,v};
@@ -217,7 +223,10 @@ int main(int argc, char* argv[])
   range<1> gws (NUM_BLOCKS*NUM_THREADS);
   range<1> lws (NUM_THREADS);
 
-  for (int i = 0; i < REPEAT; i++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto M = M_d.get_access<sycl_read>(cgh);
       auto g = g_d.get_access<sycl_read>(cgh);
@@ -231,7 +240,11 @@ int main(int argc, char* argv[])
       });
     });
   }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   } // end of sycl scope
 
