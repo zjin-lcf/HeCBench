@@ -9,10 +9,11 @@
  *
  */
 
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
+#include <omp.h>
 #include "verify.cpp"
 
 typedef struct { unsigned int x; unsigned int y; unsigned int z; unsigned int w;} uint4 ;
@@ -51,7 +52,6 @@ unsigned int scanwarp(unsigned int val, volatile unsigned int* sData, const int 
 
 uint4 scan4(const uint4 idata, unsigned int* ptr)
 {    
-
   unsigned int idx = omp_get_thread_num();
 
   uint4 val4 = idata;
@@ -109,13 +109,18 @@ uint4 rank4(const uint4 preds, unsigned int* sMem, unsigned int* numtrue)
   return rank;
 }
 
-
 #pragma omp end declare target 
 
 
 int main(int argc, char** argv) {
-  srand(512);
+  if (argc != 3) {
+    printf("Usage: %s <number of keys> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int N = atoi(argv[1]);  // assume a multiple of 512
+  const int repeat = atoi(argv[2]);
+
+  srand(512);
   unsigned int *keys = (unsigned int*) malloc (N * sizeof(unsigned int));
   unsigned int *out = (unsigned int*) malloc (N * sizeof(unsigned int));
 
@@ -129,7 +134,9 @@ int main(int argc, char** argv) {
 
 #pragma omp target data map(tofrom: out[0:N]) 
 {
-  for (int i = 0; i < 100; i++) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target teams num_teams(teams) thread_limit(threads)
     {
       unsigned int numtrue[1];
@@ -172,6 +179,10 @@ int main(int argc, char** argv) {
       }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 }
  
   bool check = verify(out, keys, threads, N);
