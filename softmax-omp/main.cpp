@@ -1,10 +1,9 @@
+#include <chrono>
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
 
 #define BLOCK_SIZE 256
-#define SLICE_SIZE 784
-
 
 // A C model derived from the OpenCL kernel 
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
@@ -25,10 +24,15 @@ void softMax_cpu(const int numSlice, const int sliceSize, const float* src, floa
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <number of slices> <slice size> <repeat>\n", argv[0]);
+    return 1;
+  }
    
-  int numSlice = 10000;
-  int sliceSize = SLICE_SIZE;
+  int numSlice = atoi(argv[1]);
+  int sliceSize = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
   int numElem = numSlice * sliceSize;
 
   float* input = (float*) aligned_alloc(1024, sizeof(float) * numElem);
@@ -40,32 +44,38 @@ int main() {
     for (int j = 0; j < sliceSize; j++)
       input[i*sliceSize+j] = rand() % 13; 
 
-#pragma omp target data map(to: input[0:numElem]) map(from: output_gpu[0:numElem])
-{
-  for (int n = 0; n < 100; n++) {
-    #pragma omp target teams distribute parallel for simd thread_limit(BLOCK_SIZE)
-    for (int i = 0; i < numSlice; i++) {
-      float max_ = input[i * sliceSize];
-      for (int j = 0; j < sliceSize; j++) {
-        max_ = (max_ < input[i * sliceSize + j]) ? input[i * sliceSize + j] : max_;
-      }
-      float sum = 0;
-      for (int j = 0; j < sliceSize; j++) {
-        sum += expf(input[i * sliceSize + j] - max_);
-      }
-      for (int j = 0; j < sliceSize; j++) {
-        output_gpu[i * sliceSize + j] = expf(input[i * sliceSize + j] - max_) / sum;
+  #pragma omp target data map(to: input[0:numElem]) map(from: output_gpu[0:numElem])
+  {
+    auto start = std::chrono::steady_clock::now();
+  
+    for (int n = 0; n < repeat; n++) {
+      #pragma omp target teams distribute parallel for simd thread_limit(BLOCK_SIZE)
+      for (int i = 0; i < numSlice; i++) {
+        float max_ = input[i * sliceSize];
+        for (int j = 0; j < sliceSize; j++) {
+          max_ = (max_ < input[i * sliceSize + j]) ? input[i * sliceSize + j] : max_;
+        }
+        float sum = 0;
+        for (int j = 0; j < sliceSize; j++) {
+          sum += expf(input[i * sliceSize + j] - max_);
+        }
+        for (int j = 0; j < sliceSize; j++) {
+          output_gpu[i * sliceSize + j] = expf(input[i * sliceSize + j] - max_) / sum;
+        }
       }
     }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
-}
 
   // verification
   bool ok = true;
   softMax_cpu(numSlice, sliceSize, input, output_cpu);
   for (int i = 0; i < numElem; i++) {
     if (fabsf(output_cpu[i] - output_gpu[i]) > 1e-3) {
-      printf("@index %d cpu: %f gpu: %f\n", i, output_cpu[i], output_gpu[i]);
+      printf("@index %d host: %f device: %f\n", i, output_cpu[i], output_gpu[i]);
       ok = false;
       break;
     }
@@ -76,6 +86,4 @@ int main() {
   free(output_cpu);
   free(output_gpu);
   return 0;
-
 }
-
