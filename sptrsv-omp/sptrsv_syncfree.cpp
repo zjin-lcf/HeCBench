@@ -1,6 +1,7 @@
 #ifndef _SPTRSV_SYNCFREE_
 #define _SPTRSV_SYNCFREE_
 
+#include <chrono>
 #include <omp.h>
 #include "sptrsv.h"
 
@@ -8,9 +9,13 @@
 int atomicLoad(const int *addr)
 {
   const volatile int *vaddr = addr; // volatile to bypass cache
+
+  #pragma omp atomic read
   const int value = *vaddr;
+
   // fence to ensure that dependent reads are correctly ordered
-#pragma omp flush
+  //#pragma omp flush
+
   return value; 
 }
 
@@ -18,21 +23,25 @@ int atomicLoad(const int *addr)
 void atomicStore(int *addr, int value)
 {
   volatile int *vaddr = addr; // volatile to bypass cache
+
   // fence to ensure that previous non-atomic stores are visible to other threads
-#pragma omp flush
+  //#pragma omp flush
+
+  #pragma omp atomic write
   *vaddr = value;
 }
 
 #pragma omp end declare target
 
 int sptrsv_syncfree (
+    const int           repeat,
     const int           *csrRowPtr,
     const int           *csrColIdx,
     const VALUE_TYPE    *csrVal,
-    const int            m,
-    const int            n,
-    const int            nnz,
-    VALUE_TYPE    *x,
+    const int           m,
+    const int           n,
+    const int           nnz,
+    VALUE_TYPE          *x,
     const VALUE_TYPE    *b,
     const VALUE_TYPE    *x_ref)
 {
@@ -45,40 +54,42 @@ int sptrsv_syncfree (
   int *warp_num=(int *)malloc((m+1)*sizeof(int));
   memset (warp_num, 0, sizeof(int)*(m+1));
 
-
   int *get_value = (int *)malloc(m * sizeof(int));
 
   double warp_occupy=0,element_occupy=0;
   int Len;
 
-  for(int i=0;i<BENCH_REPEAT;i++)
+  for(int i=0;i<repeat;i++)
   {
     matrix_warp4(m,n,nnz,csrRowPtr,csrColIdx,csrVal,10,&Len,warp_num,&warp_occupy,&element_occupy);
   }
 
 
-
-#pragma omp target data map(to: csrRowPtr[0:m+1],\
-                                csrColIdx[0:nnz],\
-                                csrVal[0:nnz],\
-                                b[0:m],\
-                                warp_num[0:Len])\
-                        map(alloc: x[0:n], get_value[0:m]) 
+  #pragma omp target data map(to: csrRowPtr[0:m+1],\
+                                  csrColIdx[0:nnz],\
+                                  csrVal[0:nnz],\
+                                  b[0:m],\
+                                  warp_num[0:Len])\
+                          map(alloc: x[0:n], get_value[0:m]) 
   {
     int num_threads = WARP_PER_BLOCK * WARP_SIZE;
     int num_blocks = ceil ((double)((Len-1)*WARP_SIZE) / (double)(num_threads));
 
-    for (int i = 0; i < BENCH_REPEAT; i++)
+    double time = 0.0;
+
+    for (int i = 0; i <= repeat; i++)
     {
       memset(x, 0, n * sizeof(VALUE_TYPE));
       memset(get_value, 0, m * sizeof(int));
-#pragma omp target update to (x[0:n])
-#pragma omp target update to (get_value[0:m])
+      #pragma omp target update to (x[0:n])
+      #pragma omp target update to (get_value[0:m])
 
-#pragma omp target teams num_teams(num_blocks) thread_limit(num_threads)
+      auto start = std::chrono::steady_clock::now();
+
+      #pragma omp target teams num_teams(num_blocks) thread_limit(num_threads)
       {
         VALUE_TYPE s_left_sum[WARP_PER_BLOCK*WARP_SIZE];
-#pragma omp parallel 
+        #pragma omp parallel 
         {
           const int local_id = omp_get_thread_num();
           const int global_id = omp_get_team_num() * num_threads + local_id;
@@ -160,8 +171,14 @@ int sptrsv_syncfree (
           }
         }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      if (i > 0)
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
-#pragma omp target update from (x[0:m])
+
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+    #pragma omp target update from (x[0:m])
   }
 
   // validate x
@@ -183,10 +200,9 @@ int sptrsv_syncfree (
   }
   res = ref == 0 ? res : res / ref;
 
-  if (res < accuracy)
-    printf("syncfree SpTRSV passed! |x-xref|/|xref| = %8.2e\n", res);
-  else
-    printf("syncfree SpTRSV failed! |x-xref|/|xref| = %8.2e\n", res);
+  printf("|x-xref|/|xref| = %8.2e\n", res);
+
+  printf("%s\n", (res < accuracy) ? "PASS" : "FAIL");
 
   free(get_value);
   free(warp_num);
@@ -195,6 +211,3 @@ int sptrsv_syncfree (
 }
 
 #endif
-
-
-
