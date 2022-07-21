@@ -9,9 +9,10 @@
  *
  */
 
-#include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <cuda.h>
 #include "verify.cu"
 
 //----------------------------------------------------------------------------
@@ -157,9 +158,16 @@ __global__ void radixSortBlocksKeysK(
 }
 
   
-int main(int argc, char** argv) {
-  srand(512);
+int main(int argc, char* argv[])
+{
+  if (argc != 3) {
+    printf("Usage: %s <number of keys> <repeat>\n", argv[0]);
+    return 1;
+  }
   const int N = atoi(argv[1]);  // assume a multiple of 512
+  const int repeat = atoi(argv[2]);
+    
+  srand(512);
   unsigned int *keys = (unsigned int*) malloc (N * sizeof(unsigned int));
   unsigned int *out = (unsigned int*) malloc (N * sizeof(unsigned int));
   for (int i = 0; i < N; i++)  keys[i] = rand() % 16;
@@ -176,9 +184,17 @@ int main(int argc, char** argv) {
   unsigned int* d_tempKeys;
   cudaMalloc((void**)&d_tempKeys, N*sizeof(unsigned int));
 
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     radixSortBlocksKeysK<<<teams, threads>>>(d_keys, d_tempKeys, nbits, startbit);
  
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+
   cudaMemcpy(out, d_tempKeys, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
   bool check = verify(out, keys, threads, N);
