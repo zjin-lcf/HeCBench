@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,9 @@ template <typename T>
 class sosfilter;
 
 template <typename T>
-void filtering (queue &q, const int n_signals, const int n_samples, const int n_sections, const int zi_width)
+void filtering (queue &q, const int repeat, 
+                const int n_signals, const int n_samples,
+                const int n_sections, const int zi_width)
 {
   // the number of second-order sections must be less than max threads per block
   assert(MAX_THREADS >= n_sections);
@@ -68,12 +71,17 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
   buffer<T, 1> d_sos (sos, sos_size);
   buffer<T, 1> d_zi (zi, z_size);
   buffer<T, 1> d_x (x, x_size);
+
   range<2> gws (blocks, THREADS);
   range<2> lws (1, THREADS);
+
   const int out_size = n_sections;
   const int shared_mem_size = (out_size + z_size + sos_size);
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
     q.submit([&] (handler &cgh) {
       auto zi = d_zi.template get_access<sycl_read>(cgh);
       auto sos = d_sos.template get_access<sycl_read>(cgh);
@@ -181,8 +189,11 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
         }
       });
     });
-  }
+
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %lf (s)\n", time * 1e-9 / repeat);
 
   }
 
@@ -199,7 +210,14 @@ void filtering (queue &q, const int n_signals, const int n_samples, const int n_
   free(zi);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) 
+{
+  if (argc != 2) 
+  {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   const int numSections = THREADS; 
 
@@ -220,7 +238,7 @@ int main(int argc, char** argv) {
   queue q(dev_sel);
 
   const int zi_width = 2;
-  filtering<float> (q, numSignals, numSamples, numSections, zi_width);
-  filtering<double> (q, numSignals, numSamples, numSections, zi_width);
+  filtering<float> (q, repeat, numSignals, numSamples, numSections, zi_width);
+  filtering<double> (q, repeat, numSignals, numSamples, numSections, zi_width);
   return 0;
 }
