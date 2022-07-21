@@ -11,17 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <hip/hip_runtime.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
+#include <hip/hip_runtime.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 //                                SOSFILT                                    //
 ///////////////////////////////////////////////////////////////////////////////
 #define MAX_THREADS 256
-#define THREADS 256
+#define THREADS 32  
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
 template<typename T>
@@ -32,9 +33,9 @@ __global__ void sosfilt(
     const int zi_width,
     const T *__restrict__ sos,
     const T *__restrict__ zi,
-    T *__restrict__ x_in)
+          T *__restrict__ x_in)
 {
-  HIP_DYNAMIC_SHARED( char, smem)
+  extern __shared__ char smem[];
   T *s_out = reinterpret_cast<T *>( smem );
   T *s_zi = reinterpret_cast<T *>( &s_out[n_sections] ) ;
   T *s_sos = reinterpret_cast<T *>( &s_zi[n_sections * zi_width] ) ;
@@ -60,8 +61,8 @@ __global__ void sosfilt(
 
   __syncthreads( );
 
-  const int load_size { n_sections - 1 };
-  const int unload_size { n_samples - load_size };
+  const int load_size = n_sections - 1 ;
+  const int unload_size = n_samples - load_size ;
 
   T temp;
   T x_n;
@@ -138,15 +139,16 @@ __global__ void sosfilt(
   }
 }
 
-  template <typename T>
-void filtering (const int n_signals, const int n_samples, const int n_sections, const int zi_width)
+template <typename T>
+void filtering (const int repeat,
+                const int n_signals, const int n_samples,
+                const int n_sections, const int zi_width)
 {
   // the number of second-order sections must be less than max threads per block
   assert(MAX_THREADS >= n_sections);
 
   // The number of samples must be greater than or equal to the number of sections
   assert(n_samples >= n_sections);
-
 
   // randomize input data
   srand(2);
@@ -155,7 +157,6 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
 
   dim3 blocksPerGrid (1, blocks);
   dim3 threadsPerBlock (THREADS, 1);
-
 
   // Second-order section digital filter
   const int sos_size = n_sections * sos_width ;
@@ -190,16 +191,24 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
   hipMemcpy(d_x, x, sizeof(T) * x_size, hipMemcpyHostToDevice);
 
   const int out_size = n_sections;
-  int shared_mem = (out_size + z_size + sos_size) * sizeof(T); 
+  const int shared_mem = (out_size + z_size + sos_size) * sizeof(T); 
 
-  for (int n = 0; n < 100; n++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(sosfilt<T>), dim3(blocksPerGrid), dim3(threadsPerBlock), shared_mem, 0, n_signals, 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(sosfilt<T>), blocksPerGrid, threadsPerBlock, shared_mem, 0, n_signals, 
       n_samples,
       n_sections,
       zi_width,
       d_sos,
       d_zi,
       d_x);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %lf (s)\n", time * 1e-9 / repeat);
 
   hipMemcpy(x, d_x, sizeof(T) * x_size, hipMemcpyDeviceToHost);
 #ifdef DEBUG
@@ -218,7 +227,14 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
   hipFree(d_zi);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) 
+{
+  if (argc != 2) 
+  {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   const int numSections = THREADS; 
 
@@ -232,7 +248,7 @@ int main(int argc, char** argv) {
 #endif
 
   const int zi_width = 2;
-  filtering<float> (numSignals, numSamples, numSections, zi_width);
-  filtering<double> (numSignals, numSamples, numSections, zi_width);
+  filtering<float> (repeat, numSignals, numSamples, numSections, zi_width);
+  filtering<double> (repeat, numSignals, numSamples, numSections, zi_width);
   return 0;
 }

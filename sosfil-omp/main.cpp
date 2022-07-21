@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -24,15 +25,15 @@
 #define THREADS 32
 #define sos_width  6   // https://www.mathworks.com/help/signal/ref/sosfilt.html 
 
-  template <typename T>
-void filtering (const int n_signals, const int n_samples, const int n_sections, const int zi_width)
+template <typename T>
+void filtering (const int repeat, const int n_signals, const int n_samples,
+                const int n_sections, const int zi_width)
 {
   // the number of second-order sections must be less than max threads per block
   assert(MAX_THREADS >= n_sections);
 
   // The number of samples must be greater than or equal to the number of sections
   assert(n_samples >= n_sections);
-
 
   // randomize input data
   srand(2);
@@ -74,7 +75,9 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
 
 #pragma omp target data map(to: sos[0:sos_size], zi[0:z_size]) map (tofrom: x_in[0:x_size])
 {
-  for (int n = 0; n < 100; n++) {
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
     #pragma omp target teams num_teams(blocks) thread_limit(THREADS)
     {
       T smem[shared_mem_size];  // known at compile time
@@ -183,6 +186,10 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
       }
     }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %lf (s)\n", time * 1e-9 / repeat);
 }
 
 #ifdef DEBUG
@@ -199,6 +206,12 @@ void filtering (const int n_signals, const int n_samples, const int n_sections, 
 }
 
 int main(int argc, char** argv) {
+  if (argc != 2) 
+  {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   const int numSections = THREADS; 
 
@@ -212,7 +225,7 @@ int main(int argc, char** argv) {
 #endif
 
   const int zi_width = 2;
-  filtering<float> (numSignals, numSamples, numSections, zi_width);
-  filtering<double> (numSignals, numSamples, numSections, zi_width);
+  filtering<float> (repeat, numSignals, numSamples, numSections, zi_width);
+  filtering<double> (repeat, numSignals, numSamples, numSections, zi_width);
   return 0;
 }
