@@ -32,7 +32,6 @@ CFLAGS := -I$(MPI_ROOT)/include -std=c++11 -Wall -fPIE
 LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas \
 	  -L$(HIPRT_ROOT)/lib -lamdhip64 
 
-
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
@@ -59,4 +58,3 @@ clean:
 
 run: $(program)
 	$(MPI_ROOT)/bin/mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10
-
