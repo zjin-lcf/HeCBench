@@ -1,8 +1,9 @@
 #ifndef _SPTRSV_SYNCFREE_
 #define _SPTRSV_SYNCFREE_
 
-#include "sptrsv.h"
+#include <chrono>
 #include <hip/hip_runtime.h>
+#include "sptrsv.h"
 
 // reference
 // https://stackoverflow.com/questions/32341081/how-to-have-atomic-load-in-cuda
@@ -29,15 +30,15 @@ __device__ void atomic_store(int *addr, int value)
 
 __global__
 void sptrsv_mix(
-    const int            *csrRowPtr,
-    const int            *csrColIdx,
-    const VALUE_TYPE     *csrVal,
-    int                  *get_value,
-    const int                      m,
-    const VALUE_TYPE     *b,
-    VALUE_TYPE           *x,
-    const int            *warp_num,
-    const int                    Len)
+    const int        *__restrict__ csrRowPtr,
+    const int        *__restrict__ csrColIdx,
+    const VALUE_TYPE *__restrict__ csrVal,
+    int              *__restrict__ get_value,
+    const int        m,
+    const VALUE_TYPE *__restrict__ b,
+    VALUE_TYPE       *__restrict__ x,
+    const int        *__restrict__ warp_num,
+    const int        Len)
 {
   const int local_id = threadIdx.x;
   const int global_id = blockIdx.x * blockDim.x + local_id;
@@ -47,7 +48,6 @@ void sptrsv_mix(
   __shared__ VALUE_TYPE s_left_sum[WARP_PER_BLOCK*WARP_SIZE];
 
   if(warp_id>=(Len-1)) return;
-
 
   const int lane_id = (WARP_SIZE - 1) & local_id;
 
@@ -119,13 +119,14 @@ void sptrsv_mix(
 }
 
 int sptrsv_syncfree (
+    const int           repeat,
     const int           *csrRowPtr,
     const int           *csrColIdx,
     const VALUE_TYPE    *csrVal,
-    const int            m,
-    const int            n,
-    const int            nnz,
-    VALUE_TYPE    *x,
+    const int           m,
+    const int           n,
+    const int           nnz,
+    VALUE_TYPE          *x,
     const VALUE_TYPE    *b,
     const VALUE_TYPE    *x_ref)
 {
@@ -140,17 +141,13 @@ int sptrsv_syncfree (
 
   memset(x, 0, m * sizeof(VALUE_TYPE));
 
-  int *get_value = (int *)malloc(m * sizeof(int));
-  memset(get_value, 0, m * sizeof(int));
-
   double warp_occupy=0,element_occupy=0;
   int Len;
 
-  for(int i=0;i<BENCH_REPEAT;i++)
+  for(int i=0;i<repeat;i++)
   {
     matrix_warp4(m,n,nnz,csrRowPtr,csrColIdx,csrVal,10,&Len,warp_num,&warp_occupy,&element_occupy);
   }
-
 
   // Matrix L
   int* d_csrRowPtr;
@@ -184,17 +181,27 @@ int sptrsv_syncfree (
   int num_threads = WARP_PER_BLOCK * WARP_SIZE;
   int num_blocks = ceil ((double)((Len-1)*WARP_SIZE) / (double)(num_threads));
 
-  for (int i = 0; i < BENCH_REPEAT; i++)
-  {
-    // memset d_get_value to 0
-    hipMemcpy(d_get_value, get_value, sizeof(int)*m, hipMemcpyHostToDevice);
+  double time = 0.0;
 
+  for (int i = 0; i <= repeat; i++)
+  {
+    hipMemset(d_get_value, 0, sizeof(int)*m);
     hipMemcpy(d_x, x, sizeof(VALUE_TYPE)*n, hipMemcpyHostToDevice);
 
-    hipLaunchKernelGGL(sptrsv_mix, dim3(num_blocks), dim3(num_threads), 0, 0, 
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    hipLaunchKernelGGL(sptrsv_mix, num_blocks, num_threads, 0, 0, 
         d_csrRowPtr, d_csrColIdx, d_csrVal, d_get_value,
         m, d_b, d_x, d_warp_num, Len);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    if (i > 0)
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   hipMemcpy(x, d_x, sizeof(VALUE_TYPE)*n, hipMemcpyDeviceToHost);
 
@@ -217,12 +224,10 @@ int sptrsv_syncfree (
   }
   res = ref == 0 ? res : res / ref;
 
-  if (res < accuracy)
-    printf("syncfree SpTRSV passed! |x-xref|/|xref| = %8.2e\n", res);
-  else
-    printf("syncfree SpTRSV failed! |x-xref|/|xref| = %8.2e\n", res);
+  printf("|x-xref|/|xref| = %8.2e\n", res);
 
-  free(get_value);
+  printf("%s\n", (res < accuracy) ? "PASS" : "FAIL");
+
   free(warp_num);
   hipFree(d_csrRowPtr);
   hipFree(d_csrColIdx);
@@ -235,6 +240,3 @@ int sptrsv_syncfree (
 }
 
 #endif
-
-
-

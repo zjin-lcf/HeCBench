@@ -22,6 +22,7 @@ obj = main.o sptrsv_syncfree.o
 
 # Standard Flags
 CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH) \
+          -DWARP_SIZE=32 -DWARP_PER_BLOCK=8 \
           -DVALUE_TYPE=double -I../sptrsv-sycl
 
 # Linker Flags
@@ -33,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -43,7 +43,7 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 main.o: ../sptrsv-sycl/main.cpp \
@@ -53,12 +53,11 @@ main.o: ../sptrsv-sycl/main.cpp \
 	../sptrsv-sycl/tranpose.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-sptrsv_syncfree.o : sptrsv_syncfree.cu
+sptrsv_syncfree.o : sptrsv_syncfree.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sptrsv-sycl/lp1.mtx
-
+	./$(program) ../sptrsv-sycl/lp1.mtx 2000

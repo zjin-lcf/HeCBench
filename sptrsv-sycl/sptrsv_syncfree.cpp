@@ -1,10 +1,11 @@
 #ifndef _SPTRSV_SYNCFREE_
 #define _SPTRSV_SYNCFREE_
 
+#include <chrono>
 #include "common.h"
 #include "sptrsv.h"
 
-int atomicLoad(nd_item<1> item, const int *addr)
+int atomicLoad(nd_item<1> &item, const int *addr)
 {
   const volatile int *vaddr = addr; // volatile to bypass cache
   //__threadfence(); // for seq_cst loads. Remove for acquire semantics.
@@ -15,7 +16,7 @@ int atomicLoad(nd_item<1> item, const int *addr)
 }
 
 // addr must be aligned properly.
-void atomicStore(nd_item<1> item, int *addr, int value)
+void atomicStore(nd_item<1> &item, int *addr, int value)
 {
   volatile int *vaddr = addr; // volatile to bypass cache
   // fence to ensure that previous non-atomic stores are visible to other threads
@@ -23,8 +24,8 @@ void atomicStore(nd_item<1> item, int *addr, int value)
   *vaddr = value;
 }
 
-
 int sptrsv_syncfree (
+    const int           repeat,
     const int           *csrRowPtr,
     const int           *csrColIdx,
     const VALUE_TYPE    *csrVal,
@@ -46,17 +47,13 @@ int sptrsv_syncfree (
 
   memset(x, 0, m * sizeof(VALUE_TYPE));
 
-  int *get_value = (int *)malloc(m * sizeof(int));
-  memset(get_value, 0, m * sizeof(int));
-
   double warp_occupy=0,element_occupy=0;
   int Len;
 
-  for(int i=0;i<BENCH_REPEAT;i++)
+  for(int i=0;i<repeat;i++)
   {
     matrix_warp4(m,n,nnz,csrRowPtr,csrColIdx,csrVal,10,&Len,warp_num,&warp_occupy,&element_occupy);
   }
-
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -85,18 +82,22 @@ int sptrsv_syncfree (
   range<1> gws (num_blocks * num_threads);
   range<1> lws (num_threads);
 
-  for (int i = 0; i < BENCH_REPEAT; i++)
-  {
+  double time = 0.0;
 
+  for (int i = 0; i <= repeat; i++)
+  {
     // memset d_get_value to 0
     q.submit([&] (handler &cgh) {
       auto acc = d_get_value.get_access<sycl_write>(cgh);
-      cgh.copy(get_value, acc);
+      cgh.fill(acc, 0);
     });
     q.submit([&] (handler &cgh) {
       auto acc = d_x.get_access<sycl_write>(cgh);
       cgh.copy(x, acc);
     });
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto csrRowPtr = d_csrRowPtr.get_access<sycl_read>(cgh);
@@ -212,15 +213,19 @@ int sptrsv_syncfree (
 
       });
     });
+    
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    if (i > 0)
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_x.get_access<sycl_read>(cgh);
     cgh.copy(acc, x);
-  });
-
-  q.wait();
-
+  }).wait();
 
   // validate x
   double accuracy = 1e-4;
@@ -241,18 +246,13 @@ int sptrsv_syncfree (
   }
   res = ref == 0 ? res : res / ref;
 
-  if (res < accuracy)
-    printf("syncfree SpTRSV passed! |x-xref|/|xref| = %8.2e\n", res);
-  else
-    printf("syncfree SpTRSV failed! |x-xref|/|xref| = %8.2e\n", res);
+  printf("|x-xref|/|xref| = %8.2e\n", res);
 
-  free(get_value);
+  printf("%s\n", (res < accuracy) ? "PASS" : "FAIL");
+
   free(warp_num);
 
   return 0;
 }
 
 #endif
-
-
-

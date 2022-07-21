@@ -1,7 +1,8 @@
 #ifndef READ_MTX_H
 #define READ_MTX_H
 
-int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add, int **csrRowPtrA_add, int **csrColIdxA_add, VALUE_TYPE **csrValA_add)
+int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add,
+             int **csrRowPtrA_add, int **csrColIdxA_add, VALUE_TYPE **csrValA_add)
 {
     int m, n, nnzA;
     int *csrRowPtrA;
@@ -51,8 +52,6 @@ int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add, int **csrR
         //printf("input matrix is symmetric = false\n");
     }
     
-    
-    
     int *csrRowPtrA_counter = (int *)malloc((m+1) * sizeof(int));
     memset(csrRowPtrA_counter, 0, (m+1) * sizeof(int));
     
@@ -71,9 +70,9 @@ int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add, int **csrR
     int i;
     for (i = 0; i < nnzA_mtx_report; i++)
     {
-        int idxi, idxj;
-        double fval;
-        int ival;
+        int idxi = 0, idxj = 0;
+        int ival = 0;
+        double fval = 0.0;
         int returnvalue;
         
         if (isReal)
@@ -186,7 +185,9 @@ int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add, int **csrR
 }
 
 
-void change2tran(int m, int nnzA,int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA, int *nnzL_add, int **csrRowPtrL_tmp_add, int **csrColIdxL_tmp_add, VALUE_TYPE **csrValL_tmp_add)
+void change2tran(int m, int nnzA,int *csrRowPtrA, int *csrColIdxA,
+                 VALUE_TYPE *csrValA, int *nnzL_add, int **csrRowPtrL_tmp_add,
+                 int **csrColIdxL_tmp_add, VALUE_TYPE **csrValL_tmp_add)
 {
     int nnzL = 0;
     int *csrRowPtrL_tmp = (int *)malloc((m+1) * sizeof(int));
@@ -239,7 +240,6 @@ void change2tran(int m, int nnzA,int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *c
         csrRowPtrL_tmp[i+1] = nnz_pointer;
     }
     
-    
     nnzL = csrRowPtrL_tmp[m];
     
     csrColIdxL_tmp = (int *)realloc(csrColIdxL_tmp, sizeof(int) * nnzL);
@@ -252,7 +252,8 @@ void change2tran(int m, int nnzA,int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *c
 }
 
 
-void get_x_b(int m, int n, const int * csrRowPtrA, const int *csrColIdxA, const VALUE_TYPE *csrValA, VALUE_TYPE **x_add, VALUE_TYPE **b_add)
+void get_x_b(int m, int n, const int * csrRowPtrA, const int *csrColIdxA,
+             const VALUE_TYPE *csrValA, VALUE_TYPE **x_add, VALUE_TYPE **b_add)
 {
     VALUE_TYPE *x_ref = (VALUE_TYPE *)malloc(sizeof(VALUE_TYPE) * n);
     int i,j;

@@ -29,7 +29,9 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -fsycl \
+          -DWARP_PER_BLOCK=8 \
+          -DVALUE_TYPE=double -DBENCH_REPEAT=100 
 
 # Linker Flags
 LDFLAGS = 
@@ -37,12 +39,14 @@ LDFLAGS =
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            --gcc-toolchain=$(GCC_TOOLCHAIN) \
+            -DWARP_SIZE=32 
 endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            -DWARP_SIZE=64
 endif
 
 # Debug Flags
@@ -74,4 +78,3 @@ clean:
 
 run: $(program)
 	./$(program) lp1.mtx
-

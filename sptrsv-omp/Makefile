@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -62,10 +61,8 @@ main.o: ../sptrsv-sycl/main.cpp \
 sptrsv_syncfree.o : sptrsv_syncfree.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sptrsv-sycl/lp1.mtx
-
+	./$(program) ../sptrsv-sycl/lp1.mtx 100

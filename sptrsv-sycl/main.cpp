@@ -5,15 +5,18 @@
 
 int main(int argc, char ** argv)
 {
-    if(argc != 2)
+    if(argc != 3)
     {
-        printf("Usage:/sptrsv example.mtx\n");
+        printf("Usage: %s <example.mtx> <repeat>\n", argv[0]);
         return -1;
     }
 
     // load matrix data from file
     char  *filename;
     filename = argv[1];
+   
+    // benchmark repeat
+    int repeat = atoi(argv[2]);  
     
     int m, n, nnzA;
     int *csrRowPtrA;
@@ -54,7 +57,7 @@ int main(int argc, char ** argv)
     get_x_b(m, n, csrRowPtrL_tmp, csrColIdxL_tmp, csrValL_tmp, &x_ref, &b);
     VALUE_TYPE *x = (VALUE_TYPE *)malloc(sizeof(VALUE_TYPE) * m);
     
-    sptrsv_syncfree(csrRowPtrL_tmp, csrColIdxL_tmp, csrValL_tmp, m, n, nnzL, x, b, x_ref);
+    sptrsv_syncfree(repeat, csrRowPtrL_tmp, csrColIdxL_tmp, csrValL_tmp, m, n, nnzL, x, b, x_ref);
     
     free(csrColIdxL_tmp);
     free(csrValL_tmp);
