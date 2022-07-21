@@ -40,7 +40,6 @@ void verifySort(const T *keys, const size_t size)
 
 int main(int argc, char** argv) 
 {
-
   if (argc != 3) 
   {
     printf("Usage: %s <problem size> <number of passes>\n.", argv[0]);
@@ -87,14 +86,16 @@ int main(int argc, char** argv)
 
   T* isums = (T*) malloc (sizeof(T) * num_work_groups * num_digits);
 
-#pragma omp target data map(to: idata[0:size]) \
-                        map(from: odata[0:size]) \
-                        map(alloc: isums[0:num_work_groups * num_digits])
+  #pragma omp target data map(to: idata[0:size]) \
+                          map(from: odata[0:size]) \
+                          map(alloc: isums[0:num_work_groups * num_digits])
   {
-    auto start = std::chrono::steady_clock::now();
+    double time = 0.0;
 
     for (int k = 0; k < passes; k++)
     {
+      auto start = std::chrono::steady_clock::now();
+
       // Assuming an 8 bit byte.
       for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
       {
@@ -111,12 +112,12 @@ int main(int argc, char** argv)
         T *in = even ? idata : odata;
         T *out = even ? odata : idata;
 
-#pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
+        #pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
         {
           T lmem[local_wsize];
-#pragma omp parallel
+          #pragma omp parallel
           {
-#include "sort_reduce.h"
+            #include "sort_reduce.h"
           }
         }
 
@@ -126,13 +127,13 @@ int main(int argc, char** argv)
           printf("reduce: %d: %d\n", shift, isums[i]);
 #endif
 
-#pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
+        #pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
         {
           T lmem[local_wsize*2];
           T s_seed;
-#pragma omp parallel
+          #pragma omp parallel
           {
-#include "sort_top_scan.h"
+            #include "sort_top_scan.h"
           }
         }
 
@@ -142,23 +143,23 @@ int main(int argc, char** argv)
           printf("top-scan: %d: %d\n", shift, isums[i]);
 #endif
 
-#pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
+        #pragma omp target teams num_teams(num_work_groups) thread_limit(local_wsize)
         {
           T lmem[local_wsize*2];
           T l_scanned_seeds[16];
           T l_block_counts[16];
-#pragma omp parallel
+          #pragma omp parallel
           {
-#include "sort_bottom_scan.h"
+            #include "sort_bottom_scan.h"
           }
         }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }  // passes
 
-    auto end = std::chrono::steady_clock::now();
-    auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    double second = t / 1.e9 / passes; // Convert to seconds
-    printf("Average elapsed time per pass %.3f (s)\n", second);
+    printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
   }
 
   verifySort(odata, size);

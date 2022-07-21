@@ -32,7 +32,6 @@ void verifySort(const T *keys, const size_t size)
 
 int main(int argc, char** argv) 
 {
-
   if (argc != 3) 
   {
     printf("Usage: %s <problem size> <number of passes>\n.", argv[0]);
@@ -87,20 +86,25 @@ int main(int argc, char** argv)
     const int num_digits = 16;
 
     const property_list props = property::buffer::use_host_ptr();
+
     buffer<T, 1> d_idata (h_idata, size, props);
     d_idata.set_final_data( nullptr );
+
     buffer<T, 1> d_odata (size); 
     d_odata.set_final_data( h_odata );
-    buffer<T, 1> d_isums (num_work_groups * num_digits);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+    buffer<T, 1> d_isums (num_work_groups * num_digits);
 
     range<1> gws (global_wsize);
     range<1> lws (local_wsize);
 
+    double time = 0.0;
+
     for (int k = 0; k < passes; k++)
     {
+      q.wait();
+      auto start = std::chrono::steady_clock::now();
+
       // Assuming an 8 bit byte.
       // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
       for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
@@ -145,13 +149,14 @@ int main(int argc, char** argv)
           });
         });
       }
+
       q.wait();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }  // passes
 
-    auto end = std::chrono::steady_clock::now();
-    auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    double second = t / 1.e9 / passes; // Convert to seconds
-    printf("Average elapsed time per pass %.3f (s)\n", second);
+    printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
+
   } // sycl scope
 
   verifySort(h_odata, size);

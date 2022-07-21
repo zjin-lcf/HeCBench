@@ -10,7 +10,7 @@
 typedef unsigned int T;
 typedef uint4 VECTYPE;
 
-// CUDA kernels
+// kernels
 #include "sort_reduce.h"
 #include "sort_top_scan.h"
 #include "sort_bottom_scan.h"
@@ -38,7 +38,6 @@ void verifySort(const T *keys, const size_t size)
 
 int main(int argc, char** argv) 
 {
-
   if (argc != 3) 
   {
     printf("Usage: %s <problem size> <number of passes>\n.", argv[0]);
@@ -95,10 +94,13 @@ int main(int argc, char** argv)
   T* d_in;
   T* d_out;
 
-  auto start = std::chrono::steady_clock::now();
+  double time = 0.0;
 
   for (int k = 0; k < passes; k++)
   {
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     // Assuming an 8 bit byte.
     // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
     for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
@@ -117,14 +119,13 @@ int main(int argc, char** argv)
       top_scan<<<1, local_wsize>>>(d_isums, num_work_groups);
       bottom_scan<<<num_work_groups, local_wsize>>>(d_out, d_in, d_isums, size, shift);
     }
+
     cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }  // passes
 
-  auto end = std::chrono::steady_clock::now();
-  auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  double second = t / 1.e9 / passes; // Convert to seconds
-  printf("Average elapsed time per pass %.3f (s)\n", second);
-
+  printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
 
   cudaMemcpy(h_odata, d_out, size * sizeof(T), cudaMemcpyDeviceToHost);
   cudaFree(d_idata);

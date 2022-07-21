@@ -38,7 +38,6 @@ void verifySort(const T *keys, const size_t size)
 
 int main(int argc, char** argv) 
 {
-
   if (argc != 3) 
   {
     printf("Usage: %s <problem size> <number of passes>\n.", argv[0]);
@@ -95,10 +94,13 @@ int main(int argc, char** argv)
   T* d_in;
   T* d_out;
 
-  auto start = std::chrono::steady_clock::now();
+  double time = 0.0;
 
   for (int k = 0; k < passes; k++)
   {
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     // Assuming an 8 bit byte.
     // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
     for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
@@ -113,17 +115,17 @@ int main(int argc, char** argv)
       d_in = even ? d_idata : d_odata;
       d_out = even ? d_odata : d_idata;
 
-      hipLaunchKernelGGL(reduce, dim3(num_work_groups), dim3(local_wsize), 0, 0, d_in, d_isums, size, shift);
-      hipLaunchKernelGGL(top_scan, dim3(1), dim3(local_wsize), 0, 0, d_isums, num_work_groups);
-      hipLaunchKernelGGL(bottom_scan, dim3(num_work_groups), dim3(local_wsize), 0, 0, d_out, d_in, d_isums, size, shift);
+      hipLaunchKernelGGL(reduce, num_work_groups, local_wsize, 0, 0, d_in, d_isums, size, shift);
+      hipLaunchKernelGGL(top_scan, 1, local_wsize, 0, 0, d_isums, num_work_groups);
+      hipLaunchKernelGGL(bottom_scan, num_work_groups, local_wsize, 0, 0, d_out, d_in, d_isums, size, shift);
     }
+
     hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }  // passes
 
-  auto end = std::chrono::steady_clock::now();
-  auto t = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  double second = t / 1.e9 / passes; // Convert to seconds
-  printf("Average elapsed time per pass %.3f (s)\n", second);
+  printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
 
   hipMemcpy(h_odata, d_out, size * sizeof(T), hipMemcpyDeviceToHost);
   hipFree(d_idata);
