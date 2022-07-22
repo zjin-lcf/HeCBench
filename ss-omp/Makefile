@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -59,5 +58,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../ss-sycl/StringSearch_Input.txt clEnqueueNDRangeKernel 100
-
+	./$(program) ../ss-sycl/StringSearch_Input.txt clEnqueueNDRangeKernel 20000

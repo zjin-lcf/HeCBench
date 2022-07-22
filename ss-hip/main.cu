@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <climits>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "StringSearch.h"
 #include "kernels.cu"
@@ -62,6 +63,10 @@ int verify(uint* resultCount, uint workGroupCount,
 
 int main(int argc, char* argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <path to file> <substring> <repeat>\n", argv[0]);
+    return -1;
+  }
   std::string file = std::string(argv[1]); // "StringSearch_Input.txt";
   std::string subStr = std::string(argv[2]);
   int iterations = atoi(argv[3]);
@@ -69,7 +74,7 @@ int main(int argc, char* argv[])
   if(iterations < 1)
   {
     std::cout<<"Error, iterations cannot be 0 or negative. Exiting..\n";
-    exit(0);
+    return -1;
   }
 
   // Check input text-file specified.
@@ -188,6 +193,8 @@ int main(int argc, char* argv[])
   dim3 block (LOCAL_SIZE);
   dim3 grid (workGroupCount);
 
+  double time = 0.0;
+
   if(subStrLength == 1)
   {
     std::cout <<
@@ -195,8 +202,11 @@ int main(int argc, char* argv[])
       std::endl;
     std::cout << "\nExecuting String search naive for " <<
       iterations << " iterations" << std::endl;
+
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++)
-      hipLaunchKernelGGL(StringSearchNaive, dim3(grid), dim3(block), subStrLength, 0, 
+      hipLaunchKernelGGL(StringSearchNaive, grid, block, subStrLength, 0, 
           textBuf,
           textLength,
           subStrBuf, 
@@ -204,6 +214,10 @@ int main(int argc, char* argv[])
           resultBuf, 
           resultCountBuf, 
           searchLenPerWG);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // Read Results Count per workGroup
     hipMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), hipMemcpyDeviceToHost);
@@ -216,8 +230,11 @@ int main(int argc, char* argv[])
   {
     std::cout << "\nExecuting String search with load balance for " <<
       iterations << " iterations" << std::endl;
+
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++)
-      hipLaunchKernelGGL(StringSearchLoadBalance, dim3(grid), dim3(block), subStrLength, 0, 
+      hipLaunchKernelGGL(StringSearchLoadBalance, grid, block, subStrLength, 0, 
           textBuf,
           textLength,
           subStrBuf, 
@@ -226,12 +243,18 @@ int main(int argc, char* argv[])
           resultCountBuf, 
           searchLenPerWG);
 
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     // Read Results Count per workGroup
     hipMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), hipMemcpyDeviceToHost);
     hipMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), hipMemcpyDeviceToHost);
 
     verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 
   hipFree(resultCountBuf);
   hipFree(resultBuf);

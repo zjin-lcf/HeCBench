@@ -21,6 +21,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 #include <climits>
 #include <omp.h>
 #include "StringSearch.h"
@@ -77,6 +78,10 @@ int compare(const uchar* text, const uchar* pattern, uint length)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 4) {
+    printf("Usage: %s <path to file> <substring> <repeat>\n", argv[0]);
+    return -1;
+  }
   std::string file = std::string(argv[1]); // "StringSearch_Input.txt";
   std::string subStr = std::string(argv[2]);
   int iterations = atoi(argv[3]);
@@ -190,6 +195,8 @@ int main(int argc, char* argv[])
   const uint patternLength = subStrLength;
   const uint maxSearchLength = searchLenPerWG;
 
+  double time = 0.0;
+
 #pragma omp target data map(to: pattern[0:subStrLength], \
                                 text[0:textLength]) \
                         map(alloc: resultCount[0:workGroupCount], \
@@ -215,6 +222,9 @@ int main(int argc, char* argv[])
       std::endl;
     std::cout << "\nExecuting String search naive for " <<
       iterations << " iterations" << std::endl;
+
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++)
     {
       #pragma omp target teams num_teams(workGroupCount) thread_limit(LOCAL_SIZE) 
@@ -264,6 +274,8 @@ int main(int argc, char* argv[])
         }
       }
     }
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // Read Results Count per workGroup
     #pragma omp target update from (resultCount[0:workGroupCount])
@@ -287,6 +299,9 @@ int main(int argc, char* argv[])
   if(subStrLength > 1) {
     std::cout << "\nExecuting String search with load balance for " <<
       iterations << " iterations" << std::endl;
+
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++) {
       #pragma omp target teams num_teams(workGroupCount) thread_limit(LOCAL_SIZE) 
       {  //uchar localPattern[subStrLength];
@@ -431,12 +446,17 @@ int main(int argc, char* argv[])
       }
     }
 
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     // Read Results Count per workGroup
     #pragma omp target update from (resultCount[0:workGroupCount])
     #pragma omp target update from (result[0:textLength - subStrLength + 1])
 
     verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 }
 
   free(text);
