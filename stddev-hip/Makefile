@@ -33,10 +33,9 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3 -ffast-math
+  CFLAGS += -O3 -ffast-math -munsafe-fp-atomics
 endif
 
 #===============================================================================
@@ -53,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 65536 16384
+	./$(program) 65536 16384 100
