@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
-
 #include "reference.h"
 
 // final step for the deviation of a sample
@@ -31,8 +31,8 @@ __global__ void sampleKernel (Type *std, IdxType D, IdxType N) {
 // sum of products using atomics
 template <typename Type, typename IdxType, int TPB, int ColsPerBlk = 32>
 __global__ void sopKernel(
-        Type *__restrict std, 
-  const Type *__restrict data, 
+        Type *__restrict__ std, 
+  const Type *__restrict__ data, 
   IdxType D, 
   IdxType N) 
 {
@@ -91,10 +91,17 @@ void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <D> <N> <repeat>\n", argv[0]);
+    printf("D: number of columns of data (must be a multiple of 32)\n");
+    printf("N: number of rows of data (at least one row)\n");
+    return 1;
+  }
   int D = atoi(argv[1]); // columns must be a multiple of 32
   int N = atoi(argv[2]); // at least one row
-  bool sample = true;
+  int repeat = atoi(argv[3]);
 
+  bool sample = true;
   long inputSize = D * N;
   long inputSizeByte = inputSize * sizeof(float);
   float *data = (float*) malloc (inputSizeByte);
@@ -109,7 +116,6 @@ int main(int argc, char* argv[]) {
   cudaMalloc((void**)&d_data, inputSizeByte);
   cudaMemcpy(d_data, data, inputSizeByte, cudaMemcpyHostToDevice);
 
-
   // host and device results
   long outputSize = D;
   long outputSizeByte = outputSize * sizeof(float);
@@ -119,8 +125,16 @@ int main(int argc, char* argv[]) {
   cudaMalloc((void**)&d_std, outputSizeByte);
 
   // execute kernels on a device
-  for (int i = 0; i < 100; i++)
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     stddev(d_std, d_data, D, N, sample);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of stddev kernels: %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(std, d_std, outputSizeByte, cudaMemcpyDeviceToHost);
 
@@ -143,4 +157,3 @@ int main(int argc, char* argv[]) {
   cudaFree(d_data);
   return 0;
 }
-

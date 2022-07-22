@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
-
 #include "reference.h"
 
 /**
@@ -95,10 +95,17 @@ void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <D> <N> <repeat>\n", argv[0]);
+    printf("D: number of columns of data (must be a multiple of 32)\n");
+    printf("N: number of rows of data (at least one row)\n");
+    return 1;
+  }
   int D = atoi(argv[1]); // columns must be a multiple of 32
   int N = atoi(argv[2]); // at least one row
-  bool sample = true;
+  int repeat = atoi(argv[3]);
 
+  bool sample = true;
   long inputSize = D * N;
   long inputSizeByte = inputSize * sizeof(float);
   float *data = (float*) malloc (inputSizeByte);
@@ -117,8 +124,14 @@ int main(int argc, char* argv[]) {
 
   #pragma omp target data map (to: data[0:inputSize]) map (from: std[0:outputSize])
   {
-    for (int i = 0; i < 100; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       stddev(std, data, D, N, sample);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of stddev kernels: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verify
@@ -138,4 +151,3 @@ int main(int argc, char* argv[]) {
   free(data);
   return 0;
 }
-

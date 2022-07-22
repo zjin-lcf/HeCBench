@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
-
 #include "reference.h"
 
 // final step for the deviation of a sample
@@ -31,8 +31,8 @@ __global__ void sampleKernel (Type *std, IdxType D, IdxType N) {
 // sum of products using atomics
 template <typename Type, typename IdxType, int TPB, int ColsPerBlk = 32>
 __global__ void sopKernel(
-        Type *__restrict std, 
-  const Type *__restrict data, 
+        Type *__restrict__ std, 
+  const Type *__restrict__ data, 
   IdxType D, 
   IdxType N) 
 {
@@ -87,14 +87,21 @@ void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
   hipLaunchKernelGGL(HIP_KERNEL_NAME(sopKernel<Type, IdxType, TPB, ColsPerBlk>), grid, block, 0, 0, std, data, D, N);
 
   IdxType sampleSize = sample ? N-1 : N;
-  hipLaunchKernelGGL(HIP_KERNEL_NAME(sampleKernel<Type, IdxType>), dim3((D+TPB-1)/TPB), dim3(TPB), 0, 0, std, D, sampleSize);
+  sampleKernel<Type, IdxType> <<<(D+TPB-1)/TPB, TPB>>>(std, D, sampleSize);
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    printf("Usage: %s <D> <N> <repeat>\n", argv[0]);
+    printf("D: number of columns of data (must be a multiple of 32)\n");
+    printf("N: number of rows of data (at least one row)\n");
+    return 1;
+  }
   int D = atoi(argv[1]); // columns must be a multiple of 32
   int N = atoi(argv[2]); // at least one row
-  bool sample = true;
+  int repeat = atoi(argv[3]);
 
+  bool sample = true;
   long inputSize = D * N;
   long inputSizeByte = inputSize * sizeof(float);
   float *data = (float*) malloc (inputSizeByte);
@@ -109,7 +116,6 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_data, inputSizeByte);
   hipMemcpy(d_data, data, inputSizeByte, hipMemcpyHostToDevice);
 
-
   // host and device results
   long outputSize = D;
   long outputSizeByte = outputSize * sizeof(float);
@@ -119,8 +125,16 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_std, outputSizeByte);
 
   // execute kernels on a device
-  for (int i = 0; i < 100; i++)
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
     stddev(d_std, d_data, D, N, sample);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of stddev kernels: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(std, d_std, outputSizeByte, hipMemcpyDeviceToHost);
 
@@ -143,4 +157,3 @@ int main(int argc, char* argv[]) {
   hipFree(d_data);
   return 0;
 }
-
