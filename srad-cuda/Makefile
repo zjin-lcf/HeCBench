@@ -28,7 +28,6 @@ CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 # Linker flags
 LDFLAGS = -lm
 
-
 # Debug Flags
 ifeq ($(DEBUG),yes)
 	CFLAGS += -g  
@@ -51,7 +50,6 @@ $(program): $(obj) Makefile
 	extract_kernel.cu prepare_kernel.cu \
 	reduce_kernel.cu srad_kernel.cu srad2_kernel.cu compress_kernel.cu
 	$(CC) $(CFLAGS) -c $< -o $@
-
 
 # delete all object files
 clean:
