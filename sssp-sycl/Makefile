@@ -72,6 +72,6 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj)
 
-# 120 work-groups, 1 CPU thread, 10 warm-up runs, and 1 timed run
+# 120 work-groups, 1 CPU thread, 10 warm-up runs, and 100 timed run
 run: $(program)
-	./$(program) -g 120 -t 1 -w 10 -r 1
+	./$(program) -g 120 -t 1 -w 10 -r 100
