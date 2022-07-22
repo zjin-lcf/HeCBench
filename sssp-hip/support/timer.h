@@ -33,33 +33,32 @@
  *
  */
 
-#include <sys/time.h>
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <string>
 
-using namespace std;
-
 struct Timer {
 
-  map<string, clock_t> startTime;
-  map<string, clock_t> stopTime;
-  map<string, float>         time;
+  std::map<const std::string, std::chrono::steady_clock::time_point> startTime;
+  std::map<const std::string, std::chrono::steady_clock::time_point> stopTime;
+  std::map<const std::string, double> time;
 
-  void start(string name) {
+  void start(const std::string &name) {
     if(!time.count(name)) {
       time[name] = 0.0;
     }
-    startTime[name] = clock();
+    startTime[name] = std::chrono::steady_clock::now();
   }
 
-  void stop(string name) {
-    stopTime[name] = clock();
-    float part_time = (float)(stopTime[name] - startTime[name]) /
-      CLOCKS_PER_SEC * 1000;
+  void stop(const std::string &name) {
+    stopTime[name] = std::chrono::steady_clock::now();
+    float part_time = std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime[name] - startTime[name]).count();
     time[name] += part_time;
   }
 
-  void print(string name, unsigned int REP) { printf("%s Time (ms): %f\n", name.c_str(), time[name] / REP); }
+  void print(const std::string &name, const unsigned int REP) {
+    printf("%s time (ms): %f\n", name.c_str(), time[name] * 1e-6f / REP);
+  }
 };
 

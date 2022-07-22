@@ -58,8 +58,8 @@ struct Params {
 
   Params(int argc, char **argv) {
     device          = 0;
-    n_gpu_threads    = 256;
-    n_gpu_blocks   = 8;
+    n_gpu_threads   = 256;
+    n_gpu_blocks    = 8;
     n_threads       = 2;
     n_warmup        = 1;
     n_reps          = 1;
@@ -74,8 +74,8 @@ struct Params {
           exit(0);
           break;
         case 'd': device          = atoi(optarg); break;
-        case 'i': n_gpu_threads    = atoi(optarg); break;
-        case 'g': n_gpu_blocks   = atoi(optarg); break;
+        case 'i': n_gpu_threads   = atoi(optarg); break;
+        case 'g': n_gpu_blocks    = atoi(optarg); break;
         case 't': n_threads       = atoi(optarg); break;
         case 'w': n_warmup        = atoi(optarg); break;
         case 'r': n_reps          = atoi(optarg); break;
@@ -99,7 +99,7 @@ struct Params {
         "\n"
         "\nGeneral options:"
         "\n    -h        help"
-        "\n    -d <D>    CUDA device ID (default=0)"
+        "\n    -d <D>    GPU device ID (default=0)"
         "\n    -i <I>    # of device threads per block (default=256)"
         "\n    -g <G>    # of device blocks (default=8)"
         "\n    -t <T>    # of host threads (default=2)"
@@ -163,9 +163,7 @@ void read_input(int &source, Node *&h_nodes, Edge *&h_edges, const Params &p) {
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
-  //CUDASetup    setcuda(p.device);
   Timer        timer;
-  //cudaError_t  cudaStatus;
   
 #ifdef USE_GPU 
   gpu_selector dev_sel;
@@ -177,7 +175,7 @@ int main(int argc, char **argv) {
   // Allocate
   int n_nodes, n_edges;
   read_input_size(n_nodes, n_edges, p);
-  timer.start("Allocation");
+  timer.start("Host/Device Allocation");
   Node * h_nodes = (Node *)malloc(sizeof(Node) * n_nodes);
   buffer<Node, 1> d_nodes(n_nodes);
   Edge * h_edges = (Edge *)malloc(sizeof(Edge) * n_edges);
@@ -207,7 +205,7 @@ int main(int argc, char **argv) {
   std::atomic_int  h_iter[1];
   buffer<int, 1> d_iter (1);
   q.wait();
-  timer.stop("Allocation");
+  timer.stop("Host/Device Allocation");
 
   // Initialize
   timer.start("Initialization");
@@ -307,7 +305,7 @@ int main(int argc, char **argv) {
           CPU_EXEC == 1) { // If the number of input queue elements is lower than switching_limit
 
         if(rep >= p.n_warmup)
-          timer.start("Kernel");
+          timer.start("Kernel on Host");
 
         // Continue until switching_limit condition is not satisfied
         while((*h_num_t != 0) && (*h_num_t < p.switching_limit || GPU_EXEC == 0) && CPU_EXEC == 1) {
@@ -336,7 +334,7 @@ int main(int argc, char **argv) {
         }
 
         if(rep >= p.n_warmup)
-          timer.stop("Kernel");
+          timer.stop("Kernel on Host");
 
       } else if((*h_num_t >= p.switching_limit || CPU_EXEC == 0) && GPU_EXEC == 1) { 
         // If the number of input queue elements is higher than or equal to switching_limit
@@ -377,9 +375,9 @@ int main(int argc, char **argv) {
           h.copy(h_iter, d_iter_acc);
         });
         q.wait();
+
         if(rep >= p.n_warmup)
           timer.stop("Copy To Device");
-
 
         // Continue until switching_limit condition is not satisfied
         while((*h_num_t != 0) && (*h_num_t >= p.switching_limit || CPU_EXEC == 0) && GPU_EXEC == 1) {
@@ -411,12 +409,14 @@ int main(int argc, char **argv) {
           if(rep >= p.n_warmup)
             timer.stop("Copy To Device");
 
-          if(rep >= p.n_warmup)
-            timer.start("Kernel");
           assert(p.n_gpu_threads <= max_gpu_threads && 
               "The thread block size is greater than the maximum thread block size that can be used on this device");
           int blocks = p.n_gpu_blocks;
           int threads = p.n_gpu_threads;
+
+          if(rep >= p.n_warmup)
+            timer.start("Kernel on Device");
+
           q.submit([&] (handler &h) {
             auto graph_nodes_av = d_nodes.get_access<sycl_read>(h);
             auto graph_edges_av = d_edges.get_access<sycl_read>(h);
@@ -427,8 +427,8 @@ int main(int argc, char **argv) {
             auto n_t = d_num_t.get_access<sycl_atomic>(h);
             auto head = d_head.get_access<sycl_atomic>(h);
             auto tail = d_tail.get_access<sycl_atomic>(h);
-            auto threads_end = d_threads_end.get_access<sycl_read>(h);
-            auto threads_run = d_threads_run.get_access<sycl_read>(h);
+            //auto threads_end = d_threads_end.get_access<sycl_read>(h);
+            //auto threads_run = d_threads_run.get_access<sycl_read>(h);
             auto overflow = d_overflow.get_access<sycl_read_write>(h);
             auto gray_shade = d_gray_shade.get_access<sycl_atomic>(h);
             auto iter = d_iter.get_access<sycl_atomic>(h);
@@ -441,7 +441,6 @@ int main(int argc, char **argv) {
 
               const int tid     = item.get_local_id(0); 
               const int gtid    = item.get_global_id(0); 
-              const int MAXWG   = item.get_global_range(0);
               const int WG_SIZE = item.get_group_range(0);
 
               int iter_local = atomic_fetch_add(iter[0], 0); //atomicAdd(&iter[0], 0);
@@ -542,7 +541,7 @@ int main(int argc, char **argv) {
 
           q.wait();
           if(rep >= p.n_warmup)
-            timer.stop("Kernel");
+            timer.stop("Kernel on Device");
 
           if(rep >= p.n_warmup)
             timer.start("Copy Back and Merge");
@@ -605,25 +604,26 @@ int main(int argc, char **argv) {
     }
 
   } // end of iteration
-  timer.print("Allocation", 1);
+  timer.print("Host/Device Allocation", 1);
   timer.print("Copy To Device", p.n_reps);
-  timer.print("Kernel", p.n_reps);
+  timer.print("Kernel on Host", p.n_reps);
+  timer.print("Kernel on Device", p.n_reps);
   timer.print("Copy Back and Merge", p.n_reps);
 
   // Verify answer
   bool ok = verify(h_cost, n_nodes, p.comparison_file);
 
   // Free memory
-  timer.start("Deallocation");
+  timer.start("Host/Device Deallocation");
   free(h_nodes);
   free(h_edges);
   free(h_color);
   free(h_cost);
   free(h_q1);
   free(h_q2);
-  timer.stop("Deallocation");
-  timer.print("Deallocation", 1);
+  timer.stop("Host/Device Deallocation");
+  timer.print("Host/Device Deallocation", 1);
 
-  if (ok) printf("Test Passed\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }
