@@ -73,5 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) StringSearch_Input.txt clEnqueueNDRangeKernel 100
-
+	./$(program) StringSearch_Input.txt clEnqueueNDRangeKernel 20000
