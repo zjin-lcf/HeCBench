@@ -7,43 +7,59 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <omp.h>
 
-#define LENGTH 134217728
-#define THREADS_PER_BLOCK 256
 #define RADIUS 7
-#define BLOCK_SIZE THREADS_PER_BLOCK
+#define BLOCK_SIZE 256
 
-int main(void) {
-  int size = LENGTH;
-  int pad_size = (LENGTH + RADIUS);
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    printf("length is a multiple of %d\n", BLOCK_SIZE);
+    return 1;
+  }
+  const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
+  int size = length;
+  int pad_size = (length + RADIUS);
 
   // Alloc space for host copies of a, b, c and setup input values
   int* a = (int *)malloc(pad_size*sizeof(int)); 
   int* b = (int *)malloc(size*sizeof(int));
 
-  for (int i = 0; i < LENGTH+RADIUS; i++) a[i] = i;
+  for (int i = 0; i < length+RADIUS; i++) a[i] = i;
 
-  #pragma omp target teams distribute map(to: a[0:pad_size]) map(from:b[0:size]) 
-  for (int i = 0; i < LENGTH; i = i + THREADS_PER_BLOCK) {
-    int temp[BLOCK_SIZE + 2 * RADIUS];
-    #pragma omp parallel for schedule(static,1)
-    for (int j = 0; j < THREADS_PER_BLOCK; j++) {
-      int gindex = i+j;
-      temp[j+RADIUS] = a[gindex]; 
-      if (j < RADIUS) {
-        temp[j] = (gindex < RADIUS) ? 0 : a[gindex - RADIUS];
-        temp[j + RADIUS + BLOCK_SIZE] = a[gindex + BLOCK_SIZE];
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    #pragma omp target teams distribute map(to: a[0:pad_size]) map(from:b[0:size]) 
+    for (int i = 0; i < length; i = i + BLOCK_SIZE) {
+      int temp[BLOCK_SIZE + 2 * RADIUS];
+      #pragma omp parallel for schedule(static,1)
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        int gindex = i+j;
+        temp[j+RADIUS] = a[gindex]; 
+        if (j < RADIUS) {
+          temp[j] = (gindex < RADIUS) ? 0 : a[gindex - RADIUS];
+          temp[j + RADIUS + BLOCK_SIZE] = a[gindex + BLOCK_SIZE];
+        }
+      }
+
+      #pragma omp parallel for schedule(static,1)
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        int result = 0;
+        for (int offset = -RADIUS ; offset <= RADIUS ; offset++)
+          result += temp[j+RADIUS+offset];
+        b[i+j] = result; 
       }
     }
-
-    #pragma omp parallel for schedule(static,1)
-    for (int j = 0; j < THREADS_PER_BLOCK; j++) {
-      int result = 0;
-      for (int offset = -RADIUS ; offset <= RADIUS ; offset++)
-        result += temp[j+RADIUS+offset];
-      b[i+j] = result; 
-    }
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   // verification
   bool ok = true;
@@ -58,7 +74,7 @@ int main(void) {
     }
   }
 
-  for (int i = 2*RADIUS; i < LENGTH; i++) {
+  for (int i = 2*RADIUS; i < length; i++) {
     int s = 0;
     for (int j = i-RADIUS; j <= i+RADIUS; j++)
       s += a[j];

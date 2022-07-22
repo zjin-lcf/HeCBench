@@ -7,14 +7,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
-#define LENGTH 1024
-#define THREADS_PER_BLOCK 256
 #define RADIUS 7
-#define BLOCK_SIZE THREADS_PER_BLOCK
+#define BLOCK_SIZE 256
 
-__global__ void stencil_1d(int *in, int *out) {
+__global__
+void stencil_1d(const int *__restrict__ in, int *__restrict__ out)
+{
   __shared__ int temp[BLOCK_SIZE + 2 * RADIUS];
   int gindex = threadIdx.x + blockIdx.x * blockDim.x;
   int lindex = threadIdx.x + RADIUS;
@@ -41,17 +42,24 @@ __global__ void stencil_1d(int *in, int *out) {
 }
 
 
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    printf("length is a multiple of %d\n", BLOCK_SIZE);
+    return 1;
+  }
+  const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
-int main(void) {
-  int size = LENGTH * sizeof(int);
-  int pad_size = (LENGTH + RADIUS) * sizeof(int);
+  int size = length * sizeof(int);
+  int pad_size = (length + RADIUS) * sizeof(int);
 
   int *a, *b;
   // Alloc space for host copies of a, b, c and setup input values
   a = (int *)malloc(pad_size); 
   b = (int *)malloc(size);
 
-  for (int i = 0; i < LENGTH+RADIUS; i++) a[i] = i;
+  for (int i = 0; i < length+RADIUS; i++) a[i] = i;
 
   int *d_a, *d_b;
   // Alloc space for device copies of a, b, c
@@ -61,8 +69,20 @@ int main(void) {
   // Copy inputs to device
   cudaMemcpy(d_a, a, pad_size, cudaMemcpyHostToDevice);
 
-  // Launch add() kernel on GPU
-  stencil_1d <<< dim3(LENGTH/THREADS_PER_BLOCK), dim3(THREADS_PER_BLOCK) >>> (d_a, d_b);
+  dim3 grids (length/BLOCK_SIZE);
+  dim3 blocks (BLOCK_SIZE);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  // Launch kernel on GPU
+  for (int i = 0; i < repeat; i++)
+    stencil_1d <<< grids, blocks >>> (d_a, d_b);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   // Copy result back to host
   cudaMemcpy(b, d_b, size, cudaMemcpyDeviceToHost);
@@ -80,7 +100,7 @@ int main(void) {
     }
   }
 
-  for (int i = 2*RADIUS; i < LENGTH; i++) {
+  for (int i = 2*RADIUS; i < length; i++) {
     int s = 0;
     for (int j = i-RADIUS; j <= i+RADIUS; j++)
       s += a[j];
