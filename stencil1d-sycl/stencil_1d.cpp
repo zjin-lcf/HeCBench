@@ -7,22 +7,29 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
-#define LENGTH 134217728
-#define THREADS_PER_BLOCK 256
 #define RADIUS 7
-#define BLOCK_SIZE THREADS_PER_BLOCK
+#define BLOCK_SIZE 256
 
-int main(void) {
-  int size = LENGTH;
-  int pad_size = (LENGTH + RADIUS);
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <length> <repeat>\n", argv[0]);
+    printf("length is a multiple of %d\n", BLOCK_SIZE);
+    return 1;
+  }
+  const int length = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
+  int size = length;
+  int pad_size = (length + RADIUS);
 
   // Alloc space for host copies of a, b, c and setup input values
   int* a = (int *)malloc(pad_size*sizeof(int)); 
   int* b = (int *)malloc(size*sizeof(int));
 
-  for (int i = 0; i < LENGTH+RADIUS; i++) a[i] = i;
+  for (int i = 0; i < length+RADIUS; i++) a[i] = i;
 
   {
 #ifdef USE_GPU
@@ -37,39 +44,50 @@ int main(void) {
     buffer<int, 1> d_a(a, pad_size, props);
     buffer<int, 1> d_b(b, size, props);
 
-    size_t global_work_size = LENGTH/THREADS_PER_BLOCK * THREADS_PER_BLOCK;
+    size_t global_work_size = length;
+    range<1> gws (global_work_size);
+    range<1> lws (BLOCK_SIZE);
 
-    q.submit([&](handler& cgh) { 
-      auto in = d_a.get_access<sycl_read>(cgh);
-      auto out = d_b.get_access<sycl_discard_write>(cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> temp (BLOCK_SIZE + 2 * RADIUS, cgh);
-      cgh.parallel_for<class stencil1D>( 
-        nd_range<1>(range<1>(global_work_size), range<1>(THREADS_PER_BLOCK)), [=] (nd_item<1> item) {
-        int gindex = item.get_global_id(0);
-        int lindex = item.get_local_id(0) + RADIUS;
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
-        // Read input elements into shared memory
-        temp[lindex] = in[gindex];
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&](handler& cgh) { 
+        auto in = d_a.get_access<sycl_read>(cgh);
+        auto out = d_b.get_access<sycl_discard_write>(cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> temp (BLOCK_SIZE + 2 * RADIUS, cgh);
+        cgh.parallel_for<class stencil1D>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          int gindex = item.get_global_id(0);
+          int lindex = item.get_local_id(0) + RADIUS;
 
-        // At both end of a block, the sliding window moves beyond the block boundary.
-        if (item.get_local_id(0) < RADIUS) {
-          temp[lindex - RADIUS] = (gindex < RADIUS) ? 0 : in[gindex - RADIUS];
-          temp[lindex + BLOCK_SIZE] = in[gindex + BLOCK_SIZE];
-        }
+          // Read input elements into shared memory
+          temp[lindex] = in[gindex];
 
-        // Synchronize (ensure all the threads will be completed before continue)
-        item.barrier(access::fence_space::local_space);
+          // At both end of a block, the sliding window moves beyond the block boundary.
+          if (item.get_local_id(0) < RADIUS) {
+            temp[lindex - RADIUS] = (gindex < RADIUS) ? 0 : in[gindex - RADIUS];
+            temp[lindex + BLOCK_SIZE] = in[gindex + BLOCK_SIZE];
+          }
 
-        // Apply the 1D stencil
-        int result = 0;
-        for (int offset = -RADIUS ; offset <= RADIUS ; offset++)
-          result += temp[lindex + offset];
+          // Synchronize (ensure all the threads will be completed before continue)
+          item.barrier(access::fence_space::local_space);
 
-        // Store the result
-        out[gindex] = result; 
+          // Apply the 1D stencil
+          int result = 0;
+          for (int offset = -RADIUS ; offset <= RADIUS ; offset++)
+            result += temp[lindex + offset];
 
+          // Store the result
+          out[gindex] = result; 
+
+        });
       });
-    });
+    }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   // verification
@@ -85,7 +103,7 @@ int main(void) {
     }
   }
 
-  for (int i = 2*RADIUS; i < LENGTH; i++) {
+  for (int i = 2*RADIUS; i < length; i++) {
     int s = 0;
     for (int j = i-RADIUS; j <= i+RADIUS; j++)
       s += a[j];
@@ -100,6 +118,5 @@ int main(void) {
   // Cleanup
   free(a);
   free(b); 
-  if (!error) printf("PASSED\n");
   return 0;
 }
