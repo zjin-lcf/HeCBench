@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 // 2D block size
@@ -132,11 +133,12 @@ void stencil3d(
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: ./%s <grid dimension>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <grid dimension> <repeat>\n", argv[0]);
     return 1;
   }
   const int size = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int nx = size;
   const int ny = size;
   const int nz = size;
@@ -183,7 +185,10 @@ int main(int argc, char* argv[])
   range<3> gws (bdimz, bdimy*BSIZE, bdimx*BSIZE);
   range<3> lws (1, BSIZE, BSIZE);
 
-  for (int i = 0; i < 100; i++)
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto Vm = d_Vm.get_access<sycl_read>(cgh);
       auto dVm = d_dVm.get_access<sycl_write>(cgh);
@@ -194,7 +199,13 @@ int main(int argc, char* argv[])
                   sigma.get_pointer(), sigma.get_pointer() + 3*vol, sigma.get_pointer() + 6*vol, 
                   nx, ny, nz);
       });
-   });
+    });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   // read dVm
   Real *h_dVm = (Real*) malloc (sizeof(Real) * vol);
