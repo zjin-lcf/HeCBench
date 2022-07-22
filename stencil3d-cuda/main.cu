@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 #include <cuda.h>
 
 // 2D block size
@@ -128,11 +129,12 @@ __global__ void stencil3d(
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: ./%s <grid dimension>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <grid dimension> <repeat>\n", argv[0]);
     return 1;
   }
   const int size = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int nx = size;
   const int ny = size;
   const int nz = size;
@@ -142,8 +144,8 @@ int main(int argc, char* argv[])
   Real *d_Vm, *d_dVm, *d_sigma;
 
   // allocate and initialize Vm
-  cudaMalloc((void**)&d_Vm,sizeof(Real)*vol);
-  Real *h_Vm = (Real*)malloc(sizeof(Real)*vol);
+  cudaMalloc((void**)&d_Vm, sizeof(Real)*vol);
+  Real *h_Vm = (Real*) malloc (sizeof(Real)*vol);
 
 #define h_Vm(x,y,z) h_Vm[ z + nz * ( y + ny * ( x  ) ) ]
 
@@ -152,7 +154,7 @@ int main(int argc, char* argv[])
       for(int kk=0;kk<nz;kk++)
         h_Vm(ii,jj,kk) = (ii*(ny*nz) + jj * nz + kk) % 19;
 
-  cudaMemcpy(d_Vm, h_Vm, sizeof(Real) * vol , cudaMemcpyHostToDevice );
+  cudaMemcpy(d_Vm, h_Vm, sizeof(Real) * vol , cudaMemcpyHostToDevice);
 
   // allocate and initialize sigma
   cudaMalloc((void**)&d_sigma,sizeof(Real)*vol*9);
@@ -160,7 +162,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < vol*9; i++) h_sigma[i] = i % 19;
 
-  cudaMemcpy(d_sigma, h_sigma, sizeof(Real) * vol*9 , cudaMemcpyHostToDevice );
+  cudaMemcpy(d_sigma, h_sigma, sizeof(Real) * vol*9, cudaMemcpyHostToDevice);
 
   // reset dVm
   cudaMalloc((void**)&d_dVm,sizeof(Real)*vol);
@@ -171,9 +173,20 @@ int main(int argc, char* argv[])
   int bdimy = (ny-2)/(BSIZE-2) + ((ny-2)%(BSIZE-2)==0?0:1);
   int bdimx = (nx-2)/XTILE + ((nx-2)%XTILE==0?0:1);
 
-  for (int i = 0; i < 100; i++)
-    stencil3d<<<dim3(bdimx,bdimy,bdimz),dim3(BSIZE,BSIZE,1)>>>(
+  dim3 grids (bdimx, bdimy, bdimz);
+  dim3 blocks (BSIZE, BSIZE, 1);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    stencil3d <<< grids, blocks >>> (
        d_Vm, d_dVm, d_sigma, d_sigma + 3*vol, d_sigma + 6*vol, nx, ny, nz);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   // read dVm
   Real *h_dVm = (Real*) malloc (sizeof(Real) * vol);

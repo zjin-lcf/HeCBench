@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <omp.h>
 
 // 2D block size
@@ -144,11 +145,12 @@ void stencil3d(
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: ./%s <grid dimension>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <grid dimension> <repeat>\n", argv[0]);
     return 1;
   }
   const int size = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
   const int nx = size;
   const int ny = size;
   const int nz = size;
@@ -180,9 +182,15 @@ int main(int argc, char* argv[])
 
   #pragma omp target data map(to: h_Vm[0:vol], h_sigma[0:vol*9]) map(tofrom: h_dVm[0:vol])
   {
-    for (int i = 0; i < 100; i++)
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       stencil3d(h_Vm, h_dVm, h_sigma, h_sigma + 3*vol, h_sigma + 6*vol, 
                 bdimx, bdimy, bdimz, nx, ny, nz);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
 #ifdef DUMP
