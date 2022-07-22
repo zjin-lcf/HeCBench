@@ -1,8 +1,7 @@
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-
 
 
 # Standard flags
@@ -12,7 +11,7 @@ CFLAGS := -std=c++11 -Wall
 LDFLAGS = -lm
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -29,42 +28,21 @@ endif
 
 
 ./srad:	./main.o \
-	./kernel/kernel_wrapper.o \
 	./util/graphics/graphics.o \
 	./util/graphics/resize.o \
 	./util/timer/timer.o
 	$(CC) $(CFLAGS)	./main.o \
-		./kernel/kernel_wrapper.o \
 		./util/graphics/graphics.o \
 		./util/graphics/resize.o \
 		./util/timer/timer.o \
 		-lm \
 		$(LDFLAGS) -o srad
 
-# ======================================================================================================================================================150
-#	MAIN FUNCTION
-# ======================================================================================================================================================150
-
-./main.o:	./main.h \
-	./main.c
-	$(CC) 	$(KERNEL_DIM) ./main.c \
+./main.o: ./main.c ./main.h
+	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./main.c \
 		-c \
 		-o ./main.o \
 		-O3
-
-# ======================================================================================================================================================150
-#	KERNELS
-# ======================================================================================================================================================150
-
-./kernel/kernel_wrapper.o:	./kernel/kernel_wrapper.h \
-	./kernel/kernel_wrapper.c
-	$(CC) $(CFLAGS)	$(KERNEL_DIM) ./kernel/kernel_wrapper.c \
-		-c \
-		-o ./kernel/kernel_wrapper.o 
-
-# ======================================================================================================================================================150
-#	UTILITIES
-# ======================================================================================================================================================150
 
 ./util/graphics/graphics.o:	./util/graphics/graphics.h \
 	./util/graphics/graphics.c
@@ -87,11 +65,8 @@ endif
 		-o ./util/timer/timer.o \
 		-O3
 
+clean:
+	rm -f ./*.o srad *.pgm ./util/graphics/*.o ./util/timer/*.o
+
 run: srad
 	./srad 1000 0.5 502 458
-
-clean:
-	rm	./*.o srad *.pgm\
-		./kernel/*.o \
-		./util/graphics/*.o \
-		./util/timer/*.o
