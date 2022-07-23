@@ -14,7 +14,7 @@
 
 #define THREADS_PER_BLOCK 256
 #define MAXBLOCKS 65536
-//#define PROFILE_TMP
+
 typedef struct {
   float weight;
   long assign;  /* number of point where this one is assigned */
@@ -29,30 +29,21 @@ float *coord_h;
 float *gl_lower;
 Point_Struct *p_h;
 
-
-//std::optional<buffer<float, 1>> work_mem_d;
-//std::optional<buffer<int,  1>> center_table_d;
-//std::optional<buffer<char, 1>> switch_membership_d;
-//std::optional<buffer<Point_Struct,1>> p_d;
-//std::optional<buffer<float,1>> coord_d;
-
 static int c;      // counters
 
-void quit(char *message){
-  printf("%s\n", message);
-  exit(1);
-}
 float pgain( long x, Points *points, float z, long int *numcenters, 
-    int kmax, bool *is_center, int *center_table, char *switch_membership,
-    double *serial, double *cpu_gpu_memcpy, double *memcpy_back, double *gpu_malloc, double *kernel_time) {
+             int kmax, bool *is_center, int *center_table, char *switch_membership,
+             double *serial, double *cpu_gpu_memcpy, double *memcpy_back,
+             double *gpu_malloc, double *kernel_time) {
+
   float gl_cost = 0;
   try{
 #ifdef PROFILE_TMP
     double t1 = gettime();
 #endif
-    int K  = *numcenters ;            // number of centers
-    int num    =   points->num;        // number of points
-    int dim     =   points->dim;        // number of dimension
+    int K = *numcenters;   // number of centers
+    int num = points->num; // number of points
+    int dim = points->dim; // number of dimensions
     kmax++;
     /***** build center index table 1*****/
     int count = 0;
@@ -66,7 +57,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     *serial += t2 - t1;
 #endif
 
-    /***** initial memory allocation and preparation for transfer : execute once -1 *****/
+    /***** initial memory allocation and preparation for transfer : execute once *****/
     if( c == 0 ) {
 #ifdef PROFILE_TMP
       double t3 = gettime();
@@ -88,10 +79,10 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 #endif
 
 #pragma omp target enter data map(alloc: coord_h[0:dim*num],\
-		center_table[0:num],\
-		work_mem_h[0:(kmax+1)*num], \
-		switch_membership[0:num], \
-		p_h[0:num])
+                                         center_table[0:num],\
+                                         work_mem_h[0:(kmax+1)*num], \
+                                         switch_membership[0:num], \
+                                         p_h[0:num])
 
 #ifdef PROFILE_TMP
       double t5 = gettime();
@@ -139,9 +130,6 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     //const size_t smSize = dim; 
     const size_t smSize = 256; // WARNING: OpenMP does not support dynamic size
 
-    // reset on the host
-    //::memset(switch_membership, 0, num);
-
 #ifdef PROFILE_TMP
     double t9 = gettime();
 #endif
@@ -185,7 +173,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     gl_cost = z;
 
     /* compute the number of centers to close if we are to open i */
-    for(int i=0; i < num; i++){  //--cambine:??
+    for(int i=0; i < num; i++){
       if( is_center[i] ) {
         float low = z;
         //printf("i=%d  ", i);
@@ -223,7 +211,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
       *numcenters = *numcenters +1 - numclose;
     }
     else
-      gl_cost = 0;  // the value we'
+      gl_cost = 0;
 
 #ifdef PROFILE_TMP
     double t12 = gettime();
@@ -240,7 +228,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
   }
 
 #ifdef DEBUG
-  FILE *fp = fopen("data_opencl.txt", "a");
+  FILE *fp = fopen("data_debug.txt", "a");
   fprintf(fp,"%d, %f\n", c, gl_cost);
   fclose(fp);
 #endif

@@ -370,10 +370,8 @@ float pFL(Points *points, int *feasible, int numfeasible,
 
     // allocate device buffer here.
 
-
     for (i=0;i<iter;i++) {
       x = i%numfeasible;
-      //printf("--cambine: feasible x=%ld, z=%f, k=%ld, kmax=%d\n", x, z, *k, kmax);
       change += pgain(feasible[x], points, z, k, kmax, is_center, center_table, switch_membership,
           &serial, &cpu_gpu_memcpy, &memcpy_back, &gpu_malloc, &kernel_time);
     }    
@@ -474,7 +472,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 {
   int i;
   float cost;
-  float lastcost;
   float hiz, loz, z;
 
   static long k;
@@ -593,7 +590,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 #endif
     /* first get a rough estimate on the FL solution */
     //    pthread_barrier_wait(barrier);    
-    lastcost = cost;
     cost = pFL(points, feasible, numfeasible,
         z, &k, kmax, cost, (long)(ITER*kmax*log((float)kmax)), 0.1, pid, barrier);
     /* if number of centers seems good, try a more accurate FL */
@@ -699,8 +695,6 @@ void copycenters(Points *points, Points* centers, long* centerIDs, long offset)
   free(is_a_median);
 }
 
-
-
 void* localSearchSub(void* arg_) {
   pkmedian_arg_t* arg= (pkmedian_arg_t*)arg_;
   pkmedian(arg->points,arg->kmin,arg->kmax,arg->kfinal,arg->pid,arg->barrier);
@@ -719,7 +713,6 @@ void localSearch( Points* points, long kmin, long kmax, long* kfinal ) {
 #endif
   pthread_t* threads = new pthread_t[nproc];
   pkmedian_arg_t* arg = new pkmedian_arg_t[nproc];
-
 
   for( int i = 0; i < nproc; i++ ) {
     arg[i].points = points;
@@ -801,7 +794,6 @@ void streamCluster( PStream* stream,
   for( int i = 0; i < chunksize; i++ ) {
     points.p[i].coord = &block[i*dim];    
   }
-
 
   Points centers;
   centers.dim = dim;
@@ -917,7 +909,6 @@ int main(int argc, char **argv)
   strcpy(outfilename, argv[8]);
   nproc = atoi(argv[9]);
 
-
   srand48(SEED);
   PStream* stream;
   if( n > 0 ) {
@@ -941,6 +932,7 @@ int main(int argc, char **argv)
   time_FL = 0.0;
   cnt_speedy = 0;
 #endif
+
   double sc_start = gettime();
   streamCluster(stream, kmin, kmax, dim, chunksize, clustersize, outfilename );
   double sc_end = gettime();
@@ -960,37 +952,30 @@ int main(int argc, char **argv)
 
 #ifdef PROFILE_TMP
   gpu_free = gettime() - gpu_free;
-#endif
 
-#ifdef PROFILE_TMP
   double t2 = gettime();
-  printf("time = %lf\n",t2-t1);
+  printf("Total time = %lf (s)\n",t2-t1);
 #endif
 
   delete stream;
 
 #ifdef PROFILE_TMP
-  printf("time pgain = %lf\n", time_gain);
-  printf("time pgain_dist = %lf\n", time_gain_dist);
-  printf("time pgain_init = %lf\n", time_gain_init);
-  printf("time pselect = %lf\n", time_select_feasible);
-  printf("time pspeedy = %lf\n", time_speedy);
-  printf("time pshuffle = %lf\n", time_shuffle);
-  printf("time FL = %lf\n", time_FL);
-  printf("time localSearch = %lf\n", time_local_search);
+  printf("==== Detailed timing info ====\n");
+  printf("pgain = %lf (s)\n", time_gain);
+  printf("pgain_dist = %lf (s)\n", time_gain_dist);
+  printf("pgain_init = %lf (s)\n", time_gain_init);
+  printf("pselect = %lf (s)\n", time_select_feasible);
+  printf("pspeedy = %lf (s)\n", time_speedy);
+  printf("pshuffle = %lf (s)\n", time_shuffle);
+  printf("FL = %lf (s)\n", time_FL);
+  printf("localSearch = %lf (s)\n", time_local_search);
   printf("\n");
-  printf("====GPU Timing info====\n");
-  printf("time serial = %lf\n", serial);
-  printf("time CPU to GPU memory copy = %lf\n", cpu_gpu_memcpy);
-  printf("time GPU to CPU memory copy back = %lf\n", memcpy_back);
-  printf("time GPU malloc = %lf\n", gpu_malloc);
-  printf("time GPU free = %lf\n", gpu_free);
-  printf("time kernel = %lf\n", kernel_time);
-
-  FILE *fp = fopen("PD.txt", "w");
-  fprintf(fp, "%lf, %lf, %lf, %lf, %lf, %lf\n",
-      time_FL, cpu_gpu_memcpy, memcpy_back, kernel_time, gpu_malloc, gpu_free);
-  fclose(fp);  
+  printf("serial = %lf (s)\n", serial);
+  printf("CPU to GPU memory copy = %lf (s)\n", cpu_gpu_memcpy);
+  printf("GPU to CPU memory copy back = %lf (s)\n", memcpy_back);
+  printf("GPU malloc = %lf (s)\n", gpu_malloc);
+  printf("GPU free = %lf (s)\n", gpu_free);
+  printf("GPU kernels = %lf (s)\n", kernel_time);
 #endif
 #ifdef ENABLE_PARSEC_HOOKS
   __parsec_bench_end();

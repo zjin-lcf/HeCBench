@@ -2,7 +2,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-
+PROFILE   = yes
 
 
 # Standard flags
@@ -11,6 +11,9 @@ CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 # Linker flags
 LDFLAGS = -lm
 
+ifeq ($(PROFILE),yes)
+  CFLAGS += -DPROFILE_TMP
+endif
 
 # Enable checksum and output file
 ifeq ($(DEBUG),yes)
@@ -21,7 +24,6 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
 
 SRC = streamcluster.cu
 EXE = streamcluster

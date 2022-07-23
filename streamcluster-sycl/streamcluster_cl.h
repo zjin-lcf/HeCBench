@@ -14,7 +14,7 @@
 
 #define THREADS_PER_BLOCK 256
 #define MAXBLOCKS 65536
-//#define PROFILE_TMP
+
 typedef struct {
   float weight;
   long assign;  /* number of point where this one is assigned */
@@ -38,21 +38,19 @@ std::optional<buffer<float,1>> coord_d;
 
 static int c;      // counters
 
-void quit(char *message){
-  printf("%s\n", message);
-  exit(1);
-}
 float pgain( long x, Points *points, float z, long int *numcenters, 
-    int kmax, bool *is_center, int *center_table, char *switch_membership,
-    double *serial, double *cpu_gpu_memcpy, double *memcpy_back, double *gpu_malloc, double *kernel_time) {
+             int kmax, bool *is_center, int *center_table, char *switch_membership,
+             double *serial, double *cpu_gpu_memcpy, double *memcpy_back,
+             double *gpu_malloc, double *kernel_time) {
+
   float gl_cost = 0;
   try{
 #ifdef PROFILE_TMP
     double t1 = gettime();
 #endif
-    int K  = *numcenters ;            // number of centers
-    int num    =   points->num;        // number of points
-    int dim     =   points->dim;        // number of dimension
+    int K = *numcenters;   // number of centers
+    int num = points->num; // number of points
+    int dim = points->dim; // number of dimensions
     kmax++;
     /***** build center index table 1*****/
     int count = 0;
@@ -66,7 +64,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     *serial += t2 - t1;
 #endif
 
-    /***** initial memory allocation and preparation for transfer : execute once -1 *****/
+    /***** initial memory allocation and preparation for transfer : execute once *****/
     if( c == 0 ) {
 #ifdef PROFILE_TMP
       double t3 = gettime();
@@ -150,9 +148,6 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     /* Determine the number of thread blocks in the x- and y-dimension */
     size_t smSize = dim; // * sizeof(float);
 
-    // reset on the host
-    //::memset(switch_membership, 0, num);
-
 #ifdef PROFILE_TMP
     double t9 = gettime();
 #endif
@@ -175,18 +170,18 @@ float pgain( long x, Points *points, float z, long int *numcenters,
       work_items = work_items + (work_group_size-(work_items%work_group_size));
 
     q.submit([&](handler& cgh) {
-        auto p_d_acc = p_d.value().get_access<sycl_read>(cgh);
-        auto coord_d_acc = coord_d.value().get_access<sycl_read>(cgh);
-        auto work_mem_d_acc = work_mem_d.value().get_access<sycl_write>(cgh);
-        auto center_table_d_acc = center_table_d.value().get_access<sycl_read>(cgh);
-        auto switch_membership_d_acc = switch_membership_d.value().get_access<sycl_write>(cgh);
-        accessor <float, 1, sycl_read_write, access::target::local> coord_s_acc (smSize, cgh);
+      auto p_d_acc = p_d.value().get_access<sycl_read>(cgh);
+      auto coord_d_acc = coord_d.value().get_access<sycl_read>(cgh);
+      auto work_mem_d_acc = work_mem_d.value().get_access<sycl_write>(cgh);
+      auto center_table_d_acc = center_table_d.value().get_access<sycl_read>(cgh);
+      auto switch_membership_d_acc = switch_membership_d.value().get_access<sycl_write>(cgh);
+      accessor <float, 1, sycl_read_write, access::target::local> coord_s_acc (smSize, cgh);
 
-        cgh.parallel_for<class kernel_pgain>(
-            nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel.sycl"
-            });
-        });
+      cgh.parallel_for<class kernel_pgain>(
+          nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
+          #include "kernel.sycl"
+      });
+    });
 
 #ifdef PROFILE_TMP
     q.wait();
@@ -219,7 +214,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     gl_cost = z;
 
     /* compute the number of centers to close if we are to open i */
-    for(int i=0; i < num; i++){  //--cambine:??
+    for(int i=0; i < num; i++){
       if( is_center[i] ) {
         float low = z;
         //printf("i=%d  ", i);
@@ -257,7 +252,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
       *numcenters = *numcenters +1 - numclose;
     }
     else
-      gl_cost = 0;  // the value we'
+      gl_cost = 0;
 
 #ifdef PROFILE_TMP
     double t12 = gettime();
@@ -274,7 +269,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
   }
 
 #ifdef DEBUG
-  FILE *fp = fopen("data_opencl.txt", "a");
+  FILE *fp = fopen("data_debug.txt", "a");
   fprintf(fp,"%d, %f\n", c, gl_cost);
   fclose(fp);
 #endif

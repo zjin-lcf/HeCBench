@@ -12,20 +12,18 @@
   on 15/03/2010
  ***********************************************/
 
-#define THREADS_PER_BLOCK 256
-#define MAXBLOCKS 65536
 #include <hip/hip_runtime.h>
 
+#define THREADS_PER_BLOCK 256
+#define MAXBLOCKS 65536
 
-//#define PROFILE_TMP
 typedef struct {
   float weight;
   long assign;  /* number of point where this one is assigned */
   float cost;  /* cost of that assignment, weight*distance */
 } Point_Struct;
 
-
-// CUDA kernel 
+// GPU kernel 
 #include "kernel.h"
 
 /* host memory analogous to device memory. These memories are allocated in the function,
@@ -45,21 +43,19 @@ Point_Struct *p_d;
 
 static int c;      // counters
 
-void quit(char *message){
-  printf("%s\n", message);
-  exit(1);
-}
 float pgain( long x, Points *points, float z, long int *numcenters, 
-    int kmax, bool *is_center, int *center_table, char *switch_membership,
-    double *serial, double *cpu_gpu_memcpy, double *memcpy_back, double *gpu_malloc, double *kernel_time) {
+             int kmax, bool *is_center, int *center_table, char *switch_membership,
+             double *serial, double *cpu_gpu_memcpy, double *memcpy_back,
+             double *gpu_malloc, double *kernel_time) {
+
   float gl_cost = 0;
   try{
 #ifdef PROFILE_TMP
     double t1 = gettime();
 #endif
-    int K  = *numcenters ;            // number of centers
-    int num    =   points->num;        // number of points
-    int dim     =   points->dim;        // number of dimension
+    int K = *numcenters ;   // number of centers
+    int num = points->num;  // number of points
+    int dim = points->dim;  // number of dimensions
     kmax++;
     /***** build center index table 1*****/
     int count = 0;
@@ -73,18 +69,17 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     *serial += t2 - t1;
 #endif
 
-    /***** initial memory allocation and preparation for transfer : execute once -1 *****/
+    /***** initial memory allocation and preparation for transfer : execute once *****/
     if( c == 0 ) {
 #ifdef PROFILE_TMP
       double t3 = gettime();
 #endif
-      coord_h = (float*) malloc( num * dim * sizeof(float));                // coordinates (host)
+      coord_h = (float*) malloc( num * dim * sizeof(float)); // coordinates (host)
       gl_lower = (float*) malloc( kmax * sizeof(float) );
       work_mem_h = (float*) malloc (kmax*num*sizeof(float));
-      p_h = (Point_Struct*)malloc(num*sizeof(Point_Struct));  //by cambine: not compatibal with original Point
+      p_h = (Point_Struct*) malloc (num*sizeof(Point_Struct));
 
       // prepare mapping for point coordinates
-      //--cambine: what's the use of point coordinates? for computing distance.
       for(int i=0; i<dim; i++){
         for(int j=0; j<num; j++)
           coord_h[ (num*i)+j ] = points->p[j].coord[i];
@@ -99,7 +94,6 @@ float pgain( long x, Points *points, float z, long int *numcenters,
       hipMalloc((void**)&coord_d, sizeof(float) * dim * num);
       hipMalloc((void**)&p_d, sizeof(Point_Struct) * num);
 
-
 #ifdef PROFILE_TMP
       double t5 = gettime();
       *gpu_malloc += t5 - t4;
@@ -107,6 +101,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 
       // copy coordinate to device memory  
       hipMemcpyAsync(coord_d, coord_h, sizeof(float)*num*dim, hipMemcpyHostToDevice, 0);
+
 #ifdef PROFILE_TMP
       hipDeviceSynchronize();
       double t6 = gettime();
@@ -134,6 +129,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     /***** memory transfer from host to device *****/
     hipMemcpyAsync(center_table_d, center_table, sizeof(int)*num, hipMemcpyHostToDevice, 0);
     hipMemcpyAsync(p_d, p_h, sizeof(Point_Struct)*num, hipMemcpyHostToDevice, 0);
+
 #ifdef PROFILE_TMP
     hipDeviceSynchronize();
     double t8 = gettime();
@@ -142,15 +138,11 @@ float pgain( long x, Points *points, float z, long int *numcenters,
 
     /***** kernel execution *****/
     /* Determine the number of thread blocks in the x- and y-dimension */
-    size_t smSize = dim; // * sizeof(float);
-
-    // reset on the host
-    //::memset(switch_membership, 0, num);
+    size_t smSize = dim;
 
 #ifdef PROFILE_TMP
     double t9 = gettime();
 #endif
-
 
     hipMemsetAsync(switch_membership_d, 0, num * sizeof(char), 0);
 
@@ -161,9 +153,9 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     if(work_items%work_group_size != 0)  //process situations that work_items cannot be divided by work_group_size
       work_items = work_items + (work_group_size-(work_items%work_group_size));
 
-    hipLaunchKernelGGL(compute_cost, dim3(work_items/work_group_size), dim3(work_group_size), smSize*sizeof(float), 0, 
-		    p_d, coord_d, work_mem_d, center_table_d, switch_membership_d,
-		    num, dim, x, K);
+    compute_cost<<<work_items/work_group_size, work_group_size, smSize*sizeof(float)>>>(
+      p_d, coord_d, work_mem_d, center_table_d, switch_membership_d,
+      num, dim, x, K);
 
 #ifdef PROFILE_TMP
     hipDeviceSynchronize();
@@ -174,7 +166,6 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     /***** copy back to host for CPU side work *****/
     hipMemcpy(switch_membership, switch_membership_d, num * sizeof(char), hipMemcpyDeviceToHost);
 
-    // reset on the host already
     hipMemcpy(work_mem_h, work_mem_d, num*(K+1)*sizeof(float), hipMemcpyDeviceToHost);
 
 #ifdef PROFILE_TMP
@@ -187,7 +178,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
     gl_cost = z;
 
     /* compute the number of centers to close if we are to open i */
-    for(int i=0; i < num; i++){  //--cambine:??
+    for(int i=0; i < num; i++){
       if( is_center[i] ) {
         float low = z;
         //printf("i=%d  ", i);
@@ -208,7 +199,6 @@ float pgain( long x, Points *points, float z, long int *numcenters,
        otherwise, do nothing */
     if ( gl_cost < 0 ) {
       for(int i=0; i<num; i++){
-
         bool close_center = gl_lower[center_table[points->p[i].assign]] > 0 ;
         if ( (switch_membership[i]=='1') || close_center ) {
           points->p[i].cost = points->p[i].weight * dist(points->p[i], points->p[x], points->dim);
@@ -225,7 +215,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
       *numcenters = *numcenters +1 - numclose;
     }
     else
-      gl_cost = 0;  // the value we'
+      gl_cost = 0;
 
 #ifdef PROFILE_TMP
     double t12 = gettime();
@@ -242,7 +232,7 @@ float pgain( long x, Points *points, float z, long int *numcenters,
   }
 
 #ifdef DEBUG
-  FILE *fp = fopen("data_opencl.txt", "a");
+  FILE *fp = fopen("data_debug.txt", "a");
   fprintf(fp,"%d, %f\n", c, gl_cost);
   fclose(fp);
 #endif
