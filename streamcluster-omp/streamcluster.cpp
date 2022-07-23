@@ -359,7 +359,6 @@ float pFL(Points *points, int *feasible, int numfeasible,
 
     // allocate device buffer here.
 
-
     for (i=0;i<iter;i++) {
       x = i%numfeasible;
       //printf("--cambine: feasible x=%ld, z=%f, k=%ld, kmax=%d\n", x, z, *k, kmax);
@@ -463,7 +462,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 {
   int i;
   float cost;
-  float lastcost;
   float hiz, loz, z;
 
   static long k;
@@ -582,7 +580,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 #endif
     /* first get a rough estimate on the FL solution */
     //    pthread_barrier_wait(barrier);    
-    lastcost = cost;
     cost = pFL(points, feasible, numfeasible,
         z, &k, kmax, cost, (long)(ITER*kmax*log((float)kmax)), 0.1, pid, barrier);
     /* if number of centers seems good, try a more accurate FL */
@@ -769,9 +766,8 @@ void outcenterIDs( Points* centers, long* centerIDs, char* outfile ) {
   fclose(fp);
 }
 
-void streamCluster( PStream* stream, 
-    long kmin, long kmax, int dim,
-    long chunksize, long centersize, char* outfile )
+void streamCluster( PStream* stream, long kmin, long kmax, int dim,
+                    long chunksize, long centersize, char* outfile )
 {
 
   float* block = (float*)malloc( chunksize*dim*sizeof(float) );
@@ -824,6 +820,8 @@ void streamCluster( PStream* stream,
     center_table = (int*)malloc(points.num*sizeof(int));
 
     localSearch(&points,kmin, kmax,&kfinal);
+
+    #pragma omp target exit data map(release: center_table[0:points.num])
 
     fprintf(stderr,"finish local search\n");
     contcenters(&points);
@@ -943,12 +941,14 @@ int main(int argc, char **argv)
   gpu_free = gettime();
 #endif
 
-  // the size of work_mem_h is (kmax+2)*chunksize, equal to the allocation size
-#pragma omp target exit data map(release: coord_h[0:dim*chunksize],\
-    work_mem_h[0:(kmax+2)*chunksize], \
-    switch_membership[0:chunksize], \
-    p_h[0:chunksize], \
-    center_table[0:chunksize])
+  // Notes
+  // 1. the size of work_mem_h is (kmax+2)*chunksize, equal to the allocation size
+  // 2. the device allocation of center_table is released before the host allocation
+  // of center_table is freed and reallocated in streamcluster.cpp
+  #pragma omp target exit data map(release: coord_h[0:dim*chunksize],\
+                                            work_mem_h[0:(kmax+2)*chunksize], \
+                                            switch_membership[0:chunksize], \
+                                            p_h[0:chunksize])
 
   free(coord_h);
   free(gl_lower);
@@ -957,38 +957,32 @@ int main(int argc, char **argv)
 
 #ifdef PROFILE_TMP
   gpu_free = gettime() - gpu_free;
-#endif
 
-#ifdef PROFILE_TMP
   double t2 = gettime();
-  printf("time = %lf\n",t2-t1);
+  printf("Total time = %lf (s)\n",t2-t1);
 #endif
 
   delete stream;
 
 #ifdef PROFILE_TMP
-  printf("time pgain = %lf\n", time_gain);
-  printf("time pgain_dist = %lf\n", time_gain_dist);
-  printf("time pgain_init = %lf\n", time_gain_init);
-  printf("time pselect = %lf\n", time_select_feasible);
-  printf("time pspeedy = %lf\n", time_speedy);
-  printf("time pshuffle = %lf\n", time_shuffle);
-  printf("time FL = %lf\n", time_FL);
-  printf("time localSearch = %lf\n", time_local_search);
+  printf("==== Detailed timing info ====\n");
+  printf("pgain = %lf (s)\n", time_gain);
+  printf("pgain_dist = %lf (s)\n", time_gain_dist);
+  printf("pgain_init = %lf (s)\n", time_gain_init);
+  printf("pselect = %lf (s)\n", time_select_feasible);
+  printf("pspeedy = %lf (s)\n", time_speedy);
+  printf("pshuffle = %lf (s)\n", time_shuffle);
+  printf("FL = %lf (s)\n", time_FL);
+  printf("localSearch = %lf (s)\n", time_local_search);
   printf("\n");
-  printf("====GPU Timing info====\n");
-  printf("time serial = %lf\n", serial);
-  printf("time CPU to GPU memory copy = %lf\n", cpu_gpu_memcpy);
-  printf("time GPU to CPU memory copy back = %lf\n", memcpy_back);
-  printf("time GPU malloc = %lf\n", gpu_malloc);
-  printf("time GPU free = %lf\n", gpu_free);
-  printf("time kernel = %lf\n", kernel_time);
-
-  FILE *fp = fopen("PD.txt", "w");
-  fprintf(fp, "%lf, %lf, %lf, %lf, %lf, %lf\n",
-      time_FL, cpu_gpu_memcpy, memcpy_back, kernel_time, gpu_malloc, gpu_free);
-  fclose(fp);  
+  printf("serial = %lf (s)\n", serial);
+  printf("CPU to GPU memory copy = %lf (s)\n", cpu_gpu_memcpy);
+  printf("GPU to CPU memory copy back = %lf (s)\n", memcpy_back);
+  printf("GPU malloc = %lf (s)\n", gpu_malloc);
+  printf("GPU free = %lf (s)\n", gpu_free);
+  printf("GPU kernels = %lf (s)\n", kernel_time);
 #endif
+
 #ifdef ENABLE_PARSEC_HOOKS
   __parsec_bench_end();
 #endif

@@ -11,6 +11,7 @@ endif
 
 OPTIMIZE  = yes
 DEBUG     = no
+PROFILE   = yes
 
 GPU       = yes
 CUDA      = no
@@ -59,6 +60,10 @@ endif
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+ifeq ($(PROFILE),yes)
+  CFLAGS += -DPROFILE_TMP
 endif
 
 # Debug Flags

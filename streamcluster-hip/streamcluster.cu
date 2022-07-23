@@ -463,7 +463,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 {
   int i;
   float cost;
-  float lastcost;
   float hiz, loz, z;
 
   static long k;
@@ -581,8 +580,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
     }
 #endif
     /* first get a rough estimate on the FL solution */
-    //    pthread_barrier_wait(barrier);    
-    lastcost = cost;
     cost = pFL(points, feasible, numfeasible,
         z, &k, kmax, cost, (long)(ITER*kmax*log((float)kmax)), 0.1, pid, barrier);
     /* if number of centers seems good, try a more accurate FL */
@@ -596,7 +593,6 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 #endif
       /* may need to run a little longer here before halting without
          improvement */
-
       cost = pFL(points, feasible, numfeasible,
           z, &k, kmax, cost, (long)(ITER*kmax*log((float)kmax)), 0.001, pid, barrier);
     }
@@ -863,8 +859,8 @@ void streamCluster( PStream* stream,
 
 int main(int argc, char **argv)
 {
-  char *outfilename = new char[MAXNAMESIZE];
-  char *infilename = new char[MAXNAMESIZE];
+  char outfilename[MAXNAMESIZE];
+  char infilename[MAXNAMESIZE];
   long kmin, kmax, n, chunksize, clustersize;
   int dim;
 #ifdef PARSEC_VERSION
@@ -905,7 +901,6 @@ int main(int argc, char **argv)
   strcpy(infilename, argv[7]);
   strcpy(outfilename, argv[8]);
   nproc = atoi(argv[9]);
-
 
   srand48(SEED);
   PStream* stream;
@@ -954,39 +949,32 @@ int main(int argc, char **argv)
 
 #ifdef PROFILE_TMP
   gpu_free = gettime() - gpu_free;
-#endif
 
-#ifdef PROFILE_TMP
   double t2 = gettime();
-  printf("time = %lf\n",t2-t1);
+  printf("Total time = %lf (s)\n",t2-t1);
 #endif
 
   delete stream;
 
 #ifdef PROFILE_TMP
-  printf("time pgain = %lf\n", time_gain);
-  printf("time pgain_dist = %lf\n", time_gain_dist);
-  printf("time pgain_init = %lf\n", time_gain_init);
-  printf("time pselect = %lf\n", time_select_feasible);
-  printf("time pspeedy = %lf\n", time_speedy);
-  printf("time pshuffle = %lf\n", time_shuffle);
-  printf("time FL = %lf\n", time_FL);
-  printf("time localSearch = %lf\n", time_local_search);
+  printf("==== Detailed timing info ====\n");
+  printf("pgain = %lf (s)\n", time_gain);
+  printf("pgain_dist = %lf (s)\n", time_gain_dist);
+  printf("pgain_init = %lf (s)\n", time_gain_init);
+  printf("pselect = %lf (s)\n", time_select_feasible);
+  printf("pspeedy = %lf (s)\n", time_speedy);
+  printf("pshuffle = %lf (s)\n", time_shuffle);
+  printf("FL = %lf (s)\n", time_FL);
+  printf("localSearch = %lf (s)\n", time_local_search);
   printf("\n");
-  printf("====GPU Timing info====\n");
-  printf("time serial = %lf\n", serial);
-  printf("time CPU to GPU memory copy = %lf\n", cpu_gpu_memcpy);
-  printf("time GPU to CPU memory copy back = %lf\n", memcpy_back);
-  printf("time GPU malloc = %lf\n", gpu_malloc);
-  printf("time GPU free = %lf\n", gpu_free);
-  printf("time kernel = %lf\n", kernel_time);
-
-  FILE *fp = fopen("PD.txt", "w");
-  fprintf(fp, "%lf, %lf, %lf, %lf, %lf, %lf\n", 
-      time_FL, cpu_gpu_memcpy, memcpy_back, 
-      kernel_time, gpu_malloc, gpu_free);
-  fclose(fp);  
+  printf("serial = %lf (s)\n", serial);
+  printf("CPU to GPU memory copy = %lf (s)\n", cpu_gpu_memcpy);
+  printf("GPU to CPU memory copy back = %lf (s)\n", memcpy_back);
+  printf("GPU malloc = %lf (s)\n", gpu_malloc);
+  printf("GPU free = %lf (s)\n", gpu_free);
+  printf("GPU kernels = %lf (s)\n", kernel_time);
 #endif
+
 #ifdef ENABLE_PARSEC_HOOKS
   __parsec_bench_end();
 #endif

@@ -3,13 +3,18 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 SM        = cc70
+PROFILE   = yes
 
 
 # Standard flags
-CFLAGS := -std=c++14 -Wall #-DPROFILE_TMP
+CFLAGS := -std=c++14 -Wall
 
 # Linker flags
 LDFLAGS = 
+
+ifeq ($(PROFILE),yes)
+  CFLAGS += -DPROFILE_TMP
+endif
 
 # Enable checksum and output file
 ifeq ($(DEBUG),yes)
@@ -31,7 +36,7 @@ SRC = streamcluster.cpp
 EXE = streamcluster
 
 $(EXE):$(SRC) kernel.h streamcluster.h  streamcluster_cl.h
-	$(CC) $(CFLAGS) $(SRC) -o $(EXE) $(LDFLAGS)	
+	$(CC) $(CFLAGS) $(SRC) -o $(EXE) $(LDFLAGS)
 
 run: $(EXE)
 	./$(EXE) 10 20 256 65536 65536 1000 none output.txt 1 

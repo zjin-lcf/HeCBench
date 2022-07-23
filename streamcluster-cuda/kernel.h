@@ -1,9 +1,10 @@
-__global__ void compute_cost(
-    const Point_Struct *p_d_acc,       
-    const float *coord_d_acc,
-    float * work_mem_d_acc,      
-    const int *center_table_d_acc,
-    char *switch_membership_d_acc,      
+__global__
+void compute_cost(
+    const Point_Struct *__restrict__ p_d_acc,       
+    const float *__restrict__ coord_d_acc,
+          float *__restrict__ work_mem_d_acc,      
+    const int *__restrict__ center_table_d_acc,
+    char *__restrict__ switch_membership_d_acc,      
     const int num,
     const int dim,
     const long x,
@@ -45,4 +46,3 @@ __global__ void compute_cost(
     }
   }
 }
-
