@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define COL_P_X 0
@@ -61,7 +62,7 @@ __global__ void surfel_render(
 }
 
 template <typename T>
-void surfelRenderTest(int n, int w, int h)
+void surfelRenderTest(int n, int w, int h, int repeat)
 {
   const int src_size = n*7;
   const int dst_size = w*h;
@@ -83,15 +84,24 @@ void surfelRenderTest(int n, int w, int h)
 
   dim3 threads(16, 16);
   dim3 blocks((w+15)/16, (h+15)/16);
+
   for (int f = 0; f < 3; f++) {
-    for (int i = 0; i < 100; i++)
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(surfel_render<T>), blocks, threads, 
-                         0, 0, d_src, n, inverseFocalLength[f], w, h, d_dst);
+    printf("\nf = %d\n", f);
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(surfel_render<T>), blocks, threads, 0, 0, d_src, n, inverseFocalLength[f], w, h, d_dst);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
     hipMemcpy(h_dst, d_dst, dst_size * sizeof(T), hipMemcpyDeviceToHost); 
     T *min = std::min_element( h_dst, h_dst + w*h );
     T *max = std::max_element( h_dst, h_dst + w*h );
-    printf("value range [%e, %e]\n", *min, *max);
+    printf("Value range [%e, %e]\n", *min, *max);
   }
 
   free(h_dst);
@@ -101,10 +111,23 @@ void surfelRenderTest(int n, int w, int h)
 }
 
 int main(int argc, char *argv[]) {
+  if (argc != 5) {
+    printf("Usage: %s <input height> <output width> <output height> <repeat>\n", argv[0]);
+    return 1;
+  }
   int n = atoi(argv[1]);
   int w = atoi(argv[2]);
   int h = atoi(argv[3]);
-  surfelRenderTest<float>(n, w, h);
-  surfelRenderTest<double>(n, w, h);
+  int repeat = atoi(argv[4]);
+
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float32  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<float>(n, w, h, repeat);
+
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float64  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<double>(n, w, h, repeat);
   return 0;
 }
