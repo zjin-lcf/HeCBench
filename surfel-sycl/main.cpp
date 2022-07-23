@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include "common.h"
 
 #define COL_P_X 0
@@ -20,12 +21,12 @@ class k;
 template<typename T>
 void surfel_render(
   nd_item<2> &item,
-  const T *__restrict__ s,
+  const T *__restrict s,
   int N,
   T f,
   int w,
   int h,
-  T *__restrict__ d)
+  T *__restrict d)
 {
   const int idx = item.get_global_id(1);
   const int idy = item.get_global_id(0);
@@ -61,12 +62,12 @@ void surfel_render(
         dMin = t; // ray hit the surfel 
       }
     }
-    d[id*w+idx] = dMin > (T)100 ? (T)0 : dMin;
+    d[idy*w+idx] = dMin > (T)100 ? (T)0 : dMin;
   }
 }
 
 template <typename T>
-void surfelRenderTest(queue &q, int n, int w, int h)
+void surfelRenderTest(queue &q, int n, int w, int h, int repeat)
 {
   const int src_size = n*7;
   const int dst_size = w*h;
@@ -86,7 +87,11 @@ void surfelRenderTest(queue &q, int n, int w, int h)
   range<2> lws (16, 16);
   range<2> gws ((h+15)/16*16, (w+15)/16*16);
   for (int f = 0; f < 3; f++) {
-    for (int i = 0; i < 100; i++)
+    printf("\nf = %d\n", f);
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
       q.submit([&] (handler &cgh) {
         auto src = d_src.template get_access<sycl_read>(cgh);
         auto dst = d_dst.template get_access<sycl_discard_write>(cgh);
@@ -96,6 +101,11 @@ void surfelRenderTest(queue &q, int n, int w, int h)
                            dst.get_pointer());
         });
       });
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
     q.submit([&] (handler &cgh) {
       auto acc = d_dst.template get_access<sycl_read>(cgh);
@@ -112,9 +122,14 @@ void surfelRenderTest(queue &q, int n, int w, int h)
 }
 
 int main(int argc, char *argv[]) {
+  if (argc != 5) {
+    printf("Usage: %s <input height> <output width> <output height> <repeat>\n", argv[0]);
+    return 1;
+  }
   int n = atoi(argv[1]);
   int w = atoi(argv[2]);
   int h = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -123,7 +138,14 @@ int main(int argc, char *argv[]) {
 #endif
   queue q(dev_sel);
 
-  surfelRenderTest<float>(q, n, w, h);
-  surfelRenderTest<double>(q, n, w, h);
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float32  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<float>(q, n, w, h, repeat);
+
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float64  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<double>(q, n, w, h, repeat);
   return 0;
 }

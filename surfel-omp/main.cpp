@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 #include <omp.h>
 
 #define COL_P_X 0
@@ -15,12 +16,12 @@
 // compute the xyz images using the inverse focal length invF
   template<typename T>
 void surfel_render(
-    const T *__restrict__ s,
+    const T *__restrict s,
     int N,
     T f,
     int w,
     int h,
-    T *__restrict__ d)
+    T *__restrict d)
 {
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
   for (int idy = 0; idy < h; idy++)
@@ -55,12 +56,12 @@ void surfel_render(
           dMin = t; // ray hit the surfel 
         }
       }
-      d[id*w+idx] = dMin > (T)100 ? (T)0 : dMin;
+      d[idy*w+idx] = dMin > (T)100 ? (T)0 : dMin;
     }
 }
 
-  template <typename T>
-void surfelRenderTest(int n, int w, int h)
+template <typename T>
+void surfelRenderTest(int n, int w, int h, int repeat)
 {
   const int src_size = n*7;
   const int dst_size = w*h;
@@ -78,8 +79,15 @@ void surfelRenderTest(int n, int w, int h)
                         map(alloc: h_dst[0:dst_size])
   {
     for (int f = 0; f < 3; f++) {
-      for (int i = 0; i < 100; i++)
+      printf("\nf = %d\n", f);
+      auto start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++)
         surfel_render<T>(h_src, n, inverseFocalLength[f], w, h, h_dst);
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
       #pragma omp target update from (h_dst[0:dst_size])
       T *min = std::min_element( h_dst, h_dst + w*h );
@@ -93,10 +101,23 @@ void surfelRenderTest(int n, int w, int h)
 }
 
 int main(int argc, char *argv[]) {
+  if (argc != 5) {
+    printf("Usage: %s <input height> <output width> <output height> <repeat>\n", argv[0]);
+    return 1;
+  }
   int n = atoi(argv[1]);
   int w = atoi(argv[2]);
   int h = atoi(argv[3]);
-  surfelRenderTest<float>(n, w, h);
-  surfelRenderTest<double>(n, w, h);
+  int repeat = atoi(argv[4]);
+
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float32  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<float>(n, w, h, repeat);
+
+  printf("-------------------------------------\n");
+  printf(" surfelRenderTest with type float64  \n");
+  printf("-------------------------------------\n");
+  surfelRenderTest<double>(n, w, h, repeat);
   return 0;
 }
