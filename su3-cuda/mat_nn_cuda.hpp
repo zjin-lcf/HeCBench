@@ -80,7 +80,7 @@ double su3_mat_nn(thrust::host_vector<site> &a, thrust::host_vector<su3_matrix> 
     if (iters == warmups) {
       cudaDeviceSynchronize();
       tstart = Clock::now();
-	  }
+    }
     k_mat_nn<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, total_sites);
   }
   cudaDeviceSynchronize();
@@ -97,4 +97,3 @@ double su3_mat_nn(thrust::host_vector<site> &a, thrust::host_vector<su3_matrix> 
 
   return (ttotal /= 1.0e6);
 }
-

@@ -21,8 +21,6 @@ double su3_mat_nn(std::vector<site> &a, std::vector<su3_matrix> &b, std::vector<
   #pragma omp target data map(to: d_a[0:total_sites], d_b[0:4]) map(from: d_c[0:total_sites])
   {  // begin OpenMP block
 
-  // benchmark loop
-  auto tstart = Clock::now();
   // This code improves performance over above baseline
   // Similar to Cuda and OpenCL work item approach
   // Initial contribution by Xinmin Tian, Intel
@@ -34,10 +32,13 @@ double su3_mat_nn(std::vector<site> &a, std::vector<su3_matrix> &b, std::vector<
     std::cout << "Number of work items = " << num_work_items << std::endl;
   }
 
+  // benchmark loop
+  auto tstart = Clock::now();
   for (int iters=0; iters<iterations+warmups; ++iters) {
-    if (iters == warmups)
+    if (iters == warmups) {
       tstart = Clock::now();
-    #pragma omp target teams distribute parallel for num_teams(total_sites)  thread_limit(threads_per_team)
+    }
+    #pragma omp target teams distribute parallel for num_teams(total_sites) thread_limit(threads_per_team)
     for (int id =0; id < num_work_items; id++) {
       int i = id/36;
       if (i < total_sites) {
@@ -63,6 +64,7 @@ double su3_mat_nn(std::vector<site> &a, std::vector<su3_matrix> &b, std::vector<
   }
 
   ttotal = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-tstart).count();
+
   } // end of OpenMP block, C gets moved back to the host
 
   // It is not possible to check for NaNs when the application is compiled with -ffast-math
