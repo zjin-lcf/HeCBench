@@ -4,18 +4,19 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <chrono>
 #include <omp.h>
 
 #include "kernels.cpp"
 
-void runDevice(float* input, float* output, int testsize)
+void runDevice(float* input, float* output, int testsize, int repeat)
 {
-
   #pragma omp target data map(to: input[0:9*testsize]) map(from: output[0:21*testsize])
   {
-    for (int i = 0; i < 100; i++) {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int tid = 0; tid < testsize; tid++) {
         svd(input[tid + 0 * testsize], input[tid + 1 * testsize], input[tid + 2 * testsize],
@@ -28,10 +29,13 @@ void runDevice(float* input, float* output, int testsize)
             output[tid + 9 * testsize], output[tid + 10 * testsize], output[tid + 11 * testsize],
             output[tid + 12 * testsize], output[tid + 13 * testsize], output[tid + 14 * testsize],
             output[tid + 15 * testsize], output[tid + 16 * testsize], output[tid + 17 * testsize],
-            output[tid + 18 * testsize], output[tid + 19 * testsize], output[tid + 20 * testsize]
-       );
+            output[tid + 18 * testsize], output[tid + 19 * testsize], output[tid + 20 * testsize]);
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
 }
 
@@ -55,8 +59,15 @@ void svd3x3_ref(float* input, float* output, int testsize)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " <path to file> <repeat>\n";
+    return 1;
+  }
+
   // Load data
   const char* filename = argv[1];
+  const int repeat = atoi(argv[2]);
+
   std::ifstream myfile;
   myfile.open(filename);
   int testsSize;
@@ -79,7 +90,7 @@ int main(int argc, char* argv[])
   myfile.close();
 
   // SVD 3x3 on a GPU 
-  runDevice(input, result, testsSize);
+  runDevice(input, result, testsSize, repeat);
 
   bool ok = true;
   svd3x3_ref(input, result_h, testsSize);

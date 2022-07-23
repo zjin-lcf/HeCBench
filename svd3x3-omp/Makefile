@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3 -ffast-math
@@ -59,4 +58,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../svd3x3-cuda/Dataset_1M.txt
+	./$(program) ../svd3x3-cuda/Dataset_1M.txt 100
+	./$(program) ../svd3x3-cuda/Dataset_1M.txt 300
+	./$(program) ../svd3x3-cuda/Dataset_1M.txt 600
+	./$(program) ../svd3x3-cuda/Dataset_1M.txt 900

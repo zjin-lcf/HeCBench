@@ -1055,4 +1055,3 @@ void svd3_SOA(float* input, float* output, int testsize, nd_item<1> &item)
       output[tid + 18 * testsize], output[tid + 19 * testsize], output[tid + 20 * testsize]
      );
 }
-
