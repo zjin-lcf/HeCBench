@@ -1040,7 +1040,9 @@ void svd(
   s33 = Sa33.f;
 }
 
-__global__ void svd3_SOA(const float*__restrict input, float*__restrict output, int testsize)
+__global__ void svd3_SOA(const float*__restrict__ input,
+                               float*__restrict__ output,
+                         const int testsize)
 {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   if (tid >= testsize) return;
@@ -1061,5 +1063,3 @@ __global__ void svd3_SOA(const float*__restrict input, float*__restrict output, 
       output[tid + 18 * testsize], output[tid + 19 * testsize], output[tid + 20 * testsize]
      );
 }
-
-

@@ -4,15 +4,14 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <chrono>
 #include "common.h"
 
 #include "kernels.cpp"
 
-void runDevice(float* input, float* output, int n)
+void runDevice(float* input, float* output, int n, int repeat)
 {
-
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -26,7 +25,10 @@ void runDevice(float* input, float* output, int n)
   range<1> lws (256);
   range<1> gws ((n+255)/256*256);
 
-  for (int i = 0; i < 100; i++) {
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto output = d_answer.get_access<sycl_discard_write>(cgh);
       auto input = d_input.get_access<sycl_read>(cgh);
@@ -35,6 +37,11 @@ void runDevice(float* input, float* output, int n)
       });
     });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 }
 
 void svd3x3_ref(float* input, float* output, int testsize)
@@ -57,8 +64,15 @@ void svd3x3_ref(float* input, float* output, int testsize)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " <path to file> <repeat>\n";
+    return 1;
+  }
+
   // Load data
   const char* filename = argv[1];
+  const int repeat = atoi(argv[2]);
+
   std::ifstream myfile;
   myfile.open(filename);
   int testsSize;
@@ -81,7 +95,7 @@ int main(int argc, char* argv[])
   myfile.close();
 
   // SVD 3x3 on a GPU 
-  runDevice(input, result, testsSize);
+  runDevice(input, result, testsSize, repeat);
 
   bool ok = true;
   svd3x3_ref(input, result_h, testsSize);

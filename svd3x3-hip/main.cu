@@ -4,13 +4,13 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "kernels.cu"
 
-void runDevice(float* input, float* output, int n)
+void runDevice(float* input, float* output, int n, int repeat)
 {
   float* d_answer;
   hipMalloc(&d_answer, 21 * sizeof(float) * n);
@@ -22,9 +22,17 @@ void runDevice(float* input, float* output, int n)
   int threads = 256;
   int pblks = int(n / threads) + 1;
 
-  for (int i = 0; i < 100; i++) {
-    hipLaunchKernelGGL(svd3_SOA, dim3(pblks), dim3(threads), 0, 0, d_input, d_answer, n);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(svd3_SOA, pblks, threads , 0, 0, d_input, d_answer, n);
   }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   hipMemcpy(output, d_answer, 21 * sizeof(float) * n, hipMemcpyDeviceToHost);
   hipFree(d_answer);
@@ -51,8 +59,15 @@ void svd3x3_ref(float* input, float* output, int testsize)
 
 int main(int argc, char* argv[])
 {
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " <path to file> <repeat>\n";
+    return 1;
+  }
+
   // Load data
   const char* filename = argv[1];
+  const int repeat = atoi(argv[2]);
+
   std::ifstream myfile;
   myfile.open(filename);
   int testsSize;
@@ -75,7 +90,7 @@ int main(int argc, char* argv[])
   myfile.close();
 
   // SVD 3x3 on a GPU 
-  runDevice(input, result, testsSize);
+  runDevice(input, result, testsSize, repeat);
 
   // run CPU 3x3 to verify results
   bool ok = true;
@@ -94,7 +109,6 @@ int main(int argc, char* argv[])
     std::cout << "PASS\n";
   else
     std::cout << "FAIL\n";
-
 
   free(input);
   free(result);
