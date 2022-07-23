@@ -80,7 +80,7 @@ double su3_mat_nn(thrust::host_vector<site> &a, thrust::host_vector<su3_matrix> 
     if (iters == warmups) {
       hipDeviceSynchronize();
       tstart = Clock::now();
-	  }
+    }
     hipLaunchKernelGGL(k_mat_nn, dim3(blocksPerGrid), dim3(threadsPerBlock), 0, 0, d_a, d_b, d_c, total_sites);
   }
   hipDeviceSynchronize();
