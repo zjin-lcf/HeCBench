@@ -16,18 +16,17 @@
 #include <cstdio>
 #include <ctime>
 #include <stdint.h>
+#include <chrono>
 #include <cuda_runtime.h>
 
 #define min(a,b) (a) < (b) ? (a) : (b)
 #define max(a,b) (a) > (b) ? (a) : (b)
 
-#define LOOP_NUM 100
-
-__global__ void atomicKernel(int *atom_arr)
+__global__ void atomicKernel(int *atom_arr, const int loop_num)
 {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-  for (int i=0; i < LOOP_NUM; i++)
+  for (int i=0; i < loop_num; i++)
   {
     // Atomic addition
     atomicAdd_system(&atom_arr[0], 10);
@@ -63,12 +62,12 @@ __global__ void atomicKernel(int *atom_arr)
   }
 }
 
-void atomicKernel_CPU(int *atom_arr, int no_of_threads)
+void atomicKernel_CPU(int *atom_arr, int no_of_threads, const int loop_num)
 {
 
   for (int i=no_of_threads; i<2*no_of_threads; i++)
   {
-    for (int j=0; j < LOOP_NUM; j++)
+    for (int j=0; j < loop_num; j++)
     {
       // Atomic addition
       __sync_fetch_and_add(&atom_arr[0],10);
@@ -128,11 +127,11 @@ void atomicKernel_CPU(int *atom_arr, int no_of_threads)
 //! @param idata      input data as provided to device
 //! @param len        number of elements in reference / idata
 ////////////////////////////////////////////////////////////////////////////////
-int verify(int *testData, const int len)
+int verify(int *testData, const int len, const int loop_num)
 {
   int val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val += 10;
   }
@@ -194,7 +193,7 @@ int verify(int *testData, const int len)
   int limit = 17;
   val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val = (val >= limit) ? 0 : val+1;
   }
@@ -208,7 +207,7 @@ int verify(int *testData, const int len)
   limit = 137;
   val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val = ((val == 0) || (val > limit)) ? limit : val-1;
   }
@@ -286,6 +285,12 @@ int verify(int *testData, const int len)
 
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <loop count within the kernel>\n", argv[0]);
+    return 1;
+  }
+  const int loop_num = atoi(argv[1]);
+
   // set device
   cudaDeviceProp device_prop;
   cudaGetDeviceProperties(&device_prop, 0);
@@ -318,7 +323,7 @@ int main(int argc, char **argv)
   if (device_prop.pageableMemoryAccess)
   {
     printf("CAN access pageable memory\n");
-    atom_arr = (int *) malloc(sizeof(int)*numData);
+    atom_arr = (int *) malloc (sizeof(int)*numData);
   }
   else
   {
@@ -333,13 +338,21 @@ int main(int argc, char **argv)
   //To make the AND and XOR tests generate something other than 0...
   atom_arr[7] = atom_arr[9] = 0xff;
 
-  atomicKernel<<<numBlocks, numThreads>>>(atom_arr);
-  atomicKernel_CPU(atom_arr, numBlocks*numThreads);
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  atomicKernel<<<numBlocks, numThreads>>>(atom_arr, loop_num);
+
+  atomicKernel_CPU(atom_arr, numBlocks*numThreads, loop_num);
 
   cudaDeviceSynchronize();
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Execution time of atomic kernels on host and device: %f (s)\n", time * 1e-9f);
+
   // Compute & verify reference solution
-  int testResult = verify(atom_arr, 2*numThreads*numBlocks);
+  int testResult = verify(atom_arr, 2*numThreads*numBlocks, loop_num);
 
   if (device_prop.pageableMemoryAccess)
   {
