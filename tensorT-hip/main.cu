@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define TILE_SIZE 5900
@@ -8,12 +9,12 @@
 // 1,2,3,4,5,6 -> 2,3,4,6,1,5
 static const int d1 = 41, d2 = 13, d3 = 11, d4 = 9, d5 = 76, d6 = 50;
 static const int data_size = d1 * d2 * d3 * d4 * d5 * d6;
-static int ITER = 1;
+static int repeat = 1;
 
 static const int shape_output[] = {d2, d3, d1};
 static const int shape_input[] = {d4, d5, d6};
-static const float shape_output_r[] = {1.0 / d2, 1.0 / d3, 1.0 / d1};
-static const float shape_input_r[] = {1.0 / d4, 1.0 / d5, 1.0 / d6};
+static const float shape_output_r[] = {1.f / d2, 1.f / d3, 1.f / d1};
+static const float shape_input_r[] = {1.f / d4, 1.f / d5, 1.f / d6};
 static const int stride_output_local[] = {d1, d1 * d2, 1};
 static const int stride_output_global[] = {1, d2, d2 * d3 * d4 * d6};
 static const int stride_input[] = {d2 * d3, d2 * d3 * d4 * d6 * d1, d2 * d3 * d4};
@@ -25,12 +26,12 @@ void verify(double *input, double *output) {
   for (size_t i = 0; i < d5; i++) {
     if (input[input_offset + i * d1 * d2 * d3 * d4] != 
         output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
-      printf("Failed\n");
+      printf("FAIL\n");
       error = true;
       break;
     }
   }
-  if (!error) printf("Passed\n");
+  if (!error) printf("PASS\n");
 }
 
 __global__ void tensor_transpose(
@@ -53,7 +54,7 @@ __global__ void tensor_transpose(
   for (int block_idx = blockIdx.x; block_idx < nblocks; block_idx += gridDim.x) {
     int it = block_idx, im = 0, offset1 = 0;
     for (int i = 0; i < dim_input; i++) {
-      im = it * shape_input_r[i];
+      im = it * shape_input_r[i];  // replace division with multiplication
       offset1 += stride_input[i] * (it - im * shape_input[i]);
       it = im;
     }
@@ -68,7 +69,7 @@ __global__ void tensor_transpose(
       it = i;
       int offset2 = 0, local_offset = 0;
       for (int j = 0; j < dim_output; j++) {
-        im = it * shape_output_r[j];
+        im = it * shape_output_r[j];  // replace division with multiplication
         int tmp = it - im * shape_output[j];
         offset2 += stride_output_global[j] * tmp;
         local_offset += stride_output_local[j] * tmp;
@@ -81,9 +82,9 @@ __global__ void tensor_transpose(
   }
 }
 
-int main(int argv, char **argc) {
-  if (argv > 1) {
-    ITER = atoi(argc[1]);
+int main(int argc, char **argv) {
+  if (argc > 1) {
+    repeat = atoi(argv[1]);
   }
 
   double *input = new double[data_size]();
@@ -130,11 +131,11 @@ int main(int argv, char **argc) {
   hipMemcpy(d_stride_output_global, stride_output_global, 
       dim_output * sizeof(int), hipMemcpyHostToDevice );
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
-  for (size_t i = 0; i < ITER; ++i) {
-    hipLaunchKernelGGL(tensor_transpose, dim3(nblocks), dim3(NTHREADS), 
-        0, 0, 
-        dim_input, 
+  for (int i = 0; i < repeat; ++i) {
+    hipLaunchKernelGGL(tensor_transpose, nblocks, NTHREADS, 0, 0, dim_input, 
         dim_output, 
         nblocks, 
         tile_size,
@@ -148,8 +149,12 @@ int main(int argv, char **argc) {
         d_input, d_output);
   }
 
-  hipMemcpy(output, d_output, data_size * sizeof(double), hipMemcpyDeviceToHost);
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
+  hipMemcpy(output, d_output, data_size * sizeof(double), hipMemcpyDeviceToHost);
   hipFree(d_output);
   hipFree(d_input);
   hipFree(d_shape_input);
@@ -164,6 +169,5 @@ int main(int argv, char **argc) {
 
   delete [] input;
   delete [] output;
-
   return 0;
 }
