@@ -19,6 +19,10 @@
 #include "utils.cpp"
 
 int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " <path to file> <repeat>\n";
+    return 1;
+  }
 
   // Open an input data file
   std::ifstream iff;
@@ -41,7 +45,7 @@ int main(int argc, char* argv[]) {
       if (!(iss >> optr[0] >> optr[1] >> optr[2] >> optr[3] >> optr[4] >>
             optr[5] >> optr[6] >> optr[7] >> optr[8] >> optr[9] >> optr[10] >>
             optr[11] >> optr[12] >> optr[13])) {
-        std::cerr << "ERROR READING data on line " << lc + 1 << "\n";
+        std::cerr << "Error reading data on line " << lc + 1 << "\n";
         break;
       }
       onesided.push_back(optr);
@@ -151,36 +155,30 @@ int main(int argc, char* argv[]) {
                                sg_str[0:sg_str_size]) \
                             map(alloc: uacc_ptr[0:uacc_size])
     {
-      auto start = std::chrono::high_resolution_clock::now();
+      double time = 0.0;
 
       for (int p = 0; p < repeat; p++) {
         #pragma omp target update to (uacc_ptr[0:uacc_size])
+        auto start = std::chrono::high_resolution_clock::now();
+
         curvilinear4sg_ci(optr[6], optr[7], optr[8], optr[9], optr[10], optr[11],
             alpha_ptr, mua_ptr, lambda_ptr, met_ptr, jac_ptr,
             uacc_ptr, onesided_ptr, cof_ptr, sg_str, nkg, op);
+
+        auto end = std::chrono::steady_clock::now();
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
 
-      auto stop = std::chrono::high_resolution_clock::now();
-      std::cout << "\nAverage kernel runtime = " <<
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-        stop-start).count() / (1.0 * repeat) << " milliseconds\n\n";
+      std::cout << "\nAverage execution time of sw4ck kernels: "
+                << (time * 1e-6f) / repeat << " milliseconds\n\n";
 
       #pragma omp target update from (uacc_ptr[0:uacc_size])
     }
 
-    auto  minmax =arrays[i]["a_Uacc"]->minmax();
-    std::cout << "MIN = " << std::defaultfloat << std::setprecision(20)
-      << std::get<0>(minmax) << "\nMAX = " << std::get<1>(minmax) << "\n\n";
-
     // Display the norms in hex and decimal formats before verification
-    float_sw4 norm=arrays[i]["a_Uacc"]->norm();
-    std::cout << "Norm of output (HEX)" << std::hexfloat
-      << norm  << "\n";
-    std::cout << "Norm of output (DEC)" << std::defaultfloat << std::setprecision(20)
-      << norm  << "\n";
-
+    float_sw4 norm = arrays[i]["a_Uacc"]->norm();
     float_sw4 err = (norm - exact_norm[i]) / exact_norm[i] * 100;
-    std::cout << "Error = " << std::setprecision(2) << err << " %\n";
+    std::cout << "Error = " << err << " %\n";
 
     free(sg_str);
     delete(optr);
@@ -192,4 +190,3 @@ int main(int argc, char* argv[]) {
       delete(x.second);
   return 0;
 }
-
