@@ -819,6 +819,7 @@ int main(int argc, char* argv[])
   }
   auto stop = myclock::now();
   myduration elapsed = stop - begin;
+  double duration = elapsed.count(); 
 
   printf("-----------------------\n");
   printf("Summary of TestSNAP run\n");
@@ -828,17 +829,20 @@ int main(int argc, char* argv[])
   printf("nsteps = %d \n", nsteps);
   printf("nneighs = %d \n", ninside);
   printf("twojmax = %d \n", twojmax);
-  printf("duration = %g [sec]\n", elapsed.count());
-  printf("step time = %g [sec/step]\n", elapsed.count() / nsteps);
-  printf("grind time = %g [msec/atom-step]\n",
-      1000.0 * elapsed.count() / (nlocal * nsteps));
-  printf("RMS |Fj| deviation %g [eV/A]\n", sqrt(sumsqferr / (ntotal * nsteps)));
+  printf("duration = %g [sec]\n", duration);
 
-  printf("\n Individual routine timings\n");
-  printf("compute_ui = %f\n", elapsed_ui);
-  printf("compute_yi = %f\n", elapsed_yi);
-  printf("compute_duidrj = %f\n", elapsed_duidrj);
-  printf("compute_deidrj = %f\n", elapsed_deidrj);
+  // step time includes host, device, and host-data transfer time
+  double ktime = elapsed_ui + elapsed_yi + elapsed_duidrj + elapsed_deidrj;
+  printf("step time = %g [msec/step]\n", 1000.0 * duration / nsteps);
+  printf("\n Individual kernel timings for each step\n");
+  printf("   compute_ui = %g [msec/step]\n", 1000.0 * elapsed_ui / nsteps);
+  printf("   compute_yi = %g [msec/step]\n", 1000.0 * elapsed_yi / nsteps);
+  printf("   compute_duidrj = %g [msec/step]\n", 1000.0 * elapsed_duidrj / nsteps);
+  printf("   compute_deidrj = %g [msec/step]\n", 1000.0 * elapsed_deidrj / nsteps);
+  printf("   Total kernel time = %g [msec/step]\n", 1000.0 * ktime / nsteps);
+  printf("   Percentage of step time = %g%%\n\n", ktime / duration * 100.0);
+  printf("grind time = %g [msec/atom-step]\n", 1000.0 * duration / (nlocal * nsteps));
+  printf("RMS |Fj| deviation %g [eV/A]\n", sqrt(sumsqferr / (ntotal * nsteps)));
 
 #if defined(OPENMP_TARGET)
 }
@@ -870,5 +874,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
-
