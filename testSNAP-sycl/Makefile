@@ -75,4 +75,3 @@ clean:
 
 run: $(program)
 	./$(program) --nsteps 100
-

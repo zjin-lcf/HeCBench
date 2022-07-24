@@ -43,8 +43,12 @@ __global__ void reset_ulisttot(COMPLEX *ulisttot, const int ulisttot_size)
   if (i < ulisttot_size) ulisttot[i] = {0.0, 0.0};
 }
 
-__global__ void set_ulisttot(COMPLEX *ulisttot, const int* idxu_block, 
-    const int num_atoms, const int twojmax, const double wself) 
+__global__ void set_ulisttot(
+    COMPLEX *__restrict__ ulisttot,
+    const int*__restrict__ idxu_block, 
+    const int num_atoms,
+    const int twojmax,
+    const double wself) 
 {
   int natom = blockIdx.x * blockDim.x + threadIdx.x;
   if (natom < num_atoms) 
@@ -58,14 +62,14 @@ __global__ void set_ulisttot(COMPLEX *ulisttot, const int* idxu_block,
 }
 
 __global__ void update_ulisttot(
-    const double* rij, 
-    const double* rcutij,
-    const double* wj, 
-    const int* ulist_parity, 
-    const int* idxu_block, 
-    const double* rootpqarray, 
-    COMPLEX *ulist, 
-    COMPLEX *ulisttot, 
+    const double*__restrict__ rij, 
+    const double*__restrict__ rcutij,
+    const double*__restrict__ wj, 
+    const int*__restrict__ ulist_parity, 
+    const int*__restrict__ idxu_block, 
+    const double*__restrict__ rootpqarray, 
+    COMPLEX *__restrict__ ulist, 
+    COMPLEX *__restrict__ ulisttot, 
     const int num_atoms,
     const int num_nbor,
     const int switch_flag, 
@@ -219,14 +223,14 @@ __global__ void reset_ylist(COMPLEX *ylist, const int ylist_size)
 }
 
 __global__ void compute_yi (
-    const int* idxz,
-    const double* idxzbeta,
-    const double* cglist,
-    const int* idxcg_block,
-    const int* idxu_block,
-    const int* idxdu_block,
-    const COMPLEX* ulisttot,
-    COMPLEX* ylist,
+    const int*__restrict__ idxz,
+    const double*__restrict__ idxzbeta,
+    const double*__restrict__ cglist,
+    const int*__restrict__ idxcg_block,
+    const int*__restrict__ idxu_block,
+    const int*__restrict__ idxdu_block,
+    const COMPLEX*__restrict__ ulisttot,
+          COMPLEX*__restrict__ ylist,
     const int num_atoms,
     const int idxz_max,
     const int jdim) 
@@ -306,12 +310,12 @@ __global__ void compute_yi (
 }
 
 __global__ void compute_duidrj (
-    const double *wj,
-    const double *rij,
-    const double *rcutij,
-    const double* rootpqarray,
-    const COMPLEX* ulist,
-    COMPLEX* dulist,
+    const double *__restrict__ wj,
+    const double *__restrict__ rij,
+    const double *__restrict__ rcutij,
+    const double*__restrict__ rootpqarray,
+    const COMPLEX*__restrict__ ulist,
+          COMPLEX*__restrict__ dulist,
     const int num_atoms,
     const int num_nbor,
     const int twojmax,
@@ -319,7 +323,6 @@ __global__ void compute_duidrj (
     const int jdimpq,
     const int switch_flag)
 {
-
   int natom = blockIdx.x * blockDim.x + threadIdx.x;
   int nbor = blockIdx.y * blockDim.y + threadIdx.y;
   if (natom < num_atoms && nbor < num_nbor) {
@@ -348,10 +351,10 @@ __global__ void compute_duidrj (
 }
 
 __global__ void compute_deidrj(
-    const int* idxdu_block,
-    const COMPLEX* dulist,
-    const COMPLEX* ylist,
-    double* dedr,
+    const int*__restrict__ idxdu_block,
+    const COMPLEX*__restrict__ dulist,
+    const COMPLEX*__restrict__ ylist,
+    double*__restrict__ dedr,
     const int num_atoms,
     const int num_nbor,
     const int twojmax,
@@ -784,6 +787,7 @@ int main(int argc, char* argv[])
   // loop over steps
 
   auto begin = myclock::now();
+
   for (int istep = 0; istep < nsteps; istep++) {
 
     time_point<system_clock> start, end;
@@ -821,18 +825,18 @@ int main(int argc, char* argv[])
 
     dim3 grid_k1 ((num_atoms*idxu_max+255)/256);
     dim3 block_k1 (256);
-    hipLaunchKernelGGL(reset_ulisttot, dim3(grid_k1), dim3(block_k1), 0, 0, d_ulisttot, num_atoms*idxu_max);
+    hipLaunchKernelGGL(reset_ulisttot, grid_k1, block_k1, 0, 0, d_ulisttot, num_atoms*idxu_max);
 
 
     dim3 grid_k2 ((num_atoms+255)/256);
     dim3 block_k2 (256);
-    hipLaunchKernelGGL(set_ulisttot, dim3(grid_k2), dim3(block_k2), 0, 0, d_ulisttot, d_idxu_block, num_atoms, twojmax, wself);
+    hipLaunchKernelGGL(set_ulisttot, grid_k2, block_k2, 0, 0, d_ulisttot, d_idxu_block, num_atoms, twojmax, wself);
 
 
     dim3 grid_k3 ((num_atoms+15)/16, (num_nbor+15)/16);
     dim3 block_k3 (16, 16);
 
-    hipLaunchKernelGGL(update_ulisttot, dim3(grid_k3), dim3(block_k3), 0, 0, 
+    hipLaunchKernelGGL(update_ulisttot, grid_k3, block_k3, 0, 0, 
         d_rij, 
         d_rcutij,
         d_wj,
@@ -847,6 +851,7 @@ int main(int argc, char* argv[])
         twojmax,
         jdimpq);
 
+    hipDeviceSynchronize();
     end = system_clock::now();
     elapsed = end - start;
     elapsed_ui += elapsed.count();
@@ -857,12 +862,12 @@ int main(int argc, char* argv[])
     dim3 grid_k4 ((num_atoms*idxdu_max+255)/256);
     dim3 block_k4 (256);
 
-    hipLaunchKernelGGL(reset_ylist, dim3(grid_k4), dim3(block_k4), 0, 0, d_ylist, num_atoms*idxdu_max);
+    hipLaunchKernelGGL(reset_ylist, grid_k4, block_k4, 0, 0, d_ylist, num_atoms*idxdu_max);
 
     dim3 grid_k5 ((num_atoms+15)/16, (idxz_max+15)/16);
     dim3 block_k5 (16, 16);
 
-    hipLaunchKernelGGL(compute_yi, dim3(grid_k5), dim3(block_k5), 0, 0, 
+    hipLaunchKernelGGL(compute_yi, grid_k5, block_k5, 0, 0, 
         d_idxz,
         d_idxzbeta,
         d_cglist,
@@ -875,6 +880,7 @@ int main(int argc, char* argv[])
         idxz_max,
         jdim);
 
+    hipDeviceSynchronize();
     end = system_clock::now();
     elapsed = end - start;
     elapsed_yi += elapsed.count();
@@ -884,7 +890,7 @@ int main(int argc, char* argv[])
 
     dim3 grid_k6 ((num_atoms+15)/16, (num_nbor+15)/16);
     dim3 block_k6 (16, 16);
-    hipLaunchKernelGGL(compute_duidrj, dim3(grid_k6), dim3(block_k6), 0, 0, 
+    hipLaunchKernelGGL(compute_duidrj, grid_k6, block_k6, 0, 0, 
         d_wj,
         d_rij,
         d_rcutij,
@@ -898,6 +904,7 @@ int main(int argc, char* argv[])
         jdimpq,
         switch_flag);
 
+    hipDeviceSynchronize();
     end = system_clock::now();
     elapsed = end - start;
     elapsed_duidrj += elapsed.count();
@@ -908,7 +915,7 @@ int main(int argc, char* argv[])
     dim3 grid_k7 ((num_atoms+15)/16, (num_nbor+15)/16);
     dim3 block_k7 (16, 16);
 
-    hipLaunchKernelGGL(compute_deidrj, dim3(grid_k7), dim3(block_k7), 0, 0,  
+    hipLaunchKernelGGL(compute_deidrj, grid_k7, block_k7, 0, 0,  
         d_idxdu_block,
         d_dulist,
         d_ylist,
@@ -918,11 +925,12 @@ int main(int argc, char* argv[])
         twojmax,
         idxdu_max);
 
-    hipMemcpy(dedr, d_dedr, sizeof(double)*num_atoms*num_nbor*3, hipMemcpyDeviceToHost);
-
+    hipDeviceSynchronize();
     end = system_clock::now();
     elapsed = end - start;
     elapsed_deidrj += elapsed.count();
+
+    hipMemcpy(dedr, d_dedr, sizeof(double)*num_atoms*num_nbor*3, hipMemcpyDeviceToHost);
 
     // Compute forces and error
     //compute_forces(snaptr);
@@ -949,6 +957,7 @@ int main(int argc, char* argv[])
   }
   auto stop = myclock::now();
   myduration elapsed = stop - begin;
+  double duration = elapsed.count(); 
 
   printf("-----------------------\n");
   printf("Summary of TestSNAP run\n");
@@ -958,17 +967,20 @@ int main(int argc, char* argv[])
   printf("nsteps = %d \n", nsteps);
   printf("nneighs = %d \n", ninside);
   printf("twojmax = %d \n", twojmax);
-  printf("duration = %g [sec]\n", elapsed.count());
-  printf("step time = %g [sec/step]\n", elapsed.count() / nsteps);
-  printf("grind time = %g [msec/atom-step]\n",
-      1000.0 * elapsed.count() / (nlocal * nsteps));
-  printf("RMS |Fj| deviation %g [eV/A]\n", sqrt(sumsqferr / (ntotal * nsteps)));
+  printf("duration = %g [sec]\n", duration);
 
-  printf("\n Individual routine timings\n");
-  printf("compute_ui = %f\n", elapsed_ui);
-  printf("compute_yi = %f\n", elapsed_yi);
-  printf("compute_duidrj = %f\n", elapsed_duidrj);
-  printf("compute_deidrj = %f\n", elapsed_deidrj);
+  // step time includes host, device, and host-data transfer time
+  double ktime = elapsed_ui + elapsed_yi + elapsed_duidrj + elapsed_deidrj;
+  printf("step time = %g [msec/step]\n", 1000.0 * duration / nsteps);
+  printf("\n Individual kernel timings for each step\n");
+  printf("   compute_ui = %g [msec/step]\n", 1000.0 * elapsed_ui / nsteps);
+  printf("   compute_yi = %g [msec/step]\n", 1000.0 * elapsed_yi / nsteps);
+  printf("   compute_duidrj = %g [msec/step]\n", 1000.0 * elapsed_duidrj / nsteps);
+  printf("   compute_deidrj = %g [msec/step]\n", 1000.0 * elapsed_deidrj / nsteps);
+  printf("   Total kernel time = %g [msec/step]\n", 1000.0 * ktime / nsteps);
+  printf("   Percentage of step time = %g%%\n\n", ktime / duration * 100.0);
+  printf("grind time = %g [msec/atom-step]\n", 1000.0 * duration / (nlocal * nsteps));
+  printf("RMS |Fj| deviation %g [eV/A]\n", sqrt(sumsqferr / (ntotal * nsteps)));
 
   hipFree(d_idxu_block);
   hipFree(d_ulist_parity);
@@ -1012,5 +1024,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
-
