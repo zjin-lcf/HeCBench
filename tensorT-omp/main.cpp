@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <omp.h>
 
 #define TILE_SIZE 5900
@@ -8,7 +9,7 @@
 // 1,2,3,4,5,6 -> 2,3,4,6,1,5
 static const int d1 = 41, d2 = 13, d3 = 11, d4 = 9, d5 = 76, d6 = 50;
 static const int data_size = d1 * d2 * d3 * d4 * d5 * d6;
-static int ITER = 1;
+static int repeat = 1;
 
 static const int shape_output[] = {d2, d3, d1};
 static const int shape_input[] = {d4, d5, d6};
@@ -25,17 +26,17 @@ void verify(double *input, double *output) {
   for (size_t i = 0; i < d5; i++) {
     if (input[input_offset + i * d1 * d2 * d3 * d4] != 
         output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
-      printf("Failed\n");
+      printf("FAIL\n");
       error = true;
       break;
     }
   }
-  if (!error) printf("Passed\n");
+  if (!error) printf("PASS\n");
 }
 
 int main(int argv, char **argc) {
   if (argv > 1) {
-    ITER = atoi(argc[1]);
+    repeat = atoi(argc[1]);
   }
 
   double *input = new double[data_size]();
@@ -60,12 +61,14 @@ int main(int argv, char **argc) {
                                 stride_output_global[0:dim_output]) \
                         map(from: output[0:data_size])
   {
-    for (size_t i = 0; i < ITER; ++i) {
+    auto start = std::chrono::steady_clock::now();
 
-#pragma omp target teams num_teams(nblocks) thread_limit(NTHREADS)
+    for (size_t i = 0; i < repeat; ++i) {
+
+      #pragma omp target teams num_teams(nblocks) thread_limit(NTHREADS)
       {
         double tile[TILE_SIZE];
-#pragma omp parallel 
+        #pragma omp parallel 
         {
           for (int block_idx = omp_get_team_num(); block_idx < nblocks; block_idx += omp_get_num_teams()) {
             int it = block_idx, im = 0, offset1 = 0;
@@ -79,7 +82,7 @@ int main(int argv, char **argc) {
               tile[i] = input[i + block_idx * tile_size];
             }
 
-#pragma omp barrier
+            #pragma omp barrier
 
             for (int i = omp_get_thread_num(); i < tile_size; i += omp_get_num_threads()) {
               it = i;
@@ -93,11 +96,15 @@ int main(int argv, char **argc) {
               }
               output[offset1 + offset2] = tile[local_offset];
             }
-#pragma omp barrier
+            #pragma omp barrier
           }
         }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   verify(input, output);
