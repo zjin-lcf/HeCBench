@@ -19,6 +19,10 @@
 #include "utils.cpp"
 
 int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " <path to file> <repeat>\n";
+    return 1;
+  }
 
   // Open an input data file
   std::ifstream iff;
@@ -41,7 +45,7 @@ int main(int argc, char* argv[]) {
       if (!(iss >> optr[0] >> optr[1] >> optr[2] >> optr[3] >> optr[4] >>
             optr[5] >> optr[6] >> optr[7] >> optr[8] >> optr[9] >> optr[10] >>
             optr[11] >> optr[12] >> optr[13])) {
-        std::cerr << "ERROR READING data on line " << lc + 1 << "\n";
+        std::cerr << "Error reading data on line " << lc + 1 << "\n";
         break;
       }
       onesided.push_back(optr);
@@ -157,7 +161,7 @@ int main(int argc, char* argv[]) {
     //float_sw4* d_sg_str_x = d_sg_str;
     //float_sw4* d_sg_str_y = d_sg_str_x + optr[7] - optr[6] + 1;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    double time = 0.0;
 
     // execute kernel (need to reset device uacc content for result verification)
     for (int p = 0; p < repeat; p++) {
@@ -166,6 +170,9 @@ int main(int argc, char* argv[]) {
         cgh.copy(uacc_ptr, acc);
       });
 
+      q.wait();
+      auto start = std::chrono::steady_clock::now();
+
       curvilinear4sg_ci(q, optr[6], optr[7], optr[8], optr[9], optr[10], optr[11],
           d_alpha_ptr, d_mua_ptr, d_lambdaa_ptr, d_met_ptr, d_jac_ptr,
           d_uacc_ptr, onesided_ptr, 
@@ -173,13 +180,14 @@ int main(int argc, char* argv[]) {
 	  //d_acof_no_gp, d_bope, d_ghcof_no_gp, d_acof_no_gp, d_ghcof_no_gp, 
 	  //d_sg_str_x, d_sg_str_y, 
 	  nkg, op);
-    }
-    q.wait();
 
-    auto stop = std::chrono::high_resolution_clock::now();
-    std::cout << "\nAverage kernel runtime = " <<
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-      stop-start).count() / (1.0 * repeat) << " milliseconds\n\n";
+      q.wait();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+
+    std::cout << "\nAverage execution time of sw4ck kernels: "
+              << (time * 1e-6f) / repeat << " milliseconds\n\n";
 
     size = arrays[i]["a_Uacc"]->m_nc * 
            arrays[i]["a_Uacc"]->m_ni * 
@@ -191,19 +199,9 @@ int main(int argc, char* argv[]) {
       cgh.copy(acc, uacc_ptr);
     }).wait();
 
-    auto  minmax =arrays[i]["a_Uacc"]->minmax();
-    std::cout << "MIN = " << std::defaultfloat << std::setprecision(20)
-      << std::get<0>(minmax) << "\nMAX = " << std::get<1>(minmax) << "\n\n";
-
-    // Display the norms in hex and decimal formats before verification
-    float_sw4 norm=arrays[i]["a_Uacc"]->norm();
-    std::cout << "Norm of output (HEX)" << std::hexfloat
-      << norm  << "\n";
-    std::cout << "Norm of output (DEC)" << std::defaultfloat << std::setprecision(20)
-      << norm  << "\n";
-
+    float_sw4 norm = arrays[i]["a_Uacc"]->norm();
     float_sw4 err = (norm - exact_norm[i]) / exact_norm[i] * 100;
-    std::cout << "Error = " << std::setprecision(2) << err << " %\n";
+    std::cout << "Error = " << err << " %\n";
 
     // Free memory allocations
     free(sg_str);
@@ -215,4 +213,3 @@ int main(int argc, char* argv[]) {
       delete(x.second);
   return 0;
 }
-
