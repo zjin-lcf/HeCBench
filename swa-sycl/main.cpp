@@ -15,23 +15,22 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <chrono>
 #include <CL/sycl.hpp>
 
 #define min(a,b) (a) < (b) ? (a) : (b)
 #define max(a,b) (a) > (b) ? (a) : (b)
-
-#define LOOP_NUM 100
 
 using atomicSystemRef = sycl::atomic_ref<int,\
                         sycl::memory_order::relaxed,\
                         sycl::memory_scope::system,\
                         sycl::access::address_space::global_space>;
 
-void atomicKernel(int *atom_arr, sycl::nd_item<1> &item)
+void atomicKernel(int *atom_arr, const int loop_num, sycl::nd_item<1> &item)
 {
   int tid = item.get_global_id(0);
 
-  for (int i=0; i < LOOP_NUM; i++)
+  for (int i=0; i < loop_num; i++)
   {
     // Atomic addition
     //atomicAdd_system(&atom_arr[0], 10);
@@ -86,12 +85,12 @@ void atomicKernel(int *atom_arr, sycl::nd_item<1> &item)
   }
 }
 
-void atomicKernel_CPU(int *atom_arr, int no_of_threads)
+void atomicKernel_CPU(int *atom_arr, int no_of_threads, const int loop_num)
 {
 
   for (int i=no_of_threads; i<2*no_of_threads; i++)
   {
-    for (int j=0; j < LOOP_NUM; j++)
+    for (int j=0; j < loop_num; j++)
     {
       // Atomic addition
       __sync_fetch_and_add(&atom_arr[0],10);
@@ -151,11 +150,11 @@ void atomicKernel_CPU(int *atom_arr, int no_of_threads)
 //! @param idata      input data as provided to device
 //! @param len        number of elements in reference / idata
 ////////////////////////////////////////////////////////////////////////////////
-int verify(int *testData, const int len)
+int verify(int *testData, const int len, const int loop_num)
 {
   int val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val += 10;
   }
@@ -217,7 +216,7 @@ int verify(int *testData, const int len)
   int limit = 17;
   val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val = (val >= limit) ? 0 : val+1;
   }
@@ -231,7 +230,7 @@ int verify(int *testData, const int len)
   limit = 137;
   val = 0;
 
-  for (int i = 0; i < len*LOOP_NUM; ++i)
+  for (int i = 0; i < len*loop_num; ++i)
   {
     val = ((val == 0) || (val > limit)) ? limit : val-1;
   }
@@ -309,6 +308,11 @@ int verify(int *testData, const int len)
 
 int main(int argc, char **argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <loop count within the kernel>\n", argv[0]);
+    return 1;
+  }
+  const int loop_num = atoi(argv[1]);
 
 #ifdef USE_GPU
   sycl::gpu_selector dev_sel;
@@ -348,17 +352,23 @@ int main(int argc, char **argv)
   sycl::range<1> gws (numBlocks * numThreads);
   sycl::range<1> lws (numThreads);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      atomicKernel(atom_arr, item);
+      atomicKernel(atom_arr, loop_num, item);
     });
   });
-  atomicKernel_CPU(atom_arr, numBlocks*numThreads);
+  atomicKernel_CPU(atom_arr, numBlocks*numThreads, loop_num);
 
   q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Execution time of atomic kernels on host and device: %f (s)\n", time * 1e-9f);
 
   // Compute & verify reference solution
-  int testResult = verify(atom_arr, 2*numThreads*numBlocks);
+  int testResult = verify(atom_arr, 2*numThreads*numBlocks, loop_num);
 
   sycl::free(atom_arr, q);
 
