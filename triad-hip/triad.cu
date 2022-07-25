@@ -1,7 +1,5 @@
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <hip/hip_runtime.h>
 
 #include "OptionParser.h"
@@ -50,7 +48,10 @@ void addBenchmarkSpecOptions(OptionParser &op)
 // Modifications:
 //
 // ****************************************************************************
-__global__ void triad(float* A, float* B, float* C, float s)
+__global__ void triad(const float*__restrict__ A,
+                      const float*__restrict__ B,
+                            float*__restrict__ C,
+                            float s)
 {
   int gid = threadIdx.x + (blockIdx.x * blockDim.x);
   C[gid] = A[gid] + s*B[gid];
@@ -88,16 +89,16 @@ void RunBenchmark(OptionParser &op)
 
   // 256k through 8M bytes
   const int nSizes = 9;
-  const size_t blockSizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+  const int blockSizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192,
     16384 };
-  const size_t memSize = 16384;
-  const size_t numMaxFloats = 1024 * memSize / 4;
-  const size_t halfNumFloats = numMaxFloats / 2;
+  const int memSize = 16384;
+  const int numMaxFloats = 1024 * memSize / 4;
+  const int halfNumFloats = numMaxFloats / 2;
 
   // Create some host memory pattern
   srand48(8650341L);
   float *h_mem;
-  hipHostMalloc((void**)&h_mem, sizeof(float) * numMaxFloats);
+  hipMallocHost((void**)&h_mem, sizeof(float) * numMaxFloats);
 
   // Allocate some device memory
   float* d_memA0, *d_memB0, *d_memC0;
@@ -112,47 +113,46 @@ void RunBenchmark(OptionParser &op)
 
   float scalar = 1.75f;
 
-  const size_t blockSize = 128;
+  const int blockSize = 128;
 
-  // Number of passes. Use a large number for stress testing.
-  // A small value is sufficient for computing sustained performance.
-  for (int pass = 0; pass < n_passes; ++pass)
+  // Step through sizes forward
+  for (int i = 0; i < nSizes; ++i)
   {
-    // Step through sizes forward
-    for (int i = 0; i < nSizes; ++i)
+    int elemsInBlock = blockSizes[i] * 1024 / sizeof(float);
+    for (int j = 0; j < halfNumFloats; ++j)
+      h_mem[j] = h_mem[halfNumFloats + j] = (float) (drand48() * 10.0);
+
+    // Copy input memory to the device
+    if (verbose) {
+      cout << ">> Executing Triad with vectors of length "
+        << numMaxFloats << " and block size of "
+        << elemsInBlock << " elements." << "\n";
+      cout << "Block: " << blockSizes[i] << "KB" << "\n";
+    }
+
+    // start submitting blocks of data of size elemsInBlock
+    // overlap the computation of one block with the data
+    // download for the next block and the results upload for
+    // the previous block
+    int crtIdx = 0;
+    int gridSize = elemsInBlock / blockSize;
+
+    hipStream_t streams[2];
+    hipStreamCreate(&streams[0]);
+    hipStreamCreate(&streams[1]);
+
+    int TH = Timer::Start();
+
+    // Number of passes. Use a large number for stress testing.
+    // A small value is sufficient for computing sustained performance.
+    for (int pass = 0; pass < n_passes; ++pass)
     {
-      int elemsInBlock = blockSizes[i] * 1024 / sizeof(float);
-      for (int j = 0; j < halfNumFloats; ++j)
-        h_mem[j] = h_mem[halfNumFloats + j]
-          = (float) (drand48() * 10.0);
-
-      // Copy input memory to the device
-      if (verbose) {
-        cout << ">> Executing Triad with vectors of length "
-          << numMaxFloats << " and block size of "
-          << elemsInBlock << " elements." << "\n";
-        printf("Block:%05ldKB\n", blockSizes[i]);
-      }
-
-      // start submitting blocks of data of size elemsInBlock
-      // overlap the computation of one block with the data
-      // download for the next block and the results upload for
-      // the previous block
-      int crtIdx = 0;
-      size_t globalWorkSize = elemsInBlock / blockSize;
-
-      hipStream_t streams[2];
-      hipStreamCreate(&streams[0]);
-      hipStreamCreate(&streams[1]);
-
-      int TH = Timer::Start();
-
       hipMemcpyAsync(d_memA0, h_mem, blockSizes[i] * 1024,
           hipMemcpyHostToDevice, streams[0]);
       hipMemcpyAsync(d_memB0, h_mem, blockSizes[i] * 1024,
           hipMemcpyHostToDevice, streams[0]);
 
-      hipLaunchKernelGGL(triad, dim3(globalWorkSize), dim3(blockSize), 0, streams[0], d_memA0, d_memB0, d_memC0, scalar);
+      hipLaunchKernelGGL(triad, gridSize, blockSize, 0, streams[0], d_memA0, d_memB0, d_memC0, scalar);
 
       if (elemsInBlock < numMaxFloats)
       {
@@ -187,11 +187,11 @@ void RunBenchmark(OptionParser &op)
           // Execute the kernel
           if (currStream)
           {
-            hipLaunchKernelGGL(triad, dim3(globalWorkSize), dim3(blockSize), 0, streams[1], d_memA1, d_memB1, d_memC1, scalar);
+            hipLaunchKernelGGL(triad, gridSize, blockSize, 0, streams[1], d_memA1, d_memB1, d_memC1, scalar);
           }
           else
           {
-            hipLaunchKernelGGL(triad, dim3(globalWorkSize), dim3(blockSize), 0, streams[0], d_memA0, d_memB0, d_memC0, scalar);
+            hipLaunchKernelGGL(triad, gridSize, blockSize, 0, streams[0], d_memA0, d_memB0, d_memC0, scalar);
           }
         }
 
@@ -220,40 +220,45 @@ void RunBenchmark(OptionParser &op)
         blockIdx += 1;
         currStream = !currStream;
       }
-
       hipDeviceSynchronize();
-      double time = Timer::Stop(TH, "thread synchronize");
 
-      double triad = ((double)numMaxFloats * 2.0) / (time*1e9);
-      if (verbose)
-        std::cout << "TriadFlops " << triad << " GFLOPS/s\n";
+    } // for (int pass = 0; pass < n_passes; ++pass)
 
-      double bdwth = ((double)numMaxFloats*sizeof(float)*3.0)
-        / (time*1000.*1000.*1000.);
-      if (verbose)
-        std::cout << "TriadBdwth " << bdwth << " GB/s\n";
+    double time = Timer::Stop(TH, "thread synchronize");
 
+    double triad = ((double)numMaxFloats*2.0*n_passes) / (time*1e9);
+    if (verbose) std::cout << "Average TriadFlops " << triad << " GFLOPS/s\n";
 
-      // Checking memory for correctness. The two halves of the array
-      // should have the same results.
-      if (verbose) cout << ">> checking memory\n";
-      for (int j=0; j<halfNumFloats; ++j)
+    double bdwth = ((double)numMaxFloats*sizeof(float)*3.0*n_passes)
+                   / (time*1000.*1000.*1000.);
+    if (verbose) std::cout << "Average TriadBdwth " << bdwth << " GB/s\n";
+
+    // Checking memory for correctness. The two halves of the array
+    // should have the same results.
+    bool ok = true;
+    for (int j=0; j<halfNumFloats; ++j)
+    {
+      if (h_mem[j] != h_mem[j+halfNumFloats])
       {
-        if (h_mem[j] != h_mem[j+halfNumFloats])
-        {
-          cout << "Error; hostMem[" << j << "]=" << h_mem[j]
-            << " is different from its twin element hostMem["
-            << (j+halfNumFloats) << "]: "
-            << h_mem[j+halfNumFloats] << "stopping check\n";
-          break;
-        }
+        cout << "Error; hostMem[" << j << "]=" << h_mem[j]
+          << " is different from its twin element hostMem["
+          << (j+halfNumFloats) << "]: "
+          << h_mem[j+halfNumFloats] << "stopping check\n";
+        ok = false;
+        break;
       }
-      if (verbose) cout << ">> finish!" << endl;
-
-      // Zero out the test host memory
-      for (int j=0; j<numMaxFloats; ++j)
-        h_mem[j] = 0.0f;
     }
+
+    if (ok)
+      cout << "PASS\n";
+    else
+      cout << "FAIL\n";
+
+    // Zero out the test host memory
+    for (int j=0; j<numMaxFloats; ++j) h_mem[j] = 0.0f;
+
+    hipStreamDestroy(streams[0]);
+    hipStreamDestroy(streams[1]);
   }
 
   // Cleanup

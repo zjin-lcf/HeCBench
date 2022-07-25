@@ -81,10 +81,8 @@ triad.o: triad.cpp Timer.h OptionParser.h
 Timer.o: Timer.cpp Timer.h config.h  
 	$(CC) $(CFLAGS) -c $< -o $@
 
-
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --passes 100 
-
+	./$(program) --passes 100 -v
