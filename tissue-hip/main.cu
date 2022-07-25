@@ -9,15 +9,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 void reference(
-    const   int *__restrict__ d_tisspoints,
-    const float *__restrict__ d_gtt,
-    const float *__restrict__ d_gbartt,
-          float *__restrict__ d_ct,
-    const float *__restrict__ d_ctprev,
-    const float *__restrict__ d_qt,
+    const   int *d_tisspoints,
+    const float *d_gtt,
+    const float *d_gbartt,
+          float *d_ct,
+    const float *d_ctprev,
+    const float *d_qt,
     int nnt, int nntDev, int step, int isp)
 {
   for (int i = 0; i < step * nnt; i++) {
@@ -80,15 +81,27 @@ __global__ void tissue(
     if(itp1 == istep && itp < nnt) d_ct[itp] += p;
 }
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <dimension of a 3D grid> <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int dim = atoi(argv[1]);
+  if (dim > 32) {
+    printf("Maximum dimension is 32\n");
+    return 1;
+  }
+  const int repeat = atoi(argv[2]);
+
   int *d_tisspoints;
   float *d_gtt;
   float *d_gbartt;
   float *d_ct;
   float *d_ctprev;
   float *d_qt;
-  const int nnt = 4000;
-  const int nntDev = 4000;
+  const int nnt = dim * dim * dim;
+  const int nntDev = 32*32*32;  // maximum number of tissue points
   const int nsp = 2;
 
     int* h_tisspoints = (int*) malloc (3*nntDev*sizeof(int));
@@ -131,7 +144,8 @@ int main() {
   int step = 4; //a power of two 
   int blocksPerGrid = (step*nnt + threadsPerBlock - 1) / threadsPerBlock;
 
-  for (int i = 0; i < 350; i++) {
+  // quick verification and warmup
+  for (int i = 0; i < 2; i++) {
     hipLaunchKernelGGL(tissue, blocksPerGrid, threadsPerBlock, 0, 0, 
         d_tisspoints,d_gtt,d_gbartt,d_ct,d_ctprev,d_qt,nnt,nntDev,step,1);
 
@@ -139,22 +153,38 @@ int main() {
         d_tisspoints,d_gtt,d_gbartt,d_ct,d_ctprev,d_qt,nnt,nntDev,step,2);
   }
 
-  hipMemcpy(h_ct, d_ct, nntDev*sizeof(float), hipMemcpyDeviceToHost);
-
-  // verify
-  for (int i = 0; i < 350; i++) {
+  // may take long for a large grid on host
+  for (int i = 0; i < 2; i++) {
     reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,1);
     reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,2);
   }
 
   bool ok = true;
+  hipMemcpy(h_ct, d_ct, nntDev*sizeof(float), hipMemcpyDeviceToHost);
   for (int i = 0; i < nntDev; i++) {
-    if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-3) {
+    if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-2f) {
       printf("@%d: %f %f\n", i, h_ct[i], h_ct_gold[i]);
       ok = false;
       break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
+  // timing kernel execution
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(tissue, blocksPerGrid, threadsPerBlock, 0, 0, 
+        d_tisspoints,d_gtt,d_gbartt,d_ct,d_ctprev,d_qt,nnt,nntDev,step,1);
+
+    hipLaunchKernelGGL(tissue, blocksPerGrid, threadsPerBlock, 0, 0, 
+        d_tisspoints,d_gtt,d_gbartt,d_ct,d_ctprev,d_qt,nnt,nntDev,step,2);
+  }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   free(h_tisspoints);
   free(h_gtt);
@@ -170,6 +200,5 @@ int main() {
   hipFree(d_ctprev);
   hipFree(d_qt);
 
-  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }

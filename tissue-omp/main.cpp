@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 void reference(
@@ -82,9 +83,21 @@ void tissue(
   }
 }
 
-int main() {
-  const int nnt = 4000;
-  const int nntDev = 4000;
+int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <dimension of a 3D grid> <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int dim = atoi(argv[1]);
+  if (dim > 32) {
+    printf("Maximum dimension is 32\n");
+    return 1;
+  }
+  const int repeat = atoi(argv[2]);
+
+  const int nnt = dim * dim * dim;
+  const int nntDev = 32*32*32;  // maximum number of tissue points
   const int nsp = 2;
 
     int* h_tisspoints = (int*) malloc (3*nntDev*sizeof(int));
@@ -115,28 +128,44 @@ int main() {
                                    h_gtt[0:nsp*nntDev],\
                                    h_gbartt[0:nsp*nntDev],\
                                    h_ctprev[0:nntDev],\
-                                   h_qt[0:nntDev]) \
-                              map (tofrom: h_ct[0:nntDev])
+                                   h_qt[0:nntDev], \
+                                   h_ct[0:nntDev])
   {
-    for (int i = 0; i < 350; i++) {
+    // quick verification and warmup
+    for (int i = 0; i < 2; i++) {
       tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
       tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
     }
-  }
 
-  // verify
-  for (int i = 0; i < 350; i++) {
-    reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,1);
-    reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,2);
-  }
-
-  bool ok = true;
-  for (int i = 0; i < nntDev; i++) {
-    if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-3) {
-      printf("@%d: %f %f\n", i, h_ct[i], h_ct_gold[i]);
-      ok = false;
-      break;
+    // may take long for a large grid on host
+    for (int i = 0; i < 2; i++) {
+      reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,1);
+      reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,2);
     }
+
+    bool ok = true;
+    #pragma omp target update from (h_ct[0:nntDev])
+    for (int i = 0; i < nntDev; i++) {
+      if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-2) {
+        printf("@%d: %f %f\n", i, h_ct[i], h_ct_gold[i]);
+        ok = false;
+        break;
+      }
+    }
+
+    printf("%s\n", ok ? "PASS" : "FAIL");
+
+    // timing kernel execution
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
+      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
+      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   free(h_tisspoints);
@@ -147,6 +176,5 @@ int main() {
   free(h_ctprev);
   free(h_qt);
 
-  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }
