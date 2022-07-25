@@ -52,48 +52,48 @@ double cyclic_small_systems(queue &q, float *a, float *b, float *c, float *d, fl
   // warm up
   if (id == 0)
     q.submit([&] (handler &cgh) {
-        auto a_d = device_a.get_access<sycl_read>(cgh);
-        auto b_d = device_b.get_access<sycl_read>(cgh);
-        auto c_d = device_c.get_access<sycl_read>(cgh);
-        auto d_d = device_d.get_access<sycl_read>(cgh);
-        auto x_d = device_x.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-        cgh.parallel_for<class cyclic_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            cyclic_small_systems_kernel(item, 
-                a_d.get_pointer(),
-                b_d.get_pointer(),
-                c_d.get_pointer(),
-                d_d.get_pointer(),
-                x_d.get_pointer(),
-                lmem.get_pointer(),
-                system_size, 
-                num_systems, 
-                iterations);
-            });
-        });
+      auto a_d = device_a.get_access<sycl_read>(cgh);
+      auto b_d = device_b.get_access<sycl_read>(cgh);
+      auto c_d = device_c.get_access<sycl_read>(cgh);
+      auto d_d = device_d.get_access<sycl_read>(cgh);
+      auto x_d = device_x.get_access<sycl_discard_write>(cgh);
+      accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
+      cgh.parallel_for<class cyclic_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cyclic_small_systems_kernel(item, 
+            a_d.get_pointer(),
+            b_d.get_pointer(),
+            c_d.get_pointer(),
+            d_d.get_pointer(),
+            x_d.get_pointer(),
+            lmem.get_pointer(),
+            system_size, 
+            num_systems, 
+            iterations);
+      });
+    });
   else
     q.submit([&] (handler &cgh) {
-        auto a_d = device_a.get_access<sycl_read>(cgh);
-        auto b_d = device_b.get_access<sycl_read>(cgh);
-        auto c_d = device_c.get_access<sycl_read>(cgh);
-        auto d_d = device_d.get_access<sycl_read>(cgh);
-        auto x_d = device_x.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-        cgh.parallel_for<class cyclic_opt_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            cyclic_branch_free_kernel(item, 
-                a_d.get_pointer(),
-                b_d.get_pointer(),
-                c_d.get_pointer(),
-                d_d.get_pointer(),
-                x_d.get_pointer(),
-                lmem.get_pointer(),
-                system_size, 
-                num_systems, 
-                iterations);
-            });
-        });
-  q.wait();
+      auto a_d = device_a.get_access<sycl_read>(cgh);
+      auto b_d = device_b.get_access<sycl_read>(cgh);
+      auto c_d = device_c.get_access<sycl_read>(cgh);
+      auto d_d = device_d.get_access<sycl_read>(cgh);
+      auto x_d = device_x.get_access<sycl_discard_write>(cgh);
+      accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
+      cgh.parallel_for<class cyclic_opt_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cyclic_branch_free_kernel(item, 
+            a_d.get_pointer(),
+            b_d.get_pointer(),
+            c_d.get_pointer(),
+            d_d.get_pointer(),
+            x_d.get_pointer(),
+            lmem.get_pointer(),
+            system_size, 
+            num_systems, 
+            iterations);
+      });
+    });
 
+  q.wait();
   shrLog("  looping %i times..\n", BENCH_ITERATIONS);  
 
   // run computations on GPUs in parallel
@@ -103,46 +103,46 @@ double cyclic_small_systems(queue &q, float *a, float *b, float *c, float *d, fl
   {
     if (id == 0)
       q.submit([&] (handler &cgh) {
-          auto a_d = device_a.get_access<sycl_read>(cgh);
-          auto b_d = device_b.get_access<sycl_read>(cgh);
-          auto c_d = device_c.get_access<sycl_read>(cgh);
-          auto d_d = device_d.get_access<sycl_read>(cgh);
-          auto x_d = device_x.get_access<sycl_discard_write>(cgh);
-          accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-          cgh.parallel_for<class cyclic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              cyclic_small_systems_kernel(item, 
-                  a_d.get_pointer(),
-                  b_d.get_pointer(),
-                  c_d.get_pointer(),
-                  d_d.get_pointer(),
-                  x_d.get_pointer(),
-                  lmem.get_pointer(),
-                  system_size, 
-                  num_systems, 
-                  iterations);
-              });
-          });
+        auto a_d = device_a.get_access<sycl_read>(cgh);
+        auto b_d = device_b.get_access<sycl_read>(cgh);
+        auto c_d = device_c.get_access<sycl_read>(cgh);
+        auto d_d = device_d.get_access<sycl_read>(cgh);
+        auto x_d = device_x.get_access<sycl_discard_write>(cgh);
+        accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
+        cgh.parallel_for<class cyclic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          cyclic_small_systems_kernel(item, 
+              a_d.get_pointer(),
+              b_d.get_pointer(),
+              c_d.get_pointer(),
+              d_d.get_pointer(),
+              x_d.get_pointer(),
+              lmem.get_pointer(),
+              system_size, 
+              num_systems, 
+              iterations);
+        });
+      });
     else
       q.submit([&] (handler &cgh) {
-          auto a_d = device_a.get_access<sycl_read>(cgh);
-          auto b_d = device_b.get_access<sycl_read>(cgh);
-          auto c_d = device_c.get_access<sycl_read>(cgh);
-          auto d_d = device_d.get_access<sycl_read>(cgh);
-          auto x_d = device_x.get_access<sycl_discard_write>(cgh);
-          accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
-          cgh.parallel_for<class cyclic_opt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              cyclic_branch_free_kernel(item, 
-                  a_d.get_pointer(),
-                  b_d.get_pointer(),
-                  c_d.get_pointer(),
-                  d_d.get_pointer(),
-                  x_d.get_pointer(),
-                  lmem.get_pointer(),
-                  system_size, 
-                  num_systems, 
-                  iterations);
-              });
-          });
+        auto a_d = device_a.get_access<sycl_read>(cgh);
+        auto b_d = device_b.get_access<sycl_read>(cgh);
+        auto c_d = device_c.get_access<sycl_read>(cgh);
+        auto d_d = device_d.get_access<sycl_read>(cgh);
+        auto x_d = device_x.get_access<sycl_discard_write>(cgh);
+        accessor<float, 1, sycl_read_write, access::target::local> lmem((system_size+1)*5, cgh);
+        cgh.parallel_for<class cyclic_opt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          cyclic_branch_free_kernel(item, 
+              a_d.get_pointer(),
+              b_d.get_pointer(),
+              c_d.get_pointer(),
+              d_d.get_pointer(),
+              x_d.get_pointer(),
+              lmem.get_pointer(),
+              system_size, 
+              num_systems, 
+              iterations);
+        });
+      });
   }
   q.wait();
   sum_time = shrDeltaT(0);

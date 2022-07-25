@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUNIX -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -DUNIX -DBENCH_ITERATIONS=100 -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -90,7 +90,6 @@ clean:
 	rm -rf $(program) $(obj) *.dat *.timing *.txt *.csv
 
 run: $(program)
-	./$(program)  
-	./$(program) --lmem  
-	./$(program) --vec4  
-
+	./$(program) -num_systems=524288
+	./$(program) --lmem -num_systems=524288
+	./$(program) --vec4 -num_systems=524288 

@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -19,11 +18,11 @@
 // much better performance when doing data reordering before
 // so that all memory accesses are coalesced
 __global__ void sweep_small_systems_local_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -116,12 +115,12 @@ inline int getLocalIdx(int i, int k, int num_systems)
 }
 
 __global__ void sweep_small_systems_global_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
-    float* w_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
+          float*__restrict__ w_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -216,6 +215,25 @@ inline void store(float* a, int i, float4 v)
   a[i+3] = v.w;
 }
 
+inline __device__ float4 operator*(float4 a, float4 b)
+{
+  return make_float4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+}
+
+inline __device__ float4 operator/(float4 a, float4 b)
+{
+  return make_float4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
+}
+
+inline __device__ float4 operator+(float4 a, float4 b)
+{
+  return make_float4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+
+inline __device__ float4 operator-(float4 a, float4 b)
+{
+  return make_float4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+}
 
 inline __device__ float4 native_divide(float4 a, float4 b)
 {
@@ -235,14 +253,26 @@ inline __device__ float4 native_recip(float4 a)
   __frcp_rn(a.w));
 }
 
+inline __device__ float4 operator-(float4 &a)
+{
+    return make_float4(-a.x, -a.y, -a.z, -a.w);
+}
+
+inline __device__ void operator+=(float4 &a, float4 b)
+{
+    a.x += b.x;
+    a.y += b.y;
+    a.z += b.z;
+    a.w += b.w;
+}
 
 __global__ void sweep_small_systems_global_vec4_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
-    float* w_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
+          float*__restrict__ w_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -332,8 +362,8 @@ __global__ void sweep_small_systems_global_vec4_kernel(
 // (BLOCK_DIM+1)*BLOCK_DIM.  This pads each row of the 2D block in shared memory 
 // so that bank conflicts do not occur when threads address the array column-wise.
 __global__ void transpose(
-    float* odata, 
-    const float* idata, 
+          float*__restrict__ odata, 
+    const float*__restrict__ idata, 
     const int width, 
     const int height) 
 {

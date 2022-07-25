@@ -47,7 +47,7 @@ double runReorderKernel(float* d_a, float* d_t, int width, int height)
   dim3 gws (szGlobalWorkSize[0], szGlobalWorkSize[1]);
   dim3 lws (szLocalWorkSize[0], szLocalWorkSize[1]);
 
-  hipLaunchKernelGGL(transpose, dim3(gws), dim3(lws), 0, 0, d_t, d_a, width, height);
+  hipLaunchKernelGGL(transpose, gws, lws, 0, 0, d_t, d_a, width, height);
 
   hipDeviceSynchronize();
 
@@ -56,7 +56,7 @@ double runReorderKernel(float* d_a, float* d_t, int width, int height)
   shrDeltaT(0);
   for (int iCycles = 0; iCycles < BENCH_ITERATIONS; iCycles++)
   {
-    hipLaunchKernelGGL(transpose, dim3(gws), dim3(lws), 0, 0, d_t, d_a, width, height);
+    hipLaunchKernelGGL(transpose, gws, lws, 0, 0, d_t, d_a, width, height);
   }
   hipDeviceSynchronize();
 
@@ -89,17 +89,17 @@ double runSweepKernel(
   dim3 gws (szGlobalWorkSize);
   dim3 lws (szLocalWorkSize);
 
+  // warm up
   if (useLmem) 
-    hipLaunchKernelGGL(sweep_small_systems_local_kernel, dim3(gws), dim3(lws), 0, 0, 
+    hipLaunchKernelGGL(sweep_small_systems_local_kernel, gws, lws, 0, 0, 
       a_d, b_d, c_d, d_d, x_d, system_size, num_systems, reorder);
   else if (useVec4) 
-    hipLaunchKernelGGL(sweep_small_systems_global_vec4_kernel, dim3(gws), dim3(lws), 0, 0, 
+    hipLaunchKernelGGL(sweep_small_systems_global_vec4_kernel, gws, lws, 0, 0, 
       a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
   else 
-    hipLaunchKernelGGL(sweep_small_systems_global_kernel, dim3(gws), dim3(lws), 0, 0, 
+    hipLaunchKernelGGL(sweep_small_systems_global_kernel, gws, lws, 0, 0, 
       a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
 
-  // warm up
   hipDeviceSynchronize();
 
   shrLog("  looping %i times..\n", BENCH_ITERATIONS);  
@@ -110,15 +110,17 @@ double runSweepKernel(
   for (int iCycles = 0; iCycles < BENCH_ITERATIONS; iCycles++)
   {
     if (useLmem) 
-      hipLaunchKernelGGL(sweep_small_systems_local_kernel, dim3(gws), dim3(lws), 0, 0, 
+      hipLaunchKernelGGL(sweep_small_systems_local_kernel, gws, lws, 0, 0, 
         a_d, b_d, c_d, d_d, x_d, system_size, num_systems, reorder);
     else if (useVec4) 
-      hipLaunchKernelGGL(sweep_small_systems_global_vec4_kernel, dim3(gws), dim3(lws), 0, 0, 
+      hipLaunchKernelGGL(sweep_small_systems_global_vec4_kernel, gws, lws, 0, 0, 
         a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
     else 
-      hipLaunchKernelGGL(sweep_small_systems_global_kernel, dim3(gws), dim3(lws), 0, 0, 
+      hipLaunchKernelGGL(sweep_small_systems_global_kernel, gws, lws, 0, 0, 
         a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
   }
+
+  hipDeviceSynchronize();
   sum_time = shrDeltaT(0);
   double time = sum_time / BENCH_ITERATIONS;
 

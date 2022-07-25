@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUNIX -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -DUNIX -DBENCH_ITERATIONS=100 -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
@@ -71,7 +71,6 @@ clean:
 	rm -rf $(program) $(obj) *.dat *.timing *.txt *.csv
 
 run: $(program)
-	./$(program)  
-	./$(program) --lmem  
-	./$(program) --vec4  
-
+	./$(program) -num_systems=524288
+	./$(program) --lmem -num_systems=524288
+	./$(program) --vec4 -num_systems=524288 
