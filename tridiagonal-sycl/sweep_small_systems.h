@@ -60,7 +60,6 @@ double runReorderKernel(queue &q, buffer<float,1> &dev_a, buffer<float,1> &dev_t
   });
   q.wait();
 
-
   // run computations on GPUs in parallel
   double sum_time = 0.0;
   shrDeltaT(0);
@@ -106,76 +105,74 @@ double runSweepKernel(queue &q,
   range<1> gws (szGlobalWorkSize);
   range<1> lws (szLocalWorkSize);
 
+  // warm up
   if (useLmem) 
     q.submit([&] (handler &cgh) {
-        auto a_d = dev_a.get_access<sycl_read>(cgh);
-        auto b_d = dev_b.get_access<sycl_read>(cgh);
-        auto c_d = dev_c.get_access<sycl_read>(cgh);
-        auto d_d = dev_d.get_access<sycl_read>(cgh);
-        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_local_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            sweep_small_systems_local_kernel(
-                item, 
-                a_d.get_pointer(), 
-                b_d.get_pointer(), 
-                c_d.get_pointer(), 
-                d_d.get_pointer(), 
-                x_d.get_pointer(), 
-                system_size,
-                num_systems,
-                reorder
-                );
-            });
-        });
+      auto a_d = dev_a.get_access<sycl_read>(cgh);
+      auto b_d = dev_b.get_access<sycl_read>(cgh);
+      auto c_d = dev_c.get_access<sycl_read>(cgh);
+      auto d_d = dev_d.get_access<sycl_read>(cgh);
+      auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class sweep_local_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        sweep_small_systems_local_kernel(
+            item, 
+            a_d.get_pointer(), 
+            b_d.get_pointer(), 
+            c_d.get_pointer(), 
+            d_d.get_pointer(), 
+            x_d.get_pointer(), 
+            system_size,
+            num_systems,
+            reorder);
+      });
+    });
 
   else if (useVec4) 
     q.submit([&] (handler &cgh) {
-        auto a_d = dev_a.get_access<sycl_read>(cgh);
-        auto b_d = dev_b.get_access<sycl_read>(cgh);
-        auto c_d = dev_c.get_access<sycl_read>(cgh);
-        auto d_d = dev_d.get_access<sycl_read>(cgh);
-        auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
-        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_global_v4_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            sweep_small_systems_global_vec4_kernel(
-                item, 
-                a_d.get_pointer(), 
-                b_d.get_pointer(), 
-                c_d.get_pointer(), 
-                d_d.get_pointer(), 
-                x_d.get_pointer(), 
-                w_d.get_pointer(), 
-                system_size,
-                num_systems,
-                reorder
-                );
-            });
+      auto a_d = dev_a.get_access<sycl_read>(cgh);
+      auto b_d = dev_b.get_access<sycl_read>(cgh);
+      auto c_d = dev_c.get_access<sycl_read>(cgh);
+      auto d_d = dev_d.get_access<sycl_read>(cgh);
+      auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
+      auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class sweep_global_v4_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        sweep_small_systems_global_vec4_kernel(
+            item, 
+            a_d.get_pointer(), 
+            b_d.get_pointer(), 
+            c_d.get_pointer(), 
+            d_d.get_pointer(), 
+            x_d.get_pointer(), 
+            w_d.get_pointer(), 
+            system_size,
+            num_systems,
+            reorder);
+      });
     });
 
   else 
     q.submit([&] (handler &cgh) {
-        auto a_d = dev_a.get_access<sycl_read>(cgh);
-        auto b_d = dev_b.get_access<sycl_read>(cgh);
-        auto c_d = dev_c.get_access<sycl_read>(cgh);
-        auto d_d = dev_d.get_access<sycl_read>(cgh);
-        auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
-        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sweep_global_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            sweep_small_systems_global_kernel(
-                item, 
-                a_d.get_pointer(), 
-                b_d.get_pointer(), 
-                c_d.get_pointer(), 
-                d_d.get_pointer(), 
-                x_d.get_pointer(), 
-                w_d.get_pointer(), 
-                system_size,
-                num_systems,
-                reorder);
-            });
-        });
+      auto a_d = dev_a.get_access<sycl_read>(cgh);
+      auto b_d = dev_b.get_access<sycl_read>(cgh);
+      auto c_d = dev_c.get_access<sycl_read>(cgh);
+      auto d_d = dev_d.get_access<sycl_read>(cgh);
+      auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
+      auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class sweep_global_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        sweep_small_systems_global_kernel(
+            item, 
+            a_d.get_pointer(), 
+            b_d.get_pointer(), 
+            c_d.get_pointer(), 
+            d_d.get_pointer(), 
+            x_d.get_pointer(), 
+            w_d.get_pointer(), 
+            system_size,
+            num_systems,
+            reorder);
+      });
+    });
 
-  // warm up
   q.wait();
 
   shrLog("  looping %i times..\n", BENCH_ITERATIONS);  
@@ -187,72 +184,72 @@ double runSweepKernel(queue &q,
   {
     if (useLmem) 
       q.submit([&] (handler &cgh) {
-          auto a_d = dev_a.get_access<sycl_read>(cgh);
-          auto b_d = dev_b.get_access<sycl_read>(cgh);
-          auto c_d = dev_c.get_access<sycl_read>(cgh);
-          auto d_d = dev_d.get_access<sycl_read>(cgh);
-          auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class sweep_local>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              sweep_small_systems_local_kernel(
-                  item, 
-                  a_d.get_pointer(), 
-                  b_d.get_pointer(), 
-                  c_d.get_pointer(), 
-                  d_d.get_pointer(), 
-                  x_d.get_pointer(), 
-                  system_size,
-                  num_systems,
-                  reorder);
-              });
-          });
+        auto a_d = dev_a.get_access<sycl_read>(cgh);
+        auto b_d = dev_b.get_access<sycl_read>(cgh);
+        auto c_d = dev_c.get_access<sycl_read>(cgh);
+        auto d_d = dev_d.get_access<sycl_read>(cgh);
+        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+        cgh.parallel_for<class sweep_local>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sweep_small_systems_local_kernel(
+              item, 
+              a_d.get_pointer(), 
+              b_d.get_pointer(), 
+              c_d.get_pointer(), 
+              d_d.get_pointer(), 
+              x_d.get_pointer(), 
+              system_size,
+              num_systems,
+              reorder);
+        });
+      });
 
     else if (useVec4) 
       q.submit([&] (handler &cgh) {
-          auto a_d = dev_a.get_access<sycl_read>(cgh);
-          auto b_d = dev_b.get_access<sycl_read>(cgh);
-          auto c_d = dev_c.get_access<sycl_read>(cgh);
-          auto d_d = dev_d.get_access<sycl_read>(cgh);
-          auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
-          auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class sweep_global_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              sweep_small_systems_global_vec4_kernel(
-                  item, 
-                  a_d.get_pointer(), 
-                  b_d.get_pointer(), 
-                  c_d.get_pointer(), 
-                  d_d.get_pointer(), 
-                  x_d.get_pointer(), 
-                  w_d.get_pointer(), 
-                  system_size,
-                  num_systems,
-                  reorder);
-              });
-          });
-
+        auto a_d = dev_a.get_access<sycl_read>(cgh);
+        auto b_d = dev_b.get_access<sycl_read>(cgh);
+        auto c_d = dev_c.get_access<sycl_read>(cgh);
+        auto d_d = dev_d.get_access<sycl_read>(cgh);
+        auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
+        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+        cgh.parallel_for<class sweep_global_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sweep_small_systems_global_vec4_kernel(
+              item, 
+              a_d.get_pointer(), 
+              b_d.get_pointer(), 
+              c_d.get_pointer(), 
+              d_d.get_pointer(), 
+              x_d.get_pointer(), 
+              w_d.get_pointer(), 
+              system_size,
+              num_systems,
+              reorder);
+        });
+      });
     else 
       q.submit([&] (handler &cgh) {
-          auto a_d = dev_a.get_access<sycl_read>(cgh);
-          auto b_d = dev_b.get_access<sycl_read>(cgh);
-          auto c_d = dev_c.get_access<sycl_read>(cgh);
-          auto d_d = dev_d.get_access<sycl_read>(cgh);
-          auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
-          auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class sweep_global>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              sweep_small_systems_global_kernel(
-                  item, 
-                  a_d.get_pointer(), 
-                  b_d.get_pointer(), 
-                  c_d.get_pointer(), 
-                  d_d.get_pointer(), 
-                  x_d.get_pointer(), 
-                  w_d.get_pointer(), 
-                  system_size,
-                  num_systems,
-                  reorder);
-              });
-          });
-
+        auto a_d = dev_a.get_access<sycl_read>(cgh);
+        auto b_d = dev_b.get_access<sycl_read>(cgh);
+        auto c_d = dev_c.get_access<sycl_read>(cgh);
+        auto d_d = dev_d.get_access<sycl_read>(cgh);
+        auto w_d = dev_w.get_access<sycl_discard_read_write>(cgh);
+        auto x_d = dev_x.get_access<sycl_discard_write>(cgh);
+        cgh.parallel_for<class sweep_global>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sweep_small_systems_global_kernel(
+              item, 
+              a_d.get_pointer(), 
+              b_d.get_pointer(), 
+              c_d.get_pointer(), 
+              d_d.get_pointer(), 
+              x_d.get_pointer(), 
+              w_d.get_pointer(), 
+              system_size,
+              num_systems,
+              reorder);
+        });
+      });
   }
+
+  q.wait();
   sum_time = shrDeltaT(0);
   double time = sum_time / BENCH_ITERATIONS;
 
@@ -279,7 +276,6 @@ double sweep_small_systems(queue &q, float *a, float *b, float *c, float *d, flo
   buffer<float, 1> device_w (mem_size); // global clone of private array
 
   int workSize = num_systems;
-
 
   double reorder_time = 0.0;
   double solver_time = 0.0;
@@ -313,9 +309,9 @@ double sweep_small_systems(queue &q, float *a, float *b, float *c, float *d, flo
 
   // copy result from device to host explictly
   q.submit([&] (handler &cgh) {
-      auto dev_x_acc = device_x.get_access<sycl_read>(cgh);
-      cgh.copy(dev_x_acc, x);
-      }).wait();
+    auto dev_x_acc = device_x.get_access<sycl_read>(cgh);
+    cgh.copy(dev_x_acc, x);
+  }).wait();
 
   return solver_time + reorder_time;
 }

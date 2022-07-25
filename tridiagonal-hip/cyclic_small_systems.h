@@ -63,10 +63,10 @@ double cyclic_small_systems(float *a, float *b, float *c, float *d, float *x,
 
   // warm up
   if (id == 0)
-    hipLaunchKernelGGL(cyclic_small_systems_kernel, dim3(gws), dim3(lws), (system_size+1)*5*sizeof(float), 0, 
+    hipLaunchKernelGGL(cyclic_small_systems_kernel, gws, lws, (system_size+1)*5*sizeof(float), 0, 
         a_d, b_d, c_d, d_d, x_d, system_size, num_systems, iterations);
   else
-    hipLaunchKernelGGL(cyclic_branch_free_kernel, dim3(gws), dim3(lws), (system_size+1)*5*sizeof(float), 0,  
+    hipLaunchKernelGGL(cyclic_branch_free_kernel, gws, lws, (system_size+1)*5*sizeof(float), 0,  
         a_d, b_d, c_d, d_d, x_d, system_size, num_systems, iterations);
 
   hipDeviceSynchronize();
@@ -79,10 +79,10 @@ double cyclic_small_systems(float *a, float *b, float *c, float *d, float *x,
   for (int iCycles = 0; iCycles < BENCH_ITERATIONS; iCycles++)
   {
     if (id == 0)
-      hipLaunchKernelGGL(cyclic_small_systems_kernel, dim3(gws), dim3(lws), (system_size+1)*5*sizeof(float), 0, 
+      hipLaunchKernelGGL(cyclic_small_systems_kernel, gws, lws, (system_size+1)*5*sizeof(float), 0, 
           a_d, b_d, c_d, d_d, x_d, system_size, num_systems, iterations);
     else
-      hipLaunchKernelGGL(cyclic_branch_free_kernel, dim3(gws), dim3(lws), (system_size+1)*5*sizeof(float), 0,  
+      hipLaunchKernelGGL(cyclic_branch_free_kernel, gws, lws, (system_size+1)*5*sizeof(float), 0,  
           a_d, b_d, c_d, d_d, x_d, system_size, num_systems, iterations);
   }
   hipDeviceSynchronize();

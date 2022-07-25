@@ -18,11 +18,11 @@
 // much better performance when doing data reordering before
 // so that all memory accesses are coalesced
 __global__ void sweep_small_systems_local_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -115,12 +115,12 @@ inline int getLocalIdx(int i, int k, int num_systems)
 }
 
 __global__ void sweep_small_systems_global_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
-    float* w_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
+          float*__restrict__ w_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -267,12 +267,12 @@ inline __device__ void operator+=(float4 &a, float4 b)
 }
 
 __global__ void sweep_small_systems_global_vec4_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
-    float* w_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
+          float*__restrict__ w_d, 
     const int system_size, 
     const int num_systems,
     const bool reorder)
@@ -362,8 +362,8 @@ __global__ void sweep_small_systems_global_vec4_kernel(
 // (BLOCK_DIM+1)*BLOCK_DIM.  This pads each row of the 2D block in shared memory 
 // so that bank conflicts do not occur when threads address the array column-wise.
 __global__ void transpose(
-    float* odata, 
-    const float* idata, 
+          float*__restrict__ odata, 
+    const float*__restrict__ idata, 
     const int width, 
     const int height) 
 {

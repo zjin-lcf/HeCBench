@@ -19,7 +19,10 @@
 #define REORDER
 
 //#define OUTPUT_RESULTS
-#define BENCH_ITERATIONS  100
+
+#ifndef BENCH_ITERATIONS
+#define BENCH_ITERATIONS  1
+#endif
 
 
 #endif

@@ -89,6 +89,7 @@ double runSweepKernel(
   dim3 gws (szGlobalWorkSize);
   dim3 lws (szLocalWorkSize);
 
+  // warm up
   if (useLmem) 
     sweep_small_systems_local_kernel<<<gws, lws>>> (
       a_d, b_d, c_d, d_d, x_d, system_size, num_systems, reorder);
@@ -99,7 +100,6 @@ double runSweepKernel(
     sweep_small_systems_global_kernel<<<gws, lws>>> (
       a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
 
-  // warm up
   cudaDeviceSynchronize();
 
   shrLog("  looping %i times..\n", BENCH_ITERATIONS);  
@@ -119,6 +119,8 @@ double runSweepKernel(
       sweep_small_systems_global_kernel<<<gws, lws>>> (
         a_d, b_d, c_d, d_d, x_d, w_d, system_size, num_systems, reorder);
   }
+
+  cudaDeviceSynchronize();
   sum_time = shrDeltaT(0);
   double time = sum_time / BENCH_ITERATIONS;
 

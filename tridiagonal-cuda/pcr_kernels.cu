@@ -22,11 +22,11 @@
 
 
 __global__ void pcr_small_systems_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
     const int system_size, 
     const int num_systems, 
     const int iterations)
@@ -128,11 +128,11 @@ __global__ void pcr_small_systems_kernel(
 }
 
 __global__ void pcr_branch_free_kernel(
-    const float* a_d, 
-    const float* b_d, 
-    const float* c_d, 
-    const float* d_d, 
-    float* x_d, 
+    const float*__restrict__ a_d, 
+    const float*__restrict__ b_d, 
+    const float*__restrict__ c_d, 
+    const float*__restrict__ d_d, 
+          float*__restrict__ x_d, 
     const int system_size, 
     const int num_systems, 
     const int iterations)

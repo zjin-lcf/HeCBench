@@ -22,10 +22,8 @@
 #define SYSTEM_SIZE  128
 
 //#define OUTPUT_RESULTS
-#ifdef DEBUG
+#ifndef BENCH_ITERATIONS
 #define BENCH_ITERATIONS  1
-#else
-#define BENCH_ITERATIONS  100
 #endif
 
 typedef struct { float x; float y; float z; float w; } float4 ;

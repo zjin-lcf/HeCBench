@@ -12,13 +12,17 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-//#define NATIVE_DIVIDE   // use native divide in the kernels
+#define NATIVE_DIVIDE   // use native divide in the kernels
 
 #define TRANSPOSE_BLOCK_DIM    16
 #define BLOCK_DIM TRANSPOSE_BLOCK_DIM
 #define REORDER
 
 //#define OUTPUT_RESULTS
-#define BENCH_ITERATIONS  100
+
+#ifndef BENCH_ITERATIONS
+#define BENCH_ITERATIONS  1
+#endif
+
 
 #endif
