@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include "common.h"
 #include "kernels.h"
 #include "reference.h"
@@ -12,7 +13,7 @@ template<typename T, int STEPS, int BLOCK_X, int BLOCK_Y, int MARGIN_X, int MARG
 class k;
 
 template <typename T>
-static void init_p(T *p_real, T *p_imag, int width, int height) {
+void init_p(T *p_real, T *p_imag, int width, int height) {
   double s = 64.0;
   for (int j = 1; j <= height; j++) {
     for (int i = 1; i <= width; i++) {
@@ -48,18 +49,18 @@ void tsa(queue &q, int width, int height, int repeat) {
   reference(h_real, h_imag, a, b, width, height, repeat);
 
   // thread block / shared memory block width
-  static const int BLOCK_X = 16;
+  const int BLOCK_X = 16;
   // shared memory block height
-  static const int BLOCK_Y = sizeof(T) == 8 ? 32 : 96;
+  const int BLOCK_Y = sizeof(T) == 8 ? 32 : 96;
   // thread block height
-  static const int STRIDE_Y = 16;
+  const int STRIDE_Y = 16;
 
   // halo sizes on each side
-  static const int MARGIN_X = 3;
-  static const int MARGIN_Y = 4;
+  const int MARGIN_X = 3;
+  const int MARGIN_Y = 4;
 
   // time step
-  static const int STEPS = 1;
+  const int STEPS = 1;
 
   range<2> gws ((height + (BLOCK_Y - 2 * STEPS * MARGIN_Y) - 1) / (BLOCK_Y - 2 * STEPS * MARGIN_Y) * STRIDE_Y,
                 (width + (BLOCK_X - 2 * STEPS * MARGIN_X) - 1) / (BLOCK_X - 2 * STEPS * MARGIN_X)  * BLOCK_X);
@@ -77,6 +78,9 @@ void tsa(queue &q, int width, int height, int repeat) {
   d_imag.emplace_back(buffer<T, 1>(p_imag, width * height));
   d_imag[0].set_final_data(nullptr);
   d_imag.emplace_back(buffer<T, 1>(width * height));
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
@@ -125,15 +129,15 @@ void tsa(queue &q, int width, int height, int repeat) {
         T cell_r[BLOCK_Y / (STRIDE_Y * 2)];
         T cell_i[BLOCK_Y / (STRIDE_Y * 2)];
 
-          #pragma unroll
         // read black cells to registers
+        #pragma unroll
         for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
           cell_r[part] = rl[sy + part * 2 * STRIDE_Y][sx];
           cell_i[part] = im[sy + part * 2 * STRIDE_Y][sx];
         }
 
         // update cells STEPS full steps
-          #pragma unroll
+        #pragma unroll
         for (int i = 0; i < STEPS; i++) {
           // 12344321
           #pragma unroll
@@ -196,7 +200,7 @@ void tsa(queue &q, int width, int height, int repeat) {
         }
 
         // write black cells in registers to shared memory
-          #pragma unroll
+        #pragma unroll
         for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
           rl[sy + part * 2 * STRIDE_Y][sx] = cell_r[part];
           im[sy + part * 2 * STRIDE_Y][sx] = cell_i[part];
@@ -221,6 +225,11 @@ void tsa(queue &q, int width, int height, int repeat) {
     });
     sense = 1 - sense; // swap
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_real[sense].template get_access<sycl_read>(cgh);
@@ -255,6 +264,10 @@ void tsa(queue &q, int width, int height, int repeat) {
 }
 
 int main(int argc, char** argv) {
+  if (argc != 4) {
+    printf("Usage: %s <matrix width> <matrix height> <repeat>\n", argv[0]);
+    return 1;
+  }
   int width = atoi(argv[1]);   // matrix width
   int height = atoi(argv[2]);  // matrix height
   int repeat = atoi(argv[3]);  // repeat kernel execution
@@ -265,7 +278,13 @@ int main(int argc, char** argv) {
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel);
+
+  printf("TSA in float32\n");
   tsa<float>(q, width, height, repeat);
+
+  printf("\n");
+
+  printf("TSA in float64\n");
   tsa<double>(q, width, height, repeat);
   return 0;
 }

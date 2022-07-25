@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <omp.h>
 #include "kernels.h"
 #include "reference.h"
@@ -72,12 +73,19 @@ void tsa(int width, int height, int repeat) {
   #pragma omp target data map (to: d_real[0][0:width*height], d_imag[0][0:width*height]) \
                           map(alloc: d_real[1][0:width*height], d_imag[1][0:width*height])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for (int i = 0; i < repeat; i++) {
       kernel<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>
           (teamX, teamY, a, b, width, height,
            d_real[sense], d_imag[sense], d_real[1-sense], d_imag[1-sense]);
       sense = 1 - sense; // swap
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+
     #pragma omp target update from (d_real[sense][0:width*height])
     #pragma omp target update from (d_imag[sense][0:width*height])
   }
@@ -107,11 +115,20 @@ void tsa(int width, int height, int repeat) {
 }
 
 int main(int argc, char** argv) {
+  if (argc != 4) {
+    printf("Usage: %s <matrix width> <matrix height> <repeat>\n", argv[0]);
+    return 1;
+  }
   int width = atoi(argv[1]);   // matrix width
   int height = atoi(argv[2]);  // matrix height
   int repeat = atoi(argv[3]);  // repeat kernel execution
 
+  printf("TSA in float32\n");
   tsa<float>(width, height, repeat);
+
+  printf("\n");
+
+  printf("TSA in float64\n");
   tsa<double>(width, height, repeat);
   return 0;
 }
