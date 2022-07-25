@@ -17,10 +17,11 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <chrono>
 #include "common.h"
 #include "kernels.cpp"
 
-void runKernels(
+double runKernels(
     queue &q,
     buffer<float, 1> &inputImageBuffer,
     buffer<float, 1> &outputImageBuffer,
@@ -42,6 +43,9 @@ void runKernels(
   range<2> gws (height, width);
   range<2> lws (16, 16);
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto input = inputImageBuffer.get_access<sycl_read>(cgh);
     auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
@@ -49,26 +53,28 @@ void runKernels(
       toneMapping(input.get_pointer(), output.get_pointer(),
                   averageLuminance, gamma, c, delta, width, numChannels, height, item);
     });
-  });
+  }).wait();
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   q.submit([&] (handler &cgh) {
     auto acc = outputImageBuffer.get_access<sycl_read>(cgh);
     cgh.copy(acc, output);
   }).wait();
+
+  return time;
 }
 
 
 int main(int argc, char *argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <path to image> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* inputImageName = argv[1]; //"input.hdr";
   const int iterations = atoi(argv[2]);
-  const float cPattanaik = 0.25f;
-  const float gammaPattanaik = 0.4f;
-  const float deltaPattanaik = 0.000002f;
-  const uint numChannels = 4;
-  uint width;
-  uint height;
-  float averageLuminance = 0.0f;
 
   // Read a simple image 
   std::ifstream inputFile;
@@ -80,6 +86,14 @@ int main(int argc, char *argv[])
     std::cout << "not able to open the file  " << inputImageName << std::endl;
     return 1;
   }
+
+  const float cPattanaik = 0.25f;
+  const float gammaPattanaik = 0.4f;
+  const float deltaPattanaik = 0.000002f;
+  const uint numChannels = 4;
+  uint width;
+  uint height;
+  float averageLuminance = 0.0f;
 
   inputFile >> width;
   inputFile >> height;
@@ -145,13 +159,14 @@ int main(int argc, char *argv[])
       numChannels, 
       height);
   }
-  std::cout << "Executing kernel for " << iterations <<
-    " iterations" <<std::endl;
+  std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
+
+  double time = 0.0;
 
   for(int i = 0; i < iterations; i++)
   {
-    runKernels(
+    time += runKernels(
       q, 
       inputImageBuffer,
       outputImageBuffer,
@@ -165,6 +180,8 @@ int main(int argc, char *argv[])
       numChannels, 
       height);
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 
   // VerifyResults
   float *referenceOutput = (float*) malloc (sizeof(float) * height * width * numChannels);
@@ -294,12 +311,12 @@ int main(int argc, char *argv[])
 
   if(error > 0.000001f)
   {
-    std::cout << "Failed with normalized error: " << error << std::endl;
+    std::cout << "FAIL with normalized error: " << error << std::endl;
     return 1;
   }
   else
   {
-    std::cout << "Passed" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
 
   free(input);

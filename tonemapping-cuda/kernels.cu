@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-__device__
+inline __device__
 float luminance(float r, float g, float b)
 {
   return ( 0.2126f * r ) + ( 0.7152f * g ) + ( 0.0722f * b );
@@ -22,8 +22,8 @@ float luminance(float r, float g, float b)
 
 __global__
 void toneMapping(
-    const float *__restrict const input, 
-    float *__restrict const output, 
+    const float *__restrict__ const input, 
+          float *__restrict__ const output, 
     const float averageLuminance, 
     const float gamma, 
     const float c, 
@@ -128,4 +128,3 @@ void toneMapping(
   output[width * numChannels * y + (x * numChannels + 3)] = 
     input[width * numChannels * y + (x * numChannels + 3)];
 }
-
