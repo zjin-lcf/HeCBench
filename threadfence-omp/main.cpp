@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 void sum (
@@ -88,8 +89,12 @@ void sum (
 }
 
 int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <repeat> <array length>\n", argv[0]);
+    return 1;
+  }
 
-  const int iterations = atoi(argv[1]);
+  const int repeat = atoi(argv[1]);
   const int N = atoi(argv[2]);
 
   const int blocks = 256;
@@ -103,19 +108,25 @@ int main(int argc, char** argv) {
   h_count[0] = 0;
 
   bool ok = true;
+  double time = 0.0;
 
   #pragma omp target data map (to: h_array[0:N], \
                                  h_count[0:1]) \
                           map (alloc: h_result[0:grids])
   {
-    for (int n = 0; n < iterations; n++) {
+    for (int n = 0; n < repeat; n++) {
   
       for (int i = 0; i < N; i++)
         h_array[i] = -1.f;
   
       #pragma omp target update to (h_array[0:N])
   
+      auto start = std::chrono::steady_clock::now();
+
       sum (grids, blocks, h_array, N, h_count, h_result);
+
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   
       #pragma omp target update from (h_result[0:1])
   
@@ -125,6 +136,8 @@ int main(int argc, char** argv) {
       }
     }
   }
+
+  if (ok) printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   free(h_array);
   free(h_count);

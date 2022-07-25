@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 #define syncthreads() item.barrier(access::fence_space::local_space)
@@ -10,10 +11,10 @@ void sum (
     nd_item<1> &item,
     float *__restrict partialSum,
     bool *__restrict isLastBlockDone,
-    const float*__restrict__ array,
+    const float*__restrict array,
     const int N,
-    unsigned int *__restrict__ count,
-    volatile float*__restrict__ result)
+    unsigned int *__restrict count,
+    volatile float*__restrict result)
 {
 
   // Each block sums a subset of the input array.
@@ -93,8 +94,12 @@ void sum (
 }
 
 int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <repeat> <array length>\n", argv[0]);
+    return 1;
+  }
 
-  const int iterations = atoi(argv[1]);
+  const int repeat = atoi(argv[1]);
   const int N = atoi(argv[2]);
 
   float* h_array = (float*) malloc (N * sizeof(float));
@@ -124,7 +129,9 @@ int main(int argc, char** argv) {
   });
 
   bool ok = true;
-  for (int n = 0; n < iterations; n++) {
+  double time = 0.0;
+
+  for (int n = 0; n < repeat; n++) {
 
     for (int i = 0; i < N; i++)
       h_array[i] = -1.f;
@@ -132,7 +139,9 @@ int main(int argc, char** argv) {
     q.submit([&] (handler &cgh) {
       auto acc = d_array.get_access<sycl_discard_write>(cgh);
       cgh.copy(h_array, acc);
-    });
+    }).wait();
+
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto array = d_array.get_access<sycl_read>(cgh);
@@ -144,7 +153,10 @@ int main(int argc, char** argv) {
         sum (item, lsum.get_pointer(), isLastBlockDone.get_pointer(),
              array.get_pointer(), N, count.get_pointer(), result.get_pointer());
       });
-    });
+    }).wait();
+
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     q.submit([&] (handler &cgh) {
       auto acc = d_result.get_access<sycl_read>(cgh, range<1>(1));
@@ -156,6 +168,8 @@ int main(int argc, char** argv) {
       break;
     }
   }
+
+  if (ok) printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   free(h_array);
 
