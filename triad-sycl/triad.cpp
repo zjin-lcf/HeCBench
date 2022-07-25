@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
 #include "common.h"
 #include "OptionParser.h"
@@ -85,34 +84,34 @@ void RunBenchmark(OptionParser &op)
   const float scalar = 1.75f;
   const size_t blockSize = 128;
 
-  // Number of passes. Use a large number for stress testing.
-  // A small value is sufficient for computing sustained performance.
-  for (int pass = 0; pass < n_passes; ++pass)
+  // Step through sizes forward
+  for (int i = 0; i < nSizes; ++i)
   {
-    // Step through sizes forward
-    for (int i = 0; i < nSizes; ++i)
+    int elemsInBlock = blockSizes[i] * 1024 / sizeof(float);
+    for (int j = 0; j < halfNumFloats; ++j)
+      h_mem[j] = h_mem[halfNumFloats + j] = (float) (drand48() * 10.0);
+
+    // Copy input memory to the device
+    if (verbose) {
+      std::cout << ">> Executing Triad with vectors of length "
+        << numMaxFloats << " and block size of "
+        << elemsInBlock << " elements." << "\n";
+      cout << "Block: " << blockSizes[i] << "KB" << "\n";
+    }
+
+    // start submitting blocks of data of size elemsInBlock
+    // overlap the computation of one block with the data
+    // download for the next block and the results upload for
+    // the previous block
+    int crtIdx = 0;
+    size_t globalWorkSize = elemsInBlock;
+
+    int TH = Timer::Start();
+
+    // Number of passes. Use a large number for stress testing.
+    // A small value is sufficient for computing sustained performance.
+    for (int pass = 0; pass < n_passes; ++pass)
     {
-      int elemsInBlock = blockSizes[i] * 1024 / sizeof(float);
-      for (int j = 0; j < halfNumFloats; ++j)
-        h_mem[j] = h_mem[halfNumFloats + j] = (float) (drand48() * 10.0);
-
-      // Copy input memory to the device
-      if (verbose) {
-        std::cout << ">> Executing Triad with vectors of length "
-          << numMaxFloats << " and block size of "
-          << elemsInBlock << " elements." << "\n";
-      //sprintf(sizeStr, "Block:%05ldKB", blockSizes[i]);
-        printf("Block:%05ldKB\n", blockSizes[i]);
-      }
-
-      // start submitting blocks of data of size elemsInBlock
-      // overlap the computation of one block with the data
-      // download for the next block and the results upload for
-      // the previous block
-      int crtIdx = 0;
-      size_t globalWorkSize = elemsInBlock;
-
-      int TH = Timer::Start();
 
       q.submit([&] (handler &cgh) {
           auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
@@ -228,40 +227,40 @@ void RunBenchmark(OptionParser &op)
         currStream = !currStream;
       }
       q.wait();
-      double time = Timer::Stop(TH, "thread synchronize");
-
-      double triad = ((double)numMaxFloats * 2.0) / (time*1e9);
-      if (verbose)
-        std::cout << "TriadFlops " << triad << " GFLOPS/s\n";
-
-      //resultDB.AddResult("TriadFlops", sizeStr, "GFLOP/s", triad);
-
-      double bdwth = ((double)numMaxFloats*sizeof(float)*3.0)
-        / (time*1000.*1000.*1000.);
-      //resultDB.AddResult("TriadBdwth", sizeStr, "GB/s", bdwth);
-      if (verbose)
-        std::cout << "TriadBdwth " << bdwth << " GB/s\n";
-
-      // Checking memory for correctness. The two halves of the array
-      // should have the same results.
-      if (verbose) std::cout << ">> checking memory\n";
-      for (int j=0; j<halfNumFloats; ++j)
-      {
-        if (h_mem[j] != h_mem[j+halfNumFloats])
-        {
-          std::cout << "Error; hostMem[" << j << "]=" << h_mem[j]
-            << " is different from its twin element hostMem["
-            << (j+halfNumFloats) << "]: "
-            << h_mem[j+halfNumFloats] << "stopping check\n";
-          break;
-        }
-      }
-      if (verbose) std::cout << ">> finish!" << std::endl;
-
-      // Zero out the test host memory
-      for (int j=0; j<numMaxFloats; ++j)
-        h_mem[j] = 0.0f;
     }
+
+    double time = Timer::Stop(TH, "thread synchronize");
+
+    double triad = ((double)numMaxFloats*2.0*n_passes) / (time*1e9);
+    if (verbose) std::cout << "Average TriadFlops " << triad << " GFLOPS/s\n";
+
+    double bdwth = ((double)numMaxFloats*sizeof(float)*3.0*n_passes)
+                   / (time*1000.*1000.*1000.);
+    if (verbose) std::cout << "Average TriadBdwth " << bdwth << " GB/s\n";
+
+    // Checking memory for correctness. The two halves of the array
+    // should have the same results.
+    bool ok = true;
+    for (int j=0; j<halfNumFloats; ++j)
+    {
+      if (h_mem[j] != h_mem[j+halfNumFloats])
+      {
+        cout << "Error; hostMem[" << j << "]=" << h_mem[j]
+          << " is different from its twin element hostMem["
+          << (j+halfNumFloats) << "]: "
+          << h_mem[j+halfNumFloats] << "stopping check\n";
+        ok = false;
+        break;
+      }
+    }
+
+    if (ok)
+      cout << "PASS\n";
+    else
+      cout << "FAIL\n";
+
+    // Zero out the test host memory
+    for (int j=0; j<numMaxFloats; ++j) h_mem[j] = 0.0f;
   }
 
   // Cleanup
