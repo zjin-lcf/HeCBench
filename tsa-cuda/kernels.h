@@ -62,7 +62,7 @@ __global__ void kernel(
 
   // Read block from global into shared memory
   if (px >= 0 && px < width) {
-#pragma unroll
+    #pragma unroll
     for (int i = 0, pidx = py * width + px; i < BLOCK_Y / STRIDE_Y; ++i, pidx += STRIDE_Y * width) {
       if (py + i * STRIDE_Y >= 0 && py + i * STRIDE_Y < height) {
         rl[threadIdx.y + i * STRIDE_Y][threadIdx.x] = p_real[pidx];
@@ -90,39 +90,39 @@ __global__ void kernel(
   T cell_r[BLOCK_Y / (STRIDE_Y * 2)];
   T cell_i[BLOCK_Y / (STRIDE_Y * 2)];
 
-#pragma unroll
   // read black cells to registers
+  #pragma unroll
   for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
     cell_r[part] = rl[sy + part * 2 * STRIDE_Y][sx];
     cell_i[part] = im[sy + part * 2 * STRIDE_Y][sx];
   }
 
   // update cells STEPS full steps
-#pragma unroll
+  #pragma unroll
   for (int i = 0; i < STEPS; i++) {
     // 12344321
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
           a, b, width, height, cell_r[part], cell_i[part], 
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part], 
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part],
@@ -130,28 +130,28 @@ __global__ void kernel(
     }
     __syncthreads();
 
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
     __syncthreads();
-#pragma unroll
+    #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>
         (a, b, width, height, cell_r[part], cell_i[part], 
@@ -161,7 +161,7 @@ __global__ void kernel(
   }
 
   // write black cells in registers to shared memory
-#pragma unroll
+  #pragma unroll
   for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
     rl[sy + part * 2 * STRIDE_Y][sx] = cell_r[part];
     im[sy + part * 2 * STRIDE_Y][sx] = cell_i[part];
@@ -174,7 +174,7 @@ __global__ void kernel(
   px += STEPS * MARGIN_X;
   py += STEPS * MARGIN_Y;
   if (sx < BLOCK_X - STEPS * MARGIN_X && px < width) {
-#pragma unroll
+    #pragma unroll
     for (int i = 0, pidx = py * width + px; i < BLOCK_Y / STRIDE_Y; ++i, pidx += STRIDE_Y * width) {
       if (sy + i * STRIDE_Y < BLOCK_Y - STEPS * MARGIN_Y && py + i * STRIDE_Y < height) {
         p2_real[pidx] = rl[sy + i * STRIDE_Y][sx];

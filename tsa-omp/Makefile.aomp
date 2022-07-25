@@ -25,7 +25,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../tsa-cuda/reference.h
+CFLAGS := -std=c++14 -Wall -I../tsa-cuda/
 
 # Linker Flags
 LDFLAGS = 
@@ -69,4 +69,3 @@ clean:
 
 run: $(program)
 	./$(program) 1024 1024 100
-
