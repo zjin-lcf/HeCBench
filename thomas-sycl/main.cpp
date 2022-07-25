@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include "common.h"
 #include "ThomasMatrix.hpp"
@@ -30,15 +31,15 @@ void solve_seq(const double* l, const double* d, double* u, double* rhs, const i
 
 int main(int argc, char const *argv[])
 {
-
-  if(argc < 4 or argc > 4){
-    std::cout << "Usage: ./run [system size] [#systems] [thread block size]" << std::endl;
+  if(argc != 5) {
+    std::cout << "Usage: %s [system size] [#systems] [thread block size] [repeat]" << std::endl;
     return -1;
   }
 
-  const int M = std::stoi(argv[1]); // c++11
+  const int M = std::stoi(argv[1]);
   const int N = std::stoi(argv[2]);
-  const int BlockSize  = std::stoi(argv[3]);  // GPU thread block size
+  const int BlockSize = std::stoi(argv[3]);  // GPU thread block size
+  const int repeat = std::stoi(argv[4]);
 
   const int matrix_byte_size = M * N * sizeof(double);
 
@@ -84,11 +85,16 @@ int main(int argc, char const *argv[])
     }
   }
 
+  auto start = std::chrono::steady_clock::now();
 
   // Sequantial CPU Execution for correct error check
-  for (int n = 0; n < 100; n++) { 
+  for (int n = 0; n < repeat; n++) {
     solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average serial execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   for (int i = 0; i < M*N; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
@@ -136,7 +142,6 @@ int main(int argc, char const *argv[])
 #endif
   queue q(dev_sel);
 
-
   buffer<double, 1> u_device (u_Thomas_host, N * M);
   buffer<double, 1> d_device (d_Thomas_host, N * M);
   buffer<double, 1> l_device (l_Thomas_host, N * M);
@@ -147,16 +152,16 @@ int main(int argc, char const *argv[])
   range<1> gws = (N + BlockSize - 1) / BlockSize * BlockSize; 
   range<1> lws = BlockSize;
 
-  for (int n = 0; n < 100; n++) {
+  q.wait();
+  start = std::chrono::steady_clock::now();
 
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
       auto L = l_device.get_access<sycl_read>(cgh);
       auto D = d_device.get_access<sycl_read>(cgh);
       auto U = u_device.get_access<sycl_read_write>(cgh);
       auto RHS = rhs_device.get_access<sycl_read_write>(cgh);
-
       cgh.parallel_for<class thomas>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-    
         int tid = item.get_global_id(0);
         if (tid < N) {
           int first = tid;
@@ -181,13 +186,16 @@ int main(int argc, char const *argv[])
       });
     });
   }
+
   q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   }
 
   // verify
   calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
-
 
   free(u_seq);  
   free(u_Thomas_host);
@@ -210,5 +218,3 @@ int main(int argc, char const *argv[])
 
   return 0;
 }
-
-

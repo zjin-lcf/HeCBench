@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -44,15 +43,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu cuThomasBatch.h  ThomasMatrix.hpp  utils.hpp
+%.o: %.cu cuThomasBatch.h ThomasMatrix.hpp utils.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
-
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1024 16384 64
+	./$(program) 1024 16384 64 100
