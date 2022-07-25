@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 __global__ void sum (
@@ -68,7 +69,6 @@ __global__ void sum (
     __syncthreads();
 
     if (lid == 0) {
-
       // Thread 0 of last block stores the total sum
       // to global memory and resets the count
       // varialble, so that the next kernel call
@@ -80,8 +80,12 @@ __global__ void sum (
 }
 
 int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <repeat> <array length>\n", argv[0]);
+    return 1;
+  }
 
-  const int iterations = atoi(argv[1]);
+  const int repeat = atoi(argv[1]);
   const int N = atoi(argv[2]);
 
   const int blocks = 256;
@@ -101,14 +105,23 @@ int main(int argc, char** argv) {
   hipMemset(d_count, 0u, sizeof(unsigned int));
 
   bool ok = true;
-  for (int n = 0; n < iterations; n++) {
+  double time = 0.0;
+
+  for (int n = 0; n < repeat; n++) {
 
     for (int i = 0; i < N; i++)
       h_array[i] = -1.f;
 
     hipMemcpy(d_array, h_array, N * sizeof(float), hipMemcpyHostToDevice);
 
-    hipLaunchKernelGGL(sum, dim3(grids), dim3(blocks), 0, 0, d_array, N, d_count, d_result);
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    hipLaunchKernelGGL(sum, grids, blocks , 0, 0, d_array, N, d_count, d_result);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     hipMemcpy(&h_sum, d_result, sizeof(float), hipMemcpyDeviceToHost);
 
@@ -117,6 +130,8 @@ int main(int argc, char** argv) {
       break;
     }
   }
+
+  if (ok) printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   free(h_array);
   hipFree(d_result);
