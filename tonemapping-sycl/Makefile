@@ -73,5 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) input.hdr 1000
-
+	./$(program) input.hdr 10000

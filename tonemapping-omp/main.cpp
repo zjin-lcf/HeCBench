@@ -17,6 +17,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <chrono>
 #include <omp.h>
 #include <math.h>
 
@@ -27,7 +28,7 @@ inline float luminance(float r, float g, float b)
 }
 #pragma omp end declare target
 
-void runKernels(
+double runKernels(
     const float *input,
     float *output,
     const float averageLuminance, 
@@ -39,6 +40,8 @@ void runKernels(
     const uint height)
 {
   #pragma omp target update to (input[0:width*numChannels*height])
+
+  auto start = std::chrono::steady_clock::now();
 
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
   for (uint y = 0; y < height; y++) {
@@ -139,7 +142,12 @@ void runKernels(
     }
   }
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   #pragma omp target update from (output[0:width*numChannels*height])
+
+  return time;
 }
 
 
@@ -221,13 +229,14 @@ int main(int argc, char *argv[])
       numChannels, 
       height);
   }
-  std::cout << "Executing kernel for " << iterations <<
-    " iterations" <<std::endl;
+  std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
+
+  double time = 0.0;
 
   for(int i = 0; i < iterations; i++)
   {
-    runKernels(
+    time += runKernels(
       input,
       output,
       averageLuminance, 
@@ -238,6 +247,8 @@ int main(int argc, char *argv[])
       numChannels, 
       height);
   }
+
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 }
 
   // VerifyResults
@@ -368,12 +379,12 @@ int main(int argc, char *argv[])
 
   if(error > 0.000001f)
   {
-    std::cout << "Failed with normalized error: " << error << std::endl;
+    std::cout << "FAIL with normalized error: " << error << std::endl;
     return 1;
   }
   else
   {
-    std::cout << "Passed" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
 
   free(input);

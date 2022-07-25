@@ -20,8 +20,8 @@ inline float luminance(float r, float g, float b)
 }
 
 void toneMapping(
-    const float *input, 
-    float *output, 
+    const float *__restrict input, 
+          float *__restrict output, 
     const float averageLuminance, 
     const float gamma, 
     const float c, 

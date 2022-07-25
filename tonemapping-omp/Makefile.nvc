@@ -59,6 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../tonemapping-sycl/input.hdr 1000
-
-
+	./$(program) ../tonemapping-sycl/input.hdr 10000
