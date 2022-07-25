@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <hip/hip_runtime.h>
 #include "ThomasMatrix.hpp"
@@ -5,7 +6,9 @@
 #include "cuThomasBatch.h"
 
 // CPU kernel
-void solve_seq(const double* l, const double* d, double* u, double* rhs, const int n, const int N) 
+void solve_seq(const double* l, const double* d,
+               double* u, double* rhs,
+               const int n, const int N) 
 {
   int first,last;
   for (int j = 0; j < N; ++j)
@@ -31,15 +34,15 @@ void solve_seq(const double* l, const double* d, double* u, double* rhs, const i
 
 int main(int argc, char const *argv[])
 {
-
-  if(argc < 4 or argc > 4){
-    std::cout << "Usage: ./run [system size] [#systems] [thread block size]" << std::endl;
+  if(argc != 5) {
+    std::cout << "Usage: %s [system size] [#systems] [thread block size] [repeat]" << std::endl;
     return -1;
   }
 
-  const int M = std::stoi(argv[1]); // c++11
+  const int M = std::stoi(argv[1]);
   const int N = std::stoi(argv[2]);
-  const int BlockSize  = std::stoi(argv[3]);  // GPU thread block size
+  const int BlockSize = std::stoi(argv[3]);  // GPU thread block size
+  const int repeat = std::stoi(argv[4]);
 
   const int matrix_byte_size = M * N * sizeof(double);
 
@@ -80,14 +83,19 @@ int main(int argc, char const *argv[])
 
       rhs_seq[(i * M) + j] = params.rhs[j];
       rhs_input[(i * M) + j] = params.rhs[j];
-
     }
   }
 
+  auto start = std::chrono::steady_clock::now();
+
   // Sequantial CPU Execution for correct error check
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < repeat; n++) {
     solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average serial execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   for (int i = 0; i < M*N; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
@@ -113,7 +121,6 @@ int main(int argc, char const *argv[])
     }
   }
 
-
   // transpose the inputs for sequential accesses on a GPU 
   for (int i = 0; i < M; ++i)
   {
@@ -124,10 +131,8 @@ int main(int argc, char const *argv[])
       d_Thomas_host[i*N+j] = d_input[j*M+i];
       rhs_Thomas_host[i*N+j] = rhs_input[j*M+i];
       rhs_seq_interleave[i*N+j] = rhs_seq_output[j*M+i];
-
     }
   }
-
  
   // Run GPU kernel
 
@@ -145,15 +150,24 @@ int main(int argc, char const *argv[])
   hipMemcpyAsync(l_device, l_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
   hipMemcpyAsync(d_device, d_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice, 0);
   hipMemcpyAsync(rhs_device, rhs_Thomas_host, matrix_byte_size, hipMemcpyHostToDevice,  0);
-  for (int n = 0; n < 100; n++) {
-    hipLaunchKernelGGL(cuThomasBatch, dim3((N/BlockSize)+1), dim3(BlockSize), 0, 0, l_device, d_device, u_device, rhs_device, M, N);
+
+  hipDeviceSynchronize();
+  start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < repeat; n++) {
+    cuThomasBatch<<<(N/BlockSize)+1, BlockSize>>> (l_device, d_device, u_device, rhs_device, M, N);
   }
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+
   hipMemcpyAsync(rhs_Thomas_host, rhs_device, matrix_byte_size, hipMemcpyDeviceToHost, 0);
   hipDeviceSynchronize();
 
   // verify
-  calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
-
+  calcError(rhs_seq_interleave, rhs_Thomas_host, N*M);
 
   free(u_seq);  
   free(u_Thomas_host);
@@ -180,7 +194,4 @@ int main(int argc, char const *argv[])
   hipFree(rhs_device);
 
   return 0;
-
 }
-
-

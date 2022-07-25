@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include "ThomasMatrix.hpp"
 #include "utils.hpp"
@@ -29,15 +30,15 @@ void solve_seq(const double* l, const double* d, double* u, double* rhs, const i
 
 int main(int argc, char const *argv[])
 {
-
-  if(argc < 4 or argc > 4){
-    std::cout << "Usage: ./run [system size] [#systems] [thread block size]" << std::endl;
+  if(argc != 5) {
+    std::cout << "Usage: %s [system size] [#systems] [thread block size] [repeat]" << std::endl;
     return -1;
   }
 
-  const int M = std::stoi(argv[1]); // c++11
+  const int M = std::stoi(argv[1]);
   const int N = std::stoi(argv[2]);
-  const int BlockSize  = std::stoi(argv[3]);  // GPU thread block size
+  const int BlockSize = std::stoi(argv[3]);  // GPU thread block size
+  const int repeat = std::stoi(argv[4]);
 
   const int matrix_byte_size = M * N * sizeof(double);
 
@@ -83,12 +84,17 @@ int main(int argc, char const *argv[])
     }
   }
 
+  auto start = std::chrono::steady_clock::now();
 
   // Sequantial CPU Execution for correct error check
   // Note each loop iteration updates u_seq and rhs_seq 
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < repeat; n++) {
     solve_seq( l_seq, d_seq, u_seq, rhs_seq, M, N );
   }
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average serial execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   for (int i = 0; i < M*N; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
@@ -127,17 +133,17 @@ int main(int argc, char const *argv[])
     }
   }
 
- 
   // Run GPU kernel
   double *U = u_Thomas_host;
   double *D = d_Thomas_host;
   double *L = l_Thomas_host;
   double *RHS = rhs_Thomas_host;
 
-
   #pragma omp target data map(to: L[0:M*N], D[0:M*N], U[0:M*N]) map(tofrom: RHS[0:M*N])
   {
-    for (int n = 0; n < 100; n++) {
+    start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
       #pragma omp target teams distribute parallel for thread_limit(BlockSize) nowait
       for (int tid = 0; tid < N; tid++) {
         int first = tid;
@@ -160,6 +166,10 @@ int main(int argc, char const *argv[])
         }
       }
     }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
   }
 
   calcError(rhs_seq_interleave,RHS,N*M);
