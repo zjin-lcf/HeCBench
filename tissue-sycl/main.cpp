@@ -9,15 +9,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "common.h"
 
 void reference(
-    const   int *__restrict d_tisspoints,
-    const float *__restrict d_gtt,
-    const float *__restrict d_gbartt,
-          float *__restrict d_ct,
-    const float *__restrict d_ctprev,
-    const float *__restrict d_qt,
+    const   int *d_tisspoints,
+    const float *d_gtt,
+    const float *d_gbartt,
+          float *d_ct,
+    const float *d_ctprev,
+    const float *d_qt,
     int nnt, int nntDev, int step, int isp)
 {
   for (int i = 0; i < step * nnt; i++) {
@@ -81,9 +82,21 @@ void tissue(
     if(itp1 == istep && itp < nnt) d_ct[itp] += p;
 }
 
-int main() {
-  const int nnt = 4000;
-  const int nntDev = 4000;
+int main(int argc, char** argv) {
+  if (argc != 3) {
+    printf("Usage: %s <dimension of a 3D grid> <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int dim = atoi(argv[1]);
+  if (dim > 32) {
+    printf("Maximum dimension is 32\n");
+    return 1;
+  }
+  const int repeat = atoi(argv[2]);
+
+  const int nnt = dim * dim * dim;
+  const int nntDev = 32*32*32;  // maximum number of tissue points
   const int nsp = 2;
 
     int* h_tisspoints = (int*) malloc (3*nntDev*sizeof(int));
@@ -124,12 +137,13 @@ int main() {
   buffer<float, 1> d_ct (h_ct, nntDev);
   buffer<float, 1> d_ctprev (h_ctprev, nntDev);
   buffer<float, 1> d_qt (h_qt, nntDev);
+  d_ct.set_final_data(nullptr);
 
   range<1> lws (256);
   range<1> gws ((step*nnt + 255) / 256 * 256);
 
-  for (int i = 0; i < 350; i++) {
-     
+  // quick verification and warmup
+  for (int i = 0; i < 2; i++) {
     q.submit([&] (handler &cgh) {
       auto tp = d_tisspoints.get_access<sycl_read>(cgh);
       auto gt = d_gtt.get_access<sycl_read>(cgh);
@@ -137,7 +151,7 @@ int main() {
       auto ct = d_ct.get_access<sycl_read_write>(cgh);
       auto cp = d_ctprev.get_access<sycl_read>(cgh);
       auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class acc>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         tissue(item,
           tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
           cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,1);
@@ -151,28 +165,73 @@ int main() {
       auto ct = d_ct.get_access<sycl_read_write>(cgh);
       auto cp = d_ctprev.get_access<sycl_read>(cgh);
       auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class acc2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class warmup2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         tissue(item,
           tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
           cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,2);
       });
     });
   }
-  }
 
-  // verify
-  for (int i = 0; i < 350; i++) {
+  for (int i = 0; i < 2; i++) {
     reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,1);
     reference(h_tisspoints,h_gtt,h_gbartt,h_ct_gold,h_ctprev,h_qt,nnt,nntDev,step,2);
   }
 
   bool ok = true;
+  q.submit([&] (handler &cgh) {
+    auto acc = d_ct.get_access<sycl_read>(cgh);
+    cgh.copy(acc, h_ct);
+  }).wait();
+
   for (int i = 0; i < nntDev; i++) {
-    if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-3) {
+    if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-2) {
       printf("@%d: %f %f\n", i, h_ct[i], h_ct_gold[i]);
       ok = false;
       break;
     }
+  }
+
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
+  // timing kernel execution
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
+      auto gt = d_gtt.get_access<sycl_read>(cgh);
+      auto gb = d_gbartt.get_access<sycl_read>(cgh);
+      auto ct = d_ct.get_access<sycl_read_write>(cgh);
+      auto cp = d_ctprev.get_access<sycl_read>(cgh);
+      auto qt = d_qt.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class timing>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        tissue(item,
+          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
+          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,1);
+      });
+    });
+
+    q.submit([&] (handler &cgh) {
+      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
+      auto gt = d_gtt.get_access<sycl_read>(cgh);
+      auto gb = d_gbartt.get_access<sycl_read>(cgh);
+      auto ct = d_ct.get_access<sycl_read_write>(cgh);
+      auto cp = d_ctprev.get_access<sycl_read>(cgh);
+      auto qt = d_qt.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class timing2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        tissue(item,
+          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
+          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,2);
+      });
+    });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
   }
 
   free(h_tisspoints);
@@ -183,6 +242,5 @@ int main() {
   free(h_ctprev);
   free(h_qt);
 
-  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }
