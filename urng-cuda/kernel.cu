@@ -78,8 +78,8 @@ float4 operator+(float4 a, float b)
 
 __global__
 void noise_uniform(
-  const uchar4* inputImage, 
-  uchar4* outputImage, 
+  const uchar4*__restrict__ inputImage, 
+        uchar4*__restrict__ outputImage, 
   const int factor)
 {
   int pos = blockIdx.x * blockDim.x + threadIdx.x;
