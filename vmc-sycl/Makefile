@@ -20,6 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
+#source = vmc.cpp
 source = vmc2.cpp
 
 obj = $(source:.cpp=.o)
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100

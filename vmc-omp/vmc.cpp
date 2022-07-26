@@ -1,28 +1,32 @@
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 #include <cstring>
 #include <omp.h>
 
-using namespace std;
+#define FLOAT float
 
-using FLOAT = float;
-
-const int NTHR_PER_BLK = 256;           // Number of threads per block
-const int NBLOCK  = 56*4;               // Number of blocks
-const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
-const int Neq = 100000;                 // No. of generations to equilibrate 
-const int Ngen_per_block = 5000;        // No. of generations per block
-const int Nsample = 100;                // No. of blocks to sample
+// Number of threads per block
+#define NTHR_PER_BLK 256
+// Number of blocks
+#define NBLOCK 56*4
+// No. of independent samples
+#define Npoint NBLOCK*NTHR_PER_BLK
+// No. of generations to equilibrate 
+#define Neq 100000
+// No. of generations per block
+#define Ngen_per_block 5000
 
 #pragma omp declare target
 
 // Explicitly typed constants so can easily work with both floats and floats
-static const FLOAT DELTA = 2.0;         // Random step size
-static const FLOAT FOUR = 4.0; 
-static const FLOAT TWO  = 2.0;
-static const FLOAT ONE  = 1.0;
-static const FLOAT HALF = 0.5;
-static const FLOAT ZERO = 0.0;
+// Random step size
+#define DELTA 2.f
+#define FOUR  4.f
+#define TWO   2.f
+#define ONE   1.f
+#define HALF  0.5f
+#define ZERO  0.f
 
 inline float EXP(float x) {return expf(x);}
 inline double EXP(double x) {return exp(x);}
@@ -185,8 +189,13 @@ void SumWithinBlocks(const int n, const int threads, FLOAT *data, FLOAT* blocksu
    }
 }
   
-int main()
-{
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <number of blocks to sample>\n", argv[0]);
+    return 1;
+  }
+  const int Nsample = atoi(argv[1]); // No. of blocks to sample
+  
   FLOAT *x1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
   FLOAT *y1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
   FLOAT *z1 = (FLOAT*) malloc(Npoint * sizeof(FLOAT));
@@ -199,75 +208,87 @@ int main()
   FLOAT *blocksums = (FLOAT*) malloc(NBLOCK * sizeof(FLOAT));
   unsigned int *ranstates = (unsigned int*) malloc(Npoint * sizeof(unsigned int));
 
-#pragma omp target data map(alloc:x1[0:Npoint],\
-                                  y1[0:Npoint],\
-                                  z1[0:Npoint],\
-                                  x2[0:Npoint],\
-                                  y2[0:Npoint],\
-                                  z2[0:Npoint],\
-                                  psi[0:Npoint],\
-                                  stats[0:4*Npoint],\
-                                  statsum[0:4],\
-                                  blocksums[0:NBLOCK],\
-                                  ranstates[0:Npoint])
-{
-  initran(Npoint, 5551212, ranstates);
-
-  initialize(Npoint, x1, y1, z1, x2, y2, z2, psi, ranstates);
-
-  zero_stats(Npoint, stats);
-    
-  // Equilibrate
-  propagate(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
-
-  // Accumulators for averages over blocks --- use doubles
-  double r1_tot = ZERO,  r1_sq_tot = ZERO;
-  double r2_tot = ZERO,  r2_sq_tot = ZERO;
-  double r12_tot = ZERO, r12_sq_tot = ZERO;
-  double naccept = ZERO;  // Keeps track of propagation efficiency
-
-  for (int sample=0; sample<Nsample; sample++) {
+  #pragma omp target data map(alloc:x1[0:Npoint],\
+                                    y1[0:Npoint],\
+                                    z1[0:Npoint],\
+                                    x2[0:Npoint],\
+                                    y2[0:Npoint],\
+                                    z2[0:Npoint],\
+                                    psi[0:Npoint],\
+                                    stats[0:4*Npoint],\
+                                    statsum[0:4],\
+                                    blocksums[0:NBLOCK],\
+                                    ranstates[0:Npoint])
+  {
+    initran(Npoint, 5551212, ranstates);
+  
+    initialize(Npoint, x1, y1, z1, x2, y2, z2, psi, ranstates);
+  
     zero_stats(Npoint, stats);
-
-    propagate(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
-
-    struct {FLOAT r1, r2, r12, accept;} s;
-    //sum_stats(Npoint, stats, statsum, blocksums);
-    for (int what=0; what<4; what++) {
-      SumWithinBlocks(Npoint, NTHR_PER_BLK, stats+what*Npoint, blocksums);
-      SumWithinBlocks(NBLOCK, NBLOCK, blocksums, statsum+what);
+      
+    // Equilibrate
+    propagate(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+  
+    // Accumulators for averages over blocks --- use doubles
+    double r1_tot = ZERO,  r1_sq_tot = ZERO;
+    double r2_tot = ZERO,  r2_sq_tot = ZERO;
+    double r12_tot = ZERO, r12_sq_tot = ZERO;
+    double naccept = ZERO;  // Keeps track of propagation efficiency
+  
+    double time = 0.0;
+  
+    for (int sample=0; sample<Nsample; sample++) {
+      auto start = std::chrono::steady_clock::now();
+  
+      zero_stats(Npoint, stats);
+  
+      propagate(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+  
+      //sum_stats(Npoint, stats, statsum, blocksums);
+      for (int what=0; what<4; what++) {
+        SumWithinBlocks(Npoint, NTHR_PER_BLK, stats+what*Npoint, blocksums);
+        SumWithinBlocks(NBLOCK, NBLOCK, blocksums, statsum+what);
+      }
+  
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  
+      #pragma omp target update from (statsum[0:4])
+      struct {FLOAT r1, r2, r12, accept;} s;
+      memcpy(&s, statsum, 4 * sizeof(FLOAT));
+  
+      naccept += s.accept;
+      s.r1 /= Ngen_per_block*Npoint;  
+      s.r2 /= Ngen_per_block*Npoint;  
+      s.r12 /= Ngen_per_block*Npoint;
+  
+  #ifdef DEBUG
+      printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
+  #endif
+  
+      r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
+      r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
+      r12_tot += s.r12; r12_sq_tot += s.r12*s.r12;
     }
-    #pragma omp target update from (statsum[0:4])
-    memcpy(&s, statsum, 4 * sizeof(FLOAT));
-
-    naccept += s.accept;
-    s.r1 /= Ngen_per_block*Npoint;  
-    s.r2 /= Ngen_per_block*Npoint;  
-    s.r12 /= Ngen_per_block*Npoint;
-
-    printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
-
-    r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
-    r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
-    r12_tot += s.r12; r12_sq_tot += s.r12*s.r12;
+  
+    r1_tot /= Nsample; r1_sq_tot /= Nsample; 
+    r2_tot /= Nsample; r2_sq_tot /= Nsample; 
+    r12_tot /= Nsample; r12_sq_tot /= Nsample; 
+    
+    double r1s = sqrt((r1_sq_tot - r1_tot*r1_tot) / Nsample);
+    double r2s = sqrt((r2_sq_tot - r2_tot*r2_tot) / Nsample);
+    double r12s = sqrt((r12_sq_tot - r12_tot*r12_tot) / Nsample);
+    
+    printf(" <r1>  = %.6f +- %.6f\n", r1_tot, r1s);
+    printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
+    printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
+    
+    // avoid int overflow
+    printf(" acceptance ratio=%.1f%%\n",
+      100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample));
+  
+    printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / Nsample);
   }
-
-  r1_tot /= Nsample; r1_sq_tot /= Nsample; 
-  r2_tot /= Nsample; r2_sq_tot /= Nsample; 
-  r12_tot /= Nsample; r12_sq_tot /= Nsample; 
-  
-  double r1s = sqrt((r1_sq_tot - r1_tot*r1_tot) / Nsample);
-  double r2s = sqrt((r2_sq_tot - r2_tot*r2_tot) / Nsample);
-  double r12s = sqrt((r12_sq_tot - r12_tot*r12_tot) / Nsample);
-  
-  printf(" <r1>  = %.6f +- %.6f\n", r1_tot, r1s);
-  printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
-  printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
-  
-  printf(" acceptance ratio=%.1f%%\n",
-     100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
-
-}
 
   free(x1);
   free(y1);
