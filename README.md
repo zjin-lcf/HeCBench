@@ -963,9 +963,6 @@ Early results are shown [here](results/README.md)
 ### wordcount (cuda)
   Count the number of words in a text (https://github.com/NVIDIA/thrust/blob/main/examples/)
 
-### wsm5 (cuda)
-  WRF Single Moment 5-tracer (https://www2.mmm.ucar.edu/wrf/WG2/GPU/WSM5.htm)
-
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)
 
