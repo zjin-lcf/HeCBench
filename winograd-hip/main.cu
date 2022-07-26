@@ -1,10 +1,11 @@
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "utils.h"
 
 __global__ void winograd_conv2d(
-    const DATA_TYPE *input,
-    const DATA_TYPE *transformed_filter ,
-    DATA_TYPE *output,
+    const DATA_TYPE *__restrict__ input,
+    const DATA_TYPE *__restrict__ transformed_filter ,
+    DATA_TYPE *__restrict__ output,
     const int offset_i,
     const int offset_j)
 {
@@ -79,14 +80,12 @@ __global__ void winograd_conv2d(
 
 int main(int argc, char* argv[]) {
 
-  // print timing info if timing is non-zero
-  int timing = atoi(argv[1]);
+  double start = rtclock();
 
   DATA_TYPE *A = (DATA_TYPE*)malloc(MAP_SIZE * MAP_SIZE * sizeof(DATA_TYPE));
   DATA_TYPE *B = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *B_outputFromGpu = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *C = (DATA_TYPE*)malloc(4 * 4 * sizeof(DATA_TYPE));
-
 
   for (int i = 0; i < MAP_SIZE; ++i)
     for (int j = 0; j < MAP_SIZE; ++j)
@@ -123,9 +122,9 @@ int main(int argc, char* argv[]) {
   bool pass = true;
 
   // sweep over cpu_offset 
-  for (int cpu_offset = 0; cpu_offset <= 100; cpu_offset++) {
+  double co_time = 0.0;
 
-    double start = rtclock();
+  for (int cpu_offset = 0; cpu_offset <= 100; cpu_offset++) {
 
     cpu_global_size[0] = cpu_offset * (size_t)ceil(((float)tile_n) / ((float)DIM_LOCAL_WORK_GROUP_X)) 
       / 100 * DIM_LOCAL_WORK_GROUP_X;
@@ -148,12 +147,15 @@ int main(int argc, char* argv[]) {
       gpu_run = true;
     }
 
+    // co-execution of host and device
+    double co_start = rtclock();
+
     if (gpu_run) {
-      hipLaunchKernelGGL(winograd_conv2d, dim3(grid), dim3(block), 0, 0, d_A, d_C, d_B, global_offset[0], global_offset[1]);
+      hipLaunchKernelGGL(winograd_conv2d, grid, block, 0, 0, d_A, d_C, d_B, global_offset[0], global_offset[1]);
     }
 
     if (cpu_run) {
-      // printf("CPU size: %d\n", cpu_global_size[0]);
+      //printf("CPU size: %d\n", cpu_global_size[0]);
       WinogradConv2D_2x2_omp(A, B, C, cpu_global_size);
 
       hipMemcpy(d_B, B, gpu_run ? global_offset[0]*2*(MAP_SIZE-2)*sizeof(DATA_TYPE) : 
@@ -162,14 +164,13 @@ int main(int argc, char* argv[]) {
 
     hipMemcpy(B_outputFromGpu, d_B, (MAP_SIZE-2) * (MAP_SIZE-2) * sizeof(DATA_TYPE), hipMemcpyDeviceToHost);
 
-    double end = rtclock();
+    co_time += rtclock() - co_start;
 
 #ifdef VERBOSE
     if (cpu_run) printf("run on host\n");
     if (gpu_run) printf("run on device\n");
     printf("CPU workload size : %d\n", cpu_offset);
 #endif
-    if (timing) printf("Total time: %lf ms\n", 1000.0 * (end - start));
 
     WinogradConv2D_2x2(A, B, C);
     pass &= compareResults(B, B_outputFromGpu);
@@ -185,5 +186,12 @@ int main(int argc, char* argv[]) {
   free(B);
   free(B_outputFromGpu);
   free(C);
+
+  double end = rtclock();
+  printf("Co-execution time: %lf s\n", co_time);
+  printf("Total time: %lf s\n", end - start);
+  printf("Ratio of co-execution time to total time: %.2lf%%\n",
+         100.0 * co_time / (end - start));
+
   return 0;
 }

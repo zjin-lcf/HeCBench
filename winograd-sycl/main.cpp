@@ -1,17 +1,13 @@
+#include <chrono>
 #include "common.h"
 #include "utils.h"
 
-
 int main(int argc, char* argv[]) {
-
-  // print timing info if timing is non-zero
-  int timing = atoi(argv[1]);
 
   DATA_TYPE *A = (DATA_TYPE*)malloc(MAP_SIZE * MAP_SIZE * sizeof(DATA_TYPE));
   DATA_TYPE *B = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *B_outputFromGpu = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *C = (DATA_TYPE*)malloc(4 * 4 * sizeof(DATA_TYPE));
-
 
   for (int i = 0; i < MAP_SIZE; ++i)
     for (int j = 0; j < MAP_SIZE; ++j)
@@ -27,6 +23,7 @@ int main(int argc, char* argv[]) {
 #endif
   queue q(dev_sel);
 
+  double start = rtclock();
 
   buffer<DATA_TYPE, 1> d_A (A, MAP_SIZE * MAP_SIZE);
   buffer<DATA_TYPE, 1> d_B ((MAP_SIZE-2) * (MAP_SIZE-2));
@@ -49,9 +46,9 @@ int main(int argc, char* argv[]) {
   bool pass = true;
 
   // sweep over cpu_offset 
-  for (int cpu_offset = 0; cpu_offset <= 100; cpu_offset++) {
+  double co_time = 0.0;
 
-    double start = rtclock();
+  for (int cpu_offset = 0; cpu_offset <= 100; cpu_offset++) {
 
     cpu_global_size[0] = cpu_offset * (size_t)ceil(((float)tile_n) / ((float)DIM_LOCAL_WORK_GROUP_X)) 
       / 100 * DIM_LOCAL_WORK_GROUP_X;
@@ -74,6 +71,9 @@ int main(int argc, char* argv[]) {
     if (gpu_global_size[0] > 0) {
       gpu_run = true;
     }
+
+    // co-execution of host and device
+    double co_start = rtclock();
 
     if (gpu_run) {
       q.submit([&] (handler &cgh) {
@@ -171,14 +171,13 @@ int main(int argc, char* argv[]) {
       cgh.copy(acc, B_outputFromGpu);
     }).wait();
 
-    double end = rtclock();
+    co_time += rtclock() - co_start;
 
 #ifdef VERBOSE
     if (cpu_run) printf("run on host\n");
     if (gpu_run) printf("run on device\n");
     printf("CPU workload size : %d\n", cpu_offset);
 #endif
-    if (timing) printf("Total time: %lf ms\n", 1000.0 * (end - start));
 
     WinogradConv2D_2x2(A, B, C);
     pass &= compareResults(B, B_outputFromGpu);
@@ -191,5 +190,12 @@ int main(int argc, char* argv[]) {
   free(B);
   free(B_outputFromGpu);
   free(C);
+
+  double end = rtclock();
+  printf("Co-execution time: %lf s\n", co_time);
+  printf("Total time: %lf s\n", end - start);
+  printf("Ratio of co-execution time to total time: %.2lf%%\n",
+         100.0 * co_time / (end - start));
+
   return 0;
 }
