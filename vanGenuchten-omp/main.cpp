@@ -6,11 +6,11 @@
 #include "reference.h"
 
 void vanGenuchten(
-  const double *__restrict__ Ksat,
-  const double *__restrict__ psi,
-        double *__restrict__ C,
-        double *__restrict__ theta,
-        double *__restrict__ K,
+  const double *__restrict Ksat,
+  const double *__restrict psi,
+        double *__restrict C,
+        double *__restrict theta,
+        double *__restrict K,
   const int size)
 {
   #pragma omp target teams distribute parallel for thread_limit(256)
@@ -22,8 +22,8 @@ void vanGenuchten(
     m = lambda/n;
 
     // Compute the volumetric moisture content [eqn 21]
-    _psi = psi[i] * 100;
-    if ( _psi < 0 )
+    _psi = psi[i] * 100.0;
+    if ( _psi < 0.0 )
       _theta = (theta_S - theta_R) / pow(1.0 + pow((alpha*(-_psi)),n), m) + theta_R;
     else
       _theta = theta_S;
@@ -38,9 +38,9 @@ void vanGenuchten(
 
     // Compute the specific moisture storage derivative of eqn (21).
     // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-    if (_psi < 0)
-      C[i] = 100 * alpha * n * (1.0/n-1.0)*pow(alpha*abs(_psi), n-1)
-        * (theta_R-theta_S) * pow(pow(alpha*abs(_psi), n)+1, 1.0/n-2.0);
+    if (_psi < 0.0)
+      C[i] = 100 * alpha * n * (1.0/n-1.0)*pow(alpha*abs(_psi), n-1.0)
+        * (theta_R-theta_S) * pow(pow(alpha*abs(_psi), n)+1.0, 1.0/n-2.0);
     else
       C[i] = 0.0;
   }
@@ -91,8 +91,8 @@ int main(int argc, char* argv[])
       vanGenuchten(Ksat, psi, C, theta, K, size);
 
     auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<float> time = end - start;
-    printf("Total kernel time : %f (s)\n", time.count());
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
   bool ok = true;
