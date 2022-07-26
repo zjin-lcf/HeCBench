@@ -28,12 +28,11 @@ obj = $(source:.cpp=.o)
 # Sets Flags
 #===============================================================================
 
-# Subgroup size is either 32 or 64
+# Subgroup size is either 32 or 64 on AMD GPUs
 SUB_GROUP = 32
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -I../vote-cuda \
-          -DWARP_SIZE=$(SUB_GROUP)
+CFLAGS := -std=c++17 -Wall -fsycl -I../vote-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -41,13 +40,13 @@ LDFLAGS =
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            --gcc-toolchain=$(GCC_TOOLCHAIN) \
+            -DWARP_SIZE=$(SUB_GROUP)
 endif
 
 ifeq ($(HIP), yes)
-  SUB_GROUP = 64
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	          -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
             -DWARP_SIZE=$(SUB_GROUP)
 endif
 
@@ -72,7 +71,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../cuda-vote/reference.h kernels.h 
+%.o: %.cpp ../vote-cuda/reference.h kernels.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

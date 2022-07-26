@@ -11,7 +11,7 @@
 // If ANY one of the threads (within the warp) of the predicated condition
 // returns a non-zero value, then all threads within this warp will return a
 // non-zero value
-void VoteAnyKernel1(unsigned int *input, unsigned int *result,
+void VoteAnyKernel1(const unsigned int *input, unsigned int *result,
                     int repeat, sycl::nd_item<1> &item) {
   int tx = item.get_local_id(0);
   auto sg = item.get_sub_group();
@@ -23,7 +23,7 @@ void VoteAnyKernel1(unsigned int *input, unsigned int *result,
 // If ALL of the threads (within the warp) of the predicated condition returns
 // a non-zero value, then all threads within this warp will return a non-zero
 // value
-void VoteAllKernel2(unsigned int *input, unsigned int *result,
+void VoteAllKernel2(const unsigned int *input, unsigned int *result,
                     int repeat, sycl::nd_item<1> &item) {
   int tx = item.get_local_id(0);
   auto sg = item.get_sub_group();
