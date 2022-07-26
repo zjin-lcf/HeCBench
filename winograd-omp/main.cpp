@@ -1,17 +1,15 @@
+#include <chrono>
 #include <omp.h>
 #include "utils.h"
 
-
 int main(int argc, char* argv[]) {
 
-  // print timing info if timing is non-zero
-  int timing = atoi(argv[1]);
+  double start = rtclock();
 
   DATA_TYPE *A = (DATA_TYPE*)malloc(MAP_SIZE * MAP_SIZE * sizeof(DATA_TYPE));
   DATA_TYPE *B_host = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *B = (DATA_TYPE*)malloc((MAP_SIZE - 2) * (MAP_SIZE - 2) * sizeof(DATA_TYPE));
   DATA_TYPE *C = (DATA_TYPE*)malloc(4 * 4 * sizeof(DATA_TYPE));
-
 
   for (int i = 0; i < MAP_SIZE; ++i)
     for (int j = 0; j < MAP_SIZE; ++j)
@@ -36,14 +34,14 @@ int main(int argc, char* argv[]) {
 
   bool pass = true;
 
+  double co_time = 0.0;
+
 #pragma omp target data map (to: A[0:MAP_SIZE * MAP_SIZE],C[0:16]), \
                         map (alloc: B[0:(MAP_SIZE-2) * (MAP_SIZE-2)])
 
 {
   // sweep over cpu workload size
   for (int cpu_offset = 0; cpu_offset <= 100; cpu_offset++) {
-
-    double start = rtclock();
 
     cpu_global_size[0] = cpu_offset * (size_t)ceil(((float)tile_n) / ((float)DIM_LOCAL_WORK_GROUP_X)) 
       / 100 * DIM_LOCAL_WORK_GROUP_X;
@@ -68,6 +66,9 @@ int main(int argc, char* argv[]) {
     if (gpu_global_size[0] > 0) {
       gpu_run = true;
     }
+
+    // co-execution of host and device
+    double co_start = rtclock();
 
     if (gpu_run) {
       #pragma omp target teams distribute parallel for collapse(2) thread_limit(thread_size)
@@ -142,7 +143,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (cpu_run) {
-      // printf("CPU size: %d\n", cpu_global_size[0]);
       WinogradConv2D_2x2_omp(A, B, C, cpu_global_size);
 
       if (gpu_run) {
@@ -155,14 +155,13 @@ int main(int argc, char* argv[]) {
 
     #pragma omp target update from (B[0:(MAP_SIZE-2)*(MAP_SIZE-2)])
 
-    double end = rtclock();
+    co_time += rtclock() - co_start;
 
 #ifdef VERBOSE
     if (cpu_run) printf("run on host\n");
     if (gpu_run) printf("run on device\n");
     printf("CPU workload size : %d\n", cpu_offset);
 #endif
-    if (timing) printf("Total time: %lf ms\n", 1000.0 * (end - start));
 
     WinogradConv2D_2x2(A, B_host, C);
     pass &= compareResults(B_host, B);
@@ -176,5 +175,12 @@ int main(int argc, char* argv[]) {
   free(B);
   free(B_host);
   free(C);
+
+  double end = rtclock();
+  printf("Co-execution time: %lf s\n", co_time);
+  printf("Total time: %lf s\n", end - start);
+  printf("Ratio of co-execution time to total time: %.2lf%%\n",
+         100.0 * co_time / (end - start));
+
   return 0;
 }
