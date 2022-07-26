@@ -55,14 +55,16 @@ int main(int argc, char* argv[])
   // may take a few seconds to initialize
   const size_t len = 1024*1024*1024;  
   std::vector<char> random_input(len);
-  for (int c = 0; c < len; c++) random_input[c] = tab[rand() % size];
+  for (size_t c = 0; c < len; c++) random_input[c] = tab[rand() % size];
 
   std::cout << "Performance evaluation for random texts of character length " << len << std::endl;
   auto start = std::chrono::steady_clock::now();
-  for (size_t i = 0; i < repeat; i++) word_count(random_input);
+
+  for (int i = 0; i < repeat; i++) word_count(random_input);
+
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  std::cout << "Average time: " << time.count() / (float)repeat << std::endl;
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average time of word count: " << time * 1e-9f / repeat << " (s)\n";
 
   return 0;
 }
