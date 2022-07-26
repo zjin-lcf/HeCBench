@@ -1,20 +1,20 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include <omp.h>
 #include "utils.h"
 
-// kernel execution times
-#define REPEAT 100
-
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: ./%s <list size> <0:an ordered list | otherwise: a random list>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: ./%s <list size> <0 or 1> <repeat>", argv[0]);
+    printf("0 and 1 indicate an ordered list and a random list, respectively\n");
     exit(-1);
   }
 
   int elems = atoi(argv[1]);
   int setRandomList = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
   int i;
 
   std::vector<int> next (elems);
@@ -43,8 +43,12 @@ int main(int argc, char* argv[]) {
 
 #pragma omp target data map (tofrom: plist[0:elems])
 {
-  for (i = 0; i < REPEAT; i++) {
+  double time = 0.0;
+
+  for (i = 0; i <= repeat; i++) {
     #pragma omp target update to (plist[0:elems])
+
+    auto start = std::chrono::steady_clock::now();
 
     #pragma omp target teams num_teams(teams) thread_limit(256)
     {
@@ -65,7 +69,12 @@ int main(int argc, char* argv[]) {
         }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    if (i > 0) time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 }
 
   for (i = 0; i < elems; i++) d_res[i] = list[i] & MASK;

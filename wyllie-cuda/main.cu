@@ -1,11 +1,9 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include <cuda.h>
 #include "utils.h"
-
-// kernel execution times
-#define REPEAT 100
 
 __global__
 void wyllie ( long *list , const int size )
@@ -27,13 +25,15 @@ void wyllie ( long *list , const int size )
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: ./%s <list size> <0:an ordered list | otherwise: a random list>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: ./%s <list size> <0 or 1> <repeat>", argv[0]);
+    printf("0 and 1 indicate an ordered list and a random list, respectively\n");
     exit(-1);
   }
 
   int elems = atoi(argv[1]);
   int setRandomList = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
   int i;
 
   std::vector<int> next (elems);
@@ -63,10 +63,22 @@ int main(int argc, char* argv[]) {
   dim3 grid ((elems + 255)/256);
   dim3 block (256);
 
-  for (i = 0; i < REPEAT; i++) {
+  double time = 0.0;
+
+  for (i = 0; i <= repeat; i++) {
     cudaMemcpy(d_list, list.data(), sizeof(long) * elems, cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     wyllie<<<grid, block>>>(d_list, elems);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    if (i > 0) time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(d_res.data(), d_list, sizeof(long) * elems, cudaMemcpyDeviceToHost);
   cudaFree(d_list); 
@@ -82,7 +94,6 @@ int main(int argc, char* argv[]) {
     i = next[i];
   }
 
- 
 #ifdef DEBUG
   printf("Ranks:\n");
   for (i = 0; i < elems; i++) {
