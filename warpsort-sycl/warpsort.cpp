@@ -385,7 +385,9 @@ sortDevice(DeviceTensor<float, 1> data,
 
 // Define sort functions called in the main
 
-std::vector<float> sort(sycl::queue &q, const std::vector<float> &data) {
+std::vector<float> sort(sycl::queue &q,
+                        const std::vector<float> &data,
+                        double &time) {
   const size_t sizeBytes = data.size() * sizeof(float);
 
   float* devFloat = NULL;
@@ -402,11 +404,18 @@ std::vector<float> sort(sycl::queue &q, const std::vector<float> &data) {
   int dataSizes[] = { (int) data.size() };
   int outSizes[] = { (int) data.size() };
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.parallel_for(
     sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
       sortDevice(DeviceTensor<float, 1>(devFloat, dataSizes),
                  DeviceTensor<float, 1>(devResult, outSizes), item);
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   std::vector<float> vals(data.size());
   q.memcpy(vals.data(), devResult, sizeBytes).wait();
@@ -418,7 +427,10 @@ std::vector<float> sort(sycl::queue &q, const std::vector<float> &data) {
 }
 
 std::vector<std::pair<float, int>>
-sortWithIndices(sycl::queue &q, const std::vector<float> &data) {
+sortWithIndices(sycl::queue &q,
+                const std::vector<float> &data,
+                double &time) {
+
   const size_t sizeBytes = data.size() * sizeof(float);
   const size_t sizeIndicesBytes = data.size() * sizeof(int);
 
@@ -440,12 +452,19 @@ sortWithIndices(sycl::queue &q, const std::vector<float> &data) {
   int dataSizes[] = { (int) data.size() };
   int outSizes[] = { (int) data.size() };
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.parallel_for(
     sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
       sortDevice(DeviceTensor<float, 1>(devFloat, dataSizes),
                  DeviceTensor<float, 1>(devResult, outSizes),
                  DeviceTensor<int, 1>(devIndices, outSizes), item);
   });
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   std::vector<float> vals(data.size());
   q.memcpy(vals.data(), devResult, sizeBytes).wait();

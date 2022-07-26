@@ -10,11 +10,11 @@
 namespace facebook { namespace cuda {
 
 // test the warp-wide sort code
-std::vector<float> sort(const std::vector<float>& data);
+std::vector<float> sort(const std::vector<float>& data, double &time);
 
 // test the warp-wide sort with indices code
 std::vector<std::pair<float, int> >
-sortWithIndices(const std::vector<float>& data);
+sortWithIndices(const std::vector<float>& data, double &time);
 
 } } // namespace
 
@@ -42,17 +42,19 @@ void addSpecialFloats(std::vector<float>& vals) {
 }
 
 
-bool test_sort() {
+bool test_sort(const int repeat) {
   std::vector<float> vals;
   addSpecialFloats(vals);
 
   std::vector<float> sorted = vals;
   std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
+  double time = 0.0;
+ 
   bool ok = true;
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < repeat; ++i) {
     std::shuffle(vals.begin(), vals.end(), std::random_device());
-    auto out = facebook::cuda::sort(vals);
+    auto out = facebook::cuda::sort(vals, time);
 
     if (sorted.size() != out.size()) {
       ok = false;
@@ -66,16 +68,18 @@ bool test_sort() {
       }
     }
   }
+  printf("Size = %3d | average kernel execution time: %f (us)\n",
+         (int)sorted.size(), (time * 1e-3f) / repeat);
   DONE:
   return ok;
 }
 
-bool test_sortInRegisters() {
+bool test_sortInRegisters(const int repeat) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
   bool ok = true;
 
-  for (int size = 1; size <= 4 * 32; ++size) {
+  for (int size = 16; size <= 4 * 32; size = size * 2) {
     std::vector<float> vals;
 
     for (int i = 0; i < size; ++i) {
@@ -85,9 +89,11 @@ bool test_sortInRegisters() {
     std::vector<float> sorted = vals;
     std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
-    for (int i = 0; i < 3; ++i) {
+    double time = 0.0;
+    
+    for (int i = 0; i < repeat; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sort(vals);
+      auto out = facebook::cuda::sort(vals, time);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -101,17 +107,19 @@ bool test_sortInRegisters() {
         }
       }
     }
+    printf("Size = %3d | average kernel execution time: %f (us)\n",
+           size, (time * 1e-3f) / repeat);
   }
   DONE:
   return ok;
 }
 
-bool test_sortIndicesInRegisters() {
+bool test_sortIndicesInRegisters(const int repeat) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
 
   bool ok = true;
-  for (int size = 1; size <= 4 * 32; ++size) {
+  for (int size = 16; size <= 4 * 32; size = size * 2) {
     std::vector<float> vals;
 
     for (int i = 0; i < size; ++i) {
@@ -121,9 +129,11 @@ bool test_sortIndicesInRegisters() {
     std::vector<float> sorted = vals;
     std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
-    for (int i = 0; i < 3; ++i) {
+    double time = 0.0;
+
+    for (int i = 0; i < repeat; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sortWithIndices(vals);
+      auto out = facebook::cuda::sortWithIndices(vals, time);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -153,21 +163,29 @@ bool test_sortIndicesInRegisters() {
         indices.emplace(p.second);
       }
     }
+    printf("Size = %3d | average kernel execution time: %f (us)\n",
+           size, (time * 1e-3f) / repeat);
   }
   DONE:
   return ok;
 }
 
 int main(int argc, char** argv) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   bool ok;
-  ok = test_sort();
-  printf("%s: test_sort\n", ok ? "PASS" : "FAIL");
+  ok = test_sort(repeat);
+  printf("test_sort: %s\n\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortInRegisters();
-  printf("%s: test_sortInRegisters\n", ok ? "PASS" : "FAIL");
+  ok = test_sortInRegisters(repeat);
+  printf("test_sortInRegisters: %s\n\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortIndicesInRegisters();
-  printf("%s: test_sortIndicesInRegisters\n", ok ? "PASS" : "FAIL");
+  ok = test_sortIndicesInRegisters(repeat);
+  printf("test_sortIndicesInRegisters: %s\n\n", ok ? "PASS" : "FAIL");
 
   return 0;
 }

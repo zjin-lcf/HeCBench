@@ -2,13 +2,14 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 //
 
+#include <assert.h>
+#include <chrono>
 #include "cuda/CudaUtils.cuh"
 #include "cuda/DeviceTensor.cuh"
 #include "cuda/NumericLimits.cuh"
 #include "cuda/RegisterUtils.cuh"
 #include "cuda/ShuffleTypes.cuh"
 #include "cuda/WarpBitonicSort.cuh"
-#include <assert.h>
 
 namespace facebook { namespace cuda {
 
@@ -377,7 +378,7 @@ sortDevice(DeviceTensor<float, 1> data,
 // Define sort functions called in the main
 
 std::vector<float>
-sort(const std::vector<float>& data) {
+sort(const std::vector<float>& data, double &time) {
   const size_t sizeBytes = data.size() * sizeof(float);
 
   float* devFloat = NULL;
@@ -394,9 +395,16 @@ sort(const std::vector<float>& data) {
   int dataSizes[] = { (int) data.size() };
   int outSizes[] = { (int) data.size() };
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   sortDevice<<<grid, block>>>(
     DeviceTensor<float, 1>(devFloat, dataSizes),
     DeviceTensor<float, 1>(devResult, outSizes));
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   std::vector<float> vals(data.size());
   cudaMemcpy(vals.data(), devResult, sizeBytes, cudaMemcpyDeviceToHost);
@@ -408,7 +416,7 @@ sort(const std::vector<float>& data) {
 }
 
 std::vector<std::pair<float, int> >
-sortWithIndices(const std::vector<float>& data) {
+sortWithIndices(const std::vector<float>& data, double &time) {
   const size_t sizeBytes = data.size() * sizeof(float);
   const size_t sizeIndicesBytes = data.size() * sizeof(int);
 
@@ -429,10 +437,17 @@ sortWithIndices(const std::vector<float>& data) {
   int dataSizes[] = { (int) data.size() };
   int outSizes[] = { (int) data.size() };
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   sortDevice<<<grid, block>>>(
     DeviceTensor<float, 1>(devFloat, dataSizes),
     DeviceTensor<float, 1>(devResult, outSizes),
     DeviceTensor<int, 1>(devIndices, outSizes));
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   std::vector<float> vals(data.size());
   cudaMemcpy(vals.data(),
