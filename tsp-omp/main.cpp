@@ -45,7 +45,7 @@ Purpose Processing Using GPUs (10 pages). February 2015.
 #include <string.h>
 #include <math.h>
 #include <limits.h>
-#include <sys/time.h>
+#include <chrono>
 #include <omp.h>
 
 // no point in using precise FP math or double precision as we are rounding
@@ -99,11 +99,11 @@ static int best_thread_count(int cities)
 
 int main(int argc, char *argv[])
 {
-  printf("2-opt TSP CUDA GPU code v2.3\n");
+  printf("2-opt TSP OpenMP target offloading GPU code v2.3\n");
   printf("Copyright (c) 2014-2020, Texas State University. All rights reserved.\n");
 
-  if (argc != 3) {
-    fprintf(stderr, "\narguments: input_file restart_count\n");
+  if (argc != 4) {
+    fprintf(stderr, "\narguments: <input_file> <restart_count> <repeat>\n");
     exit(-1);
   }
 
@@ -113,8 +113,7 @@ int main(int argc, char *argv[])
   int restarts = atoi(argv[2]);
   if (restarts < 1) {fprintf(stderr, "restart_count is too small: %d\n", restarts); exit(-1);}
 
-  double runtime;
-  struct timeval starttime, endtime;
+  int repeat = atoi(argv[3]);
 
   //======================================================================
   // read data from input file
@@ -173,21 +172,24 @@ int main(int argc, char *argv[])
   int climbs[1] = {0};
   int best[1] = {INT_MAX};
 
-  int* glob = (int*) malloc (sizeof(int) * restarts * ((3 * cities + 2 + 31) / 32 * 32));
+  const int glob_size = restarts * ((3 * cities + 2 + 31) / 32 * 32);
+  int* glob = (int*) malloc (sizeof(int) * glob_size); 
 
-#pragma omp target data map(to: posx[0:cities], posy[0:cities]) \
-                        map(alloc: glob[0:restarts * ((3 * cities + 2 + 31) / 32 * 32)]) \
-                        map(alloc: climbs[0:1], best[0:1])
+  #pragma omp target data map(to: posx[0:cities], posy[0:cities]) \
+                          map(alloc: glob[0:glob_size]) \
+                          map(alloc: climbs[0:1], best[0:1])
   {
 
   int threads = best_thread_count(cities);
-  printf("thread block size: %d\n", threads);
+  printf("number of threads per team: %d\n", threads);
 
-  gettimeofday(&starttime, NULL);
+  double ktime = 0.0;
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < repeat; i++) {
     #pragma omp target update to (climbs[0:1])
     #pragma omp target update to (best[0:1])
+
+    auto kstart = std::chrono::steady_clock::now();
 
     #pragma omp target teams num_teams(restarts) thread_limit(threads)
     {
@@ -352,18 +354,20 @@ int main(int argc, char *argv[])
         }
       }
     }
+
+    auto kend = std::chrono::steady_clock::now();
+    if (i > 0)
+      ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
   }
 
   #pragma omp target update from (climbs[0:1])
   #pragma omp target update from (best[0:1])
 
-  gettimeofday(&endtime, NULL);
-  runtime = (endtime.tv_sec + endtime.tv_usec / 1000000.0 - 
-             starttime.tv_sec - starttime.tv_usec / 1000000.0) / 100;
   long long moves = 1LL * climbs[0] * (cities - 2) * (cities - 1) / 2;
 
-  printf("Average runtime = %.4f s, %.3f Gmoves/s\n", runtime, moves * 0.000000001 / runtime);
-  printf("Best found tour length = %d with %d climbers\n", best[0], climbs[0]);
+  printf("Average kernel time: %.4f s\n", ktime * 1e-9f / repeat);
+  printf("%.3f Gmoves/s\n", moves * repeat / ktime);
+  printf("Best found tour length is %d with %d climbers\n", best[0], climbs[0]);
 
   // for the specific dataset d493.tsp
   if (best[0] < 38000 && best[0] >= 35002)

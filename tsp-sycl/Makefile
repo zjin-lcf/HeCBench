@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) d493.tsp 24
+	./$(program) d493.tsp 24 100
