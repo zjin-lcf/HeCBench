@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <chrono>
 #include <CL/sycl.hpp>
 #include "reference.h"
 #include "kernels.h"
@@ -47,17 +48,30 @@ int main(int argc, char **argv) {
   q.memcpy(d_input, h_input,
            VOTE_DATA_GROUP * warp_size * sizeof(unsigned int)).wait();
 
-  // Start of Vote Any Test Kernel #1
-  printf("[VOTE Kernel Test 1/3]\n");
-  printf("\tRunning <<Vote.Any>> kernel1 ...\n");
   sycl::range<1> gws (VOTE_DATA_GROUP * warp_size);
   sycl::range<1> lws (VOTE_DATA_GROUP * warp_size);
 
+  // Start of Vote Any Test Kernel #1
+  printf("\tRunning <<Vote.Any>> kernel1 ...\n");
+
+  // Warmup
+
   // reqd_sub_group_size requires a constant
+  q.parallel_for<class any_test_warmup>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
+      [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+        VoteAnyKernel1(d_input, d_result, repeat, item);
+  }).wait();
+
+  auto start = std::chrono::steady_clock::now();
+
   q.parallel_for<class any_test>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
       [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAnyKernel1(d_input, d_result, repeat, item);
   }).wait();
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
 
   q.memcpy(h_result, d_result,
            VOTE_DATA_GROUP * warp_size * sizeof(unsigned int)).wait();
@@ -67,10 +81,23 @@ int main(int argc, char **argv) {
 
   // Start of Vote All Test Kernel #2
   printf("\tRunning <<Vote.All>> kernel2 ...\n");
+
+  // Warmup
+  q.parallel_for<class all_test_warmup>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
+      [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+        VoteAllKernel2(d_input, d_result, repeat, item);
+  }).wait();
+
+  start = std::chrono::steady_clock::now();
+
   q.parallel_for<class all_test>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
       [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAllKernel2(d_input, d_result, repeat, item);
   }).wait();
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
 
   q.memcpy(h_result, d_result,
            VOTE_DATA_GROUP * warp_size * sizeof(unsigned int)).wait();
@@ -79,18 +106,33 @@ int main(int argc, char **argv) {
       h_result, VOTE_DATA_GROUP * warp_size, warp_size);
 
   // Second Vote Kernel Test #3 (both Any/All)
-  hinfo = reinterpret_cast<bool *>(calloc(warp_size * 3 * 3, sizeof(bool)));
-  *(reinterpret_cast<void **>(&dinfo)) =
-      (void *)sycl::malloc_device(warp_size * 3 * 3 * sizeof(bool), q);
-  q.memcpy(dinfo, hinfo, warp_size * 3 * 3 * sizeof(bool)).wait();
+  dinfo = (bool *)sycl::malloc_device(warp_size * 3 * 3 * sizeof(bool), q);
+
+  // Warmup
+  q.parallel_for<class vote_any_warmup> (
+    sycl::nd_range<1>(sycl::range<1>(warp_size * 3),
+                      sycl::range<1>(warp_size * 3)),
+      [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+        VoteAnyKernel3(dinfo, warp_size, repeat, item);
+  }).wait();
+
+  q.memset(dinfo, 0, warp_size * 3 * 3 * sizeof(bool)).wait();
 
   printf("\tRunning <<Vote.Any>> kernel3 ...\n");
+
+  start = std::chrono::steady_clock::now();
+
   q.parallel_for<class vote_any> (sycl::nd_range<1>(sycl::range<1>(warp_size * 3),
                                    sycl::range<1>(warp_size * 3)),
       [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAnyKernel3(dinfo, warp_size, repeat, item);
   }).wait();
 
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
+
+  hinfo = (bool*) malloc (warp_size * 3 * 3 * sizeof(bool));
   q.memcpy(hinfo, dinfo, warp_size * 3 * 3 * sizeof(bool)).wait();
 
   error_count[2] = checkResultsVoteAnyKernel3(hinfo, warp_size * 3);

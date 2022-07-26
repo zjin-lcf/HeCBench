@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "reference.h"
 #include "kernels.h"
@@ -9,15 +10,14 @@ int main(int argc, char **argv) {
     printf("Usage: %s <warp_size> <repeat>\n", argv[0]);
     return 1;
   }
+  const int warp_size = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   bool *dinfo = NULL, *hinfo = NULL;
-  int error_count[3] = {0, 0, 0};
-
   unsigned int *h_input, *h_result;
   unsigned int *d_input, *d_result;
 
-  const int warp_size = atoi(argv[1]);
-  const int repeat = atoi(argv[2]);
+  int error_count[3] = {0, 0, 0};
 
   h_input = (unsigned int *)malloc(VOTE_DATA_GROUP * warp_size *
                                    sizeof(unsigned int));
@@ -25,20 +25,33 @@ int main(int argc, char **argv) {
                                     sizeof(unsigned int));
   genVoteTestPattern(h_input, VOTE_DATA_GROUP * warp_size);
 
-  hipMalloc(reinterpret_cast<void **>(&d_input),
+  hipMalloc((void**)&d_input,
              VOTE_DATA_GROUP * warp_size * sizeof(unsigned int));
-  hipMalloc(reinterpret_cast<void **>(&d_result),
+  hipMalloc((void**)&d_result,
              VOTE_DATA_GROUP * warp_size * sizeof(unsigned int));
   hipMemcpy(d_input, h_input,
              VOTE_DATA_GROUP * warp_size * sizeof(unsigned int),
              hipMemcpyHostToDevice);
 
-  // Start of Vote Any Test Kernel #1
-  printf("[VOTE Kernel Test 1/3]\n");
-  printf("\tRunning <<Vote.Any>> kernel1 ...\n");
   dim3 gridBlock(1);
   dim3 threadBlock(VOTE_DATA_GROUP * warp_size);
+
+  // Start of Vote Any Test Kernel #1
+  printf("\tRunning <<Vote.Any>> kernel1 ...\n");
+
+  // Warmup
   hipLaunchKernelGGL(VoteAnyKernel1, gridBlock, threadBlock, 0, 0, d_input, d_result, repeat);
+  hipDeviceSynchronize();
+
+  auto start = std::chrono::steady_clock::now();
+
+  hipLaunchKernelGGL(VoteAnyKernel1, gridBlock, threadBlock, 0, 0, d_input, d_result, repeat);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
+
   hipMemcpy(h_result, d_result,
              VOTE_DATA_GROUP * warp_size * sizeof(unsigned int),
              hipMemcpyDeviceToHost);
@@ -48,7 +61,20 @@ int main(int argc, char **argv) {
 
   // Start of Vote All Test Kernel #2
   printf("\tRunning <<Vote.All>> kernel2 ...\n");
+
+  // Warmup
   hipLaunchKernelGGL(VoteAllKernel2, gridBlock, threadBlock, 0, 0, d_input, d_result, repeat);
+  hipDeviceSynchronize();
+
+  start = std::chrono::steady_clock::now();
+
+  hipLaunchKernelGGL(VoteAllKernel2, gridBlock, threadBlock, 0, 0, d_input, d_result, repeat);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
+
   hipMemcpy(h_result, d_result,
              VOTE_DATA_GROUP * warp_size * sizeof(unsigned int),
              hipMemcpyDeviceToHost);
@@ -57,15 +83,26 @@ int main(int argc, char **argv) {
       h_result, VOTE_DATA_GROUP * warp_size, warp_size);
 
   // Second Vote Kernel Test #3 (both Any/All)
-  hinfo = reinterpret_cast<bool *>(calloc(warp_size * 3 * 3, sizeof(bool)));
-  hipMalloc(reinterpret_cast<void **>(&dinfo),
-             warp_size * 3 * 3 * sizeof(bool));
-  hipMemcpy(dinfo, hinfo, warp_size * 3 * 3 * sizeof(bool),
-             hipMemcpyHostToDevice);
+  hipMalloc((void**)&dinfo, warp_size * 3 * 3 * sizeof(bool));
+
+  // Warmup
+  hipLaunchKernelGGL(VoteAnyKernel3, 1, warp_size * 3, 0, 0, dinfo, warp_size, repeat);
+  hipDeviceSynchronize();
+
+  hipMemset(dinfo, 0, warp_size * 3 * 3 * sizeof(bool));
 
   printf("\tRunning <<Vote.Any>> kernel3 ...\n");
+
+  start = std::chrono::steady_clock::now();
+
   hipLaunchKernelGGL(VoteAnyKernel3, 1, warp_size * 3, 0, 0, dinfo, warp_size, repeat);
 
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("\tkernel execution time: %f (s)\n", time * 1e-9f);
+
+  hinfo = (bool*) malloc (warp_size * 3 * 3 * sizeof(bool));
   hipMemcpy(hinfo, dinfo, warp_size * 3 * 3 * sizeof(bool),
              hipMemcpyDeviceToHost);
 
