@@ -2,8 +2,6 @@
 #pragma once
 
 #include <hip/hip_runtime.h>
-//#include "cuda/ComputeCapabilities.cuh"
-//#include "cuda/CudaStaticAssert.cuh"
 
 namespace facebook { namespace cuda {
 

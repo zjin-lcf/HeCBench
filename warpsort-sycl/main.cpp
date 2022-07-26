@@ -11,11 +11,11 @@
 namespace facebook { namespace cuda {
 
 // test the warp-wide sort code
-std::vector<float> sort(sycl::queue &q, const std::vector<float>& data);
+std::vector<float> sort(sycl::queue &q, const std::vector<float>& data, double &time);
 
 // test the warp-wide sort with indices code
 std::vector<std::pair<float, int> >
-sortWithIndices(sycl::queue &q, const std::vector<float>& data);
+sortWithIndices(sycl::queue &q, const std::vector<float>& data, double &);
 
 } } // namespace
 
@@ -42,18 +42,19 @@ void addSpecialFloats(std::vector<float>& vals) {
   vals.push_back(-std::numeric_limits<float>::denorm_min() * 4.0f);
 }
 
-
-bool test_sort(sycl::queue &q) {
+bool test_sort(sycl::queue &q, const int repeat) {
   std::vector<float> vals;
   addSpecialFloats(vals);
 
   std::vector<float> sorted = vals;
   std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
+  double time = 0.0;
+
   bool ok = true;
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < repeat; ++i) {
     std::shuffle(vals.begin(), vals.end(), std::random_device());
-    auto out = facebook::cuda::sort(q, vals);
+    auto out = facebook::cuda::sort(q, vals, time);
 
     if (sorted.size() != out.size()) {
       ok = false;
@@ -67,16 +68,18 @@ bool test_sort(sycl::queue &q) {
       }
     }
   }
+  printf("Size = %3d | average kernel execution time: %f (us)\n",
+         (int)sorted.size(), (time * 1e-3f) / repeat);
   DONE:
   return ok;
 }
 
-bool test_sortInRegisters(sycl::queue &q) {
+bool test_sortInRegisters(sycl::queue &q, const int repeat) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
   bool ok = true;
 
-  for (int size = 1; size <= 4 * 32; ++size) {
+  for (int size = 16; size <= 4 * 32; size = size * 2) {
     std::vector<float> vals;
 
     for (int i = 0; i < size; ++i) {
@@ -86,9 +89,11 @@ bool test_sortInRegisters(sycl::queue &q) {
     std::vector<float> sorted = vals;
     std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
-    for (int i = 0; i < 3; ++i) {
+    double time = 0.0;
+    
+    for (int i = 0; i < repeat; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sort(q, vals);
+      auto out = facebook::cuda::sort(q, vals, time);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -102,17 +107,19 @@ bool test_sortInRegisters(sycl::queue &q) {
         }
       }
     }
+    printf("Size = %3d | average kernel execution time: %f (us)\n",
+           size, (time * 1e-3f) / repeat);
   }
   DONE:
   return ok;
 }
 
-bool test_sortIndicesInRegisters(sycl::queue &q) {
+bool test_sortIndicesInRegisters(sycl::queue &q, const int repeat) {
   // Test sorting std::vectors of size 1 to 4 x warpSize, which is the
   // maximum in-register size we support
 
   bool ok = true;
-  for (int size = 1; size <= 4 * 32; ++size) {
+  for (int size = 16; size <= 4 * 32; size = size * 2) {
     std::vector<float> vals;
 
     for (int i = 0; i < size; ++i) {
@@ -122,9 +129,11 @@ bool test_sortIndicesInRegisters(sycl::queue &q) {
     std::vector<float> sorted = vals;
     std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
-    for (int i = 0; i < 3; ++i) {
+    double time = 0.0;
+
+    for (int i = 0; i < repeat; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
-      auto out = facebook::cuda::sortWithIndices(q, vals);
+      auto out = facebook::cuda::sortWithIndices(q, vals, time);
 
       if (sorted.size() != out.size()) {
         ok = false;
@@ -154,12 +163,20 @@ bool test_sortIndicesInRegisters(sycl::queue &q) {
         indices.emplace(p.second);
       }
     }
+    printf("Size = %3d | average kernel execution time: %f (us)\n",
+           size, (time * 1e-3f) / repeat);
   }
   DONE:
   return ok;
 }
 
 int main(int argc, char** argv) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
 #ifdef USE_GPU
   sycl::gpu_selector dev_sel;
 #else
@@ -168,14 +185,14 @@ int main(int argc, char** argv) {
   sycl::queue q(dev_sel);
 
   bool ok;
-  ok = test_sort(q);
-  printf("%s: test_sort\n", ok ? "PASS" : "FAIL");
+  ok = test_sort(q, repeat);
+  printf("test_sort: %s\n\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortInRegisters(q);
-  printf("%s: test_sortInRegisters\n", ok ? "PASS" : "FAIL");
+  ok = test_sortInRegisters(q, repeat);
+  printf("test_sortInRegisters: %s\n\n", ok ? "PASS" : "FAIL");
 
-  ok = test_sortIndicesInRegisters(q);
-  printf("%s: test_sortIndicesInRegisters\n", ok ? "PASS" : "FAIL");
+  ok = test_sortIndicesInRegisters(q, repeat);
+  printf("test_sortIndicesInRegisters: %s\n\n", ok ? "PASS" : "FAIL");
 
   return 0;
 }

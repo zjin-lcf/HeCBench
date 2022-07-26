@@ -48,15 +48,15 @@ $(program): $(obj) Makefile
 main.o: main.cpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-warpsort.o: warpsort.cu ../warpsort-cuda/cuda/CudaUtils.cuh \
-                        ../warpsort-cuda/cuda/Comparators.cuh \
-                        ../warpsort-cuda/cuda/DeviceTensor.cuh \
-                        ../warpsort-cuda/cuda/DeviceTensor-inl.cuh \
-                        ../warpsort-cuda/cuda/NumericLimits.cuh \
-                        ../warpsort-cuda/cuda/Pair.cuh \
-                        ../warpsort-cuda/cuda/RegisterUtils.cuh \
-                        ../warpsort-cuda/cuda/ShuffleTypes.cuh \
-                        ../warpsort-cuda/cuda/WarpBitonicSort.cuh \
+warpsort.o: warpsort.cu cuda/CudaUtils.cuh \
+                        cuda/Comparators.cuh \
+                        cuda/DeviceTensor.cuh \
+                        cuda/DeviceTensor-inl.cuh \
+                        cuda/NumericLimits.cuh \
+                        cuda/Pair.cuh \
+                        cuda/RegisterUtils.cuh \
+                        cuda/ShuffleTypes.cuh \
+                        cuda/WarpBitonicSort.cuh \
                         Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -64,5 +64,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
-
+	./$(program) 1000
