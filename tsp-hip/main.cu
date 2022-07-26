@@ -39,13 +39,12 @@ Random-Restart Hill Climbing. Proceedings of the Eighth Workshop on General
 Purpose Processing Using GPUs (10 pages). February 2015.
  */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <limits.h>
-#include <sys/time.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 // no point in using precise FP math or double precision as we are rounding
@@ -76,7 +75,7 @@ void TwoOpt(int cities,
     int *__restrict climbs_d,
     int *__restrict best_d)
 {
-  HIP_DYNAMIC_SHARED(int, buf_s)
+  extern __shared__ int buf_s[];
   __shared__ float px_s[tilesize];
   __shared__ float py_s[tilesize];
   __shared__ int bf_s[tilesize];
@@ -255,9 +254,10 @@ static int best_thread_count(int cities)
 int main(int argc, char *argv[])
 {
   printf("2-opt TSP HIP GPU code v2.3\n");
+  printf("Copyright (c) 2014-2020, Texas State University. All rights reserved.\n");
 
-  if (argc != 3) {
-    fprintf(stderr, "\narguments: input_file restart_count\n");
+  if (argc != 4) {
+    fprintf(stderr, "\narguments: <input_file> <restart_count> <repeat>\n");
     exit(-1);
   }
 
@@ -267,8 +267,7 @@ int main(int argc, char *argv[])
   int restarts = atoi(argv[2]);
   if (restarts < 1) {fprintf(stderr, "restart_count is too small: %d\n", restarts); exit(-1);}
 
-  double runtime;
-  struct timeval starttime, endtime;
+  int repeat = atoi(argv[3]);
 
   //======================================================================
   // read data from input file
@@ -343,23 +342,30 @@ int main(int argc, char *argv[])
   int threads = best_thread_count(cities);
   printf("thread block size: %d\n", threads);
 
-  gettimeofday(&starttime, NULL);
+  double ktime = 0.0;
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i <= repeat; i++) {
     hipMemcpy(climbs_d, &climbs, sizeof(int), hipMemcpyHostToDevice);
     hipMemcpy(best_d, &best, sizeof(int), hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(TwoOpt, dim3(restarts), dim3(threads), sizeof(int) * threads, 0, cities, posx_d, posy_d, glob_d, climbs_d, best_d);
+
+    auto kstart = std::chrono::steady_clock::now();
+
+    TwoOpt<<<restarts, threads, sizeof(int) * threads>>>(cities, posx_d, posy_d, glob_d, climbs_d, best_d);
+
+    hipDeviceSynchronize();
+    auto kend = std::chrono::steady_clock::now();
+    if (i > 0)
+      ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
   }
+
   hipMemcpy(&best, best_d, sizeof(int), hipMemcpyDeviceToHost);
   hipMemcpy(&climbs, climbs_d, sizeof(int), hipMemcpyDeviceToHost);
 
-  gettimeofday(&endtime, NULL);
-  runtime = (endtime.tv_sec + endtime.tv_usec / 1000000.0 - 
-             starttime.tv_sec - starttime.tv_usec / 1000000.0) / 100;
   long long moves = 1LL * climbs * (cities - 2) * (cities - 1) / 2;
 
-  printf("Average runtime = %.4f s, %.3f Gmoves/s\n", runtime, moves * 0.000000001 / runtime);
-  printf("Best found tour length = %d with %d climbers\n", best, climbs);
+  printf("Average kernel time: %.4f s\n", ktime * 1e-9f / repeat);
+  printf("%.3f Gmoves/s\n", moves * repeat / ktime);
+  printf("Best found tour length is %d with %d climbers\n", best, climbs);
 
   // for the specific dataset d493.tsp
   if (best < 38000 && best >= 35002)
