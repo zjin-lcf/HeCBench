@@ -23,8 +23,8 @@ void vanGenuchten(
     m = lambda/n;
 
     // Compute the volumetric moisture content [eqn 21]
-    _psi = psi[i] * 100;
-    if ( _psi < 0 )
+    _psi = psi[i] * 100.0;
+    if ( _psi < 0.0 )
       _theta = (theta_S - theta_R) / pow(1.0 + pow((alpha*(-_psi)),n), m) + theta_R;
     else
       _theta = theta_S;
@@ -39,9 +39,9 @@ void vanGenuchten(
 
     // Compute the specific moisture storage derivative of eqn (21).
     // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-    if (_psi < 0)
-      C[i] = 100 * alpha * n * (1.0/n-1.0)*pow(alpha*abs(_psi), n-1)
-        * (theta_R-theta_S) * pow(pow(alpha*abs(_psi), n)+1, 1.0/n-2.0);
+    if (_psi < 0.0)
+      C[i] = 100.0 * alpha * n * (1.0/n-1.0)*pow(alpha*abs(_psi), n-1.0)
+        * (theta_R-theta_S) * pow(pow(alpha*abs(_psi), n)+1.0, 1.0/n-2.0);
     else
       C[i] = 0.0;
   }
@@ -98,7 +98,6 @@ int main(int argc, char* argv[])
   dim3 blocks (256);
 
   hipDeviceSynchronize();
-
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
@@ -107,8 +106,8 @@ int main(int argc, char* argv[])
   hipDeviceSynchronize();
 
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  printf("Total kernel time : %f (s)\n", time.count());
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(C, d_C, size_byte, hipMemcpyDeviceToHost);
   hipMemcpy(theta, d_theta, size_byte, hipMemcpyDeviceToHost);
@@ -142,4 +141,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-  

@@ -23,8 +23,8 @@ void vanGenuchten(
     m = lambda/n;
 
     // Compute the volumetric moisture content [eqn 21]
-    _psi = psi[i] * 100;
-    if ( _psi < 0 )
+    _psi = psi[i] * 100.0;
+    if ( _psi < 0.0 )
       _theta = (theta_S - theta_R) / sycl::pow<double>(
                1.0 + sycl::pow<double>((alpha * (-_psi)), n), m) + theta_R;
     else
@@ -42,11 +42,11 @@ void vanGenuchten(
 
     // Compute the specific moisture storage derivative of eqn (21).
     // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-    if (_psi < 0)
-      C[i] = 100 * alpha * n * (1.0 / n - 1.0) *
-             sycl::pow<double>(alpha * sycl::fabs(_psi), n - 1) *
+    if (_psi < 0.0)
+      C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
+             sycl::pow<double>(alpha * sycl::fabs(_psi), n - 1.0) *
              (theta_R - theta_S) *
-             sycl::pow<double>(sycl::pow<double>(alpha * sycl::fabs(_psi), n) + 1,
+             sycl::pow<double>(sycl::pow<double>(alpha * sycl::fabs(_psi), n) + 1.0,
                             1.0 / n - 2.0);
     else
       C[i] = 0.0;
@@ -111,7 +111,6 @@ int main(int argc, char* argv[])
   sycl::range<1> lws (256);
 
   q.wait();
-
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
@@ -124,8 +123,8 @@ int main(int argc, char* argv[])
   q.wait();
 
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  printf("Total kernel time : %f (s)\n", time.count());
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
   q.memcpy(C, d_C, size_byte);
   q.memcpy(theta, d_theta, size_byte);
@@ -161,4 +160,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-  
