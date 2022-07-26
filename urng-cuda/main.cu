@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -24,6 +24,10 @@
 
 int main(int argc, char** argv) 
 {
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int blockSizeX = atoi(argv[2]);
   const int blockSizeY = atoi(argv[3]);
@@ -41,20 +45,20 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  uint pixelSize = sizeof(uchar4);
+  size_t imageSize = height * width * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
   std::cout << " width: " << width << std::endl;
 
   // allocate memory for input & output image data
-  uchar4* inputImageData  = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* inputImageData  = (uchar4*)malloc(imageSize);
 
   // allocate memory for output image data
-  uchar4* outputImageData = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* outputImageData = (uchar4*)malloc(imageSize);
 
   // initializa the Image data to NULL
-  memset(outputImageData, 0, width * height * pixelSize);
+  memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
   uchar4 *pixelData = inputBitmap.getPixels();
@@ -67,21 +71,21 @@ int main(int argc, char** argv)
   }
 
   // Copy pixel data into inputImageData
-  memcpy(inputImageData, pixelData, width * height * pixelSize);
+  memcpy(inputImageData, pixelData, imageSize);
 
   // allocate memory for verification output
-  uchar4 *verificationOutput = (uchar4*)malloc(width * height * pixelSize);
+  uchar4 *verificationOutput = (uchar4*)malloc(imageSize);
 
   // initialize the data to NULL
-  memset(verificationOutput, 0, width * height * pixelSize);
+  memset(verificationOutput, 0, imageSize);
 
   const int factor = FACTOR;
 
   uchar4 *inputImageBuffer;
-  cudaMalloc((void**)&inputImageBuffer, width * height * sizeof(uchar4)); 
+  cudaMalloc((void**)&inputImageBuffer, imageSize);
 
   uchar4 *outputImageBuffer;
-  cudaMalloc((void**)&outputImageBuffer, width * height * sizeof(uchar4)); 
+  cudaMalloc((void**)&outputImageBuffer, imageSize);
 
   dim3 grid (height * width / (blockSizeY * blockSizeX));
   dim3 block (blockSizeY * blockSizeX);  // maximum work-group size is 256
@@ -89,12 +93,22 @@ int main(int argc, char** argv)
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
-  cudaMemcpy(inputImageBuffer, inputImageData, width * height * sizeof(uchar4), cudaMemcpyHostToDevice);
+  cudaMemcpy(inputImageBuffer, inputImageData, imageSize, cudaMemcpyHostToDevice);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for(int i = 0; i < iterations; i++)
   {
     noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, factor);
   }
-  cudaMemcpy(outputImageData, outputImageBuffer, width * height * sizeof(uchar4), cudaMemcpyDeviceToHost);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
+
+  cudaMemcpy(outputImageData, outputImageBuffer, imageSize, cudaMemcpyDeviceToHost);
   cudaFree(inputImageBuffer);
   cudaFree(outputImageBuffer);
 
@@ -107,21 +121,21 @@ int main(int argc, char** argv)
     mean += outputImageData[i].z - inputImageData[i].z;
     mean += outputImageData[i].w - inputImageData[i].w;
   }
-  mean /= (4 * width * height * factor);
-  std::cout << "The averaged mean: " << mean << std::endl;
+  mean /= (imageSize * factor);
+  std::cout << "The averaged mean of the image: " << mean << std::endl;
 
   if(fabs(mean) < 1.0)
   {
-    std::cout << "Passed! \n" << std::endl;
+    std::cout << "PASS\n" << std::endl;
   }
   else
   {
-    std::cout << "Failed! \n" << std::endl;
+    std::cout << "FAIL\n" << std::endl;
   }
 
 #ifdef DUMP
   // copy output image data back to original pixel data
-  memcpy(pixelData, outputImageData, width * height * pixelSize);
+  memcpy(pixelData, outputImageData, imageSize);
 
   // write the output bmp file
   if(!inputBitmap.write(OUTPUT_IMAGE))
@@ -136,5 +150,3 @@ int main(int argc, char** argv)
   free(verificationOutput);
   return 0;
 }
-
-

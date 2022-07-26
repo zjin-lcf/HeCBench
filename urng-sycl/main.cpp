@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -24,6 +24,10 @@
 
 int main(int argc, char** argv) 
 {
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int blockSizeX = atoi(argv[2]);
   const int blockSizeY = atoi(argv[3]);
@@ -41,20 +45,20 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  uint pixelSize = sizeof(uchar4);
+  size_t imageSize = height * width * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
   std::cout << " width: " << width << std::endl;
 
   // allocate memory for input & output image data
-  uchar4* inputImageData  = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* inputImageData  = (uchar4*)malloc(imageSize);
 
   // allocate memory for output image data
-  uchar4* outputImageData = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* outputImageData = (uchar4*)malloc(imageSize);
 
   // initializa the Image data to NULL
-  memset(outputImageData, 0, width * height * pixelSize);
+  memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
   uchar4 *pixelData = inputBitmap.getPixels();
@@ -67,13 +71,13 @@ int main(int argc, char** argv)
   }
 
   // Copy pixel data into inputImageData
-  memcpy(inputImageData, pixelData, width * height * pixelSize);
+  memcpy(inputImageData, pixelData, imageSize);
 
   // allocate memory for verification output
-  uchar4 *verificationOutput = (uchar4*)malloc(width * height * pixelSize);
+  uchar4 *verificationOutput = (uchar4*)malloc(imageSize);
 
   // initialize the data to NULL
-  memset(verificationOutput, 0, width * height * pixelSize);
+  memset(verificationOutput, 0, imageSize);
 
   const int factor = FACTOR;
 
@@ -93,22 +97,29 @@ int main(int argc, char** argv)
     std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
     std::cout << "-------------------------------------------" << std::endl;
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     for(int i = 0; i < iterations; i++)
     {
       q.submit([&] (handler &cgh) {
-          auto input = inputImageBuffer.get_access<sycl_read>(cgh);
-          auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
-          accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
-          cgh.parallel_for<class noise_uniform>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              kernel_noise_uniform(input.get_pointer(), 
-                  output.get_pointer(), 
-                  factor, 
-                  iv.get_pointer(), 
-                  item);    
-              });
-          });
+        auto input = inputImageBuffer.get_access<sycl_read>(cgh);
+        auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
+        accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
+        cgh.parallel_for<class noise_uniform>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          kernel_noise_uniform(input.get_pointer(), 
+            output.get_pointer(), 
+            factor, 
+            iv.get_pointer(), 
+            item);    
+        });
+      });
     }
+
     q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
   }
 
   // verify
@@ -125,11 +136,11 @@ int main(int argc, char** argv)
 
   if(fabs(mean) < 1.0)
   {
-    std::cout << "Passed! \n" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else
   {
-    std::cout << "Failed! \n" << std::endl;
+    std::cout << "FAIL" << std::endl;
   }
 
 #ifdef DUMP
@@ -149,5 +160,3 @@ int main(int argc, char** argv)
   free(verificationOutput);
   return 0;
 }
-
-

@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include
+CFLAGS := -std=c++14 -Wall -I../include -I../urng-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -32,7 +32,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -46,12 +45,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernel.cu urng.h ../include/SDKBitMap.h  
+%.o: %.cu ../urng-cuda/kernel.cu ../urng-cuda/urng.h ../include/SDKBitMap.h  
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../urng-sycl/URNG_Input.bmp 16 16 1
-
+	./$(program) ../urng-sycl/URNG_Input.bmp 16 16 1000

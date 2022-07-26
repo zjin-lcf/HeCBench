@@ -14,7 +14,7 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -24,6 +24,10 @@
 
 int main(int argc, char** argv) 
 {
+  if (argc != 5) {
+    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+    return 1;
+  }
   const char* filePath = argv[1];
   const int blockSizeX = atoi(argv[2]);
   const int blockSizeY = atoi(argv[3]);
@@ -41,20 +45,20 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  uint pixelSize = sizeof(uchar4);
+  size_t imageSize = height * width * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
   std::cout << " width: " << width << std::endl;
 
   // allocate memory for input & output image data
-  uchar4* inputImageData  = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* inputImageData  = (uchar4*)malloc(imageSize);
 
   // allocate memory for output image data
-  uchar4* outputImageData = (uchar4*)malloc(width * height * sizeof(uchar4));
+  uchar4* outputImageData = (uchar4*)malloc(imageSize);
 
   // initializa the Image data to NULL
-  memset(outputImageData, 0, width * height * pixelSize);
+  memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
   uchar4 *pixelData = inputBitmap.getPixels();
@@ -67,13 +71,13 @@ int main(int argc, char** argv)
   }
 
   // Copy pixel data into inputImageData
-  memcpy(inputImageData, pixelData, width * height * pixelSize);
+  memcpy(inputImageData, pixelData, imageSize);
 
   // allocate memory for verification output
-  uchar4 *verificationOutput = (uchar4*)malloc(width * height * pixelSize);
+  uchar4 *verificationOutput = (uchar4*)malloc(imageSize);
 
   // initialize the data to NULL
-  memset(verificationOutput, 0, width * height * pixelSize);
+  memset(verificationOutput, 0, imageSize);
 
   const int factor = FACTOR;
 
@@ -83,28 +87,37 @@ int main(int argc, char** argv)
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
-  #pragma omp target data map(to: inputImageData[0:width*height]) map(from: outputImageData[0:width*height])
-  for(int i = 0; i < iterations; i++)
+  #pragma omp target data map(to: inputImageData[0:width*height]) \
+                          map(from: outputImageData[0:width*height])
   {
-    #pragma omp target teams num_teams(teams) thread_limit(block)
+    auto start = std::chrono::steady_clock::now();
+
+    for(int i = 0; i < iterations; i++)
     {
-      int iv[NTAB * GROUP_SIZE];
-      #pragma omp parallel 
+      #pragma omp target teams num_teams(teams) thread_limit(block)
       {
-        int pos = omp_get_team_num() * block + omp_get_thread_num(); 
-        float4 temp = convert_float4(inputImageData[pos]);
+        int iv[NTAB * GROUP_SIZE];
+        #pragma omp parallel 
+        {
+          int pos = omp_get_team_num() * block + omp_get_thread_num(); 
+          float4 temp = convert_float4(inputImageData[pos]);
 
-        /* compute average value of a pixel from its compoments */
-        float avg = (temp.x + temp.y + temp.z + temp.w) / 4.0f;
+          /* compute average value of a pixel from its compoments */
+          float avg = (temp.x + temp.y + temp.z + temp.w) / 4.0f;
 
-        /* Calculate deviation from the avg value of a pixel */
-        float dev = ran1(-avg, iv);
-        dev = (dev - 0.55f) * (float)factor;
+          /* Calculate deviation from the avg value of a pixel */
+          float dev = ran1(-avg, iv);
+          dev = (dev - 0.55f) * (float)factor;
 
-        /* Saturate(clamp) the values */
-        outputImageData[pos] = convert_uchar4_sat(temp + dev);
+          /* Saturate(clamp) the values */
+          outputImageData[pos] = convert_uchar4_sat(temp + dev);
+        }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
   }
 
   // verify
@@ -116,21 +129,22 @@ int main(int argc, char** argv)
     mean += outputImageData[i].z - inputImageData[i].z;
     mean += outputImageData[i].w - inputImageData[i].w;
   }
-  mean /= (4 * width * height * factor);
-  std::cout << "The averaged mean: " << mean << std::endl;
+
+  mean /= (imageSize * factor);
+  std::cout << "The averaged mean of the image: " << mean << std::endl;
 
   if(fabs(mean) < 1.0)
   {
-    std::cout << "Passed! \n" << std::endl;
+    std::cout << "PASS" << std::endl;
   }
   else
   {
-    std::cout << "Failed! \n" << std::endl;
+    std::cout << "FAIL" << std::endl;
   }
 
 #ifdef DUMP
   // copy output image data back to original pixel data
-  memcpy(pixelData, outputImageData, width * height * pixelSize);
+  memcpy(pixelData, outputImageData, imageSize);
 
   // write the output bmp file
   if(!inputBitmap.write(OUTPUT_IMAGE))
