@@ -1,9 +1,8 @@
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 #include <curand.h>
 #include <curand_kernel.h>
-
-using namespace std;
 
 using FLOAT = float;
 
@@ -14,15 +13,14 @@ const int NBLOCK  = 56*4;               // Number of CUDA blocks (SMs on P100)
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
 const int Neq = 100000;                 // No. of generations to equilibrate 
 const int Ngen_per_block = 5000;        // No. of generations per block
-const int Nsample = 100;                // No. of blocks to sample
 const float DELTA = 2.0;                // Random step size
 
 // Explicitly typed constants so can easily work with both floats and floats
-static const FLOAT FOUR = 4.0; 
-static const FLOAT TWO  = 2.0;
-static const FLOAT ONE  = 1.0;
-static const FLOAT HALF = 0.5;
-static const FLOAT ZERO = 0.0;
+const FLOAT FOUR = 4.0; 
+const FLOAT TWO  = 2.0;
+const FLOAT ONE  = 1.0;
+const FLOAT HALF = 0.5;
+const FLOAT ZERO = 0.0;
 
 // Specialized/overloaded functions to support both double and float
 template <typename T> __device__ __forceinline__ T rand(curandState_t* state);
@@ -164,7 +162,13 @@ __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y
   P[i] = p;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <number of blocks to sample>\n", argv[0]);
+    return 1;
+  }
+  const int Nsample = atoi(argv[1]); // No. of blocks to sample
+  
   FLOAT *x1, *y1, *z1, *x2, *y2, *z2, *psi, *stats, *statsum, *blocksums;
   curandState_t *ranstates;  
 
@@ -192,12 +196,24 @@ int main() {
   double r2_tot = ZERO,  r2_sq_tot = ZERO;
   double r12_tot = ZERO, r12_sq_tot = ZERO;
   double naccept = ZERO;  // Keeps track of propagation efficiency
+
+  double time = 0.0;
+
   for (int sample=0; sample<Nsample; sample++) {
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
     propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
 
-    struct {FLOAT r1, r2, r12, accept;} s;
     sum_stats(Npoint, stats, statsum, blocksums);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    struct {FLOAT r1, r2, r12, accept;} s;
     CHECK(cudaMemcpy(&s, statsum, sizeof(s), cudaMemcpyDeviceToHost));
 
     naccept += s.accept;
@@ -205,7 +221,9 @@ int main() {
     s.r2 /= Ngen_per_block*Npoint;  
     s.r12 /= Ngen_per_block*Npoint;
 
+#ifdef DEBUG
     printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
+#endif
 
     r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
     r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
@@ -224,7 +242,11 @@ int main() {
   printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
   printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
 
-  printf(" acceptance ratio=%.1f%%\n",100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+  // avoid int overflow
+  printf(" acceptance ratio=%.1f%%\n",
+    100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample));
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / Nsample);
 
   CHECK(cudaFree(x1));
   CHECK(cudaFree(y1));
@@ -239,4 +261,3 @@ int main() {
   CHECK(cudaFree(ranstates));
   return 0;
 }
-
