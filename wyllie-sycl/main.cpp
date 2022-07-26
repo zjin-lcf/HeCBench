@@ -1,21 +1,20 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include "common.h"
 #include "utils.h"
 
-// kernel execution times
-#define REPEAT 100
-
-
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: ./%s <list size> <0:an ordered list | otherwise: a random list>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: ./%s <list size> <0 or 1> <repeat>", argv[0]);
+    printf("0 and 1 indicate an ordered list and a random list, respectively\n");
     exit(-1);
   }
 
   int elems = atoi(argv[1]);
   int setRandomList = atoi(argv[2]);
+  int repeat = atoi(argv[3]);
   int i;
 
   std::vector<int> next (elems);
@@ -51,11 +50,16 @@ int main(int argc, char* argv[]) {
   range<1> gws ((elems + 255)/256*256);
   range<1> lws (256);
 
-  for (i = 0; i < REPEAT; i++) {
+  double time = 0.0;
+
+  for (i = 0; i <= repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto acc = d_list.get_access<sycl_write>(cgh);
       cgh.copy(list.data(), acc);
     });
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &cgh) {
       auto list = d_list.get_access<sycl_read_write>(cgh);
@@ -73,8 +77,13 @@ int main(int argc, char* argv[]) {
           }
         }
       });
-    });
+    }).wait();
+
+    auto end = std::chrono::steady_clock::now();
+    if (i > 0) time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
+
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   q.submit([&] (handler &cgh) {
     auto acc = d_list.get_access<sycl_read>(cgh);
