@@ -6,8 +6,8 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-GSL_INC   =-I/noback/5zj/gsl-2.7/include
-GSL_LIB   =-L/noback/5zj/gsl-2.7/lib -lgsl -lgslcblas 
+GSL_INC   =-I/path/to/gsl/include
+GSL_LIB   =-L/path/to/gsl/lib -lgsl -lgslcblas 
 
 GPU       = yes
 CUDA      = no
@@ -89,4 +89,3 @@ clean:
 run: $(program)
 	./$(program) sp
 	./$(program) dp
-

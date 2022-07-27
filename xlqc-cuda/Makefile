@@ -7,8 +7,8 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-GSL_INC   =-I/path/to/include
-GSL_LIB   =-L/path/to/lib -lgsl -lgslcblas 
+GSL_INC   =-I/path/to/gsl/include
+GSL_LIB   =-L/path/to/gsl/lib -lgsl -lgslcblas 
 
 
 #===============================================================================
@@ -35,7 +35,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -70,4 +69,3 @@ clean:
 run: $(program)
 	./$(program) sp
 	./$(program) dp
-

@@ -34,7 +34,7 @@ void my_cuda_safe(cudaError_t err, std::string word)
     fprintf(stderr, "Error during %s: ", word.c_str());
 
     // check for error
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if(error != cudaSuccess)
     {

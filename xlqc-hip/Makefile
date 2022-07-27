@@ -6,8 +6,8 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-GSL_INC   =-I/path/to/gsl-2.7/include
-GSL_LIB   =-L/path/to/gsl-2.7/lib -lgsl -lgslcblas 
+GSL_INC   =-I/path/to/gsl/include
+GSL_LIB   =-L/path/to/gsl/lib -lgsl -lgslcblas 
 
 
 #===============================================================================
