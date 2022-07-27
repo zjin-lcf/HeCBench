@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../xsbench-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -66,11 +66,26 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.h Makefile
+Main.o: ../xsbench-cuda/Main.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+Simulation.o: Simulation.cpp ../xsbench-cuda/XSbench_header.h
 	$(CC) $(CFLAGS) -c $< -o $@
+
+io.o: ../xsbench-cuda/io.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+GridInit.o: ../xsbench-cuda/GridInit.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+Materials.o: ../xsbench-cuda/Materials.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+XSutils.o: ../xsbench-cuda/XSutils.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s small -m event
+	./$(program) -s small -m event -r 10

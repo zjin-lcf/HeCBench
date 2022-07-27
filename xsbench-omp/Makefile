@@ -3,11 +3,12 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC          = icpc
-OPTIMIZE    = yes
-DEBUG       = no
-PROFILE     = no
-MPI         = no
+CC        = icpx
+OPTIMIZE  = yes
+DEBUG     = no
+PROFILE   = no
+MPI       = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -15,26 +16,17 @@ MPI         = no
 
 program = XSBench
 
-source = \
-Main.c \
-io.c \
-Simulation.c \
-GridInit.c \
-XSutils.c \
-Materials.c
-
-obj = $(source:.c=.o)
+obj = Main.o io.o Simulation.o GridInit.o XSutils.o Materials.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-
+CFLAGS := -Wall -I../xsbench-cuda
+          
 # Linker Flags
 LDFLAGS = -lm
-
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -42,38 +34,44 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-# Profiling Flags
-ifeq ($(PROFILE),yes)
-  CFLAGS += -pg
-  LDFLAGS  += -pg
-endif
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-# MPI
-ifeq ($(MPI),yes)
-  CC = mpicc
-  CFLAGS += -DMPI
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
 endif
 
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c XSbench_header.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+Main.o: ../xsbench-cuda/Main.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+Simulation.o: Simulation.cpp ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+io.o: ../xsbench-cuda/io.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+GridInit.o: ../xsbench-cuda/GridInit.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+Materials.o: ../xsbench-cuda/Materials.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
+
+XSutils.o: ../xsbench-cuda/XSutils.cu ../xsbench-cuda/XSbench_header.h
+	$(CC) -x c++ $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
-edit:
-	vim -p $(source) XSbench_header.h
-
 run: $(program)
-	./$(program) -s small -m event
+	./$(program) -s small -m event -r 10

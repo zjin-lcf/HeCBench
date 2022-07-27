@@ -14,13 +14,12 @@ ARCH      = sm_60
 
 program = xsbench
 
-source = \
-Main.cu \
-Simulation.cu\
-io.cu \
-GridInit.cu \
-Materials.cu \
-XSutils.cu
+source = Main.cu \
+         Simulation.cu\
+         io.cu \
+         GridInit.cu \
+         Materials.cu \
+         XSutils.cu
 
 obj = $(source:.cu=.o)
 
@@ -39,7 +38,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -60,5 +58,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s small -m event
-
+	./$(program) -s small -m event -r 10

@@ -1,4 +1,4 @@
-#include <cuda.h>
+#include <omp.h>
 #include "XSbench_header.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -9,80 +9,8 @@
 // Following these functions are a number of optimized variants,
 // which each deploy a different combination of optimizations strategies. By
 // default, XSBench will only run the baseline implementation. Optimized variants
-// are not yet implemented in this CUDA port.
+// are not yet implemented for this OpenMP targeting offload port.
 ////////////////////////////////////////////////////////////////////////////////////
-__global__ void lookup (
-    const int *__restrict__ num_nucs,
-    const double *__restrict__ concs,
-    const int *__restrict__ mats, 
-    const NuclideGridPoint *__restrict__ nuclide_grid,
-    int*__restrict__  verification,
-    const double *__restrict__ unionized_energy_array,
-    const int *__restrict__ index_grid,
-    const int n_lookups,
-    const long n_isotopes, 
-    const long n_gridpoints,
-    const int grid_type,
-    const int hash_bins,
-    const int max_num_nucs ) {
-
-  // get the index to operate on, first dimemsion
-  size_t i = threadIdx.x + blockIdx.x * blockDim.x;
-
-  if (i < n_lookups) {
-
-    // Set the initial seed value
-    uint64_t seed = STARTING_SEED;  
-
-    // Forward seed to lookup index (we need 2 samples per lookup)
-    seed = fast_forward_LCG(seed, 2*i);
-
-    // Randomly pick an energy and material for the particle
-    double p_energy = LCG_random_double(&seed);
-    int mat         = pick_mat(&seed); 
-
-    // debugging
-    //printf("E = %lf mat = %d\n", p_energy, mat);
-
-    double macro_xs_vector[5] = {0};
-
-    // Perform macroscopic Cross Section Lookup
-    calculate_macro_xs(
-        p_energy,     // Sampled neutron energy (in lethargy)
-        mat,          // Sampled material type index neutron is in
-        n_isotopes,   // Total number of isotopes in simulation
-        n_gridpoints, // Number of gridpoints per isotope in simulation
-        num_nucs,     // 1-D array with number of nuclides per material
-        concs,        // Flattened 2-D array with concentration of each nuclide in each material
-        unionized_energy_array, // 1-D Unionized energy array
-        index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
-        nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-        mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
-        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
-        grid_type,    // Lookup type (nuclide, hash, or unionized)
-        hash_bins,    // Number of hash bins used (if using hash lookup type)
-        max_num_nucs  // Maximum number of nuclides present in any material
-     );
-
-    // For verification, and to prevent the compiler from optimizing
-    // all work out, we interrogate the returned macro_xs_vector array
-    // to find its maximum value index, then increment the verification
-    // value by that index. In this implementation, we store to a global
-    // array that will get tranferred back and reduced on the host.
-    double max = -1.0;
-    int max_idx = 0;
-    for(int j = 0; j < 5; j++ )
-    {
-      if( macro_xs_vector[j] > max )
-      {
-        max = macro_xs_vector[j];
-        max_idx = j;
-      }
-    }
-    verification[i] = max_idx+1;
-  }
-}
-
 
 unsigned long long
 run_event_based_simulation(Inputs in, SimulationData SD,
@@ -108,64 +36,18 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   //       number of bytes.
   ////////////////////////////////////////////////////////////////////////////////
 
-  if(mype==0) printf("Beginning event based simulation...\n");
+  if( mype == 0)  
+    printf("Beginning event based simulation...\n");
 
-  // Let's create an extra verification array to reduce manually later on
   if( mype == 0 )
      printf("Allocating an additional %.1lf MB of memory for verification arrays...\n",
             in.lookups * sizeof(int) /1024.0/1024.0);
 
-  int * verification_h = (int *) malloc(in.lookups * sizeof(int));
-
-  cudaDeviceProp devProp;
-  cudaGetDeviceProperties(&devProp, 0);
-  if(mype == 0 ) printf("Running on: %s\n", devProp.name);
-  if(mype == 0 ) printf("Initializing device buffers and JIT compiling kernel...\n");
-
-  ////////////////////////////////////////////////////////////////////////////////
-  // Create Device Buffers
-  ////////////////////////////////////////////////////////////////////////////////
-
-  int *verification_d = nullptr;
-  int *mats_d = nullptr ;
-  int *num_nucs_d = nullptr;
-  double *concs_d = nullptr;
-  NuclideGridPoint *nuclide_grid_d = nullptr;
-
-  //buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
-  cudaMalloc((void**)&num_nucs_d, sizeof(int) * SD.length_num_nucs);
-  cudaMemcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs, cudaMemcpyHostToDevice);
-
-  //buffer<double, 1> concs_d(SD.concs, SD.length_concs);
-  cudaMalloc((void**)&concs_d, sizeof(double) * SD.length_concs);
-  cudaMemcpy(concs_d, SD.concs, sizeof(double) * SD.length_concs, cudaMemcpyHostToDevice);
-
-  //buffer<int, 1> mats_d(SD.mats, SD.length_mats);
-  cudaMalloc((void**)&mats_d, sizeof(int) * SD.length_mats);
-  cudaMemcpy(mats_d, SD.mats, sizeof(int) * SD.length_mats, cudaMemcpyHostToDevice);
-
-  //buffer<NuclideGridPoint, 1> nuclide_grid_d(SD.nuclide_grid, SD.length_nuclide_grid);
-  cudaMalloc((void**)&nuclide_grid_d, sizeof(NuclideGridPoint) * SD.length_nuclide_grid);
-  cudaMemcpy(nuclide_grid_d, SD.nuclide_grid, sizeof(NuclideGridPoint) * SD.length_nuclide_grid, cudaMemcpyHostToDevice);
-
-  //buffer<int, 1> verification_d(verification_h, in.lookups);
-  cudaMalloc((void**)&verification_d, sizeof(int) * in.lookups);
-
-  // These two are a bit of a hack. Sometimes they are empty buffers (if using hash or nuclide
-  // grid methods). OpenCL will throw an example when we try to create an empty buffer. So, we
-  // will just allocate some memory for them and move them as normal. The rest of our code
-  // won't actually use them if they aren't needed, so this is safe. Probably a cleaner way
-  // of doing this.
   if( SD.length_unionized_energy_array == 0 )
   {
     SD.length_unionized_energy_array = 1;
     SD.unionized_energy_array = (double *) malloc(sizeof(double));
   }
-  //buffer<double,1> unionized_energy_array_d(SD.unionized_energy_array, SD.length_unionized_energy_array);
-  double *unionized_energy_array_d = nullptr;
-  cudaMalloc((void**)&unionized_energy_array_d, sizeof(double) * SD.length_unionized_energy_array);
-  cudaMemcpy(unionized_energy_array_d, SD.unionized_energy_array, 
-      sizeof(double) * SD.length_unionized_energy_array, cudaMemcpyHostToDevice);
 
   if( SD.length_index_grid == 0 )
   {
@@ -173,56 +55,113 @@ run_event_based_simulation(Inputs in, SimulationData SD,
     SD.index_grid = (int *) malloc(sizeof(int));
   }
 
-  //buffer<int, 1> index_grid_d(SD.index_grid, (unsigned long long ) SD.length_index_grid);
-  int *index_grid_d = nullptr;
-  cudaMalloc((void**)&index_grid_d, sizeof(int) * (unsigned long long)SD.length_index_grid);
-  cudaMemcpy(index_grid_d, SD.index_grid, sizeof(int) * (unsigned long long )SD.length_index_grid, cudaMemcpyHostToDevice);
+  ////////////////////////////////////////////////////////////////////////////////
+  // Begin Actual Simulation Loop 
+  ////////////////////////////////////////////////////////////////////////////////
+  int * verification = (int *) malloc(in.lookups * sizeof(int));
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // Define Device Kernel
-  ////////////////////////////////////////////////////////////////////////////////
-  cudaDeviceSynchronize();
+  const int SD_max_num_nucs = SD.max_num_nucs;
+     int *SD_num_nucs = SD.num_nucs;
+  double *SD_concs = SD.concs;
+     int *SD_mats = SD.mats;
+  NuclideGridPoint *SD_nuclide_grid  = SD.nuclide_grid;
+  double *SD_unionized_energy_array = SD.unionized_energy_array;
+     int *SD_index_grid = SD.index_grid;
+ 
+  #pragma omp target data \
+    map(to: SD_num_nucs[:SD.length_num_nucs])\
+    map(to: SD_concs[:SD.length_concs])\
+    map(to: SD_mats[:SD.length_mats])\
+    map(to: SD_unionized_energy_array[:SD.length_unionized_energy_array])\
+    map(to: SD_index_grid[:SD.length_index_grid])\
+    map(to: SD_nuclide_grid[:SD.length_nuclide_grid])\
+    map(from: verification[:in.lookups])
+  {
+
   double kstart = get_time();
 
-  for (int i = 0; i < in.kernel_repeat; i++) { 
-    lookup<<< dim3((in.lookups + 255) / 256), dim3(256) >>> (
-        num_nucs_d, concs_d, mats_d, 
-        nuclide_grid_d, verification_d, unionized_energy_array_d,
-        index_grid_d, in.lookups, in.n_isotopes, in.n_gridpoints, 
-        in.grid_type, in.hash_bins, SD.max_num_nucs );
+  for (int i = 0; i < in.kernel_repeat; i++) {
+
+    #pragma omp target teams distribute parallel for thread_limit(256)
+    for( int i = 0; i < in.lookups; i++ )
+    {
+      // Set the initial seed value
+      uint64_t seed = STARTING_SEED;  
+
+      // Forward seed to lookup index (we need 2 samples per lookup)
+      seed = fast_forward_LCG(seed, 2*i);
+
+      // Randomly pick an energy and material for the particle
+      double p_energy = LCG_random_double(&seed);
+      int mat         = pick_mat(&seed); 
+
+      // debugging
+      //printf("E = %lf mat = %d\n", p_energy, mat);
+
+      double macro_xs_vector[5] = {0};
+
+      // Perform macroscopic Cross Section Lookup
+      calculate_macro_xs(
+          p_energy,        // Sampled neutron energy (in lethargy)
+          mat,             // Sampled material type index neutron is in
+          in.n_isotopes,   // Total number of isotopes in simulation
+          in.n_gridpoints, // Number of gridpoints per isotope in simulation
+          SD_num_nucs,     // 1-D array with number of nuclides per material
+          SD_concs,        // Flattened 2-D array with concentration of each nuclide in each material
+          SD_unionized_energy_array, // 1-D Unionized energy array
+          SD_index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+          SD_nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+          SD_mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+          macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+          in.grid_type,    // Lookup type (nuclide, hash, or unionized)
+          in.hash_bins,    // Number of hash bins used (if using hash lookup type)
+          SD_max_num_nucs  // Maximum number of nuclides present in any material
+      );
+
+      // For verification, and to prevent the compiler from optimizing
+      // all work out, we interrogate the returned macro_xs_vector array
+      // to find its maximum value index, then increment the verification
+      // value by that index. In this implementation, we prevent thread
+      // contention by using an OMP reduction on the verification value.
+      // For accelerators, a different approach might be required
+      // (e.g., atomics, reduction of thread-specific values in large
+      // array via CUDA thrust, etc).
+      double max = -1.0;
+      int max_idx = 0;
+      for(int j = 0; j < 5; j++ )
+      {
+        if( macro_xs_vector[j] > max )
+        {
+          max = macro_xs_vector[j];
+          max_idx = j;
+        }
+      }
+      verification[i] = max_idx+1;
+    }
   }
 
-  cudaDeviceSynchronize();
   double kstop = get_time();
   *kernel_time = (kstop - kstart) / in.kernel_repeat;
 
-  cudaMemcpy(verification_h, verification_d, sizeof(int) * in.lookups, cudaMemcpyDeviceToHost);
-
-  cudaFree(verification_d);
-  cudaFree(mats_d);
-  cudaFree(num_nucs_d);
-  cudaFree(concs_d);
-  cudaFree(nuclide_grid_d);
-  cudaFree(unionized_energy_array_d);
-  cudaFree(index_grid_d);
+  } // omp target
 
   // Host reduces the verification array
   unsigned long long verification_scalar = 0;
   for( int i = 0; i < in.lookups; i++ )
-    verification_scalar += verification_h[i];
+    verification_scalar += verification[i];
 
   if( SD.length_unionized_energy_array == 0 ) free(SD.unionized_energy_array);
   if( SD.length_index_grid == 0 ) free(SD.index_grid);
-  free(verification_h);
+  free(verification);
 
   return verification_scalar;
 }
 
+#pragma omp declare target
 
 // binary search for energy on unionized energy grid
 // returns lower index
 template <class T>
-__device__
 long grid_search( long n, double quarry, T A)
 {
   long lowerLimit = 0;
@@ -247,7 +186,6 @@ long grid_search( long n, double quarry, T A)
 
 // Calculates the microscopic cross section for a given nuclide & energy
 template <class Double_Type, class Int_Type, class NGP_Type>
-__device__
 void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
     long n_gridpoints,
     Double_Type  egrid, Int_Type  index_data,
@@ -343,7 +281,6 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 
 // Calculates macroscopic cross section based on a given material & energy 
 template <class Double_Type, class Int_Type, class NGP_Type, class E_GRID_TYPE, class INDEX_TYPE>
-__device__
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     long n_gridpoints, Int_Type  num_nucs,
     Double_Type  concs,
@@ -396,7 +333,6 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 }
 
 // picks a material based on a probabilistic distribution
-__device__
 int pick_mat( unsigned long * seed )
 {
   // I have a nice spreadsheet supporting these numbers. They are
@@ -436,7 +372,6 @@ int pick_mat( unsigned long * seed )
   return 0;
 }
 
-__host__ __device__
 double LCG_random_double(uint64_t * seed)
 {
   // LCG parameters
@@ -447,7 +382,6 @@ double LCG_random_double(uint64_t * seed)
   return (double) (*seed) / (double) m;
 }  
 
-__host__ __device__
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
   // LCG parameters
@@ -467,7 +401,6 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
       a_new *= a;
       c_new = c_new * a + c;
     }
-    c *= (a + 1);
     a *= a;
 
     n >>= 1;
@@ -475,3 +408,5 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 
   return (a_new * seed + c_new) % m;
 }
+
+#pragma omp end declare target

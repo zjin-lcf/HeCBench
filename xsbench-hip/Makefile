@@ -13,13 +13,12 @@ DEBUG     = no
 
 program = xsbench
 
-source = \
-Main.cu \
-Simulation.cu\
-io.cu \
-GridInit.cu \
-Materials.cu \
-XSutils.cu
+source = Main.cu \
+         Simulation.cu\
+         io.cu \
+         GridInit.cu \
+         Materials.cu \
+         XSutils.cu
 
 obj = $(source:.cu=.o)
 
@@ -28,7 +27,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := -std=c++14 -Wall -I../xsbench-cuda
 
 # Linker Flags
 LDFLAGS = -lm
@@ -39,7 +38,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -49,15 +47,29 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h Makefile
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu XSbench_header.h Makefile
+Main.o: ../xsbench-cuda/Main.cu ../xsbench-cuda/XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Simulation.o: Simulation.cu ../xsbench-cuda/XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+io.o: ../xsbench-cuda/io.cu ../xsbench-cuda/XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+GridInit.o: ../xsbench-cuda/GridInit.cu ../xsbench-cuda/XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+Materials.o: ../xsbench-cuda/Materials.cu ../xsbench-cuda/XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+XSutils.o: ../xsbench-cuda/XSutils.cu ../xsbench-cuda/XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s small -m event
-
+	./$(program) -s small -m event -r 10
