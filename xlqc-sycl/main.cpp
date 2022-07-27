@@ -16,7 +16,7 @@ or tort (including negligence or otherwise) arising in any way out of the use
 of this software, even if advised of the possibility of such damage.
  *****************************************************************************/
 
-#include <ctime>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -61,10 +61,9 @@ int main(int argc, char* argv[])
   }
 
   // initialize timer
-  clock_t t0, t1;
-  double  time_in_sec, time_total, time_mat_J, time_mat_K;
+  double  time_in_usec, time_total, time_mat_J, time_mat_K;
 
-  t0 = clock();
+  auto start = std::chrono::steady_clock::now();
   std::string time_txt ("");
   time_total = 0.0;
   time_mat_J = 0.0;
@@ -140,14 +139,16 @@ int main(int argc, char* argv[])
   print_basis(p_basis);
 #endif
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_Basis    = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_Basis    = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
 
   //====== one-electron integrals ========
+  
+  start = std::chrono::steady_clock::now();
 
   // overlap, kinetic energy and nuclear attraction integral
   gsl_matrix *S = gsl_matrix_alloc(p_basis->num, p_basis->num);
@@ -180,14 +181,16 @@ int main(int argc, char* argv[])
     }
   }
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_1e_Ints  = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_1e_Ints  = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
 
   //====== allocate memory for arrays on host ========
+
+  start = std::chrono::steady_clock::now();
 
   // number of primitive basis functions (pbf)
   int n_pbf = 0;
@@ -261,14 +264,15 @@ int main(int argc, char* argv[])
   else if (mem_on_dev > 1000)    { fprintf(stdout, "%zu KB\n", mem_on_dev / 1000); }
   else                           { fprintf(stdout, "%zu B\n",  mem_on_dev); }
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_2e_Prep  = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
-
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_2e_Prep  = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
   //====== start SCF calculation ========
+
+  start = std::chrono::steady_clock::now();
 
   // NOTE: assume zero charge and closed-shell electronics structure
   int n_elec = 0;
@@ -377,13 +381,16 @@ int main(int argc, char* argv[])
   buffer<double, 1> d_mat_D (n_combi);
   buffer<double, 1> d_mat_Q (h_mat_Q, n_combi);
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_SCF_Init = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_SCF_Init = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
   // start SCF iterations
+
+  start = std::chrono::steady_clock::now();
+
   int iter = 0;
   while (1)
   {
@@ -424,8 +431,7 @@ int main(int argc, char* argv[])
 
 
     // timer for J and K matrices
-    clock_t t2,t3;
-    t2 = clock();
+    auto kstart = std::chrono::steady_clock::now();
 
     // use 1T1PI for J and K matrices
     if (use_dp) {
@@ -466,17 +472,18 @@ int main(int argc, char* argv[])
       });
     }
 
+    q.wait();
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    time_in_usec = ktime * 1e-3f;
+    time_mat_J += time_in_usec;
+
     q.submit([&] (handler &cgh) {
       auto acc = d_mat_J_PI.get_access<sycl_read>(cgh);
       cgh.copy(acc, h_mat_J_PI);
     }).wait();
 
-
-    t3 = clock();
-    time_in_sec = (t3 - t2) / (double)CLOCKS_PER_SEC;
-    time_mat_J += time_in_sec;
-    t2 = t3;
-
+    kstart = std::chrono::steady_clock::now();
 
     if (use_dp) {
       q.submit([&] (handler &cgh) {
@@ -516,16 +523,15 @@ int main(int argc, char* argv[])
       });
     }
 
+    q.wait();
+    kend = std::chrono::steady_clock::now();
+    ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    time_mat_K += time_in_usec;
+
     q.submit([&] (handler &cgh) {
       auto acc = d_mat_K_PI.get_access<sycl_read>(cgh);
       cgh.copy(acc, h_mat_K_PI);
     }).wait();
-
-
-    t3 = clock();
-    time_in_sec = (t3 - t2) / (double)CLOCKS_PER_SEC;
-    time_mat_K += time_in_sec;
-    t2 = t3;
 
 
     // sum up primitive J and K matrices to contracted ones
@@ -635,14 +641,16 @@ int main(int argc, char* argv[])
   fprintf(stdout, "SCF converged! E_total = %20.10f\n", ene_total);
 
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_SCF_Conv = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_SCF_Conv = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
 
   // print MO information
+  start = std::chrono::steady_clock::now();
+
   fprintf(stdout, "%5s %10s %15s %12s\n", "MO", "State", "E(Eh)", "E(eV)");
   for (ibasis = 0; ibasis < p_basis->num; ++ ibasis)
   {
@@ -734,17 +742,17 @@ int main(int argc, char* argv[])
 
   free(p_basis);
 
-  t1 = clock();
-  time_in_sec = (t1 - t0) / (double)CLOCKS_PER_SEC;
-  time_txt += "Time_Finalize = " + std::to_string(time_in_sec) + " sec\n";
-  time_total += time_in_sec;
-  t0 = t1;
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  time_in_usec = time * 1e-3f;
+  time_txt += "Time_Finalize = " + std::to_string(time_in_usec) + " usec\n";
+  time_total += time_in_usec;
 
   std::cout << time_txt;
-  std::cout << "Total time used " << time_total << " sec\n";
+  std::cout << "Total time: " << time_total << " usec\n";
 
-  std::cout << "Mat_J time used " << time_mat_J << " sec\n";
-  std::cout << "Mat_K time used " << time_mat_K << " sec\n";
+  std::cout << "Total kernel Mat_J time: " << time_mat_J << " usec\n";
+  std::cout << "Total kernel Mat_K time: " << time_mat_K << " usec\n";
 
 
   //====== the end of program ========

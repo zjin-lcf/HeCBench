@@ -38,8 +38,8 @@ void my_cuda_safe(hipError_t err, std::string word)
     hipError_t error = hipGetLastError();
     if(error != hipSuccess)
     {
-      // print the CUDA error message and exit
-      fprintf(stderr, "CUDA error: %s\n", hipGetErrorString(error));
+      // print the HIP error message and exit
+      fprintf(stderr, "HIP error: %s\n", hipGetErrorString(error));
       exit(-1);
     }
   } 
