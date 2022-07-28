@@ -704,6 +704,9 @@ Early results are shown [here](results/README.md)
 ### overlay (cuda)
   Overlay grid in the DetectNet (https://github.com/dusty-nv/jetson-inference)
 
+### p4 (cuda)
+  PointPillar post-processing (https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars)
+
 ### page-rank (opencl)
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
 
