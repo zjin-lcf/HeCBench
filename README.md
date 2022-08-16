@@ -398,6 +398,9 @@ Early results are shown [here](results/README.md)
 ### haccmk (c)
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
 
+### hausdorff (c/c++)
+  Hausdorff distance  (https://github.com/arohamirai/Hausdorff-Distance-Match)
+
 ### haversine (cuda)
   Haversine distance  (https://github.com/rapidsai/cuspatial)
 
