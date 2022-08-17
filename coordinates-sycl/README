@@ -1,0 +1,6 @@
+Please clone the oneDPL and oneTBB repos in the current directory before building the SYCL program
+
+https://github.com/oneapi-src/oneDPL
+https://github.com/oneapi-src/oneTBB
+
+
