@@ -216,6 +216,30 @@ Early results are shown [here](results/README.md)
 ### convolutionSeperable (opencl)
   Convolution filter of a 2D image with separable kernels (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### coordinates (cuda)
+  Coordinates(latitude and longitude) transformation using the STL transform (https://github.com/rapidsai/cuspatial)
+
+### crc64 (openmp)
+  64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
+
+### crs (cuda)
+  Cauchy Reed-Solomon encoding (https://www.comp.hkbu.edu.hk/~chxw/gcrs.html)
+
+### d2q9_bgk (sycl)
+  A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
+
+### d3q19_bgk (cuda)
+  Lattice Boltzmann simulation framework based on C++ parallel algorithms (https://gitlab.com/unigehpfs/stlbm)
+
+### daphne (cuda)
+  The Darmstadt automotive parallel heterogeneous benchmark suite (https://github.com/esa-tu-darmstadt/daphne-benchmark)
+
+### damage (opencl)
+  The continuum level damage in a peridynamic body (https://github.com/alan-turing-institute/PeriPy)
+
+### dct8x8 (opencl)
+  Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
 
