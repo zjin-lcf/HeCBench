@@ -381,6 +381,9 @@ Early results are shown [here](results/README.md)
 ### ga (cuda)
   Gene alignment (https://github.com/NUCAR-DEV/Hetero-Mark)
 
+### gabor (c/c++)
+  Gabor filter function (https://github.com/fercer/gaborfilter)
+
 ### gamma-correction (sycl)
   Gamma correction (https://github.com/intel/BaseKit-code-samples)
 
