@@ -132,6 +132,9 @@ Early results are shown [here](results/README.md)
 ### boxfilter (cuda)
   Box filtering (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
+### bscan (cuda)
+  Binary scan in a block (Harris, M. and Garland, M., 2012. Optimizing parallel prefix operations for the Fermi architecture. In GPU Computing Gems Jade Edition (pp. 29-38). Morgan Kaufmann.)
+
 ### bsearch (cuda)
   Classic and vectorizable binary search algorithms (https://www.sciencedirect.com/science/article/abs/pii/S0743731517302836)
 
