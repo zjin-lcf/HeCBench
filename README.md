@@ -599,6 +599,9 @@ Early results are shown [here](results/README.md)
 ### match (cuda)
   Compute matching scores for two 16K 128D feature points (https://github.com/Celebrandil/CudaSift)
 
+### matern (cuda)
+  Sum using the Matern kernel (https://tbetcke.github.io/hpc_lecture_notes/rbf_evaluation.html)
+
 ### matrix-rotate (openmp)
   In-place matrix rotation
 
