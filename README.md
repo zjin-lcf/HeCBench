@@ -512,6 +512,9 @@ Early results are shown [here](results/README.md)
 ### keogh (cuda)
   Keogh's lower bound (https://github.com/gravitino/cudadtw)
 
+### kmc (cuda)
+  Kernel matrix compute (https://github.com/MKLab-ITI/CUDA)
+
 ### kmeans (opencl)
   K-means in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
