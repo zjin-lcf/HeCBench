@@ -174,6 +174,9 @@ Early results are shown [here](results/README.md)
 ### cfd (opencl)
   The CFD solver in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### chacha20 (c)
+  ChaCha20 stream cipher (https://github.com/983/ChaCha20)
+
 ### che (cuda)
   Phase-field simulation of spinodal decomposition using the Cahn-Hilliard equation (https://github.com/myousefi2016/Cahn-Hilliard-CUDA)
 
