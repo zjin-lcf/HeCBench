@@ -375,6 +375,8 @@ int main(int argc, char **argv)
 #endif
   queue q(dev_sel);
 
+  const char *kernelName;
+
   // execution configuration parameters
   range<2> gws (size_y/TILE_DIM * BLOCK_ROWS,
                 size_x/TILE_DIM * TILE_DIM); 
@@ -424,9 +426,10 @@ int main(int argc, char **argv)
     switch (k)
     {
       case 0: {
+        kernelName = "simple copy       ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -437,18 +440,20 @@ int main(int argc, char **argv)
                    size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 1: {
+        kernelName = "shared memory copy";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -462,18 +467,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 2: {
+        kernelName = "naive             ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -485,18 +492,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 3: {
+        kernelName = "coalesced         ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -510,18 +519,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 4: {
+        kernelName = "optimized         ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -535,18 +546,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 5: {
+        kernelName = "coarse-grained    ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -560,18 +573,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 6: {
+        kernelName = "fine-grained      ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -585,18 +600,20 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
 
       case 7: {
+        kernelName = "diagonal          ";
         auto start = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++) {
           q.submit([&] (handler &cgh) {
             auto odata = d_odata.get_access<sycl_discard_write>(cgh);
             auto idata = d_idata.get_access<sycl_read>(cgh);
@@ -610,11 +627,12 @@ int main(int argc, char **argv)
                 size_x, size_y);
             });
           });
+        }
 
         q.wait();
         auto end = std::chrono::steady_clock::now();
         auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+        printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
       }
       break;
     }
