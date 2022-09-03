@@ -369,7 +369,8 @@ int main(int argc, char **argv)
   const char *kernelName;
 
   // execution configuration parameters
-  dim3 grid(size_x/TILE_DIM, size_y/TILE_DIM), threads(TILE_DIM,BLOCK_ROWS);
+  dim3 grid(size_x/TILE_DIM, size_y/TILE_DIM);
+  dim3 threads(TILE_DIM,BLOCK_ROWS);
 
   if (grid.x < 1 || grid.y < 1)
   {
@@ -483,7 +484,7 @@ int main(int argc, char **argv)
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average kernel (%s) execution time: %f (us)\n", kernelName, (time * 1e-3f) / repeat);
 
     checkHipErrors(hipMemcpy(h_odata, d_odata, mem_size, hipMemcpyDeviceToHost));
  
