@@ -285,6 +285,9 @@ Early results are shown [here](results/README.md)
 ### diamond (opencl)
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
+### distort (cuda)
+  Barrel distortion (https://github.com/Cuda-Chen/barrel-distortion-cuda)
+
 ### divergence (cuda)
   CPU and GPU divergence test (https://github.com/E3SM-Project/divergence_cmdvse)
 
