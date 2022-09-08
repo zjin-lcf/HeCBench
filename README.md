@@ -315,6 +315,9 @@ Early results are shown [here](results/README.md)
 ### eigenvalue (opencl)
   Calculate the eigenvalues of a tridiagonal symmetric matrix (https://github.com/OpenCL/AMD_APP_samples)
 
+### eikonal (cuda)
+  Fast iterative method for Eikonal equations on structured volumes (https://github.com/SCIInstitute/StructuredEikonal)
+
 ### entropy (cuda)
   Compute the entropy for each point of a 2D matrix using a 5x5 window (https://lan-jing.github.io/parallel%20computing/system/entropy/)
 
