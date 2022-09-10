@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall 
+CFLAGS := -Wall -qopenmp
 
 # Linker Flags
 LDFLAGS = 
@@ -42,8 +42,6 @@ endif
 
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build

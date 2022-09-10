@@ -1355,9 +1355,19 @@ inline __host__ __device__ float4 sqrtf(float4 v)
     return make_float4(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z), sqrtf(v.w));
 }
 
+inline __device__ float4 fast_sqrtf(float4 v)
+{
+    return make_float4(__fsqrt_rn(v.x), __fsqrt_rn(v.y), __fsqrt_rn(v.z), __fsqrt_rn(v.w));
+}
+
 inline __host__ __device__ float4 expf(float4 v)
 {
     return make_float4(expf(v.x), expf(v.y), expf(v.z), expf(v.w));
+}
+
+inline __device__ float4 fast_expf(float4 v)
+{
+    return make_float4(__expf(v.x), __expf(v.y), __expf(v.z), __expf(v.w));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

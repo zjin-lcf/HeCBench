@@ -19,7 +19,7 @@
 #include <omp.h>
 #include "WKFUtils.h"
 
-#define SEP printf("-----------------------------------------------------------\n")
+#define SEP printf("\n")
 
 void gendata(float *ax,float *ay,float *az,
     float *gx,float *gy,float *gz,
@@ -69,7 +69,7 @@ void run_gpu_kernel(
     const float *size, 
     const float xkappa, 
     const float pre1, 
-    float *val)
+          float *val)
 {
   wkf_timerhandle timer = wkf_timer_create();
 
@@ -83,7 +83,6 @@ void run_gpu_kernel(
                                 gz[0:ngadj]) \
                         map(alloc: val[0:ngadj])
   {
-
     wkf_timer_start(timer); 
 
     for(int n = 0; n < itmax; n++) {
@@ -117,6 +116,7 @@ void run_gpu_kernel(
 
 // reference CPU kernel
 void run_cpu_kernel(
+    const int itmax,
     const int ngrid,
     const int natom,
     const float *ax,
@@ -129,22 +129,33 @@ void run_cpu_kernel(
     const float *size,
     const float xkappa,
     const float pre1,
-    float *val)
+          float *val)
 {
-  #pragma omp parallel for
-  for(int igrid=0;igrid<ngrid;igrid++){
-    float sum = 0.0f;
-    #pragma omp parallel for simd reduction(+:sum)
-    for(int iatom=0; iatom<natom; iatom++) {
-      float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-          (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-          (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+  wkf_timerhandle timer = wkf_timer_create();
+  wkf_timer_start(timer); 
 
-      sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-        / (1+xkappa*size[iatom]);
+  for(int n = 0; n < itmax; n++) {
+    #pragma omp parallel for
+    for(int igrid=0;igrid<ngrid;igrid++){
+      float sum = 0.0f;
+      #pragma omp parallel for simd reduction(+:sum)
+      for(int iatom=0; iatom<natom; iatom++) {
+        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
+            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
+            (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+
+        sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
+          / (1+xkappa*size[iatom]);
+      }
+      val[igrid] = sum;
     }
-    val[igrid] = sum;
   }
+
+  wkf_timer_stop(timer);
+  double avg_kernel_time = wkf_timer_time(timer) / ((double) itmax);
+  printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
+
+  wkf_timer_destroy(timer);
 }
 
 
@@ -200,30 +211,26 @@ int main(int argc, const char **argv) {
   float *gy = (float*)calloc(ngadj, sizeof(float));
   float *gz = (float*)calloc(ngadj, sizeof(float));
 
-  // host result
-  float *val1 = (float*)calloc(ngadj, sizeof(float));
-  // device result
-  float *val2 = (float*)calloc(ngadj, sizeof(float));
+  // result
+  float *val = (float*)calloc(ngadj, sizeof(float));
 
   gendata(ax, ay, az, gx, gy, gz, charge, size, natom, ngrid);
 
   wkf_timer_start(timer);
-  run_cpu_kernel(ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val1);
+  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val);
   wkf_timer_stop(timer);
 
-  SEP;
-  print_total(val1, ngrid);
-  printf("CPU Time: %1.12g\n", wkf_timer_time(timer));
+  print_total(val, ngrid);
+  printf("CPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
   wkf_timer_start(timer);
   run_gpu_kernel(wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
-      charge, size, xkappa, pre1, val2);
+                 charge, size, xkappa, pre1, val);
   wkf_timer_stop(timer);
 
-  SEP;
-  print_total(val2, ngrid);
-  printf("GPU Time: %1.12g\n", wkf_timer_time(timer)); // Vec4 Optimized: 
+  print_total(val, ngrid);
+  printf("GPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
 
@@ -235,8 +242,7 @@ int main(int argc, const char **argv) {
   free(gx);
   free(gy);
   free(gz);
-  free(val1);
-  free(val2);
+  free(val);
 
   wkf_timer_destroy(timer);
 
