@@ -19,17 +19,27 @@
 #include <hip/hip_runtime.h>
 #include "WKFUtils.h"
 
-#define SEP printf("-----------------------------------------------------------\n")
-
-inline __host__ __device__ float4 sqrtf(float4 v)
+inline __device__ float4 sqrtf(float4 v)
 {
-  return make_float4(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z), sqrtf(v.w));
+    return make_float4(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z), sqrtf(v.w));
 }
 
-inline __host__ __device__ float4 expf(float4 v)
+inline __device__ float4 fast_sqrtf(float4 v)
 {
-  return make_float4(expf(v.x), expf(v.y), expf(v.z), expf(v.w));
+    return make_float4(__fsqrt_rn(v.x), __fsqrt_rn(v.y), __fsqrt_rn(v.z), __fsqrt_rn(v.w));
 }
+
+inline __device__ float4 expf(float4 v)
+{
+    return make_float4(expf(v.x), expf(v.y), expf(v.z), expf(v.w));
+}
+
+inline __device__ float4 fast_expf(float4 v)
+{
+    return make_float4(__expf(v.x), __expf(v.y), __expf(v.z), __expf(v.w));
+}
+
+#define SEP printf("\n")
 
 void gendata(float *ax,float *ay,float *az,
     float *gx,float *gy,float *gz,
@@ -64,9 +74,6 @@ void print_total(float * arr, int ngrid){
 }
 
 __global__ void mdh (
-    const int ngrid,
-    const int natom,
-    const int ngadj,
     const float *__restrict__ ax, 
     const float *__restrict__ ay,
     const float *__restrict__ az,
@@ -75,16 +82,17 @@ __global__ void mdh (
     const float *__restrict__ gz,
     const float *__restrict__ charge, 
     const float *__restrict__ size, 
+          float *__restrict__ val,
+    const float pre1,
     const float xkappa, 
-    const float pre1, 
-    float *__restrict__ val)
+    const int natom)
 {
-  HIP_DYNAMIC_SHARED(float, shared);
+  extern __shared__ float shared[];
 
   int lid = threadIdx.x;
   int lsize = blockDim.x;
   int igrid = blockIdx.x * lsize + lid;
-  float4 v = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+  float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
   float4 lgx = reinterpret_cast<const float4*>(gx)[igrid];
   float4 lgy = reinterpret_cast<const float4*>(gy)[igrid];
   float4 lgz = reinterpret_cast<const float4*>(gz)[igrid];
@@ -106,10 +114,10 @@ __global__ void mdh (
       float4 dx = lgx - shared[i * 5    ];
       float4 dy = lgy - shared[i * 5 + 1];
       float4 dz = lgz - shared[i * 5 + 2];
-      float4 dist = sqrtf(dx*dx + dy*dy + dz*dz);
+      float4 dist = sqrtf( dx * dx + dy * dy + dz * dz );
       v += pre1 * (shared[i * 5 + 3] / dist)  *
-        expf( -xkappa * (dist - shared[i * 5 + 4])) /
-        (1.0f + xkappa * shared[i * 5 + 4]);
+           expf( -xkappa * (dist - shared[i * 5 + 4])) /
+           (1.0f + xkappa * shared[i * 5 + 4]);
     }
     __syncthreads();
   }
@@ -117,9 +125,6 @@ __global__ void mdh (
 }
 
 __global__ void mdh2 (
-    const int ngrid,
-    const int natom,
-    const int ngadj,
     const float *__restrict__ ax, 
     const float *__restrict__ ay,
     const float *__restrict__ az,
@@ -128,16 +133,17 @@ __global__ void mdh2 (
     const float *__restrict__ gz,
     const float *__restrict__ charge, 
     const float *__restrict__ size, 
-    const float xkappa, 
+          float *__restrict__ val,
     const float pre1, 
-    float *__restrict__ val)
+    const float xkappa, 
+    const int natom)
 {
-  HIP_DYNAMIC_SHARED(float, shared);
+  extern __shared__ float shared[];
 
   int lid = threadIdx.x;
   int lsize = blockDim.x;
   int igrid = blockIdx.x * lsize + lid;
-  float4 v = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+  float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
   float4 lgx = reinterpret_cast<const float4*>(gx)[igrid];
   float4 lgy = reinterpret_cast<const float4*>(gy)[igrid];
   float4 lgz = reinterpret_cast<const float4*>(gz)[igrid];
@@ -161,9 +167,59 @@ __global__ void mdh2 (
       float4 dz = lgz - shared[i + 2*lsize];
       float4 dist = sqrtf( dx * dx + dy * dy + dz * dz );
       v += pre1 * ( shared[i + 3*lsize] / dist )  *
-        expf( -xkappa * (dist - shared[i + 4*lsize])) /
-        (1.0f + xkappa * shared[i + 4*lsize]);
+           expf( -xkappa * (dist - shared[i + 4*lsize])) /
+           (1.0f + xkappa * shared[i + 4*lsize]);
+    }
+    __syncthreads();
+  }
+  reinterpret_cast<float4*>(val)[ igrid ] = v;
+}
 
+__global__ void mdh3 (
+    const float *__restrict__ ax, 
+    const float *__restrict__ ay,
+    const float *__restrict__ az,
+    const float *__restrict__ gx, 
+    const float *__restrict__ gy, 
+    const float *__restrict__ gz,
+    const float *__restrict__ charge, 
+    const float *__restrict__ size, 
+          float *__restrict__ val,
+    const float pre1, 
+    const float xkappa, 
+    const int natom)
+{
+  extern __shared__ float shared[];
+
+  int lid = threadIdx.x;
+  int lsize = blockDim.x;
+  int igrid = blockIdx.x * lsize + lid;
+  float4 v = make_float4(0.f, 0.f, 0.f, 0.f);
+  float4 lgx = reinterpret_cast<const float4*>(gx)[igrid];
+  float4 lgy = reinterpret_cast<const float4*>(gy)[igrid];
+  float4 lgz = reinterpret_cast<const float4*>(gz)[igrid];
+
+  for(int jatom = 0; jatom < natom; jatom+=lsize )
+  {
+    if((jatom+lsize) > natom) lsize = natom - jatom;
+
+    if((jatom + lid) < natom) {
+      shared[lid          ] = ax[jatom + lid];
+      shared[lid +   lsize] = ay[jatom + lid];
+      shared[lid + 2*lsize] = az[jatom + lid];
+      shared[lid + 3*lsize] = charge[jatom + lid];
+      shared[lid + 4*lsize] = size[jatom + lid];
+    }
+    __syncthreads();
+
+    for(int i=0; i<lsize; i++) {
+      float4 dx = lgx - shared[i          ];
+      float4 dy = lgy - shared[i +   lsize];
+      float4 dz = lgz - shared[i + 2*lsize];
+      float4 dist = fast_sqrtf( dx * dx + dy * dy + dz * dz );
+      v += pre1 * ( shared[i + 3*lsize] / dist )  *
+           fast_expf( -xkappa * (dist - shared[i + 4*lsize])) /
+           (1.0f + xkappa * shared[i + 4*lsize]);
     }
     __syncthreads();
   }
@@ -171,7 +227,7 @@ __global__ void mdh2 (
 }
 
 void run_gpu_kernel(
-    const bool smem_strided_write,
+    const int choice, 
     const int wgsize, 
     const int itmax,
     const int ngrid,
@@ -187,7 +243,7 @@ void run_gpu_kernel(
     const float *size, 
     const float xkappa, 
     const float pre1, 
-    float *val)
+          float *val)
 {
   wkf_timerhandle timer = wkf_timer_create();
 
@@ -233,13 +289,11 @@ void run_gpu_kernel(
   // scale number of work units by vector size
   dim3 grids (ngadj / 4 / wgsize);
   dim3 blocks (wgsize);
+  const int sm_size = sizeof(float) * 5 * wgsize;
 
   for(int n = 0; n < itmax; n++) {
-    if (smem_strided_write) 
-      hipLaunchKernelGGL(mdh, dim3(grids), dim3(blocks), sizeof(float)*5*wgsize, 0, 
-          ngrid,
-          natom,
-          ngadj,
+    if (choice == 0)
+      hipLaunchKernelGGL(mdh, grids, blocks, sm_size, 0, 
           d_ax,
           d_ay,
           d_az,
@@ -248,15 +302,12 @@ void run_gpu_kernel(
           d_gz,
           d_charge,
           d_size,
-          xkappa,
+          d_val,
           pre1,
-          d_val
-          );
-    else 
-      hipLaunchKernelGGL(mdh2, dim3(grids), dim3(blocks), sizeof(float)*5*wgsize, 0, 
-          ngrid,
-          natom,
-          ngadj,
+          xkappa,
+          natom);
+    else if (choice == 1)
+      hipLaunchKernelGGL(mdh2, grids, blocks, sm_size, 0, 
           d_ax,
           d_ay,
           d_az,
@@ -265,10 +316,24 @@ void run_gpu_kernel(
           d_gz,
           d_charge,
           d_size,
-          xkappa,
+          d_val,
           pre1,
-          d_val
-          );
+          xkappa,
+          natom);
+    else
+      hipLaunchKernelGGL(mdh3, grids, blocks, sm_size, 0, 
+          d_ax,
+          d_ay,
+          d_az,
+          d_gx,
+          d_gy,
+          d_gz,
+          d_charge,
+          d_size,
+          d_val,
+          pre1,
+          xkappa,
+          natom);
   }
   hipDeviceSynchronize();
 
@@ -292,9 +357,9 @@ void run_gpu_kernel(
   wkf_timer_destroy(timer);
 }
 
-
 // reference CPU kernel
 void run_cpu_kernel(
+    const int itmax,
     const int ngrid,
     const int natom,
     const float *ax,
@@ -307,22 +372,33 @@ void run_cpu_kernel(
     const float *size,
     const float xkappa,
     const float pre1,
-    float *val)
+          float *val)
 {
-  #pragma omp parallel for
-  for(int igrid=0;igrid<ngrid;igrid++){
-    float sum = 0.0f;
-    #pragma omp parallel for simd reduction(+:sum)
-    for(int iatom=0; iatom<natom; iatom++) {
-      float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-          (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-          (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+  wkf_timerhandle timer = wkf_timer_create();
+  wkf_timer_start(timer); 
 
-      sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-        / (1+xkappa*size[iatom]);
+  for(int n = 0; n < itmax; n++) {
+    #pragma omp parallel for
+    for(int igrid=0;igrid<ngrid;igrid++){
+      float sum = 0.0f;
+      #pragma omp parallel for simd reduction(+:sum)
+      for(int iatom=0; iatom<natom; iatom++) {
+        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
+            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
+            (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+
+        sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
+          / (1+xkappa*size[iatom]);
+      }
+      val[igrid] = sum;
     }
-    val[igrid] = sum;
   }
+
+  wkf_timer_stop(timer);
+  double avg_kernel_time = wkf_timer_time(timer) / ((double) itmax);
+  printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
+
+  wkf_timer_destroy(timer);
 }
 
 
@@ -378,41 +454,29 @@ int main(int argc, const char **argv) {
   float *gy = (float*)calloc(ngadj, sizeof(float));
   float *gz = (float*)calloc(ngadj, sizeof(float));
 
-  // host result
-  float *val1 = (float*)calloc(ngadj, sizeof(float));
-  // device result
-  float *val2 = (float*)calloc(ngadj, sizeof(float));
+  // result
+  float *val = (float*)calloc(ngadj, sizeof(float));
 
   gendata(ax, ay, az, gx, gy, gz, charge, size, natom, ngrid);
 
   wkf_timer_start(timer);
-  run_cpu_kernel(ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val1);
+  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val);
   wkf_timer_stop(timer);
 
-  SEP;
-  print_total(val1, ngrid);
-  printf("CPU Time: %1.12g\n", wkf_timer_time(timer));
-  SEP;
-
-  wkf_timer_start(timer);
-  run_gpu_kernel(true, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
-      charge, size, xkappa, pre1, val2);
-  wkf_timer_stop(timer);
-
-  SEP;
-  print_total(val2, ngrid);
-  printf("GPU Time: %1.12g\n", wkf_timer_time(timer)); // Vec4 Optimized: 
+  print_total(val, ngrid);
+  printf("CPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
-  wkf_timer_start(timer);
-  run_gpu_kernel(false, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
-      charge, size, xkappa, pre1, val2);
-  wkf_timer_stop(timer);
+  for (int choice = 0; choice < 3; choice++) {
+    wkf_timer_start(timer);
+    run_gpu_kernel(choice, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
+                   charge, size, xkappa, pre1, val);
+    wkf_timer_stop(timer);
 
-  SEP;
-  print_total(val2, ngrid);
-  printf("GPU Time: %1.12g\n", wkf_timer_time(timer)); // Vec4 Optimized: 
-  SEP;
+    print_total(val, ngrid);
+    printf("GPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
+    SEP;
+  }
 
   free(ax);
   free(ay);
@@ -422,8 +486,7 @@ int main(int argc, const char **argv) {
   free(gx);
   free(gy);
   free(gz);
-  free(val1);
-  free(val2);
+  free(val);
 
   wkf_timer_destroy(timer);
 

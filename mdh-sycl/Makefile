@@ -29,10 +29,10 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := -std=c++17 -Wall -I../include -fsycl -fopenmp
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -L/path/to/openmp/lib -lomp
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
