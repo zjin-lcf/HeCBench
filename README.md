@@ -873,6 +873,9 @@ Early results are shown [here](results/README.md)
 ### seam-carving (cuda)
   Seam carving (https://github.com/pauty/CUDA_seam_carving)
 
+### segment-reduce (cuda)
+  Segmented reduction using Thrust and oneDPL (https://github.com/c3sr/tcu_scope)
+
 ### segsort (cuda)
   Fast segmented sort on a GPU (https://github.com/Funatiq/bb_segsort)
 
