@@ -285,6 +285,9 @@ Early results are shown [here](results/README.md)
 ### diamond (opencl)
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
+### dispatch (hip)
+  Kernel dispatch rate and latency (https://github.com/ROCm-Developer-Tools/HIP-CPU)
+
 ### distort (cuda)
   Barrel distortion (https://github.com/Cuda-Chen/barrel-distortion-cuda)
 
