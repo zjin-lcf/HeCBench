@@ -423,6 +423,9 @@ Early results are shown [here](results/README.md)
 ### gemmEx (cuda)
   General matrix-matrix multiplication on GPUs (https://godweiyang.com/2021/08/24/gemm/)
 
+### gibbs (cuda)
+  Implementation of a Gibbs-Metropolis sampling algorithm (https://github.com/arendsee/cuda-gibbs-example)
+
 ### gmm (cuda)
   Expectation maximization with Gaussian mixture models (https://github.com/Corv/CUDA-GMM-MultiGPU)
 
