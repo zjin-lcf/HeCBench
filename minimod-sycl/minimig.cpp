@@ -8,6 +8,7 @@
 #define R 4
 #define NDIM 8
 
+__attribute__ ((always_inline))
 void target_inner_3d_kernel(
     llint nx, llint ny, llint nz,
     llint x3, llint x4, llint y3, llint y4, llint z3, llint z4,
@@ -74,6 +75,7 @@ void target_inner_3d_kernel(
   v[IDX3_l(i,j,k)] = 2.f * s_u[sui][suj][suk] + vp[IDX3(i,j,k)] * lap - v[IDX3_l(i,j,k)];
 }
 
+__attribute__ ((always_inline))
 void target_pml_3d_kernel(
     llint nx, llint ny, llint nz,
     llint x3, llint x4, llint y3, llint y4, llint z3, llint z4,
