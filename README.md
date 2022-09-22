@@ -918,6 +918,9 @@ Early results are shown [here](results/README.md)
 ### sort (opencl)
   Radix sort in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
+### sortKV (cuda)
+  Sort by key using Thrust and oneDPL
+
 ### sosfil (cuda)
   Second-order IIR digital filtering (https://github.com/rapidsai/cusignal/)
 
