@@ -818,6 +818,9 @@ Early results are shown [here](results/README.md)
 ### radixsort (opencl)
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
+### rainflow (c)
+  A fast rainflow cycle counting algorithm (https://github.com/carlos-souto/rainflow-cycle-counting)
+  
 ### randomAccess (openmp)
   Random memory access (https://icl.cs.utk.edu/projectsfiles/hpcc/RandomAccess/)
   
