@@ -1,0 +1,2 @@
+ace-sycl
+minimod-cuda
