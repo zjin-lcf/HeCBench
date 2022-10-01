@@ -93,6 +93,9 @@ Early results are shown [here](results/README.md)
 ### babelstream (cuda)
   Measure memory transfer rates for copy, add, mul, triad, dot, and nstream (https://github.com/UoB-HPC/BabelStream)
 
+### background-subtract (cuda)
+  Background subtraction (Alptekin Temizel et al. Experiences on Image and Video Processing with CUDA and OpenCL, In Applications of GPU Computing Series, GPU Computing Gems Emerald Edition, Morgan Kaufmann, 2011, Pages 547-567)
+
 ### backprop (opencl)
   Backpropagation in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
