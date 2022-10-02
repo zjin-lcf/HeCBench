@@ -1,0 +1,5 @@
+outs:
+- md5: e276394d661867f0445b3a9ff72ee5a2
+  size: 333563
+  hash: md5
+  path: dataset.tar.gz
