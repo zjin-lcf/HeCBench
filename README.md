@@ -650,6 +650,9 @@ Early results are shown [here](results/README.md)
 ### md5hash (opencl)
   MD5 hash function in the SHOC benchmark suite (https://github.com/vetter/shoc/)
 
+### meanshift (cuda)
+  Mean shift clustering (https://github.com/w00zie/mean_shift)
+  
 ### medianfilter (opencl)
   Two-dimensional 3x3 median filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
