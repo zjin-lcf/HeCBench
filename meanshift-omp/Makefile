@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../meanshift-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../meanshift-cuda
 
 # Linker Flags
 LDFLAGS = 
