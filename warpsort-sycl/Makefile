@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DWARP_SIZE=32 -DHALF_WARP_SIZE=16 -std=c++17 -Wall -I. -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -DWARP_SIZE=32 -DHALF_WARP_SIZE=16 -std=c++17 -Wall -I. -fsycl
 
 # Linker Flags
 LDFLAGS = 

@@ -28,7 +28,7 @@ obj = main.o args.o compute.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../tpacf-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../tpacf-cuda
 
 # Linker Flags
 LDFLAGS = 

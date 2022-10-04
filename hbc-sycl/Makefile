@@ -29,7 +29,7 @@ obj = main.o kernels.o util.o parse.o sequential.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -I../hbc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl -I../hbc-cuda
 
 # Linker Flags
 LDFLAGS = 

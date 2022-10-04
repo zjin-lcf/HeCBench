@@ -20,7 +20,7 @@ program = vj-cpu vj-gpu
 OMP_TARGET_FLAGS += -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 
 # Standard Flags
-CFLAGS := -Wall -I../face-sycl
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../face-sycl
 
 # Linker Flags
 LDFLAGS = 

@@ -22,7 +22,7 @@ obj = main.o cOgrd.o  cOkadaFault.o  cOkadaEarthquake.o cSphere.o okada.o utilit
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 

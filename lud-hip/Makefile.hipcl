@@ -20,7 +20,7 @@ source = lud.cu ./common/common.cu
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I./common -pthread -fPIE `hipcl_config -C`
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I./common -pthread -fPIE `hipcl_config -C`
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 

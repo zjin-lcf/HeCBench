@@ -22,7 +22,7 @@ obj = Main.o io.o Simulation.o GridInit.o XSutils.o Materials.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../xsbench-cuda
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../xsbench-cuda
 
 # Linker Flags
 LDFLAGS = -lm

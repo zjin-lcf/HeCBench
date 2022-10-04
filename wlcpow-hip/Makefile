@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../wlcpow-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../wlcpow-cuda
 
 # Linker Flags
 LDFLAGS = 

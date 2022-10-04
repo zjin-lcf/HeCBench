@@ -25,7 +25,7 @@ OMP_TARGET_FLAGS += -target x86_64-pc-linux-gnu \
           -march=$(ARCH)
 
 # Standard Flags
-CFLAGS := -Wall -I../face-sycl
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../face-sycl
 
 # Linker Flags
 LDFLAGS = 

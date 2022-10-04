@@ -32,7 +32,7 @@ obj = main.o kernel.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -fsycl -I../../../include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../../../include \
           -I../include -I$(SHARED_SRC_PATH)/points2image
 
 # Linker Flags

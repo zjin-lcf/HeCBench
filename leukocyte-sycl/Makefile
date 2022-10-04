@@ -30,7 +30,7 @@ MATRIX_DIR = ./meschach_lib
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I$(MATRIX_DIR)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(MATRIX_DIR)
 
 ifeq ($(VENDOR), codeplay)
 CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \

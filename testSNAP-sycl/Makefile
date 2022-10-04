@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DREFDATA_TWOJ=14 -I. -I../testSNAP-omp \
+CFLAGS := $(EXTRA_CFLAGS) -DREFDATA_TWOJ=14 -I. -I../testSNAP-omp \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

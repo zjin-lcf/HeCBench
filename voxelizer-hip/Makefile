@@ -28,7 +28,7 @@ obj = main.o voxelize.o voxelize_solid.o util_io.o cpu_voxelizer.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -fopenmp \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -fopenmp \
           -I$(Trimesh_PATH)/include \
           -I$(GLM_PATH)/include
 

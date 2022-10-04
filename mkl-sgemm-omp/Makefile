@@ -18,7 +18,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I${MKLROOT}/include
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I${MKLROOT}/include
 
 # Linker Flags
 LDFLAGS = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \

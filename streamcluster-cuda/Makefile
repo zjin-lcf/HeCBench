@@ -6,7 +6,7 @@ PROFILE   = yes
 
 
 # Standard flags
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker flags
 LDFLAGS = -lm

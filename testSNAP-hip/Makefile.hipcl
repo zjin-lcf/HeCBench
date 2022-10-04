@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` \
           -I../testSNAP-omp -DREFDATA_TWOJ=14
 
 # Linker Flags

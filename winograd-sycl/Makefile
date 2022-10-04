@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DMAP_SIZE=$(INPUT_SIZE) -std=c++17 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -DMAP_SIZE=$(INPUT_SIZE) -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 

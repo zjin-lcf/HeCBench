@@ -18,7 +18,7 @@ program = vj-cpu vj-gpu
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../face-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../face-cuda
 
 # Linker Flags
 LDFLAGS = 

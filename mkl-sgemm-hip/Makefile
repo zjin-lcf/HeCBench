@@ -24,7 +24,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I$(HIPBLAS_ROOT)/include
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(HIPBLAS_ROOT)/include
 
 # Linker Flags
 LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas

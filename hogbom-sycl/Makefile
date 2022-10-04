@@ -30,7 +30,7 @@ obj = main.o kernels.o reference.o timer.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I$(inc) -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I$(inc) -fsycl
 
 # Linker Flags
 LDFLAGS = 

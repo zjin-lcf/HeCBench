@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../hausdorff-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../hausdorff-cuda
 
 # Linker Flags
 LDFLAGS = 

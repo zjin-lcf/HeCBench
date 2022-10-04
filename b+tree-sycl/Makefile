@@ -29,7 +29,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I. -I./util/num -I./util/timer -I./kernel
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I. -I./util/num -I./util/timer -I./kernel
 
 ifeq ($(VENDOR), codeplay)
 CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \

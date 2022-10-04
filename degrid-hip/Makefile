@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DPRECISION=double -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -DPRECISION=double -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
