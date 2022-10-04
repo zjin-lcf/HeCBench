@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Ddfloat=double -Ddlong=int \
+CFLAGS := $(EXTRA_CFLAGS) -Ddfloat=double -Ddlong=int \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

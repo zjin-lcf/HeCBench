@@ -22,7 +22,7 @@ obj = main.o kernels.o util.o parse.o sequential.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../hbc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../hbc-cuda
 
 # Linker Flags
 LDFLAGS = 

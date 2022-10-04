@@ -21,7 +21,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../include \
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../include \
           -Ddfloat=float -Ddlong=int \
           --hipsycl-platform=$(PLATFORM) \
 	  --hipsycl-gpu-arch=$(MARCH)

@@ -26,7 +26,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -I$(MPI_ROOT)/include -std=c++11 -Wall -fPIE
+CFLAGS := $(EXTRA_CFLAGS) -I$(MPI_ROOT)/include -std=c++11 -Wall -fPIE
 
 # Linker Flags
 LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas \

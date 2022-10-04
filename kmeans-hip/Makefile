@@ -3,7 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 
 # Standard flags
-CFLAGS := -std=c++11 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
 
 
 # Debug Flags

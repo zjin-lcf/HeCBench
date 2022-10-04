@@ -40,7 +40,7 @@ headers = \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I../bmf-cuda/ -fsycl -DWARPSPERBLOCK=8 #-fopenmp
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../bmf-cuda/ -fsycl -DWARPSPERBLOCK=8 #-fopenmp
 
 # Linker Flags
 LDFLAGS = 

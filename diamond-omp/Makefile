@@ -90,7 +90,7 @@ obj = $(c_src:.c=.o) $(cpp_src:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = -lz -lpthread

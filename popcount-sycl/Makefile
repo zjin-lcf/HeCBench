@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -save-temps
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl -save-temps
 
 # Linker Flags
 LDFLAGS = 

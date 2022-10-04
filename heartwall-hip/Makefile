@@ -5,7 +5,7 @@ DEBUG       = no
 
 
 # Standard flags
-CFLAGS := -Wall
+CFLAGS := $(EXTRA_CFLAGS) -Wall
 
 # Linker flags
 LDFLAGS = -lm

@@ -23,7 +23,7 @@ obj = main.o shmem_kernels.o
 # Sets Flags
 #===============================================================================
 
-CFLAGS := -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

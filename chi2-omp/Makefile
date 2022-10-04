@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../chi2-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../chi2-cuda
 
 # Linker Flags
 LDFLAGS = 

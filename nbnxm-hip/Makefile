@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -Wno-unused-result -I../nbnxm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -Wno-unused-result -I../nbnxm-cuda
 
 # Linker Flags
 LDFLAGS = 

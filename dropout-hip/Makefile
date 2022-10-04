@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I/opt/rocm/hiprand/include/ \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I/opt/rocm/hiprand/include/ \
                            -I/opt/rocm/rocrand/include/
 
 # Linker Flags

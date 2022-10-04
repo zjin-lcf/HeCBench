@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall \
+CFLAGS := $(EXTRA_CFLAGS) -Wall \
           -DMILC_COMPLEX \
           -DLDIM=32 \
           -DPRECISION=2

@@ -24,7 +24,7 @@ obj = main.o kernel.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall \
           -I$(SHARED_SRC_PATH)/include \
           -I$(SHARED_SRC_PATH)/points2image
 

@@ -31,7 +31,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DNX=400 \
+CFLAGS := $(EXTRA_CFLAGS) -DNX=400 \
        	  -DNZ=200 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \

@@ -20,7 +20,7 @@ source = lud.cu ./common/common.cu
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I./common
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I./common
 
 # Linker Flags
 LDFLAGS = 

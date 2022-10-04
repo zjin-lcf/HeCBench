@@ -6,7 +6,7 @@ DEBUG     = no
 MATRIX_DIR = ./meschach_lib
 
 # Standard flags
-CFLAGS := -Wall -std=c++11 -I$(MATRIX_DIR) -x hip
+CFLAGS := $(EXTRA_CFLAGS) -Wall -std=c++11 -I$(MATRIX_DIR) -x hip
 
 # Linker flags
 LDFLAGS = -lm

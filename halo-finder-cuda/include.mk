@@ -11,6 +11,6 @@ HF_HEADERS += ${HF_HOME}/ParticleDistribute.h
 HF_HEADERS += ${HF_HOME}/CosmoHaloFinderP.h
 HF_HEADERS += ${HF_HOME}/FOFHaloProperties.h
 #HF_WARNING := -Wmissing-noreturn -Wunused -Wsign-compare -Wshadow -Wformat
-HF_CFLAGS := -I${HF_HOME} ${HF_TYPE_FLAGS} ${HF_WARNING}
+HF_CFLAGS := $(EXTRA_CFLAGS) -I${HF_HOME} ${HF_TYPE_FLAGS} ${HF_WARNING}
 HF_CXXFLAGS := -I${HF_HOME} ${HF_TYPE_FLAGS} ${HF_WARNING}
 HF_LDFLAGS := -L${HF_HOME}/${HACC_OBJDIR}

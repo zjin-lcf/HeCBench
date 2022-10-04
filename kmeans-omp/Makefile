@@ -11,7 +11,7 @@ DEVICE    = gpu
 
 
 # Standard flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker flags
 LDFLAGS = -lm

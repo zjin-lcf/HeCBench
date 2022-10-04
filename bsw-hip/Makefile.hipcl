@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` -DUSE_HIPCL
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` -DUSE_HIPCL
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 

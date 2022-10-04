@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I. -I../bm3d-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I. -I../bm3d-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 

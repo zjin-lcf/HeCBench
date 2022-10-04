@@ -30,7 +30,7 @@ obj = kernel.o fim.o timer.o main.o StructuredEikonal.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I../eikonal-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../eikonal-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
