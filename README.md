@@ -231,6 +231,9 @@ Early results are shown [here](results/README.md)
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
 
+### crossEntropy (sycl)
+  Cross entropy loss in the backward phase (https://github.com/intel/llvm/issues/5969)
+
 ### crs (cuda)
   Cauchy Reed-Solomon encoding (https://www.comp.hkbu.edu.hk/~chxw/gcrs.html)
 
