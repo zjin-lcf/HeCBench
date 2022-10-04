@@ -1,13 +1,54 @@
 # HeCBench
-This repository contains a collection of Heterogeneous Computing benchmarks written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
+This repository contains a collection of heterogeneous computing benchmarks written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
 
 # Software installation
 [AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
 [Intel DPC++ compiler](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md) or [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
-[Nvidia HPC SDK](https://developer.nvidia.com/hpc-sdk)
+[NVIDIA HPC SDK](https://developer.nvidia.com/hpc-sdk)
+
+# Run a benchmark
+  Option 1:
+    Go to a benchmark and type `make run`  
+  Option 2:
+    Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
+
+    It works with a `.json` file containing the benchmark names, a regex to
+    find the timings in the benchmark output and optional arguments that
+    must be provided to the benchmark binary. The `subset.json` contains
+    roughly 70 of the benchmarks for cuda, hip and sycl at the moment, more
+    work would be required to support the rest of the benchmarks. In
+    addition if there are failing benchmarks in the `.json` list, an
+    additional text file can be provided with a list of benchmarks to skip
+    when running all of them. Benchmarks in the text file can still be run
+    explicitely.
+
+    For example to run all the SYCL benchmarks and then all the CUDA
+    benchmarks and compare the two:
+
+    ```
+    ./autohecbench.py sycl -o sycl.csv
+    ./autohecbench.py cuda -o cuda.csv
+    ./autohecbench-compare.py sycl.csv cuda.csv
+    ```
+
+    It can also be used to run a single benchmark:
+
+    ```
+    ./autohecbench.py mandelbrot-sycl --verbose
+    ```
+
+    By default it will run a warmup iteration before running each benchmark,
+    and it is possible to run the benchmarks multiple times with `-r`:
+    ```
+    ./autohecbench.py mandelbrot-sycl -r 20 -o mandel.csv
+    ```
+
+    And it also has options to pick the SM version or HIP architecture and a
+    few other parameters.
 
 # Dataset
-For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm 
+For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm  
+For other benchmarks, datasets are either included with the repository or could be downloaded through the links to the benchmarks 
 
 # Known issues
 The programs have not been evaluated on Windows or MacOS  
@@ -1058,7 +1099,9 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Henry Gabb, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jianxin Qiu, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Robin Kobus, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen 
+Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Henry Gabb, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jianxin Qiu, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Robin Kobus, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen
+
+Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
 The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
 
