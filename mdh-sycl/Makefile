@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -fopenmp
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl -fopenmp
 
 # Linker Flags
 LDFLAGS = -L/path/to/openmp/lib -lomp

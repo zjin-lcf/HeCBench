@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -DMAP_SIZE=$(INPUT_SIZE)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DMAP_SIZE=$(INPUT_SIZE)
 
 # Linker Flags
 LDFLAGS = 

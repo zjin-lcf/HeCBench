@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../phmm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../phmm-cuda
 
 # Linker Flags
 LDFLAGS = 

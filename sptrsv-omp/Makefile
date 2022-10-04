@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -DVALUE_TYPE=double -I../sptrsv-sycl 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DVALUE_TYPE=double -I../sptrsv-sycl 
 
 # Linker Flags
 LDFLAGS = 

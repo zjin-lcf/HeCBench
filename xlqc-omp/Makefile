@@ -25,7 +25,7 @@ obj=basis.o scf.o main.o crys.o cints.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../xlqc-cuda -I../xlqc-cuda/int_lib $(GSL_INC)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../xlqc-cuda -I../xlqc-cuda/int_lib $(GSL_INC)
 
 # Linker Flags
 LDFLAGS = $(GSL_LIB)

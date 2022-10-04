@@ -25,7 +25,7 @@ obj = $(source:.cpp=.o)
 BLOCK_SIZE=256
 
 # Standard flags
-CFLAGS := -std=c++14 -Wall -DBLOCK_SIZE=$(BLOCK_SIZE)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DBLOCK_SIZE=$(BLOCK_SIZE)
 
 # Linker Flags
 LDFLAGS = 

@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSE_WORKAROUND -DMILC_COMPLEX \
+CFLAGS := $(EXTRA_CFLAGS) -DUSE_WORKAROUND -DMILC_COMPLEX \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

@@ -18,7 +18,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` -Ddfloat=float -Ddlong=int 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -pthread -fPIE `hipcl_config -C` -Ddfloat=float -Ddlong=int 
 
 # Linker Flags
 LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl BlasLapack/libBlasLapack.a -lgfortran

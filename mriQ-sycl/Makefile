@@ -29,7 +29,7 @@ obj = main.o file.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I../mriQ-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../mriQ-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 

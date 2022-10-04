@@ -35,7 +35,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -fsycl -fopenmp \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -fsycl -fopenmp \
           -I$(Trimesh_PATH)/include \
           -I$(GLM_PATH)/include
 

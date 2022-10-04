@@ -39,7 +39,7 @@ default_target: release
 
 .PHONY: release
 release: export CXXFLAGS := $(CXXFLAGS) $(COMPILE_FLAGS)
-release: export HIPCCFLAGS := $(HIPCC_COMPILE_FLAGS)
+release: export HIPCCFLAGS := $(EXTRA_CFLAGS) $(HIPCC_COMPILE_FLAGS)
 release: dirs
 	@$(MAKE) all
 

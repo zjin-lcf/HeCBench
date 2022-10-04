@@ -30,7 +30,7 @@ obj = $(c_source:.c=.o) $(sycl_source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -D__CUDACC__ -DFLOAT \
+CFLAGS := $(EXTRA_CFLAGS) -D__CUDACC__ -DFLOAT \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

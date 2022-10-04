@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -qopenmp
+CFLAGS := $(EXTRA_CFLAGS) -Wall -qopenmp
 
 # Linker Flags
 LDFLAGS = 

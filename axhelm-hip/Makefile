@@ -18,7 +18,7 @@ program = axhelm
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -Ddfloat=float -Ddlong=int 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -Ddfloat=float -Ddlong=int 
 
 # Linker Flags
 LDFLAGS = BlasLapack/libBlasLapack.a -lgfortran

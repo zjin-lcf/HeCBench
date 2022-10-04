@@ -32,7 +32,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -fsycl -I../include -I$(ONEMKL)/include -qmkl=parallel
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../include -I$(ONEMKL)/include -qmkl=parallel
 
 # Linker Flags
 #LDFLAGS = -L$(ONEMKL)/lib -lonemkl

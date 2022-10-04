@@ -26,7 +26,7 @@ source = main.cpp \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../crs-sycl
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../crs-sycl
 
 # Linker Flags
 LDFLAGS = 

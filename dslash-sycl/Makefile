@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DMILC_COMPLEX -DLDIM=32 -DPRECISION=1 \
+CFLAGS := $(EXTRA_CFLAGS) -DMILC_COMPLEX -DLDIM=32 -DPRECISION=1 \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

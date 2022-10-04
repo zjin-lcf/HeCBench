@@ -25,7 +25,7 @@ obj = $(cuda_source:.cu=.o) $(cpp_source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../cmp-cuda 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../cmp-cuda 
 
 # Linker Flags
 LDFLAGS = 

@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUNIX -DBENCH_ITERATIONS=100 -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -DUNIX -DBENCH_ITERATIONS=100 -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 

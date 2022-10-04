@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wno-narrowing -Wall -I../mr-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wno-narrowing -Wall -I../mr-cuda
 
 # Linker Flags
 LDFLAGS = 
