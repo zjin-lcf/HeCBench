@@ -22,7 +22,7 @@ obj = main.o kernels.o reference.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -include utils.h
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -include utils.h
 
 # Linker Flags
 LDFLAGS = 

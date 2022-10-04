@@ -22,7 +22,7 @@ obj = main.o read_data.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../extend2-sycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../extend2-sycl
 
 # Linker Flags
 LDFLAGS = 

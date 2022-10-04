@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DUSEOMP -std=c++17 -Wall -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -DUSEOMP -std=c++17 -Wall -fsycl
 
 # Linker Flags
 LDFLAGS = -lpthread

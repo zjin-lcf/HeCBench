@@ -30,7 +30,7 @@ obj = main.o svm.o
 ONEMKL = /path/to/oneMKL
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../kmc-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../kmc-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 

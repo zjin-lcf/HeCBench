@@ -23,7 +23,7 @@ obj = main.o kernels.o reference.o timer.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../include -I$(src)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../include -I$(src)
 
 
 # Linker Flags

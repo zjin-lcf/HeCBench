@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../laplace3d-cuda
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../laplace3d-cuda
 
 # Linker Flags
 LDFLAGS = 

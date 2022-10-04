@@ -35,7 +35,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -I../nw-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../nw-cuda
 
 ifeq ($(VENDOR), codeplay)
 CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \

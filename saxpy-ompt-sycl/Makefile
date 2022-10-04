@@ -23,7 +23,7 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -fsycl -fopenmp
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -fopenmp
 
 # Linker Flags
 LDFLAGS = -qmkl=parallel

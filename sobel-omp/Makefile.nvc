@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../include
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../include
 
 # Linker Flags
 LDFLAGS = 

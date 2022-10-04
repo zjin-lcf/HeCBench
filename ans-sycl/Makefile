@@ -33,7 +33,7 @@ OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 

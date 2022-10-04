@@ -7,7 +7,7 @@ DEVICE      = gpu
 MATRIX_DIR = ./meschach_lib
 
 # Standard flags
-CFLAGS := -std=c++11 -Wall -I$(MATRIX_DIR)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall -I$(MATRIX_DIR)
 
 # Linker flags
 LDFLAGS = -lm

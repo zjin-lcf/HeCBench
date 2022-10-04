@@ -28,7 +28,7 @@ obj = main.o util.o Kernel256_winograd.o Kernel128_winograd.o \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 

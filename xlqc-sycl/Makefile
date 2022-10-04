@@ -30,7 +30,7 @@ obj=basis.o scf.o main.o crys.o cints.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -I../xlqc-cuda -I../xlqc-cuda/int_lib $(GSL_INC) \
+CFLAGS := $(EXTRA_CFLAGS) -I../xlqc-cuda -I../xlqc-cuda/int_lib $(GSL_INC) \
           -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags

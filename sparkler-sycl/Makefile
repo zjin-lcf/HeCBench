@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -cxx=clang++ -std=c++17 -Wall -I../include -I${MKLROOT}/include -DMKL_ILP64 
+CFLAGS := $(EXTRA_CFLAGS) -cxx=clang++ -std=c++17 -Wall -I../include -I${MKLROOT}/include -DMKL_ILP64 
 
 # Linker Flags
 LDFLAGS = ${MKLROOT}/lib/intel64/libmkl_sycl.a \

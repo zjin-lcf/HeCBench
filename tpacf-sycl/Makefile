@@ -32,7 +32,7 @@ obj = main.o args.o compute.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -I../include -fsycl -I../tpacf-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl -I../tpacf-cuda
 
 # Linker Flags
 LDFLAGS = 

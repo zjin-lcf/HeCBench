@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../goulash-cuda
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../goulash-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -I../idivide-cuda
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../idivide-cuda
 
 # Linker Flags
 LDFLAGS = 

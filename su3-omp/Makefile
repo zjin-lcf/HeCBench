@@ -23,7 +23,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -DMILC_COMPLEX
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DMILC_COMPLEX
 
 # Linker Flags
 LDFLAGS = 

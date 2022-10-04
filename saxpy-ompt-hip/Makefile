@@ -24,7 +24,7 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -Wall -D__HIP_PLATFORM_AMD__ -I/opt/rocm/hipblas/include
+CFLAGS := $(EXTRA_CFLAGS) -Wall -D__HIP_PLATFORM_AMD__ -I/opt/rocm/hipblas/include
 
 # Linker Flags
 LDFLAGS = -L/opt/rocm/hipblas/lib -lhipblas -lamdhip64

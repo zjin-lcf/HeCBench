@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -Wall -fgpu-rdc 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fgpu-rdc 
 
 # Linker Flags
 LDFLAGS = -fgpu-rdc --hip-link

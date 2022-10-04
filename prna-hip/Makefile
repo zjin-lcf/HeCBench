@@ -23,7 +23,7 @@ obj = main.o base.o param.o util.o prna.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DFLOAT -std=c++14 -x hip -D__HIP_PLATFORM_AMD__ -Wall -I. -I../prna-cuda
+CFLAGS := $(EXTRA_CFLAGS) -DFLOAT -std=c++14 -x hip -D__HIP_PLATFORM_AMD__ -Wall -I. -I../prna-cuda
 
 # Linker Flags
 LDFLAGS = 
