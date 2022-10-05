@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 //define the data set size (cubic volume)
@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
-  double clock_d = double(clock()) / CLOCKS_PER_SEC;
+  auto offload_start = std::chrono::steady_clock::now();
 
   // define the chunk sizes that each threadblock will work on
   dim3 grid ((DATAZSIZE+7)/8, (DATAYSIZE+7)/8, (DATAXSIZE+3)/4);
@@ -377,6 +377,9 @@ int main(int argc, char *argv[])
   cudaMemcpy(d_uold, u_host, (vol*sizeof(double)), cudaMemcpyHostToDevice);
 
   int t = 0;
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   while (t <= num_steps) {
 
@@ -402,6 +405,11 @@ int main(int argc, char *argv[])
     t++;
   }
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
+
   cudaMemcpy(phi_host, d_phiold, (vol*sizeof(double)), cudaMemcpyDeviceToHost);
   cudaMemcpy(u_host, d_uold, (vol*sizeof(double)), cudaMemcpyDeviceToHost);
 
@@ -413,8 +421,9 @@ int main(int argc, char *argv[])
   cudaFree(d_Fy);
   cudaFree(d_Fz);
 
-  clock_d = double(clock()) / CLOCKS_PER_SEC - clock_d; 
-  printf("Offload time = %.3fms\n", clock_d*1e3);
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+  printf("Offload time: %.3f (ms)\n", offload_time * 1e-6f);
 
 #ifdef VERIFY
   bool ok = true;

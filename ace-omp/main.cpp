@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 //define the data set size (cubic volume)
@@ -347,6 +347,8 @@ int main(int argc, char *argv[])
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
+  auto offload_start = std::chrono::steady_clock::now();
+
   // storage for result computed on device
   double *d_phiold = (double*)phi_host;
   double *d_uold = (double*)u_host;
@@ -356,43 +358,49 @@ int main(int argc, char *argv[])
   double *d_Fy = (double*) malloc (vol*sizeof(double));
   double *d_Fz = (double*) malloc (vol*sizeof(double));
 
-  double start = omp_get_wtime();
+  #pragma omp target data map(tofrom: d_phiold[0:vol], \
+                                      d_uold[0:vol]) \
+                          map(alloc: d_phinew[0:vol], \
+                                     d_unew[0:vol], \
+                                     d_Fx[0:vol],\
+                                     d_Fy[0:vol],\
+                                     d_Fz[0:vol])
+  {
+    int t = 0;
 
-#pragma omp target data map(tofrom: d_phiold[0:vol], \
-                                    d_uold[0:vol]) \
-                        map(alloc: d_phinew[0:vol], \
-                                   d_unew[0:vol], \
-                                   d_Fx[0:vol],\
-                                   d_Fy[0:vol],\
-                                   d_Fz[0:vol])
-{
-  int t = 0;
-  while (t <= num_steps) {
-
-    calculateForce((nRarray*)d_phiold, (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
-                   dx,dy,dz,epsilon,W0,tau0);
-
-    allenCahn((nRarray*)d_phinew,(nRarray*)d_phiold,(nRarray*)d_uold,
-              (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
-              epsilon,W0,tau0,lambda, dt,dx,dy,dz);
-
-    boundaryConditionsPhi((nRarray*)d_phinew);
-
-    thermalEquation((nRarray*)d_unew,(nRarray*)d_uold,(nRarray*)d_phinew,(nRarray*)d_phiold,
-                    D,dt,dx,dy,dz);
-
-    boundaryConditionsU((nRarray*)d_unew,delta);
-
-    swapGrid((nRarray*)d_phinew, (nRarray*)d_phiold);
-
-    swapGrid((nRarray*)d_unew, (nRarray*)d_uold);
-
-    t++;
+    auto start = std::chrono::steady_clock::now();
+  
+    while (t <= num_steps) {
+  
+      calculateForce((nRarray*)d_phiold, (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
+                     dx,dy,dz,epsilon,W0,tau0);
+  
+      allenCahn((nRarray*)d_phinew,(nRarray*)d_phiold,(nRarray*)d_uold,
+                (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
+                epsilon,W0,tau0,lambda, dt,dx,dy,dz);
+  
+      boundaryConditionsPhi((nRarray*)d_phinew);
+  
+      thermalEquation((nRarray*)d_unew,(nRarray*)d_uold,(nRarray*)d_phinew,(nRarray*)d_phiold,
+                      D,dt,dx,dy,dz);
+  
+      boundaryConditionsU((nRarray*)d_unew,delta);
+  
+      swapGrid((nRarray*)d_phinew, (nRarray*)d_phiold);
+  
+      swapGrid((nRarray*)d_unew, (nRarray*)d_uold);
+  
+      t++;
+    }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
   }
-}
 
-  double end = omp_get_wtime();
-  printf("Offload time = %.3f(s)\n", end - start);
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+  printf("Offload time: %.3f (ms)\n", offload_time * 1e-6f);
 
 #ifdef VERIFY
   bool ok = true;
