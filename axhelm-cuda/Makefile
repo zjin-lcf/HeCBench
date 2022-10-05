@@ -12,7 +12,9 @@ ARCH      = sm_60
 # Program name & source code list
 #===============================================================================
 
-program = axhelm
+program = main
+
+obj = main.o meshBasis.o
 
 #===============================================================================
 # Sets Flags
@@ -31,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -40,9 +41,9 @@ endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
-all: build
 
-build: $(program)
+$(program): $(obj) BlasLapack/libBlasLapack.a 
+	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 main.o : main.cu axhelmKernel.cpp axhelmReference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -53,12 +54,9 @@ meshBasis.o : meshBasis.cpp meshBasis.hpp
 BlasLapack/libBlasLapack.a: 
 	cd BlasLapack && make -j8 && cd ..
 
-$(program): main.o meshBasis.o BlasLapack/libBlasLapack.a 
-	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
-
 clean:
 	cd BlasLapack && make clean && cd ..
-	rm -rf $(program) main.o meshBasis.o 
+	rm -rf $(program) $(obj)
 
 # run one- and three-dimensional kernels
 run: $(program)
