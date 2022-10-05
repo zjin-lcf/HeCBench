@@ -254,7 +254,7 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "cpu execution time: " << time << " ms" << std::endl;
+  std::cout << "host execution time: " << time << " ms" << std::endl;
 
   // Device run
 
@@ -271,7 +271,16 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   dim3 block(p.work_group_size);
   dim3 grid((out_size_i + p.work_group_size - 1) / p.work_group_size);
-  hipLaunchKernelGGL(BezierGPU, grid, block, 0, 0, d_in, d_out, in_size_i, in_size_j, out_size_i, out_size_j);
+
+  hipDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+
+  hipLaunchKernelGGL(BezierGPU, grid, block , 0, 0, d_in, d_out, in_size_i, in_size_j, out_size_i, out_size_j);
+
+  hipDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
+  std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
 
   hipMemcpy(gpu_out, d_out, out_size, hipMemcpyDeviceToHost);
 
@@ -287,9 +296,8 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   free(gpu_out);
   hipFree(d_in);
   hipFree(d_out);
+
 }
-
-
 
 int main(int argc, char **argv) {
 
@@ -307,5 +315,3 @@ int main(int argc, char **argv) {
   free(h_in);
   return 0;
 }
-
-
