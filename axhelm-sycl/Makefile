@@ -20,9 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp meshBasis.cpp
-
-obj = $(source:.cpp=.o)
+obj = main.o meshBasis.o
 
 #===============================================================================
 # Sets Flags
@@ -64,14 +62,17 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): $(obj) BlasLapack/libBlasLapack.a
+	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
 main.o : main.cpp axhelmReference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 	
 meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
 	$(CC) $(CFLAGS) -c $< -o $@
+
+BlasLapack/libBlasLapack.a: 
+	cd BlasLapack && make -j8 && cd ..
 
 clean:
 	rm -rf $(program) $(obj)
