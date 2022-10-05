@@ -10,14 +10,12 @@
 
 #define MAX_THREADS_PER_BLOCK 256
 
-
 //Structure to hold a node information
 struct Node
 {
   int starting;
   int no_of_edges;
 };
-
 
 //----------------------------------------------------------
 //--bfs on cpu
@@ -29,7 +27,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
     int *h_graph_edges, char *h_graph_mask, char *h_updating_graph_mask, \
     char *h_graph_visited, int *h_cost_ref){
   char stop;
-  int k = 0;
   do{
     //if no thread changes this value then the loop stops
     stop=0;
@@ -56,7 +53,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
         h_updating_graph_mask[tid]=0;
       }
     }
-    k++;
   }
   while(stop);
 }
@@ -94,13 +90,15 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     range<1> gws (global_work_size);
     range<1> lws (MAX_THREADS_PER_BLOCK);
 
-    // invoke kernel
+    long time = 0;
     do {
       h_over = 0;
       q.submit([&](handler& cgh) {
         auto d_over_acc = d_over.get_access<sycl_write>(cgh);
         cgh.copy(&h_over, d_over_acc);
-      });
+      }).wait();
+      
+      auto start = std::chrono::steady_clock::now();
 
       q.submit([&](handler& cgh) {
         auto d_graph_nodes_acc = d_graph_nodes.get_access<sycl_read>(cgh);
@@ -126,8 +124,6 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
         });
       });
 
-      //--kernel 1
-
       q.submit([&](handler& cgh) {
         auto d_graph_mask_acc = d_graph_mask.get_access<sycl_write>(cgh);
         auto d_updating_graph_mask_acc = d_updating_graph_mask.get_access<sycl_read_write>(cgh);
@@ -142,7 +138,10 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
             d_updating_graph_mask_acc[tid]=0;
           }
         });
-      });
+      }).wait();
+
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
       q.submit([&](handler& cgh) {
         auto d_over_acc = d_over.get_access<sycl_read>(cgh);
@@ -151,8 +150,11 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     }
     while (h_over);
 
+    printf("Total kernel execution time : %f (us)\n", time * 1e-3f);
+
   } // SYCL scope
 }
+
 void Usage(int argc, char**argv){
 
   fprintf(stderr,"Usage: %s <input_file>\n", argv[0]);

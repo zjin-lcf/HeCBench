@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 #define MAX_THREADS_PER_BLOCK 256
@@ -63,7 +64,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     char *h_graph_visited, int *h_cost_ref)
 {
   char stop;
-  int k = 0;
   do{
     //if no thread changes this value then the loop stops
     stop=0;
@@ -91,7 +91,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
         h_updating_graph_mask[tid]=0;
       }
     }
-    k++;
   }
   while(stop);
 }
@@ -138,14 +137,26 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
   dim3 grid((no_of_nodes + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK);
   dim3 threads(MAX_THREADS_PER_BLOCK);
 
+  long time = 0;
   do {
     h_over = 0;
     cudaMemcpy(d_over, &h_over, sizeof(char), cudaMemcpyHostToDevice) ;
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     Kernel<<< grid, threads >>>(d_graph_nodes, d_graph_edges, d_graph_mask, d_updating_graph_mask, 
                                 d_graph_visited, d_cost, no_of_nodes);
     Kernel2<<< grid, threads >>>(d_graph_mask, d_updating_graph_mask, d_graph_visited, d_over, no_of_nodes);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     cudaMemcpy(&h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
   } while(h_over);
+
+  printf("Total kernel execution time : %f (us)\n", time * 1e-3f);
 
   // copy result from device to host
   cudaMemcpy(h_cost, d_cost, sizeof(int)*no_of_nodes, cudaMemcpyDeviceToHost) ;
