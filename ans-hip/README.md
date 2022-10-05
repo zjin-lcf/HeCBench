@@ -34,6 +34,8 @@ For each dataset, the program will:
 
 To compile the test program, configure the Makefile as described above. Run:
 
+`mkdir bin`  
+
 `make`
 
 #### Running the test program
@@ -43,6 +45,4 @@ To compile the test program, configure the Makefile as described above. Run:
 #### Major changes
 1. In main.cu and multians_gpu_decoder.cu, explicitly call the HIP API functions for device management and data transfers.
    Hence, all GPU-related files are removed except cuhd_gpu_decoder.h, cuhd_cuda_definitions.h, and multians_gpu_decoder.cu.
-3. Focuse on the GPU decoding part
-
-
+2. Focuse on the GPU decoding part
