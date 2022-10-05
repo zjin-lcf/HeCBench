@@ -139,12 +139,8 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
     /**
      * brief Default constructor
      */
-    SDKBitMap()
-      : pixels_(NULL),
-      numColors_(0),
-      colors_(NULL),
-      isLoaded_(false)
-  {}
+    SDKBitMap() :
+      pixels_(NULL), numColors_(0), colors_(NULL), isLoaded_(false) {}
 
     /**
      * brief Constructor
@@ -156,14 +152,11 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
      * In the case of an error, e.g. the bitmap file could not be loaded for
      * some reason, then a following call to isLoaded will return false.
      */
-    SDKBitMap(const char * filename)
-      : pixels_(NULL),
-      numColors_(0),
-      colors_(NULL),
-      isLoaded_(false)
-  {
-    load(filename);
-  }
+    SDKBitMap(const char * filename) :
+      pixels_(NULL), numColors_(0), colors_(NULL), isLoaded_(false) 
+    {
+      load(filename);
+    }
 
     /**
      * Copy constructor
@@ -389,6 +382,10 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           delete[] tmpPixels;
           // Loaded file so record this fact
           isLoaded_  = true;
+        }
+        else 
+        {
+          fprintf(stderr, "Failed to load file %s\n", filename);
         }
       }
 
