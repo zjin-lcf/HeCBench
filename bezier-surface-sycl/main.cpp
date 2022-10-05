@@ -225,7 +225,7 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "cpu execution time: " << time << " ms" << std::endl;
+  std::cout << "host execution time: " << time << " ms" << std::endl;
 
   // Device run
   
@@ -246,6 +246,9 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   size_t lws = p.work_group_size;
   size_t gws = (out_size_i + p.work_group_size - 1) / p.work_group_size * p.work_group_size;
+
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
 
   q.submit([&](handler& cgh) {
     auto inp = d_in.get_access<sycl_read>(cgh);
@@ -278,6 +281,11 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
     });
   });
 
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
+  std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
+
   q.submit([&](handler& cgh) {
     auto outp = d_out.get_access<sycl_read>(cgh);
     cgh.copy(outp, gpu_out);
@@ -295,8 +303,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   free(gpu_out);
 }
 
-
-
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
@@ -313,5 +319,3 @@ int main(int argc, char **argv) {
   free(h_in);
   return 0;
 }
-
-

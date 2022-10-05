@@ -234,13 +234,15 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "cpu execution time: " << time << " ms" << std::endl;
+  std::cout << "host execution time: " << time << " ms" << std::endl;
 
   start = std::chrono::steady_clock::now();
-  #pragma omp target map(to: in[0:(in_size_i+1)*(in_size_j+1)]) \
-                     map(from: gpu_out [0:out_size_i*out_size_j])
+  #pragma omp target data map(to: in[0:(in_size_i+1)*(in_size_j+1)]) \
+                          map(from: gpu_out [0:out_size_i*out_size_j])
   {
-    #pragma omp teams distribute parallel for simd thread_limit(256)
+    auto kstart = std::chrono::steady_clock::now();
+
+    #pragma omp target teams distribute parallel for simd thread_limit(256)
     for (int i = 0; i < out_size_i; i++) {
       FLOAT   mui = i / (FLOAT)(out_size_i - 1);
       for(int j = 0; j < out_size_j; j++) {
@@ -260,6 +262,10 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
         gpu_out[i * out_size_j + j] = out;
       }
     }
+
+    auto kend = std::chrono::steady_clock::now();
+    auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
+    std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
   }
 
   end = std::chrono::steady_clock::now();
@@ -290,5 +296,3 @@ int main(int argc, char **argv) {
   free(h_in);
   return 0;
 }
-
-
