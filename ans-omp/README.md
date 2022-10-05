@@ -27,11 +27,10 @@ For each dataset, the program will:
 #### Compiling the test program
 
 To compile the test program, configure the Makefile as described above. For example:
+`mkdir bin`  
 
 `make -f Makefile.aomp`
 
 #### Running the test program
 
 `./bin/demo <size of input in megabytes>`
-
-

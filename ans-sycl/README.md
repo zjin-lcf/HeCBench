@@ -35,6 +35,8 @@ For each dataset, the program will:
 
 To compile the test program, configure the Makefile as described above. Run:
 
+`mkdir bin`  
+
 `make`
 
 #### Running the test program
@@ -44,4 +46,3 @@ To compile the test program, configure the Makefile as described above. Run:
 #### Major changes
 1. In main.cc and multians_gpu_decoder.cc, explicitly use the SYCL buffers for device management and data transfers.
 2. Focuse on the GPU decoding part
-

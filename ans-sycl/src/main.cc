@@ -51,7 +51,7 @@ void run(long int input_size) {
 
     // vectors to record timings
     std::cout << std::left << std::setw(5) << lambda << std::setfill(' ');
-kk
+
     // generate random, exponentially distributed data
     auto dist = ANSTableGenerator::generate_distribution(
         SEED, NUM_SYMBOLS, NUM_STATES,
