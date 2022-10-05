@@ -3,6 +3,8 @@
 #include <string>
 #include <cstring>
 #include <cstdio>
+#include <chrono>
+#include <omp.h>
 
 #include "util.h"
 
@@ -15,7 +17,6 @@ struct Node
   int no_of_edges;
 };
 
-
 //----------------------------------------------------------
 //--bfs on cpu
 //--programmer:  jianbin
@@ -26,7 +27,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
     int *h_graph_edges, char *h_graph_mask, char *h_updating_graph_mask, \
     char *h_graph_visited, int *h_cost_ref){
   char stop;
-  int k = 0;
   do{
     //if no thread changes this value then the loop stops
     stop=0;
@@ -53,7 +53,6 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
         h_updating_graph_mask[tid]=0;
       }
     }
-    k++;
   }
   while(stop);
 }
@@ -67,19 +66,21 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
   char d_over[1];
 
 #pragma omp target data map(to: d_graph_nodes[0:no_of_nodes], \
-    d_graph_edges[0:edge_list_size], \
-    d_graph_visited[0:no_of_nodes], \
-    d_graph_mask[0:no_of_nodes], \
-    d_updating_graph_mask[0:no_of_nodes]) \
-  map(alloc: d_over[0:1])\
-  map(tofrom: d_cost[0:no_of_nodes])
+                                d_graph_edges[0:edge_list_size], \
+                                d_graph_visited[0:no_of_nodes], \
+                                d_graph_mask[0:no_of_nodes], \
+                                d_updating_graph_mask[0:no_of_nodes]) \
+                        map(alloc: d_over[0:1])\
+                        map(tofrom: d_cost[0:no_of_nodes])
   {
-
+    long time = 0;
     do {
       d_over[0] = 0;
-#pragma omp target update to (d_over[0:1])
+      #pragma omp target update to (d_over[0:1])
 
-#pragma omp target teams distribute parallel for thread_limit(MAX_THREADS_PER_BLOCK)
+      auto start = std::chrono::steady_clock::now();
+
+      #pragma omp target teams distribute parallel for thread_limit(MAX_THREADS_PER_BLOCK)
       for (int tid = 0; tid < no_of_nodes; tid++) {
         if(d_graph_mask[tid]){
           d_graph_mask[tid]=0;
@@ -94,7 +95,7 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
         }  
       }
 
-#pragma omp target teams distribute parallel for thread_limit(MAX_THREADS_PER_BLOCK) 
+      #pragma omp target teams distribute parallel for thread_limit(MAX_THREADS_PER_BLOCK) 
       for (int tid = 0; tid < no_of_nodes; tid++) {
         if(d_updating_graph_mask[tid]){
           d_graph_mask[tid]=1;
@@ -104,8 +105,14 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
         }
       }
 
-#pragma omp target update from (d_over[0:1])
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+      #pragma omp target update from (d_over[0:1])
+
     } while (d_over[0]);
+
+    printf("Total kernel execution time : %f (us)\n", time * 1e-3f);
   }
 }
 
