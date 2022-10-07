@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <chrono>
 #include "common.h"
 
 #include "binomialOptions.h"
@@ -101,7 +103,10 @@ extern "C" void binomialOptionsGPU(
   range<1> gws (optN * THREADBLOCK_SIZE);
   range<1> lws (THREADBLOCK_SIZE);
 
-  for (int i = 0; i < numIterations; i++) 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < numIterations; i++) {
     q.submit([&] (handler &cgh) {
       auto callValue = d_CallValue.get_access<sycl_discard_write>(cgh);
       auto optionData = d_OptionData.get_access<sycl_read>(cgh);
@@ -147,4 +152,10 @@ extern "C" void binomialOptionsGPU(
         }
       });
     });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (us)\n", time * 1e-3f / numIterations);
 }

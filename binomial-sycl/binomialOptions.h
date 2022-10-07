@@ -37,6 +37,6 @@ typedef struct
 //Max option batch size
 #define MAX_OPTIONS 1024
 
-#define NUM_ITERATIONS 100 
+#define NUM_ITERATIONS 1000 
 
 #endif

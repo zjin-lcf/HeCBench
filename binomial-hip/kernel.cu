@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "binomialOptions.h"
@@ -140,8 +141,16 @@ extern "C" void binomialOptionsGPU(
   real *d_CallValue;
   hipMalloc ((void**)&d_CallValue, sizeof(real) * MAX_OPTIONS);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
     hipLaunchKernelGGL(binomialOptionsKernel, dim3(optN), dim3(THREADBLOCK_SIZE), 0, 0, d_OptionData, d_CallValue);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (us)\n", time * 1e-3f / numIterations);
 
   hipMemcpy(callValue, d_CallValue, optN *sizeof(real), hipMemcpyDeviceToHost);
   hipFree(d_OptionData);

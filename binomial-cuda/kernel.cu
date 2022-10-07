@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 
 #include "binomialOptions.h"
@@ -140,8 +141,16 @@ extern "C" void binomialOptionsGPU(
   real *d_CallValue;
   cudaMalloc ((void**)&d_CallValue, sizeof(real) * MAX_OPTIONS);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int i = 0; i < numIterations; i++)
     binomialOptionsKernel<<<optN, THREADBLOCK_SIZE>>>(d_OptionData, d_CallValue);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time : %f (us)\n", time * 1e-3f / numIterations);
 
   cudaMemcpy(callValue, d_CallValue, optN *sizeof(real), cudaMemcpyDeviceToHost);
   cudaFree(d_OptionData);
