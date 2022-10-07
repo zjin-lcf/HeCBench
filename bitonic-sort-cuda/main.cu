@@ -87,6 +87,8 @@ void ParallelBitonicSort(int data_gpu[], int n) {
   cudaMalloc((void**)&a, sizeof(int) * size);
   cudaMemcpy(a, data_gpu, sizeof(int) * size, cudaMemcpyHostToDevice);
   
+  long time = 0; // kernel execution time
+
   // step from 0, 1, 2, ...., n-1
   for (int step = 0; step < n; step++) {
     // for each step s, stage goes s, s-1, ..., 0
@@ -103,9 +105,18 @@ void ParallelBitonicSort(int data_gpu[], int n) {
 #endif
       // Constant used in the kernel: 2**(step-stage).
       int two_power = 1 << (step - stage);
+      auto start = std::chrono::steady_clock::now();
+
       bs<<< dim3(size/BLOCK_SIZE), dim3(BLOCK_SIZE) >>> (seq_len, two_power, a);
+
+      cudaDeviceSynchronize();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }  // end stage
   } // end step
+
+  printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
+
   cudaMemcpy(data_gpu, a, sizeof(int) * size, cudaMemcpyDeviceToHost);
   cudaFree( a );
 }

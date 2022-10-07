@@ -45,6 +45,8 @@ void ParallelBitonicSort(int data_gpu[], int n) {
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
 
+  long time = 0; // kernel execution time
+
   // step from 0, 1, 2, ...., n-1
 #pragma omp target data map(tofrom: data_gpu[0:size]) 
   for (int step = 0; step < n; step++) {
@@ -64,6 +66,8 @@ void ParallelBitonicSort(int data_gpu[], int n) {
       int two_power = 1 << (step - stage);
 
       // Offload the work to kernel.
+      auto start = std::chrono::steady_clock::now();
+
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (int i = 0; i < size; i++) {
         // Assign the bitonic sequence number.
@@ -97,8 +101,13 @@ void ParallelBitonicSort(int data_gpu[], int n) {
           }
         }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }  // end stage
   } // end step
+
+  printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
 }
 
 // Loop over the bitonic sequences at each stage in serial.
