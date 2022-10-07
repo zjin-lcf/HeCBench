@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #include "binomialOptions.h"
@@ -90,55 +91,61 @@ extern "C" void binomialOptionsGPU(
     d_OptionData[i].pdByDf = (real)pdByDf;
   }
 
-#pragma omp target data map(to: d_OptionData[0:MAX_OPTIONS]) \
-                        map(from: callValue[0:MAX_OPTIONS])
-{
-  for (int i = 0; i < numIterations; i++) {
-    #pragma omp target teams num_teams(optN) thread_limit(THREADBLOCK_SIZE)
-    {
-      real call_exchange[THREADBLOCK_SIZE + 1];
-      #pragma omp parallel 
+  #pragma omp target data map(to: d_OptionData[0:MAX_OPTIONS]) \
+                          map(from: callValue[0:MAX_OPTIONS])
+  {
+    auto start = std::chrono::steady_clock::now();
+  
+    for (int i = 0; i < numIterations; i++) {
+      #pragma omp target teams num_teams(optN) thread_limit(THREADBLOCK_SIZE)
       {
-        const int     tid = omp_get_thread_num();
-        const int     bid = omp_get_team_num();
-        const real      S = d_OptionData[bid].S;
-        const real      X = d_OptionData[bid].X;
-        const real    vDt = d_OptionData[bid].vDt;
-        const real puByDf = d_OptionData[bid].puByDf;
-        const real pdByDf = d_OptionData[bid].pdByDf;
-
-        real call[ELEMS_PER_THREAD + 1];
-        #pragma unroll
-        for(int i = 0; i < ELEMS_PER_THREAD; ++i)
-          call[i] = expiryCallValue(S, X, vDt, tid * ELEMS_PER_THREAD + i);
-
-        if (tid == 0)
-          call_exchange[THREADBLOCK_SIZE] = expiryCallValue(S, X, vDt, NUM_STEPS);
-
-        int final_it = max(0, tid * ELEMS_PER_THREAD - 1);
-
-        #pragma unroll 16
-        for(int i = NUM_STEPS; i > 0; --i)
+        real call_exchange[THREADBLOCK_SIZE + 1];
+        #pragma omp parallel 
         {
-          call_exchange[tid] = call[0];
-          #pragma omp barrier
-          call[ELEMS_PER_THREAD] = call_exchange[tid + 1];
-          #pragma omp barrier
-
-          if (i > final_it)
+          const int     tid = omp_get_thread_num();
+          const int     bid = omp_get_team_num();
+          const real      S = d_OptionData[bid].S;
+          const real      X = d_OptionData[bid].X;
+          const real    vDt = d_OptionData[bid].vDt;
+          const real puByDf = d_OptionData[bid].puByDf;
+          const real pdByDf = d_OptionData[bid].pdByDf;
+  
+          real call[ELEMS_PER_THREAD + 1];
+          #pragma unroll
+          for(int i = 0; i < ELEMS_PER_THREAD; ++i)
+            call[i] = expiryCallValue(S, X, vDt, tid * ELEMS_PER_THREAD + i);
+  
+          if (tid == 0)
+            call_exchange[THREADBLOCK_SIZE] = expiryCallValue(S, X, vDt, NUM_STEPS);
+  
+          int final_it = max(0, tid * ELEMS_PER_THREAD - 1);
+  
+          #pragma unroll 16
+          for(int i = NUM_STEPS; i > 0; --i)
           {
-            #pragma unroll
-            for(int j = 0; j < ELEMS_PER_THREAD; ++j)
-              call[j] = puByDf * call[j + 1] + pdByDf * call[j];
+            call_exchange[tid] = call[0];
+            #pragma omp barrier
+            call[ELEMS_PER_THREAD] = call_exchange[tid + 1];
+            #pragma omp barrier
+  
+            if (i > final_it)
+            {
+              #pragma unroll
+              for(int j = 0; j < ELEMS_PER_THREAD; ++j)
+                call[j] = puByDf * call[j + 1] + pdByDf * call[j];
+            }
           }
-        }
-
-        if (tid == 0)
-        {
-          callValue[bid] = call[0];
+  
+          if (tid == 0)
+          {
+            callValue[bid] = call[0];
+          }
         }
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time : %f (us)\n", time * 1e-3f / numIterations);
   }
-}
 }
