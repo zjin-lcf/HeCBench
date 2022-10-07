@@ -429,7 +429,10 @@ void compress(
         + ", need " + std::to_string(reqWorkSize));
   }
 
-  for (int n = 0; n < 100; n++)
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < 1000; n++)
     NVCOMP_TYPE_SWITCH(
       inType,
       bitPackInternal,
@@ -440,5 +443,10 @@ void compress(
       maxNum,
       minValueDevicePtr,
       numBitsDevicePtr);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (1000 iterations) = %f (s)\n", time * 1e-9f);
 }
 
