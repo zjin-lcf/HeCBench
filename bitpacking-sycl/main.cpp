@@ -117,6 +117,7 @@ int main() {
     T minValue;
     int numBitsAct;
 
+    printf("Size = %10zu\n", n);
     auto start = std::chrono::steady_clock::now();
 
     runBitPackingOnGPU(
@@ -124,7 +125,7 @@ int main() {
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Size = %10zu Bitpacking time = %f (s) ", n, time * 1e-9f);
+    printf("Device offload time = %f (s)\n", time * 1e-9f);
 
     assert(numBitsAct <= numBits);
 
