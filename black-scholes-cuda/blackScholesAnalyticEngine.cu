@@ -18,7 +18,7 @@
 #define NUM_DIFF_SETTINGS 37
 
 //function to run the black scholes analytic engine on the gpu
-void runBlackScholesAnalyticEngine()
+void runBlackScholesAnalyticEngine(const int repeat)
 {
   int numberOfSamples = 50000000;
   {
@@ -223,8 +223,8 @@ void runBlackScholesAnalyticEngine()
     float* outputVals = (float*)malloc(numVals * sizeof(float));
 
     printf("Number of options: %d\n\n", numVals);
-    long seconds, useconds;    
-    float mtimeCpu, mtimeGpu;
+    long seconds, useconds, kseconds, kuseconds;
+    float mtimeCpu, mtimeGpu, ktimeGpu;
     struct timeval start;
     gettimeofday(&start, NULL);
 
@@ -240,10 +240,21 @@ void runBlackScholesAnalyticEngine()
     cudaMemcpy(optionsGpu, values, numVals * sizeof(optionInputStruct), cudaMemcpyHostToDevice);
 
     // setup execution parameters
-    dim3  grid( (numVals + THREAD_BLOCK_SIZE - 1)/THREAD_BLOCK_SIZE, 1, 1);
+    dim3  grid((numVals + THREAD_BLOCK_SIZE - 1)/THREAD_BLOCK_SIZE, 1, 1);
     dim3  threads( THREAD_BLOCK_SIZE, 1, 1);
 
-    getOutValOption <<< dim3(grid), dim3(threads) >>> (optionsGpu, outputValsGpu, numVals);
+    struct timeval kstart;
+    gettimeofday(&kstart, NULL);
+
+    for (int i = 0; i < repeat; i++)
+      getOutValOption <<< dim3(grid), dim3(threads) >>> (optionsGpu, outputValsGpu, numVals);
+
+    cudaDeviceSynchronize();
+    struct timeval kend;
+    gettimeofday(&kend, NULL);
+    kseconds  = kend.tv_sec  - kstart.tv_sec;
+    kuseconds = kend.tv_usec - kstart.tv_usec;
+    ktimeGpu = ((kseconds) * 1000 + ((float)kuseconds)/1000.0) + 0.5f;
 
     //copy the resulting option values back to the CPU
     cudaMemcpy(outputVals, outputValsGpu, numVals * sizeof(float), cudaMemcpyDeviceToHost);
@@ -255,10 +266,12 @@ void runBlackScholesAnalyticEngine()
     gettimeofday(&end, NULL);
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
-
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
 
     printf("Run on GPU\n");
+    printf("Average kernel execution time on GPU: %f (ms)\n", ktimeGpu / repeat);
+
+    mtimeGpu -= ktimeGpu + ktimeGpu / repeat;
     printf("Processing time on GPU: %f (ms)\n", mtimeGpu);
 
     float totResult = 0.0f;
@@ -303,6 +316,12 @@ void runBlackScholesAnalyticEngine()
 
 int main( int argc, char** argv) 
 {
-  runBlackScholesAnalyticEngine();
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int repeat = atoi(argv[1]);
+  runBlackScholesAnalyticEngine(repeat);
   return 0;
 }

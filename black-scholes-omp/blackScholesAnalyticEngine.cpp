@@ -18,7 +18,7 @@
 #include "blackScholesAnalyticEngineKernelsCpu.cpp"
 
 //function to run the black scholes analytic engine on the gpu
-void runBlackScholesAnalyticEngine()
+void runBlackScholesAnalyticEngine(const int repeat)
 {
   int numberOfSamples = 50000000;
   {
@@ -223,63 +223,74 @@ void runBlackScholesAnalyticEngine()
     float* outputVals = (float*)malloc(numVals * sizeof(float));
 
     printf("Number of options: %d\n\n", numVals);
-    long seconds, useconds;    
-    float mtimeCpu, mtimeGpu;
+    long seconds, useconds, kseconds, kuseconds;
+    float mtimeCpu, mtimeGpu, ktimeGpu;
     struct timeval start;
     gettimeofday(&start, NULL);
 
-    #pragma omp target map(to: values[0:numVals]) map(from: outputVals[0:numVals])
+    #pragma omp target data map(to: values[0:numVals]) map(from: outputVals[0:numVals])
     {
-      #pragma omp teams distribute parallel for simd thread_limit(THREAD_BLOCK_SIZE)
-      for (int optionNum = 0; optionNum < numVals; optionNum++) {
-        optionInputStruct threadOption = values[optionNum];
+      struct timeval kstart;
+      gettimeofday(&kstart, NULL);
 
-        payoffStruct currPayoff;
-        currPayoff.type = threadOption.type;
-        currPayoff.strike = threadOption.strike;
+      for (int i = 0; i < repeat; i++) {
+        #pragma omp target teams distribute parallel for simd thread_limit(THREAD_BLOCK_SIZE)
+        for (int optionNum = 0; optionNum < numVals; optionNum++) {
+          optionInputStruct threadOption = values[optionNum];
 
-        yieldTermStruct qTS;
-        qTS.timeYearFraction = threadOption.t;
-        qTS.forward = threadOption.q;
+          payoffStruct currPayoff;
+          currPayoff.type = threadOption.type;
+          currPayoff.strike = threadOption.strike;
 
-        yieldTermStruct rTS;
-        rTS.timeYearFraction = threadOption.t;
-        rTS.forward = threadOption.r;
+          yieldTermStruct qTS;
+          qTS.timeYearFraction = threadOption.t;
+          qTS.forward = threadOption.q;
 
-        blackVolStruct volTS;
-        volTS.timeYearFraction = threadOption.t;
-        volTS.volatility = threadOption.vol;
+          yieldTermStruct rTS;
+          rTS.timeYearFraction = threadOption.t;
+          rTS.forward = threadOption.r;
 
-        blackScholesMertStruct stochProcess;
-        stochProcess.x0 = threadOption.spot;
-        stochProcess.dividendTS = qTS;
-        stochProcess.riskFreeTS = rTS;
-        stochProcess.blackVolTS = volTS;
+          blackVolStruct volTS;
+          volTS.timeYearFraction = threadOption.t;
+          volTS.volatility = threadOption.vol;
 
-        optionStruct currOption;
-        currOption.payoff = currPayoff;
-        currOption.yearFractionTime = threadOption.t;
-        currOption.pricingEngine = stochProcess; 
+          blackScholesMertStruct stochProcess;
+          stochProcess.x0 = threadOption.spot;
+          stochProcess.dividendTS = qTS;
+          stochProcess.riskFreeTS = rTS;
+          stochProcess.blackVolTS = volTS;
 
-        float variance = getBlackVolBlackVar(currOption.pricingEngine.blackVolTS);
-        float dividendDiscount = getDiscountOnDividendYield(currOption.yearFractionTime, currOption.pricingEngine.dividendTS);
-        float riskFreeDiscount = getDiscountOnRiskFreeRate(currOption.yearFractionTime, currOption.pricingEngine.riskFreeTS);
-        float spot = currOption.pricingEngine.x0; 
+          optionStruct currOption;
+          currOption.payoff = currPayoff;
+          currOption.yearFractionTime = threadOption.t;
+          currOption.pricingEngine = stochProcess; 
 
-        float forwardPrice = spot * dividendDiscount / riskFreeDiscount;
+          float variance = getBlackVolBlackVar(currOption.pricingEngine.blackVolTS);
+          float dividendDiscount = getDiscountOnDividendYield(currOption.yearFractionTime, currOption.pricingEngine.dividendTS);
+          float riskFreeDiscount = getDiscountOnRiskFreeRate(currOption.yearFractionTime, currOption.pricingEngine.riskFreeTS);
+          float spot = currOption.pricingEngine.x0; 
 
-        //declare the blackCalcStruct
-        blackCalcStruct blackCalc;
+          float forwardPrice = spot * dividendDiscount / riskFreeDiscount;
 
-        //initialize the calculator
-        initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrtf(variance), riskFreeDiscount);
+          //declare the blackCalcStruct
+          blackCalcStruct blackCalc;
 
-        //retrieve the results values
-        float resultVal = getResultVal(blackCalc);
+          //initialize the calculator
+          initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrtf(variance), riskFreeDiscount);
 
-        //write the resulting value to global memory
-        outputVals[optionNum] = resultVal;
+          //retrieve the results values
+          float resultVal = getResultVal(blackCalc);
+
+          //write the resulting value to global memory
+          outputVals[optionNum] = resultVal;
+        }
       }
+
+      struct timeval kend;
+      gettimeofday(&kend, NULL);
+      kseconds  = kend.tv_sec  - kstart.tv_sec;
+      kuseconds = kend.tv_usec - kstart.tv_usec;
+      ktimeGpu = ((kseconds) * 1000 + ((float)kuseconds)/1000.0) + 0.5f;
     }
 
     struct timeval end;
@@ -287,10 +298,12 @@ void runBlackScholesAnalyticEngine()
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
-
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
 
     printf("Run on GPU\n");
+    printf("Average kernel execution time on GPU: %f (ms)\n", ktimeGpu / repeat);
+
+    mtimeGpu -= ktimeGpu + ktimeGpu / repeat;
     printf("Processing time on GPU: %f (ms)\n", mtimeGpu);
 
     float totResult = 0.0f;
@@ -331,6 +344,12 @@ void runBlackScholesAnalyticEngine()
 
 int main( int argc, char** argv) 
 {
-  runBlackScholesAnalyticEngine();
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int repeat = atoi(argv[1]);
+  runBlackScholesAnalyticEngine(repeat);
   return 0;
 }
