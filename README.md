@@ -1,16 +1,74 @@
 # HeCBench
-This repository contains a collection of heterogeneous computing benchmarks written with CUDA, HIP, SYCL (DPC++), and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
+This repository contains a collection of heterogeneous computing benchmarks written with CUDA, HIP, SYCL/DPC++, and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
 
 # Software installation
 [AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
 [Intel DPC++ compiler](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md) or [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
 [NVIDIA HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
+# Benchmark categories
+Each benchmark falls into a single category. While such classification is not accurate, the arrangement serves as a starting point for users of the benchmark suite. Please see the Reference for more information about each benchmark. 
+
+### Automotive
+    daphne
+
+### Bandwidth
+    babelstream, memcpy, memtest, randomAccess, shmembench, triad 
+
+### Bioinformatics
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, snake  
+
+### Cryptography
+    aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
+
+### Data compression and reduction
+    atomicAggregate, atomicIntrinsics, atomicCAS, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mtf, scan, scan2, scan3, segment-reduce
+
+### Data encoding, decoding, or verification
+    ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
+
+### Finance
+    aop, black-scholes, binomial, bonds, libor
+
+### Computer vision and image processing
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
+
+### Geographic information system
+    aidw, coordinates, geodesic, hausdorff, haversine
+
+### Graph
+    cc, floydwarshall, gc, hbc, hungarian, mis, sssp
+
+### Language and kernel features
+    aligned-types, asta, collision, concurrentKernels, dispatch, ert, interleave, layout, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+
+### Machine learning  
+    attention, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
+
+### Math
+    alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sobel, sptrsv, thomas, wyllie 
+   
+### Random number generation
+    mt, qrg, rng-wallace, sobol, urng
+
+### Search
+    bfs, bsearch, b+tree, grp, keogh, ss, tsp
+
+### Signal processing
+    extrema, fft, lombscargle, sosfil
+
+### Simulation
+    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, testSNAP, tissue, tpacf, tensorT, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, xlqc, xsbench
+
+### Sorting
+    bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
+
+### Robotics
+    inversek2j
+
 # Run a benchmark
-  Option 1:
-    Go to a benchmark and type `make run`  
-  Option 2:
-    Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
+  Option 1: Go to a benchmark and type `make run`  
+  Option 2: Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
 
     It works with a `.json` file containing the benchmark names, a regex to
     find the timings in the benchmark output and optional arguments that

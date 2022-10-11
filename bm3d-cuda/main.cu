@@ -225,122 +225,132 @@ int main(int argc, char** argv)
   // repeat the execution of kernels
   for (int n = 0; n < REPEAT; n++) {
 
-  for(auto & it : d_numerator) 
-    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
+    for(auto & it : d_numerator) 
+      cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
-  for(auto & it : d_denominator)
-    cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
+    for(auto & it : d_denominator)
+      cuda_error_check( cudaMemset(it, 0, image_size * sizeof(float)) );
 
-  //Batch processing: in each iteration only the batch_size reference patches are processed. 
-  uint2 start_point;
-  for(start_point.y = 0; start_point.y < stacks_dim.y + p - 1; 
-      start_point.y += (h_batch_size.y*p))
-  {
-    for(start_point.x = 0; start_point.x < stacks_dim.x + p - 1; 
-        start_point.x += (h_batch_size.x*p))
+    //Batch processing: in each iteration only the batch_size reference patches are processed. 
+    uint2 start_point;
+    for(start_point.y = 0; start_point.y < stacks_dim.y + p - 1; 
+        start_point.y += (h_batch_size.y*p))
     {
-      //Finds similar patches for each reference patch of a batch and stores them in d_stacks array
-      run_block_matching(
-          d_noisy_image[0],      // IN: Image  
-          d_stacks,              // OUT: Array of adresses of similar patches
-          d_num_patches_in_stack,// OUT: Array containing numbers of these addresses
-          image_dim,             // IN: Image dimensions
-          stacks_dim,            // IN: Dimensions limiting addresses of reference patches
-          h_hard_params,         // IN: Denoising parameters 
-          start_point,           // IN: Address of the top-left reference patch of a batch
-          num_threads_bm,        // Threads in block 
-          num_blocks_bm,         // Blocks in grid
-          lmem_size_bm           // Shared memory size
-      );
-
-      //cuda_error_check( cudaGetLastError() );
-      //cuda_error_check( cudaDeviceSynchronize() );
-
-      for (uint channel = 0; channel < channels; ++channel)
+      for(start_point.x = 0; start_point.x < stacks_dim.x + p - 1; 
+          start_point.x += (h_batch_size.x*p))
       {
-        //Assembles 3D groups of a batch according to the d_stacks array
-        run_get_block(
-            start_point,             // IN: First reference patch of a batch
-            d_noisy_image[channel],  // IN: Image
-            d_stacks,                // IN: Array of adresses of similar patches
-            d_num_patches_in_stack,  // IN: Numbers of patches in 3D groups
-            d_gathered_stacks,       // OUT: Assembled 3D groups
-            image_dim,               // IN: Image dimensions
-            stacks_dim,              // IN: Dimensions limiting addresses of reference patches
-            h_hard_params,           // IN: Denoising parameters
-            num_threads,             // Threads in block
-            num_blocks               // Blocks in grid
-        );
-
-        //cuda_error_check( cudaGetLastError() );
-        //cuda_error_check( cudaDeviceSynchronize() );
-
-        //Apply the 2D DCT transform to each layer of 3D group
-        run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
-        //cuda_error_check( cudaGetLastError() );
-        //cuda_error_check( cudaDeviceSynchronize() );
-
-        // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
-        //      3D group of a batch to complete the 3D transform.
-        // 2) Hard thresholding
-        // 3) Inverse 1D Walsh-Hadamard trannsform.
-        // 4) Compute the weingt of each 3D group
-
-        run_hard_treshold_block(
-            start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN/OUT: 3D groups with transfomed patches
-            d_w_P,                 // OUT: Weight of each 3D group
-            d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
-            stacks_dim,            // IN: Dimensions limiting addresses of reference patches
-            h_hard_params,         // IN: Denoising parameters
-            sigma2[channel],       // IN: sigma
-            num_threads,           // Threads in block
-            num_blocks,            // Blocks in grid
-            s_size_t               // Shared memory size
-        );
-
-        //cuda_error_check( cudaGetLastError() );
-        //cuda_error_check( cudaDeviceSynchronize() );
-
-        //Apply inverse 2D DCT transform to each layer of 3D group
-        run_IDCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
-
-        //cuda_error_check( cudaGetLastError() );
-        //cuda_error_check( cudaDeviceSynchronize() );
-
-        //Aggregates filtered patches of all 3D groups of a batch into numerator and denominator buffers
-        run_aggregate_block(
-            start_point,           // IN: First reference patch of a batch
-            d_gathered_stacks,     // IN: 3D groups with transfomed patches
-            d_w_P,                 // IN: Numbers of non zero coeficients after 3D thresholding
-            d_stacks,              // IN: Array of adresses of similar patches
-            d_kaiser_window,       // IN: Kaiser window
-            d_numerator[channel],  // IN/OUT: Numerator aggregation buffer
-            d_denominator[channel],// IN/OUT: Denominator aggregation buffer
-            d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
+        //Finds similar patches for each reference patch of a batch and stores them in d_stacks array
+        run_block_matching(
+            d_noisy_image[0],      // IN: Image  
+            d_stacks,              // OUT: Array of adresses of similar patches
+            d_num_patches_in_stack,// OUT: Array containing numbers of these addresses
             image_dim,             // IN: Image dimensions
             stacks_dim,            // IN: Dimensions limiting addresses of reference patches
-            h_hard_params,         // IN: Denoising parameters
-            num_threads,           // Threads in block
-            num_blocks             // Blocks in grid
+            h_hard_params,         // IN: Denoising parameters 
+            start_point,           // IN: Address of the top-left reference patch of a batch
+            num_threads_bm,        // Threads in block 
+            num_blocks_bm,         // Blocks in grid
+            lmem_size_bm           // Shared memory size
         );
+
         //cuda_error_check( cudaGetLastError() );
         //cuda_error_check( cudaDeviceSynchronize() );
+
+        for (uint channel = 0; channel < channels; ++channel)
+        {
+          //Assembles 3D groups of a batch according to the d_stacks array
+          run_get_block(
+              start_point,             // IN: First reference patch of a batch
+              d_noisy_image[channel],  // IN: Image
+              d_stacks,                // IN: Array of adresses of similar patches
+              d_num_patches_in_stack,  // IN: Numbers of patches in 3D groups
+              d_gathered_stacks,       // OUT: Assembled 3D groups
+              image_dim,               // IN: Image dimensions
+              stacks_dim,              // IN: Dimensions limiting addresses of reference patches
+              h_hard_params,           // IN: Denoising parameters
+              num_threads,             // Threads in block
+              num_blocks               // Blocks in grid
+          );
+
+          //cuda_error_check( cudaGetLastError() );
+          //cuda_error_check( cudaDeviceSynchronize() );
+
+          //Apply the 2D DCT transform to each layer of 3D group
+          run_DCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
+          //cuda_error_check( cudaGetLastError() );
+          //cuda_error_check( cudaDeviceSynchronize() );
+
+          // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
+          //      3D group of a batch to complete the 3D transform.
+          // 2) Hard thresholding
+          // 3) Inverse 1D Walsh-Hadamard trannsform.
+          // 4) Compute the weingt of each 3D group
+
+          run_hard_treshold_block(
+              start_point,           // IN: First reference patch of a batch
+              d_gathered_stacks,     // IN/OUT: 3D groups with transfomed patches
+              d_w_P,                 // OUT: Weight of each 3D group
+              d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
+              stacks_dim,            // IN: Dimensions limiting addresses of reference patches
+              h_hard_params,         // IN: Denoising parameters
+              sigma2[channel],       // IN: sigma
+              num_threads,           // Threads in block
+              num_blocks,            // Blocks in grid
+              s_size_t               // Shared memory size
+          );
+
+          //cuda_error_check( cudaGetLastError() );
+          //cuda_error_check( cudaDeviceSynchronize() );
+
+          //Apply inverse 2D DCT transform to each layer of 3D group
+          run_IDCT2D8x8(d_gathered_stacks, d_gathered_stacks, trans_size, num_threads_tr, num_blocks_tr);
+
+          //cuda_error_check( cudaGetLastError() );
+          //cuda_error_check( cudaDeviceSynchronize() );
+
+          //Aggregates filtered patches of all 3D groups of a batch into numerator and denominator buffers
+          run_aggregate_block(
+              start_point,           // IN: First reference patch of a batch
+              d_gathered_stacks,     // IN: 3D groups with transfomed patches
+              d_w_P,                 // IN: Numbers of non zero coeficients after 3D thresholding
+              d_stacks,              // IN: Array of adresses of similar patches
+              d_kaiser_window,       // IN: Kaiser window
+              d_numerator[channel],  // IN/OUT: Numerator aggregation buffer
+              d_denominator[channel],// IN/OUT: Denominator aggregation buffer
+              d_num_patches_in_stack,// IN: Numbers of patches in 3D groups
+              image_dim,             // IN: Image dimensions
+              stacks_dim,            // IN: Dimensions limiting addresses of reference patches
+              h_hard_params,         // IN: Denoising parameters
+              num_threads,           // Threads in block
+              num_blocks             // Blocks in grid
+          );
+          //cuda_error_check( cudaGetLastError() );
+          //cuda_error_check( cudaDeviceSynchronize() );
+        }
       }
     }
-  }
 
-  //Divide numerator by denominator and save the result in output image
-  for (uint channel = 0; channel < channels; ++channel)
-  {
-    run_aggregate_final(
-        d_numerator[channel],      // IN: Numerator aggregation buffer
-        d_denominator[channel],    // IN: Denominator aggregation buffer
-        image_dim,                 // IN: Image dimensions
-        d_denoised_image[channel], // OUT: Image estimate
-        num_threads_f,             // Threads in block
-        num_blocks_f               // Blocks in grid
-    );
+    //Divide numerator by denominator and save the result in output image
+    for (uint channel = 0; channel < channels; ++channel)
+    {
+      run_aggregate_final(
+          d_numerator[channel],      // IN: Numerator aggregation buffer
+          d_denominator[channel],    // IN: Denominator aggregation buffer
+          image_dim,                 // IN: Image dimensions
+          d_denoised_image[channel], // OUT: Image estimate
+          num_threads_f,             // Threads in block
+          num_blocks_f               // Blocks in grid
+      );
+    }
+  } // REPEAT
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  double gpuTime = (double)elapsed_seconds.count();
+  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
+
+  for (uint channel = 0; channel < channels; ++channel) {
     //cuda_error_check( cudaGetLastError() );
     //cuda_error_check( cudaDeviceSynchronize() );
     cuda_error_check( cudaMemcpy(
@@ -349,13 +359,6 @@ int main(int argc, char** argv)
           image_size*sizeof(uchar), 
           cudaMemcpyDeviceToHost) );
   }
-
-  } // REPEAT
-
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed_seconds = end - start;
-  double gpuTime = (double)elapsed_seconds.count();
-  std::cout << "Average device execution time (s): " << gpuTime / REPEAT << std::endl;
 
   if (channels == 3) 
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
