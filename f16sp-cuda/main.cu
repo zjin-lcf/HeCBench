@@ -138,11 +138,11 @@ int main(int argc, char *argv[])
 
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
-  half2 * a, *b;
-  half2 * d_a, *d_b;
+  half2 *a, *b;
+  half2 *d_a, *d_b;
 
-  float * r;  // result
-  float * d_r;
+  float *r;  // result
+  float *d_r;
 
   a = (half2*) malloc (size*sizeof(half2));
   b = (half2*) malloc (size*sizeof(half2));
@@ -159,6 +159,10 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   cudaMemcpy(d_b, b, size*sizeof(half2), cudaMemcpyHostToDevice);
 
+  // warmup
+  for (int i = 0; i < repeat; i++)
+    scalarProductKernel_intrinsics<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
@@ -168,7 +172,7 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), cudaMemcpyDeviceToHost);
 
@@ -179,6 +183,10 @@ int main(int argc, char *argv[])
   }
   printf("Result intrinsics\t: %f \n", result_intrinsics);
 
+  // warmup
+  for (int i = 0; i < repeat; i++)
+    scalarProductKernel_native<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
@@ -188,7 +196,7 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), cudaMemcpyDeviceToHost);
 
