@@ -38,37 +38,6 @@ void reduceInShared_native(half2 *const v, nd_item<1> &item)
   item.barrier(access::fence_space::local_space);
 }
 
-void scalarProductKernel_intrinsics(const half2 *a,
-                                    const half2 *b,
-                                    float *results,
-                                          half2 *shArray,
-                                    const size_t size,
-                                    nd_item<1> &item)
-{
-  int lid = item.get_local_id(0);
-  int gid = item.get_group(0); 
-
-  const int stride = item.get_group_range(0) * item.get_local_range(0);
-
-  half2 value = float2{0.f, 0.f}.convert<half, rounding_mode::rte>();
-
-  for (int i = item.get_global_id(0); i < size; i += stride)
-  {
-    value = sycl::fma(a[i], b[i], value);
-  }
-
-  shArray[lid] = value;
-  item.barrier(access::fence_space::local_space);
-  reduceInShared_native(shArray, item);
-
-  if (lid == 0)
-  {
-    half2 result = shArray[0];
-    float f_result = result[1] + result[0];
-    results[gid] = f_result;
-  }
-}
-
 void scalarProductKernel_native(const half2 *a,
                                 const half2 *b,
                                 float *results, 
@@ -144,46 +113,27 @@ int main(int argc, char *argv[])
   range<1> gws (NUM_OF_BLOCKS * NUM_OF_THREADS);
   range<1> lws (NUM_OF_THREADS);
 
-  q.wait();
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < repeat; i++)
+  // warmup
+  for (int i = 0; i < repeat; i++) {
     q.submit([&](handler &cgh) {
       auto a = d_a.get_access<sycl_read>(cgh); 
       auto b = d_b.get_access<sycl_read>(cgh); 
       auto r = d_r.get_access<sycl_discard_write>(cgh); 
       accessor<half2, 1, sycl_read_write, sycl_lmem> shArray(NUM_OF_THREADS, cgh);
-      cgh.parallel_for<class sp1>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        scalarProductKernel_intrinsics(
-            a.get_pointer(),
-            b.get_pointer(),
-            r.get_pointer(),
-            shArray.get_pointer(),
-            size, item);
-        });
+      cgh.parallel_for<class warm_sp2>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        scalarProductKernel_native(
+          a.get_pointer(),
+          b.get_pointer(),
+          r.get_pointer(),
+          shArray.get_pointer(),
+          size, item);
       });
-
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
-
-  q.submit([&](handler &cgh) {
-    auto acc = d_r.get_access<sycl_read>(cgh); 
-    cgh.copy(acc, r);
-  }).wait();
-
-  float result_intrinsics = 0;
-  for (int i = 0; i < NUM_OF_BLOCKS; ++i)
-  {
-    result_intrinsics += r[i];
+    });
   }
-  printf("Result intrinsics\t: %f \n", result_intrinsics);
-
   q.wait();
-  start = std::chrono::steady_clock::now();
+  auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
     q.submit([&](handler &cgh) {
       auto a = d_a.get_access<sycl_read>(cgh); 
       auto b = d_b.get_access<sycl_read>(cgh); 
@@ -196,13 +146,14 @@ int main(int argc, char *argv[])
           r.get_pointer(),
           shArray.get_pointer(),
           size, item);
-        });
       });
+    });
+  }
 
   q.wait();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
   q.submit([&](handler &cgh) {
     auto acc = d_r.get_access<sycl_read>(cgh); 
@@ -216,7 +167,9 @@ int main(int argc, char *argv[])
   }
   printf("Result native operators\t: %f \n", result_native);
 
-  printf("fp16ScalarProduct %s\n", (fabs(result_intrinsics - result_native) < 0.00001) ? 
+  float result_reference = 5241674.f;
+
+  printf("fp16ScalarProduct %s\n", (fabs(result_reference - result_native) < 0.00001) ? 
          "PASS" : "FAIL");
 
   free(a);
