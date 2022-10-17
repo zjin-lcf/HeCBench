@@ -9,9 +9,9 @@
 
 int main(int argc, char* argv[]) {
 
-  if (argc != 7) {
-    printf("Usage: %s <filename> <rows> <cols> <cases> <controls> <threads>\n",
-           argv[0]);
+  if (argc != 8) {
+    printf("Usage: %s <filename> <rows> <cols> <cases> <controls> "
+           "<threads> <repeat>\n", argv[0]);
     return 1;
   }
 
@@ -27,6 +27,7 @@ int main(int argc, char* argv[]) {
   int ncases = atoi(argv[4]);
   int ncontrols = atoi(argv[5]);
   int nthreads = atoi(argv[6]);
+  int repeat = atoi(argv[7]);
 
   printf("Individuals=%d SNPs=%d cases=%d controls=%d nthreads=%d\n",
          rows,cols,ncases,ncontrols,nthreads);
@@ -35,9 +36,12 @@ int main(int argc, char* argv[]) {
   printf("Size of the data = %lu\n",size);
 
   // allocate SNP host data 
-  unsigned char *dataT = (unsigned char*)malloc(size);
-  float* h_results = (float*) malloc(cols * sizeof(float)); 
-  float* cpu_results = (float*) malloc(cols * sizeof(float)); 
+  size_t snpdata_size = sizeof(unsigned char) * size;
+  size_t result_size = sizeof(float) * cols;
+
+  unsigned char *dataT = (unsigned char*)malloc(snpdata_size);
+  float* h_results = (float*) malloc(result_size);
+  float* cpu_results = (float*) malloc(result_size);
 
   if(dataT == NULL || h_results == NULL || cpu_results == NULL) {
     printf("ERROR: Memory for data not allocated.\n");
@@ -53,89 +57,94 @@ int main(int argc, char* argv[]) {
 #endif
   queue q(dev_sel);
 
-  auto start = std::chrono::high_resolution_clock::now();
-
   // allocate SNP device data
-  buffer<unsigned char, 1> d_dataT (dataT, size);
-  buffer<float, 1> d_results (cols);
+
+  unsigned char *snpdata = malloc_device<unsigned char>(size, q);
+  q.memcpy(dataT, snpdata, snpdata_size);
+
+  float *chi_result = malloc_device<float>(cols, q);
 
   unsigned jobs = cols;
   range<1> gws ((jobs + nthreads - 1)/nthreads * nthreads);
   range<1> lws (nthreads);
 
-  q.submit([&](handler& cgh) {
-    auto snpdata = d_dataT.get_access<sycl_read>(cgh);
-    auto chi_result = d_results.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class chi2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      unsigned char y;
-      int m, n;
-      unsigned int p = 0;
-      int cases[3];
-      int controls[3];
-      int tot_cases = 1;
-      int tot_controls= 1;
-      int total = 1;
-      float chisquare = 0.0f;
-      float exp[3];        
-      float Conexpected[3];        
-      float Cexpected[3];
-      float numerator1;
-      float numerator2;
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-      int tid  = item.get_global_id(0);
-      if (tid >= cols) return;
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](handler& cgh) {
+      cgh.parallel_for<class chi2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        unsigned char y;
+        int m, n;
+        unsigned int p = 0;
+        int cases[3];
+        int controls[3];
+        int tot_cases = 1;
+        int tot_controls= 1;
+        int total = 1;
+        float chisquare = 0.0f;
+        float exp[3];        
+        float Conexpected[3];        
+        float Cexpected[3];
+        float numerator1;
+        float numerator2;
 
-      cases[0]=1;cases[1]=1;cases[2]=1;
-      controls[0]=1;controls[1]=1;controls[2]=1;
+        int tid  = item.get_global_id(0);
+        if (tid >= cols) return;
 
-      // read cases: each thread reads a column of snpdata matrix
-      for ( m = 0 ; m < ncases ; m++ ) {
-        y = snpdata[m * cols + tid];
-        if ( y == '0') { cases[0]++; }
-        else if ( y == '1') { cases[1]++; }
-        else if ( y == '2') { cases[2]++; }
-      }
+        cases[0]=1;cases[1]=1;cases[2]=1;
+        controls[0]=1;controls[1]=1;controls[2]=1;
 
-      // read controls: each thread reads a column of snpdata matrix
-      for ( n = ncases ; n < ncases + ncontrols ; n++ ) {
-        y = snpdata[n * cols + tid];
-        if ( y == '0' ) { controls[0]++; }
-        else if ( y == '1') { controls[1]++; }
-        else if ( y == '2') { controls[2]++; }
-      }
+        // read cases: each thread reads a column of snpdata matrix
+        for ( m = 0 ; m < ncases ; m++ ) {
+          y = snpdata[m * cols + tid];
+          if ( y == '0') { cases[0]++; }
+          else if ( y == '1') { cases[1]++; }
+          else if ( y == '2') { cases[2]++; }
+        }
 
-      tot_cases = cases[0]+cases[1]+cases[2];
-      tot_controls = controls[0]+controls[1]+controls[2];
-      total = tot_cases + tot_controls;
+        // read controls: each thread reads a column of snpdata matrix
+        for ( n = ncases ; n < ncases + ncontrols ; n++ ) {
+          y = snpdata[n * cols + tid];
+          if ( y == '0' ) { controls[0]++; }
+          else if ( y == '1') { controls[1]++; }
+          else if ( y == '2') { controls[2]++; }
+        }
 
-      for( p = 0 ; p < 3; p++) {
-        exp[p] = (float)cases[p] + controls[p]; 
-        Cexpected[p] = tot_cases * exp[p] / total;
-        Conexpected[p] = tot_controls * exp[p] / total;
-        numerator1 = (float)cases[p] - Cexpected[p];
-        numerator2 = (float)controls[p] - Conexpected[p];
-        chisquare += numerator1 * numerator1 / Cexpected[p] +  numerator2 * numerator2 / Conexpected[p];
-      }
-      chi_result[tid] = chisquare;
+        tot_cases = cases[0]+cases[1]+cases[2];
+        tot_controls = controls[0]+controls[1]+controls[2];
+        total = tot_cases + tot_controls;
+
+        for( p = 0 ; p < 3; p++) {
+          exp[p] = (float)cases[p] + controls[p]; 
+          Cexpected[p] = tot_cases * exp[p] / total;
+          Conexpected[p] = tot_controls * exp[p] / total;
+          numerator1 = (float)cases[p] - Cexpected[p];
+          numerator2 = (float)controls[p] - Conexpected[p];
+          chisquare += numerator1 * numerator1 / Cexpected[p] +  numerator2 * numerator2 / Conexpected[p];
+        }
+        chi_result[tid] = chisquare;
+      });
     });
-  });
+  }
+  q.wait();
 
-  q.submit([&](handler& cgh) {
-    auto r = d_results.get_access<sycl_read>(cgh);
-    cgh.copy(r, h_results);
-  }).wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time = %f (s)\n", time * 1e-9f / repeat);
 
-  auto end = std::chrono::high_resolution_clock::now();
-  auto seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-  printf("Total time (device) = %f (s)\n", seconds);
+  q.memcpy(chi_result, h_results, result_size).wait();
 
-  start = std::chrono::high_resolution_clock::now();
+  free(snpdata, q);
+  free(chi_result, q);
+
+  start = std::chrono::steady_clock::now();
 
   cpu_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
 
-  end = std::chrono::high_resolution_clock::now();
-  seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-  printf("Total time (host) = %f (s)\n", seconds);
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Host execution time = %f (s)\n", time * 1e-9f);
 
   // verify
   int error = 0;

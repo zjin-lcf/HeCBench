@@ -69,9 +69,9 @@ __global__ void kernel(
 
 int main(int argc, char* argv[]) {
 
-  if (argc != 7) {
-    printf("Usage: %s <filename> <rows> <cols> <cases> <controls> <threads>\n",
-           argv[0]);
+  if (argc != 8) {
+    printf("Usage: %s <filename> <rows> <cols> <cases> <controls> "
+           "<threads> <repeat>\n", argv[0]);
     return 1;
   }
 
@@ -87,6 +87,7 @@ int main(int argc, char* argv[]) {
   int ncases = atoi(argv[4]);
   int ncontrols = atoi(argv[5]);
   int nthreads = atoi(argv[6]);
+  int repeat = atoi(argv[7]);
 
   printf("Individuals=%d SNPs=%d cases=%d controls=%d nthreads=%d\n",
          rows,cols,ncases,ncontrols,nthreads);
@@ -95,9 +96,12 @@ int main(int argc, char* argv[]) {
   printf("Size of the data = %lu\n",size);
 
   // allocate SNP host data 
-  unsigned char *dataT = (unsigned char*)malloc(size);
-  float* h_results = (float*) malloc(cols * sizeof(float)); 
-  float* cpu_results = (float*) malloc(cols * sizeof(float)); 
+  size_t snpdata_size = sizeof(unsigned char) * size;
+  size_t result_size = sizeof(float) * cols;
+
+  unsigned char *dataT = (unsigned char*)malloc(snpdata_size);
+  float* h_results = (float*) malloc(result_size);
+  float* cpu_results = (float*) malloc(result_size);
 
   if(dataT == NULL || h_results == NULL || cpu_results == NULL) {
     printf("ERROR: Memory for data not allocated.\n");
@@ -119,37 +123,43 @@ int main(int argc, char* argv[]) {
     }
   }
   fclose(fp);
-  printf("Finished read the SNP data from the file.\n");
   fflush(stdout);
-
-  auto start = std::chrono::high_resolution_clock::now();
 
   // allocate SNP device data
   unsigned char *d_data;
   float *d_results;
-  cudaMalloc((void**) &d_data, (size_t) size * (size_t) sizeof(unsigned char) );
-  cudaMalloc((void**) &d_results, cols * sizeof(float) );
+  cudaMalloc((void**) &d_data, snpdata_size);
+  cudaMalloc((void**) &d_results, result_size);
 
-  cudaMemcpy(d_data, dataT, (size_t)size * (size_t)sizeof(unsigned char), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_data, dataT, snpdata_size, cudaMemcpyHostToDevice);
 
   unsigned jobs = cols;
   int nblocks = (jobs + nthreads - 1)/nthreads;
 
-  kernel <<< dim3(nblocks), dim3(nthreads) >>> (rows,cols,ncases,ncontrols,d_data,d_results);
+  cudaDeviceSynchronize();
+  auto start = std::chrono::high_resolution_clock::now();
 
-  cudaMemcpy(h_results,d_results,cols * sizeof(float),cudaMemcpyDeviceToHost);
+  for (int i = 0; i < repeat; i++) {
+    kernel <<< dim3(nblocks), dim3(nthreads) >>> (rows,cols,ncases,ncontrols,d_data,d_results);
+  }
 
+  cudaDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
-  auto seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-  printf("Total time (device) = %f (s)\n", seconds);
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time = %f (s)\n", time * 1e-9f / repeat);
+
+  cudaMemcpy(h_results, d_results, result_size, cudaMemcpyDeviceToHost);
+
+  cudaFree(d_data);
+  cudaFree(d_results);
 
   start = std::chrono::high_resolution_clock::now();
 
   cpu_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
 
   end = std::chrono::high_resolution_clock::now();
-  seconds = std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
-  printf("Total time (host) = %f (s)\n", seconds);
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Host execution time = %f (s)\n", time * 1e-9f);
 
   // verify
   int error = 0;
@@ -158,8 +168,6 @@ int main(int argc, char* argv[]) {
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 
-  cudaFree(d_data);
-  cudaFree(d_results);
   free(dataT);
   free(h_results);
   free(cpu_results);

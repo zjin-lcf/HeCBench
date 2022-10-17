@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) traindata 4000 400000 2000 2000 256
+	./$(program) ../chi2-cuda/traindata 4000 400000 2000 2000 256 1000
