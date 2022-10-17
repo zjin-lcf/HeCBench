@@ -198,6 +198,8 @@ int main(int argc, char **argv) {
 #endif
   sycl::queue q(dev_sel);
 
+  auto t1 = std::chrono::high_resolution_clock::now();
+
   buffer<unsigned char, 1> d_in_out(in_size);
   buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
   buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
@@ -565,6 +567,10 @@ int main(int argc, char **argv) {
       }
   }));
   std::for_each(proxy_threads.begin(), proxy_threads.end(), [](std::thread &t) { t.join(); });
+
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Total time %lf secs \n", total_time / 1.0e6);
 
 #ifdef CHAI_OPENCV
   // Display the result
