@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <cuda.h>
 #include <float.h>
+#include <chrono>
+#include <cuda.h>
 #include "kernels.cu"
 
 const int HIGHEST = 3;
@@ -54,8 +54,6 @@ int main(int argc, char** argv) {
   int i, j, c = 0, tmp, a, b;
   float tmpd;
 
-  clock_t start, finish, total = 0, pre1, pre2;
-
   printf("NODE_N=%d\nInitialization...\n", NODE_N);
 
   srand(2);
@@ -79,24 +77,27 @@ int main(int argc, char** argv) {
   cudaMalloc((void **)&D_parent, NODE_N * sizeof(bool)); 
   cudaMalloc((void **)&D_resP, (sizepernode / (256 * WORKLOAD) + 1) * 4 * sizeof(int));
 
-  pre1 = clock();
-
   dim3 grid(sizepernode / 256 + 1, 1, 1);
   dim3 threads(256, 1, 1);
 
   cudaMemset(D_localscore, 0.f, NODE_N * sizepernode * sizeof(float));
   cudaMemcpy(D_data, data, NODE_N * DATA_N * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(D_LG, LG, (DATA_N + 2) * sizeof(float), cudaMemcpyHostToDevice);
+
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   genScoreKernel<<<grid, threads>>>(sizepernode, D_localscore, D_data, D_LG);
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
+
   cudaMemcpy(localscore, D_localscore, NODE_N * sizepernode * sizeof(float), cudaMemcpyDeviceToHost);
 
-  printf("Begin to generate orders.\n");
-
-  pre2 = clock();
   i = 0;
   while (i != ITER) {
-
-    start = clock();
 
     i++;
     score = 0;
@@ -112,9 +113,6 @@ int main(int argc, char** argv) {
       genOrders();
 
     score = findBestGraph(D_localscore, D_resP, D_Score, D_parent);
-
-    finish = clock();
-    total += finish - start;
 
     ConCore();
 
@@ -191,20 +189,6 @@ int main(int argc, char** argv) {
     }
     fprintf(fpout,"--------------------------------------------------------------------\n");
   }
-
-  fprintf(fpout, "Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
-
-  printf("Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  printf("Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  printf("Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
 
   return 0;
 }

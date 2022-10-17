@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <hip/hip_runtime.h>
 #include <float.h>
+#include <chrono>
+#include <hip/hip_runtime.h>
 #include "kernels.cu"
 
 const int HIGHEST = 3;
@@ -54,8 +54,6 @@ int main(int argc, char** argv) {
   int i, j, c = 0, tmp, a, b;
   float tmpd;
 
-  clock_t start, finish, total = 0, pre1, pre2;
-
   printf("NODE_N=%d\nInitialization...\n", NODE_N);
 
   srand(2);
@@ -79,25 +77,27 @@ int main(int argc, char** argv) {
   hipMalloc((void **)&D_parent, NODE_N * sizeof(bool)); 
   hipMalloc((void **)&D_resP, (sizepernode / (256 * WORKLOAD) + 1) * 4 * sizeof(int));
 
-  pre1 = clock();
-
   dim3 grid(sizepernode / 256 + 1, 1, 1);
   dim3 threads(256, 1, 1);
 
   hipMemset(D_localscore, 0.f, NODE_N * sizepernode * sizeof(float));
   hipMemcpy(D_data, data, NODE_N * DATA_N * sizeof(int), hipMemcpyHostToDevice);
   hipMemcpy(D_LG, LG, (DATA_N + 2) * sizeof(float), hipMemcpyHostToDevice);
-  hipLaunchKernelGGL(genScoreKernel, dim3(grid), dim3(threads), 0, 0, sizepernode, D_localscore, D_data, D_LG);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  hipLaunchKernelGGL(genScoreKernel, grid, threads, 0, 0, sizepernode, D_localscore, D_data, D_LG);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
+
   hipMemcpy(localscore, D_localscore, NODE_N * sizepernode * sizeof(float), hipMemcpyDeviceToHost);
 
-  printf("Begin to generate orders.\n");
-
-
-  pre2 = clock();
   i = 0;
   while (i != ITER) {
-
-    start = clock();
 
     i++;
     score = 0;
@@ -113,9 +113,6 @@ int main(int argc, char** argv) {
       genOrders();
 
     score = findBestGraph(D_localscore, D_resP, D_Score, D_parent);
-
-    finish = clock();
-    total += finish - start;
 
     ConCore();
 
@@ -193,20 +190,6 @@ int main(int argc, char** argv) {
     fprintf(fpout,"--------------------------------------------------------------------\n");
   }
 
-  fprintf(fpout, "Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
-
-  printf("Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  printf("Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  printf("Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
-
   return 0;
 }
 
@@ -245,7 +228,7 @@ float findBestGraph(float* D_localscore, int* D_resP, float* D_Score, bool *D_pa
       hipMemset(D_Score, -999999.f, blocknum * sizeof(float));
       hipMemcpy(D_parent, orders[node], NODE_N * sizeof(bool), hipMemcpyHostToDevice);
 
-      hipLaunchKernelGGL(computeKernel, dim3(blocknum), dim3(256), 256 * sizeof(float), 0, 
+      computeKernel<<<blocknum, 256, 256 * sizeof(float)>>>(
           WORKLOAD, sizepernode, D_localscore, D_parent, node, total, D_Score,
           D_resP);
       hipMemcpy(parents, D_resP, blocknum * 4 * sizeof(int), hipMemcpyDeviceToHost);
