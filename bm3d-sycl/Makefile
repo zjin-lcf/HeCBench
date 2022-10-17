@@ -32,7 +32,7 @@ obj = $(source:.cpp=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I. -I../bm3d-cuda -fsycl
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
