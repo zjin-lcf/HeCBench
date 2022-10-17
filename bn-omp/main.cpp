@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <chrono>
 #include <omp.h>
 #include "kernels.cpp"
 
@@ -56,8 +56,6 @@ int main(int argc, char** argv) {
   int i, j, c = 0, tmp, a, b;
   float tmpd;
 
-  clock_t start, finish, total = 0, pre1, pre2;
-
   printf("NODE_N=%d\nInitialization...\n", NODE_N);
 
   srand(2);
@@ -80,23 +78,21 @@ int main(int argc, char** argv) {
                                    D_parent[0:NODE_N], \
                                    D_resP[0:(sizepernode / (256 * WORKLOAD) + 1) * 4])
 {
-
-  pre1 = clock();
+  auto start = std::chrono::steady_clock::now();
 
   genScoreKernel(sizepernode, localscore, data, LG);
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
 
 #ifdef DEBUG
   for (int i = 0; i < NODE_N * sizepernode; i=i+sizepernode)
     printf("%f\n", localscore[i]);
 #endif
     
-  printf("Begin to generate orders.\n");
-  pre2 = clock();
-
   i = 0;
   while (i != ITER) {
-
-    start = clock();
 
     i++;
     score = 0;
@@ -112,9 +108,6 @@ int main(int argc, char** argv) {
       genOrders();
 
     score = findBestGraph(localscore, D_resP, D_Score, D_parent);
-
-    finish = clock();
-    total += finish - start;
 
     ConCore();
 
@@ -188,20 +181,6 @@ int main(int argc, char** argv) {
     }
     fprintf(fpout,"--------------------------------------------------------------------\n");
   }
-
-  fprintf(fpout, "Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
-
-  printf("Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  printf("Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  printf("Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
 
   return 0;
 }

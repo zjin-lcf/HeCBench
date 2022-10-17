@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <chrono>
 #include "common.h"
 #include "kernels.cpp"
 
@@ -57,8 +57,6 @@ int main(int argc, char** argv) {
   int i, j, c = 0, tmp, a, b;
   float tmpd;
 
-  clock_t start, finish, total = 0, pre1, pre2;
-
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -82,8 +80,6 @@ int main(int argc, char** argv) {
   buffer<bool, 1> D_parent(NODE_N);
   buffer<int, 1> D_resP((sizepernode / (256 * WORKLOAD) + 1) * 4);
 
-  pre1 = clock();
-
   range<1> gws((sizepernode+255)/256*256);
   range<1> lws(256);
 
@@ -94,6 +90,9 @@ int main(int argc, char** argv) {
     cgh.fill(ls, 0.f);
   });
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   q.submit([&] (handler &cgh) {
     auto ls = D_localscore.get_access<sycl_read_write>(cgh);
     auto data = D_data.get_access<sycl_read>(cgh);
@@ -103,18 +102,18 @@ int main(int argc, char** argv) {
     });
   });
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
+
   q.submit([&] (handler &cgh) {
     auto ls = D_localscore.get_access<sycl_read>(cgh);
     cgh.copy(ls, localscore);
   }).wait();
 
-  printf("Begin to generate orders.\n");
-
-  pre2 = clock();
   i = 0;
   while (i != ITER) {
-
-    start = clock();
 
     i++;
     score = 0;
@@ -130,9 +129,6 @@ int main(int argc, char** argv) {
       genOrders();
 
     score = findBestGraph(q, D_localscore, D_resP, D_Score, D_parent);
-
-    finish = clock();
-    total += finish - start;
 
     ConCore();
 
@@ -203,20 +199,6 @@ int main(int argc, char** argv) {
     }
     fprintf(fpout,"--------------------------------------------------------------------\n");
   }
-
-  fprintf(fpout, "Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  fprintf(fpout, "Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
-
-  printf("Duration per iteration is %f seconds.\n",
-      ((float)total / ITER) / CLOCKS_PER_SEC);
-  printf("Total duration is %f seconds.\n",
-      (float)(pre2 - pre1 + total) / CLOCKS_PER_SEC);
-  printf("Preprocessing duration is %f seconds.\n",
-      (float)(pre2 - pre1) / CLOCKS_PER_SEC);
 
   return 0;
 }
