@@ -8,7 +8,6 @@
 
 #define NOW std::chrono::high_resolution_clock::now()
 
-
 std::string bwt_cpu(const std::string sequence) {
   const int n = sequence.size();
   const char* sequence_cstr = sequence.c_str();
@@ -42,7 +41,7 @@ int main(int argc, char const *argv[])
   // bioinformatics 
   std::string alphabet("ATCG");
   const int N = (argc > 1) ? atoi(argv[1]) : 1E6;
-  std::cout << "running sample of " << N << std::endl;
+  std::cout << "running a sample sequence of length " << N << std::endl;
 
   // initialize sequence
   srand(123);
@@ -62,8 +61,8 @@ int main(int argc, char const *argv[])
   auto gpu_seq = bwt(sequence);
   auto gpu_time = std::chrono::duration_cast<std::chrono::milliseconds>(NOW - start);
 
-  std::cout << "Host time: " << cpu_time.count() << "ms" << std::endl;
-  std::cout << "Device time: " << gpu_time.count() << "ms" << std::endl;
+  std::cout << "Host time: " << cpu_time.count() << " ms" << std::endl;
+  std::cout << "Device time: " << gpu_time.count() << " ms" << std::endl;
 
   if(cpu_seq.compare(gpu_seq) == 0) {
     std::cout << "PASS\n";
