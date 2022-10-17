@@ -1,6 +1,10 @@
 
 Canny Edge Detection - data partitioning (CEDD)
 
+Extract the dataset
+
+    tar -zxf frames.tar.gz
+
 Compilation instructions:
 
     make
