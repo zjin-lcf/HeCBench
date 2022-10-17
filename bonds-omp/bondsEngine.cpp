@@ -321,90 +321,90 @@ void runBoundsEngine()
     dataType* cleanPrice = resultsFromGpu.cleanPrice;
     dataType* bondForwardVal = resultsFromGpu.bondForwardVal;
 
-#pragma omp target data map(to: discountCurve[0:numBonds], \
-                                repoCurve[0:numBonds], \
-                                currDate[0:numBonds], \
-                                maturityDate[0:numBonds], \
-                                bondCleanPrice[0:numBonds], \
-                                bond[0:numBonds], \
-                                dummyStrike[0:numBonds]) \
-                        map(from: dirtyPrice[0:numBonds], \
-                                  accruedAmountCurrDate[0:numBonds], \
-                                  cleanPrice[0:numBonds], \
-                                  bondForwardVal[0:numBonds]) 
-{
-  gettimeofday(&start, NULL);
-
-  #pragma omp target teams distribute parallel for thread_limit(256) 
-  for (int bondNum = 0; bondNum < numBonds; bondNum++)
-  {
-    int numLegs;
-
-    int numCashFlows = 0;
-
-    bondsDateStruct currCashflowDate = bond[bondNum].maturityDate;
-
-    while (currCashflowDate.dateSerialNum > bond[bondNum].startDate.dateSerialNum)
+    #pragma omp target data map(to: discountCurve[0:numBonds], \
+                                    repoCurve[0:numBonds], \
+                                    currDate[0:numBonds], \
+                                    maturityDate[0:numBonds], \
+                                    bondCleanPrice[0:numBonds], \
+                                    bond[0:numBonds], \
+                                    dummyStrike[0:numBonds]) \
+                            map(from: dirtyPrice[0:numBonds], \
+                                      accruedAmountCurrDate[0:numBonds], \
+                                      cleanPrice[0:numBonds], \
+                                      bondForwardVal[0:numBonds]) 
     {
-      numCashFlows++;
-      currCashflowDate = advanceDateGpu(currCashflowDate, -6); 
+      gettimeofday(&start, NULL);
+    
+      #pragma omp target teams distribute parallel for thread_limit(256) 
+      for (int bondNum = 0; bondNum < numBonds; bondNum++)
+      {
+        int numLegs;
+    
+        int numCashFlows = 0;
+    
+        bondsDateStruct currCashflowDate = bond[bondNum].maturityDate;
+    
+        while (currCashflowDate.dateSerialNum > bond[bondNum].startDate.dateSerialNum)
+        {
+          numCashFlows++;
+          currCashflowDate = advanceDateGpu(currCashflowDate, -6); 
+        }
+    
+        numLegs = numCashFlows+1;
+    
+        cashFlowsStruct cashFlows; 
+        couponStruct cashLegs[9];
+        cashFlows.legs = cashLegs;
+    
+        cashFlows.intRate.dayCounter = USE_EXACT_DAY;
+        cashFlows.intRate.rate  = bond[bondNum].rate;
+        cashFlows.intRate.freq  = ANNUAL_FREQ;
+        cashFlows.intRate.comp  = SIMPLE_INTEREST;
+        cashFlows.dayCounter  = USE_EXACT_DAY;
+        cashFlows.nominal  = (dataType)100.0;
+    
+        //bondsDateStruct currPaymentDate;
+        bondsDateStruct currStartDate = advanceDateGpu(bond[bondNum].maturityDate, (numLegs - 1)*-6);
+        bondsDateStruct currEndDate = advanceDateGpu(currStartDate, 6); 
+    
+        int cashFlowNum;
+        for (cashFlowNum = 0; cashFlowNum < numLegs-1; cashFlowNum++)
+        {
+          cashFlows.legs[cashFlowNum].paymentDate = currEndDate;
+    
+          cashFlows.legs[cashFlowNum].accrualStartDate  = currStartDate;
+          cashFlows.legs[cashFlowNum].accrualEndDate  = currEndDate;
+    
+          cashFlows.legs[cashFlowNum].amount = COMPUTE_AMOUNT;
+    
+          currStartDate = currEndDate;
+          currEndDate = advanceDateGpu(currEndDate, 6); 
+        }
+    
+        cashFlows.legs[numLegs-1].paymentDate  = bond[bondNum].maturityDate;
+        cashFlows.legs[numLegs-1].accrualStartDate = currDate[bondNum];
+        cashFlows.legs[numLegs-1].accrualEndDate  = currDate[bondNum];
+        cashFlows.legs[numLegs-1].amount = (dataType)100.0;
+    
+        bondForwardVal[bondNum] = getBondYieldGpu(bondCleanPrice[bondNum],
+            USE_EXACT_DAY,
+            COMPOUNDED_INTEREST,
+            (dataType)2.0,
+            currDate[bondNum],
+            ACCURACY,
+            100,
+            bond, 
+            maturityDate,
+            bondNum, cashFlows, numLegs);
+    
+        discountCurve[bondNum].forward = bondForwardVal[bondNum];
+        dirtyPrice[bondNum] = getDirtyPriceGpu(bond, discountCurve, currDate, bondNum, cashFlows, numLegs);
+        accruedAmountCurrDate[bondNum] = getAccruedAmountGpu(maturityDate, currDate[bondNum], bondNum, cashFlows, numLegs);
+    
+        cleanPrice[bondNum] = dirtyPrice[bondNum] - accruedAmountCurrDate[bondNum];
+      }
+      gettimeofday(&end, NULL);
     }
-
-    numLegs = numCashFlows+1;
-
-    cashFlowsStruct cashFlows; 
-    couponStruct cashLegs[9];
-    cashFlows.legs = cashLegs;
-
-    cashFlows.intRate.dayCounter = USE_EXACT_DAY;
-    cashFlows.intRate.rate  = bond[bondNum].rate;
-    cashFlows.intRate.freq  = ANNUAL_FREQ;
-    cashFlows.intRate.comp  = SIMPLE_INTEREST;
-    cashFlows.dayCounter  = USE_EXACT_DAY;
-    cashFlows.nominal  = (dataType)100.0;
-
-    //bondsDateStruct currPaymentDate;
-    bondsDateStruct currStartDate = advanceDateGpu(bond[bondNum].maturityDate, (numLegs - 1)*-6);
-    bondsDateStruct currEndDate = advanceDateGpu(currStartDate, 6); 
-
-    int cashFlowNum;
-    for (cashFlowNum = 0; cashFlowNum < numLegs-1; cashFlowNum++)
-    {
-      cashFlows.legs[cashFlowNum].paymentDate = currEndDate;
-
-      cashFlows.legs[cashFlowNum].accrualStartDate  = currStartDate;
-      cashFlows.legs[cashFlowNum].accrualEndDate  = currEndDate;
-
-      cashFlows.legs[cashFlowNum].amount = COMPUTE_AMOUNT;
-
-      currStartDate = currEndDate;
-      currEndDate = advanceDateGpu(currEndDate, 6); 
-    }
-
-    cashFlows.legs[numLegs-1].paymentDate  = bond[bondNum].maturityDate;
-    cashFlows.legs[numLegs-1].accrualStartDate = currDate[bondNum];
-    cashFlows.legs[numLegs-1].accrualEndDate  = currDate[bondNum];
-    cashFlows.legs[numLegs-1].amount = (dataType)100.0;
-
-    bondForwardVal[bondNum] = getBondYieldGpu(bondCleanPrice[bondNum],
-        USE_EXACT_DAY,
-        COMPOUNDED_INTEREST,
-        (dataType)2.0,
-        currDate[bondNum],
-        ACCURACY,
-        100,
-        bond, 
-        maturityDate,
-        bondNum, cashFlows, numLegs);
-
-    discountCurve[bondNum].forward = bondForwardVal[bondNum];
-    dirtyPrice[bondNum] = getDirtyPriceGpu(bond, discountCurve, currDate, bondNum, cashFlows, numLegs);
-    accruedAmountCurrDate[bondNum] = getAccruedAmountGpu(maturityDate, currDate[bondNum], bondNum, cashFlows, numLegs);
-
-    cleanPrice[bondNum] = dirtyPrice[bondNum] - accruedAmountCurrDate[bondNum];
-  }
-  gettimeofday(&end, NULL);
-}
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;

@@ -355,12 +355,15 @@ void runBoundsEngine()
     results.cleanPrice            = cleanPriceGpu;
     results.bondForwardVal        = bondForwardValGpu;
 
-    gettimeofday(&start, NULL);
     dim3  grid((numBonds+255)/256, 1, 1);
     dim3  threads(256, 1, 1);
-    hipLaunchKernelGGL(getBondsResultsGpu, dim3(grid), dim3(threads), 0, 0, inArgs, results, numBonds);
-    hipDeviceSynchronize();
 
+    hipDeviceSynchronize();
+    gettimeofday(&start, NULL);
+
+    hipLaunchKernelGGL(getBondsResultsGpu, dim3(grid), dim3(threads), 0, 0, inArgs, results, numBonds);
+
+    hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
     hipMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);

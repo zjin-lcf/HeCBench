@@ -329,10 +329,12 @@ void runBoundsEngine()
     buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
     buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
 
-    gettimeofday(&start, NULL);
-
     range<1> gws ((numBonds + 255)/256*256);
     range<1> lws (256);
+
+    q.wait();
+    gettimeofday(&start, NULL);
+
     q.submit([&] (handler &cgh) {
       auto discountCurve = discountCurveGpu.get_access<sycl_read>(cgh);
       auto repoCurve = repoCurveGpu.get_access<sycl_read>(cgh);
@@ -360,9 +362,7 @@ void runBoundsEngine()
           bondForwardVal.get_pointer(),
           numBonds);
       });
-    });
-
-    q.wait();
+    }).wait();
 
     gettimeofday(&end, NULL);
 
