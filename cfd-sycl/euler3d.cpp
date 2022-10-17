@@ -341,6 +341,8 @@ int main(int argc, char** argv){
     }
   }
 
+  double kernel_start, kernel_end;
+
   double offload_start = get_time();
   { // SYCL scope
 #ifdef USE_GPU
@@ -359,7 +361,6 @@ int main(int argc, char** argv){
     buffer<Float3,1> d_ff_flux_contribution_momentum_y (&h_ff_flux_contribution_momentum_y,1,props);
     buffer<Float3,1> d_ff_flux_contribution_momentum_z (&h_ff_flux_contribution_momentum_z,1,props);
     buffer<Float3,1> d_ff_flux_contribution_density_energy (&h_ff_flux_contribution_density_energy,1,props);
-
 
     //areas = alloc<float>(nelr);
     //upload<float>(areas, h_areas, nelr);
@@ -386,6 +387,8 @@ int main(int argc, char** argv){
     //step_factors = alloc<float>(nelr); 
     buffer<float,1> d_step_factors (nelr);
 
+    q.wait();
+    kernel_start = get_time();
 
     initialize_variables(q, nelr, d_variables, d_ff_variable);
     initialize_variables(q, nelr, d_old_variables, d_ff_variable);	
@@ -419,6 +422,9 @@ int main(int argc, char** argv){
       }
     }
 
+    q.wait();
+    kernel_end = get_time();
+
     q.submit([&](handler& cgh) {
       accessor<float, 1, sycl_read, access::target::global_buffer> 
       variables_acc(d_variables, cgh, range<1>(nelr*NVAR), id<1>(0));  // add workgroup size
@@ -428,6 +434,8 @@ int main(int argc, char** argv){
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  printf("Total execution time of kernels = %lf(s)\n", kernel_end - kernel_start);
 
 #ifdef OUTPUT
     std::cout << "Saving solution..." << std::endl;

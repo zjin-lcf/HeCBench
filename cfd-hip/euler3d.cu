@@ -58,32 +58,32 @@ typedef struct{
 } Float3;
 
 __device__
-inline void compute_velocity(float  density, Float3 momentum, Float3* velocity){
+inline void compute_velocity(const float density, const Float3 momentum, Float3* velocity){
   velocity->x = momentum.x / density;
   velocity->y = momentum.y / density;
   velocity->z = momentum.z / density;
 }
 
 __device__
-inline float compute_speed_sqd(Float3 velocity){
+inline float compute_speed_sqd(const Float3 velocity){
   return velocity.x*velocity.x + velocity.y*velocity.y + velocity.z*velocity.z;
 }
 
 __device__
-inline float compute_pressure(float density, float density_energy, float speed_sqd){
+inline float compute_pressure(const float density, const float density_energy, const float speed_sqd){
   return ((float)(GAMMA) - (float)(1.0f))*(density_energy - (float)(0.5f)*density*speed_sqd);
 }
 // sqrt is a device function
 __device__
-inline float compute_speed_of_sound(float density, float pressure){
+inline float compute_speed_of_sound(const float density, const float pressure){
   return sqrt((float)(GAMMA)*pressure/density);
 }
   __device__ __host__
-inline void compute_flux_contribution(float density, 
+inline void compute_flux_contribution(const float density, 
     Float3 momentum, 
-    float density_energy, 
-    float pressure, 
-    Float3 velocity, 
+    const float density_energy, 
+    const float pressure, 
+    const Float3 velocity, 
     Float3* fc_momentum_x, 
     Float3* fc_momentum_y, 
     Float3* fc_momentum_z, 
@@ -102,19 +102,19 @@ inline void compute_flux_contribution(float density,
   fc_momentum_z->y = fc_momentum_y->z;
   fc_momentum_z->z = velocity.z*momentum.z + pressure;
 
-  float de_p = density_energy+pressure;
+  const float de_p = density_energy+pressure;
   fc_density_energy->x = velocity.x*de_p;
   fc_density_energy->y = velocity.y*de_p;
   fc_density_energy->z = velocity.z*de_p;
 }
 
 
-void copy(float* dst, const float* src, int N){
+void copy(float* dst, const float* src, const int N){
   hipMemcpy(dst, src, N*sizeof(float), hipMemcpyDeviceToDevice);
 }
 
 
-void dump(float *h_variables, int nel, int nelr){
+void dump(const float *h_variables, const int nel, const int nelr){
 
   {
     std::ofstream file("density");
@@ -505,6 +505,9 @@ int main(int argc, char** argv){
   dim3 gridDim3 ((nelr + BLOCK_SIZE_3 - 1)/BLOCK_SIZE_3);
   dim3 gridDim4 ((nelr + BLOCK_SIZE_4 - 1)/BLOCK_SIZE_4);
 
+  hipDeviceSynchronize();
+  double kernel_start = get_time();
+
   hipLaunchKernelGGL(initialize_variables, gridDim1, BLOCK_SIZE_1, 0, 0, nelr, d_variables, d_ff_variable);
   hipLaunchKernelGGL(initialize_variables, gridDim1, BLOCK_SIZE_1, 0, 0, nelr, d_old_variables, d_ff_variable);  
   hipLaunchKernelGGL(initialize_variables, gridDim1, BLOCK_SIZE_1, 0, 0, nelr, d_fluxes, d_ff_variable);    
@@ -530,6 +533,9 @@ int main(int argc, char** argv){
     }
   }
 
+  hipDeviceSynchronize();
+  double kernel_end = get_time();
+
   hipMemcpy(h_variables, d_variables, sizeof(float)*nelr*NVAR, hipMemcpyDeviceToHost);
 
   hipFree(d_ff_variable);
@@ -547,6 +553,8 @@ int main(int argc, char** argv){
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  printf("Total execution time of kernels = %lf(s)\n", kernel_end - kernel_start);
 
 #ifdef OUTPUT
   std::cout << "Saving solution..." << std::endl;
