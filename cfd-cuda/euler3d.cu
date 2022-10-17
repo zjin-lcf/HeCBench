@@ -505,6 +505,9 @@ int main(int argc, char** argv){
   dim3 gridDim3 ((nelr + BLOCK_SIZE_3 - 1)/BLOCK_SIZE_3);
   dim3 gridDim4 ((nelr + BLOCK_SIZE_4 - 1)/BLOCK_SIZE_4);
 
+  cudaDeviceSynchronize();
+  double kernel_start = get_time();
+
   initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_variables, d_ff_variable);
   initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_old_variables, d_ff_variable);  
   initialize_variables<<<gridDim1, BLOCK_SIZE_1>>>(nelr, d_fluxes, d_ff_variable);    
@@ -530,6 +533,9 @@ int main(int argc, char** argv){
     }
   }
 
+  cudaDeviceSynchronize();
+  double kernel_end = get_time();
+
   cudaMemcpy(h_variables, d_variables, sizeof(float)*nelr*NVAR, cudaMemcpyDeviceToHost);
 
   cudaFree(d_ff_variable);
@@ -547,6 +553,8 @@ int main(int argc, char** argv){
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+
+  printf("Total execution time of kernels = %lf(s)\n", kernel_end - kernel_start);
 
 #ifdef OUTPUT
   std::cout << "Saving solution..." << std::endl;

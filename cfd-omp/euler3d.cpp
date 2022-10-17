@@ -476,6 +476,7 @@ int main(int argc, char** argv){
     }
   }
 
+  double kernel_start, kernel_end;
   double offload_start = get_time();
 
   // copy far field conditions to the device
@@ -488,6 +489,8 @@ int main(int argc, char** argv){
                                    h_step_factors [0:nelr] ) \
                         map(from: h_variables[0:nelr*NVAR])
   {
+    kernel_start = get_time();
+
     initialize_variables(nelr, h_variables, h_ff_variable);
     initialize_variables(nelr, h_old_variables, h_ff_variable);  
     initialize_variables(nelr, h_fluxes, h_ff_variable);    
@@ -519,6 +522,8 @@ int main(int argc, char** argv){
         time_step(j, nelr, h_old_variables, h_variables, h_step_factors, h_fluxes);
       }
     }
+
+    kernel_end = get_time();
   }
 #ifdef OUTPUT
   std::cout << "Saving solution..." << std::endl;
@@ -529,6 +534,8 @@ int main(int argc, char** argv){
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
   
+  printf("Total execution time of kernels = %lf(s)\n", kernel_end - kernel_start);
+
   delete[] h_areas;
   delete[] h_elements_surrounding_elements;
   delete[] h_normals;
