@@ -368,12 +368,15 @@ void runBoundsEngine()
     results.cleanPrice                = cleanPriceGpu;
     results.bondForwardVal         = bondForwardValGpu;
 
-    gettimeofday(&start, NULL);
     dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
     dim3  threads(256, 1, 1);
-    getBondsResultsGpu <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
-    cudaDeviceSynchronize();
 
+    cudaDeviceSynchronize();
+    gettimeofday(&start, NULL);
+
+    getBondsResultsGpu <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+
+    cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
 
     cudaMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
@@ -387,7 +390,6 @@ void runBoundsEngine()
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
     printf("Processing time on GPU: %f (ms)  \n\n", mtimeGpu);
-
 
     double totPrice = 0.0;
     int numBond1;
