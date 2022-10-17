@@ -55,4 +55,4 @@ clean:
 
 run: $(program)
 	ulimit -s unlimited	
-	./$(program) ../mis-cuda/internet.egr 
+	./$(program) delaunay_n24.egr 100

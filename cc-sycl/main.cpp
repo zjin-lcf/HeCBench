@@ -304,7 +304,8 @@ void flatten(nd_item<1> &item,
   }
 }
 
-static void computeCC(const int nodes, const int edges,
+static void computeCC(const int repeat,
+                      const int nodes, const int edges,
                       const int *const __restrict nidx,
                       const int *const __restrict nlist,
                             int *const __restrict nstat) 
@@ -333,14 +334,14 @@ static void computeCC(const int nodes, const int edges,
   buffer<int, 1> nstat_d (nstat, nodes);
   buffer<int, 1> wl_d (nodes);
 
+  range<1> gws (blocks * ThreadsPerBlock);
+  range<1> lws (ThreadsPerBlock);
+
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  range<1> gws (blocks * ThreadsPerBlock);
-  range<1> lws (ThreadsPerBlock);
-
-  for (int n = 0; n < 1; n++) {
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
       auto nidx = nidx_d.get_access<sycl_read>(cgh);
       auto nlist = nlist_d.get_access<sycl_read>(cgh);
@@ -415,7 +416,7 @@ static void computeCC(const int nodes, const int edges,
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = elapsed_seconds.count() / 100;
+  float runtime = elapsed_seconds.count() / repeat;
 
   printf("compute time: %.4f s\n", runtime);
   printf("throughput: %.3f Mnodes/s\n", nodes * 0.000001 / runtime);
@@ -444,9 +445,13 @@ int main(int argc, char* argv[])
   printf("ECL-CC v1.1 (%s)\n", __FILE__);
   printf("Copyright 2017-2020 Texas State University\n");
 
-  if (argc != 2) {fprintf(stderr, "USAGE: %s input_file_name\n\n", argv[0]);  exit(-1);}
+  if (argc != 3) {
+    fprintf(stderr, "USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);
+    exit(-1);
+  }
 
   ECLgraph g = readECLgraph(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   int* nodestatus = (int*) malloc (sizeof(int) * g.nodes);
 
@@ -467,7 +472,7 @@ int main(int argc, char* argv[])
   printf("minimum degree: %d edges\n", mindeg);
   printf("maximum degree: %d edges\n", maxdeg);
 
-  computeCC(g.nodes, g.edges, g.nindex, g.nlist, nodestatus);
+  computeCC(repeat, g.nodes, g.edges, g.nindex, g.nlist, nodestatus);
 
   std::set<int> s1;
   for (int v = 0; v < g.nodes; v++) {

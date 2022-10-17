@@ -270,7 +270,8 @@ void flatten(const int nodes,
   }
 }
 
-static void computeCC(const int nodes, const int edges,
+static void computeCC(const int repeat,
+                      const int nodes, const int edges,
                       const int* const __restrict__ nidx,
                       const int* const __restrict__ nlist,
                             int* const __restrict__ nstat)
@@ -310,7 +311,7 @@ static void computeCC(const int nodes, const int edges,
   cudaDeviceSynchronize();
   auto start = std::chrono::high_resolution_clock::now();
 
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < repeat; n++) {
     init<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d);
     compute1<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d, wl_d);
     compute2<<<blocks, ThreadsPerBlock>>>(nodes, nidx_d, nlist_d, nstat_d, wl_d);
@@ -319,12 +320,11 @@ static void computeCC(const int nodes, const int edges,
   }
 
   cudaDeviceSynchronize();
-
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = elapsed_seconds.count() / 100;
+  float runtime = elapsed_seconds.count() / repeat;
 
-  printf("compute time: %.4f s\n", runtime);
+  printf("Average kernel execution time: %.4f s\n", runtime);
   printf("throughput: %.3f Mnodes/s\n", nodes * 0.000001 / runtime);
   printf("throughput: %.3f Medges/s\n", edges * 0.000001 / runtime);
 
@@ -359,9 +359,13 @@ int main(int argc, char* argv[])
   printf("ECL-CC v1.1 (%s)\n", __FILE__);
   printf("Copyright 2017-2020 Texas State University\n");
 
-  if (argc != 2) {fprintf(stderr, "USAGE: %s input_file_name\n\n", argv[0]);  exit(-1);}
+  if (argc != 3) {
+    fprintf(stderr, "USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);
+    exit(-1);
+  }
 
   ECLgraph g = readECLgraph(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   int* nodestatus = NULL;
   cudaHostAlloc(&nodestatus, g.nodes * sizeof(int), cudaHostAllocDefault);
@@ -382,7 +386,7 @@ int main(int argc, char* argv[])
   printf("minimum degree: %d edges\n", mindeg);
   printf("maximum degree: %d edges\n", maxdeg);
 
-  computeCC(g.nodes, g.edges, g.nindex, g.nlist, nodestatus);
+  computeCC(repeat, g.nodes, g.edges, g.nindex, g.nlist, nodestatus);
 
   std::set<int> s1;
   for (int v = 0; v < g.nodes; v++) {
