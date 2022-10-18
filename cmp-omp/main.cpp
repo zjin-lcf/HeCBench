@@ -187,7 +187,7 @@ int main(int argc, const char** argv) {
 
   int number_of_semblances = 0;
 
-  LOG(DEBUG, "Starting CMP execution");
+  LOG(INFO, "Starting CMP execution");
 
   // Alloc memory
   real *d_gx = h_gx;
@@ -263,7 +263,9 @@ int main(int argc, const char** argv) {
 
     number_of_semblances += stride;
 
-    LOG(DEBUG, "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps));
+#ifdef DEBUG
+    std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
+#endif
   }
 
   // Gets time at end of computation
@@ -300,7 +302,9 @@ int main(int argc, const char** argv) {
 
     // Get max C for max semblance for each sample on this cdp
     h_redux_semblances(h_num, h_stt, r_ctr, r_str, r_stk, nc, cdp_id, ns);
-    LOG(DEBUG, "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps));
+#ifdef DEBUG
+    std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
+#endif
   }
 
   int error = 0;

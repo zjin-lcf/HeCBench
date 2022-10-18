@@ -218,7 +218,7 @@ int main(int argc, const char** argv) {
 
   int number_of_semblances = 0;
 
-  LOG(DEBUG, "Starting CMP execution");
+  LOG(INFO, "Starting CMP execution");
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -226,6 +226,9 @@ int main(int argc, const char** argv) {
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel);
+
+  // Chronometer
+  auto beg = std::chrono::high_resolution_clock::now();
 
   // Alloc memory
   buffer<real, 1> d_gx (h_gx, ttraces);
@@ -247,12 +250,11 @@ int main(int argc, const char** argv) {
   h_str = (real*) malloc (sizeof(real)*ncdps*ns);
   h_stk = (real*) malloc (sizeof(real)*ncdps*ns);
 
-  // Chronometer
-  auto beg = std::chrono::high_resolution_clock::now();
-
   //
   // DEVICE REGION
   //
+
+  auto kbeg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
   q.submit([&] (handler &cgh) {
@@ -317,11 +319,13 @@ int main(int argc, const char** argv) {
 
     number_of_semblances += stride;
 
-    LOG(DEBUG, "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps));
+#ifdef DEBUG
+    std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
+#endif
   }
   // Gets time at end of computation
   q.wait();
-  auto end = std::chrono::high_resolution_clock::now();
+  auto kend = std::chrono::high_resolution_clock::now();
 
   // Copy results back to host
   q.submit([&] (handler &cgh) {
@@ -337,6 +341,8 @@ int main(int argc, const char** argv) {
     cgh.copy(acc, h_stk);
   });
   q.wait();
+
+  auto end = std::chrono::high_resolution_clock::now();
 
   //
   // END DEVICE REGION
@@ -367,7 +373,9 @@ int main(int argc, const char** argv) {
 
     // Get max C for max semblance for each sample on this cdp
     h_redux_semblances(h_num, h_stt, r_ctr, r_str, r_stk, nc, cdp_id, ns);
-    LOG(DEBUG, "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps));
+#ifdef DEBUG
+    std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
+#endif
   }
 
   int error = 0;
@@ -383,10 +391,12 @@ int main(int argc, const char** argv) {
     LOG(INFO, "Test: PASS");
 
   // Logs stats (exec time and semblance-traces per second)
-  double total_exec_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / total_exec_time);
-  std::string stats = "Total Execution Time: " + std::to_string(total_exec_time);
-  stats += ": Giga-Semblances-Trace/s: " + std::to_string(stps);
+  double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / ktime);
+  std::string stats = "Giga-Semblances-Trace/s: " + std::to_string(stps);
+
+  double offload_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  stats += "\nDevice offload time: " + std::to_string(offload_time) + " (s) ";
   LOG(INFO, stats);
 
 #ifdef SAVE
