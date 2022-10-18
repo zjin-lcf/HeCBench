@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <iterator>
 #include <vector>
+#include <chrono>
 #include "common.h"
 
 using namespace std;
@@ -329,8 +330,14 @@ void test_collisionMask(sycl::queue &q, const int ND) {
 }
 
 int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
   srand(123);
   const int num_dup = 32;
+  const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
   sycl::gpu_selector dev_sel;
@@ -339,8 +346,21 @@ int main(int argc, char* argv[]) {
 #endif
   sycl::queue q(dev_sel);
   
-  test_collision(q, num_dup);
-  test_collisionMask(q, num_dup);
+  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) 
+    test_collision(q, num_dup);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of the function test_collision: %f (us)\n",
+         time * 1e-3f / repeat);
+
+  start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) 
+    test_collisionMask(q, num_dup);
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Execution time of the function test_collisionMask: %f (us)\n", time * 1e-3f);
+
   return 0;
 }
 
