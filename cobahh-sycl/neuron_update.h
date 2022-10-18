@@ -20,7 +20,6 @@ void neurongroup_stateupdater (
     const int _N,
     const int iteration ) 
 {
-
   const float dt = _ptr_array_defaultclock_dt[0];
   const float t = _ptr_array_defaultclock_t[0];
   const int    _lio_1 = _timestep(0.003, dt);
@@ -64,70 +63,92 @@ void neurongroup_stateupdater (
 #endif
   queue q(dev_sel);
 
-  buffer<float, 1>  d_h  (_ptr_array_neurongroup_h, _N);
-  buffer<float, 1>  d_m  (_ptr_array_neurongroup_m, _N);
-  buffer<float, 1>  d_n  (_ptr_array_neurongroup_n, _N);
-  buffer<float, 1>  d_ge (_ptr_array_neurongroup_ge, _N);
-  buffer<float, 1>  d_v  (_ptr_array_neurongroup_v, _N);
-  buffer<float, 1>  d_gi (_ptr_array_neurongroup_gi, _N);
-  buffer<float, 1>  d_lastspike (_ptr_array_neurongroup_lastspike, _N);
-  buffer<char, 1>  d_not_refractory (_ptr_array_neurongroup_not_refractory, _N);
+  size_t size = _N * sizeof(float);
 
-  range<1> global_work_size ((_N+255)/256*256);
-  range<1> local_work_size (256);
+  float *d_h  = malloc_device<float>(_N, q);
+  q.memcpy(d_h, _ptr_array_neurongroup_h, size);
+
+  float *d_m  = malloc_device<float>(_N, q);
+  q.memcpy(d_m, _ptr_array_neurongroup_m, size);
+
+  float *d_n  = malloc_device<float>(_N, q);
+  q.memcpy(d_n, _ptr_array_neurongroup_n, size);
+
+  float *d_ge = malloc_device<float>(_N, q);
+  q.memcpy(d_ge, _ptr_array_neurongroup_ge, size);
+
+  float *d_v  = malloc_device<float>(_N, q);
+  q.memcpy(d_v, _ptr_array_neurongroup_v, size); 
+
+  float *d_gi = malloc_device<float>(_N, q);
+  q.memcpy(d_gi, _ptr_array_neurongroup_gi, size); 
+
+  float *d_lastspike = malloc_device<float>(_N, q);
+  q.memcpy(d_lastspike, _ptr_array_neurongroup_lastspike, size); 
+
+  char *d_not_refractory = malloc_device<char>(_N, q);
+
+  range<1> gws ((_N+255)/256*256);
+  range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
-
     q.submit([&] (handler &h) {
-      auto d_h_acc = d_h.get_access<sycl_read_write>(h);
-      auto d_m_acc = d_m.get_access<sycl_read_write>(h);
-      auto d_n_acc = d_n.get_access<sycl_read_write>(h);
-      auto d_ge_acc = d_ge.get_access<sycl_read_write>(h);
-      auto d_gi_acc = d_gi.get_access<sycl_read_write>(h);
-      auto d_v_acc = d_v.get_access<sycl_read_write>(h);
-      auto d_lastspike_acc = d_lastspike.get_access<sycl_read>(h);
-      auto d_not_refractory_acc = d_not_refractory.get_access<sycl_discard_write>(h);
-      h.parallel_for<class nstep>(nd_range<1>(global_work_size, local_work_size), [=] (nd_item<1> item) {
+      h.parallel_for<class nstep>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int _idx = item.get_global_id(0);
         if (_idx >= _N) return;
-        float h = d_h_acc[_idx];
-        float m = d_m_acc[_idx];
-        float n = d_n_acc[_idx];
-        float ge = d_ge_acc[_idx];
-        float v = d_v_acc[_idx];
-        const float lastspike = d_lastspike_acc[_idx];
-        float gi = d_gi_acc[_idx];
+        float h = d_h[_idx];
+        float m = d_m[_idx];
+        float n = d_n[_idx];
+        float ge = d_ge[_idx];
+        float v = d_v[_idx];
+        const float lastspike = d_lastspike[_idx];
+        float gi = d_gi[_idx];
         char not_refractory;
         not_refractory = _timestep(t - lastspike, dt) >= _lio_1;
-        const float _BA_h = (_lio_2 * cl::sycl::exp(_lio_3 * v))/(((-4.0f)/(0.001f + (_lio_4 * cl::sycl::exp(_lio_5 * v)))) - (_lio_2 * cl::sycl::exp(_lio_3 * v)));
-        const float _h = (- _BA_h) + ((_BA_h + h) * cl::sycl::exp(dt * (((-4.0f)/(0.001f + (_lio_4 * cl::sycl::exp(_lio_5 * v)))) - (_lio_2 * cl::sycl::exp(_lio_3 * v)))));
-        const float _BA_m = (((_lio_6/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))) + (_lio_10/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v))))) - ((0.32f * v)/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))))/(((((_lio_11/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))) + (_lio_12/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))) + (_lio_16/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))) + ((0.32f * v)/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v))))) - ((_lio_10/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))) + ((0.28f * v)/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))));
-        const float _m = (- _BA_m) + ((_BA_m + m) * cl::sycl::exp(dt * (((((_lio_11/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))) + (_lio_12/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))) + (_lio_16/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))) + ((0.32f * v)/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v))))) - ((_lio_10/(_lio_7 + (_lio_8 * cl::sycl::exp(_lio_9 * v)))) + ((0.28f * v)/(_lio_13 + (_lio_14 * cl::sycl::exp(_lio_15 * v))))))));
-        const float _BA_n = (((_lio_17/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))) + (_lio_19/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v))))) - ((0.032f * v)/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))))/(((_lio_20/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))) + ((0.032f * v)/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v))))) - ((_lio_19/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))) + (_lio_21 * cl::sycl::exp(_lio_22 * v))));
-        const float _n = (- _BA_n) + ((_BA_n + n) * cl::sycl::exp(dt * (((_lio_20/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))) + ((0.032f * v)/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v))))) - ((_lio_19/(_lio_7 + (_lio_18 * cl::sycl::exp(_lio_5 * v)))) + (_lio_21 * cl::sycl::exp(_lio_22 * v))))));
+        const float _BA_h = (_lio_2 * sycl::exp(_lio_3 * v))/(((-4.0f)/(0.001f + (_lio_4 * sycl::exp(_lio_5 * v)))) - (_lio_2 * sycl::exp(_lio_3 * v)));
+        const float _h = (- _BA_h) + ((_BA_h + h) * sycl::exp(dt * (((-4.0f)/(0.001f + (_lio_4 * sycl::exp(_lio_5 * v)))) - (_lio_2 * sycl::exp(_lio_3 * v)))));
+        const float _BA_m = (((_lio_6/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))) + (_lio_10/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v))))) - ((0.32f * v)/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))))/(((((_lio_11/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))) + (_lio_12/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))) + (_lio_16/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))) + ((0.32f * v)/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v))))) - ((_lio_10/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))) + ((0.28f * v)/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))));
+        const float _m = (- _BA_m) + ((_BA_m + m) * sycl::exp(dt * (((((_lio_11/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))) + (_lio_12/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))) + (_lio_16/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))) + ((0.32f * v)/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v))))) - ((_lio_10/(_lio_7 + (_lio_8 * sycl::exp(_lio_9 * v)))) + ((0.28f * v)/(_lio_13 + (_lio_14 * sycl::exp(_lio_15 * v))))))));
+        const float _BA_n = (((_lio_17/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))) + (_lio_19/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v))))) - ((0.032f * v)/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))))/(((_lio_20/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))) + ((0.032f * v)/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v))))) - ((_lio_19/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))) + (_lio_21 * sycl::exp(_lio_22 * v))));
+        const float _n = (- _BA_n) + ((_BA_n + n) * sycl::exp(dt * (((_lio_20/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))) + ((0.032f * v)/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v))))) - ((_lio_19/(_lio_7 + (_lio_18 * sycl::exp(_lio_5 * v)))) + (_lio_21 * sycl::exp(_lio_22 * v))))));
         const float _ge = _lio_23 * ge;
         const float _BA_v = (_lio_24 + ((((_lio_25 * (n*n*n*n)) + (_lio_26 * (h * (m*m*m)))) + (_lio_27 * ge)) + (_lio_28 * gi)))/((_lio_29 + (_lio_30 * (n*n*n*n))) - (((_lio_31 * (h * (m*m*m))) + (_lio_32 * ge)) + (_lio_32 * gi)));
-        const float _v = (- _BA_v) + ((_BA_v + v) * cl::sycl::exp(dt * ((_lio_29 + (_lio_30 * (n*n*n*n))) - (((_lio_31 * (h * (m*m*m))) + (_lio_32 * ge)) + (_lio_32 * gi)))));
+        const float _v = (- _BA_v) + ((_BA_v + v) * sycl::exp(dt * ((_lio_29 + (_lio_30 * (n*n*n*n))) - (((_lio_31 * (h * (m*m*m))) + (_lio_32 * ge)) + (_lio_32 * gi)))));
         const float _gi = _lio_33 * gi;
 
-        d_h_acc[_idx] = _h;
-        d_m_acc[_idx] = _m;
-        d_n_acc[_idx] = _n;
-        d_ge_acc[_idx] = _ge;
-        d_v_acc[_idx] = _v;
-        d_gi_acc[_idx] = _gi;
-        d_not_refractory_acc[_idx] = not_refractory;
+        d_h[_idx] = _h;
+        d_m[_idx] = _m;
+        d_n[_idx] = _n;
+        d_ge[_idx] = _ge;
+        d_v[_idx] = _v;
+        d_gi[_idx] = _gi;
+        d_not_refractory[_idx] = not_refractory;
       });
     });
   }
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / iteration);
 
+  q.memcpy(_ptr_array_neurongroup_ge, d_ge, size);
+  q.memcpy(_ptr_array_neurongroup_gi, d_gi, size);
+  q.memcpy(_ptr_array_neurongroup_m, d_m, size);
+  q.memcpy(_ptr_array_neurongroup_n, d_n, size);
+  q.memcpy(_ptr_array_neurongroup_v, d_v, size);
+  q.memcpy(_ptr_array_neurongroup_h, d_h, size);
+  q.memcpy(_ptr_array_neurongroup_not_refractory, d_not_refractory, _N*sizeof(char));
+  q.wait();
+
+  free(d_h, q);
+  free(d_m, q);
+  free(d_n, q);
+  free(d_ge, q);
+  free(d_gi, q);
+  free(d_v, q);
+  free(d_lastspike, q);
+  free(d_not_refractory, q);
 }
-
-

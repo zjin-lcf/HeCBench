@@ -217,7 +217,7 @@ void neurongroup_stateupdater (
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / iteration);
 
   hipMemcpyAsync(_ptr_array_neurongroup_ge, d_ge, _N*sizeof(float), hipMemcpyDeviceToHost, 0);
   hipMemcpyAsync(_ptr_array_neurongroup_gi, d_gi, _N*sizeof(float), hipMemcpyDeviceToHost, 0);
@@ -237,5 +237,3 @@ void neurongroup_stateupdater (
   hipFree(d_lastspike);
   hipFree(d_not_refractory);
 }
-
-
