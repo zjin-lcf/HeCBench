@@ -23,14 +23,14 @@
 #define BLOCKSIZE    BLOCKSIZEX * BLOCKSIZEY
 
 
-int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<cl::sycl::float4,1> &atominfo) {
+int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<sycl::float4,1> &atominfo) {
 
   if (count > MAXATOMS) {
     printf("Atom count exceeds constant buffer storage capacity\n");
     return -1;
   }
 
-  cl::sycl::float4 atompre[MAXATOMS];
+  sycl::float4 atompre[MAXATOMS];
   int i;
   for (i=0; i<count; i++) {
     atompre[i].x() = atoms[i*4    ];
@@ -44,14 +44,13 @@ int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<cl::sycl::
   q.submit([&](auto &h) {
     auto d = atominfo.get_access<sycl_write>(h, range<1>(count), id<1>(0));
     h.copy(atompre, d);
-  });
-  q.wait();
+  }).wait();
   return 0;
 }
 
 
-int initatoms(float **atombuf, int count, cl::sycl::int3 volsize, float gridspacing) {
-  cl::sycl::float3 size;
+int initatoms(float **atombuf, int count, sycl::int3 volsize, float gridspacing) {
+  sycl::float3 size;
   int i;
   float *atoms;
   srand(2);
@@ -79,7 +78,7 @@ int initatoms(float **atombuf, int count, cl::sycl::int3 volsize, float gridspac
 int main(int argc, char** argv) {
   float *energy = NULL;
   float *atoms = NULL;
-  cl::sycl::int3 volsize;
+  sycl::int3 volsize;
   wkf_timerhandle runtimer, mastertimer, copytimer, hostcopytimer;
   float copytotal, runtotal, mastertotal, hostcopytotal;
   const char *statestr = "|/-\\.";
@@ -109,8 +108,8 @@ int main(int argc, char** argv) {
   //     each thread will do several consecutive grid cells in this version,
   //     we're using up some of our available parallelism to reduce overhead.
 
-  auto global_range = range<3>(volsize.z(), volsize.y()/UNROLLY, volsize.x()/UNROLLX);
-  auto local_range = range<3>(1, BLOCKSIZEY, BLOCKSIZEX);
+  auto gws = range<3>(volsize.z(), volsize.y()/UNROLLY, volsize.x()/UNROLLX);
+  auto lws = range<3>(1, BLOCKSIZEY, BLOCKSIZEX);
 
   // initialize the wall clock timers
   runtimer = wkf_timer_create();
@@ -141,15 +140,14 @@ int main(int argc, char** argv) {
   queue q(dev_sel);
 
   //cudaMalloc((void**)&doutput, volmemsz);
-  //cudaMalloc((void**)&datominfo, sizeof(cl::sycl::float4) * MAXATOMS);
+  //cudaMalloc((void**)&datominfo, sizeof(sycl::float4) * MAXATOMS);
   buffer<float,1> doutput (volmemsz/sizeof(float));
-  buffer<cl::sycl::float4,1> datominfo (MAXATOMS);
+  buffer<sycl::float4,1> datominfo (MAXATOMS);
 
   q.submit([&](auto &h) {
-    auto d = doutput.get_access<sycl_write>(h);
+    auto d = doutput.get_access<sycl_discard_write>(h);
     h.fill(d, 0.f);
-  });
-  q.wait();
+  }).wait();
 
   printf("starting run...\n");
   wkf_timer_start(mastertimer);
@@ -179,70 +177,70 @@ int main(int argc, char** argv) {
     // RUN the kernel...
     wkf_timer_start(runtimer);
     q.submit([&](auto &h) {
-      // Create accessors
       auto atominfo = datominfo.get_access<sycl_read>(h);
       auto energygrid = doutput.get_access<sycl_write>(h);
-      h.parallel_for(nd_range<3>(global_range, local_range), [=](nd_item<3> item) {
+      h.parallel_for(nd_range<3>(gws, lws), [=](nd_item<3> item) {
+        unsigned int xindex = sycl::mul24(unsigned(item.get_group(2)),
+                              unsigned(item.get_local_range(2))) * UNROLLX + item.get_local_id(2); 
+        unsigned int yindex = sycl::mul24(unsigned(item.get_group(1)),
+                              unsigned(item.get_local_range(1))) + item.get_local_id(1); 
+        unsigned int outaddr = (sycl::mul24(unsigned(item.get_group_range(2)),
+                               unsigned(item.get_local_range(2))) * UNROLLX) * yindex + xindex;
 
-      unsigned int xindex = cl::sycl::mul24(unsigned(item.get_group(2)), unsigned(item.get_local_range(2))) * UNROLLX + item.get_local_id(2); 
-      unsigned int yindex = cl::sycl::mul24(unsigned(item.get_group(1)), unsigned(item.get_local_range(1))) + item.get_local_id(1); 
-      unsigned int outaddr = (cl::sycl::mul24(unsigned(item.get_group_range(2)), unsigned(item.get_local_range(2))) * UNROLLX) * yindex + xindex;
+        float coory = gridspacing * yindex;
+        float coorx = gridspacing * xindex;
 
-      float coory = gridspacing * yindex;
-      float coorx = gridspacing * xindex;
+        float energyvalx1=0.0f;
+        float energyvalx2=0.0f;
+        float energyvalx3=0.0f;
+        float energyvalx4=0.0f;
+        float energyvalx5=0.0f;
+        float energyvalx6=0.0f;
+        float energyvalx7=0.0f;
+        float energyvalx8=0.0f;
 
-      float energyvalx1=0.0f;
-      float energyvalx2=0.0f;
-      float energyvalx3=0.0f;
-      float energyvalx4=0.0f;
-      float energyvalx5=0.0f;
-      float energyvalx6=0.0f;
-      float energyvalx7=0.0f;
-      float energyvalx8=0.0f;
+        float gridspacing_u = gridspacing * BLOCKSIZEX;
 
-      float gridspacing_u = gridspacing * BLOCKSIZEX;
+        //
+        // XXX 59/8 FLOPS per atom
+        //
+        int atomid;
+        for (atomid=0; atomid<runatoms; atomid++) {
+          float dy = coory - atominfo[atomid].y();
+          float dyz2 = (dy * dy) + atominfo[atomid].z();
 
-      //
-      // XXX 59/8 FLOPS per atom
-      //
-      int atomid;
-      for (atomid=0; atomid<runatoms; atomid++) {
-        float dy = coory - atominfo[atomid].y();
-        float dyz2 = (dy * dy) + atominfo[atomid].z();
+          float dx1 = coorx - atominfo[atomid].x();
+          float dx2 = dx1 + gridspacing_u;
+          float dx3 = dx2 + gridspacing_u;
+          float dx4 = dx3 + gridspacing_u;
+          float dx5 = dx4 + gridspacing_u;
+          float dx6 = dx5 + gridspacing_u;
+          float dx7 = dx6 + gridspacing_u;
+          float dx8 = dx7 + gridspacing_u;
 
-        float dx1 = coorx - atominfo[atomid].x();
-        float dx2 = dx1 + gridspacing_u;
-        float dx3 = dx2 + gridspacing_u;
-        float dx4 = dx3 + gridspacing_u;
-        float dx5 = dx4 + gridspacing_u;
-        float dx6 = dx5 + gridspacing_u;
-        float dx7 = dx6 + gridspacing_u;
-        float dx8 = dx7 + gridspacing_u;
+          energyvalx1 += atominfo[atomid].w() * sycl::rsqrt(dx1*dx1 + dyz2);
+          energyvalx2 += atominfo[atomid].w() * sycl::rsqrt(dx2*dx2 + dyz2);
+          energyvalx3 += atominfo[atomid].w() * sycl::rsqrt(dx3*dx3 + dyz2);
+          energyvalx4 += atominfo[atomid].w() * sycl::rsqrt(dx4*dx4 + dyz2);
+          energyvalx5 += atominfo[atomid].w() * sycl::rsqrt(dx5*dx5 + dyz2);
+          energyvalx6 += atominfo[atomid].w() * sycl::rsqrt(dx6*dx6 + dyz2);
+          energyvalx7 += atominfo[atomid].w() * sycl::rsqrt(dx7*dx7 + dyz2);
+          energyvalx8 += atominfo[atomid].w() * sycl::rsqrt(dx8*dx8 + dyz2);
+        }
 
-        energyvalx1 += atominfo[atomid].w() * cl::sycl::rsqrt(dx1*dx1 + dyz2);
-        energyvalx2 += atominfo[atomid].w() * cl::sycl::rsqrt(dx2*dx2 + dyz2);
-        energyvalx3 += atominfo[atomid].w() * cl::sycl::rsqrt(dx3*dx3 + dyz2);
-        energyvalx4 += atominfo[atomid].w() * cl::sycl::rsqrt(dx4*dx4 + dyz2);
-        energyvalx5 += atominfo[atomid].w() * cl::sycl::rsqrt(dx5*dx5 + dyz2);
-        energyvalx6 += atominfo[atomid].w() * cl::sycl::rsqrt(dx6*dx6 + dyz2);
-        energyvalx7 += atominfo[atomid].w() * cl::sycl::rsqrt(dx7*dx7 + dyz2);
-        energyvalx8 += atominfo[atomid].w() * cl::sycl::rsqrt(dx8*dx8 + dyz2);
-      }
-
-      energygrid[outaddr             ] += energyvalx1;
-      energygrid[outaddr+1*BLOCKSIZEX] += energyvalx2;
-      energygrid[outaddr+2*BLOCKSIZEX] += energyvalx3;
-      energygrid[outaddr+3*BLOCKSIZEX] += energyvalx4;
-      energygrid[outaddr+4*BLOCKSIZEX] += energyvalx5;
-      energygrid[outaddr+5*BLOCKSIZEX] += energyvalx6;
-      energygrid[outaddr+6*BLOCKSIZEX] += energyvalx7;
-      energygrid[outaddr+7*BLOCKSIZEX] += energyvalx8;
+        energygrid[outaddr             ] += energyvalx1;
+        energygrid[outaddr+1*BLOCKSIZEX] += energyvalx2;
+        energygrid[outaddr+2*BLOCKSIZEX] += energyvalx3;
+        energygrid[outaddr+3*BLOCKSIZEX] += energyvalx4;
+        energygrid[outaddr+4*BLOCKSIZEX] += energyvalx5;
+        energygrid[outaddr+5*BLOCKSIZEX] += energyvalx6;
+        energygrid[outaddr+6*BLOCKSIZEX] += energyvalx7;
+        energygrid[outaddr+7*BLOCKSIZEX] += energyvalx8;
       });
-    });
+    }).wait();
     wkf_timer_stop(runtimer);
     runtotal += wkf_timer_time(runtimer);
   }
-  q.wait();
   printf("Done\n");
 
   wkf_timer_stop(mastertimer);
@@ -254,8 +252,7 @@ int main(int argc, char** argv) {
   q.submit([&](auto &h) {
     auto d = doutput.get_access<sycl_read>(h);
     h.copy(d, energy);
-  });
-  q.wait();
+  }).wait();
   wkf_timer_stop(hostcopytimer);
   hostcopytotal=wkf_timer_time(hostcopytimer);
 
