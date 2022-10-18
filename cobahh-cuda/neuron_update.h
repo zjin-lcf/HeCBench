@@ -217,7 +217,7 @@ void neurongroup_stateupdater (
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / iteration);
 
   cudaMemcpyAsync(_ptr_array_neurongroup_ge, d_ge, _N*sizeof(float), cudaMemcpyDeviceToHost, 0);
   cudaMemcpyAsync(_ptr_array_neurongroup_gi, d_gi, _N*sizeof(float), cudaMemcpyDeviceToHost, 0);
