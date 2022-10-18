@@ -41,7 +41,6 @@ void logger::log(enum log_level_t level, const std::string& msg) {
   switch(level) {
     CASE(WARNING, std::cerr);
     CASE(INFO, std::cout);
-    CASE(DEBUG, std::cerr);
     default:
       std::cerr << "[FAIL]: " << msg << std::endl;
       exit(EXIT_FAILURE);
@@ -55,7 +54,7 @@ void logger::verbosity_level(int level) {
     case 0:  logger ::verbosity_level() = FAIL;    break ;
     case 1:  logger ::verbosity_level() = WARNING; break ;
     case 2:  logger ::verbosity_level() = INFO;    break ;
-    default: logger ::verbosity_level() = DEBUG;
+    default: logger ::verbosity_level() = INFO;
   }
 }
 
