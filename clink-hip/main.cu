@@ -84,7 +84,7 @@ void init(const char* work_path, const char* input_filename, const char* weight_
   fclose(fp);
 }
 
-void lstm_n5(const float* x, 
+long lstm_n5(const float* x, 
              const float* inW, 
              const float* intW, 
              const float* intB, 
@@ -108,8 +108,15 @@ void lstm_n5(const float* x,
   hipMemcpy(d_outW, outW, 5 * sizeof(float), hipMemcpyHostToDevice);
   hipMemcpy(d_outB, outB, 1 * sizeof(float), hipMemcpyHostToDevice);
 
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   hipLaunchKernelGGL(lstm_inference, dim3(N/WGS), dim3(WGS), 0, 0, 
       d_x, d_inW, d_intW, d_intB, d_outW, d_outB, d_y);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   hipMemcpy(y, d_y, N * SAMPLE_TEST_LEN * sizeof(float), hipMemcpyDeviceToHost);
   hipFree(d_x);
@@ -119,6 +126,7 @@ void lstm_n5(const float* x,
   hipFree(d_outW);
   hipFree(d_outB);
   hipFree(d_y);
+  return time;
 }
 
 int main() {
@@ -139,14 +147,15 @@ int main() {
   const char* result2_filename = "float_infer_result_2.hpp";
 #endif
 
+  long kernel_time = 0;
   for (int n = 0; n < 10; n++) {
     init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
     auto start = std::chrono::steady_clock::now();
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
+    kernel_time += lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
     auto end = std::chrono::steady_clock::now();
     auto elapsedTime =
       std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+    std::cout << "Device offload time: " <<  elapsedTime << " ms\n";
 
 #ifdef DEBUG
     dump(work_path, result1_filename, infer1_out);
@@ -154,16 +163,17 @@ int main() {
 
     init(work_path, input_filename, weight2_filename, sample_input, inW, intW, intB, outW, &outB) ;
     start = std::chrono::steady_clock::now();
-    lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
+    kernel_time += lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer2_out);
     end = std::chrono::steady_clock::now();
     elapsedTime =
       std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-    std::cout << "Execute time: " <<  elapsedTime << " ms\n";
+    std::cout << "Device offload time: " <<  elapsedTime << " ms\n";
 
 #ifdef DEBUG
     dump(work_path, result2_filename, infer2_out);
 #endif
   }
+  std::cout << "Average kernel time: " <<  kernel_time * 1e-6 / 20 << " ms\n";
 
   free(sample_input);
   free(infer1_out);
