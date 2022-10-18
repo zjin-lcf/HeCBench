@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /***************************************************************************
  *cr
  *cr            (C) Copyright 2007 The Board of Trustees of the
@@ -238,11 +237,11 @@ int main(int argc, char** argv) {
     // RUN the kernel...
     wkf_timer_start(runtimer);
     hipLaunchKernelGGL(cenergy, dim3(Gsz), dim3(Bsz), 0, 0, runatoms, 0.1, doutput, datominfo);
+    hipDeviceSynchronize();
     CUERR // check and clear any existing errors
     wkf_timer_stop(runtimer);
     runtotal += wkf_timer_time(runtimer);
   }
-  hipDeviceSynchronize();
   printf("Done\n");
 
   wkf_timer_stop(mastertimer);
