@@ -37,8 +37,12 @@ entitled "GNU Free Documentation License".
 
 #include "kernels.cpp"
 
-void extractBigrams(float *scores, const char* filename) {
+bool extractBigrams(float *scores, const char* filename) {
   FILE* bigramsFile = fopen(filename, "r");
+  if (bigramsFile == NULL) {
+    fprintf(stderr, "Failed to open file %s. Exit\n", filename);
+    return true;
+  }
   while(1){
     char tempBigram[2];
     float tempBigramScore = 0.0;
@@ -47,6 +51,7 @@ void extractBigrams(float *scores, const char* filename) {
     scores[(tempBigram[0]-'a')*ALPHABET + tempBigram[1]-'a'] = tempBigramScore; 
   }
   fclose(bigramsFile);
+  return false;
 }
 
 bool verify(int* encrMap) {
@@ -81,7 +86,8 @@ int main(int argc, char* argv[]) {
     encryptedMap[j] = ENCRYPTED_T[j] - 'a';
 
   float scores[totalBigrams];  
-  extractBigrams(scores, filename);
+  bool fail = extractBigrams(scores, filename);
+  if (fail) return 1;
 
   int* decrypted = new int[ENCRYPTEDLEN*THREADS];
   unsigned int state[THREADS];
