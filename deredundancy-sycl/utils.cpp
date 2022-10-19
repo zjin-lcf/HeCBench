@@ -61,8 +61,12 @@ bool compare(const Read &a, const Read &b) {
 }
 
 // readFile
-void readFile(std::vector<Read> &reads, Option &option) {
+bool readFile(std::vector<Read> &reads, Option &option) {
   std::ifstream file(option.inputFile.c_str());
+  if (!file.is_open()) {
+    std::cout << "Failed to open file " << option.inputFile << ". Exit\n";
+    return true;
+  }
   Read read;
   std::string line;
   getline(file, line);
@@ -80,4 +84,5 @@ void readFile(std::vector<Read> &reads, Option &option) {
   file.close();
   std::sort(reads.begin(), reads.end(), compare);
   std::cout << "reads count:\t" << reads.size() << std::endl;
+  return false;
 }

@@ -25,4 +25,4 @@ struct Read {
 
 //--------------------function--------------------//
 void checkOption(int argc, char **argv, Option &option);
-void readFile(std::vector<Read> &reads, Option &option);
+bool readFile(std::vector<Read> &reads, Option &option);
