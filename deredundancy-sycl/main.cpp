@@ -1,3 +1,4 @@
+#include <chrono>
 #include "utils.h"
 #include "kernels.cpp"
 
@@ -5,7 +6,8 @@ int main(int argc, char **argv) {
   Option option;
   checkOption(argc, argv, option);
   std::vector<Read> reads;
-  readFile(reads, option);
+  bool fail = readFile(reads, option);
+  if (fail) return 1;
 
   int readsCount = reads.size();
   int* h_lengths = (int*) malloc (sizeof(int) * readsCount);
@@ -31,6 +33,8 @@ int main(int argc, char **argv) {
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel);
+
+  auto t1 = std::chrono::high_resolution_clock::now();
 
   buffer<int, 1> d_lengths (h_lengths, readsCount);
   buffer<long, 1> d_offsets (h_offsets, (1 + readsCount));
@@ -375,9 +379,13 @@ int main(int argc, char **argv) {
     cgh.copy(cluster, h_cluster);
   }).wait();
 
+  auto t2 = std::chrono::high_resolution_clock::now();
+  double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+  printf("Device offload time %lf secs \n", total_time / 1.0e6);
+
   std::ofstream file(option.outputFile.c_str());
   int sum = 0;
-  for (int i = 0; i < reads.size(); i++) {
+  for (int i = 0; i < readsCount; i++) {
     if (h_cluster[i] == i) {
       file << reads[i].name << std::endl;
       file << reads[i].data << std::endl;
