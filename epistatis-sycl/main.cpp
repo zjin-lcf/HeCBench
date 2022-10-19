@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <float.h>
 #include <fstream>
@@ -29,8 +28,8 @@ float gammafunction(unsigned int n)
 {   
   if(n == 0)
     return 0.0f;
-  float x = ((float)n + 0.5f) * cl::sycl::log((float) n) - 
-            ((float)n - 1.0f) * cl::sycl::log(cl::sycl::exp((float) 1.0f));
+  float x = ((float)n + 0.5f) * sycl::log((float) n) - 
+            ((float)n - 1.0f) * sycl::log(sycl::exp((float) 1.0f));
   return x;
 }
 
@@ -165,12 +164,15 @@ int main(int argc, char **argv)
   range<2> local_epi(1, block_snp);
 
   // epistasis detection kernel
+  float total_ktime = 0.f;
+
   for (int i = 0; i < iteration; i++) {
-  
     q.submit([&](handler& h) {
       auto acc = d_scores.get_access<sycl_discard_write>(h);
       h.copy(scores, acc);
-    });
+    }).wait();
+
+    auto kstart = myclock::now();
 
     q.submit([&](handler& h) {
       auto dev_data_zeros = d_data_zeros.get_access<sycl_read>(h);
@@ -210,15 +212,15 @@ int main(int argc, char **argv)
             t21 = di2 & SNPj[p + 1];
             t22 = di2 & dj2;
 
-            ft[0] += cl::sycl::popcount(t00);
-            ft[1] += cl::sycl::popcount(t01);
-            ft[2] += cl::sycl::popcount(t02);
-            ft[3] += cl::sycl::popcount(t10);
-            ft[4] += cl::sycl::popcount(t11);
-            ft[5] += cl::sycl::popcount(t12);
-            ft[6] += cl::sycl::popcount(t20);
-            ft[7] += cl::sycl::popcount(t21);
-            ft[8] += cl::sycl::popcount(t22);
+            ft[0] += sycl::popcount(t00);
+            ft[1] += sycl::popcount(t01);
+            ft[2] += sycl::popcount(t02);
+            ft[3] += sycl::popcount(t10);
+            ft[4] += sycl::popcount(t11);
+            ft[5] += sycl::popcount(t12);
+            ft[6] += sycl::popcount(t20);
+            ft[7] += sycl::popcount(t21);
+            ft[8] += sycl::popcount(t22);
           }
 
           // remainder
@@ -238,15 +240,15 @@ int main(int argc, char **argv)
           t21 = di2 & SNPj[p + 1];
           t22 = di2 & dj2;
 
-          ft[0] += cl::sycl::popcount(t00);
-          ft[1] += cl::sycl::popcount(t01);
-          ft[2] += cl::sycl::popcount(t02);
-          ft[3] += cl::sycl::popcount(t10);
-          ft[4] += cl::sycl::popcount(t11);
-          ft[5] += cl::sycl::popcount(t12);
-          ft[6] += cl::sycl::popcount(t20);
-          ft[7] += cl::sycl::popcount(t21);
-          ft[8] += cl::sycl::popcount(t22);
+          ft[0] += sycl::popcount(t00);
+          ft[1] += sycl::popcount(t01);
+          ft[2] += sycl::popcount(t02);
+          ft[3] += sycl::popcount(t10);
+          ft[4] += sycl::popcount(t11);
+          ft[5] += sycl::popcount(t12);
+          ft[6] += sycl::popcount(t20);
+          ft[7] += sycl::popcount(t21);
+          ft[8] += sycl::popcount(t22);
 
           // Phenotype 1
           SNPi = (unsigned int*) &dev_data_ones[i * 2];
@@ -266,15 +268,15 @@ int main(int argc, char **argv)
             t21 = di2 & SNPj[p + 1];
             t22 = di2 & dj2;
 
-            ft[9]  += cl::sycl::popcount(t00);
-            ft[10] += cl::sycl::popcount(t01);
-            ft[11] += cl::sycl::popcount(t02);
-            ft[12] += cl::sycl::popcount(t10);
-            ft[13] += cl::sycl::popcount(t11);
-            ft[14] += cl::sycl::popcount(t12);
-            ft[15] += cl::sycl::popcount(t20);
-            ft[16] += cl::sycl::popcount(t21);
-            ft[17] += cl::sycl::popcount(t22);
+            ft[9]  += sycl::popcount(t00);
+            ft[10] += sycl::popcount(t01);
+            ft[11] += sycl::popcount(t02);
+            ft[12] += sycl::popcount(t10);
+            ft[13] += sycl::popcount(t11);
+            ft[14] += sycl::popcount(t12);
+            ft[15] += sycl::popcount(t20);
+            ft[16] += sycl::popcount(t21);
+            ft[17] += sycl::popcount(t22);
           }
           p = 2 * PP_ones * num_snp - 2 * num_snp;
           di2 = ~(SNPi[p] | SNPi[p + 1]);
@@ -292,28 +294,32 @@ int main(int argc, char **argv)
           t21 = di2 & SNPj[p + 1];
           t22 = di2 & dj2;
 
-          ft[9]  += cl::sycl::popcount(t00);
-          ft[10] += cl::sycl::popcount(t01);
-          ft[11] += cl::sycl::popcount(t02);
-          ft[12] += cl::sycl::popcount(t10);
-          ft[13] += cl::sycl::popcount(t11);
-          ft[14] += cl::sycl::popcount(t12);
-          ft[15] += cl::sycl::popcount(t20);
-          ft[16] += cl::sycl::popcount(t21);
-          ft[17] += cl::sycl::popcount(t22);
+          ft[9]  += sycl::popcount(t00);
+          ft[10] += sycl::popcount(t01);
+          ft[11] += sycl::popcount(t02);
+          ft[12] += sycl::popcount(t10);
+          ft[13] += sycl::popcount(t11);
+          ft[14] += sycl::popcount(t12);
+          ft[15] += sycl::popcount(t20);
+          ft[16] += sycl::popcount(t21);
+          ft[17] += sycl::popcount(t22);
 
           // compute score
           score = 0.0f;
           for(k = 0; k < 9; k++)
             score += gammafunction(ft[k] + ft[9 + k] + 1) - gammafunction(ft[k]) - gammafunction(ft[9 + k]);
-          score = cl::sycl::fabs((float) score);
+          score = sycl::fabs((float) score);
           if(score == 0.0f)
             score = FLT_MAX;
           dev_scores[tid] = score;
         }
       });
-    });
+    }).wait();
+
+    myduration ktime = myclock::now() - kstart;
+    total_ktime += ktime.count();
   }
+  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
 
   q.submit([&](handler& h) {
     auto acc = d_scores.get_access<sycl_read>(h);

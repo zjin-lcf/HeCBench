@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <float.h>
 #include <fstream>
@@ -315,11 +314,19 @@ int main(int argc, char **argv)
   dim3 block(block_snp, 1);
 
   // epistasis detection kernel
+  float total_ktime = 0.f;
+
   for (int i = 0; i < iteration; i++) {
     cudaMemcpy(d_scores, scores, sizeof(float) * num_snp * num_snp, cudaMemcpyHostToDevice);
+    auto kstart = myclock::now();
     epi<<<grid, block>>>(d_data_zeros, d_data_ones, d_scores, num_snp, 
                          PP_zeros, PP_ones, mask_zeros, mask_ones);
+    cudaDeviceSynchronize();
+    myduration ktime = myclock::now() - kstart;
+    total_ktime += ktime.count();
   }
+  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
+
   cudaMemcpy(scores, d_scores, sizeof(float) * num_snp * num_snp, cudaMemcpyDeviceToHost);
 
   auto end = myclock::now();

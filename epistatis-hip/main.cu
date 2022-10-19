@@ -173,7 +173,7 @@ __global__ void epi(const unsigned int* dev_data_zeros,
     score = 0.0f;
     for(k = 0; k < 9; k++)
       score += gammafunction(ft[k] + ft[9 + k] + 1) - gammafunction(ft[k]) - gammafunction(ft[9 + k]);
-    score = fabs((float) score);
+    score = fabs(score);
     if(score == 0.0f)
       score = FLT_MAX;
     dev_scores[tid] = score;
@@ -314,11 +314,19 @@ int main(int argc, char **argv)
   dim3 block(block_snp, 1);
 
   // epistasis detection kernel
+  float total_ktime = 0.f;
+
   for (int i = 0; i < iteration; i++) {
     hipMemcpy(d_scores, scores, sizeof(float) * num_snp * num_snp, hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(epi, dim3(grid), dim3(block), 0, 0, d_data_zeros, d_data_ones, d_scores, num_snp, 
+    auto kstart = myclock::now();
+    hipLaunchKernelGGL(epi, grid, block, 0, 0, d_data_zeros, d_data_ones, d_scores, num_snp, 
                          PP_zeros, PP_ones, mask_zeros, mask_ones);
+    hipDeviceSynchronize();
+    myduration ktime = myclock::now() - kstart;
+    total_ktime += ktime.count();
   }
+  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
+
   hipMemcpy(scores, d_scores, sizeof(float) * num_snp * num_snp, hipMemcpyDeviceToHost);
 
   auto end = myclock::now();

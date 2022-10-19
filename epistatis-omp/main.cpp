@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <float.h>
 #include <fstream>
@@ -174,10 +173,14 @@ int main(int argc, char **argv)
   while(num_snp_m % block_snp != 0) num_snp_m++;
 
   // epistasis detection kernel
+  float total_ktime = 0.f;
+
   for (int i = 0; i < iteration; i++) {
   
     memcpy(dev_scores, scores, sizeof(float) * num_snp * num_snp);
     #pragma omp target update to (dev_scores[0:num_snp*num_snp])
+
+    auto kstart = myclock::now();
 
     #pragma omp target teams distribute parallel for thread_limit(block_snp)
     for (int n = 0; n < num_snp_m * num_snp_m; n++) {
@@ -316,7 +319,11 @@ int main(int argc, char **argv)
         dev_scores[tid] = score;
       }
     }
+    myduration ktime = myclock::now() - kstart;
+    total_ktime += ktime.count();
   }
+  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
+
   #pragma omp target update from (dev_scores[0:num_snp*num_snp])
 
   auto end = myclock::now();
