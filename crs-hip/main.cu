@@ -18,6 +18,7 @@ int main(int argc, const char * argv[]) {
   int bufSize = atoi(argv[1]) * 1024 * 1024; // workSize per data parity block
   int taskNum = atoi(argv[2]);
 
+  double encode_time = 0.0;
 
 #ifdef DUMP
   for (int m = 4; m <= 4; ++m) {
@@ -32,7 +33,9 @@ int main(int argc, const char * argv[]) {
     int w = gcrs_check_k_m_w(k, m, n);
     if (w < 0) continue;
 
+#ifdef DUMP
     printf("k:%d, m:%d w:%d\n",k,m,w);
+#endif
 
     int *bitmatrix = gcrs_create_bitmatrix(k, m, w);
     //printMatrix(bitmatrix, k*w, m*w);
@@ -43,8 +46,10 @@ int main(int argc, const char * argv[]) {
 
     //  compute the bufSize for the last task
     int bufSizeForLastTask = bufSize - (bufSizePerTask * (taskNum - 1));
+#ifdef DUMP
     printf("Total Size:%d Size per task:%d Size for last task:%d\n", 
-        bufSize, bufSizePerTask, bufSizeForLastTask);
+           bufSize, bufSizePerTask, bufSizeForLastTask);
+#endif
 
     // allocate host buffers
     char* data = (char*) malloc (bufSize * k);
@@ -79,7 +84,9 @@ int main(int argc, const char * argv[]) {
       if (m % MAX_M != 0) ++taskSize;
     }
 
+#ifdef DUMP
     printf("task size: %d\n", taskSize);
+#endif
 
     // set up kernel execution parameters
     int *mValue = (int*) malloc (sizeof(int) * taskSize);
@@ -133,7 +140,9 @@ int main(int argc, const char * argv[]) {
       blockNum = blockNum + 1;
     }
 
+#ifdef DUMP
     printf("#blocks: %zu  blockSize: %d\n", blockNum, threadNum);
+#endif
 
     struct timeval startEncodeTime, endEncodeTime;
     gettimeofday(&startEncodeTime, NULL);
@@ -149,7 +158,7 @@ int main(int argc, const char * argv[]) {
       mValueSum = 0;
       for (int j = 0; j < taskSize; ++j) {
         coding_function_ptrs[j](k, index[j], d_data_ptr[i], d_code_ptr[i]+mValueSum*size, 
-          d_bitmatrix, threadNum, blockNum, workSizePerGrid);
+                                d_bitmatrix, threadNum, blockNum, workSizePerGrid);
         mValueSum += mValue[j];
       }
 
@@ -160,8 +169,11 @@ int main(int argc, const char * argv[]) {
     }
     hipDeviceSynchronize();
     gettimeofday(&endEncodeTime, NULL);
-    printf("Total elapsed time %lf (ms)\n",
-      elapsed_time_in_ms(startEncodeTime, endEncodeTime));
+    double etime = elapsed_time_in_ms(startEncodeTime, endEncodeTime);
+#ifdef DUMP
+    printf("Encoding time over %d tasks: %lf (ms)\n", taskNum, etime);
+#endif
+    encode_time += etime;
 
 #ifdef DUMP
     for (int i = 0; i < bufSize*m; i++) printf("%d\n", code[i]);
@@ -183,6 +195,8 @@ int main(int argc, const char * argv[]) {
   }
   }
   }
+
+  printf("Total encoding time %lf (s)\n", encode_time * 1e-3);
 
   return 0;
 }
