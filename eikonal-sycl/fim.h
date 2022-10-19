@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include "common_def.h"
 
-//#define TIMER
+#define TIMER
 
 void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem);
 
