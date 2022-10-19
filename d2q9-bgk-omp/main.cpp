@@ -59,6 +59,7 @@
 #include <iostream>
 #include <omp.h>
 
+#define WARMUPS         1000
 #define NSPEEDS         9
 #define LOCALSIZEX      128
 #define LOCALSIZEY      1
@@ -201,11 +202,6 @@ int main(int argc, char* argv[])
     }
   }
 
-  //start timer
-  gettimeofday(&timstr, NULL);
-  tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-
-
   //parameters for kernel
   float omega = params.omega;
   float densityaccel = params.density*params.accel;
@@ -236,7 +232,16 @@ int main(int argc, char* argv[])
                                    tot_cellsp[0:(Ny/LOCALSIZEY) * (Nx/LOCALSIZEX) * MaxIters])
   {
 
+  //start timer
+  gettimeofday(&timstr, NULL);
+  tic = timstr.tv_sec * 1e6 + timstr.tv_usec;
+
   for (int tt = 0; tt < MaxIters; tt++) {
+    if (tt == WARMUPS - 1) {
+      //start timer after warmup
+      gettimeofday(&timstr, NULL);
+      tic = timstr.tv_sec * 1e6 + timstr.tv_usec;
+    }
     #pragma omp target teams num_teams(teams) thread_limit(threads)
     {
       float local_sum[LOCALSIZEX*LOCALSIZEY];
@@ -449,6 +454,12 @@ int main(int argc, char* argv[])
     tmp_speeds8 = speed_tmp;
   }
 
+  gettimeofday(&timstr, NULL);
+  toc = timstr.tv_sec * 1e6 + timstr.tv_usec;
+  printf("After warmup for %d iterations, ", WARMUPS);
+  printf("average kernel execution time over %d iterations:\t\t\t%.6lf (us)\n",
+         MaxIters - WARMUPS, (toc - tic) / (MaxIters - WARMUPS));
+
   } // omp target 
 
   float tot_u = 0;
@@ -463,10 +474,6 @@ int main(int argc, char* argv[])
     }
     av_vels[tt] = tot_u/tot_cells;
   }
-
-  //end timer
-  gettimeofday(&timstr, NULL);
-  toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
   // put answers back into cells
   for (int jj = 0; jj < Ny; jj++)
@@ -488,7 +495,6 @@ int main(int argc, char* argv[])
   /* write final values and free memory */
   printf("==done==\n");
   printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells, obstacles));
-  printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
   write_values(params, cells, obstacles, av_vels);
   finalise(cells, tmp_cells, obstacles, av_vels);
 

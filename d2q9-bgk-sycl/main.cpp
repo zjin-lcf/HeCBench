@@ -59,6 +59,7 @@
 #include <iostream>
 #include "common.h"
 
+#define WARMUPS         1000
 #define NSPEEDS         9
 #define LOCALSIZEX      128
 #define LOCALSIZEY      1
@@ -200,9 +201,6 @@ int main(int argc, char* argv[])
     std::cout << "Running on "
       << q.get_device().get_info<info::device::name>()
       << "\n";
-    //start timer
-    gettimeofday(&timstr, NULL);
-    tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
     // Creating buffers which are bound to host arrays
     buffer<float, 1> speeds0 (speedsHostS0, Ny*Nx);
@@ -236,8 +234,16 @@ int main(int argc, char* argv[])
     //Define range
     auto myRange = nd_range<2>(range<2>(Ny,Nx), range<2>(LOCALSIZEY,LOCALSIZEX));
 
+    q.wait();
+
     for (int tt = 0; tt < MaxIters; tt++) {
-      q.submit([&](handler &cgh){
+      if (tt == WARMUPS - 1) {
+	//start timer after warmup
+        q.wait();
+	gettimeofday(&timstr, NULL);
+	tic = timstr.tv_sec * 1e6 + timstr.tv_usec;
+      }
+      q.submit([&](handler &cgh) {
           //Set up accessors
           auto Speed0A = speeds0.get_access<sycl_read>(cgh);
           auto Speed1A = speeds1.get_access<sycl_read>(cgh);
@@ -470,6 +476,14 @@ int main(int argc, char* argv[])
       tmp_speeds8 = std::move(speed_tmp);
     }
 
+    //end timer
+    q.wait();
+    gettimeofday(&timstr, NULL);
+    toc = timstr.tv_sec * 1e6 + timstr.tv_usec;
+    printf("After warmup for %d iterations, ", WARMUPS);
+    printf("average kernel execution time over %d iterations:\t\t\t%.6lf (us)\n",
+           MaxIters - WARMUPS, (toc - tic) / (MaxIters - WARMUPS));
+
   }//sycl scope
 
   float tot_u = 0;
@@ -484,10 +498,6 @@ int main(int argc, char* argv[])
     }
     av_vels[tt] = tot_u/tot_cells;
   }
-
-  //end timer
-  gettimeofday(&timstr, NULL);
-  toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
   // put answers back into cells
   for (int jj = 0; jj < Ny; jj++)
@@ -509,7 +519,6 @@ int main(int argc, char* argv[])
   /* write final values and free memory */
   printf("==done==\n");
   printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells, obstaclesHost));
-  printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
   write_values(params, cells, obstaclesHost, av_vels);
   finalise(cells, tmp_cells, obstaclesHost, av_vels);
 

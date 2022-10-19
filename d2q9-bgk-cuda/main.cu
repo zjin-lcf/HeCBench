@@ -57,6 +57,7 @@
 #include <sys/time.h>
 #include <cuda.h>
 
+#define WARMUPS         1000
 #define NSPEEDS         9
 #define LOCALSIZEX      128
 #define LOCALSIZEY      1
@@ -382,10 +383,6 @@ int main(int argc, char* argv[])
     }
   }
 
-  //start timer
-  gettimeofday(&timstr, NULL);
-  tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-
   // Creating buffers which are bound to host arrays
   float *speeds0, *speeds1, *speeds2, *speeds3, *speeds4,
     *speeds5, *speeds6, *speeds7, *speeds8;
@@ -439,6 +436,12 @@ int main(int argc, char* argv[])
   dim3 threads(LOCALSIZEX, LOCALSIZEY);
 
   for (int tt = 0; tt < MaxIters; tt++){
+    if (tt == WARMUPS - 1) {
+      //start timer after warmup
+      cudaDeviceSynchronize();
+      gettimeofday(&timstr, NULL);
+      tic = timstr.tv_sec * 1e6 + timstr.tv_usec;
+    }
     d2q9_bgk<<<grids, threads>>>(
         speeds0, 
         speeds1,
@@ -505,6 +508,14 @@ int main(int argc, char* argv[])
     tmp_speeds8 = speed_tmp;
   }
 
+  //end timer
+  cudaDeviceSynchronize();
+  gettimeofday(&timstr, NULL);
+  toc = timstr.tv_sec * 1e6 + timstr.tv_usec;
+  printf("After warmup for %d iterations, ", WARMUPS);
+  printf("average kernel execution time over %d iterations:\t\t\t%.6lf (us)\n",
+         MaxIters - WARMUPS, (toc - tic) / (MaxIters - WARMUPS));
+
   cudaMemcpy(tot_up, partial_sum, sizeof(float)*(Ny/LOCALSIZEY)*(Nx/LOCALSIZEX)*MaxIters, cudaMemcpyDeviceToHost);
   cudaMemcpy(tot_cellsp, partial_sum2, sizeof(int)*(Ny/LOCALSIZEY)*(Nx/LOCALSIZEX)*MaxIters, cudaMemcpyDeviceToHost);
 
@@ -553,10 +564,6 @@ int main(int argc, char* argv[])
     av_vels[tt] = tot_u/tot_cells;
   }
 
-  //end timer
-  gettimeofday(&timstr, NULL);
-  toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-
   // put answers back into cells
   for (int jj = 0; jj < params.ny; jj++)
   {
@@ -577,7 +584,6 @@ int main(int argc, char* argv[])
   /* write final values and free memory */
   printf("==done==\n");
   printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells, obstaclesHost));
-  printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
   write_values(params, cells, obstaclesHost, av_vels);
   finalise(cells, tmp_cells, obstaclesHost, av_vels);
 
