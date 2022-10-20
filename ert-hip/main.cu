@@ -24,7 +24,7 @@ double getTime()
 template <typename T>
 T *alloc(uint64_t psize)
 {
-  T* buffer =  (T *)malloc(psize);
+  T* buffer = (T *)calloc(psize/sizeof(T), sizeof(T));
   if (buffer == nullptr) {
     fprintf(stderr, "Out of memory!\n");
     exit(1);
@@ -112,7 +112,6 @@ int main(int argc, char *argv[])
   start = getTime();
   run<half2>(PSIZE, hlfbuf);
   printf("runtime (half2): %lf (s)\n", getTime() - start);
-  // final checksum
   checksum = 0; 
   for (uint64_t i = 0; i < PSIZE / sizeof(half2); i++) {
     float2 t = __half22float2(hlfbuf[i]);
@@ -126,9 +125,10 @@ int main(int argc, char *argv[])
   start = getTime();
   run<float>(PSIZE, sglbuf);
   printf("runtime (float): %lf (s)\n", getTime() - start);
-  // final checkchecksum
   checksum = 0; 
-  for (uint64_t i = 0; i < PSIZE/sizeof(float); i++) checksum += sglbuf[i];
+  for (uint64_t i = 0; i < PSIZE/sizeof(float); i++) {
+    checksum += sglbuf[i];
+  }
   printf("checksum: %lf\n", checksum);
   free(sglbuf);
 
@@ -137,9 +137,10 @@ int main(int argc, char *argv[])
   start = getTime();
   run<double>(PSIZE, dblbuf);
   printf("runtime (double): %lf (s)\n", getTime() - start);
-  // final checkchecksum
   checksum = 0; 
-  for (uint64_t i = 0; i < PSIZE/sizeof(double); i++) checksum += dblbuf[i];
+  for (uint64_t i = 0; i < PSIZE/sizeof(double); i++) {
+    checksum += dblbuf[i];
+  }
   printf("checksum: %lf\n", checksum);
   free(dblbuf);
 

@@ -10,7 +10,7 @@ int gpu_threads;
 #define KERNEL1(a, b, c) ((a) = (b) + (c))
 #define KERNEL2(a, b, c) ((a) = (a) * (b) + (c))
 #define KERNEL2HALF(a, b, c) ((a) = ((b) + (c)))
-#define KERNEL4HALF(a, b, c) ((a) = sycl::fma((a), (b), (c)))
+#define KERNEL4HALF(a, b, c) ((a) = (a) * (b) + (c))
 
 // forward declaration
 template <typename T>
@@ -62,9 +62,8 @@ void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> 
 
   // A needs to be initilized to -1 coming in
   // And with alpha=2 and beta=1, A=-1 is preserved upon return
-  T alpha, const_beta;
-  alpha      = half2(2.0f);
-  const_beta = half2(1.0f);
+  T alpha      = half2(2.0f);
+  T const_beta = half2(1.0f);
 
   uint32_t i, j;
   for (j = 0; j < ntrials; ++j) {
@@ -82,6 +81,7 @@ void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> 
       REP128(KERNEL4HALF(beta, A[i], alpha));
       REP256(KERNEL4HALF(beta, A[i], alpha));
       A[i] = -beta;
+
     }
   }
 }

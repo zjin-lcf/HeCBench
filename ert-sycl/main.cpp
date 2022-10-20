@@ -6,8 +6,7 @@
 
 #define ERT_ALIGN           256
 #define ERT_NUM_EXPERIMENTS 1
-//#define ERT_MEMORY_MAX      33554432
-#define ERT_MEMORY_MAX      1000
+#define ERT_MEMORY_MAX      33554432
 #define ERT_WORKING_SET_MIN 128
 #define ERT_TRIALS_MIN      1
 #define ERT_WSS_MULT        1.3
@@ -26,7 +25,7 @@ double getTime()
 template <typename T>
 T *alloc(uint64_t psize)
 {
-  T* buffer =  (T *)malloc(psize);
+  T* buffer =  (T *)calloc(psize/sizeof(T), sizeof(T));
   if (buffer == nullptr) {
     fprintf(stderr, "Out of memory!\n");
     exit(1);
@@ -44,7 +43,6 @@ inline void launchKernel(queue &q, uint64_t n, uint64_t t, T *buf, buffer<T,1> &
 template <typename T>
 void run(queue &q, uint64_t PSIZE, T *buf)
 {
-
   uint64_t nsize = PSIZE;
   nsize          = nsize & (~(ERT_ALIGN - 1));
   nsize          = nsize / sizeof(T);
@@ -124,11 +122,9 @@ int main(int argc, char *argv[])
   start = getTime();
   run<half2>(q, PSIZE, hlfbuf);
   printf("runtime (half2): %lf (s)\n", getTime() - start);
-  // final checksum
   checksum = 0; 
   for (uint64_t i = 0; i < PSIZE / sizeof(half2); i++) {
-    float2 t = hlfbuf[i].convert<float, sycl::rounding_mode::automatic>();
-    checksum += t.x() + t.y();
+    checksum += (float)hlfbuf[i].x() + (float)hlfbuf[i].y();
   }
   printf("checksum: %lf\n", checksum);
   free(hlfbuf);
@@ -138,9 +134,10 @@ int main(int argc, char *argv[])
   start = getTime();
   run<float>(q, PSIZE, sglbuf);
   printf("runtime (float): %lf (s)\n", getTime() - start);
-  // final checkchecksum
   checksum = 0; 
-  for (uint64_t i = 0; i < PSIZE/sizeof(float); i++) checksum += sglbuf[i];
+  for (uint64_t i = 0; i < PSIZE/sizeof(float); i++) {
+    checksum += sglbuf[i];
+  }
   printf("checksum: %lf\n", checksum);
   free(sglbuf);
 
@@ -149,9 +146,10 @@ int main(int argc, char *argv[])
   start = getTime();
   run<double>(q, PSIZE, dblbuf);
   printf("runtime (double): %lf (s)\n", getTime() - start);
-  // final checkchecksum
   checksum = 0; 
-  for (uint64_t i = 0; i < PSIZE/sizeof(double); i++) checksum += dblbuf[i];
+  for (uint64_t i = 0; i < PSIZE/sizeof(double); i++) {
+    checksum += dblbuf[i];
+  }
   printf("checksum: %lf\n", checksum);
   free(dblbuf);
 
