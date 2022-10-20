@@ -82,7 +82,11 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   cudaMemcpy(d_b, b, size*sizeof(half2), cudaMemcpyHostToDevice);
 
+  for (int i = 0; i < repeat; i++)
+    hmax<half2><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
+      d_a, d_b, d_r, size);
   cudaDeviceSynchronize();
+
   auto start = std::chrono::steady_clock::now();
   
   // run hmax2
@@ -113,7 +117,11 @@ int main(int argc, char *argv[])
   }
   printf("fp16_hmax2 %s\n", ok ?  "PASS" : "FAIL");
 
+  for (int i = 0; i < repeat; i++)
+    hmax<half><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
+      (half*)d_a, (half*)d_b, (half*)d_r, size*2);
   cudaDeviceSynchronize();
+
   start = std::chrono::steady_clock::now();
   
   // run hmax (the size is doubled)

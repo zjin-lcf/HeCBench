@@ -119,7 +119,17 @@ int main(int argc, char *argv[])
   range<1> gws (NUM_OF_BLOCKS * NUM_OF_THREADS);
   range<1> lws (NUM_OF_THREADS);
 
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (handler &cgh) {
+      auto a = d_a.get_access<sycl_read>(cgh);
+      auto b = d_b.get_access<sycl_read>(cgh);
+      auto r = d_r.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class f16_max_v2_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        hmax<half2>(item, a.get_pointer(), b.get_pointer(), r.get_pointer(), size);
+      });
+    });
   q.wait();
+
   auto start = std::chrono::steady_clock::now();
 
   // run hmax2
@@ -164,7 +174,18 @@ int main(int argc, char *argv[])
   auto d_b_re = d_b.reinterpret<half>(range<1>(2*size));
   auto d_r_re = d_r.reinterpret<half>(range<1>(2*size));
 
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (handler &cgh) {
+      auto a = d_a_re.get_access<sycl_read>(cgh);
+      auto b = d_b_re.get_access<sycl_read>(cgh);
+      auto r = d_r_re.get_access<sycl_discard_write>(cgh);
+      cgh.parallel_for<class f16_max_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        hmax<half>(item, a.get_pointer(), b.get_pointer(), r.get_pointer(), size*2);
+      });
+    });
+
   q.wait();
+
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
@@ -177,6 +198,7 @@ int main(int argc, char *argv[])
       });
     });
 
+  q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel (max_half) execution time %f (s)\n", (time * 1e-9f) / repeat);
