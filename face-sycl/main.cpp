@@ -39,9 +39,9 @@ using namespace std;
 
 int main (int argc, char *argv[]) 
 {
-
-  if (argc != 3) {
-    fprintf(stderr, "Usage: %s <input image file> <output image file>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <input image file> <classifier information> ", argv[0]);
+    printf("<class information> <output image file>\n");
     exit(-1);
   }
 
@@ -62,6 +62,10 @@ int main (int argc, char *argv[])
     return 1;
   }
 
+  /*return total number of weak classifiers (one node each)*/
+  int total_nodes = readTextClassifier(argv[2], argv[3]);
+  if (total_nodes == -1) return 1;
+
   printf("-- loading cascade classifier --\r\n");
 
   myCascade cascadeObj;
@@ -75,13 +79,8 @@ int main (int argc, char *argv[])
   cascade->orig_window_size.height = 24;
   cascade->orig_window_size.width = 24;
 
-
-  /*return total number of weak classifiers (one node each)*/
-  int total_nodes = readTextClassifier();
-
-  std::vector<MyRect> result;
-
   printf("-- detecting faces --\r\n");
+  std::vector<MyRect> result;
 
   auto start = std::chrono::steady_clock::now();
 
@@ -98,7 +97,7 @@ int main (int argc, char *argv[])
   }
 
   printf("-- saving output --\r\n"); 
-  flag = writePgm(argv[2], image); 
+  flag = writePgm(argv[4], image); 
 
   printf("-- image saved --\r\n");
 

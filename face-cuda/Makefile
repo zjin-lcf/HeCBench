@@ -70,6 +70,5 @@ clean:
 	rm -f $(program) *.o Output-cpu.pgm Output-gpu.pgm
 
 run: build
-	./vj-cpu Face.pgm Output-cpu.pgm
-	./vj-gpu Face.pgm Output-gpu.pgm
-
+	./vj-cpu Face.pgm info.txt class.txt Output-cpu.pgm
+	./vj-gpu Face.pgm info.txt class.txt Output-gpu.pgm

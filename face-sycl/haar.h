@@ -102,7 +102,7 @@ myCascade* cascade, MyIntImage* sum, MyIntImage* sqsum, int total_nodes);
 /* runs the cascade on the specified window */
 int runCascadeClassifier( myCascade* cascade, MyPoint pt, int start_stage);
 
-int readTextClassifier();
+int readTextClassifier(const char* info_file, const char* class_file);
 void releaseTextClassifier();
 
 
