@@ -91,7 +91,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include "common.h"
 #include "util.h"
 #include "kernel.h"
@@ -166,7 +166,7 @@ int main ( int argc, char **argv )
   buffer<double, 1> d_err (1);
   buffer<int, 1> d_n_inside (1);
 
-  timestamp ( );
+  long time = 0;
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       auto acc = d_err.get_access<sycl_discard_write>(cgh);
@@ -178,16 +178,20 @@ int main ( int argc, char **argv )
       cgh.copy(&n_inside, acc);
     });
 
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
     q.submit([&] (handler &cgh) {
       auto err = d_err.get_access<sycl_read_write>(cgh);
       auto n = d_n_inside.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class solution>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         fk (item, ni, nj, seed, N, a, b, h, rth, n.get_pointer(), err.get_pointer());
       });
-    });
+    }).wait();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
-  q.wait(); 
-  timestamp ( );
+  printf("Average kernel time: %lf (s)\n", time * 1e-9 / repeat);
   
   q.submit([&] (handler &cgh) {
     auto acc = d_err.get_access<sycl_read>(cgh);

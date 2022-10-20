@@ -91,7 +91,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "util.h"
 #include "kernel.h"
@@ -162,14 +162,21 @@ int main ( int argc, char **argv )
   hipMalloc((void**)&d_err, sizeof(double));
   hipMalloc((void**)&d_n_inside, sizeof(int));
 
-  timestamp ( );
+  long time = 0;
   for (int i = 0; i < repeat; i++) {
     hipMemcpy(d_err, &err, sizeof(double), hipMemcpyHostToDevice);
     hipMemcpy(d_n_inside, &n_inside, sizeof(int), hipMemcpyHostToDevice);
-    hipLaunchKernelGGL(fk, dim3(grids), dim3(blocks ), 0, 0, ni, nj, seed, N, a, b, h, rth, d_n_inside, d_err);
+
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    hipLaunchKernelGGL(fk, grids, blocks , 0, 0, ni, nj, seed, N, a, b, h, rth, d_n_inside, d_err);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
-  hipDeviceSynchronize();
-  timestamp ( );
+  printf("Average kernel time: %lf (s)\n", time * 1e-9 / repeat);
 
   hipMemcpy(&err, d_err, sizeof(double), hipMemcpyDeviceToHost);
   hipMemcpy(&n_inside, d_n_inside, sizeof(int), hipMemcpyDeviceToHost);

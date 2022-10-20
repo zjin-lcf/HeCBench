@@ -91,7 +91,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include <omp.h>
 #include "util.h"
 
@@ -155,106 +155,108 @@ int main ( int argc, char **argv )
   #pragma omp target data map (to: ni, nj, seed, N, a, b, h, rth) \
                           map (from: err, n_inside)
   {
+    long time = 0;
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target update to (err) 
+      #pragma omp target update to (n_inside) 
 
-  timestamp ( );
-  for (int i = 0; i < repeat; i++) {
-    #pragma omp target update to (err) 
-    #pragma omp target update to (n_inside) 
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(256) \
-                                                     reduction(+: err, n_inside) 
-    for (int j = 0; j < nj; j++) {
-      for (int i = 0; i < ni; i++) {
-        double x = ( ( double ) ( nj - j     ) * ( - a )
-                   + ( double ) (      j - 1 ) *     a )
-                   / ( double ) ( nj     - 1 );
+      auto start = std::chrono::steady_clock::now();
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(256) \
+                                                       reduction(+: err, n_inside) 
+      for (int j = 0; j < nj; j++) {
+        for (int i = 0; i < ni; i++) {
+          double x = ( ( double ) ( nj - j     ) * ( - a )
+                     + ( double ) (      j - 1 ) *     a )
+                     / ( double ) ( nj     - 1 );
 
-        double y = ( ( double ) ( ni - i     ) * ( - b )
-                   + ( double ) (      i - 1 ) *     b ) 
-                   / ( double ) ( ni     - 1 );
+          double y = ( ( double ) ( ni - i     ) * ( - b )
+                     + ( double ) (      i - 1 ) *     b ) 
+                     / ( double ) ( ni     - 1 );
 
-        double dx;
-        double dy;
-        double us;
-        double ut;
-        double vh;
-        double vs;
-        double x1;
-        double x2;
-        double w;
-        double w_exact;
-        double we;
-        double wt;
-        int steps;
-        double chk = pow ( x / a, 2.0 ) + pow ( y / b, 2.0 );
+          double dx;
+          double dy;
+          double us;
+          double ut;
+          double vh;
+          double vs;
+          double x1;
+          double x2;
+          double w;
+          double w_exact;
+          double we;
+          double wt;
+          int steps;
+          double chk = pow ( x / a, 2.0 ) + pow ( y / b, 2.0 );
 
-        if ( 1.0 < chk )
-        {
-          w_exact = 1.0;
-          wt = 1.0;
-        }
-        else {
-          n_inside++;
-          w_exact = exp ( pow ( x / a, 2.0 ) + pow ( y / b, 2.0 ) - 1.0 );
-          wt = 0.0;
-          steps = 0;
-          for ( int k = 0; k < N; k++ )
+          if ( 1.0 < chk )
           {
-            x1 = x;
-            x2 = y;
-            w = 1.0;  
-            chk = 0.0;
-            while ( chk < 1.0 )
-            {
-              ut = r8_uniform_01 ( &seed );
-              if ( ut < 1.0 / 2.0 )
-              {
-                us = r8_uniform_01 ( &seed ) - 0.5;
-                if ( us < 0.0)
-                  dx = - rth;
-                else
-                  dx = rth;
-              } 
-              else
-              {
-                dx = 0.0;
-              }
-
-              ut = r8_uniform_01 ( &seed );
-              if ( ut < 1.0 / 2.0 )
-              {
-                us = r8_uniform_01 ( &seed ) - 0.5;
-                if ( us < 0.0 )
-                  dy = - rth;
-                else
-                  dy = rth;
-              }
-              else
-              {
-                dy = 0.0;
-              }
-              vs = potential ( a, b, x1, x2 );
-              x1 = x1 + dx;
-              x2 = x2 + dy;
-
-              steps++;
-
-              vh = potential ( a, b, x1, x2 );
-
-              we = ( 1.0 - h * vs ) * w;
-              w = w - 0.5 * h * ( vh * we + vs * w ); 
-
-              chk = pow ( x1 / a, 2.0 ) + pow ( x2 / b, 2.0 );
-            }
-            wt += w;
+            w_exact = 1.0;
+            wt = 1.0;
           }
-          wt /= ( double ) ( N ); 
-          err += pow ( w_exact - wt, 2.0 );
+          else {
+            n_inside++;
+            w_exact = exp ( pow ( x / a, 2.0 ) + pow ( y / b, 2.0 ) - 1.0 );
+            wt = 0.0;
+            steps = 0;
+            for ( int k = 0; k < N; k++ )
+            {
+              x1 = x;
+              x2 = y;
+              w = 1.0;  
+              chk = 0.0;
+              while ( chk < 1.0 )
+              {
+                ut = r8_uniform_01 ( &seed );
+                if ( ut < 1.0 / 2.0 )
+                {
+                  us = r8_uniform_01 ( &seed ) - 0.5;
+                  if ( us < 0.0)
+                    dx = - rth;
+                  else
+                    dx = rth;
+                } 
+                else
+                {
+                  dx = 0.0;
+                }
+
+                ut = r8_uniform_01 ( &seed );
+                if ( ut < 1.0 / 2.0 )
+                {
+                  us = r8_uniform_01 ( &seed ) - 0.5;
+                  if ( us < 0.0 )
+                    dy = - rth;
+                  else
+                    dy = rth;
+                }
+                else
+                {
+                  dy = 0.0;
+                }
+                vs = potential ( a, b, x1, x2 );
+                x1 = x1 + dx;
+                x2 = x2 + dy;
+
+                steps++;
+
+                vh = potential ( a, b, x1, x2 );
+
+                we = ( 1.0 - h * vs ) * w;
+                w = w - 0.5 * h * ( vh * we + vs * w ); 
+
+                chk = pow ( x1 / a, 2.0 ) + pow ( x2 / b, 2.0 );
+              }
+              wt += w;
+            }
+            wt /= ( double ) ( N ); 
+            err += pow ( w_exact - wt, 2.0 );
+          }
         }
       }
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
-  }
-  timestamp ( );
-  
+    printf("Average kernel time: %lf (s)\n", time * 1e-9 / repeat);
   }
 
   err = sqrt ( err / ( double ) ( n_inside ) );
