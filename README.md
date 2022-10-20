@@ -474,6 +474,9 @@ Early results are shown [here](results/README.md)
 ### floydwarshall (hip)
   Floyd-Warshall Pathfinding sample (https://github.com/ROCm-Developer-Tools/HIP-Examples/blob/master/HIP-Examples-Applications/FloydWarshall/)
 
+### floydwarshall2 (cuda)
+  Fast Floyd-Warshall for all-pairs-shortest paths (https://userweb.cs.txstate.edu/~burtscher/research/ECL-APSP/)
+
 ### fluidSim (opencl)
   2D Fluid Simulation using the Lattice-Boltzman method (https://github.com/OpenCL/AMD_APP_samples)
 
