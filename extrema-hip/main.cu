@@ -206,7 +206,7 @@ void cpu_relextrema_2D(
 }
 
 template <typename T>
-void test_1D (const int length, const int order, const bool clip,
+long test_1D (const int length, const int order, const bool clip,
               const int repeat, const char* type) 
 {
   T* x = (T*) malloc (sizeof(T)*length);
@@ -254,10 +254,11 @@ void test_1D (const int length, const int order, const bool clip,
   free(cpu_r);
   free(gpu_r);
   if (error) printf("1D test: FAILED\n");
+  return time;
 }
 
 template <typename T>
-void test_2D (const int length_x, const int length_y, const int order,
+long test_2D (const int length_x, const int length_y, const int order,
               const bool clip, const int axis, const int repeat, const char* type) 
 {
   const int length = length_x * length_y;
@@ -286,6 +287,7 @@ void test_2D (const int length_x, const int length_y, const int order,
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
   printf("Average 2D kernel (type = %s, order = %d, clip = %d, axis = %d) execution time %f (s)\n", 
          type, order, clip, axis, (time * 1e-9f) / repeat);
 
@@ -306,6 +308,7 @@ void test_2D (const int length_x, const int length_y, const int order,
   free(cpu_r);
   free(gpu_r);
   if (error) printf("2D test: FAILED\n");
+  return time;
 }
 
 int main(int argc, char* argv[]) {
@@ -315,26 +318,32 @@ int main(int argc, char* argv[]) {
   }
   const int repeat = atoi(argv[1]);
 
+  long time = 0;
+
   for (int order = 1; order <= 128; order = order * 2) {
-    test_1D<   int>(1000000, order, true, repeat, "int");
-    test_1D<  long>(1000000, order, true, repeat, "long");
-    test_1D< float>(1000000, order, true, repeat, "float");
-    test_1D<double>(1000000, order, true, repeat, "double");
+    time += test_1D<   int>(1000000, order, true, repeat, "int");
+    time += test_1D<  long>(1000000, order, true, repeat, "long");
+    time += test_1D< float>(1000000, order, true, repeat, "float");
+    time += test_1D<double>(1000000, order, true, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(1000, 1000, order, true, 1, repeat, "int");
-    test_2D<  long>(1000, 1000, order, true, 1, repeat, "long");
-    test_2D< float>(1000, 1000, order, true, 1, repeat, "float");
-    test_2D<double>(1000, 1000, order, true, 1, repeat, "double");
+    time += test_2D<   int>(1000, 1000, order, true, 1, repeat, "int");
+    time += test_2D<  long>(1000, 1000, order, true, 1, repeat, "long");
+    time += test_2D< float>(1000, 1000, order, true, 1, repeat, "float");
+    time += test_2D<double>(1000, 1000, order, true, 1, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(1000, 1000, order, true, 0, repeat, "int");
-    test_2D<  long>(1000, 1000, order, true, 0, repeat, "long");
-    test_2D< float>(1000, 1000, order, true, 0, repeat, "float");
-    test_2D<double>(1000, 1000, order, true, 0, repeat, "double");
+    time += test_2D<   int>(1000, 1000, order, true, 0, repeat, "int");
+    time += test_2D<  long>(1000, 1000, order, true, 0, repeat, "long");
+    time += test_2D< float>(1000, 1000, order, true, 0, repeat, "float");
+    time += test_2D<double>(1000, 1000, order, true, 0, repeat, "double");
   }
+
+  printf("\n-----------------------------------------------\n");
+  printf("Total kernel execution time: %lf (s)", time * 1e-9);
+  printf("\n-----------------------------------------------\n");
 
   return 0;
 }
