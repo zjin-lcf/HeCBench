@@ -91,7 +91,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include <cuda.h>
 #include "util.h"
 #include "kernel.h"
@@ -162,14 +162,21 @@ int main ( int argc, char **argv )
   cudaMalloc((void**)&d_err, sizeof(double));
   cudaMalloc((void**)&d_n_inside, sizeof(int));
 
-  timestamp ( );
+  long time = 0;
   for (int i = 0; i < repeat; i++) {
     cudaMemcpy(d_err, &err, sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_n_inside, &n_inside, sizeof(int), cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     fk <<< grids, blocks >>> (ni, nj, seed, N, a, b, h, rth, d_n_inside, d_err);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
-  cudaDeviceSynchronize();
-  timestamp ( );
+  printf("Average kernel time: %lf (s)\n", time * 1e-9 / repeat);
 
   cudaMemcpy(&err, d_err, sizeof(double), cudaMemcpyDeviceToHost);
   cudaMemcpy(&n_inside, d_n_inside, sizeof(int), cudaMemcpyDeviceToHost);
