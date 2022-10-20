@@ -695,7 +695,7 @@ void nearestNeighbor (MyImage *src, MyImage *dst)
   }
 }
 
-int readTextClassifier()
+int readTextClassifier(const char *info_file, const char *class_file)
 {
   /*number of stages of the cascade classifier*/
   int stages = 0;
@@ -706,7 +706,17 @@ int readTextClassifier()
   int r_index = 0;
   int w_index = 0;
   int tree_index = 0;
-  FILE *finfo = fopen("info.txt", "r");
+  FILE *finfo = fopen(info_file, "r");
+  if (finfo == NULL) {
+    fprintf(stderr, "Failed to open file %s. Exit\n", info_file);
+    return -1;
+  }
+
+  FILE *fp = fopen(class_file, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Failed to open file %s. Exit\n", class_file);
+    return -1;
+  }
 
   /**************************************************
    * how many stages are in the cascaded filter? 
@@ -737,7 +747,6 @@ int readTextClassifier()
   }
   fclose(finfo);
 
-
   /* TODO: use matrices where appropriate */
   /***********************************************
    * Allocate a lot of array structures
@@ -751,7 +760,6 @@ int readTextClassifier()
   alpha2_array = (int*)malloc(sizeof(int)*total_nodes);
   tree_thresh_array = (int*)malloc(sizeof(int)*total_nodes);
   stages_thresh_array = (int*)malloc(sizeof(int)*stages);
-  FILE *fp = fopen("class.txt", "r");
 
   /******************************************
    * Read the filter parameters in class.txt
