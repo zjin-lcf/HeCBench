@@ -127,7 +127,7 @@ void cpu_relextrema_2D( const int  in_x,
 }
 
 template <typename T>
-void test_1D (queue &q, const int length, const int order, const bool clip,
+long test_1D (queue &q, const int length, const int order, const bool clip,
               const int repeat, const char* type)
 {
   T* x = (T*) malloc (sizeof(T)*length);
@@ -137,6 +137,7 @@ void test_1D (queue &q, const int length, const int order, const bool clip,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
+  long time;
   {
     buffer<T, 1> d_x(x, length);
     buffer<bool, 1> d_result(gpu_r, length);
@@ -173,7 +174,7 @@ void test_1D (queue &q, const int length, const int order, const bool clip,
       });
     q.wait();
     auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average 1D kernel (type = %s, order = %d, clip = %d) execution time %f (s)\n", 
            type, order, clip, (time * 1e-9f) / repeat);
   }
@@ -191,12 +192,13 @@ void test_1D (queue &q, const int length, const int order, const bool clip,
   free(cpu_r);
   free(gpu_r);
   if (error) printf("1D test: FAILED\n");
+  return time;
 }
 
 // length_x is the number of columns
 // length_y is the number of rows
 template <typename T>
-void test_2D (queue &q, const int length_x, const int length_y, 
+long test_2D (queue &q, const int length_x, const int length_y, 
               const int order, const bool clip, const int axis,
               const int repeat, const char* type) 
 {
@@ -208,6 +210,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
+  long time;
   {
     buffer<T, 1> d_x(x, length);
     buffer<bool, 1> d_result(gpu_r, length);
@@ -218,7 +221,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    for (int n = 0; n < repeat; n++) 
+    for (int n = 0; n < repeat; n++)
       q.submit([&] (handler &cgh) {
         auto results = d_result.template get_access<sycl_discard_write>(cgh);
         auto inp = d_x.template get_access<sycl_read>(cgh);
@@ -262,7 +265,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
       });
     q.wait();
     auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average 2D kernel (type = %s, order = %d, clip = %d, axis = %d) execution time %f (s)\n", 
          type, order, clip, axis, (time * 1e-9f) / repeat);
   }
@@ -280,6 +283,7 @@ void test_2D (queue &q, const int length_x, const int length_y,
   free(cpu_r);
   free(gpu_r);
   if (error) printf("2D test: FAILED\n");
+  return time;
 }
 
 int main(int argc, char* argv[]) {
@@ -296,26 +300,32 @@ int main(int argc, char* argv[]) {
 #endif
   queue q(dev_sel);
 
+  long time = 0;
+
   for (int order = 1; order <= 128; order = order * 2) {
-    test_1D<   int>(q, 1000000, order, true, repeat, "int");
-    test_1D<  long>(q, 1000000, order, true, repeat, "long");
-    test_1D< float>(q, 1000000, order, true, repeat, "float");
-    test_1D<double>(q, 1000000, order, true, repeat, "double");
+    time += test_1D<   int>(q, 1000000, order, true, repeat, "int");
+    time += test_1D<  long>(q, 1000000, order, true, repeat, "long");
+    time += test_1D< float>(q, 1000000, order, true, repeat, "float");
+    time += test_1D<double>(q, 1000000, order, true, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(q, 1000, 1000, order, true, 1, repeat, "int");
-    test_2D<  long>(q, 1000, 1000, order, true, 1, repeat, "long");
-    test_2D< float>(q, 1000, 1000, order, true, 1, repeat, "float");
-    test_2D<double>(q, 1000, 1000, order, true, 1, repeat, "double");
+    time += test_2D<   int>(q, 1000, 1000, order, true, 1, repeat, "int");
+    time += test_2D<  long>(q, 1000, 1000, order, true, 1, repeat, "long");
+    time += test_2D< float>(q, 1000, 1000, order, true, 1, repeat, "float");
+    time += test_2D<double>(q, 1000, 1000, order, true, 1, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(q, 1000, 1000, order, true, 0, repeat, "int");
-    test_2D<  long>(q, 1000, 1000, order, true, 0, repeat, "long");
-    test_2D< float>(q, 1000, 1000, order, true, 0, repeat, "float");
-    test_2D<double>(q, 1000, 1000, order, true, 0, repeat, "double");
+    time += test_2D<   int>(q, 1000, 1000, order, true, 0, repeat, "int");
+    time += test_2D<  long>(q, 1000, 1000, order, true, 0, repeat, "long");
+    time += test_2D< float>(q, 1000, 1000, order, true, 0, repeat, "float");
+    time += test_2D<double>(q, 1000, 1000, order, true, 0, repeat, "double");
   }
+
+  printf("\n-----------------------------------------------\n");
+  printf("Total kernel execution time: %lf (s)", time * 1e-9);
+  printf("\n-----------------------------------------------\n");
 
   return 0;
 }
