@@ -82,7 +82,11 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   hipMemcpy(d_b, b, size*sizeof(half2), hipMemcpyHostToDevice);
 
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half2>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+      d_a, d_b, d_r, size);
   hipDeviceSynchronize();
+
   auto start = std::chrono::steady_clock::now();
   
   // run hmax2
@@ -113,7 +117,11 @@ int main(int argc, char *argv[])
   }
   printf("fp16_hmax2 %s\n", ok ?  "PASS" : "FAIL");
 
+  for (int i = 0; i < repeat; i++)
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+      (half*)d_a, (half*)d_b, (half*)d_r, size*2);
   hipDeviceSynchronize();
+
   start = std::chrono::steady_clock::now();
   
   // run hmax (the size is doubled)
