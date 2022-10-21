@@ -142,7 +142,7 @@ int main(int argc, char** argv)
 
     auto kend = std::chrono::steady_clock::now();
     auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-    printf("Average kernel execution time %f (s)\n", (ktime * 1e-9f) / iterations);
+    printf("Average kernel execution time %f (us)\n", (ktime * 1e-3f) / iterations);
 
     if (iterations & 01) {
      #pragma omp target update from (tIn[0:size])
