@@ -17,7 +17,7 @@ stop_watch(double t0)
   double time;
   struct timeval t;
   gettimeofday(&t, NULL);
-  time = (double) t.tv_sec + (double) t.tv_usec * 1e-6;  
+  time = t.tv_sec * 1e6 + t.tv_usec;
   return time-t0;
 }
 
@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
   printf(" Ly,Lx = %d,%d\n", Ly, Lx);
   printf(" niter = %d\n", niter);
   printf(" input file = %s\n", argv[4]);
+
   /* Allocate the buffer for the data */
   float *cpu_arr = (float*) malloc(sizeof(float)*Lx*Ly);
   /* read file to buffer */
@@ -81,9 +82,9 @@ int main(int argc, char *argv[]) {
   //write_to_file(fname, arr);
   /* write timing info */
   printf(" iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
-	 niter, Lx, Ly, t0*1e6, 
-	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9), 
-	 (Lx*Ly*6.0)/(t0*1.0e9));
+	 niter, Lx, Ly, t0,
+	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e3), 
+	 (Lx*Ly*6.0)/(t0*1.0e3));
   /* free super-site buffers */
   for(int i=0; i<2; i++) {
     free(ssarr[i]);
@@ -99,8 +100,6 @@ int main(int argc, char *argv[]) {
   float xdelta = sigma / (1.0+4.0*sigma);
   float xnorm = 1.0/(1.0+4.0*sigma);
 
-  {
-  
   #ifdef USE_GPU
   gpu_selector dev_sel;
   #else
@@ -110,27 +109,20 @@ int main(int argc, char *argv[]) {
   
   int lx = Lx;
   int ly = Ly;
-  buffer<float, 1> d_in(lx*ly);
-  buffer<float, 1> d_out(lx*ly);
-  d_in.set_final_data(nullptr);
-  d_out.set_final_data(nullptr);
+  float* in = malloc_device<float>(lx*ly, q);
+  q.memcpy(in, gpu_arr, sizeof(float) * lx * ly);
 
-  q.submit([&](auto &h) {
-    auto a = d_in.get_access<sycl_write>(h);
-    h.copy(gpu_arr, a); 
-  });
+  float* out = malloc_device<float>(lx*ly, q);
+
+  auto global_range = range<1>(ly*lx);
+  auto local_range = range<1>(NTY*NTX);
 
   // start timer
   q.wait();
   t0 = stop_watch(0);
 
-  auto global_range = range<1>(ly*lx);
-  auto local_range = range<1>(NTY*NTX);
-
   for(int i=0; i<niter; i++) {
     q.submit([&](auto &h) {
-      auto out = d_out.get_access<sycl_write>(h);
-      auto in = d_in.get_access<sycl_read>(h);
       h.template parallel_for<class stencil>(nd_range<1>(global_range, local_range), [=](nd_item<1> item) {
         int idx = item.get_global_id(0);
         int x = idx % lx; 
@@ -144,25 +136,22 @@ int main(int argc, char *argv[]) {
       });
     });
     // Pointer swap
-    auto tmp = std::move(d_in);
-    d_in = std::move(d_out);
-    d_out = std::move(tmp);
+    float* tmp = out;
+    out = in;
+    in = tmp;
   }
 
   q.wait();
   t0 = stop_watch(t0)/(double)niter;
 
-  q.submit([&](auto &h) {
-    auto a = d_in.get_access<sycl_read>(h);
-    h.copy(a, gpu_arr); 
-  });
-
-  }
+  q.memcpy(gpu_arr, in, sizeof(float) * lx * ly).wait();
+  free(in, q);
+  free(out, q);
 
   printf("Device: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
-  	 niter, Lx, Ly, t0*1e6,
-  	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9),
-  	 (Lx*Ly*6.0)/(t0*1.0e9));
+  	 niter, Lx, Ly, t0,
+  	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e3),
+  	 (Lx*Ly*6.0)/(t0*1.0e3));
 
   // verification
   bool ok = true;
