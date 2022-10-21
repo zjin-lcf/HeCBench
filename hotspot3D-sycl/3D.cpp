@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     queue q(dev_sel);
 
     const property_list props = property::buffer::use_host_ptr();
-    buffer<float, 1> d_tIn (tIn,size, props);
+    buffer<float, 1> d_tIn (tIn, size, props);
     buffer<float, 1> d_pIn (pIn, size, props);
     buffer<float, 1> d_tOut (tOut, size, props);
     d_tIn.set_final_data(nullptr);
@@ -110,32 +110,34 @@ int main(int argc, char** argv)
     local_work_size[1] = WG_SIZE_X;
     local_work_size[0] = WG_SIZE_Y;
 
+    range<2> gws (global_work_size[0], global_work_size[1]);
+    range<2> lws (local_work_size[0], local_work_size[1]);
+
     q.wait();
     auto kstart = std::chrono::steady_clock::now();
 
     for(int j = 0; j < iterations; j++)
     {
       q.submit([&](handler& cgh) {
-          auto pIn_acc = d_pIn.get_access<sycl_read>(cgh); 
-          auto tIn_acc = d_tIn.get_access<sycl_read>(cgh);
-          auto tOut_acc = d_tOut.get_access<sycl_discard_write>(cgh);
+        auto pIn_acc = d_pIn.get_access<sycl_read>(cgh); 
+        auto tIn_acc = d_tIn.get_access<sycl_read>(cgh);
+        auto tOut_acc = d_tOut.get_access<sycl_discard_write>(cgh);
 
-          cgh.parallel_for<class hotspot>(
-            nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
-              range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
-#include "kernel_hotspot.sycl"
-            });
-          });
+        cgh.parallel_for<class hotspot>(
+          nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+            #include "kernel_hotspot.sycl"
+        });
+      });
 
-      auto temp = d_tIn;
-      d_tIn = d_tOut;
-      d_tOut = temp;
+      auto temp = std::move(d_tIn);
+      d_tIn = std::move(d_tOut);
+      d_tOut = std::move(temp);
     }
 
     q.wait();
     auto kend = std::chrono::steady_clock::now();
     auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-    printf("Average kernel execution time %f (s)\n", (ktime * 1e-9f) / iterations);
+    printf("Average kernel execution time %f (us)\n", (ktime * 1e-3f) / iterations);
 
     q.submit([&](handler& cgh) {
       auto d_sel = (iterations & 01) ? d_tIn : d_tOut;

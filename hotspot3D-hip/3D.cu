@@ -173,7 +173,7 @@ int main(int argc, char** argv)
   hipDeviceSynchronize();
   auto kend = std::chrono::steady_clock::now();
   auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-  printf("Average kernel execution time %f (s)\n", (ktime * 1e-9f) / iterations);
+  printf("Average kernel execution time %f (us)\n", (ktime * 1e-3f) / iterations);
 
   float* d_sel = (iterations & 01) ? d_tIn : d_tOut;
   hipMemcpy(tOut, d_sel,  sizeof(float)*size, hipMemcpyDeviceToHost); 
