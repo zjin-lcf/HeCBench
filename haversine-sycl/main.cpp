@@ -3,21 +3,22 @@
 #include <algorithm>
 #include "distance.h"
 
-void distance_device(queue &q, const double4* loc, double* dist, const int n, const int iteration) {
+void distance_device(queue &q, const double4* loc, double* dist,
+                     const int n, const int iteration) {
 
   range<1> gws ((n+255)/256*256);
   range<1> lws (256);
 
-  buffer<double4, 1> d_loc (loc, n);
-  buffer<double, 1> d_dist (dist, n);
+  double4 *in = malloc_device<double4>(n, q);
+  q.memcpy(in, loc, sizeof(double4) * n);
+
+  double *out = malloc_device<double>(n, q);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
     q.submit([&] (handler &cgh) {
-      auto in = d_loc.get_access<sycl_read>(cgh);
-      auto out = d_dist.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class haversine>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
@@ -42,6 +43,10 @@ void distance_device(queue &q, const double4* loc, double* dist, const int n, co
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+
+  q.memcpy(dist, out, sizeof(double) * n).wait();
+  free(in, q);
+  free(out, q);
 }
 
 void verify(int size, const double *output, const double *expected_output) {
