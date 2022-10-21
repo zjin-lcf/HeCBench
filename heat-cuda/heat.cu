@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
     << " Steps: " <<  nsteps << std::endl
     << " Total time: " << dt*(double)nsteps << std::endl
     << " Time step: " << dt << std::endl
-    << " HIP device: " << device_name << std::endl
+    << " GPU device: " << device_name << std::endl
     << LINE << std::endl;
 
   // Stability check

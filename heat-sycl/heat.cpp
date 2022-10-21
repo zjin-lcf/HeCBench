@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
     << " Steps: " <<  nsteps << std::endl
     << " Total time: " << dt*(double)nsteps << std::endl
     << " Time step: " << dt << std::endl
-    << " SYCL device: " << q.get_device().get_info<sycl::info::device::name>() << std::endl
+    << " GPU device: " << q.get_device().get_info<sycl::info::device::name>() << std::endl
     << LINE << std::endl;
 
   // Stability check
