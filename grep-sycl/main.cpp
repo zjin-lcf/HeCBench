@@ -135,6 +135,7 @@ int main(int argc, char **argv)
   int postsize = (strlen(builder.re) + 1) * sizeof (char);
 
   buffer<char, 1> device_regex(builder.re, postsize);
+  device_regex.set_final_data(nullptr);
 
   u32 * table = (u32 *) malloc(sizeof(u32) * strlen(*lines));
   table[0] = 0;
@@ -153,6 +154,7 @@ int main(int argc, char **argv)
 
   buffer<u32, 1> device_line_table(table, len);
   buffer<char, 1> device_line(*lines, len+1);
+  device_line.set_final_data(nullptr);
 
   u32 host_regex_table[1]; /*offsets to regexes on host*/
   host_regex_table[0]=0;   /*in case of one regex offset must be 0*/
@@ -163,6 +165,7 @@ int main(int argc, char **argv)
 
   State pmatchstate = { Match };  /* matching state */
   buffer<State, 1> device_match_state(&pmatchstate, 1);
+  device_match_state.set_final_data(nullptr);
 
   endSetup = CycleTimer::currentSeconds();
 
@@ -241,5 +244,3 @@ int main(int argc, char **argv)
 
   return EXIT_SUCCESS;
 }
-
-

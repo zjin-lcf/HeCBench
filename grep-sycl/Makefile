@@ -18,7 +18,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = nfa
 
 source = main.cpp nfautil.cpp regex.cpp
 
@@ -74,4 +74,3 @@ clean:
 
 run: $(program)
 	./runtests.sh
-
