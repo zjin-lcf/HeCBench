@@ -18,9 +18,9 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
-program = main
+program = heat
 
-source = main.cpp
+source = heat.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 4096 1000
