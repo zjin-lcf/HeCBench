@@ -29,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl -mllvm -amdgpu-early-inline-all=true -mllvm -amdgpu-function-calls=false
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100
+	./$(program) 1000
