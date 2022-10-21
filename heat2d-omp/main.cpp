@@ -15,7 +15,7 @@ stop_watch(double t0)
   double time;
   struct timeval t;
   gettimeofday(&t, NULL);
-  time = (double) t.tv_sec + (double) t.tv_usec * 1e-6;  
+  time = t.tv_sec * 1e6 + t.tv_usec;
   return time-t0;
 }
 
@@ -84,9 +84,9 @@ int main(int argc, char *argv[]) {
 
   /* write timing info */
   printf("Host: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
-	 niter, Lx, Ly, t0*1e6, 
-	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9), 
-	 (Lx*Ly*6.0)/(t0*1.0e9));
+	 niter, Lx, Ly, t0,
+	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e3), 
+	 (Lx*Ly*6.0)/(t0*1.0e3));
   /*
    * GPU part
    */
@@ -120,9 +120,9 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Device: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
-  	 niter, Lx, Ly, t0*1e6,
-  	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e9),
-  	 (Lx*Ly*6.0)/(t0*1.0e9));
+  	 niter, Lx, Ly, t0,
+  	 Lx*Ly*sizeof(float)*2.0/(t0*1.0e3),
+  	 (Lx*Ly*6.0)/(t0*1.0e3));
 
   float *gpu_arr = in;
   float *cpu_arr = cpu_in;

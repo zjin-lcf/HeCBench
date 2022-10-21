@@ -76,5 +76,4 @@ data.txt: mkinit.py
 	python2 mkinit.py 4096 8192 data.txt
 
 run: $(program) data.txt
-	./$(program) 4096 8192 100 data.txt
-
+	./$(program) 4096 8192 1000 data.txt
