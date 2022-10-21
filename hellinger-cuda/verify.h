@@ -60,4 +60,3 @@ void VerifyResult(FP (*a_host)[N], FP (*b_host)[P],
   }
 }
 #endif
-
