@@ -212,9 +212,6 @@ int main(int argc, char* argv[]) {
   std::cout << "Iterations: " << nIterations << std::endl;
   std::cout << std::endl;
 
-  // Start timer
-  auto start = std::chrono::steady_clock::now();
-
   std::cout << "Computing wavefield in device .." << std::endl;
 
   #pragma omp target data map(next_base[0:nsize], prev_base[0:nsize]) \
@@ -233,15 +230,9 @@ int main(int argc, char* argv[]) {
   
     auto kend = std::chrono::steady_clock::now();
     auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-    std::cout << "Average kernel execution time " << (ktime * 1e-9f) / nIterations << " (s)\n";
+    std::cout << "Total kernel execution time " << ktime * 1e-6f << " (ms)\n";
+    std::cout << "Average kernel execution time " << (ktime * 1e-3f) / nIterations << " (us)\n";
   }
-
-  // Compute and display time used by device
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-                  .count();
-  std::cout << "Elapsed time: " << time << " ms" << std::endl;
-  std::cout << std::endl;
 
   // Output final wavefield (computed by device) to binary file
   std::ofstream outFile;
@@ -257,13 +248,13 @@ int main(int argc, char* argv[]) {
 
   // Compute wavefield on CPU
   // Start timer for CPU
-  start = std::chrono::steady_clock::now();
+  auto start = std::chrono::steady_clock::now();
   iso_2dfd_iteration_cpu(next_cpu, prev_base, vel_base, dtDIVdxy, nRows, nCols,
                          nIterations);
 
   // Compute and display time used by CPU
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
                   .count();
   std::cout << "CPU time: " << time << " ms" << std::endl;
   std::cout << std::endl;
