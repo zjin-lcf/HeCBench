@@ -917,6 +917,9 @@ Early results are shown [here](results/README.md)
 ### projectile (sycl)
   Projectile motion is a program that implements a ballistic equation (https://github.com/intel/BaseKit-code-samples)
 
+### pso (cuda)
+  A modified implementation of particle swarm optimization using Levy function (https://github.com/wiseodd/cuda-pso, https://github.com/chensohg/GPU_CUDA_PSO)
+
 ### qrg (cuda)
   Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
