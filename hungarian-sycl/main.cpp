@@ -731,6 +731,9 @@ int main(int argc, char* argv[])
   printf("%s\n", ctime(&current_time));
   fflush(file);
 
+  // total kernel time for all testcases
+  long total_time = 0;
+
   data *slack = sycl::malloc_device<data>(nrows*ncols, q); // The slack matrix
   data *min_in_rows = sycl::malloc_device<data>(nrows, q);  // Minimum in rows
   data *min_in_cols = sycl::malloc_device<data>(ncols, q);  // Minimum in columns
@@ -984,7 +987,8 @@ int main(int argc, char* argv[])
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Total device execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
+  total_time += time;
+  printf("Total kernel execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
 
   fflush(file);
 
@@ -1000,10 +1004,11 @@ int main(int argc, char* argv[])
   printf("Total cost is \t %d \n", total_cost);
 
 #ifndef USE_TEST_MATRIX
-  } // for (int test
+  }
 #endif
 
   fclose(file);
+  fprintf(stderr, "Total kernel time for all test cases %lf (s)\n", total_time * 1e-9);
 
   sycl::free(slack, q);
   sycl::free(min_in_rows, q);

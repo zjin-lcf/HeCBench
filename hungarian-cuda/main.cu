@@ -666,6 +666,9 @@ int main(int argc, char* argv[])
   printf("%s\n", ctime(&current_time));
   fflush(file);
 
+  // total kernel time for all testcases
+  long total_time = 0;
+
 #ifndef USE_TEST_MATRIX
   std::default_random_engine generator(seed);
   std::uniform_int_distribution<int> distribution(0, range-1);
@@ -697,7 +700,8 @@ int main(int argc, char* argv[])
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total device execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
+    total_time += time;
+    printf("Total kernel execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
            
     fflush(file);
 
@@ -713,9 +717,10 @@ int main(int argc, char* argv[])
     printf("Total cost is \t %d \n", total_cost);
 
 #ifndef USE_TEST_MATRIX
-  } // for (int test
+  }
 #endif
 
   fclose(file);
+  fprintf(stderr, "Total kernel time for all test cases %lf (s)\n", total_time * 1e-9);
   return 0;
 }
