@@ -19,7 +19,7 @@
 using real_t = float;
 using real_2_t = float2;
 // == 1 / Pi
-#define hbar  (1.f / cl::sycl::acos(-1.f)) 
+#define hbar  (1.f / sycl::acos(-1.f)) 
 #define dt  1e-3f
 #define hdt  (dt / hbar)
 
@@ -27,7 +27,7 @@ using real_2_t = float2;
 #else
 using real_t = double;
 using real_2_t = double2;
-#define hbar  (1.0 / cl::sycl::acos(-1.0))
+#define hbar  (1.0 / sycl::acos(-1.0))
 #define dt  1e-3
 #define hdt  (dt / hbar)
 
@@ -71,7 +71,7 @@ using complex_t = std::complex<real_t>;
 
 // number of kernel iterations (including warmup)
 #ifndef NUM_ITERATIONS
-#define NUM_ITERATIONS 26
+#define NUM_ITERATIONS 1001
 #endif
 
 // number of warmup iterations not taken into statistics

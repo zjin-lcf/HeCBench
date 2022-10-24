@@ -76,7 +76,7 @@ using complex_t = std::complex<real_t>;
 
 // number of kernel iterations (including warmup)
 #ifndef NUM_ITERATIONS
-#define NUM_ITERATIONS 26
+#define NUM_ITERATIONS 1001
 #endif
 
 // number of warmup iterations not taken into statistics

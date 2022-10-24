@@ -205,7 +205,7 @@ inline void operator+=(double4 &a, double4 b)
 
 // number of kernel iterations (including warmup)
 #ifndef NUM_ITERATIONS
-#define NUM_ITERATIONS 1
+#define NUM_ITERATIONS 1001
 #endif
 
 // number of warmup iterations not taken into statistics
