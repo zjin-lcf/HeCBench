@@ -74,7 +74,7 @@ void update_lattice(signed char *lattice,
 
       // Determine whether to flip spin
       signed char lij = lattice[i * ny + j];
-      float acceptance_ratio = exp((double)(-2.0f * inv_temp * nn_sum * lij));
+      float acceptance_ratio = expf(-2.0f * inv_temp * nn_sum * lij);
       if (randvals[i*ny + j] < acceptance_ratio) {
         lattice[i * ny + j] = -lij;
       }
