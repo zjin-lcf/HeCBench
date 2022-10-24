@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Average kernel execution time " << (time * 1e-9f) / iteration << " (s)\n";
+    std::cout << "Average kernel execution time " << (time * 1e-3f) / iteration << " (us)\n";
   }
 
   // CPU
