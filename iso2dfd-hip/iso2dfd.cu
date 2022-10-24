@@ -225,16 +225,13 @@ int main(int argc, char* argv[]) {
   std::cout << "Iterations: " << nIterations << std::endl;
   std::cout << std::endl;
 
-  // Start timer
-  auto start = std::chrono::steady_clock::now();
-
   std::cout << "Computing wavefield in device .." << std::endl;
 
   // Display info about device
   hipDeviceProp_t devProp;
   hipGetDeviceProperties(&devProp, 0);
-  std::cout << " Running on:: " << devProp.name << std::endl;
-  std::cout << " The Device Max Work Group Size is : " << devProp.maxThreadsPerBlock << std::endl;
+  std::cout << "Running on:: " << devProp.name << std::endl;
+  std::cout << "The Device Max Work Group Size is : " << devProp.maxThreadsPerBlock << std::endl;
 
   float* d_next;
   float* d_prev;
@@ -265,16 +262,10 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto kend = std::chrono::steady_clock::now();
   auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-  std::cout << "Average kernel execution time " << (ktime * 1e-9f) / nIterations << " (s)\n";
+  std::cout << "Total kernel execution time " << ktime * 1e-6f  << " (ms)\n";
+  std::cout << "Average kernel execution time " << (ktime * 1e-3f) / nIterations << " (us)\n";
 
   hipMemcpy(next_base, d_next, sizeof(float)*nsize, hipMemcpyDeviceToHost);
-
-  // Compute and display time used by device
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-                  .count();
-  std::cout << "Elapsed time: " << time << " ms" << std::endl;
-  std::cout << std::endl;
 
   // Output final wavefield (computed by device) to binary file
   std::ofstream outFile;
@@ -290,15 +281,15 @@ int main(int argc, char* argv[]) {
 
   // Compute wavefield on CPU
   // Start timer for CPU
-  start = std::chrono::steady_clock::now();
+  auto start = std::chrono::steady_clock::now();
   iso_2dfd_iteration_cpu(next_cpu, prev_base, vel_base, dtDIVdxy, nRows, nCols,
                          nIterations);
 
   // Compute and display time used by CPU
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
                   .count();
-  std::cout << "CPU time: " << time << " ms" << std::endl;
+  std::cout << "Host time: " << time << " ms" << std::endl;
   std::cout << std::endl;
 
   // Compute error (difference between final wavefields computed in device and
