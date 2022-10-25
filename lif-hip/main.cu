@@ -193,7 +193,7 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (elapsed_time * 1e-9f) / num_steps);
+  printf("Average kernel execution time: %f (us)\n", (elapsed_time * 1e-3) / num_steps);
 
   hipMemcpy(spikes, d_spikes, neurons_size, hipMemcpyDeviceToHost); 
   hipMemcpy(voltage, d_voltage, neurons_size, hipMemcpyDeviceToHost); 
