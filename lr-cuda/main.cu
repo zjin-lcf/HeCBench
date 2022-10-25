@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
 
   double endtime = gettime();
   printf("Time: %lf ms\n", 1000.0 * (endtime - starttime));
-  printf("Average kernel execution time: %lf ms\n", (total_ktime * 1e-6) / loops);
+  printf("Average kernel execution time: %lf us\n", (total_ktime * 1e-3) / loops);
 
   write_results(&results, "a");
 
