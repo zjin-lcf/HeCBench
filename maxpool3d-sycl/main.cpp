@@ -48,7 +48,6 @@ int main(int argc, char** argv)
   DTYPE* h_output = (DTYPE*) malloc(mem_size_output*i_img_count);
   DTYPE* d_output = (DTYPE*) malloc(mem_size_output*i_img_count);
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -58,12 +57,14 @@ int main(int argc, char** argv)
   queue q(dev_sel);
 
   // Create the input and output arrays in device memory 
-  buffer<DTYPE, 1> d_image(h_image, size_image*i_img_count);
-  buffer<DTYPE, 1> d_result(d_output, size_output*i_img_count);
+  DTYPE *d_image = malloc_device<DTYPE>(size_image*i_img_count, q);
+  q.memcpy(d_image, h_image, mem_size_image*i_img_count);
+
+  DTYPE *d_result = malloc_device<DTYPE>(size_output*i_img_count, q);
 
   // assume output image dimensions are multiple of 16
-  range<3> localWorkSize(1, 16, 16);
-  range<3> globalWorkSize(i_img_count, o_img_height, o_img_width);
+  range<3> lws (1, 16, 16);
+  range<3> gws (i_img_count, o_img_height, o_img_width);
 
   // filter size same as stride size
   const int pool_width  = Hstride;
@@ -74,9 +75,7 @@ int main(int argc, char** argv)
 
   for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &h) {
-      auto i_img = d_image.get_access<sycl_read>(h);
-      auto o_img = d_result.get_access<sycl_discard_write>(h);
-      h.parallel_for<class maxpool3>(nd_range<3>(globalWorkSize, localWorkSize), [=] (nd_item<3> item) {
+      h.parallel_for<class maxpool3>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
         const int x = item.get_global_id(2); 
         const int y = item.get_global_id(1);
         const int z = item.get_global_id(0);
@@ -90,10 +89,10 @@ int main(int argc, char** argv)
           for(int c = 0; c < pool_width; c++)
           {
             const int idxIn = idxIntmp + c;
-            maxval = sycl::fmax(maxval,i_img[idxIn]);
+            maxval = sycl::fmax(maxval,d_image[idxIn]);
           }
         }
-        o_img[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
+        d_result[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
       });
     });
   }
@@ -103,11 +102,9 @@ int main(int argc, char** argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
-  } // sycl scope
+  q.memcpy(d_output, d_result, mem_size_output*i_img_count).wait();
 
   // verification using the CPU results
-  const int pool_width  = Hstride;
-  const int pool_height = Vstride;
   for (int z = 0; z < i_img_count; z++)
     for (int y = 0; y < o_img_height; y++)
       for (int x = 0; x < o_img_width; x++) {
@@ -135,5 +132,7 @@ int main(int argc, char** argv)
   free(h_image);
   free(h_output);
   free(d_output);
+  free(d_image, q);
+  free(d_result, q);
   return status;
 }
