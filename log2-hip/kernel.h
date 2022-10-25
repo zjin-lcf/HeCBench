@@ -93,11 +93,9 @@ void log2_approx (
 
     hipDeviceSynchronize();
     auto end = std::chrono::high_resolution_clock::now(); 
-    double etime = 
-        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    etime = (etime * 1e-9) / repeat;
+    auto etime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     std::cout << "\nIterative approximation with " << precision[i] <<" bits of precision\n";
-    std::cout << "Average kernel execution time " << etime << " (s)\n";
+    std::cout << "Average kernel execution time " << etime * 1e-3 / repeat << " (us)\n";
   }
 
   hipMemcpy(outputs.data(), d_outputs, output_size_bytes, hipMemcpyDeviceToHost); 

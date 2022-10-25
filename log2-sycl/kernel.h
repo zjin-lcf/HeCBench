@@ -101,11 +101,9 @@ void log2_approx (
 
     q.wait();
     auto end = std::chrono::high_resolution_clock::now(); 
-    double etime = 
-      std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    etime = (etime * 1e-9) / repeat;
+    auto etime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     std::cout << "\nIterative approximation with " << precision[i] <<" bits of precision\n";
-    std::cout << "Average kernel execution time " << etime << " (s)\n";
+    std::cout << "Average kernel execution time " << etime * 1e-3 / repeat << " (us)\n";
   }
 
   q.submit([&] (handler &cgh) {
