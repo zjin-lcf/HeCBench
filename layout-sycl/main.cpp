@@ -143,7 +143,8 @@ int main(int argc, char * argv[])
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (AoS): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out = outputBuffer.get_access<sycl_read>(cgh);
@@ -192,7 +193,8 @@ int main(int argc, char * argv[])
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (SoA): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out = outputBuffer.get_access<sycl_read>(cgh);

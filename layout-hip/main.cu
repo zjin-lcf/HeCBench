@@ -129,7 +129,8 @@ int main(int argc, char * argv[])
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (AoS): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   hipMemcpy(deviceResult, outputBuffer, outputSize, hipMemcpyDeviceToHost);
 
@@ -163,7 +164,8 @@ int main(int argc, char * argv[])
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (SoA): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   hipMemcpy(deviceResult, outputBuffer, outputSize, hipMemcpyDeviceToHost);
 
