@@ -104,7 +104,8 @@ int main(int argc, char * argv[])
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (AoS): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (AoS): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   #pragma omp target update from (output[0:treeNumber])
 
@@ -148,7 +149,8 @@ int main(int argc, char * argv[])
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time (SoA): " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time (SoA): "
+            << (time * 1e-3f) / iterations << " (us)\n";
 
   #pragma omp target update from (output[0:treeNumber])
 
