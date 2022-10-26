@@ -223,36 +223,38 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto mem = dev_mem.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class test_k5_init>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
-      kernel5_init(item, mem.get_pointer(), mem_size);
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      auto mem = dev_mem.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class test_k5_init>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
+        kernel5_init(item, mem.get_pointer(), mem_size);
+      });
     });
-  });
 
-  q.submit([&] (handler &cgh) {
-    auto mem = dev_mem.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class test_k5_move>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
-      kernel5_move(item, mem.get_pointer(), mem_size);
+    q.submit([&] (handler &cgh) {
+      auto mem = dev_mem.get_access<sycl_read_write>(cgh);
+      cgh.parallel_for<class test_k5_move>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
+        kernel5_move(item, mem.get_pointer(), mem_size);
+      });
     });
-  });
 
-  q.submit([&] (handler &cgh) {
-    auto mem = dev_mem.get_access<sycl_read>(cgh);
-    auto cnt = err_cnt.get_access<sycl_read_write>(cgh);
-    auto addr = err_addr.get_access<sycl_write>(cgh);
-    auto exp = err_expect.get_access<sycl_write>(cgh);
-    auto curr = err_current.get_access<sycl_write>(cgh);
-    auto read = err_second_read.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class test_k5_check>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
-      kernel5_check(item, mem.get_pointer(), mem_size,
-                 cnt.get_pointer(),
-                 addr.get_pointer(),
-                 exp.get_pointer(),
-                 curr.get_pointer(),
-                 read.get_pointer());
+    q.submit([&] (handler &cgh) {
+      auto mem = dev_mem.get_access<sycl_read>(cgh);
+      auto cnt = err_cnt.get_access<sycl_read_write>(cgh);
+      auto addr = err_addr.get_access<sycl_write>(cgh);
+      auto exp = err_expect.get_access<sycl_write>(cgh);
+      auto curr = err_current.get_access<sycl_write>(cgh);
+      auto read = err_second_read.get_access<sycl_write>(cgh);
+      cgh.parallel_for<class test_k5_check>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
+        kernel5_check(item, mem.get_pointer(), mem_size,
+                   cnt.get_pointer(),
+                   addr.get_pointer(),
+                   exp.get_pointer(),
+                   curr.get_pointer(),
+                   read.get_pointer());
+      });
     });
-  });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
