@@ -100,12 +100,15 @@ void mergeType(const uint64_t size, const uint32_t runs) {
         errors += hC[i] < hC[i-1];
       }
     }
-    if (timing)
-      printf("\nAverage kernel execution time: %f (s)\n", (total_time * 1e-9f) / runs);
-  }
 
-  // Print error info
-  PV(errors);
+    PV(errors); // Print error info
+    printf("%s. ", errors ? "FAIL" : "PASS");
+
+    if (timing)
+      printf("Average kernel execution time: %f (us).\n", (total_time * 1e-3f) / runs);
+    else
+      printf("Warmup run\n");
+  }
 }
 
 /* 
@@ -114,12 +117,15 @@ void mergeType(const uint64_t size, const uint32_t runs) {
 template<uint32_t blocks, uint32_t threads>
 void mergeAllTypes(const uint64_t size, const uint32_t runs) {
   PS("uint32_t", size)  mergeType<uint32_t, blocks, threads, false>(size, runs); printf("\n");
-  PS("float",    size)  mergeType<float,    blocks, threads, false>(size, runs); printf("\n");
-  PS("uint64_t", size)  mergeType<uint64_t, blocks, threads, false>(size, runs); printf("\n");
-  PS("double", size)    mergeType<double,   blocks, threads, false>(size, runs); printf("\n");
   PS("uint32_t", size)  mergeType<uint32_t, blocks, threads, true>(size, runs); printf("\n");
+
+  PS("float",    size)  mergeType<float,    blocks, threads, false>(size, runs); printf("\n");
   PS("float",    size)  mergeType<float,    blocks, threads, true>(size, runs); printf("\n");
+
+  PS("uint64_t", size)  mergeType<uint64_t, blocks, threads, false>(size, runs); printf("\n");
   PS("uint64_t", size)  mergeType<uint64_t, blocks, threads, true>(size, runs); printf("\n");
+
+  PS("double", size)    mergeType<double,   blocks, threads, false>(size, runs); printf("\n");
   PS("double", size)    mergeType<double,   blocks, threads, true>(size, runs); printf("\n");
 }
 
