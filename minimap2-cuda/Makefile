@@ -1,5 +1,5 @@
-CXX ?= g++
-NVCC ?= nvcc
+CXX = g++
+NVCC = nvcc
 ARCH = sm_60
 
 # path #
@@ -84,3 +84,6 @@ $(BUILD_PATH)/%.o: $(SRC_PATH)/%.$(SRC_EXT)
 $(BUILD_CUDA_PATH)/%.o: $(CUDA_PATH)/%.$(CUDA_EXT)
 	@echo "Compiling: $< -> $@"
 	$(NVCC) $(NVCCFLAGS) $(INCLUDES) -c $< -o $@
+
+run: dirs $(BIN_PATH)/$(BIN_NAME)
+	$(BIN_PATH)/$(BIN_NAME) ../minimap2-sycl/in-1k.txt kernel-out.txt
