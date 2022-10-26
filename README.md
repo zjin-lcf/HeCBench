@@ -18,6 +18,9 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, snake  
 
+### Computer vision and image processing
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
+    
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
@@ -29,9 +32,6 @@ Each benchmark falls into a single category. While such classification is not ac
 
 ### Finance
     aop, black-scholes, binomial, bonds, libor
-
-### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
 
 ### Geographic information system
     aidw, coordinates, geodesic, hausdorff, haversine
@@ -46,13 +46,13 @@ Each benchmark falls into a single category. While such classification is not ac
     attention, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
 
 ### Math
-    alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sobel, sptrsv, thomas, wyllie 
+    alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
    
 ### Random number generation
     mt, qrg, rng-wallace, sobol, urng
 
 ### Search
-    bfs, bsearch, b+tree, grp, keogh, ss, tsp
+    bfs, bsearch, b+tree, grep, keogh, ss, tsp
 
 ### Signal processing
     extrema, fft, lombscargle, sosfil
