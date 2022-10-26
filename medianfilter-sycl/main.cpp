@@ -26,7 +26,7 @@ double MedianFilterGPU(
     queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
-    buffer<cl::sycl::uchar4> &cmDevBufIn,
+    buffer<sycl::uchar4> &cmDevBufIn,
     buffer<unsigned int> &cmDevBufOut,
     const int uiImageWidth,
     const int uiImageHeight);
@@ -70,7 +70,7 @@ int main(int argc, char** argv)
 #endif
   queue q(dev_sel);
 
-  buffer<cl::sycl::uchar4, 1> cmDevBufIn(szBuffWords);
+  buffer<sycl::uchar4, 1> cmDevBufIn(szBuffWords);
   buffer<unsigned int, 1> cmDevBufOut(szBuffWords);
 
   // Warmup call 
@@ -117,7 +117,7 @@ double MedianFilterGPU(
     queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
-    buffer<cl::sycl::uchar4> &cmDevBufIn,
+    buffer<sycl::uchar4> &cmDevBufIn,
     buffer<unsigned int> &cmDevBufOut,
     const int uiImageWidth,
     const int uiImageHeight)
@@ -130,7 +130,7 @@ double MedianFilterGPU(
 
   q.submit([&] (handler &cgh) {
     auto acc = cmDevBufIn.get_access<sycl_discard_write>(cgh);
-    cgh.copy((cl::sycl::uchar4*)uiInputImage, acc);
+    cgh.copy((sycl::uchar4*)uiInputImage, acc);
   });
 
   szLocalWorkSize[0] = iBlockDimX;
@@ -147,7 +147,7 @@ double MedianFilterGPU(
   q.submit([&] (handler &cgh) {
     auto uc4Source = cmDevBufIn.get_access<sycl_read>(cgh);
     auto uiDest = cmDevBufOut.get_access<sycl_discard_write>(cgh);
-    accessor<cl::sycl::uchar4, 1, sycl_read_write, access::target::local> 
+    accessor<sycl::uchar4, 1, sycl_read_write, access::target::local> 
       uc4LocalData(iLocalPixPitch * (iBlockDimY + 2), cgh);
     cgh.parallel_for<class media_filter>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
       ckMedian(item, uc4Source.get_pointer(), uiDest.get_pointer(),
