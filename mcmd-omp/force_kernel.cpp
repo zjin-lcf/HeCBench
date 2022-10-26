@@ -1,6 +1,5 @@
 #include <math.h>
 #include <stdio.h>
-#include <chrono>
 #include <omp.h>
 
 // minimal data needed to compute forces on a device
@@ -365,14 +364,8 @@ void force_kernel(
   #pragma omp target data map (to: h_basis[0:9], h_rbasis[0:9]) \
                           map (tofrom: h_atom_list[0:total_atoms])
   {
-    auto start = std::chrono::steady_clock::now();
-
     calculateForceKernel(
       h_atom_list, total_atoms, cutoff, h_basis, h_rbasis, pform, 
       ewald_alpha, ewald_kmax, kspace_option, polar_damp);
-
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Kernel execution time: %f (s)\n", time * 1e-9f);
   }
 }
