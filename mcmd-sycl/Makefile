@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
+
 # if GPU = no, then -DSYCL has not effect
 GPU       = yes
 CUDA      = no
@@ -47,7 +48,8 @@ endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            -DSYCL_USE_NATIVE_FP_ATOMICS
 endif
 
 # Debug Flags
@@ -66,13 +68,13 @@ endif
 #===============================================================================
 
 $(program): $(obj)
-	$(CC) -Xcuda-ptxas -v -v --save-temps $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 main.o: ../mcmd-cuda/main.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 force_kernel.o: force_kernel.cpp
-	$(CC) -Xcuda-ptxas -v -v --save-temps $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
