@@ -74,8 +74,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 test: $(program)
-	./$(program) -i toy.tns -m 0 -R 32 -f 128 -w 1
+	./$(program) -i ../mmcsf-cuda/toy.tns -m 0 -R 32 -f 128 -w 1
   
 run: $(program)
-	./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4
-
+	./$(program) -i ../mmcsf-cuda/output.tns -m 0 -R 32 -f 128 -w 4
