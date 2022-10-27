@@ -216,7 +216,11 @@ void MPCcompress(
     int loc = 0;
     if (v2 != 0) loc = 1;
 
+#if (CUDART_VERSION < 9000)
     unsigned int bitmap = __ballot(loc);
+#else
+    unsigned int bitmap = __ballot_sync(0xffffffff, loc);
+#endif
 
     if (lanex == 32) {
       sbuf2[tid] = bitmap;

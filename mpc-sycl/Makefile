@@ -73,6 +73,6 @@ clean:
 	rm -rf $(program) $(obj) *.mpc *.org
 
 run: $(program)
-	./$(program) main 1
-	./$(program) main.mpc 
-	diff main main.mpc.org
+	./$(program) ../mpc-cuda/msg_sp.trace.out 1
+	./$(program) ../mpc-cuda/msg_sp.trace.out.mpc 
+	diff ../mpc-cuda/msg_sp.trace.out msg_sp.trace.out.mpc.org
