@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicIntrinsics, atomicCAS, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mtf, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicIntrinsics, atomicCAS, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3

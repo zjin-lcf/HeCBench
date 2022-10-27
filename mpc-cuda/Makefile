@@ -49,9 +49,13 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.mpc *.org
+	rm -rf $(program) $(obj) *.mpc *.org fpc
 
-run: $(program)
-	./$(program) main 1
-	./$(program) main.mpc 
-	diff main main.mpc.org
+process: fpc.c
+	gcc -O3 fpc.c -o fpc
+	./fpc < msg_sp.trace.fpc > msg_sp.trace.out
+
+run: process $(program)
+	./$(program) msg_sp.trace.out 1
+	./$(program) msg_sp.trace.out.mpc 
+	diff msg_sp.trace.out msg_sp.trace.out.mpc.org
