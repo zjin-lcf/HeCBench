@@ -35,7 +35,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -62,4 +61,3 @@ test: $(program)
   
 run: $(program)
 	./$(program) -i ../mmcsf-cuda/output.tns -m 0 -R 32 -f 128 -w 4
-

@@ -36,7 +36,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -59,9 +58,8 @@ clean:
 output.tns: generate_tensor.py
 	python generate_tensor.py output.tns 2%4096 2%4096 2%4096 2%512
 
-test: $(program) toy.tns
+test: toy.tns $(program)
 	./$(program) -i toy.tns -m 0 -R 32 -f 128 -w 1
   
-run: $(program) output.tns
+run: output.tns $(program)
 	./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4
-
