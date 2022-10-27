@@ -93,10 +93,12 @@ int main(int argc, char* argv[]) {
           int col = index.get_global_id(1);
           if( col < P && row < M) {
             float sum = 0;
+            //float sum = sycl::native::powr(sycl::fabs(A[row * N] - B[col]), p);
+            #pragma unroll (4)
             for (int i = 0; i < N; i++) {
-              sum += sycl::pow(sycl::fabs(A[row * N + i] - B[i * P + col]), p);
+              sum += sycl::native::powr(sycl::fabs(A[row * N + i] - B[i * P + col]), p);
             }
-            C[row * P + col] = sycl::pow(sum, one_over_p);
+            C[row * P + col] = sycl::native::powr(sum, one_over_p);
           }
         });
       });
