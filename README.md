@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, dispatch, ert, interleave, layout, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     attention, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
@@ -718,6 +718,9 @@ Early results are shown [here](results/README.md)
 
 ### lulesh (cuda)
   Livermore unstructured Lagrangian explicit shock hydrodynamics (https://github.com/LLNL/LULESH)
+
+### mallocFree (hip)
+  Memory allocation and deallocation samples (https://github.com/ROCm-Developer-Tools/HIP/)
 
 ### mandelbrot (sycl)
   The Mandelbrot set in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
