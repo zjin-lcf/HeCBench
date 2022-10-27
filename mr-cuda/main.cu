@@ -96,8 +96,8 @@ void run_benchmark()
     }
   }
 
-  printf("Total kernel execution time (mr32_simple  ): %f (s)\n", mr32_sf_time * 1e-9f);
-  printf("Total kernel execution time (mr32_efficent): %f (s)\n", mr32_eff_time * 1e-9f);
+  printf("Total kernel execution time (mr32_simple  ): %f (ms)\n", mr32_sf_time * 1e-6);
+  printf("Total kernel execution time (mr32_efficent): %f (ms)\n", mr32_eff_time * 1e-6);
   printf("%s\n", ok ? "PASS" : "FAIL");
 
   // device results are not included
