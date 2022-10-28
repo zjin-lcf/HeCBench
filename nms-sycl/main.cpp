@@ -110,14 +110,15 @@ int main(int argc, char *argv[])
   }
 
   /* Memory allocation in the host memory address space */
-  float4* cpu_points = (float4*) malloc(sizeof(float4) * MAX_DETECTIONS);
+  size_t size = sizeof(float4) * MAX_DETECTIONS;
+  float4* cpu_points = (float4*) malloc (size);
   if(!cpu_points)
   {
     printf("Error: Unable to allocate CPU memory.\n");
     return -1;
   }
 
-  memset(cpu_points, 0, sizeof(float4) * MAX_DETECTIONS);
+  memset(cpu_points, 0, size);
 
   while(!feof(fp))
   {
@@ -142,9 +143,10 @@ int main(int argc, char *argv[])
   fclose(fp);
 
   /* CPU array for storing the detection bitmap */
-  unsigned char* cpu_pointsbitmap;
-  cpu_pointsbitmap = (unsigned char*) malloc(sizeof(unsigned char) * MAX_DETECTIONS);
-  memset(cpu_pointsbitmap, 0, sizeof(unsigned char) * MAX_DETECTIONS);
+  size_t pts_bm_size = sizeof(uchar) * MAX_DETECTIONS;
+  uchar* cpu_pointsbitmap;
+  cpu_pointsbitmap = (uchar*) malloc(pts_bm_size);
+  memset(cpu_pointsbitmap, 0, pts_bm_size);
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
@@ -154,27 +156,21 @@ int main(int argc, char *argv[])
   queue q(dev_sel);
 
   /* GPU array for storing the coordinates, dimensions and score of each detected object */
-  buffer<float4, 1> d_points(cpu_points, MAX_DETECTIONS);
+  float4 *rects = malloc_device<float4>(MAX_DETECTIONS, q);
+  q.memcpy(rects, cpu_points, size);
 
   /* GPU array for storing the non-maximum supression bitmap */
-  buffer<unsigned char, 1> d_nmsbitmap (MAX_DETECTIONS * MAX_DETECTIONS);
+  size_t nms_bm_size = sizeof(uchar) * MAX_DETECTIONS * MAX_DETECTIONS;
+  uchar *nmsbitmap = malloc_device<uchar>(MAX_DETECTIONS * MAX_DETECTIONS, q);
+  q.memset(nmsbitmap, (uchar)1, nms_bm_size);
 
   /* GPU array for storing the detection bitmap */
-  buffer<unsigned char, 1> d_pointsbitmap (MAX_DETECTIONS);
+  uchar *pointsbitmap = malloc_device<uchar>(MAX_DETECTIONS, q);
+  q.memset(pointsbitmap, (uchar)0, pts_bm_size);
 
   /* Execute NMS on the GPU */
-  q.submit([&] (handler &cgh) {
-    auto nmsbitmap = d_nmsbitmap.get_access<sycl_write>(cgh);
-    cgh.fill(nmsbitmap, (unsigned char)1);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto pointsbitmap = d_pointsbitmap.get_access<sycl_write>(cgh);
-    cgh.fill(pointsbitmap, (unsigned char)0);
-  });
 
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
-  // generate_nms_bitmap<<<pkgrid, pkthreads>>>(points, nmsbitmap, 0.3f);
   int repeat = atoi(argv[3]);
   int limit = get_upper_limit(ndetections, 16);
   range<2> gen_gws(limit, limit);
@@ -185,18 +181,16 @@ int main(int argc, char *argv[])
 
   for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
-      auto rects = d_points.get_access<sycl_read>(cgh);
-      auto nmsbitmap = d_nmsbitmap.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class generate_nms_bitmap>(nd_range<2>(gen_gws, gen_lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class generate>(nd_range<2>(gen_gws, gen_lws), [=] (nd_item<2> item) {
         const int i = item.get_global_id(1);
         const int j = item.get_global_id(0);
         if(rects[i].w() < rects[j].w())
         {
           float area = (rects[j].z() + 1.0f) * (rects[j].z() + 1.0f);
-          float w = cl::sycl::fmax(0.0f, cl::sycl::fmin(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) - 
-                    cl::sycl::fmax(rects[i].x(), rects[j].x()) + 1.0f);
-          float h = cl::sycl::fmax(0.0f, cl::sycl::fmin(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) - 
-                    cl::sycl::fmax(rects[i].y(), rects[j].y()) + 1.0f);
+          float w = sycl::fmax(0.0f, sycl::fmin(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) - 
+                    sycl::fmax(rects[i].x(), rects[j].x()) + 1.0f);
+          float h = sycl::fmax(0.0f, sycl::fmin(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) - 
+                    sycl::fmax(rects[i].y(), rects[j].y()) + 1.0f);
           nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (rects[j].z() != 0);
         } 
       });
@@ -209,7 +203,6 @@ int main(int argc, char *argv[])
   printf("Average kernel execution time (generate_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
 
   /* Then we perform a reduction for generating a point bitmap vector */
-  // reduce_nms_bitmap<<<pkgrid, pkthreads>>>(nmsbitmap, pointsbitmap, ndetections);
   range<1> reduce_gws (ndetections * MAX_DETECTIONS / N_PARTITIONS); 
   range<1> reduce_lws (MAX_DETECTIONS / N_PARTITIONS); 
 
@@ -217,22 +210,20 @@ int main(int argc, char *argv[])
 
   for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
-      auto nmsbitmap= d_nmsbitmap.get_access<sycl_read>(cgh);
-      auto pointsbitmap= d_pointsbitmap.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class reduce_nms_bitmap>(nd_range<1>(reduce_gws, reduce_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class reduce>(nd_range<1>(reduce_gws, reduce_lws), [=] (nd_item<1> item) {
         auto g = item.get_group();
         int bid = item.get_group(0);
         int lid = item.get_local_id(0);
         int idx = bid * MAX_DETECTIONS + lid;
 
-        pointsbitmap[bid] = ( item.barrier(access::fence_space::local_space),
-              ext::oneapi::all_of(g, nmsbitmap[idx]));
+        pointsbitmap[bid] = (item.barrier(access::fence_space::local_space),
+                            ext::oneapi::all_of(g, nmsbitmap[idx]));
 
         for(int i=0; i<(N_PARTITIONS-1); i++)
         {
           idx += MAX_DETECTIONS / N_PARTITIONS;
-          pointsbitmap[bid] = ( item.barrier(access::fence_space::local_space),
-              ext::oneapi::all_of(g, pointsbitmap[bid] && nmsbitmap[idx]));
+          pointsbitmap[bid] = (item.barrier(access::fence_space::local_space),
+                              ext::oneapi::all_of(g, pointsbitmap[bid] && nmsbitmap[idx]));
         }
       });
     });
@@ -244,11 +235,11 @@ int main(int argc, char *argv[])
   printf("Average kernel execution time (reduce_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
 
   /* Dump detections after having performed the NMS */
-  q.submit([&] (handler &cgh) {
-    auto pointsbitmap = d_pointsbitmap.get_access<sycl_read>(cgh);
-    cgh.copy(pointsbitmap, cpu_pointsbitmap);
-  });
-  q.wait();
+  q.memcpy(cpu_pointsbitmap, pointsbitmap, pts_bm_size).wait();
+
+  free(pointsbitmap, q);
+  free(nmsbitmap, q);
+  free(rects, q);
 
   fp = fopen(argv[2], "w");
   if (!fp)

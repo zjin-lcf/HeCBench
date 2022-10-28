@@ -52,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) detections.txt output.txt 100
+	./$(program) detections.txt output.txt 1000
