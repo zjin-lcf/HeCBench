@@ -91,7 +91,9 @@ void GSimulation::Start() {
   InitAcc();
   InitMass();
 
+#ifdef DEBUG
   PrintHeader();
+#endif
 
   total_time_ = 0.;
 
@@ -134,6 +136,7 @@ void GSimulation::Start() {
     energy[0] = 0;
     if ((s % get_sfreq()) == 0) {
       nf += 1;
+#ifdef DEBUG
       std::cout << " " << std::left << std::setw(8) << s << std::left
                 << std::setprecision(5) << std::setw(8) << s * get_tstep()
                 << std::left << std::setprecision(5) << std::setw(12)
@@ -141,6 +144,7 @@ void GSimulation::Start() {
                 << std::setw(12) << elapsed_seconds << std::left
                 << std::setprecision(5) << std::setw(12)
                 << gflops * get_sfreq() / elapsed_seconds << "\n";
+#endif
       if (nf > 2) {
         av += gflops * get_sfreq() / elapsed_seconds;
         dev += gflops * get_sfreq() * gflops * get_sfreq() /
@@ -160,6 +164,7 @@ void GSimulation::Start() {
             << "\n";
 }
 
+#ifdef DEBUG
 /* Print the headers for the output */
 void GSimulation::PrintHeader() {
   std::cout << " nPart = " << get_npart() << "; "
@@ -176,3 +181,4 @@ void GSimulation::PrintHeader() {
   std::cout << "------------------------------------------------"
             << "\n";
 }
+#endif
