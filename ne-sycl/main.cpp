@@ -135,6 +135,15 @@ int main(int argc, char* argv[]) {
   range<1> gws ((numPts + 255)/256*256);
   range<1> lws  (256);
 
+  // warmup
+  q.submit([&] (handler &cgh) {
+    auto p = d_points.get_access<sycl_read>(cgh);
+    auto np = d_normal_points.get_access<sycl_discard_write>(cgh);
+    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      ne(item, p.get_pointer(), np.get_pointer(), width, height, numPts); 
+    });
+  });
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
