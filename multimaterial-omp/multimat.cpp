@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <chrono>
 #ifdef KNL
 #include <hbwmalloc.h>
 #else
@@ -481,7 +482,7 @@ int main(int argc, char** argv) {
   else initialise_field_file(cc);
   //else initialise_field_static(cc);
 
-  FILE *f;
+  FILE *f = nullptr;
   int print_to_file = 0;
 
   if (print_to_file==1)
@@ -619,9 +620,16 @@ int main(int argc, char** argv) {
   full_matrix_cell_centric(cc);
 
 #define MIN(a,b) (a)<(b)?(a):(b)
+
+  auto start = std::chrono::system_clock::now();
+
   for (int i = 0; i < 10; i++) {
     compact_cell_centric(cc, ccc, argc, argv);
   }
+
+  std::chrono::duration<double> t = std::chrono::system_clock::now() - start;
+  printf("Total offload time for compact cell centric: %g sec\n", t.count());
+
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];
   //Alg 1:

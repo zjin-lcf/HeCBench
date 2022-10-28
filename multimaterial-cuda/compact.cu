@@ -342,7 +342,7 @@ __global__ void ccc_loop3(
         int mmc_cells;
       };
 
-      void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv)
+      void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
       {
         int sizex = cc.sizex;
         int sizey = cc.sizey;
