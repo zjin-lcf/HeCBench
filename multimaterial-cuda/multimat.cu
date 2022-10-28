@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <chrono>
 #ifdef KNL
 #include <hbwmalloc.h>
 #else
@@ -96,7 +97,7 @@ extern void full_matrix_material_centric(full_data cc, full_data mc);
 
 extern bool full_matrix_check_results(full_data cc, full_data mc);
 
-extern void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv);
+extern void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv);
 
 extern bool compact_check_results(full_data cc, compact_data ccc);
 
@@ -477,7 +478,7 @@ int main(int argc, char** argv) {
   else initialise_field_file(cc);
   //else initialise_field_static(cc);
 
-  FILE *f;
+  FILE *f = nullptr;
   int print_to_file = 0;
 
   if (print_to_file==1)
@@ -620,19 +621,16 @@ int main(int argc, char** argv) {
   }*/
 #define MIN(a,b) (a)<(b)?(a):(b)
   double a1,a2,a3;
-  compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
-  double t1=100, t2=100, t3=100;
+
+  auto start = std::chrono::system_clock::now();
+
   for (int i = 0; i < 10; i++) {
-    a1=a2=a3=0.0;
-    compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
-    /*    t1+=a1;
-          t2+=a2;
-          t3+=a3;*/
-    t1 = MIN(t1,a1*10.0);
-    t2 = MIN(t2,a2*10.0);
-    t3 = MIN(t3,a3*10.0);
+    compact_cell_centric(cc, ccc, argc, argv);
   }
-  //printf("%g %g %g\n", t1/10.0,t2/10.0,t3/10.0);
+
+  std::chrono::duration<double> t = std::chrono::system_clock::now() - start;
+  printf("Total offload time for compact cell centric: %g sec\n", t.count());
+
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];
   //Alg 1:
@@ -727,8 +725,6 @@ int main(int argc, char** argv) {
   alg3 += (ccc.mmc_cells+1) * sizeof(int);
 #endif
 
-
-  //printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t2/1e9, alg3*10.0/t3/1e9);
 
   // Check results
   if (!compact_check_results(cc, ccc))
