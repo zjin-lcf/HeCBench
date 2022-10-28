@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     attention, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
@@ -320,6 +320,9 @@ Early results are shown [here](results/README.md)
 
 ### contract (cuda)
   Second-order tensor aggregation with an adjacency matrix (https://github.com/HyTruongSon/GraphFlow)
+
+### conversion (sycl)
+  Conversion among common data types (https://github.com/intel/llvm/issues/7195)
 
 ### convolutionSeperable (opencl)
   Convolution filter of a 2D image with separable kernels (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
