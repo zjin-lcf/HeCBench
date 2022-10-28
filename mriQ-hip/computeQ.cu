@@ -110,15 +110,7 @@ void computePhiMag_GPU(int numK, float* phiR_d, float* phiI_d, float* phiMag_d)
   dim3 DimPhiMagBlock(KERNEL_PHI_MAG_THREADS_PER_BLOCK);
   dim3 DimPhiMagGrid(phiMagBlocks);
 
-  hipDeviceSynchronize();
-  auto start = std::chrono::steady_clock::now();
-
   hipLaunchKernelGGL(ComputePhiMag_GPU, DimPhiMagGrid, DimPhiMagBlock , 0, 0, phiR_d, phiI_d, phiMag_d, numK);
-
-  hipDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computePhiMag execution time: %f s\n", time * 1e-9f);
 }
 
 void computeQ_GPU(int numK, int numX,
@@ -135,9 +127,6 @@ void computeQ_GPU(int numK, int numX,
   dim3 DimQBlock(KERNEL_Q_THREADS_PER_BLOCK);
   dim3 DimQGrid(QBlocks);
 
-  hipDeviceSynchronize();
-  auto start = std::chrono::steady_clock::now();
-
   for (int QGrid = 0; QGrid < QGrids; QGrid++) {
     // Put the tile of K values into constant mem
     int QGridBase = QGrid * KERNEL_Q_K_ELEMS_PER_GRID;
@@ -148,11 +137,6 @@ void computeQ_GPU(int numK, int numX,
 
     hipLaunchKernelGGL(ComputeQ_GPU, DimQGrid, DimQBlock , 0, 0, numK, QGridBase, x_d, y_d, z_d, Qr_d, Qi_d);
   }
-
-  hipDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computeQ execution time: %f s\n", time * 1e-9);
 }
 
 void createDataStructsCPU(int numK, int numX, float** phiMag,

@@ -59,6 +59,8 @@ int main (int argc, char *argv[]) {
   createDataStructsCPU(numK, numX, &phiMag, &Qr, &Qi);
 
   /* GPU section 1 (precompute PhiMag) */
+  auto start = std::chrono::steady_clock::now();
+
   int phiMagBlocks = numK / KERNEL_PHI_MAG_THREADS_PER_BLOCK;
   if (numK % KERNEL_PHI_MAG_THREADS_PER_BLOCK)
     phiMagBlocks++;
@@ -66,8 +68,6 @@ int main (int argc, char *argv[]) {
   #pragma omp target data map(to: phiR[0:numK], phiI[0:numK]) \
                           map(from: phiMag[0:numK])
   {
-    auto start = std::chrono::steady_clock::now();
-
     #pragma omp target teams distribute parallel for \
       num_teams(phiMagBlocks) thread_limit(KERNEL_PHI_MAG_THREADS_PER_BLOCK)
     for (int indexK = 0; indexK < numK; indexK++) {
@@ -75,11 +75,10 @@ int main (int argc, char *argv[]) {
       float imag = phiI[indexK];
       phiMag[indexK] = real*real + imag*imag;
     }
-
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("computePhiMag execution time: %f s\n", time * 1e-9f);
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("computePhiMag offload time: %f s\n", time * 1e-9f);
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
   for (int k = 0; k < numK; k++) {
@@ -90,6 +89,8 @@ int main (int argc, char *argv[]) {
   }
 
   /* GPU section 2 */
+  start = std::chrono::steady_clock::now();
+
   kValues ck [KERNEL_Q_K_ELEMS_PER_GRID];
 
   #pragma omp target data map(to: x[0:numX], y[0:numX], z[0:numX]) \
@@ -104,6 +105,9 @@ int main (int argc, char *argv[]) {
 
     computeQ_GPU(numK, numX, x, y, z, kVals, ck, Qr, Qi);
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("computeQ offload time: %f s\n", time * 1e-9f);
 
   outputData(outputFileName, Qr, Qi, numX);
 

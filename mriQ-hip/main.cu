@@ -77,6 +77,7 @@ int main (int argc, char *argv[]) {
   createDataStructsCPU(numK, numX, &phiMag, &Qr, &Qi);
 
   /* GPU section 1 (precompute PhiMag) */
+  auto start = std::chrono::steady_clock::now();
   {
     /* Mirror several data structures on the device */
     float *phiR_d, *phiI_d;
@@ -93,6 +94,9 @@ int main (int argc, char *argv[]) {
     hipFree(phiR_d);
     hipFree(phiI_d);
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("computePhiMag execution time: %f s\n", time * 1e-9);
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
   for (int k = 0; k < numK; k++) {
@@ -103,6 +107,7 @@ int main (int argc, char *argv[]) {
   }
 
   /* GPU section 2 */
+  start = std::chrono::steady_clock::now();
   {
     float *x_d, *y_d, *z_d;
     float *Qr_d, *Qi_d;
@@ -125,6 +130,9 @@ int main (int argc, char *argv[]) {
     cleanupMemoryGPU(numX, sizeof(float), Qr_d, Qr);
     cleanupMemoryGPU(numX, sizeof(float), Qi_d, Qi);
   }
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("computeQ execution time: %f s\n", time * 1e-9);
 
   outputData(outputFileName, Qr, Qi, numX);
 
