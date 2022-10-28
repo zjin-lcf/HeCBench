@@ -104,9 +104,6 @@ void computePhiMag_GPU(
   range<1> lws (KERNEL_PHI_MAG_THREADS_PER_BLOCK);
   range<1> gws (KERNEL_PHI_MAG_THREADS_PER_BLOCK * phiMagBlocks);
 
-  q.wait();
-  auto start = std::chrono::steady_clock::now();
-
   q.submit([&] (handler &cgh) {
     auto r = phiR_d.get_access<sycl_read>(cgh);
     auto i = phiI_d.get_access<sycl_read>(cgh);
@@ -120,11 +117,6 @@ void computePhiMag_GPU(
         m.get_pointer());
     });
   });
-
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computePhiMag execution time: %f s\n", time * 1e-9f);
 }
 
 void computeQ_GPU(
@@ -148,10 +140,7 @@ void computeQ_GPU(
 
 /* Values in the k-space coordinate system are stored in constant memory
  * on the GPU */
-   buffer<kValues, 1> ck (KERNEL_Q_K_ELEMS_PER_GRID);
-
-  q.wait();
-  auto start = std::chrono::steady_clock::now();
+  buffer<kValues, 1> ck (KERNEL_Q_K_ELEMS_PER_GRID);
 
   for (int QGrid = 0; QGrid < QGrids; QGrid++) {
     // Put the tile of K values into constant mem
@@ -185,11 +174,6 @@ void computeQ_GPU(
       });
     });
   }
-
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computeQ execution time: %f s\n", time * 1e-9);
 }
 
 void createDataStructsCPU(int numK, int numX, float** phiMag,
@@ -199,4 +183,3 @@ void createDataStructsCPU(int numK, int numX, float** phiMag,
   *Qr = (float*) memalign(16, numX * sizeof (float));
   *Qi = (float*) memalign(16, numX * sizeof (float));
 }
-

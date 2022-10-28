@@ -44,8 +44,6 @@ void computeQ_GPU(
 
 /* Values in the k-space coordinate system are stored in device memory
  * on the GPU */
-  auto start = std::chrono::steady_clock::now();
-
   for (int QGrid = 0; QGrid < QGrids; QGrid++) {
     // Put the tile of K values into constant mem
     int QGridBase = QGrid * KERNEL_Q_K_ELEMS_PER_GRID;
@@ -98,10 +96,6 @@ void computeQ_GPU(
       Qi[xIndex] = sQi;
     }
   }
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computeQ execution time: %f s\n", time * 1e-9);
 }
 
 void createDataStructsCPU(int numK, int numX, float** phiMag,
