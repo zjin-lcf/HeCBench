@@ -124,6 +124,9 @@ int main(int argc, char* argv[]) {
   dim3 grids ((numPts + 255)/256);
   dim3 blocks (256);
 
+  // warmup
+  ne <<< grids, blocks >>> (d_points, d_normal_points, width, height, numPts); 
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
