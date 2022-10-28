@@ -91,7 +91,9 @@ void GSimulation::Start() {
   InitAcc();
   InitMass();
 
+#ifdef DEBUG
   PrintHeader();
+#endif
 
   total_time_ = 0.;
 
@@ -102,12 +104,10 @@ void GSimulation::Start() {
   int nf = 0;
   double av = 0.0, dev = 0.0;
 
-  //buffer<Particle, 1> pbuf(particles_.data(), r, {property::buffer::use_host_ptr()});
   Particle *p;
   cudaMalloc((void**)&p, sizeof(Particle) * n);
   cudaMemcpyAsync(p, particles_.data(), sizeof(Particle) * n, cudaMemcpyHostToDevice, 0);
 
-  //buffer<RealType, 1> ebuf(energy.data(), r, {property::buffer::use_host_ptr()});
   RealType *e;
   cudaMalloc((void**)&e, sizeof(RealType) * n);
   cudaMemcpyAsync(e, energy.data(), sizeof(RealType) * n, cudaMemcpyHostToDevice, 0);
@@ -134,6 +134,7 @@ void GSimulation::Start() {
     energy[0] = 0;
     if ((s % get_sfreq()) == 0) {
       nf += 1;
+#ifdef DEBUG
       std::cout << " " << std::left << std::setw(8) << s << std::left
                 << std::setprecision(5) << std::setw(8) << s * get_tstep()
                 << std::left << std::setprecision(5) << std::setw(12)
@@ -141,6 +142,7 @@ void GSimulation::Start() {
                 << std::setw(12) << elapsed_seconds << std::left
                 << std::setprecision(5) << std::setw(12)
                 << gflops * get_sfreq() / elapsed_seconds << "\n";
+#endif
       if (nf > 2) {
         av += gflops * get_sfreq() / elapsed_seconds;
         dev += gflops * get_sfreq() * gflops * get_sfreq() /
@@ -160,6 +162,7 @@ void GSimulation::Start() {
             << "\n";
 }
 
+#ifdef DEBUG
 /* Print the headers for the output */
 void GSimulation::PrintHeader() {
   std::cout << " nPart = " << get_npart() << "; "
@@ -176,3 +179,4 @@ void GSimulation::PrintHeader() {
   std::cout << "------------------------------------------------"
             << "\n";
 }
+#endif
