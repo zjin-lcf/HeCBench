@@ -161,6 +161,9 @@ int main(int argc, char* argv[]) {
 
   buffer<float, 1> d_std (std, outputSize);
 
+  // warmup
+  stddev(q, d_std, d_data, D, N, sample);
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
