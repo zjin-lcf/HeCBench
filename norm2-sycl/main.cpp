@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     // snrm2 results match across all iterations
     for (j = 0; j < repeat; j++) 
-      if (fabsf((float)gold - h_result[j]) > 1e-3f) {
+      if (fabsf((float)gold - h_result[j]) > 1e-1f) {
         printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
                j, (float)gold, h_result[j], i);
         ok = false;
