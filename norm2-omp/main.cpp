@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
       auto kend = std::chrono::steady_clock::now();
       auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-      printf("Average omp nrm2 execution time: %f (us)\n", (ktime * 1e-3f) / repeat);
+      printf("Average omp nrm2 execution time: %f (us)\n", (ktime * 1e-1f) / repeat);
     }
 
     auto end = std::chrono::steady_clock::now();
