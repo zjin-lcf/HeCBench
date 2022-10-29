@@ -124,6 +124,9 @@ int main(int argc, char* argv[]) {
   float *d_std;
   hipMalloc((void**)&d_std, outputSizeByte);
 
+  // warmup
+  stddev(d_std, d_data, D, N, sample);
+
   // execute kernels on a device
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();

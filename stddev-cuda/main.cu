@@ -124,6 +124,9 @@ int main(int argc, char* argv[]) {
   float *d_std;
   cudaMalloc((void**)&d_std, outputSizeByte);
 
+  // warmup
+  stddev(d_std, d_data, D, N, sample);
+
   // execute kernels on a device
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();

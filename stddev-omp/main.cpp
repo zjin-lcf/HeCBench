@@ -124,6 +124,9 @@ int main(int argc, char* argv[]) {
 
   #pragma omp target data map (to: data[0:inputSize]) map (from: std[0:outputSize])
   {
+    // warmup
+    stddev(std, data, D, N, sample);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
