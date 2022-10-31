@@ -3,14 +3,7 @@
    biology and bioinformatics," by Payne, Sinnott-Armstrong, and
    Moore, to appear in "The Handbook of Research on Computational and
    Systems Biology: Interdisciplinary applications," by IGI Global.
-
-   Please feel free to use, modify, or redistribute this code.
-
-   Make sure you have a CUDA compatible GPU and the nvcc is installed.
-   To compile, type make.
-   After compilation, type ./chapter to run
-   Output written to timing.txt
-*/
+ */
 
 #include <cstdio>
 #include <cstdlib>
@@ -96,10 +89,11 @@ int main(int argc, char **argv) {
   for (int n = 0; n < iterations; n++) {
     /* register-based kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
+    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
+
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
-    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
     #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
     {
       #pragma omp parallel
@@ -125,19 +119,21 @@ int main(int argc, char **argv) {
           if(j.w ^ k.w)
             count++;
     
-          /* Only one atomic write to global memory */
+          /* atomic write to global memory */
           #pragma omp atomic update
           gpu_distance[ INSTANCES*gx + gy ] += count;
         }
       }
     }
-    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
+
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
+
+    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
   }
 
-  printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
@@ -146,10 +142,11 @@ int main(int argc, char **argv) {
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
+    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
+
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
-    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
     #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
     {
       int dist[THREADS];
@@ -205,13 +202,15 @@ int main(int argc, char **argv) {
         }
       }
     }
-    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
+
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
+
+    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
   }
 
-  printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");

@@ -3,14 +3,7 @@
    biology and bioinformatics," by Payne, Sinnott-Armstrong, and
    Moore, to appear in "The Handbook of Research on Computational and
    Systems Biology: Interdisciplinary applications," by IGI Global.
-
-   Please feel free to use, modify, or redistribute this code.
-
-   Make sure you have a CUDA compatible GPU and the nvcc is installed.
-   To compile, type make.
-   After compilation, type ./chapter to run
-   Output written to timing.txt
-   */
+ */
 
 #include <cstdio>
 #include <cstdlib>
@@ -108,13 +101,14 @@ int main(int argc, char **argv) {
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (handler &h) {
       auto distance_acc = distance_device.get_access<sycl_write>(h);
       h.copy(gpu_distance, distance_acc);
-    });
+    }).wait();
+
+    gettimeofday(&tp, &tzp);
+    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (handler &h) {
       auto data = data_char_device.get_access<sycl_read>(h);
@@ -142,22 +136,23 @@ int main(int argc, char **argv) {
           if(j.w() ^ k.w())
             count++;
 
-          /* Only one atomic write to global memory */
+          /* atomic write to global memory */
           atomic_fetch_add(distance[INSTANCES*gx + gy], count);
         }
       });
-    });
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_read>(h);
-      h.copy(distance_acc, gpu_distance);
     }).wait();
 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
+
+    q.submit([&] (handler &h) {
+      auto distance_acc = distance_device.get_access<sycl_read>(h);
+      h.copy(distance_acc, gpu_distance);
+    }).wait();
   }
 
-  printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
@@ -166,13 +161,14 @@ int main(int argc, char **argv) {
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (handler &h) {
       auto distance_acc = distance_device.get_access<sycl_write>(h);
       h.copy(gpu_distance, distance_acc);
-    });
+    }).wait();
+
+    gettimeofday(&tp, &tzp);
+    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     /*  coalesced GPU implementation of the all-pairs kernel using
         character data types, registers, and shared memory */
@@ -235,18 +231,19 @@ int main(int argc, char **argv) {
           distance[INSTANCES*gy + gx] = dist[0];
         }
       });
-    });
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_read>(h);
-      h.copy(distance_acc, gpu_distance);
     }).wait();
 
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
+
+    q.submit([&] (handler &h) {
+      auto distance_acc = distance_device.get_access<sycl_read>(h);
+      h.copy(distance_acc, gpu_distance);
+    }).wait();
   }
 
-  printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
@@ -254,6 +251,7 @@ int main(int argc, char **argv) {
   free(cpu_distance);
   free(gpu_distance);
   free(data);
+  free(data_char);
 
   return status;
 }
