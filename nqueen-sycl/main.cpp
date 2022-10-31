@@ -173,6 +173,22 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
   range<1> gws (num_blocks * _QUEENS_BLOCK_SIZE_);
   range<1> lws (_QUEENS_BLOCK_SIZE_);
 
+  // warmup
+  q.submit([&] (handler &cgh) {
+    auto root_prefixes = root_prefixes_d.get_access<sycl_read>(cgh);
+    auto vector_of_tree_size = vector_of_tree_size_d.get_access<sycl_discard_write>(cgh);
+    auto sols =  sols_d.get_access<sycl_discard_write>(cgh);
+    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      BP_queens_root_dfs(item,
+                         size,
+                         n_explorers,
+                         initial_depth,
+                         root_prefixes.get_pointer(),
+                         vector_of_tree_size.get_pointer(),
+                         sols.get_pointer());
+    });
+  });
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 

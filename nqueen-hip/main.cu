@@ -178,6 +178,15 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
 
   printf("\n### Regular BP-DFS search. ###\n");
 
+  // warmup
+  hipLaunchKernelGGL(BP_queens_root_dfs, num_blocks, _QUEENS_BLOCK_SIZE_, 0, 0, 
+    size,
+    n_explorers,
+    initial_depth,
+    root_prefixes_d,
+    vector_of_tree_size_d,
+    sols_d);
+
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
