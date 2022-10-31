@@ -13,7 +13,7 @@ DUMP      = no
 # Program name & source code list
 #===============================================================================
 
-program = nw
+program = main
 
 source = nw.cu
 
@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -59,4 +58,3 @@ clean:
 
 run: $(program)
 	./$(program) 16384 10
-

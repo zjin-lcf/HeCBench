@@ -175,7 +175,7 @@ int main(int argc, char **argv){
     buffer<int,1> reference_d (reference, max_cols * max_rows, props);
     reference_d.set_final_data( nullptr );
 
-    // warmup is required to exclude data copy from host to device 
+    // warmup
     for(int blk = 1 ; blk <= block_width ; blk++){
       global_work = BLOCK_SIZE * blk; // kernel arg set every iteration
       q.submit([&](handler& cgh) {
@@ -186,6 +186,19 @@ int main(int argc, char **argv){
         cgh.parallel_for<class kernel1_warmup>(
           nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
             #include "kernel1.sycl"
+        });
+      });
+    }
+    for(int blk = block_width - 1 ; blk >= 1 ; blk--){	   
+      global_work = BLOCK_SIZE * blk;
+      q.submit([&](handler& cgh) {
+        auto d_input_itemsets_acc = input_itemsets_d.get_access<sycl_read_write>(cgh);
+        auto d_reference_acc = reference_d.get_access<sycl_read_write>(cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
+        accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+        cgh.parallel_for<class kernel2_warmup>(
+          nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+            #include "kernel2.sycl"
         });
       });
     }
