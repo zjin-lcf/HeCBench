@@ -320,6 +320,18 @@ int main(int argc, char **argv){
   hipMemcpy(d_input_itemsets, input_itemsets, max_cols * max_rows * sizeof(int), hipMemcpyHostToDevice);
   hipMemcpy(d_reference, reference, max_cols * max_rows * sizeof(int), hipMemcpyHostToDevice);
 
+  // warmup
+  for( int blk = 1 ; blk <= block_width ; blk++){
+    global_work = blk;
+    hipLaunchKernelGGL(kernel1, global_work, local_work, 0, 0,
+                       d_input_itemsets, d_reference, offset_r, offset_c, max_cols, blk, penalty);
+  }
+  for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
+    global_work = blk;
+    hipLaunchKernelGGL(kernel2, global_work, local_work, 0, 0,
+                       d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
+  }
+
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
@@ -328,7 +340,8 @@ int main(int argc, char **argv){
 #endif
   for( int blk = 1 ; blk <= block_width ; blk++){
     global_work = blk;
-    hipLaunchKernelGGL(kernel1, global_work, local_work, 0, 0, d_input_itemsets, d_reference, offset_r, offset_c, max_cols, blk, penalty);
+    hipLaunchKernelGGL(kernel1, global_work, local_work, 0, 0,
+                       d_input_itemsets, d_reference, offset_r, offset_c, max_cols, blk, penalty);
   }
 
 #ifdef DEBUG
@@ -336,7 +349,8 @@ int main(int argc, char **argv){
 #endif
   for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
     global_work = blk;
-    hipLaunchKernelGGL(kernel2, global_work, local_work, 0, 0, d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
+    hipLaunchKernelGGL(kernel2, global_work, local_work, 0, 0,
+                       d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
   }
 
   hipDeviceSynchronize();

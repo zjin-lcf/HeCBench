@@ -320,6 +320,16 @@ int main(int argc, char **argv){
   cudaMemcpy(d_input_itemsets, input_itemsets, max_cols * max_rows * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_reference, reference, max_cols * max_rows * sizeof(int), cudaMemcpyHostToDevice);
 
+  // warmup
+  for( int blk = 1 ; blk <= block_width ; blk++){
+    global_work = blk;
+    kernel1<<<global_work, local_work>>>(d_input_itemsets, d_reference, offset_r, offset_c, max_cols, blk, penalty);
+  }
+  for( int blk = block_width - 1 ; blk >= 1 ; blk--){      
+    global_work = blk;
+    kernel2<<<global_work, local_work>>>(d_input_itemsets, d_reference, block_width, offset_r, offset_c, max_cols, blk, penalty);
+  }
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
