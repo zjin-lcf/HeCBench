@@ -84,12 +84,12 @@ void motion_device(float* particleX, float* particleY,
   auto maxBlockSize = device.get_info<info::device::max_work_group_size>();
   auto maxEUCount = device.get_info<info::device::max_compute_units>();
 
-  std::cout << " Running on:: " << deviceName << std::endl;
-  std::cout << " The Device Max Work Group Size is : " << maxBlockSize << std::endl;
-  std::cout << " The Device Max EUCount is : " << maxEUCount << "\n";
-  std::cout << " The number of iterations is : " << nIterations << std::endl;
-  std::cout << " The number of kernel execution is : " << nRepeat << std::endl;
-  std::cout << " The number of particles is : " << n_particles << std::endl;
+  std::cout << " Running on " << deviceName << std::endl;
+  std::cout << " The Device Max Work Group Size is " << maxBlockSize << std::endl;
+  std::cout << " The Device Max EUCount is " << maxEUCount << "\n";
+  std::cout << " The number of iterations is " << nIterations << std::endl;
+  std::cout << " The number of kernel execution is " << nRepeat << std::endl;
+  std::cout << " The number of particles is " << n_particles << std::endl;
 
   // Set the seed for rand() function.
   // Use a fixed seed for reproducibility/debugging

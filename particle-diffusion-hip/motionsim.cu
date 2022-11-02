@@ -142,11 +142,11 @@ void motion_device(float* particleX, float* particleY,
   hipDeviceProp_t devProp;
   hipGetDeviceProperties(&devProp, 0);
 
-  std::cout << " Running on:: " << devProp.name << std::endl;
-  std::cout << " The Device Max Work Group Size is : " << devProp.maxThreadsPerBlock << std::endl;
-  std::cout << " The number of iterations is : " << nIterations << std::endl;
-  std::cout << " The number of kernel execution is : " << nRepeat << std::endl;
-  std::cout << " The number of particles is : " << n_particles << std::endl;
+  std::cout << " Running on " << devProp.name << std::endl;
+  std::cout << " The Device Max Work Group Size is " << devProp.maxThreadsPerBlock << std::endl;
+  std::cout << " The number of iterations is " << nIterations << std::endl;
+  std::cout << " The number of kernel execution is " << nRepeat << std::endl;
+  std::cout << " The number of particles is " << n_particles << std::endl;
 
   // Set the seed for rand() function.
   // Use a fixed seed for reproducibility/debugging

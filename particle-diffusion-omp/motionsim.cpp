@@ -89,8 +89,8 @@ void motion_device(float* particleX, float* particleY,
                                       particleY[0:n_particles], \
                                       map[0:MAP_SIZE])
   {
-    std::cout << " The number of kernel execution is : " << nRepeat << std::endl;
-    std::cout << " The number of particles is : " << n_particles << std::endl;
+    std::cout << " The number of kernel execution is " << nRepeat << std::endl;
+    std::cout << " The number of particles is " << n_particles << std::endl;
 
     double time_total = 0.0;
 
