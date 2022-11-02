@@ -87,7 +87,7 @@ int DetectionOverlay(
 
     q.submit([&] (handler &cgh) {
       auto in = input.template get_access<sycl_read>(cgh); 
-      auto out = output.template get_access<sycl_write>(cgh); 
+      auto out = output.template get_access<sycl_discard_write>(cgh); 
       cgh.parallel_for<class overlay<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         DetectionOverlayBox<T>(item, in.get_pointer(), out.get_pointer(), 
           width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   const int width = atoi(argv[1]);
   const int height = atoi(argv[2]);
