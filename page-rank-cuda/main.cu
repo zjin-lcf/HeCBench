@@ -231,7 +231,8 @@ int main(int argc, char *argv[]) {
     map <<< dim3(num_blocks), dim3(block_size) >>> (
       d_pages, d_page_ranks, d_maps, d_noutlinks, n);
 
-    reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
+    reduce <<< dim3(num_blocks), dim3(block_size) >>> (
+      d_page_ranks, d_maps, n, d_diffs);
     
     cudaDeviceSynchronize();
     auto end = std::chrono::high_resolution_clock::now();
@@ -250,9 +251,9 @@ int main(int argc, char *argv[]) {
   cudaFree(d_noutlinks);
   cudaFree(d_diffs);
 
-  fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
-         1, n, iter, thresh, ktime);
+  fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
+  printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
+         n, iter, thresh, ktime);
 
   free(pages);
   free(maps);

@@ -246,9 +246,9 @@ int main(int argc, char *argv[]) {
     max_diff = maximum_dif(diffs, n);
   }
 
-  fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-  printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
-         1, n, iter, thresh, ktime);
+  fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
+  printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
+         n, iter, thresh, ktime);
 
   free(pages);
   free(maps);
@@ -257,4 +257,3 @@ int main(int argc, char *argv[]) {
   free(diffs);
   return 0;
 }
-

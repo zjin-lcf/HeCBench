@@ -197,15 +197,14 @@ int main(int argc, char *argv[]) {
        #pragma omp target update from(diffs[0:n])
        max_diff = maximum_dif(diffs, n);
    
-   
        #pragma omp target teams distribute parallel for thread_limit(block_size) 
        for (int i = 0; i < n; i++)
          diffs[i] = 0.f;
      }
    
-     fprintf(stderr, "max dif %f is reached at iteration %d\n", max_diff, t);
-     printf("{ \"status\": %d, \"options\": \"-n %d -i %d -t %f\", \"kernel time\": %f }\n",
-            1, n, iter, thresh, ktime);
+     fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
+     printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
+            n, iter, thresh, ktime);
   }
 
   free(pages);
@@ -215,5 +214,3 @@ int main(int argc, char *argv[]) {
   free(diffs);
   return 0;
 }
-
-
