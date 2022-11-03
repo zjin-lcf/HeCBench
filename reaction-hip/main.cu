@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end-start;
   printf("timesteps: %d\n", timesteps);
-  printf("Total time:     %12.3f s\n\n", elapsed_seconds.count());
+  printf("Total kernel execution time:     %12.3f s\n\n", elapsed_seconds.count());
 
   // copy results back
   hipMemcpy(a, d_a, bytes, hipMemcpyDeviceToHost);
