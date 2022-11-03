@@ -43,14 +43,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) 
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu qrg.h
+%.o: %.cu qrg.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1000
+	./$(program) 100000
