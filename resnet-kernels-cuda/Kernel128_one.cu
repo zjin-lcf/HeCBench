@@ -119,14 +119,14 @@ void kernel_128_1_in(double &time, double &ktime) {
 
   cudaMemcpy(result, output_, nOutput<<2, cudaMemcpyDeviceToHost);
 
-  auto end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
   cudaFree(bnScale_);
   cudaFree(bnBias_);
   cudaFree(input_);
   cudaFree(output_);
   cudaFree(weight_);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;

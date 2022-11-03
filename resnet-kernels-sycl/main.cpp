@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   double time_total = 0, ktime_total = 0;
   double time, ktime;
