@@ -100,11 +100,19 @@ void kernel_256_1_in(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  buffer<float, 1> input_(input, nInput);
-  buffer<float, 1> output_(nOutput);
-  buffer<float, 1> weight_(weight, nWeights);
-  buffer<float, 1> bnBias_(bnBias_myKernel, 256);
-  buffer<float, 1> bnScale_(bnScale_myKernel, 256);
+  float *input_ = malloc_device<float>(nInput, q);
+  q.memcpy(input_, input, sizeof(float) * nInput);
+
+  float *output_ = malloc_device<float>(nOutput, q);
+
+  float *weight_ = malloc_device<float>(nWeights, q);
+  q.memcpy(weight_, weight, sizeof(float) * nWeights);
+
+  float *bnBias_ = malloc_device<float>(256, q);
+  q.memcpy(bnBias_, bnBias_myKernel, sizeof(float) * 256);
+
+  float *bnScale_ = malloc_device<float>(256, q);
+  q.memcpy(bnScale_, bnScale_myKernel, sizeof(float) * 256);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
@@ -113,16 +121,11 @@ void kernel_256_1_in(queue &q, double &time, double &ktime) {
   range<2> lws (4, 256);
 
   q.submit([&] (handler &cgh) {
-    auto i = input_.get_access<sycl_read>(cgh);
-    auto w = weight_.get_access<sycl_read>(cgh);
-    auto b = bnBias_.get_access<sycl_read>(cgh);
-    auto s = bnScale_.get_access<sycl_read>(cgh);
-    auto o = output_.get_access<sycl_discard_write>(cgh);
     accessor<float, 1, sycl_read_write, access::target::local>
       sm (4*1024 + 16*256 + 4*256 + 2*256, cgh);
     cgh.parallel_for<class k1024>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      kernel_1024_one_256 (item, sm.get_pointer(), i.get_pointer(),
-        w.get_pointer(), b.get_pointer(), s.get_pointer(), o.get_pointer());
+      kernel_1024_one_256 (item, sm.get_pointer(), input_,
+                           weight_, bnBias_, bnScale_, output_);
     });
   });
 
@@ -130,10 +133,13 @@ void kernel_256_1_in(queue &q, double &time, double &ktime) {
   auto kend = std::chrono::steady_clock::now();
   ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = output_.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, output_, sizeof(float) * nOutput).wait();
+
+  free(input_, q);
+  free(output_, q);
+  free(weight_, q);
+  free(bnBias_, q);
+  free(bnScale_, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -163,11 +169,19 @@ void kernel_256_1_out(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  buffer<float, 1> input_(input, nInput);
-  buffer<float, 1> output_(nOutput);
-  buffer<float, 1> weight_(weight, nWeights);
-  buffer<float, 1> bnBias_(bnBias_myKernel, 1024);
-  buffer<float, 1> bnScale_(bnScale_myKernel, 1024);
+  float *input_ = malloc_device<float>(nInput, q);
+  q.memcpy(input_, input, sizeof(float) * nInput);
+
+  float *output_ = malloc_device<float>(nOutput, q);
+
+  float *weight_ = malloc_device<float>(nWeights, q);
+  q.memcpy(weight_, weight, sizeof(float) * nWeights);
+
+  float *bnBias_ = malloc_device<float>(1024, q);
+  q.memcpy(bnBias_, bnBias_myKernel, sizeof(float) * 1024);
+
+  float *bnScale_ = malloc_device<float>(1024, q);
+  q.memcpy(bnScale_, bnScale_myKernel, sizeof(float) * 1024);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
@@ -176,16 +190,11 @@ void kernel_256_1_out(queue &q, double &time, double &ktime) {
   range<2> lws (4, 256);
 
   q.submit([&] (handler &cgh) {
-    auto i = input_.get_access<sycl_read>(cgh);
-    auto w = weight_.get_access<sycl_read>(cgh);
-    auto b = bnBias_.get_access<sycl_read>(cgh);
-    auto s = bnScale_.get_access<sycl_read>(cgh);
-    auto o = output_.get_access<sycl_discard_write>(cgh);
     accessor<float, 1, sycl_read_write, access::target::local>
       sm (4*256 + 32*256 + 4*256 + 2*256, cgh);
     cgh.parallel_for<class k256_1024>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      kernel_256_one_1024 (item, sm.get_pointer(), i.get_pointer(),
-        w.get_pointer(), b.get_pointer(), s.get_pointer(), o.get_pointer());
+      kernel_256_one_1024 (item, sm.get_pointer(), input_,
+                           weight_, bnBias_, bnScale_, output_);
     });
   });
 
@@ -193,10 +202,13 @@ void kernel_256_1_out(queue &q, double &time, double &ktime) {
   auto kend = std::chrono::steady_clock::now();
   ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = output_.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, output_, sizeof(float) * nOutput).wait();
+
+  free(input_, q);
+  free(output_, q);
+  free(weight_, q);
+  free(bnBias_, q);
+  free(bnScale_, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

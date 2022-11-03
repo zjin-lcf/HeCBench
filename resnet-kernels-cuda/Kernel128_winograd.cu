@@ -260,9 +260,6 @@ void kernel_128(double &time, double &ktime) {
 
   cudaMemcpy(result, output, nOutput<<2, cudaMemcpyDeviceToHost);
 
-  auto end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
   cudaFree(t_input);
   cudaFree(output);
   cudaFree(l_weights);
@@ -270,6 +267,9 @@ void kernel_128(double &time, double &ktime) {
   cudaFree(input);
   cudaFree(l_bnScale);
   cudaFree(l_bnBias);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;

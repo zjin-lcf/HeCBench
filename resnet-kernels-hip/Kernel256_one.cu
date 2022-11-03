@@ -177,14 +177,14 @@ void kernel_256_1_out(double &time, double &ktime) {
 
   hipMemcpy(result, output_, nOutput<<2, hipMemcpyDeviceToHost);
 
-  auto end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
   hipFree(input_);
   hipFree(output_);
   hipFree(weight_);
   hipFree(bnScale_);
   hipFree(bnBias_);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;

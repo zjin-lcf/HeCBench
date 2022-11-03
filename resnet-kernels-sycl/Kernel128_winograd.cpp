@@ -236,29 +236,27 @@ void kernel_128(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  buffer<float, 1> input(input_, nInput);
-  buffer<float, 1> l_weights(kernel, nWeights);
-  buffer<float, 1> output(nOutput);
-  buffer<float, 1> t_input(nTransInput);
-  buffer<float, 1> ip(nInnerProd);
+  float *input = malloc_device<float>(nInput, q);
+  q.memcpy(input, input_, sizeof(float) * nInput);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = output.get_access<sycl_write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  float *l_weights = malloc_device<float>(nWeights, q);
+  q.memcpy(l_weights, kernel, sizeof(float) * nWeights);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = t_input.get_access<sycl_write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  float *output = malloc_device<float>(nOutput, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = ip.get_access<sycl_write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  float *t_input = malloc_device<float>(nTransInput, q);
 
-  buffer<float, 1> l_bnBias (bnBias, nBias);
-  buffer<float, 1> l_bnScale (bnScale, nBias);
+  float *ip = malloc_device<float>(nInnerProd, q);
+
+  q.memset(output, 0, sizeof(float) * nOutput);
+  q.memset(t_input, 0, sizeof(float) * nTransInput);
+  q.memset(ip, 0, sizeof(float) * nInnerProd);
+
+  float *l_bnBias = malloc_device<float>(nBias, q);
+  q.memcpy(l_bnBias, bnBias, sizeof(float) * nBias);
+
+  float *l_bnScale = malloc_device<float>(nBias, q);
+  q.memcpy(l_bnScale, bnScale, sizeof(float) * nBias);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
@@ -267,41 +265,31 @@ void kernel_128(queue &q, double &time, double &ktime) {
   range<2> lws (6, 128);
 
   q.submit([&] (handler &cgh) {
-    auto i = input.get_access<sycl_read>(cgh);
-    auto t = t_input.get_access<sycl_write>(cgh);
     accessor<float, 1, sycl_read_write, access::target::local> sm (6*6*128, cgh);
     cgh.parallel_for<class k1>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      kernel_128_winograd_BtdB (item, sm.get_pointer(), i.get_pointer(), t.get_pointer());
+      kernel_128_winograd_BtdB (item, sm.get_pointer(), input, t_input);
     });
   });
 
   range<2> gws2 (2*8, 36*128);
   range<2> lws2 (8, 128);
   q.submit([&] (handler &cgh) {
-    auto t = t_input.get_access<sycl_read>(cgh);
-    auto w = l_weights.get_access<sycl_read>(cgh);
-    auto i = ip.get_access<sycl_write>(cgh);
     accessor<float, 1, sycl_read_write, access::target::local> sm (8*128 + 64*128 + 8*128, cgh);
     cgh.parallel_for<class k2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
-      kernel_128_OuterProduct_128(item, sm.get_pointer(),
-        t.get_pointer(), w.get_pointer(), i.get_pointer());
+      kernel_128_OuterProduct_128(item, sm.get_pointer(), t_input, l_weights, ip);
     });
   });
 
   range<3> gws3 (128, 4*6, 4*6);
   range<3> lws3 (1, 6, 6);
   q.submit([&] (handler &cgh) {
-    auto i = ip.get_access<sycl_read>(cgh);
-    auto b = l_bnBias.get_access<sycl_read>(cgh);
-    auto s = l_bnScale.get_access<sycl_read>(cgh);
-    auto o = output.get_access<sycl_discard_write>(cgh);
     accessor<float, 1, sycl_read_write, access::target::local> sm_bias (1, cgh);
     accessor<float, 1, sycl_read_write, access::target::local> sm_scale (1, cgh);
     accessor<float, 1, sycl_read_write, access::target::local> sm_input (6*6, cgh);
     cgh.parallel_for<class k3>(nd_range<3>(gws3, lws3), [=] (nd_item<3> item) {
       kernel_128_winograd_AtIA(item,
         sm_bias.get_pointer(), sm_scale.get_pointer(), sm_input.get_pointer(),
-        i.get_pointer(), b.get_pointer(), s.get_pointer(), o.get_pointer());
+        ip, l_bnBias, l_bnScale, output);
     });
   });
 
@@ -309,10 +297,15 @@ void kernel_128(queue &q, double &time, double &ktime) {
   auto kend = std::chrono::steady_clock::now();
   ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, output, sizeof(float) * nOutput).wait();
+
+  free(input, q);
+  free(t_input, q);
+  free(l_weights, q);
+  free(l_bnBias, q);
+  free(l_bnScale, q);
+  free(ip, q);
+  free(output, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

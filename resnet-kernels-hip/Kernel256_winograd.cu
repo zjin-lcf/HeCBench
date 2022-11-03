@@ -266,9 +266,6 @@ void kernel_256(double &time, double &ktime) {
 
   hipMemcpy(result, output, nOutput<<2, hipMemcpyDeviceToHost);
 
-  auto end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
   hipFree(t_input);
   hipFree(ip);
   hipFree(input);
@@ -276,6 +273,9 @@ void kernel_256(double &time, double &ktime) {
   hipFree(l_weights);
   hipFree(l_bnScale);
   hipFree(l_bnBias);
+
+  auto end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   #ifdef DEBUG
   double s = 0;
