@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100, 9999);
 
-  double time = 0.0;
+  long time = 0;
 
   #pragma omp target data map(alloc: test[0:len]) 
   {

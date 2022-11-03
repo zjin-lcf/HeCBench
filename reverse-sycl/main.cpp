@@ -37,9 +37,9 @@ int main(int argc, char* argv[]) {
   cpu_selector dev_sel;
 #endif
 
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
   
-  buffer<int, 1> d_test (len);
+  int *d_test = malloc_device<int>(len, q);
   range<1> gws (len);
   range<1> lws (len);
 
@@ -47,27 +47,23 @@ int main(int argc, char* argv[]) {
   // bound the number of reverse operations
   std::uniform_int_distribution<int> distribution(100,9999);
 
-  double time = 0.0;
+  long time = 0;
 
   for (int i = 0; i < iteration; i++) {
     const int count = distribution(generator);
 
-    q.submit([&](handler &cgh) {
-      auto acc = d_test.get_access<sycl_discard_write>(cgh);
-      cgh.copy(gold_even, acc);
-    }).wait();
+    q.memcpy(d_test, gold_even, sizeof(int) * len);
       
     auto start = std::chrono::steady_clock::now();
 
     for (int j = 0; j < count; j++) {
       q.submit([&](handler &cgh) {
         accessor <int, 1, sycl_read_write, access::target::local> s (len, cgh);
-        auto acc = d_test.get_access<sycl_read_write>(cgh);
         cgh.parallel_for<class blockReverse>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
           int t = item.get_local_id(0);
-          s[t] = acc[t];
+          s[t] = d_test[t];
           item.barrier(access::fence_space::local_space);
-          acc[t] = s[len-t-1];
+          d_test[t] = s[len-t-1];
         });
       });
     }
@@ -76,10 +72,7 @@ int main(int argc, char* argv[]) {
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    q.submit([&](handler &cgh) {
-      auto acc = d_test.get_access<sycl_read>(cgh);
-      cgh.copy(acc, test);
-    }).wait();
+    q.memcpy(test, d_test, sizeof(int) * len).wait();
 
     if (count % 2 == 0)
       error = memcmp(test, gold_even, len*sizeof(int));
@@ -91,6 +84,8 @@ int main(int argc, char* argv[]) {
   
   printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
+ 
+  free(d_test, q);
 
   return 0;
 }
