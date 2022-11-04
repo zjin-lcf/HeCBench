@@ -102,48 +102,48 @@ int main(int argc, char * argv[])
   printf("Executing kernel for %d iterations", iterations);
   printf("-------------------------------------------\n");
 
-#pragma omp target data map (to: inputImageData[0:width*height]) \
-                        map(from: outputImageData[0:width*height])
-{
-  auto start = std::chrono::steady_clock::now();
-
-  for(int i = 0; i < iterations; i++)
+  #pragma omp target data map (to: inputImageData[0:width*height]) \
+                          map(from: outputImageData[0:width*height])
   {
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
-    for (uint y = 1; y < height - 1; y++)
-      for (uint x = 1; x < width - 1; x++) 
-      {
-        const float4 two = {2, 2, 2, 2};
+    auto start = std::chrono::steady_clock::now();
 
-        int c = x + y * width;
-        float4 i00 = convert_float4(inputImageData[c - 1 - width]);
-        float4 i01 = convert_float4(inputImageData[c - width]);
-        float4 i02 = convert_float4(inputImageData[c + 1 - width]);
+    for(int i = 0; i < iterations; i++)
+    {
+      #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
+      for (uint y = 1; y < height - 1; y++)
+        for (uint x = 1; x < width - 1; x++) 
+        {
+          const float4 two = {2, 2, 2, 2};
 
-        float4 i10 = convert_float4(inputImageData[c - 1]);
-        //float4 i11 = convert_float4(inputImageData[c]);
-        float4 i12 = convert_float4(inputImageData[c + 1]);
+          int c = x + y * width;
+          float4 i00 = convert_float4(inputImageData[c - 1 - width]);
+          float4 i01 = convert_float4(inputImageData[c - width]);
+          float4 i02 = convert_float4(inputImageData[c + 1 - width]);
 
-        float4 i20 = convert_float4(inputImageData[c - 1 + width]);
-        float4 i21 = convert_float4(inputImageData[c + width]);
-        float4 i22 = convert_float4(inputImageData[c + 1 + width]);
+          float4 i10 = convert_float4(inputImageData[c - 1]);
+          //float4 i11 = convert_float4(inputImageData[c]);
+          float4 i12 = convert_float4(inputImageData[c + 1]);
 
-        float4 Gx = i00 + two * i10 + i20 - i02  - two * i12 - i22;
+          float4 i20 = convert_float4(inputImageData[c - 1 + width]);
+          float4 i21 = convert_float4(inputImageData[c + width]);
+          float4 i22 = convert_float4(inputImageData[c + 1 + width]);
 
-        float4 Gy = i00 - i20  + two * i01 - two * i21 + i02  -  i22;
+          float4 Gx = i00 + two * i10 + i20 - i02  - two * i12 - i22;
 
-        /* taking root of sums of squares of Gx and Gy */
-        outputImageData[c] = convert_uchar4({sqrtf(Gx.x*Gx.x + Gy.x*Gy.x)/2.f,
-                                             sqrtf(Gx.y*Gx.y + Gy.y*Gy.y)/2.f,
-                                             sqrtf(Gx.z*Gx.z + Gy.z*Gy.z)/2.f,
-                                             sqrtf(Gx.w*Gx.w + Gy.w*Gy.w)/2.f});
+          float4 Gy = i00 - i20  + two * i01 - two * i21 + i02  -  i22;
+
+          /* taking root of sums of squares of Gx and Gy */
+          outputImageData[c] = convert_uchar4({sqrtf(Gx.x*Gx.x + Gy.x*Gy.x)/2.f,
+                                               sqrtf(Gx.y*Gx.y + Gy.y*Gy.y)/2.f,
+                                               sqrtf(Gx.z*Gx.z + Gy.z*Gy.z)/2.f,
+                                               sqrtf(Gx.w*Gx.w + Gy.w*Gy.w)/2.f});
+      }
     }
-  }
 
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
-}
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
+  }
 
   // reference implementation
   reference (verificationOutput, inputImageData, width, height, pixelSize);
@@ -171,12 +171,11 @@ int main(int argc, char * argv[])
     outputReference[i * 4 + 3] = verificationOutput[i].w;
   }
 
-
   // compare the results and see if they match
   if(compare(outputReference, outputDevice, imageSize))
-    printf("Passed!\n");
+    printf("PASS\n");
   else
-    printf("Failed!\n");
+    printf("FAIL\n");
 
   free(outputDevice);
   free(outputReference);
@@ -184,5 +183,4 @@ int main(int argc, char * argv[])
   free(inputImageData);
   free(outputImageData);
   return SDK_SUCCESS;
-
 }
