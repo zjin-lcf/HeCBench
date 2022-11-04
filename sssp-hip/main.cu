@@ -43,7 +43,7 @@
 #include "support/verify.h"
 
 
-// Params ---------------------------------------------------------------------
+// Params
 struct Params {
 
   int         device;
@@ -114,13 +114,18 @@ struct Params {
   }
 };
 
-// Input Data -----------------------------------------------------------------
-void read_input_size(int &n_nodes, int &n_edges, const Params &p) {
+// Input Data
+int read_input_size(int &n_nodes, int &n_edges, const Params &p) {
   FILE *fp = fopen(p.file_name, "r");
+  if (fp == NULL) {
+    printf("Error: failed to read file %s. Exit\n", p.file_name);
+    return -1;
+  }
+    
   fscanf(fp, "%d", &n_nodes);
   fscanf(fp, "%d", &n_edges);
-  if(fp)
-    fclose(fp);
+  if(fp) fclose(fp);
+  return 0;
 }
 
 void read_input(int &source, Node *&h_nodes, Edge *&h_edges, const Params &p) {
@@ -159,7 +164,7 @@ void read_input(int &source, Node *&h_nodes, Edge *&h_edges, const Params &p) {
     fclose(fp);
 }
 
-// CUDA kernel ------------------------------------------------------------------------------------------
+// GPU kernel
 __global__ void SSSP_gpu(
     const Node *__restrict__ graph_nodes_av,
     const Edge *__restrict__ graph_edges_av,
@@ -281,7 +286,7 @@ __global__ void SSSP_gpu(
   }
 }
 
-// Main ------------------------------------------------------------------------------------------
+// Main
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
@@ -289,7 +294,9 @@ int main(int argc, char **argv) {
 
   // Allocate
   int n_nodes, n_edges;
-  read_input_size(n_nodes, n_edges, p);
+  int status = read_input_size(n_nodes, n_edges, p);
+  if (status == -1) return 1;
+
   timer.start("Host/Device Allocation");
   Node * h_nodes = (Node *)malloc(sizeof(Node) * n_nodes);
   Node * d_nodes;
