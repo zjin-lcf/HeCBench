@@ -77,4 +77,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) lp1.mtx
+	./$(program) lp1.mtx 2000

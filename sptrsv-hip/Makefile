@@ -59,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sptrsv-sycl/lp1.mtx 100
+	./$(program) ../sptrsv-sycl/lp1.mtx 2000
