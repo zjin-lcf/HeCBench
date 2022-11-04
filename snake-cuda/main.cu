@@ -96,7 +96,7 @@ int main(int argc, const char * const argv[])
   int tokenIndex=1;
   fp = fopen(argv[2], "r");
   if (!fp){
-    printf("Sorry, the file does not exist or you do not have access permission\n");
+    printf("The file %s does not exist or you do not have access permission\n", argv[2]);
     return 0;
   }
   for(int this_read = 0; this_read < NumReads; this_read++) {
