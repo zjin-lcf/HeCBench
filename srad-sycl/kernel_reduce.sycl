@@ -1,7 +1,7 @@
 int bx = item.get_group(0);              // get current horizontal block index
 int tx = item.get_local_id(0);           // get current horizontal thread index
 int ei = (bx*NUMBER_THREADS)+tx;         // unique thread id, more threads than actual elements !!!
-int nf = NUMBER_THREADS-(blocks2_work_size*NUMBER_THREADS-no);        // number of elements assigned to last block
+int nf = NUMBER_THREADS-(blocks_work_size2*NUMBER_THREADS-no);        // number of elements assigned to last block
 int df = 0;                              // divisibility factor for the last block
 
 // counters
@@ -39,7 +39,7 @@ if(nf == NUMBER_THREADS){
 // reduction of sums if last block is not full (common case)
 else{ 
   // for full blocks (all except for last block)
-  if(bx != (blocks2_work_size - 1)){                      //
+  if(bx != (blocks_work_size2 - 1)){                      //
     // sum of every 2, 4, ..., NUMBER_THREADS elements
     for(i=2; i<=NUMBER_THREADS; i=2*i){                //
       // sum of elements
