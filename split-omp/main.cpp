@@ -132,58 +132,58 @@ int main(int argc, char** argv) {
   unsigned threads = 128;
   unsigned teams = N/4/threads;
 
-#pragma omp target data map(tofrom: out[0:N]) 
-{
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < repeat; i++) {
-    #pragma omp target teams num_teams(teams) thread_limit(threads)
-    {
-      unsigned int numtrue[1];
-      unsigned int sMem[512];
-      #pragma omp parallel 
+  #pragma omp target data map(tofrom: out[0:N]) 
+  {
+    auto start = std::chrono::steady_clock::now();
+  
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target teams num_teams(teams) thread_limit(threads)
       {
-        int localId = omp_get_thread_num();
-        int localSize = omp_get_num_threads();
-        int globalId = omp_get_team_num() * localSize + localId;
-        uint4 key = reinterpret_cast<uint4*>(out)[globalId];
-
-        for(unsigned int shift = startbit; shift < (startbit + nbits); ++shift)
+        unsigned int numtrue[1];
+        unsigned int sMem[512];
+        #pragma omp parallel 
         {
-          uint4 lsb;
-          lsb.x = !((key.x >> shift) & 0x1);
-          lsb.y = !((key.y >> shift) & 0x1);
-          lsb.z = !((key.z >> shift) & 0x1);
-          lsb.w = !((key.w >> shift) & 0x1);
-
-          uint4 r;
-
-          r = rank4(lsb, sMem, numtrue);
-
-          // This arithmetic strides the ranks across 4 CTA_SIZE regions
-          sMem[(r.x & 3) * localSize + (r.x >> 2)] = key.x;
-          sMem[(r.y & 3) * localSize + (r.y >> 2)] = key.y;
-          sMem[(r.z & 3) * localSize + (r.z >> 2)] = key.z;
-          sMem[(r.w & 3) * localSize + (r.w >> 2)] = key.w;
-          #pragma omp barrier
-
-             // The above allows us to read without 4-way bank conflicts:
-          key.x = sMem[localId];
-          key.y = sMem[localId +     localSize];
-          key.z = sMem[localId + 2 * localSize];
-          key.w = sMem[localId + 3 * localSize];
-
-          #pragma omp barrier
+          int localId = omp_get_thread_num();
+          int localSize = omp_get_num_threads();
+          int globalId = omp_get_team_num() * localSize + localId;
+          uint4 key = reinterpret_cast<uint4*>(out)[globalId];
+  
+          for(unsigned int shift = startbit; shift < (startbit + nbits); ++shift)
+          {
+            uint4 lsb;
+            lsb.x = !((key.x >> shift) & 0x1);
+            lsb.y = !((key.y >> shift) & 0x1);
+            lsb.z = !((key.z >> shift) & 0x1);
+            lsb.w = !((key.w >> shift) & 0x1);
+  
+            uint4 r;
+  
+            r = rank4(lsb, sMem, numtrue);
+  
+            // This arithmetic strides the ranks across 4 CTA_SIZE regions
+            sMem[(r.x & 3) * localSize + (r.x >> 2)] = key.x;
+            sMem[(r.y & 3) * localSize + (r.y >> 2)] = key.y;
+            sMem[(r.z & 3) * localSize + (r.z >> 2)] = key.z;
+            sMem[(r.w & 3) * localSize + (r.w >> 2)] = key.w;
+            #pragma omp barrier
+  
+               // The above allows us to read without 4-way bank conflicts:
+            key.x = sMem[localId];
+            key.y = sMem[localId +     localSize];
+            key.z = sMem[localId + 2 * localSize];
+            key.w = sMem[localId + 3 * localSize];
+  
+            #pragma omp barrier
+          }
+          reinterpret_cast<uint4*>(out)[globalId] = key;
         }
-        reinterpret_cast<uint4*>(out)[globalId] = key;
       }
     }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
-}
  
   bool check = verify(out, keys, threads, N);
   if (check)
