@@ -196,6 +196,8 @@ int main(int argc, char* argv[])
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaMemcpy(out, d_tempKeys, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+  cudaFree(d_keys);
+  cudaFree(d_tempKeys);
 
   bool check = verify(out, keys, threads, N);
   if (check)
@@ -203,8 +205,6 @@ int main(int argc, char* argv[])
   else 
     printf("FAIL\n");
 
-  cudaFree(d_keys);
-  cudaFree(d_tempKeys);
   free(keys);
   free(out);
 

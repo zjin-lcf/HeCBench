@@ -44,12 +44,12 @@ uint scanwarp(nd_item<1> &item, uint val, volatile uint* sData, const int maxlev
 // scan4 scans 4*RadixSort::CTA_SIZE numElements in a block (4 per thread), using 
 // a warp-scan algorithm
 //----------------------------------------------------------------------------
-cl::sycl::uint4 scan4(nd_item<1> item, const cl::sycl::uint4 idata, uint* ptr)
+sycl::uint4 scan4(nd_item<1> item, const sycl::uint4 idata, uint* ptr)
 {    
 
   uint idx = item.get_local_id(0);
 
-  cl::sycl::uint4 val4 = idata;
+  sycl::uint4 val4 = idata;
   uint sum[3];
   sum[0] = val4.x();
   sum[1] = val4.y() + sum[0];
@@ -81,12 +81,12 @@ cl::sycl::uint4 scan4(nd_item<1> item, const cl::sycl::uint4 idata, uint* ptr)
   return val4;
 }
 
-cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem, local_ptr<uint> numtrue)
+sycl::uint4 rank4(nd_item<1> &item, const sycl::uint4 preds, uint* sMem, local_ptr<uint> numtrue)
 {
   int localId = item.get_local_id(0);
   int localSize = item.get_local_range(0);
 
-  cl::sycl::uint4 address = scan4(item, preds, sMem);
+  sycl::uint4 address = scan4(item, preds, sMem);
 
   if (localId == localSize - 1) 
   {
@@ -94,7 +94,7 @@ cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem,
   }
   item.barrier(access::fence_space::local_space);
 
-  cl::sycl::uint4 rank;
+  sycl::uint4 rank;
   int idx = localId*4;
   rank.x() = (preds.x()) ? address.x() : numtrue[0] + idx - address.x();
   rank.y() = (preds.y()) ? address.y() : numtrue[0] + idx + 1 - address.y();
@@ -106,31 +106,30 @@ cl::sycl::uint4 rank4(nd_item<1> &item, const cl::sycl::uint4 preds, uint* sMem,
 
 void radixSortBlocksKeysK(
     nd_item<1> &item,
-    global_ptr<uint> keysIn,
-    global_ptr<uint> keysOut,
+    uint*__restrict keysIn, 
+    uint*__restrict keysOut,
     const uint nbits,
     const uint startbit,
-    local_ptr<uint> sMem,
-    local_ptr<uint> numtrue)
+    uint*__restrict sMem,
+    uint*__restrict numtrue)
 {
   int globalId = item.get_global_id(0);
   int localId = item.get_local_id(0);
   int localSize = item.get_local_range(0);
 
-  vec<uint, 4> key;
-  key.load(globalId, keysIn);
+  uint4 key = reinterpret_cast<uint4*>(keysIn)[globalId];
 
   item.barrier(access::fence_space::local_space);
 
   for(uint shift = startbit; shift < (startbit + nbits); ++shift)
   {
-    cl::sycl::uint4 lsb;
+    sycl::uint4 lsb;
     lsb.x() = !((key.x() >> shift) & 0x1);
     lsb.y() = !((key.y() >> shift) & 0x1);
     lsb.z() = !((key.z() >> shift) & 0x1);
     lsb.w() = !((key.w() >> shift) & 0x1);
 
-    cl::sycl::uint4 r;
+    sycl::uint4 r;
 
     r = rank4(item, lsb, sMem, numtrue);
 
@@ -150,8 +149,7 @@ void radixSortBlocksKeysK(
     item.barrier(access::fence_space::local_space);
   }
 
-  //keysOut[globalId] = key;
-  key.store(globalId, keysOut);
+  reinterpret_cast<uint4*>(keysOut)[globalId] = key;  
 }
 
 int main(int argc, char** argv) {
@@ -172,16 +170,17 @@ int main(int argc, char** argv) {
   const unsigned threads = 128;
   const unsigned teams = N/4/threads;
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<unsigned int, 1> d_keys (keys, N); 
-  buffer<unsigned int, 1> d_tempKeys (out, N); 
+  uint *d_keys = malloc_device<uint>(N, q);
+  q.memcpy(d_keys, keys, sizeof(uint) * N);
+
+  uint *d_tempKeys = malloc_device<uint>(N, q);
 
   range<1> gws (teams * threads);
   range<1> lws (threads);
@@ -191,12 +190,10 @@ int main(int argc, char** argv) {
 
   for (int i = 0; i < repeat; i++)
     q.submit([&] (handler &cgh) {
-      auto keysIn = d_keys.get_access<sycl_read>(cgh);
-      auto keysOut = d_tempKeys.get_access<sycl_discard_write>(cgh);
       accessor<unsigned int, 1, sycl_read_write, access::target::local> sMem(4*threads, cgh);
       accessor<unsigned int, 1, sycl_read_write, access::target::local> numtrue(1, cgh);
       cgh.parallel_for<class radixSort_blocksKeys>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        radixSortBlocksKeysK(item, keysIn.get_pointer(), keysOut.get_pointer(), 
+        radixSortBlocksKeysK(item, d_keys, d_tempKeys,
                              nbits, startbit, sMem.get_pointer(), numtrue.get_pointer());
       });
     });
@@ -206,7 +203,9 @@ int main(int argc, char** argv) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  }
+  q.memcpy(out, d_tempKeys, sizeof(uint) * N).wait();
+  free(d_tempKeys, q);
+  free(d_keys, q);
  
   bool check = verify(out, keys, threads, N);
   if (check)
