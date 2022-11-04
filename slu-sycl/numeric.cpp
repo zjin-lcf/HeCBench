@@ -356,7 +356,6 @@ void RL_onecol_cleartmpMem(
 
 void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bool PERTURB)
 {
-  float time;
   unsigned n = A_sym.n;
   unsigned nnz = A_sym.nnz;
   unsigned num_lev = A_sym.num_lev;
@@ -402,9 +401,9 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
   }
 
   q.wait();
+
   Timer t;
   double utime;
-
   t.start();
   for (unsigned i = 0; i < num_lev; ++i)
   {
@@ -707,37 +706,38 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
                 });
               });
 
-              q.submit([&] (handler &cgh) {
-                auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl_read>(cgh);
-                auto sym_r_idx = sym_r_idx_dev.get_access<sycl_read>(cgh);
-                auto l_col_ptr = l_col_ptr_dev.get_access<sycl_read>(cgh);
-                auto tmp = tmpMem.get_access<sycl_write>(cgh);
-                cgh.parallel_for<class clearMem>(nd_range<1>(256, 256), [=] (nd_item<1> item) {
-                  RL_onecol_cleartmpMem(
-                    item,
-                    sym_c_ptr.get_pointer(),
-                    sym_r_idx.get_pointer(),
-                    l_col_ptr.get_pointer(),
-                    currentCol,
-                    tmp.get_pointer(),
-                    j,
-                    n);
-                });
+            q.submit([&] (handler &cgh) {
+              auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl_read>(cgh);
+              auto sym_r_idx = sym_r_idx_dev.get_access<sycl_read>(cgh);
+              auto l_col_ptr = l_col_ptr_dev.get_access<sycl_read>(cgh);
+              auto tmp = tmpMem.get_access<sycl_write>(cgh);
+              cgh.parallel_for<class clearMem>(nd_range<1>(256, 256), [=] (nd_item<1> item) {
+                RL_onecol_cleartmpMem(
+                  item,
+                  sym_c_ptr.get_pointer(),
+                  sym_r_idx.get_pointer(),
+                  l_col_ptr.get_pointer(),
+                  currentCol,
+                  tmp.get_pointer(),
+                  j,
+                  n);
               });
+            });
           }
         }
       }
     }
   }
 
+  q.wait();
+  t.elapsedUserTime(utime);
+  out << "Total LU kernel execution time: " << utime << " ms" << std::endl;
+
   //copy LU val back to main mem
   q.submit([&] (handler &cgh) {
     auto acc = val_dev.get_access<sycl_read>(cgh);
     cgh.copy(acc, &(A_sym.val[0]));
   }).wait();
-
-  t.elapsedUserTime(utime);
-  out << "Total LU kernel loop time: " << utime << " ms" << std::endl;
 
 #ifdef VERIFY
   //check NaN elements
@@ -747,6 +747,6 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
       err_find++;
 
   if (err_find != 0)
-    err << "LU data check: " << " NaN found!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+    err << "LU data check: NaN found!!" << std::endl;
 #endif
 }

@@ -563,11 +563,12 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
       }
     }
   }
+  hipDeviceSynchronize();
+  t.elapsedUserTime(utime);
+  out << "Total LU kernel execution time: " << utime << " ms" << std::endl;
 
   //copy LU val back to main mem
   hipMemcpy(&(A_sym.val[0]), val_dev, nnz * sizeof(REAL), hipMemcpyDeviceToHost);
-  t.elapsedUserTime(utime);
-  out << "Total LU kernel loop time: " << utime << " ms" << std::endl;
 
 #ifdef VERIFY
   //check NaN elements
@@ -577,7 +578,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
       err_find++;
 
   if (err_find != 0)
-    err << "LU data check: " << " NaN found!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+    err << "LU data check: NaN found!!" << std::endl;
 #endif
 
   hipFree(sym_c_ptr_dev);

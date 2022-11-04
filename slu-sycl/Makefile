@@ -35,7 +35,7 @@ SLU_INC = -I$(SLU_PATH)/../include \
           -I$(SLU_PATH)/nicslu/util
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall $(SLU_INC)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall $(SLU_INC) -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = -lpthread
