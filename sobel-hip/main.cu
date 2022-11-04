@@ -129,6 +129,8 @@ int main(int argc, char * argv[])
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 
   hipMemcpy(outputImageData, outputImageBuffer, imageSize, hipMemcpyDeviceToHost);
+  hipFree(inputImageBuffer);
+  hipFree(outputImageBuffer);
 
   // reference implementation
   reference (verificationOutput, inputImageData, width, height, pixelSize);
@@ -167,7 +169,5 @@ int main(int argc, char * argv[])
   free(verificationOutput);
   free(inputImageData);
   free(outputImageData);
-  hipFree(inputImageBuffer);
-  hipFree(outputImageBuffer);
   return SDK_SUCCESS;
 }

@@ -106,47 +106,48 @@ int main(int argc, char * argv[])
   // initialize the data
   memset(verificationOutput, 0, imageSize);
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel);
 
-    // Create memory object for input Image
-    buffer<uchar4, 1> inputImageBuffer (inputImageData, width * height);
-    buffer<uchar4, 1> outputImageBuffer (outputImageData, width * height);
+  // Create memory object for input Image
+  uchar4 *inputImageBuffer = malloc_device<uchar4>(width * height, q);
+  q.memcpy(inputImageBuffer, inputImageData, sizeof(uchar4) * width * height);
 
-    // Enqueue a kernel run call.
-    const int blockSizeX = 16;
-    const int blockSizeY = 16;
-    range<2> gws (height, width);
-    range<2> lws (blockSizeY, blockSizeX);
+  uchar4 *outputImageBuffer = malloc_device<uchar4>(width * height, q);
 
-    printf("Executing kernel for %d iterations", iterations);
-    printf("-------------------------------------------\n");
+  // Enqueue a kernel run call.
+  const int blockSizeX = 16;
+  const int blockSizeY = 16;
+  range<2> gws (height, width);
+  range<2> lws (blockSizeY, blockSizeX);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  printf("Executing kernel for %d iterations", iterations);
+  printf("-------------------------------------------\n");
 
-    for(int i = 0; i < iterations; i++)
-    {
-      q.submit([&] (handler &cgh) {
-        auto inputImage = inputImageBuffer.get_access<sycl_read>(cgh);
-        auto outputImage = outputImageBuffer.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class sobel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          sobel_filter(inputImage.get_pointer(), 
-                       outputImage.get_pointer(), width, height, item);
-        });
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for(int i = 0; i < iterations; i++)
+  {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class sobel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        sobel_filter(inputImageBuffer, outputImageBuffer, width, height, item);
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
+
+  q.memcpy(outputImageData, outputImageBuffer, sizeof(uchar4) * width * height).wait();
+  free(outputImageBuffer, q);
+  free(inputImageBuffer, q);
 
   // reference implementation
   reference (verificationOutput, inputImageData, width, height, pixelSize);
@@ -174,12 +175,11 @@ int main(int argc, char * argv[])
     outputReference[i * 4 + 3] = verificationOutput[i].w();
   }
 
-
   // compare the results and see if they match for the given input image
   if(compare(outputReference, outputDevice, imageSize))
-    printf("Passed!\n");
+    printf("PASS\n");
   else
-    printf("Failed!\n");
+    printf("FAIL\n");
 
   free(outputDevice);
   free(outputReference);
