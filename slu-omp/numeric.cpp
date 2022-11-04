@@ -629,10 +629,10 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
       }
     }
   }
+  t.elapsedUserTime(utime);
+  out << "Total LU kernel execution time: " << utime << " ms" << std::endl;
 
   #pragma omp target update from (val_dev[0:nnz])
-  t.elapsedUserTime(utime);
-  out << "Total LU kernel loop time: " << utime << " ms" << std::endl;
 
 #ifdef VERIFY
   //check NaN elements
@@ -642,7 +642,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
       err_find++;
 
   if (err_find != 0)
-    err << "LU data check: " << " NaN found!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+    err << "LU data check: NaN found!!" << std::endl;
 #endif
 
   } // omp
