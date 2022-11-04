@@ -80,6 +80,8 @@ void verifyTransposeMatrix(const float *TransposeMatrix,
     std::cout << "FAIL\n";
 }
 
+#define __shfl(v, d)  __shfl_sync(0xffffffff, v, d)
+#define __shfl_xor(v, d)  __shfl_xor_sync(0xffffffff, v, d)
 
 //==================================================================================
 // Broadcast
@@ -171,7 +173,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
   verifyBroadcast(out, 8);
@@ -184,7 +187,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
   verifyBroadcast(out, 16);
@@ -197,7 +201,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
   verifyBroadcast(out, 32);
@@ -211,7 +216,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
   verifyBroadcast(out, 8, PATTERN);
@@ -224,7 +230,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
 
@@ -238,7 +245,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   cudaMemcpy(out, d_out, sizeof(int) * BUF_SIZE, cudaMemcpyDeviceToHost);
   verifyBroadcast(out, 32, PATTERN);
@@ -275,7 +283,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   cudaMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), cudaMemcpyDeviceToHost);
@@ -290,7 +299,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   cudaMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), cudaMemcpyDeviceToHost);
@@ -305,7 +315,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   cudaMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), cudaMemcpyDeviceToHost);

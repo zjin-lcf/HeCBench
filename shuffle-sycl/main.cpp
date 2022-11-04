@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 #else
   cpu_selector dev_sel;   // CPU support may be unavailable for the shuffle instructions
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   std::cout << "Broadcast using the shuffle xor function (subgroup sizes 8, 16, and 32) \n";
   int *out = (int *)malloc(sizeof(int) * BUF_SIZE);
@@ -107,8 +107,9 @@ int main(int argc, char* argv[]) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg8_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = item.get_local_id(0) & 0x7;
+        auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
-          value += item.get_sub_group().shuffle_xor(value, mask);
+          value += sg.shuffle_xor(value, mask);
         out_acc[item.get_global_id(0)] = value;
       });
     });
@@ -121,8 +122,9 @@ int main(int argc, char* argv[]) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = item.get_local_id(0) & 0x7;
+        auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
-          value += item.get_sub_group().shuffle_xor(value, mask);
+          value += sg.shuffle_xor(value, mask);
         out_acc[item.get_global_id(0)] = value;
       });
     });
@@ -130,7 +132,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg8): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -147,8 +150,9 @@ int main(int argc, char* argv[]) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = item.get_local_id(0) & 0xf;
+        auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0xf; mask *= 2)
-          value += item.get_sub_group().shuffle_xor(value, mask);
+          value += sg.shuffle_xor(value, mask);
         out_acc[item.get_global_id(0)] = value;
       });
     });
@@ -156,7 +160,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg16): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -172,6 +177,7 @@ int main(int argc, char* argv[]) {
       auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class bc_shflxor_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int value = item.get_local_id(0) & 0x1f;
+        auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x1f; mask *= 2)
           value += item.get_sub_group().shuffle_xor(value, mask);
         out_acc[item.get_global_id(0)] = value;
@@ -181,7 +187,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg32): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -207,7 +214,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg8): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -232,7 +240,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg16): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -257,7 +266,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg32): " << time * 1e-9f << "(s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = d_out.get_access<sycl_read>(cgh);
@@ -304,7 +314,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat2 << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
@@ -333,7 +344,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat2 << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
@@ -362,7 +374,8 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat2 << "(us)\n";
 
   q.submit([&] (handler &cgh) {
     auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);

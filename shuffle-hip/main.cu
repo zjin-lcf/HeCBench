@@ -171,7 +171,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
   verifyBroadcast(out, 8);
@@ -184,7 +185,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
   verifyBroadcast(out, 16);
@@ -197,7 +199,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_xor_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
   verifyBroadcast(out, 32);
@@ -211,7 +214,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
   verifyBroadcast(out, 8, PATTERN);
@@ -224,7 +228,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
 
@@ -238,7 +243,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (bcast_shfl_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat << " (us)\n";
 
   hipMemcpy(out, d_out, sizeof(int) * BUF_SIZE, hipMemcpyDeviceToHost);
   verifyBroadcast(out, 32, PATTERN);
@@ -275,7 +281,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg8): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 8): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   hipMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), hipMemcpyDeviceToHost);
@@ -290,7 +297,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg16): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 16): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   hipMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), hipMemcpyDeviceToHost);
@@ -305,7 +313,8 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-  std::cout << "Kernel time (transpose_shfl_sg32): " << time * 1e-9f << " (s)\n";
+  std::cout << "Average kernel time (subgroup size = 32): "
+            << time * 1e-3f / repeat2 << " (us)\n";
 
   // Memory transfer from device to host
   hipMemcpy(TransposeMatrix, gpuTransposeMatrix, total * sizeof(float), hipMemcpyDeviceToHost);
