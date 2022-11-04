@@ -76,7 +76,7 @@ __global__ void benchmark_shmem(float4 *g_data){
                                     shm_buffer[tid+5*blockDim.x]);
 }
 
-void shmembenchGPU(double *c, const long size, const int n) {
+void shmembenchGPU(double *c, const long size, const int repeat) {
   const int TOTAL_BLOCKS = size/(BLOCK_SIZE);
 
   double *cd;
@@ -86,12 +86,14 @@ void shmembenchGPU(double *c, const long size, const int n) {
   dim3 dimGrid_f4(TOTAL_BLOCKS/4, 1, 1);
 
   auto start = high_resolution_clock::now();
-  for (int i = 0; i < n; i++)
+
+  for (int i = 0; i < repeat; i++)
     benchmark_shmem<<< dimGrid_f4, dimBlock >>>((float4*)cd);
+
   cudaDeviceSynchronize();
   auto end = high_resolution_clock::now();
-  auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
-  printf("Average kernel execution time : %8.2f (ns)\n", time_shmem_128b);
+  auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)repeat;
+  printf("Average kernel execution time : %f (ms)\n", time_shmem_128b * 1e-6);
 
   // Copy results back to host memory
   cudaMemcpy(c, cd, size*sizeof(double), cudaMemcpyDeviceToHost);

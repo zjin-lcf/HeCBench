@@ -92,7 +92,7 @@ void shmembenchGPU(double *c, const long size, const int n) {
   hipDeviceSynchronize();
   auto end = high_resolution_clock::now();
   auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
-  printf("Average kernel execution time : %8.2f (ns)\n", time_shmem_128b);
+  printf("Average kernel execution time : %f (ms)\n", time_shmem_128b * 1e-6);
 
   // Copy results back to host memory
   hipMemcpy(c, cd, size*sizeof(double), hipMemcpyDeviceToHost);
