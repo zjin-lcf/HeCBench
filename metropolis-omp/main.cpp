@@ -132,11 +132,6 @@ int main(int argc, char **argv){
   for (int k = 0; k < rpool; ++k) {
     // offset and sequence approach
     kernel_gpupcg_setup(pcga + k * N/4, pcgb + k * N/4, N/4, seed + N/4 * k, k);
-
-#ifdef DEBUG
-    printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
-            0, N, N/4, R, seed + (N/4 * k), k);
-#endif
   }
 
   /* host memory setup for each replica */
@@ -169,12 +164,6 @@ int main(int argc, char **argv){
   FILE *fw = fopen("trials.dat", "w");
   fprintf(fw, "trial  av  min max\n");
 
-#ifdef DEBUG
-  /* print the beginning temp */
-  printarrayfrag(aT, ar, "Initial temp set:\naT");
-  printf("\n\n");
-#endif
-
   double total_ktime = 0.0;
 
   double start = rtclock();
@@ -188,11 +177,6 @@ int main(int argc, char **argv){
     /* distribution for H */
     kernel_reset_random_gpupcg(dH, N, pcga, pcgb);  
     
-#ifdef DEBUG
-    #pragma omp target update from(dH[0:N])
-    for (int n = 0; n < N; n++) printf("dH %d %d\n", n, dH[n]);
-#endif
-
     /* reset ex counters */
     reset_array(aex, rpool, 0.0f);
 
@@ -202,29 +186,10 @@ int main(int argc, char **argv){
     /* reset gpu data with a new seed from the sequential PRNG */
     seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
-#ifdef DEBUG
-    printf("new seed [%lu]\n", seed);
-#endif
-
     for (int k = 0; k < ar; ++k) {
       kernel_reset<int>(mdlat + k * N, N, 1);
       kernel_gpupcg_setup(pcga + k * N/4, pcgb + k * N/4, N/4, seed + (uint64_t)(N/4 * k), k);
     }
-#ifdef DEBUG
-      #pragma omp target update from (pcga[0:ar*N/4])
-      #pragma omp target update from (pcgb[0:ar*N/4])
-
-      for (int k = 0; k < ar; ++k) {
-        uint64_t *t = pcga + k * N/4;
-        for (int i = 0; i < N/4; i++)
-          printf("pcga: %d %d %lu\n", k, i, t[i]);
-
-        t = pcgb + k * N/4;
-        for (int i = 0; i < N/4; i++)
-          printf("pcgb: %d %d %lu\n", k, i, t[i]);
-      }
-#endif
-
     /* parallel tempering */
     for(int p = 0; p < apts; ++p) {
 
@@ -236,42 +201,10 @@ int main(int argc, char **argv){
           kernel_metropolis(N, L, mdlat + k*N, dH, h, -2.0f/aT[atrs[k].i], 
                             pcga + k * N/4, pcgb + k * N/4, 0);
         }
-#ifdef DEBUG
-        #pragma omp target update from (pcga[0:ar*N/4])
-        #pragma omp target update from (pcgb[0:ar*N/4])
-        #pragma omp target update from (mdlat[0:ar*N])
-
-        for (int k = 0; k < ar; ++k) {
-          uint64_t *m = pcga + k * N/4;
-          uint64_t *n = pcgb + k * N/4;
-          int *p = mdlat + k * N;
-          for (int i = 0; i < N/4; i++)
-            printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, m[i], n[i]);
-          for (int i = 0; i < N; i++) 
-            printf("black replica: %d %d %d\n", k, i, p[i]); 
-        }
-#endif
-
         for(int k = 0; k < ar; ++k) {
           kernel_metropolis(N, L, mdlat + k*N, dH, h, -2.0f/aT[atrs[k].i],
                             pcga + k * N/4, pcgb + k * N/4, 1);
         }
-
-#ifdef DEBUG
-        #pragma omp target update from (pcga[0:ar*N/4])
-        #pragma omp target update from (pcgb[0:ar*N/4])
-        #pragma omp target update from (mdlat[0:ar*N])
-
-        for (int k = 0; k < ar; ++k) {
-          uint64_t *m = pcga + k * N/4;
-          uint64_t *n = pcgb + k * N/4;
-          int *p = mdlat + k * N;
-          for (int i = 0; i < N/4; i++)
-            printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, m[i], n[i]);
-          for (int i = 0; i < N; i++) 
-            printf("white replica: %d %d %d\n", k, i, p[i]); 
-        }
-#endif
       }
 
       double k_end = rtclock();
@@ -303,10 +236,6 @@ int main(int argc, char **argv){
           (aexE[arts[fleft.i].i] - aexE[arts[fnow.i].i]);
 
         double randme = gpu_rand01(&hpcgs, &hpcgi);
-
-#ifdef DEBUG
-        printf("delta=%f exp(-delta) = %f      rand = %f\n", delta, exp(-delta), randme);
-#endif
 
         if( delta < 0.0 || randme < exp(-delta) ){
           //adapt_swap(s, fnow, fleft);

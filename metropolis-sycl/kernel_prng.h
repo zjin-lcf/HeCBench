@@ -58,10 +58,12 @@
 
 #include <limits.h>
 #include <inttypes.h>
+#include <sycl/sycl.hpp>
 
 #define INV_UINT_MAX 2.3283064e-10f
 
 inline uint32_t gpu_pcg32_random_r(uint64_t *state, uint64_t *inc);
+
 
 inline void gpu_pcg32_srandom_r(uint64_t *state, uint64_t *inc, uint64_t initstate, uint64_t initseq)
 {
@@ -82,15 +84,15 @@ inline uint32_t gpu_pcg32_random_r(uint64_t *state, uint64_t *inc)
   return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
 }
 
+
 inline float gpu_rand01(uint64_t *state, uint64_t *inc)
 {
   return (float) gpu_pcg32_random_r(state, inc) * INV_UINT_MAX;
 }
 
 
-
-
 // Murmur hash 64-bit
+
 uint64_t mmhash64( const void * key, int len, unsigned int seed )
 {
   const uint64_t m = 0xc6a4a7935bd1e995;
@@ -130,8 +132,9 @@ uint64_t mmhash64( const void * key, int len, unsigned int seed )
   return h;
 } 
 
+
 void kernel_gpupcg_setup(uint64_t *state, uint64_t *inc, int N, 
-                         uint64_t seed, uint64_t seq, nd_item<1> &item)
+                         uint64_t seed, uint64_t seq, sycl::nd_item<1> &item)
 {
   int x = item.get_global_id(0);
   if( x < N ){
@@ -142,24 +145,4 @@ void kernel_gpupcg_setup(uint64_t *state, uint64_t *inc, int N,
     gpu_pcg32_srandom_r(&state[x], &inc[x], hseed, hseq);
   }
 }
-
-void pcg_setup(queue &q,
-               range<1> gws, 
-               range<1> lws, 
-               buffer<uint64_t, 1> &pcga,
-               buffer<uint64_t, 1> &pcgb,
-               const int N, 
-               const uint64_t seed, 
-               const uint64_t seq)
-{
-  q.submit([&] (handler &cgh) {
-    auto state = pcga.get_access<sycl_read_write>(cgh);
-    auto inc = pcgb.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class setup_pcg>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      kernel_gpupcg_setup(state.get_pointer(), inc.get_pointer(), N, seed, seq, item);
-    });
-  });
-}
-
 #endif
-
