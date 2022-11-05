@@ -23,12 +23,14 @@
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
+#include <sycl/sycl.hpp>
 #include "utils.h"
 #include "kernel_prng.h"
 #include "kernel_metropolis.h"
 #include "kernel_reduction.h"
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 
   int L         = 32;
   int R         = 1;
@@ -93,35 +95,34 @@ int main(int argc, char **argv){
   seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::gpu_selector dev_sel;
 #else
-  cpu_selector dev_sel;
+  sycl::cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   /* build the space of computation for the lattices */
-  range<3> mc_lws (BZ, BY / 2, BX);
-  range<3> mc_gws ((L + BZ - 1) / BZ * BZ, (L + BY - 1) / (2 * BY) * BY/2, (L + BX - 1) / BX * BX);
-
-  range<1> reset_lws (BLOCKSIZE1D);
-  range<1> reset_gws  ((N + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
-  range<1> reset_gws2 ((ar + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
+  sycl::range<3> mc_lws(BZ, BY / 2, BX);
+  sycl::range<3> mc_gws((L + BZ - 1) / BZ * BZ, (L + BY - 1) / (2 * BY) * (BY/2),
+                        (L + BX - 1) / BX * BX);
+  sycl::range<1> reset_lws(BLOCKSIZE1D);
+  sycl::range<1> reset_gws((N + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
+  sycl::range<1> reset_gws2((ar + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
 
   /* build the space of computation for random numbers and lattice simulation */
-  range<1> prng_lws(BLOCKSIZE1D);
-  range<1> prng_gws((N / 4 + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
+  sycl::range<1> prng_lws(BLOCKSIZE1D);
+  sycl::range<1> prng_gws(((N / 4) + BLOCKSIZE1D - 1) / BLOCKSIZE1D * BLOCKSIZE1D);
 
-  range<3> redenergy_lws(BZ, BY, BX);
-  range<3> redenergy_gws((L + BZ - 1) / BZ * BZ, 
-                         (L + BY - 1) / BY * BY, 
-                         (L + BX - 1) / BX * BX); 
+  sycl::range<3> redenergy_lws(BZ, BY, BX);
+  sycl::range<3> redenergy_gws((L + BZ - 1) / BZ * BZ,
+                               (L + BY - 1) / BY * BY,
+                               (L + BX - 1) / BX * BX);
 
   /* T is a sorted temp array */
   float* T = (float*)malloc(sizeof(float) * Ra);
 
   /* allocate the replica pool */
-  std::vector<buffer<int, 1>> mdlat;
-  
+  int** mdlat = (int**) malloc(sizeof(int *) * rpool);
   /* per temperature counter array */
   float* aex = (float*) malloc(sizeof(float) * rpool);
   /* per temperature counter array */
@@ -130,8 +131,8 @@ int main(int argc, char **argv){
   float* aexE = (float*)malloc(sizeof(float) * rpool);
 
   /* PRNG states volume, one state per thread */
-  std::vector<buffer<uint64_t, 1>> apcga;
-  std::vector<buffer<uint64_t, 1>> apcgb;
+  uint64_t** apcga = (uint64_t**)malloc(sizeof(uint64_t*) * rpool);
+  uint64_t** apcgb = (uint64_t**)malloc(sizeof(uint64_t*) * rpool);
 
   /* fragmented indices for replicas temperature sorted */
   findex_t* arts = (findex_t*)malloc(sizeof(findex_t) * rpool);
@@ -141,22 +142,27 @@ int main(int argc, char **argv){
   float* aT = (float*)malloc(sizeof(float) * rpool);
 
   /* malloc device magnetic field */
-  buffer<int, 1> dH (N);
+  int* dH = sycl::malloc_device<int>(N, q);
 
   /* malloc device energy reductions */
-  buffer<float, 1> dE (rpool);
+  float* dE = sycl::malloc_device<float>(rpool, q);
 
   /* malloc the data for 'r' replicas on each GPU */
   for (int k = 0; k < rpool; ++k) {
-    mdlat.emplace_back(buffer<int, 1>(N));
-    apcga.emplace_back(buffer<uint64_t, 1>(N/4));
-    apcgb.emplace_back(buffer<uint64_t, 1>(N/4));
+    mdlat[k] = sycl::malloc_device<int>(N, q);
+    apcga[k] = sycl::malloc_device<uint64_t>((N / 4), q);
+    apcgb[k] = sycl::malloc_device<uint64_t>((N / 4), q);
+    // offset and sequence approach
 
-    pcg_setup(q, prng_gws, prng_lws, apcga[k], apcgb[k], N/4, seed + N/4 * k, k);
-#ifdef DEBUG
-    printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
-            0, N, N/4, R, seed + (N/4 * k), k);
-#endif
+    q.submit([&](sycl::handler &cgh) {
+      auto apcga_k = apcga[k];
+      auto apcgb_k = apcgb[k];
+
+      cgh.parallel_for(sycl::nd_range<1>(prng_gws, prng_lws), [=](sycl::nd_item<1> item) {
+        kernel_gpupcg_setup(apcga_k, apcgb_k, N / 4,
+        seed + N / 4 * k, k, item);
+      });
+    });
   }
 
   /* host memory setup for each replica */
@@ -187,12 +193,6 @@ int main(int argc, char **argv){
   FILE *fw = fopen("trials.dat", "w");
   fprintf(fw, "trial  av  min max\n");
 
-#ifdef DEBUG
-  /* print the beginning temp */
-  printarrayfrag(aT, ar, "Initial temp set:\naT");
-  printf("\n\n");
-#endif
-
   double total_ktime = 0.0;
 
   double start = rtclock();
@@ -204,12 +204,13 @@ int main(int argc, char **argv){
     printf("[trial %i of %i]\n", trial+1, atrials); fflush(stdout);
 
     /* distribution for H */
-    reset_random_pcg(q, reset_gws, reset_lws, dH, N, apcga[0], apcgb[0]);  
-    
-#ifdef DEBUG
-  auto hH = dH.get_access<sycl_read>();
-  for (int n = 0; n < N; n++) printf("dH %d %d\n", n, hH[n]);
-#endif
+    q.submit([&](sycl::handler &cgh) {
+      auto apcga_ct2 = apcga[0];
+      auto apcgb_ct3 = apcgb[0];
+      cgh.parallel_for(sycl::nd_range<1>(reset_gws, reset_lws), [=](sycl::nd_item<1> item) {
+        kernel_reset_random_gpupcg(dH, N, apcga_ct2, apcgb_ct3, item);
+      });
+    });
 
     /* reset ex counters */
     reset_array(aex, rpool, 0.0f);
@@ -220,19 +221,23 @@ int main(int argc, char **argv){
     /* reset gpu data with a new seed from the sequential PRNG */
     seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
-#ifdef DEBUG
-    printf("new seed [%lu]\n", seed);
-#endif
-
     for (int k = 0; k < ar; ++k) {
-      reset<int>(q, reset_gws, reset_lws, mdlat[k], N, 1);
-      pcg_setup(q, prng_gws, prng_lws, apcga[k], apcgb[k], N/4, seed + N/4 * k, k);
-#ifdef DEBUG
-      auto pcga = apcga[k].get_access<sycl_read>();
-      for (int i = 0; i < N/4; i++) printf("pcga: %d %d %lu\n", k, i, pcga[i]);
-      auto pcgb = apcgb[k].get_access<sycl_read>();
-      for (int i = 0; i < N/4; i++) printf("pcgb: %d %d %lu\n", k, i, pcgb[i]);
-#endif
+      q.submit([&](sycl::handler &cgh) {
+        auto mdlat_k = mdlat[k];
+        cgh.parallel_for(sycl::nd_range<1>(reset_gws, reset_lws), [=](sycl::nd_item<1> item) {
+          kernel_reset<int>(mdlat_k, N, 1, item);
+        });
+      });
+
+      q.submit([&](sycl::handler &cgh) {
+        auto apcga_k = apcga[k];
+        auto apcgb_k = apcgb[k];
+        cgh.parallel_for(sycl::nd_range<1>(prng_gws, prng_lws), [=](sycl::nd_item<1> item) {
+          kernel_gpupcg_setup(apcga_k, apcgb_k, N / 4,
+                              seed + (uint64_t)(N / 4 * k), k,
+                              item);
+        });
+      });
     }
 
     /* parallel tempering */
@@ -242,30 +247,46 @@ int main(int argc, char **argv){
 
       /* metropolis simulation */
       for(int i = 0; i < ams; ++i) {
-        for(int k = 0; k < ar; ++k)  {
-          metropolis(q, mc_gws, mc_lws, N, L, mdlat[k], dH, h, 
-              -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
-#ifdef DEBUG
-          auto pcga = apcga[k].get_access<sycl_read>();
-          auto pcgb = apcgb[k].get_access<sycl_read>();
-          auto lat = mdlat[k].get_access<sycl_read>();
-          for (int i = 0; i < N/4; i++) printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("black replica: %d %d %d\n", k, i, lat[i]); 
-#endif
+        for(int k = 0; k < ar; ++k) {
+          q.submit([&](sycl::handler &cgh) {
+            sycl::accessor<site_t, 1, sycl::access_mode::read_write,
+                           sycl::access::target::local>
+                ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
+
+            auto mdlat_k_ct2 = mdlat[k];
+            auto aT_atrs_k_i_ct5 = -2.0f / aT[atrs[k].i];
+            auto apcga_k_ct6 = apcga[k];
+            auto apcgb_k_ct7 = apcgb[k];
+
+            cgh.parallel_for(sycl::nd_range<3>(mc_gws, mc_lws), [=](sycl::nd_item<3> item) {
+              kernel_metropolis(N, L, mdlat_k_ct2, dH, h,
+                                aT_atrs_k_i_ct5, apcga_k_ct6,
+                                apcgb_k_ct7, 0, item,
+                                ss_acc.get_pointer());
+            });
+          });
         }
 
         q.wait();
 
         for(int k = 0; k < ar; ++k) {
-          metropolis(q, mc_gws, mc_lws, N, L, mdlat[k], dH, h, 
-              -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
-#ifdef DEBUG
-          auto pcga = apcga[k].get_access<sycl_read>();
-          auto pcgb = apcgb[k].get_access<sycl_read>();
-          auto lat = mdlat[k].get_access<sycl_read>();
-          for (int i = 0; i < N/4; i++) printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("white replica: %d %d %d\n", k, i, lat[i]); 
-#endif
+          q.submit([&](sycl::handler &cgh) {
+            sycl::accessor<site_t, 1, sycl::access_mode::read_write,
+                           sycl::access::target::local>
+                ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
+
+            auto mdlat_k_ct2 = mdlat[k];
+            auto aT_atrs_k_i_ct5 = -2.0f / aT[atrs[k].i];
+            auto apcga_k_ct6 = apcga[k];
+            auto apcgb_k_ct7 = apcgb[k];
+
+            cgh.parallel_for(sycl::nd_range<3>(mc_gws, mc_lws), [=](sycl::nd_item<3> item) {
+              kernel_metropolis(N, L, mdlat_k_ct2, dH, h,
+                                aT_atrs_k_i_ct5, apcga_k_ct6,
+                                apcgb_k_ct7, 1, item,
+                                ss_acc.get_pointer());
+            });
+          });
         }
 
         q.wait();
@@ -276,21 +297,32 @@ int main(int argc, char **argv){
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
-      reset<float>(q, reset_gws2, reset_lws, dE, ar, 0.0f);
+      q.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for(sycl::nd_range<1>(reset_gws2, reset_lws), [=](sycl::nd_item<1> item) {
+          kernel_reset<float>(dE, ar, 0.0f, item);
+        });
+      });
       q.wait();
 
       /* compute one energy reduction for each replica */
-
-      for(int k = 0; k < ar; ++k) {
+      for(int k = 0; k < ar; ++k){
         /* launch reduction kernel for k-th replica */
-        redenergy<float>(q, redenergy_gws, redenergy_lws, mdlat[k], L, dE, k, dH, h);
+        q.submit([&](sycl::handler &cgh) {
+          sycl::accessor<float, 1, sycl::access_mode::read_write,
+                         sycl::access::target::local>
+              shared_acc(sycl::range<1>(32), cgh);
+
+          auto mdlat_k = mdlat[k];
+
+          cgh.parallel_for(sycl::nd_range<3>(redenergy_gws, redenergy_lws),
+            [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(32)]] {
+            kernel_redenergy<float>(mdlat_k, L, dE + k, dH, h, item,
+                                    shared_acc.get_pointer());
+          });
+        });
         q.wait();
       }
-
-      q.submit([&] (handler &cgh) {
-        auto acc = dE.get_access<sycl_read>(cgh, range<1>(ar));
-        cgh.copy(acc, aexE);
-      }).wait();
+      q.memcpy(aexE, dE, ar * sizeof(float)).wait();
 
       /* exchange phase */
       double delta = 0.0;
@@ -309,10 +341,6 @@ int main(int argc, char **argv){
           (aexE[arts[fleft.i].i] - aexE[arts[fnow.i].i]);
 
         double randme = gpu_rand01(&hpcgs, &hpcgi);
-
-#ifdef DEBUG
-        printf("delta=%f exp(-delta) = %f      rand = %f\n", delta, exp(-delta), randme);
-#endif
 
         if( delta < 0.0 || randme < exp(-delta) ){
           //adapt_swap(s, fnow, fleft);
@@ -377,11 +405,22 @@ int main(int argc, char **argv){
   printf("Total kernel time (metropolis simulation) %.2f secs\n", total_ktime);
 
   fclose(fw);
-  
+  for(int i = 0; i < rpool; ++i) {
+    sycl::free(mdlat[i], q);
+    sycl::free(apcga[i], q);
+    sycl::free(apcgb[i], q);
+  }
+
+  sycl::free(dH, q);
+  sycl::free(dE, q);
+
   free(T);
   free(aex);
   free(aavex);
   free(aexE);
+  free(mdlat);
+  free(apcga);
+  free(apcgb);
   free(arts);
   free(atrs);
   free(aT);

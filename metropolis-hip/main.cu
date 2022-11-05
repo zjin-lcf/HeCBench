@@ -105,14 +105,6 @@ int main(int argc, char **argv){
   /* T is a sorted temp array */
   float* T = (float*)malloc(sizeof(float) * Ra);
 
-#ifdef DEBUG
-  // memory for H array
-  int* hH = (int*)malloc(sizeof(int) * N);
-  int* hr = (int*)malloc(sizeof(int) * N);
-  uint64_t* pcga = (uint64_t*)malloc(sizeof(uint64_t) * N/4);
-  uint64_t* pcgb = (uint64_t*)malloc(sizeof(uint64_t) * N/4);
-#endif
-
   /* allocate the replica pool */
   int** mdlat = (int**) malloc(sizeof(int *) * rpool);
   /* per temperature counter array */
@@ -149,10 +141,6 @@ int main(int argc, char **argv){
     // offset and sequence approach
     hipLaunchKernelGGL(kernel_gpupcg_setup, prng_grid, prng_block, 0, 0, apcga[k], apcgb[k], N/4, 
         seed + N/4 * k, k);
-#ifdef DEBUG
-    printf("tid=%i   N=%i   N/4 = %i  R = %i  seed = %lu   k = %d \n", 
-            0, N, N/4, R, seed + (N/4 * k), k);
-#endif
   }
 
   /* host memory setup for each replica */
@@ -183,12 +171,6 @@ int main(int argc, char **argv){
   FILE *fw = fopen("trials.dat", "w");
   fprintf(fw, "trial  av  min max\n");
 
-#ifdef DEBUG
-  /* print the beginning temp */
-  printarrayfrag(aT, ar, "Initial temp set:\naT");
-  printf("\n\n");
-#endif
-
   double total_ktime = 0.0;
 
   double start = rtclock();
@@ -202,11 +184,6 @@ int main(int argc, char **argv){
     /* distribution for H */
     hipLaunchKernelGGL(kernel_reset_random_gpupcg, lgrid, lblock, 0, 0, dH, N, apcga[0], apcgb[0]);  
     
-#ifdef DEBUG
-    hipMemcpy(hH, dH, N*sizeof(int), hipMemcpyDeviceToHost);
-    for (int n = 0; n < N; n++) printf("dH %d %d\n", n, hH[n]);
-#endif
-
     /* reset ex counters */
     reset_array(aex, rpool, 0.0f);
 
@@ -216,10 +193,6 @@ int main(int argc, char **argv){
     /* reset gpu data with a new seed from the sequential PRNG */
     seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
-#ifdef DEBUG
-    printf("new seed [%lu]\n", seed);
-#endif
-
     for (int k = 0; k < ar; ++k) {
       hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel_reset<int>), lgrid, lblock , 0, 0, mdlat[k], N, 1);
       cudaCheckErrors("kernel: reset spins up");
@@ -227,12 +200,6 @@ int main(int argc, char **argv){
       hipLaunchKernelGGL(kernel_gpupcg_setup, prng_grid, prng_block, 0, 0, apcga[k], apcgb[k], N/4, 
           seed + (uint64_t)(N/4 * k), k);
       cudaCheckErrors("kernel: prng reset");
-#ifdef DEBUG
-      hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-      for (int i = 0; i < N/4; i++) printf("pcga: %d %d %lu\n", k, i, pcga[i]);
-      hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-      for (int i = 0; i < N/4; i++) printf("pcgb: %d %d %lu\n", k, i, pcgb[i]);
-#endif
     }
 
     /* parallel tempering */
@@ -246,13 +213,6 @@ int main(int argc, char **argv){
 
           hipLaunchKernelGGL(kernel_metropolis, mcgrid, mcblock , 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 0);
-#ifdef DEBUG
-          hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-          hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-          hipMemcpy(hr, mdlat[k], N*sizeof(int), hipMemcpyDeviceToHost);
-          for (int i = 0; i < N/4; i++) printf("black pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("black replica: %d %d %d\n", k, i, hr[i]); 
-#endif
         }
 
         hipDeviceSynchronize();
@@ -261,13 +221,6 @@ int main(int argc, char **argv){
         for(int k = 0; k < ar; ++k) {
           hipLaunchKernelGGL(kernel_metropolis, mcgrid, mcblock , 0, 0, N, L, mdlat[k], dH, h, 
               -2.0f/aT[atrs[k].i], apcga[k], apcgb[k], 1);
-#ifdef DEBUG
-          hipMemcpy(pcga, apcga[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-          hipMemcpy(pcgb, apcgb[k], sizeof(uint64_t)*N/4, hipMemcpyDeviceToHost);
-          hipMemcpy(hr, mdlat[k], N*sizeof(int), hipMemcpyDeviceToHost);
-          for (int i = 0; i < N/4; i++) printf("white pcga & pcgb: %d %d %lu %lu\n", k, i, pcga[i], pcgb[i]);
-          for (int i = 0; i < N; i++) printf("white replica: %d %d %d\n", k, i, hr[i]); 
-#endif
         }
 
         hipDeviceSynchronize();
@@ -276,11 +229,6 @@ int main(int argc, char **argv){
 
       double k_end = rtclock();
       total_ktime += k_end - k_start; 
-
-#ifdef DEBUG
-      for(int k = 0; k < ar; ++k) {
-      }
-#endif
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
@@ -316,10 +264,6 @@ int main(int argc, char **argv){
           (aexE[arts[fleft.i].i] - aexE[arts[fnow.i].i]);
 
         double randme = gpu_rand01(&hpcgs, &hpcgi);
-
-#ifdef DEBUG
-        printf("delta=%f exp(-delta) = %f      rand = %f\n", delta, exp(-delta), randme);
-#endif
 
         if( delta < 0.0 || randme < exp(-delta) ){
           //adapt_swap(s, fnow, fleft);
@@ -394,12 +338,6 @@ int main(int argc, char **argv){
   hipFree(dE);
   
   free(T);
-#ifdef DEBUG
-  free(hH);
-  free(hr);
-  free(pcga);
-  free(pcgb);
-#endif
   free(aex);
   free(aavex);
   free(aexE);

@@ -1,25 +1,24 @@
 //////////////////////////////////////////////////////////////////////////////////
 //                                                                              //
-//  trueke                                                                      //
-//  A multi-GPU implementation of the exchange Monte Carlo method.              //
+//  trueke // A multi-GPU implementation of the exchange Monte Carlo method. //
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 //                                                                              //
-//  Copyright © 2015 Cristobal A. Navarro, Wei Huang.                           //
+//  Copyright © 2015 Cristobal A. Navarro, Wei Huang. //
 //                                                                              //
-//  This file is part of trueke.                                                //
-//  trueke is free software: you can redistribute it and/or modify              //
-//  it under the terms of the GNU General Public License as published by        //
-//  the Free Software Foundation, either version 3 of the License, or           //
-//  (at your option) any later version.                                         //
+//  This file is part of trueke. // trueke is free software: you can
+//  redistribute it and/or modify              // it under the terms of the GNU
+//  General Public License as published by        // the Free Software
+//  Foundation, either version 3 of the License, or           // (at your
+//  option) any later version.                                         //
 //                                                                              //
-//  trueke is distributed in the hope that it will be useful,                   //
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of              //
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the               //
-//  GNU General Public License for more details.                                //
+//  trueke is distributed in the hope that it will be useful, // but WITHOUT ANY
+//  WARRANTY; without even the implied warranty of              //
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the // GNU General
+//  Public License for more details.                                //
 //                                                                              //
-//  You should have received a copy of the GNU General Public License           //
-//  along with trueke.  If not, see <http://www.gnu.org/licenses/>.             //
+//  You should have received a copy of the GNU General Public License // along
+//  with trueke.  If not, see <http://www.gnu.org/licenses/>.             //
 //                                                                              //
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -42,73 +41,62 @@
 #define C(x,y,z,L)     ((z)*(L)*(L)+(y)*(L)+(x))
 #define sC(x,y,z,Lx,Ly)  ((z+1)*(Ly)*(Lx)+(y+1)*(Lx)+(x+1))
 
-// Forward declaration
-template<typename T>
-class kernel_reset;
-
-// kernel_metropolis
+typedef int site_t;
 
 void
-kernel_metropolis(const int N, const int L, int *s, const int *H, 
-                  const float h, const float B, uint64_t *state, 
-                  uint64_t *inc, int alt, size_t *ss, nd_item<3> &item)
+kernel_metropolis(const int N, const int L, site_t *s, const int *H, 
+                  const float h, const float B, uint64_t *state, uint64_t *inc, int alt,
+                  sycl::nd_item<3> &item, site_t *ss)
 {
-
-  const int gridDim_x = item.get_group_range(2);
-  const int gridDim_z = item.get_group_range(0);
-  const int blockIdx_x = item.get_group(2);
-  const int blockIdx_y = item.get_group(1);
-  const int blockIdx_z = item.get_group(0);
-  const int threadIdx_x = item.get_local_id(2);
-  const int threadIdx_y = item.get_local_id(1);
-  const int threadIdx_z = item.get_local_id(0);
-
   // offsets
-  const int offx = blockIdx_x * BX;
-  const int offy = (2*blockIdx_y + ((blockIdx_x + blockIdx_z + alt) & 1)) * BY;
-  const int offz = blockIdx_z * BZ;
+  int offx = item.get_group(2) * BX;
+  int offy = (2 * item.get_group(1) +
+              ((item.get_group(2) + item.get_group(0) + alt) & 1)) *
+             BY;
+  int offz = item.get_group(0) * BZ;
 
   // halo shared memory coords
-  const int sx = threadIdx_x;
-  const int sy1 = 2*threadIdx_y;
-  const int sy2 = 2*threadIdx_y + 1;
-  const int sz = threadIdx_z;
+  int sx = item.get_local_id(2);
+  int sy1 = 2 * item.get_local_id(1);
+  int sy2 = 2 * item.get_local_id(1) + 1;
+  int sz = item.get_local_id(0);
 
   // global coords
-  const int x = offx + sx;
-  const int y1 = offy + sy1;
-  const int y2 = offy + sy2;
-  const int z = offz + sz;
+  int x = offx + sx;
+  int y1 = offy + sy1;
+  int y2 = offy + sy2;
+  int z = offz + sz;
 
   //if(x >= N || y1 >= N || y2 >= N || z >= N)
   //return;
 
   // global and local and block id in soc
-  const int tid = z*L*L/4 + (blockIdx_y * BY/2 + threadIdx_y)*L + x;
+  int tid = z * L * L / 4 +
+            (item.get_group(1) * BY / 2 + item.get_local_id(1)) * L + x;
 
   // load the spins into shared memory
   ss[sC(sx, sy1, sz, sLx, sLy)] = s[C(x, y1, z, L)];
   ss[sC(sx, sy2, sz, sLx, sLy)] = s[C(x, y2, z, L)];
-  // get the h1,h2 values for y1 y2_
-  const int h1 = H[C(x, y1, z, L)];
-  const int h2 = H[C(x, y2, z, L)];
+  // get the h1,h2 values for y1 y2.
+  int h1 = H[C(x, y1, z, L)];
+  int h2 = H[C(x, y2, z, L)];
   //printf("thread %i   h1=%i   h2=%i\n", tid, h1, h2);
 
   // ------------------------------------------------
   // halo
   // ------------------------------------------------
   // Y boundary
-  if(threadIdx_y == 0){
+  if (item.get_local_id(1) == 0) {
     // we also check if we are on the limit of the lattice
     ss[sC(sx, -1, sz, sLx, sLy)] = (offy == 0) ? s[C(x, L-1, z, L)] : s[C(x, offy-1, z, L)];
   }
-  if(threadIdx_y == BY/2-1){
+  if (item.get_local_id(1) == BY / 2 - 1) {
     ss[sC(sx, BY, sz, sLx, sLy)] = (offy == L-BY) ? s[C(x, 0, z, L)] : s[C(x, offy+BY, z, L)];
   }
 
   // X boundary
-  if(threadIdx_x == 0){
-    if(blockIdx_x == 0){
+  if (item.get_local_id(2) == 0) {
+    if (item.get_group(2) == 0) {
       ss[sC(-1, sy1, sz, sLx, sLy)] = s[C(L-1, y1, z, L)];
       ss[sC(-1, sy2, sz, sLx, sLy)] = s[C(L-1, y2, z, L)];
     }
@@ -117,8 +105,8 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
       ss[sC(-1, sy2, sz, sLx, sLy)] = s[C(offx-1, y2, z, L)];
     }
   }
-  if(threadIdx_x == BX-1){
-    if(blockIdx_x == gridDim_x-1){
+  if (item.get_local_id(2) == BX - 1) {
+    if (item.get_group(2) == item.get_group_range(2) - 1) {
       ss[sC(BX, sy1, sz, sLx, sLy)] = s[C(0, y1, z, L)];
       ss[sC(BX, sy2, sz, sLx, sLy)] = s[C(0, y2, z, L)];
     }
@@ -129,8 +117,8 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
   }
 
   // Z boundary
-  if(threadIdx_z == 0){
-    if(blockIdx_z == 0){
+  if (item.get_local_id(0) == 0) {
+    if (item.get_group(0) == 0) {
       ss[sC(sx, sy1, -1, sLx, sLy)] = s[C(x, y1, L-1, L)];
       ss[sC(sx, sy2, -1, sLx, sLy)] = s[C(x, y2, L-1, L)];
     }
@@ -139,8 +127,8 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
       ss[sC(sx, sy2, -1, sLx, sLy)] = s[C(x, y2, offz-1, L)];
     }
   }
-  if(threadIdx_z == BZ-1){
-    if(blockIdx_z == gridDim_z-1){
+  if (item.get_local_id(0) == BZ - 1) {
+    if (item.get_group(0) == item.get_group_range(0) - 1) {
       ss[sC(sx, sy1, BZ, sLx, sLy)] = s[C(x, y1, 0, L)];
       ss[sC(sx, sy2, BZ, sLx, sLy)] = s[C(x, y2, 0, L)];
     }
@@ -154,14 +142,14 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
   uint64_t lstate = state[tid];
   uint64_t linc = inc[tid];
   // the white and black y
-  int wy = ((sx + sz) & 1)     + 2*threadIdx_y;
-  int by = ((sx + sz + 1) & 1)  + 2*threadIdx_y;
+  int wy = ((sx + sz) & 1) + 2 * item.get_local_id(1);
+  int by = ((sx + sz + 1) & 1) + 2 * item.get_local_id(1);
   float dh;
   int c;
 
-  item.barrier(access::fence_space::local_space);
-  
-  //#pragma unroll
+  item.barrier(sycl::access::fence_space::local_space);
+
+  #pragma unroll 2
   for(int i = 0; i < BLOCK_STEPS; ++i){
 
     /* -------- white update -------- */
@@ -169,9 +157,11 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
          (float)(ss[sC(sx-1,wy,sz, sLx, sLy)] + ss[sC(sx+1, wy, sz, sLx, sLy)] + 
                  ss[sC(sx,wy-1,sz, sLx, sLy)] + ss[sC(sx, wy+1, sz, sLx, sLy)] +
                  ss[sC(sx,wy,sz-1, sLx, sLy)] + ss[sC(sx, wy, sz+1, sLx, sLy)]) + h*h1));
-    c = signbit(dh-EPSILON) | signbit(gpu_rand01(&lstate, &linc) - cl::sycl::exp(dh * B));
+    c = sycl::signbit(dh - EPSILON) |
+        sycl::signbit(gpu_rand01(&lstate, &linc) - sycl::exp(dh * B));
     ss[sC(sx, wy, sz, sLx, sLy)] *= (1 - 2*c);
-    item.barrier(access::fence_space::local_space);
+
+    item.barrier(sycl::access::fence_space::local_space);
 
     /* -------- black update -------- */
     dh = (float)(ss[sC(sx, by, sz, sLx, sLy)] * (
@@ -179,9 +169,11 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
                  ss[sC(sx,by-1,sz, sLx, sLy)] + ss[sC(sx, by+1, sz, sLx, sLy)] +
                  ss[sC(sx,by,sz-1, sLx, sLy)] + ss[sC(sx, by, sz+1, sLx, sLy)]) + h*h2));
 
-    c = signbit(dh-EPSILON) | signbit(gpu_rand01(&lstate, &linc) - cl::sycl::exp(dh * B));
+    c = sycl::signbit(dh - EPSILON) |
+        sycl::signbit(gpu_rand01(&lstate, &linc) - sycl::exp(dh * B));
     ss[sC(sx, by, sz, sLx, sLy)] *= (1 - 2*c);
-    item.barrier(access::fence_space::local_space);
+
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   /* copy data back to gmem */
@@ -192,35 +184,11 @@ kernel_metropolis(const int N, const int L, int *s, const int *H,
   inc[tid] = linc;
 }
 
-void metropolis(queue &q,
-                range<3> gws,
-                range<3> lws,
-                const int N,
-                const int L,
-                buffer<int, 1> &s,
-                buffer<int, 1> &H,
-                const float h,
-                const float B,
-                buffer<uint64_t, 1> &state,
-                buffer<uint64_t, 1> &inc,
-                int alt) 
-{
-  q.submit([&] (handler &cgh) {
-    auto s_acc = s.get_access<sycl_read_write>(cgh);
-    auto H_acc = H.get_access<sycl_read>(cgh);
-    auto state_acc = state.get_access<sycl_read_write>(cgh);
-    auto inc_acc = inc.get_access<sycl_read_write>(cgh);
-    accessor<size_t, 1, sycl_read_write, access::target::local> lmem (SVOLUME, cgh);
-    cgh.parallel_for<class simulation>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      kernel_metropolis(N, L, s_acc.get_pointer(), H_acc.get_pointer(), h, B, 
-                        state_acc.get_pointer(), inc_acc.get_pointer(), alt, 
-                        lmem.get_pointer(), item);
-    });
-  });
-}
 
-
-void kernel_reset_random_gpupcg(int *s, int N, uint64_t *state, uint64_t *inc, nd_item<1> &item)
+// NOTE: the space of computation is 1/4 of N, so that is why each thread does quadruple work.
+void 
+kernel_reset_random_gpupcg(int *s, int N, uint64_t *state, uint64_t *inc,
+                           sycl::nd_item<1> &item)
 {
   int x = item.get_global_id(0);
   float v;
@@ -250,40 +218,8 @@ void kernel_reset_random_gpupcg(int *s, int N, uint64_t *state, uint64_t *inc, n
 }
 
 template<typename T>
-void reset(queue &q,
-           range<1> gws, 
-           range<1> lws, 
-           buffer<T, 1> &arr,
-           const int N, 
-           const T val)
-{
-  q.submit([&] (handler &cgh) {
-    auto acc = arr.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class kernel_reset<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      int idx = item.get_global_id(0);
-      if(idx < N) acc[idx] = val;
-    });
-  });
+void kernel_reset(T *a, int N, T val, sycl::nd_item<1> &item){
+  int idx = item.get_global_id(0);
+  if(idx < N) a[idx] = val;
 }
-
-
-// NOTE: the space of computation is 1/4 of N, so that is why each thread does quadruple work.
-void reset_random_pcg(queue &q,
-                      range<1> gws,
-                      range<1> lws,
-                      buffer<int, 1> &dH, 
-                      const int N, 
-                      buffer<uint64_t, 1> &pcga,
-                      buffer<uint64_t, 1> &pcgb)
-{
-  q.submit([&] (handler &cgh) {
-    auto s = dH.get_access<sycl_discard_write>(cgh);
-    auto state = pcga.get_access<sycl_read_write>(cgh);
-    auto inc = pcgb.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class reset_pcg>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      kernel_reset_random_gpupcg(s.get_pointer(), N, state.get_pointer(), inc.get_pointer(), item);
-    });
-  });
-}
-
 #endif
