@@ -16,10 +16,10 @@
 void gate(double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
 {
   #pragma omp target teams distribute parallel for thread_limit(256)
-  for (long ii = 0; ii < nCells; ii++) {
+  for (long i = 0; i < nCells; i++) {
 
     double sum1,sum2;
-    const double x = Vm[ii];
+    const double x = Vm[i];
     const int Mhu_l = 10;
     const int Mhu_m = 5;
     const double Mhu_a[] = { 9.9632117206253790e-01,  4.0825738726469545e-02,  6.3401613233199589e-04,  4.4158436861700431e-06,  1.1622058324043520e-08,  1.0000000000000000e+00,  4.0568375699663400e-02,  6.4216825832642788e-04,  4.2661664422410096e-06,  1.3559930396321903e-08, -1.3573468728873069e-11, -4.2594802366702580e-13,  7.6779952208246166e-15,  1.4260675804433780e-16, -2.6656212072499249e-18};
@@ -40,7 +40,7 @@ void gate(double* __restrict m_gate, const long nCells, const double* __restrict
     for (int j = Tau_m-1; j >= 0; j--)
       sum1 = Tau_a[j] + x*sum1;
     double tauR = sum1;
-    m_gate[ii] += (mhu - m_gate[ii])*(1-exp(-tauR));
+    m_gate[i] += (mhu - m_gate[i])*(1-exp(-tauR));
   }
 }
 
@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 
   /* Get iteration count and target kernel memory used arguments */
   long iterations = atol(argv[1]);
-  double kernel_mem_used=atof(argv[2]);
+  double kernel_mem_used = atof(argv[2]);
 
   /* Calculate nCells from target memory target */
   long nCells = (long) ((kernel_mem_used * 1024.0 * 1024.0 * 1024.0) / (sizeof(double) * 2));
@@ -70,29 +70,29 @@ int main(int argc, char* argv[])
   double* Vm = (double*)calloc(nCells,sizeof(double));
   if (Vm == NULL) printf ("failed calloc Vm\n");
 
-#pragma omp target data map (to: m_gate[0:nCells], Vm[0:nCells])
-{
-  double kernel_starttime, kernel_endtime, kernel_runtime;
-  for (long itime=0; itime<=iterations; itime++) {
-    /* Start timer after warm-up iteration 0 */
-    if (itime == 1) {
-      #pragma omp target update from (m_gate[0:nCells])
-      kernel_starttime = secs_elapsed();
+  #pragma omp target data map (to: m_gate[0:nCells], Vm[0:nCells])
+  {
+    double kernel_starttime, kernel_endtime, kernel_runtime;
+    for (long itime=0; itime<=iterations; itime++) {
+      /* Start timer after warm-up iteration 0 */
+      if (itime == 1) {
+        #pragma omp target update from (m_gate[0:nCells])
+        kernel_starttime = secs_elapsed();
+      }
+      gate(m_gate, nCells, Vm);
     }
-    gate(m_gate, nCells, Vm);
+  
+    kernel_endtime = secs_elapsed();
+    kernel_runtime = kernel_endtime-kernel_starttime;
+    printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
   }
-
-  kernel_endtime = secs_elapsed();
-  kernel_runtime = kernel_endtime-kernel_starttime;
-  printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
-}
 
   // verify
   reference(m_gate_h, nCells, Vm);
 
   bool ok = true;
-  for (long ii = 0; ii < nCells; ii++) {
-    if (fabs(m_gate[ii] - m_gate_h[ii]) > 1e-6) {
+  for (long i = 0; i < nCells; i++) {
+    if (fabs(m_gate[i] - m_gate_h[i]) > 1e-6) {
       ok = false;
       break;
     }
