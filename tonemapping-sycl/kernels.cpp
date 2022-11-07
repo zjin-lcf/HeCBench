@@ -117,9 +117,9 @@ void toneMapping(
 
   float yDPattanaik = yLuminance / (yLuminance + cLPattanaik);
 
-  r = sycl::pow((r1 / yLuminance), gamma) * yDPattanaik;
-  g = sycl::pow((g1 / yLuminance), gamma) * yDPattanaik;  
-  b = sycl::pow((b1 / yLuminance), gamma) * yDPattanaik;
+  r = sycl::native::powr((r1 / yLuminance), gamma) * yDPattanaik;
+  g = sycl::native::powr((g1 / yLuminance), gamma) * yDPattanaik;
+  b = sycl::native::powr((b1 / yLuminance), gamma) * yDPattanaik;
 
   output[width * numChannels * y + (x * numChannels + 0)] = r;
   output[width * numChannels * y + (x * numChannels + 1)] = g;
