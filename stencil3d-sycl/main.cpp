@@ -185,6 +185,19 @@ int main(int argc, char* argv[])
   range<3> gws (bdimz, bdimy*BSIZE, bdimx*BSIZE);
   range<3> lws (1, BSIZE, BSIZE);
 
+  // warmup
+  q.submit([&] (handler &cgh) {
+    auto Vm = d_Vm.get_access<sycl_read>(cgh);
+    auto dVm = d_dVm.get_access<sycl_write>(cgh);
+    auto sigma = d_sigma.get_access<sycl_read>(cgh);
+    accessor<Real, 1, sycl_read_write, access::target::local> sm_psi (4*BSIZE*BSIZE, cgh);
+    cgh.parallel_for<class diffusion_warmup>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      stencil3d(item, sm_psi.get_pointer(), Vm.get_pointer(), dVm.get_pointer(), 
+                sigma.get_pointer(), sigma.get_pointer() + 3*vol, sigma.get_pointer() + 6*vol, 
+                nx, ny, nz);
+    });
+  });
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 

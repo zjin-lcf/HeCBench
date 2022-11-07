@@ -182,6 +182,10 @@ int main(int argc, char* argv[])
 
   #pragma omp target data map(to: h_Vm[0:vol], h_sigma[0:vol*9]) map(tofrom: h_dVm[0:vol])
   {
+    // warmup
+    stencil3d(h_Vm, h_dVm, h_sigma, h_sigma + 3*vol, h_sigma + 6*vol, 
+              bdimx, bdimy, bdimz, nx, ny, nz);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
