@@ -47,23 +47,28 @@ void setup(size_t *size, int &num, int **pA, const size_t totalGlobalMem) {
   valSet(*pA, 1, size[num - 1]);
 }
 
-void testInit(size_t size, bool um) {
+void testInit(size_t size, int type) {
 
   printf("Initial allocation and deallocation\n");
 
   int *Ad;
   auto start = Clock();
-  if (um)
+  if (type == 0)
     hipMallocManaged(&Ad, size);
-  else
+  else if (type == 1)
     hipMalloc(&Ad, size);
+  else if (type == 2)
+    hipHostMalloc(&Ad, size, hipHostMallocMapped);
+
   auto end = Clock();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  if (um)
+  if (type == 0)
     printf("hipMallocManaged(%zu) takes %lf us\n", size, time * 1e-3);
-  else
+  else if (type == 1)
     printf("hipMalloc(%zu) takes %lf us\n", size, time * 1e-3);
+  else if (type == 2)
+    printf("hipHostMalloc(%zu) takes %lf us\n", size, time * 1e-3);
 
   start = Clock();
   hipFree(Ad);
@@ -89,7 +94,30 @@ int main(int argc, char* argv[])
   int *A;
   setup(size, num, &A, totalGlobalMem);
 
+  printf("\n==== Evaluate hipMallocManaged and hipFree ====\n");
   testInit(size[0], 0);
+
+  for (int i = 0; i < num; i++) {
+    auto start = Clock();
+    for (int j = 0; j < NUM_ITER; j++) {
+      hipMallocManaged(&Ad[j], size[i]);
+    }
+    auto end = Clock();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("hipMallocManaged(%zu) takes %lf us\n", size[i], time * 1e-3  / NUM_ITER);
+
+    start = Clock();
+    for (int j = 0; j < NUM_ITER; j++) {
+      hipFree(Ad[j]);
+      Ad[j] = nullptr;
+    }
+    end = Clock();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("hipFree(%zu) takes %lf us\n", size[i], time * 1e-3  / NUM_ITER);
+  }
+
+  printf("\n==== Evaluate hipMalloc and hipFree ====\n");
+  testInit(size[0], 1);
 
   for (int i = 0; i < num; i++) {
     auto start = Clock();
@@ -110,17 +138,17 @@ int main(int argc, char* argv[])
     printf("hipFree(%zu) takes %lf us\n", size[i], time * 1e-3  / NUM_ITER);
   }
 
-  printf("\n==== Unified memory ====\n");
-  testInit(size[0], 1);
+  printf("\n==== Evaluate hipHostMalloc (hipHostMallocMapped) and hipFree ====\n");
+  testInit(size[0], 2);
 
   for (int i = 0; i < num; i++) {
     auto start = Clock();
     for (int j = 0; j < NUM_ITER; j++) {
-      hipMallocManaged(&Ad[j], size[i]);
+      hipHostMalloc(&Ad[j], size[i], hipHostMallocMapped);
     }
     auto end = Clock();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("hipMallocManaged(%zu) takes %lf us\n", size[i], time * 1e-3  / NUM_ITER);
+    printf("hipHostMalloc(%zu) takes %lf us\n", size[i], time * 1e-3  / NUM_ITER);
 
     start = Clock();
     for (int j = 0; j < NUM_ITER; j++) {
