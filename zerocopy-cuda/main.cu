@@ -27,15 +27,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
-
-long long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 /* Add two vectors on the GPU */
 __global__ void vectorAddGPU(float *__restrict__ a,
@@ -53,19 +47,20 @@ __global__ void vectorAddGPU(float *__restrict__ a,
 #define MEMORY_ALIGNMENT 4096
 #define ALIGN_UP(x, size) (((size_t)x + (size - 1)) & (~(size - 1)))
 
-void eval (bool bPinGenericMemory) {
+void eval (bool warmup, bool bPinGenericMemory, const int repeat) {
   int n, nelem;
   unsigned int flags;
   size_t bytes;
-  float *a, *b, *c;           // Pinned memory allocated on the CPU
-  float *a_UA, *b_UA, *c_UA;  // Non-4K Aligned Pinned memory on the CPU
-  float *d_a, *d_b, *d_c;     // Device pointers for mapped memory
+  float *a, *b, *c;       // Pinned memory allocated on the CPU
+  float *a_UA = nullptr,
+        *b_UA = nullptr,
+        *c_UA = nullptr;  // Non-4K Aligned Pinned memory on the CPU
+  float *d_a, *d_b, *d_c; // Device pointers for mapped memory
   float errorNorm, refNorm, ref, diff;
 
-
 #if defined(__APPLE__) || defined(MACOSX)
-    bPinGenericMemory = false;
-    printf("Warning: Generic Pinning of System Paged memory is not support on MacOS\n");
+  bPinGenericMemory = false;
+  printf("Warning: Generic Pinning of System Paged memory is not support on MacOS\n");
 #endif
 
   if (bPinGenericMemory) {
@@ -74,14 +69,20 @@ void eval (bool bPinGenericMemory) {
     printf("> Using Host Allocated (cudaHostAlloc)\n");
   }
 
+  if (warmup) printf("Warmup...\n");
+
   // Allocate mapped CPU memory
 
-  for (nelem = 1024*1024; nelem <= (1024*1024*128); nelem = nelem*2) {
+  for (nelem = 1024*1024; nelem <= (1024*1024*64); nelem = nelem*2) {
+
+    if (!warmup)
+      printf("\nvector length = %d\n", nelem);
+
     bytes = nelem * sizeof(float);
 
-    auto start = get_time();
-
     if (bPinGenericMemory) {
+      auto start = std::chrono::steady_clock::now();
+
       // Allocate generic memory with malloc() and pin it later 
       // instead of using cudaHostAlloc()
       a_UA = (float *)malloc(bytes + MEMORY_ALIGNMENT);
@@ -97,11 +98,21 @@ void eval (bool bPinGenericMemory) {
       cudaHostRegister(a, bytes, cudaHostRegisterMapped);
       cudaHostRegister(b, bytes, cudaHostRegisterMapped);
       cudaHostRegister(c, bytes, cudaHostRegisterMapped);
+
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      if (!warmup)
+        printf("Memory allocation (cudaHostRegister): %lf ms\n", time * 1e-6);
     } else {
+      auto start = std::chrono::steady_clock::now();
       flags = cudaHostAllocMapped;
       cudaHostAlloc((void **)&a, bytes, flags);
       cudaHostAlloc((void **)&b, bytes, flags);
       cudaHostAlloc((void **)&c, bytes, flags);
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      if (!warmup)
+        printf("Memory allocation (cudaHostAlloc): %lf ms\n", time * 1e-6);
     }
 
     // Initialize the vectors
@@ -112,61 +123,91 @@ void eval (bool bPinGenericMemory) {
 
     // Get the device pointers for the pinned CPU memory mapped into the GPU
     // memory space
+    auto start = std::chrono::steady_clock::now();
     cudaHostGetDevicePointer((void **)&d_a, (void *)a, 0);
     cudaHostGetDevicePointer((void **)&d_b, (void *)b, 0);
     cudaHostGetDevicePointer((void **)&d_c, (void *)c, 0);
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    if (!warmup)
+      printf("cudaHostGetDevicePointer: %lf ms\n", time * 1e-6);
 
     // Call the GPU kernel using the pointers residing in CPU mapped memory
     dim3 block(256);
     dim3 grid((unsigned int)ceil(nelem / (float)block.x));
-    vectorAddGPU<<<grid, block>>>(d_a, d_b, d_c, nelem);
+
+    start = std::chrono::steady_clock::now();
+    for (n = 0; n < repeat; n++) {
+      vectorAddGPU<<<grid, block>>>(d_a, d_b, d_c, nelem);
+    }
     cudaDeviceSynchronize();
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    if (!warmup)
+      printf("Average kernel execution time: %lf ms\n", time * 1e-6 / repeat);
 
     // Compare the results
+    if (warmup) {
+      errorNorm = 0.f;
+      refNorm = 0.f;
 
-    errorNorm = 0.f;
-    refNorm = 0.f;
+      for (n = 0; n < nelem; n++) {
+        ref = a[n] + b[n];
+        diff = c[n] - ref;
+        errorNorm += diff * diff;
+        refNorm += ref * ref;
+      }
 
-    for (n = 0; n < nelem; n++) {
-      ref = a[n] + b[n];
-      diff = c[n] - ref;
-      errorNorm += diff * diff;
-      refNorm += ref * ref;
+      errorNorm = (float)sqrt((double)errorNorm);
+      refNorm = (float)sqrt((double)refNorm);
+
+      printf("%s\n", (errorNorm / refNorm < 1.e-6f) ? "SUCCESS" : "FAILURE");
     }
-
-    errorNorm = (float)sqrt((double)errorNorm);
-    refNorm = (float)sqrt((double)refNorm);
-
-    printf("%s ", (errorNorm / refNorm < 1.e-6f) ? "SUCCESS" : "FAILURE");
 
     // Memory clean up
 
     if (bPinGenericMemory) {
+      auto start = std::chrono::steady_clock::now();
       cudaHostUnregister(a);
       cudaHostUnregister(b);
       cudaHostUnregister(c);
       free(a_UA);
       free(b_UA);
       free(c_UA);
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      if (!warmup)
+        printf("Memory deallocation (cudaHostUnregister): %lf ms\n", time * 1e-6);
     } else {
+      auto start = std::chrono::steady_clock::now();
       cudaFreeHost(a);
       cudaFreeHost(b);
       cudaFreeHost(c);
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      if (!warmup)
+        printf("Memory deallocation (cudaFreeHost): %lf ms\n", time * 1e-6);
     }
-
-    auto end = get_time();
-    printf("Total elapsed time (vector length = %d): %.2f s\n", 
-           nelem, (end - start) / 1e6f);
   }
+  if (warmup) printf("Done.\n");
 }
 
 int main(int argc, char **argv) {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   bool bPinGenericMemory;
 
   bPinGenericMemory = false;
-  eval(bPinGenericMemory); 
+  eval(true, bPinGenericMemory, repeat); 
+  eval(false, bPinGenericMemory, repeat); 
 
   bPinGenericMemory = true;
-  eval(bPinGenericMemory); 
+  eval(true, bPinGenericMemory, repeat); 
+  eval(false, bPinGenericMemory, repeat); 
   return 0;
 }
