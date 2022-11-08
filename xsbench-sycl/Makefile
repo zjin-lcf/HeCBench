@@ -88,4 +88,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -s small -m event -r 10
+	./$(program) -s large -m event -r 10
