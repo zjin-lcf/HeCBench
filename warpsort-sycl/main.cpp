@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
 #else
   sycl::cpu_selector dev_sel;
 #endif
-  sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   bool ok;
   ok = test_sort(q, repeat);
