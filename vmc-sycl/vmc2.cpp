@@ -3,6 +3,8 @@
 #include <cmath>
 #include "common.h"
 
+using FLOAT = float;
+
 const int NTHR_PER_BLK = 256;           // Number of threads per block
 const int NBLOCK  = 56*4;               // Number of blocks
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
