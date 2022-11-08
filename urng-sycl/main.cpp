@@ -97,6 +97,19 @@ int main(int argc, char** argv)
     std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
     std::cout << "-------------------------------------------" << std::endl;
 
+    q.submit([&] (handler &cgh) {
+      auto input = inputImageBuffer.get_access<sycl_read>(cgh);
+      auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
+      accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
+      cgh.parallel_for<class noise_uniform_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        kernel_noise_uniform(input.get_pointer(), 
+          output.get_pointer(), 
+          factor, 
+          iv.get_pointer(), 
+          item);    
+      });
+    });
+
     q.wait();
     auto start = std::chrono::steady_clock::now();
 

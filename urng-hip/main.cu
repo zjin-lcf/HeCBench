@@ -95,6 +95,9 @@ int main(int argc, char** argv)
 
   hipMemcpy(inputImageBuffer, inputImageData, imageSize, hipMemcpyHostToDevice);
 
+  // warmup
+  hipLaunchKernelGGL(noise_uniform, grid, block, 0, 0, inputImageBuffer, outputImageBuffer, factor);
+
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
