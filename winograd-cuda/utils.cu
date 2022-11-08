@@ -49,11 +49,9 @@ void WinogradConv2D_2x2_omp(DATA_TYPE* input, DATA_TYPE* output, DATA_TYPE* tran
   int out_map_size = MAP_SIZE - 2;
   int tile_n = (out_map_size + 1) / 2;
 
-  // for (int tile_i = 0; tile_i < tile_n; tile_i ++) {
-  //     for (int tile_j = 0; tile_j < cpu_global_size[0]; tile_j ++) {
-#pragma omp parallel
+  #pragma omp parallel
   for (int tile_i = 0; tile_i < cpu_global_size[0]; tile_i++) {
-#pragma omp for
+    #pragma omp for
     for (int tile_j = 0; tile_j < tile_n; tile_j++) {
       // input transformation
 
