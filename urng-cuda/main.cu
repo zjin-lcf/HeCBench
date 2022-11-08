@@ -95,6 +95,9 @@ int main(int argc, char** argv)
 
   cudaMemcpy(inputImageBuffer, inputImageData, imageSize, cudaMemcpyHostToDevice);
 
+  // warmup 
+  noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, factor);
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
