@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include <cuda.h>
 #include "utils.h"
 
@@ -253,6 +254,9 @@ int main(int argc, char* argv[]) {
 
   const int sm_size = (n_type+1) * 8 * sizeof(r32);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   // note the outputs are not reset for each run
   for (i = 0; i < repeat; i++) {
     bond_wlcpowallvisc <<<grids, blocks, sm_size, 0>>> (
@@ -278,6 +282,11 @@ int main(int argc, char* argv[]) {
       n);
   }
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", time * 1e-3f / repeat);
+
   download (force_x, dev_force_x, n+1);
   download (force_y, dev_force_y, n+1);
   download (force_z, dev_force_z, n+1);
@@ -296,7 +305,7 @@ int main(int argc, char* argv[]) {
   }
   // values are meaningless, but they should be consistent across devices
   printf("checksum: forceX=%lf forceY=%lf forceZ=%lf\n",
-    force_x_sum/(n+1), force_y_sum/(n+1), force_z_sum/(n+1));
+         force_x_sum/(n+1), force_y_sum/(n+1), force_z_sum/(n+1));
   
 #ifdef DEBUG
   for (i = 0; i < 16; i++) {

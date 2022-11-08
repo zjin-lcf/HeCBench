@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include <omp.h>
 #include "utils.h"
 
@@ -226,6 +227,8 @@ int main(int argc, char* argv[]) {
     const int teams = (n + 127) / 128;
     const int blocks = 128;
 
+    auto start = std::chrono::steady_clock::now();
+
     // note the outputs are not reset for each run
     for (i = 0; i < repeat; i++) {
       bond_wlcpowallvisc (
@@ -251,6 +254,10 @@ int main(int argc, char* argv[]) {
         teams,
         blocks);
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (us)\n", time * 1e-3f / repeat);
   }
 
   // no NaN values in the outputs

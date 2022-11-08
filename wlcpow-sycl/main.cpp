@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <random>
+#include <chrono>
 #include "common.h"
 #include "utils.h"
 
@@ -134,17 +135,17 @@ T* grow (queue &q, int n) {
 
 template <typename T>
 void upload(queue &q, T* d, T* h, int n) {
-  q.memcpy(d, h, sizeof(T) * n).wait();
+  q.memcpy(d, h, sizeof(T) * n);
 }
 
 template <typename T>
 void reset(queue &q, T* d, int n) {
-  q.memset(d, (T)0, sizeof(T) * n).wait();
+  q.memset(d, (T)0, sizeof(T) * n);
 }
 
 template <typename T>
 void download(queue &q, T* h, T* d, int n) {
-  q.memcpy(h, d, sizeof(T) * n).wait();
+  q.memcpy(h, d, sizeof(T) * n);
 }
 
 int main(int argc, char *argv[]) {
@@ -260,6 +261,9 @@ int main(int argc, char *argv[]) {
 
   const int sm_size = (n_type + 1) * 8;
 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
   // note the outputs are not reset for each run
   for (i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
@@ -275,9 +279,16 @@ int main(int argc, char *argv[]) {
     });
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", time * 1e-3f / repeat);
+
   download (q, force_x, dev_force_x, n+1);
   download (q, force_y, dev_force_y, n+1);
   download (q, force_z, dev_force_z, n+1);
+
+  q.wait();
 
   // no NaN values in the outputs
   for (i = 0; i < n+1; i++) {
