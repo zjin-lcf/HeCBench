@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    attention, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
+    attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
 
 ### Math
     alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
