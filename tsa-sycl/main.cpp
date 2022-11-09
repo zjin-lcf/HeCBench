@@ -68,159 +68,27 @@ void tsa(queue &q, int width, int height, int repeat) {
   range<2> lws (STRIDE_Y, BLOCK_X);
   int sense = 0;
 
-  // ping-pong arrays
-  std::vector<buffer<T, 1>> d_real;
-  std::vector<buffer<T, 1>> d_imag;
-  d_real.emplace_back(buffer<T, 1>(p_real, width * height));
-  d_real[0].set_final_data(nullptr);
-  d_real.emplace_back(buffer<T, 1>(width * height));
+  T *d_real[2];
+  T *d_imag[2];
 
-  d_imag.emplace_back(buffer<T, 1>(p_imag, width * height));
-  d_imag[0].set_final_data(nullptr);
-  d_imag.emplace_back(buffer<T, 1>(width * height));
+  // ping-pong arrays
+  d_real[0] = malloc_device<T>(width * height, q);
+  d_real[1] = malloc_device<T>(width * height, q);
+  d_imag[0] = malloc_device<T>(width * height, q); 
+  d_imag[1] = malloc_device<T>(width * height, q); 
+  q.memcpy(d_real[0], p_real, width * height * sizeof(T));
+  q.memcpy(d_imag[0], p_imag, width * height * sizeof(T));
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      auto p_real = d_real[sense].template get_access<sycl_read>(cgh);
-      auto p_imag = d_imag[sense].template get_access<sycl_read>(cgh);
-      auto p2_real = d_real[1-sense].template get_access<sycl_discard_write>(cgh);
-      auto p2_imag = d_imag[1-sense].template get_access<sycl_discard_write>(cgh);
-      accessor<T, 2, sycl_read_write, access::target::local> rl({BLOCK_Y, BLOCK_X}, cgh);
-      accessor<T, 2, sycl_read_write, access::target::local> im({BLOCK_Y, BLOCK_X}, cgh);
       cgh.parallel_for<class k<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>>(
         nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        int blockIdx_x = item.get_group(1);
-        int blockIdx_y = item.get_group(0);
-        int threadIdx_x = item.get_local_id(1);
-        int threadIdx_y = item.get_local_id(0);
-        int px = blockIdx_x * (BLOCK_X - 2 * STEPS * MARGIN_X) + threadIdx_x - STEPS * MARGIN_X;
-        int py = blockIdx_y * (BLOCK_Y - 2 * STEPS * MARGIN_Y) + threadIdx_y - STEPS * MARGIN_Y;
-
-        // Read block from global into shared memory
-        if (px >= 0 && px < width) {
-          #pragma unroll
-          for (int i = 0, pidx = py * width + px; i < BLOCK_Y / STRIDE_Y; ++i, pidx += STRIDE_Y * width) {
-            if (py + i * STRIDE_Y >= 0 && py + i * STRIDE_Y < height) {
-              rl[threadIdx_y + i * STRIDE_Y][threadIdx_x] = p_real[pidx];
-              im[threadIdx_y + i * STRIDE_Y][threadIdx_x] = p_imag[pidx];
-            }
-          }
-        }
-
-        item.barrier(access::fence_space::local_space);
-
-        // Place threads along the black cells of a checkerboard pattern
-        int sx = threadIdx_x;
-        int sy;
-        if ((STEPS * MARGIN_X) % 2 == (STEPS * MARGIN_Y) % 2) {
-          sy = 2 * threadIdx_y + threadIdx_x % 2;
-        } else {
-          sy = 2 * threadIdx_y + 1 - threadIdx_x % 2;
-        }
-
-        // global y coordinate of the thread on the checkerboard (px remains the same)
-        // used for range checks
-        int checkerboard_py = blockIdx_y * (BLOCK_Y - 2 * STEPS * MARGIN_Y) + sy - STEPS * MARGIN_Y;
-
-        // keep the fixed black cells on registers, reds are updated in shared memory
-        T cell_r[BLOCK_Y / (STRIDE_Y * 2)];
-        T cell_i[BLOCK_Y / (STRIDE_Y * 2)];
-
-        // read black cells to registers
-        #pragma unroll
-        for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-          cell_r[part] = rl[sy + part * 2 * STRIDE_Y][sx];
-          cell_i[part] = im[sy + part * 2 * STRIDE_Y][sx];
-        }
-
-        // update cells STEPS full steps
-        #pragma unroll
-        for (int i = 0; i < STEPS; i++) {
-          // 12344321
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
-                a, b, width, height, cell_r[part], cell_i[part], 
-                sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
-                a, b, width, height, cell_r[part], cell_i[part],
-                sx, sy + part * 2 * STRIDE_Y, px, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-                a, b, width, height, cell_r[part], cell_i[part], 
-                sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-                a, b, width, height, cell_r[part], cell_i[part],
-                sx, sy + part * 2 * STRIDE_Y, px, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-                a, b, width, height, cell_r[part], cell_i[part],
-                sx, sy + part * 2 * STRIDE_Y, px, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-                a, b, width, height, cell_r[part], cell_i[part],
-                sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
-                a, b, width, height, cell_r[part], cell_i[part],
-                sx, sy + part * 2 * STRIDE_Y, px, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-          #pragma unroll
-          for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-            trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>
-              (a, b, width, height, cell_r[part], cell_i[part], 
-               sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
-          }
-          item.barrier(access::fence_space::local_space);
-        }
-
-        // write black cells in registers to shared memory
-        #pragma unroll
-        for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
-          rl[sy + part * 2 * STRIDE_Y][sx] = cell_r[part];
-          im[sy + part * 2 * STRIDE_Y][sx] = cell_i[part];
-        }
-        item.barrier(access::fence_space::local_space);
-
-        // discard the halo and copy results from shared to global memory
-        sx = threadIdx_x + STEPS * MARGIN_X;
-        sy = threadIdx_y + STEPS * MARGIN_Y;
-        px += STEPS * MARGIN_X;
-        py += STEPS * MARGIN_Y;
-        if (sx < BLOCK_X - STEPS * MARGIN_X && px < width) {
-          #pragma unroll
-          for (int i = 0, pidx = py * width + px; i < BLOCK_Y / STRIDE_Y; ++i, pidx += STRIDE_Y * width) {
-            if (sy + i * STRIDE_Y < BLOCK_Y - STEPS * MARGIN_Y && py + i * STRIDE_Y < height) {
-              p2_real[pidx] = rl[sy + i * STRIDE_Y][sx];
-              p2_imag[pidx] = im[sy + i * STRIDE_Y][sx];
-            }
-          }
-        }
+        tsa_kernel<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>
+          (item, a, b, width, height,
+           d_real[sense], d_imag[sense], d_real[1-sense], d_imag[1-sense]);
       });
     });
     sense = 1 - sense; // swap
@@ -231,15 +99,8 @@ void tsa(queue &q, int width, int height, int repeat) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_real[sense].template get_access<sycl_read>(cgh);
-    cgh.copy(acc, p_real);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_imag[sense].template get_access<sycl_read>(cgh);
-    cgh.copy(acc, p_imag);
-  });
+  q.memcpy(p_real, d_real[sense], width * height * sizeof(T));
+  q.memcpy(p_imag, d_imag[sense], width * height * sizeof(T));
 
   q.wait();
 
@@ -277,7 +138,7 @@ int main(int argc, char** argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   printf("TSA in float32\n");
   tsa<float>(q, width, height, repeat);
