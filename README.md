@@ -16,7 +16,7 @@ Each benchmark falls into a single category. While such classification is not ac
     babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, snake  
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
     affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
@@ -185,6 +185,9 @@ Early results are shown [here](results/README.md)
 
 ### attention (pseudocodes)
   Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
+
+### attentionMultiHead (cuda)
+  Implementation of multi-head attention (https://github.com/IrishCoffee/cudnnMultiHeadAttention)
 
 ### axhelm (cuda)
   Helmholtz matrix-vector product (https://github.com/Nek5000/nekBench/tree/master/axhelm)
