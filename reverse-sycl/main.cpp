@@ -53,7 +53,8 @@ int main(int argc, char* argv[]) {
     const int count = distribution(generator);
 
     q.memcpy(d_test, gold_even, sizeof(int) * len);
-      
+    
+    q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int j = 0; j < count; j++) {
