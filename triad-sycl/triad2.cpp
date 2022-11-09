@@ -63,33 +63,29 @@ void RunBenchmark(OptionParser &op)
   const size_t numMaxFloats = 1024 * memSize / 4;
   const size_t halfNumFloats = numMaxFloats / 2;
 
-  // Create some host memory pattern
-  srand48(8650341L);
-  float *h_mem = (float*) malloc (sizeof(float) * numMaxFloats);
-
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  cl::sycl::queue p(dev_sel);
-  cl::sycl::queue q(dev_sel);
+  cl::sycl::queue p(dev_sel, property::queue::in_order());
+  cl::sycl::queue q(dev_sel, property::queue::in_order());
+
+  // Create some host memory pattern
+  srand48(8650341L);
+  float *h_mem = malloc_host<float> (numMaxFloats, q);
 
   // Allocate device memory of maximum sizes
-  buffer<float,1> d_memA0 (blockSizes[nSizes - 1] * 1024);
-  buffer<float,1> d_memB0 (blockSizes[nSizes - 1] * 1024);
-  buffer<float,1> d_memC0 (blockSizes[nSizes - 1] * 1024);
-  buffer<float,1> d_memA1 (blockSizes[nSizes - 1] * 1024);
-  buffer<float,1> d_memB1 (blockSizes[nSizes - 1] * 1024);
-  buffer<float,1> d_memC1 (blockSizes[nSizes - 1] * 1024);
+  float *d_memA0 = malloc_device<float>(numMaxFloats, q);
+  float *d_memB0 = malloc_device<float>(numMaxFloats, q);
+  float *d_memC0 = malloc_device<float>(numMaxFloats, q);
+  float *d_memA1 = malloc_device<float>(numMaxFloats, q);
+  float *d_memB1 = malloc_device<float>(numMaxFloats, q);
+  float *d_memC1 = malloc_device<float>(numMaxFloats, q);
 
   const float scalar = 1.75f;
   const size_t blockSize = 128;
 
-  // Number of passes. Use a large number for stress testing.
-  // A small value is sufficient for computing sustained performance.
-  for (int pass = 0; pass < n_passes; ++pass)
-  {
     // Step through sizes forward
     for (int i = 0; i < nSizes; ++i)
     {
@@ -102,7 +98,6 @@ void RunBenchmark(OptionParser &op)
         std::cout << ">> Executing Triad with vectors of length "
           << numMaxFloats << " and block size of "
           << elemsInBlock << " elements." << "\n";
-      //sprintf(sizeStr, "Block:%05ldKB", blockSizes[i]);
         printf("Block:%05ldKB\n", blockSizes[i]);
       }
 
@@ -115,36 +110,26 @@ void RunBenchmark(OptionParser &op)
 
       int TH = Timer::Start();
 
-      p.submit([&] (handler &cgh) {
-          auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-          cgh.copy(h_mem, d_memA0_acc);
-          });
-      p.submit([&] (handler &cgh) {
-          auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-          cgh.copy(h_mem, d_memB0_acc);
-          });
-      p.submit([&] (handler &cgh) {
-          auto A = d_memA0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
-          auto B = d_memB0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
-          auto C = d_memC0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-          cgh.parallel_for<class triad_start>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-              int gid = item.get_global_id(0); 
-              C[gid] = A[gid] + scalar*B[gid];
-              });
-          });
+    // Number of passes. Use a large number for stress testing.
+    // A small value is sufficient for computing sustained performance.
+    for (int pass = 0; pass < n_passes; ++pass)
+    {
+      p.memcpy(d_memA0, h_mem, sizeof(float) * elemsInBlock);
+      p.memcpy(d_memB0, h_mem, sizeof(float) * elemsInBlock);
 
+      p.submit([&] (handler &cgh) {
+        cgh.parallel_for<class triad_start>(nd_range<1>(
+          range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+          int gid = item.get_global_id(0); 
+          d_memC0[gid] = d_memA0[gid] + scalar*d_memB0[gid];
+        });
+      });
 
       if (elemsInBlock < numMaxFloats)
       {
         // start downloading data for next block
-        q.submit([&] (handler &cgh) {
-            auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-            cgh.copy(h_mem+elemsInBlock, d_memA1_acc);
-            });
-        q.submit([&] (handler &cgh) {
-            auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-            cgh.copy(h_mem+elemsInBlock, d_memB1_acc);
-            });
+        q.memcpy(d_memA1, h_mem + elemsInBlock, sizeof(float) * elemsInBlock);
+        q.memcpy(d_memB1, h_mem + elemsInBlock, sizeof(float) * elemsInBlock);
       }
 
       int blockIdx = 1;
@@ -155,17 +140,11 @@ void RunBenchmark(OptionParser &op)
         // Start copying back the answer from the last kernel
         if (currStream)
         {
-          p.submit([&] (handler &cgh) {
-              auto d_memC0_acc = d_memC0.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
-              cgh.copy(d_memC0_acc, h_mem+crtIdx);
-              });
+          p.memcpy(h_mem + crtIdx, d_memC0, sizeof(float) * elemsInBlock);
         }
         else
         {
-          q.submit([&] (handler &cgh) {
-              auto d_memC1_acc = d_memC1.get_access<sycl_read>(cgh, range<1>(elemsInBlock));
-              cgh.copy(d_memC1_acc, h_mem+crtIdx);
-              });
+          q.memcpy(h_mem + crtIdx, d_memC1, sizeof(float) * elemsInBlock);
         }
 
         crtIdx += elemsInBlock;
@@ -176,26 +155,20 @@ void RunBenchmark(OptionParser &op)
           if (currStream)
           {
             q.submit([&] (handler &cgh) {
-                auto A = d_memA1.get_access<sycl_read>(cgh);
-                auto B = d_memB1.get_access<sycl_read>(cgh);
-                auto C = d_memC1.get_access<sycl_write>(cgh);
-                cgh.parallel_for<class triad_curr>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-                    int gid = item.get_global_id(0); 
-                    C[gid] = A[gid] + scalar*B[gid];
-                    });
-                });
+              cgh.parallel_for<class triad_curr>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+                int gid = item.get_global_id(0); 
+                d_memC1[gid] = d_memA1[gid] + scalar*d_memB1[gid];
+              });
+            });
           }
           else
           {
             p.submit([&] (handler &cgh) {
-                auto A = d_memA0.get_access<sycl_read>(cgh);
-                auto B = d_memB0.get_access<sycl_read>(cgh);
-                auto C = d_memC0.get_access<sycl_write>(cgh);
-                cgh.parallel_for<class triad_next>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-                    int gid = item.get_global_id(0); 
-                    C[gid] = A[gid] + scalar*B[gid];
-                    });
-                });
+              cgh.parallel_for<class triad_next>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
+                int gid = item.get_global_id(0); 
+                d_memC0[gid] = d_memA0[gid] + scalar*d_memB0[gid];
+              });
+            });
           }
         }
 
@@ -204,25 +177,13 @@ void RunBenchmark(OptionParser &op)
           // Download data for next block
           if (currStream)
           {
-            p.submit([&] (handler &cgh) {
-                auto d_memA0_acc = d_memA0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-                cgh.copy(h_mem+crtIdx+elemsInBlock, d_memA0_acc);
-                });
-            p.submit([&] (handler &cgh) {
-                auto d_memB0_acc = d_memB0.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-                cgh.copy(h_mem+crtIdx+elemsInBlock, d_memB0_acc);
-                });
+            p.memcpy(d_memA0, h_mem+crtIdx+elemsInBlock, sizeof(float) * elemsInBlock);
+            p.memcpy(d_memB0, h_mem+crtIdx+elemsInBlock, sizeof(float) * elemsInBlock);
           }
           else
           {
-            q.submit([&] (handler &cgh) {
-                auto d_memA1_acc = d_memA1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-                cgh.copy(h_mem+crtIdx+elemsInBlock, d_memA1_acc);
-                });
-            q.submit([&] (handler &cgh) {
-                auto d_memB1_acc = d_memB1.get_access<sycl_write>(cgh, range<1>(elemsInBlock));
-                cgh.copy(h_mem+crtIdx+elemsInBlock, d_memB1_acc);
-                });
+            q.memcpy(d_memA1, h_mem+crtIdx+elemsInBlock, sizeof(float) * elemsInBlock);
+            q.memcpy(d_memB1, h_mem+crtIdx+elemsInBlock, sizeof(float) * elemsInBlock);
           }
         }
         blockIdx += 1;
@@ -230,42 +191,48 @@ void RunBenchmark(OptionParser &op)
       }
       q.wait();
       p.wait();
-      double time = Timer::Stop(TH, "thread synchronize");
-
-      double triad = ((double)numMaxFloats * 2.0) / (time*1e9);
-      if (verbose)
-        std::cout << "TriadFlops " << triad << " GFLOPS/s\n";
-
-      //resultDB.AddResult("TriadFlops", sizeStr, "GFLOP/s", triad);
-
-      double bdwth = ((double)numMaxFloats*sizeof(float)*3.0)
-        / (time*1000.*1000.*1000.);
-      //resultDB.AddResult("TriadBdwth", sizeStr, "GB/s", bdwth);
-      if (verbose)
-        std::cout << "TriadBdwth " << bdwth << " GB/s\n";
-
-      // Checking memory for correctness. The two halves of the array
-      // should have the same results.
-      if (verbose) std::cout << ">> checking memory\n";
-      for (int j=0; j<halfNumFloats; ++j)
-      {
-        if (h_mem[j] != h_mem[j+halfNumFloats])
-        {
-          std::cout << "Error; hostMem[" << j << "]=" << h_mem[j]
-            << " is different from its twin element hostMem["
-            << (j+halfNumFloats) << "]: "
-            << h_mem[j+halfNumFloats] << "stopping check\n";
-          break;
-        }
-      }
-      if (verbose) std::cout << ">> finish!" << std::endl;
-
-      // Zero out the test host memory
-      for (int j=0; j<numMaxFloats; ++j)
-        h_mem[j] = 0.0f;
     }
+
+    double time = Timer::Stop(TH, "thread synchronize");
+
+    double triad = ((double)numMaxFloats*2.0*n_passes) / (time*1e9);
+    if (verbose) std::cout << "Average TriadFlops " << triad << " GFLOPS/s\n";
+
+    double bdwth = ((double)numMaxFloats*sizeof(float)*3.0*n_passes)
+                   / (time*1000.*1000.*1000.);
+    if (verbose) std::cout << "Average TriadBdwth " << bdwth << " GB/s\n";
+
+    // Checking memory for correctness. The two halves of the array
+    // should have the same results.
+    bool ok = true;
+    for (int j=0; j<halfNumFloats; ++j)
+    {
+      if (h_mem[j] != h_mem[j+halfNumFloats])
+      {
+        cout << "Error; hostMem[" << j << "]=" << h_mem[j]
+          << " is different from its twin element hostMem["
+          << (j+halfNumFloats) << "]: "
+          << h_mem[j+halfNumFloats] << "stopping check\n";
+        ok = false;
+        break;
+      }
+    }
+
+    if (ok)
+      cout << "PASS\n";
+    else
+      cout << "FAIL\n";
+
+    // Zero out the test host memory
+    for (int j=0; j<numMaxFloats; ++j) h_mem[j] = 0.0f;
   }
 
   // Cleanup
-  free(h_mem);
+  free(d_memA0, q);
+  free(d_memB0, q);
+  free(d_memC0, q);
+  free(d_memA1, q);
+  free(d_memB1, q);
+  free(d_memC1, q);
+  free(h_mem, q);
 }

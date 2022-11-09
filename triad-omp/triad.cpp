@@ -50,8 +50,8 @@ void RunBenchmark(OptionParser &op)
 
   const int nSizes = 9;
   const int blockSizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
-  const int memSize = 16384; //blockSizes[nSizes-1];
-  const int numMaxFloats = 1024 * memSize / 4;
+  const int memSize = 16384;
+  const int numMaxFloats = 1024 * memSize / sizeof(float);
   const int halfNumFloats = numMaxFloats / 2;
   const int maxBlockSize = blockSizes[nSizes - 1] * 1024;
 
