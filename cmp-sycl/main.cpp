@@ -378,17 +378,17 @@ int main(int argc, const char** argv) {
 #endif
   }
 
-  int error = 0;
+  int err_ctr = 0, err_str = 0, err_stk = 0;
   for (int i = 0; i < ncdps*ns; i++) {
-   if (r_ctr[i] != h_ctr[i] || (r_str[i] - h_str[i] > 1e-3) || (r_stk[i] - h_stk[i] > 1e-3)) {
-     error = 1;
-     break;
-   }
+   if (r_ctr[i] != h_ctr[i]) err_ctr++;
+   if (r_str[i] - h_str[i] > 1e-3) err_str++;
+   if (r_stk[i] - h_stk[i] > 1e-3) err_stk++;
   }
-  if (error)
-    LOG(INFO, "Test: FAILED");
-  else
-    LOG(INFO, "Test: PASS");
+  float err_ctr_rate = (float)err_ctr / (ncdps * ns);
+  float err_str_rate = (float)err_str / (ncdps * ns); 
+  float err_stk_rate = (float)err_stk / (ncdps * ns); 
+  printf("Error rate: ctr=%e str=%e stk=%e\n",
+         err_ctr_rate, err_str_rate, err_stk_rate);
 
   // Logs stats (exec time and semblance-traces per second)
   double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
