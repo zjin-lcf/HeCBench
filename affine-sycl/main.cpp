@@ -71,122 +71,128 @@ int main(int argc, char** argv)
 
   const int iterations = atoi(argv[3]);
 
-  { // SYCL scope
-
 #ifdef USE_GPU 
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-    buffer<unsigned short, 1> d_input_image (input_image, X_SIZE*Y_SIZE);
-    buffer<unsigned short, 1> d_output_image (output_image, X_SIZE*Y_SIZE);
+  size_t image_size_bytes = sizeof(unsigned short) * X_SIZE * Y_SIZE;
+  
+  unsigned short *d_input_image = malloc_device<unsigned short>(X_SIZE * Y_SIZE, q);
+  q.memcpy(d_input_image, input_image, image_size_bytes); 
 
-    range<2> globalSize(512,512);
-    range<2> localSize(16,16);
+  unsigned short *d_output_image = malloc_device<unsigned short>(X_SIZE*Y_SIZE, q);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  range<2> globalSize(Y_SIZE,X_SIZE);
+  range<2> localSize(16,16);
 
-    for (int i = 0; i < iterations; i++) {
-      q.submit([&](handler &h) {
-          auto src = d_input_image.get_access<sycl_read>(h);
-          auto dst = d_output_image.get_access<sycl_discard_write>(h);
-          h.parallel_for<class affine_transform> (nd_range<2>(globalSize, localSize), [=](nd_item<2> item) {
-              int y = item.get_global_id(0); 
-              int x = item.get_global_id(1); 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-              const float lx_rot   = 30.0f;
-              const float ly_rot   = 0.0f; 
-              const float lx_expan = 0.5f;
-              const float ly_expan = 0.5f; 
-              int   lx_move  = 0;
-              int   ly_move  = 0;
-              float affine[2][2];   // coefficients
-              float i_affine[2][2];
-              float beta[2];
-              float i_beta[2];
-              float det;
-              float x_new, y_new;
-              float x_frac, y_frac;
-              float gray_new;
-              int   m, n;
-              unsigned short output_buffer;
+  for (int i = 0; i < iterations; i++) {
+    q.submit([&](handler &h) {
+      h.parallel_for<class affine_transform> (nd_range<2>(globalSize, localSize), [=](nd_item<2> item) {
+        int y = item.get_global_id(0); 
+        int x = item.get_global_id(1); 
 
-              // forward affine transformation 
-              affine[0][0] = lx_expan * sycl::cos(lx_rot*PI/180.0f);
-              affine[0][1] = ly_expan * sycl::sin(ly_rot*PI/180.0f);
-              affine[1][0] = lx_expan * sycl::sin(lx_rot*PI/180.0f);
-              affine[1][1] = ly_expan * sycl::cos(ly_rot*PI/180.0f);
-              beta[0]      = lx_move;
-              beta[1]      = ly_move;
+        const float lx_rot   = 30.0f;
+        const float ly_rot   = 0.0f; 
+        const float lx_expan = 0.5f;
+        const float ly_expan = 0.5f; 
+        int   lx_move  = 0;
+        int   ly_move  = 0;
+        float affine[2][2];   // coefficients
+        float i_affine[2][2];
+        float beta[2];
+        float i_beta[2];
+        float det;
+        float x_new, y_new;
+        float x_frac, y_frac;
+        float gray_new;
+        int   m, n;
+        unsigned short output_buffer;
 
-              // determination of inverse affine transformation
-              det = (affine[0][0] * affine[1][1]) - (affine[0][1] * affine[1][0]);
-              if (det == 0.0f)
-              {
-                i_affine[0][0] = 1.0f;
-                i_affine[0][1] = 0.0f;
-                i_affine[1][0] = 0.0f;
-                i_affine[1][1] = 1.0f;
-                i_beta[0]      = -beta[0];
-                i_beta[1]      = -beta[1];
-              } 
-              else 
-              {
-                i_affine[0][0] =  affine[1][1]/det;
-                i_affine[0][1] = -affine[0][1]/det;
-                i_affine[1][0] = -affine[1][0]/det;
-                i_affine[1][1] =  affine[0][0]/det;
-                i_beta[0]      = -i_affine[0][0]*beta[0]-i_affine[0][1]*beta[1];
-                i_beta[1]      = -i_affine[1][0]*beta[0]-i_affine[1][1]*beta[1];
-              }
+        // forward affine transformation 
+        affine[0][0] = lx_expan * sycl::cos(lx_rot*PI/180.0f);
+        affine[0][1] = ly_expan * sycl::sin(ly_rot*PI/180.0f);
+        affine[1][0] = lx_expan * sycl::sin(lx_rot*PI/180.0f);
+        affine[1][1] = ly_expan * sycl::cos(ly_rot*PI/180.0f);
+        beta[0]      = lx_move;
+        beta[1]      = ly_move;
 
-              // Output image generation by inverse affine transformation and bilinear transformation
+        // determination of inverse affine transformation
+        det = (affine[0][0] * affine[1][1]) - (affine[0][1] * affine[1][0]);
+        if (det == 0.0f)
+        {
+          i_affine[0][0] = 1.0f;
+          i_affine[0][1] = 0.0f;
+          i_affine[1][0] = 0.0f;
+          i_affine[1][1] = 1.0f;
+          i_beta[0]      = -beta[0];
+          i_beta[1]      = -beta[1];
+        } 
+        else 
+        {
+          i_affine[0][0] =  affine[1][1]/det;
+          i_affine[0][1] = -affine[0][1]/det;
+          i_affine[1][0] = -affine[1][0]/det;
+          i_affine[1][1] =  affine[0][0]/det;
+          i_beta[0]      = -i_affine[0][0]*beta[0]-i_affine[0][1]*beta[1];
+          i_beta[1]      = -i_affine[1][0]*beta[0]-i_affine[1][1]*beta[1];
+        }
 
-              x_new  = i_beta[0] + i_affine[0][0]*(x-X_SIZE/2.0f) + i_affine[0][1]*(y-Y_SIZE/2.0f) + X_SIZE/2.0f;
-              y_new  = i_beta[1] + i_affine[1][0]*(x-X_SIZE/2.0f) + i_affine[1][1]*(y-Y_SIZE/2.0f) + Y_SIZE/2.0f;
+        // Output image generation by inverse affine transformation and bilinear transformation
 
-              m      = (int)sycl::floor(x_new);
-              n      = (int)sycl::floor(y_new);
+        x_new  = i_beta[0] + i_affine[0][0]*(x-X_SIZE/2.0f) + i_affine[0][1]*(y-Y_SIZE/2.0f) + X_SIZE/2.0f;
+        y_new  = i_beta[1] + i_affine[1][0]*(x-X_SIZE/2.0f) + i_affine[1][1]*(y-Y_SIZE/2.0f) + Y_SIZE/2.0f;
 
-              x_frac = x_new - m;
-              y_frac = y_new - n;
+        m      = (int)sycl::floor(x_new);
+        n      = (int)sycl::floor(y_new);
 
-              if ((m >= 0) && (m + 1 < X_SIZE) && (n >= 0) && (n+1 < Y_SIZE))
-              {
-                gray_new = (1.0f - y_frac) * ((1.0f - x_frac) * (src[(n * X_SIZE) + m])       + x_frac * (src[(n * X_SIZE) + m + 1])) + 
-                  y_frac  * ((1.0f - x_frac) * (src[((n + 1) * X_SIZE) + m]) + x_frac * (src[((n + 1) * X_SIZE) + m + 1]));
+        x_frac = x_new - m;
+        y_frac = y_new - n;
 
-                output_buffer = (unsigned short)gray_new;
-              } 
-              else if (((m + 1 == X_SIZE) && (n >= 0) && (n < Y_SIZE)) || ((n + 1 == Y_SIZE) && (m >= 0) && (m < X_SIZE))) 
-              {
-                output_buffer = src[(n * X_SIZE) + m];
-              } 
-              else 
-              {
-                output_buffer = WHITE;
-              }
+        if ((m >= 0) && (m + 1 < X_SIZE) && (n >= 0) && (n+1 < Y_SIZE))
+        {
+          gray_new = (1.0f - y_frac) * ((1.0f - x_frac) * d_input_image[(n * X_SIZE) + m] +
+                     x_frac * d_input_image[(n * X_SIZE) + m + 1]) +
+                     y_frac  * ((1.0f - x_frac) * (d_input_image[((n + 1) * X_SIZE) + m]) +
+                     x_frac * (d_input_image[((n + 1) * X_SIZE) + m + 1]));
 
-              dst[(y * X_SIZE)+x] = output_buffer;
-          });
+          output_buffer = (unsigned short)gray_new;
+        } 
+        else if (((m + 1 == X_SIZE) && (n >= 0) && (n < Y_SIZE)) || ((n + 1 == Y_SIZE) && (m >= 0) && (m < X_SIZE))) 
+        {
+          output_buffer = d_input_image[(n * X_SIZE) + m];
+        } 
+        else 
+        {
+          output_buffer = WHITE;
+        }
+
+        d_output_image[(y * X_SIZE)+x] = output_buffer;
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "   Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "   Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+
+  q.memcpy(output_image, d_output_image, image_size_bytes).wait();
+
+  free(d_input_image, q);
+  free(d_output_image, q);
 
   // verify
   affine_reference(input_image, output_image_ref);
   int max_error = 0;
-  for (int y = 0; y < 512; y++) {
-    for (int x = 0; x < 512; x++) {
-      max_error = std::max(max_error, std::abs(output_image[y*512+x] - output_image_ref[y*512+x]));
+  for (int y = 0; y < Y_SIZE; y++) {
+    for (int x = 0; x < X_SIZE; x++) {
+      max_error = std::max(max_error, std::abs(output_image[y*X_SIZE+x] - output_image_ref[y*X_SIZE+x]));
     }
   }
   printf("   Max output error is %d\n\n", max_error);

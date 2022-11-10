@@ -72,14 +72,16 @@ int main(int argc, char** argv)
 
   const int iterations = atoi(argv[3]);
 
+  size_t image_size_bytes = sizeof(unsigned short) * X_SIZE * Y_SIZE;
+
   unsigned short *d_input_image;
-  cudaMalloc((void**)&d_input_image, sizeof(unsigned short)*X_SIZE*Y_SIZE);
-  cudaMemcpy(d_input_image, input_image, sizeof(unsigned short)*X_SIZE*Y_SIZE, cudaMemcpyHostToDevice);
+  cudaMalloc((void**)&d_input_image, image_size_bytes);
+  cudaMemcpy(d_input_image, input_image, image_size_bytes, cudaMemcpyHostToDevice);
 
   unsigned short *d_output_image;
-  cudaMalloc((void**)&d_output_image, sizeof(unsigned short)*X_SIZE*Y_SIZE);
+  cudaMalloc((void**)&d_output_image, image_size_bytes);
 
-  dim3 grids (32,32);
+  dim3 grids (X_SIZE/16,Y_SIZE/16);
   dim3 threads (16,16);
 
   cudaDeviceSynchronize();
@@ -94,16 +96,16 @@ int main(int argc, char** argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "   Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
 
-  cudaMemcpy(output_image, d_output_image, sizeof(unsigned short)*X_SIZE*Y_SIZE, cudaMemcpyDeviceToHost);
+  cudaMemcpy(output_image, d_output_image, image_size_bytes, cudaMemcpyDeviceToHost);
   cudaFree(d_input_image);
   cudaFree(d_output_image);
 
   // verify
   affine_reference(input_image, output_image_ref);
   int max_error = 0;
-  for (int y = 0; y < 512; y++) {
-    for (int x = 0; x < 512; x++) {
-      max_error = std::max(max_error, std::abs(output_image[y*512+x] - output_image_ref[y*512+x]));
+  for (int y = 0; y < Y_SIZE; y++) {
+    for (int x = 0; x < X_SIZE; x++) {
+      max_error = std::max(max_error, std::abs(output_image[y*X_SIZE+x] - output_image_ref[y*X_SIZE+x]));
     }
   }
   printf("   Max output error is %d\n\n", max_error);
