@@ -70,12 +70,25 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 log.o : $(inc)/log.cpp $(inc)/log.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 parser.o: $(inc)/parser.cpp $(inc)/parser.hpp  
+	$(CC) $(CFLAGS) -c $< -o $@
+
 su_cdp.o : $(inc)/su_cdp.cpp $(inc)/su_cdp.hpp $(inc)/log.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 su_gather.o : $(inc)/su_gather.cpp $(inc)/su_gather.hpp $(inc)/log.hpp $(inc)/su_trace.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 su_trace.o : $(inc)/su_trace.cpp $(inc)/su_trace.hpp $(inc)/log.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 main.o : main.cpp $(inc)/log.hpp $(inc)/utils.hpp $(inc)/parser.hpp $(inc)/su_gather.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 reference.o : $(inc)/reference.cpp $(inc)/utils.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
