@@ -16,18 +16,23 @@ float* attention_device(const float* key, const float* value, const float* query
   queue q(dev_sel, property::queue::in_order());
 
   // input
-  buffer<float, 1> d_key (key, n*d);
-  buffer<float, 1> d_value (value, n*d);
-  buffer<float, 1> d_query (query, d);
+  float *d_key = malloc_device<float>(n*d, q);
+  q.memcpy(d_key, key, sizeof(float) * n * d);
+
+  float *d_value = malloc_device<float>(n*d, q);
+  q.memcpy(d_value, value, sizeof(float) * n * d);
+
+  float *d_query = malloc_device<float>(d, q);
+  q.memcpy(d_query, query, sizeof(float) * d);
 
   // intermediate
-  buffer<float, 1> d_dot_product (n);
-  buffer<float, 1> d_score (n);
-  buffer<float, 1> d_exp_sum (1);
+  float *d_dot_product = malloc_device<float>(n, q);
+  float *d_score = malloc_device<float>(n, q);
+  float *d_exp_sum = malloc_device<float>(1, q);
 
   // result
   float *output = (float*) malloc (d * sizeof(float));
-  buffer<float, 1> d_output (d);
+  float *d_output = malloc_device<float>(d, q);
 
   range<1> n_gws ((n+255)/256*256);
   range<1> n_lws (256);
@@ -38,54 +43,41 @@ float* attention_device(const float* key, const float* value, const float* query
   auto start = std::chrono::steady_clock::now();
 
   for (int k = 0; k < repeat; k++) {
-    q.submit([&] (handler &cgh) {
-      auto exp_sum = d_exp_sum.get_access<sycl_discard_write>(cgh);
-      cgh.fill(exp_sum, 0.f);
-    });
+    q.memset(d_exp_sum, 0, sizeof(float));
 
     q.submit([&] (handler &cgh) {
-      auto key = d_key.get_access<sycl_read>(cgh);
-      auto query = d_query.get_access<sycl_read>(cgh);
-      auto dot_product = d_dot_product.get_access<sycl_discard_write>(cgh);
-      auto exp_sum = d_exp_sum.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class k1>(nd_range<1>(n_gws, n_lws), [=] (nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
           float sum = 0;
           for (int j = 0; j < d; j++)
-            sum += key[i * d + j] * query[j];
-          dot_product[i] = sum;
+            sum += d_key[i * d + j] * d_query[j];
+          d_dot_product[i] = sum;
           auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
             ext::oneapi::memory_order::relaxed,
             ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (exp_sum[0]);
+            access::address_space::global_space> (d_exp_sum[0]);
           atomic_obj_ref.fetch_add(sycl::exp(sum));
         }
       });
     });
 
     q.submit([&] (handler &cgh) {
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto dot_product = d_dot_product.get_access<sycl_read>(cgh);
-      auto exp_sum = d_exp_sum.get_access<sycl_read>(cgh);
       cgh.parallel_for<class k2>(nd_range<1>(n_gws, n_lws), [=] (nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n)
-          score[i] = sycl::exp(dot_product[i]) / exp_sum[0];
+          d_score[i] = sycl::exp(d_dot_product[i]) / d_exp_sum[0];
       });
     });
 
     q.submit([&] (handler &cgh) {
-      auto output = d_output.get_access<sycl_discard_write>(cgh);
-      auto score = d_score.get_access<sycl_read>(cgh);
-      auto value = d_value.get_access<sycl_read>(cgh);
       cgh.parallel_for<class k3>(nd_range<1>(d_gws, d_lws), [=] (nd_item<1> item) {
         int j = item.get_global_id(0);
         if (j < d) {
           float sum = 0;
           for (int i = 0; i < n; i++)
-            sum += score[i] * value[i * d + j];
-          output[j] = sum;
+            sum += d_score[i] * d_value[i * d + j];
+          d_output[j] = sum;
         }
       });
     });
@@ -96,10 +88,15 @@ float* attention_device(const float* key, const float* value, const float* query
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of kernels %f (ms)\n", time * 1e-6f / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, output);
-  }).wait();
+  q.memcpy(output, d_output, sizeof(float) * d).wait();
+
+  free(d_key, q);
+  free(d_value, q);
+  free(d_query, q);
+  free(d_dot_product, q);
+  free(d_score, q);
+  free(d_exp_sum, q);
+  free(d_output, q);
 
   return output;
 }
