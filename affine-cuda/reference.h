@@ -7,8 +7,8 @@
 // reference implementation for verification
 void affine_reference(const unsigned short *src, unsigned short *dst) 
 {
-  for (int y = 0; y < 512; y++) {
-    for (int x = 0; x < 512; x++) {
+  for (int y = 0; y < Y_SIZE; y++) {
+    for (int x = 0; x < X_SIZE; x++) {
       const float    lx_rot   = 30.0f;
       const float    ly_rot   = 0.0f; 
       const float    lx_expan = 0.5f;

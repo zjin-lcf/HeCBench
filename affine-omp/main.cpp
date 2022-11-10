@@ -71,7 +71,8 @@ int main(int argc, char** argv)
 
   const int iterations = atoi(argv[3]);
 
-  #pragma omp target data map(to: input_image[0:X_SIZE*Y_SIZE]) map(from:output_image[0:X_SIZE*Y_SIZE])
+  #pragma omp target data map(to: input_image[0:X_SIZE*Y_SIZE]) \
+                          map(from:output_image[0:X_SIZE*Y_SIZE])
   {
     auto start = std::chrono::steady_clock::now();
 
@@ -166,9 +167,9 @@ int main(int argc, char** argv)
   // verify
   affine_reference(input_image, output_image_ref);
   int max_error = 0;
-  for (int y = 0; y < 512; y++) {
-    for (int x = 0; x < 512; x++) {
-      max_error = std::max(max_error, std::abs(output_image[y*512+x] - output_image_ref[y*512+x]));
+  for (int y = 0; y < Y_SIZE; y++) {
+    for (int x = 0; x < X_SIZE; x++) {
+      max_error = std::max(max_error, std::abs(output_image[y*X_SIZE+x] - output_image_ref[y*X_SIZE+x]));
     }
   }
   printf("   Max output error is %d\n\n", max_error);
