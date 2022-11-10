@@ -91,6 +91,8 @@ float* attention_device(const float* key, const float* value, const float* query
   dim3 d_grid((d+255)/256);
   dim3 d_block(256);
 
+  cudaDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
 
   for (int k = 0; k < repeat; k++) {
     cudaMemset(d_exp_sum, 0, 4);
@@ -101,6 +103,11 @@ float* attention_device(const float* key, const float* value, const float* query
 
     kernel3<<<d_grid, d_block>>>(d_score, d_value, d_output, n, d);
   }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of kernels %f (ms)\n", time * 1e-6f / repeat);
 
   cudaMemcpy(output, d_output, d * sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(d_score);
@@ -138,13 +145,7 @@ int main(int argc, char* argv[]) {
 
   float* hout = attention_host(key, value, query, n, d);
 
-  auto start = std::chrono::steady_clock::now();
-
   float* dout = attention_device(key, value, query, n, d, r);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Device offload time %f (s)\n", (time * 1e-9f));
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 

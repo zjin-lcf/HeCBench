@@ -13,7 +13,7 @@ float* attention_device(const float* key, const float* value, const float* query
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   // input
   buffer<float, 1> d_key (key, n*d);
@@ -33,6 +33,9 @@ float* attention_device(const float* key, const float* value, const float* query
   range<1> n_lws (256);
   range<1> d_gws ((d+255)/256*256);
   range<1> d_lws (256);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
   for (int k = 0; k < repeat; k++) {
     q.submit([&] (handler &cgh) {
@@ -88,6 +91,11 @@ float* attention_device(const float* key, const float* value, const float* query
     });
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of kernels %f (ms)\n", time * 1e-6f / repeat);
+
   q.submit([&] (handler &cgh) {
     auto acc = d_output.get_access<sycl_read>(cgh);
     cgh.copy(acc, output);
@@ -122,13 +130,7 @@ int main(int argc, char* argv[]) {
 
   float* hout = attention_host(key, value, query, n, d);
 
-  auto start = std::chrono::steady_clock::now();
-
   float* dout = attention_device(key, value, query, n, d, r);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Device offload time %f (s)\n", (time * 1e-9f));
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 
