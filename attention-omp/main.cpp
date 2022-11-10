@@ -20,6 +20,8 @@ float* attention_device(const float* key, const float* value, const float* query
                           map(alloc: dot_product[0:n], score[0:n], exp_sum[0:1]), \
                           map(from: output[0:d])
   {
+    auto start = std::chrono::steady_clock::now();
+
     for (int k = 0; k < repeat; k++) {
       exp_sum[0] = 0;
       #pragma omp target update to (exp_sum[0:1])
@@ -46,6 +48,10 @@ float* attention_device(const float* key, const float* value, const float* query
         output[j] = sum;
       }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of kernels %f (ms)\n", time * 1e-6f / repeat);
   }
 
   free(dot_product);
@@ -80,13 +86,7 @@ int main(int argc, char* argv[]) {
 
   float* hout = attention_host(key, value, query, n, d);
 
-  auto start = std::chrono::steady_clock::now();
-
   float* dout = attention_device(key, value, query, n, d, r);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Device offload time %f (s)\n", (time * 1e-9f));
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 
