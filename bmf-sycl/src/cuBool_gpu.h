@@ -154,7 +154,6 @@ class cuBool
         accessor<factor_t, 1, sycl_read_write, sycl_lmem> B_block_sm(32 * WARPSPERBLOCK, cgh);
         accessor<bit_vector_t, 1, sycl_read_write, sycl_lmem> C_block_sm(32 * WARPSPERBLOCK, cgh);
         accessor<error_t, 1, sycl_read_write, sycl_lmem> reductionArray_sm(WARPSPERBLOCK, cgh);
-
         auto d_C_t = d_C;
         auto height_t = height_;
         auto width_t = width_;
@@ -171,9 +170,7 @@ class cuBool
             reductionArray_sm.get_pointer());
         });
       });
-      q.wait();
-      q.memcpy(handler.distance_, handler.d_distance_, sizeof(error_t));
-      q.wait();
+      q.memcpy(handler.distance_, handler.d_distance_, sizeof(error_t)).wait();
     }
 
   public:
@@ -298,8 +295,6 @@ class cuBool
             reductionArray_sm.get_pointer());
         });
       });
-      q.wait();
-
       q.memcpy(distance_proof, d_distance_proof, sizeof(error_t)).wait();
 
       bool equal = *handler.distance_ == *distance_proof;
@@ -484,7 +479,6 @@ class cuBool
               C_block_sm.get_pointer());
           });
         });
-        q.wait();
 
         // Change cols
         lineToBeChanged = (fast_kiss32(state) % width_) / WARPSPERBLOCK * WARPSPERBLOCK;
@@ -518,11 +512,9 @@ class cuBool
              C_block_sm.get_pointer());
            });
         });
-        q.wait();
 
         if(iteration % syncStep == 0) {
-          q.memcpy(handler.distance_, handler.d_distance_, sizeof(error_t));
-          q.wait();
+          q.memcpy(handler.distance_, handler.d_distance_, sizeof(error_t)).wait();
 
           if(*handler.distance_ == distancePrev)
             stuckIterations += syncStep;
@@ -624,7 +616,7 @@ class cuBool
     vector<factor_handler> activeExperiments;
     vector<float> finalDistances;
 #ifdef USE_GPU
-    sycl::queue q{sycl::gpu_selector{}};
+    sycl::queue q{sycl::gpu_selector{}, property::queue::in_order()};
 #else
     sycl::queue q{sycl::cpu_selector{}};
 #endif
