@@ -64,7 +64,7 @@ Each benchmark falls into a single category. While such classification is not ac
     bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
 
 ### Robotics
-    inversek2j
+    inversek2j, rodrigues
 
 # Run a benchmark
   Option 1: Go to a benchmark and type `make run`  
@@ -967,6 +967,9 @@ Early results are shown [here](results/README.md)
 
 ### rng-wallace (cuda)
   Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
+
+### rodrigues (cuda)
+  Rodrigues' rotation (https://github.com/DIDSR/VICTRE_MCGPU)
 
 ### romberg (cuda)
   Romberg's method (https://github.com/SwayambhuNathRay/Parallel-Romberg-Integration)
