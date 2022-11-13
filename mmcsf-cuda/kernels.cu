@@ -12,9 +12,24 @@ inline cudaError_t checkCuda(cudaError_t result, int s){
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC, int fbrPerWarp, int logOfFPW){
+__global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds2, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2, 
+  ITYPE  mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  int fbrPerWarp,
+  int logOfFPW)
+{
 
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
@@ -70,10 +85,27 @@ __global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *f
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0, 
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC, int fbrPerWarp, int logOfFPW){
-
+__global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds3, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  const ITYPE *__restrict__ fbrPtr2,
+  const ITYPE *__restrict__ fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0, 
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2,
+  const DTYPE *__restrict__ dU3,
+  ITYPE  mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  int fbrPerWarp,
+  int logOfFPW)
+{
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
   ITYPE bdim = blockDim.x;
@@ -134,9 +166,25 @@ __global__ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC){
+__global__ void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds3, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  const ITYPE *__restrict__ fbrPtr2,
+  const ITYPE *__restrict__ fbrIdx2,
+  ITYPE nFibers,
+  DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2,
+  const DTYPE *__restrict__ dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC)
+{
 
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
@@ -173,10 +221,22 @@ __global__ void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(DTYPE * vals, ITYP
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC){
-
+__global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds2, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2, 
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC)
+{
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
   ITYPE bdim = blockDim.x;
@@ -202,16 +262,30 @@ __global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(DTYPE * vals, ITYPE *f
     for(unsigned int r=laneId; r<R; r+=32) { 
       tmp = tmp_val * dU2[idx2 * R + r] ;
       atomicAdd(&dU0[idx0 * R + r], tmp); //2PR
-
     }    
   }
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC){
-
+__global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds3, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  const ITYPE *__restrict__ fbrPtr2,
+  const ITYPE *__restrict__ fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2,
+  const DTYPE *__restrict__ dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC)
+{
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
   ITYPE bdim = blockDim.x;
@@ -243,10 +317,22 @@ __global__ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC){
-
+__global__ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds2, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2, 
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC)
+{
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
   ITYPE bdim = blockDim.x;
@@ -277,10 +363,25 @@ __global__ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(DTYPE * vals, ITYPE *f
 }
 
 // CUDA fbr atomic sing slcLikeFbr
-__global__ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC){
-
+__global__ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict__ vals,
+  const ITYPE *__restrict__ fbrLikeSlcInds,
+  const ITYPE *__restrict__ dInds3, 
+  const ITYPE *__restrict__ fbrPtr0,
+  const ITYPE *__restrict__ fbrPtr1,
+  const ITYPE *__restrict__ fbrIdx1,
+  const ITYPE *__restrict__ fbrPtr2,
+  const ITYPE *__restrict__ fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict__ dU0,
+  const DTYPE *__restrict__ dU1,
+  const DTYPE *__restrict__ dU2,
+  const DTYPE *__restrict__ dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC)
+{
   ITYPE tId = threadIdx.x;
   ITYPE laneId = tId & 31;
   ITYPE bdim = blockDim.x;
@@ -426,8 +527,6 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   if(TiledX[0].ndims == 4)
     checkCuda(cudaMemcpyAsync(dU + szDU[0] + szDU[1] + szDU[2], &(U[mode3].vals[0]), 
         U[mode3].nRows * U[mode3].nCols * sizeof(DTYPE), cudaMemcpyHostToDevice, 0), __LINE__);
-
-
 
   dLoc = 0, dSlcLoc = 0, dSlcIdxLoc = 0; dFbrLoc =0, dFbrIdxLoc = 0, dFbrLoc2= 0;
 
@@ -598,7 +697,6 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
               TiledX[m].nFibers,  dU + dULoc[3], dU + dULoc[0], dU + dULoc[1], dU + dULoc[2], Opt.mode, Opt.R, warpPerFbr, logOfWarpPerFbr);
 	}
       }
-
       cudaDeviceSynchronize();
     }
   }
@@ -628,7 +726,6 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   delete[] dULoc;
   delete[] szDU;
 
-
   int totalMIslics = 0, totalMISfibers = 0, totalMIfibers = 0, totalMInnz = 0;;
   for (int m = 0; m <  TiledX[0].ndims; ++m){
     if(TiledX[m].totNnz){
@@ -643,7 +740,6 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
         totalMISfibers += TiledX[m].fbrPtr[1].size();
         totalMIfibers += TiledX[m].fbrPtr[2].size();
         totalMInnz += TiledX[m].totNnz;
-
       }
     }
   }
@@ -651,13 +747,11 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   std::cout << "Resource usage: " << std::endl;
   if(TiledX[0].ndims == 3)
     std::cout << " nSlc:" << totalMIslics
-      << ", nFibers:" << totalMIfibers << ", nnz:" << totalMInnz  
-      << std::endl;
+              << ", nFibers:" << totalMIfibers << ", nnz:" << totalMInnz  
+              << std::endl;
   else if(TiledX[0].ndims == 4)
     std::cout << " nSlc:" << totalMIslics  << ", nSFibers:" << totalMISfibers
-      << ", nFibers:" << totalMIfibers << ", nnz:" << totalMInnz  
-      << std::endl;
-
+              << ", nFibers:" << totalMIfibers << ", nnz:" << totalMInnz  
+              << std::endl;
   return 0;
 }
-

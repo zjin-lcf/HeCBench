@@ -3,11 +3,25 @@
 #include <vector>
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC, int fbrPerWarp, int logOfFPW, 
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds2, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2, 
+  ITYPE  mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  int fbrPerWarp,
+  int logOfFPW,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -48,11 +62,11 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
         diffFiber = true;
         for(unsigned int r=laneId; r<R; r+=32) { 
           //atomicAdd(&dU0[idx0 * R + r], tmp); //2PR
-          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                       ext::oneapi::memory_order::relaxed, 
-                       ext::oneapi::memory_scope::device, 
-                       access::address_space::global_space> (dU0[idx0 * R + r]);
-          atomic_obj_ref.fetch_add(tmp);
+          auto ao = ext::oneapi::atomic_ref<DTYPE,
+                    ext::oneapi::memory_order::relaxed, 
+                    ext::oneapi::memory_scope::device, 
+                    access::address_space::global_space> (dU0[idx0 * R + r]);
+          ao.fetch_add(tmp);
         } 
         tmp = 0;
       }
@@ -61,22 +75,39 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
     if(!diffFiber) {  
       for(unsigned int r=laneId; r<R; r+=32) { 
         //atomicAdd(&dU0[idx0 * R + r], tmp); 
-        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (dU0[idx0 * R + r]);
-        atomic_obj_ref.fetch_add(tmp);
+        auto ao = ext::oneapi::atomic_ref<DTYPE,
+                  ext::oneapi::memory_order::relaxed, 
+                  ext::oneapi::memory_scope::device, 
+                  access::address_space::global_space> (dU0[idx0 * R + r]);
+        ao.fetch_add(tmp);
       }  
     }  
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0, 
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC, int fbrPerWarp, 
-    int logOfFPW, nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds3, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  const ITYPE *__restrict fbrPtr2,
+  const ITYPE *__restrict fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0, 
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2,
+  const DTYPE *__restrict dU3,
+  ITYPE  mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  int fbrPerWarp,
+  int logOfFPW,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -124,11 +155,11 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
         diffFiber = true;
         for(unsigned int r=laneId; r<R; r+=32) { 
           //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR
-          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                       ext::oneapi::memory_order::relaxed, 
-                       ext::oneapi::memory_scope::device, 
-                       access::address_space::global_space> (dU0[idx0 * R + r]);
-          atomic_obj_ref.fetch_add(tmp2);
+          auto ao = ext::oneapi::atomic_ref<DTYPE,
+                    ext::oneapi::memory_order::relaxed, 
+                    ext::oneapi::memory_scope::device, 
+                    access::address_space::global_space> (dU0[idx0 * R + r]);
+          ao.fetch_add(tmp2);
         } 
         tmp2 = 0;
       }
@@ -137,22 +168,37 @@ void mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
     if(!diffFiber) {  
       for(unsigned int r=laneId; r<R; r+=32) {
         //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR           
-        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (dU0[idx0 * R + r]);
-        atomic_obj_ref.fetch_add(tmp2);
+        auto ao = ext::oneapi::atomic_ref<DTYPE,
+                  ext::oneapi::memory_order::relaxed, 
+                  ext::oneapi::memory_scope::device, 
+                  access::address_space::global_space> (dU0[idx0 * R + r]);
+        ao.fetch_add(tmp2);
       }
     }
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC, 
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds3, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  const ITYPE *__restrict fbrPtr2,
+  const ITYPE *__restrict fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2,
+  const DTYPE *__restrict dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -183,21 +229,33 @@ void mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeS
     for(unsigned int r=laneId; r<R; r+=32) { 
       tmp2 = tmp * dU3[idx3 * R + r];
       //atomicAdd(&dU0[idx0 * R + r], tmp2); //2PR
-      auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                   ext::oneapi::memory_order::relaxed, 
-                   ext::oneapi::memory_scope::device, 
-                   access::address_space::global_space> (dU0[idx0 * R + r]);
-      atomic_obj_ref.fetch_add(tmp2);
+      auto ao = ext::oneapi::atomic_ref<DTYPE,
+                ext::oneapi::memory_order::relaxed, 
+                ext::oneapi::memory_scope::device, 
+                access::address_space::global_space> (dU0[idx0 * R + r]);
+      ao.fetch_add(tmp2);
     }    
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC,
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds2, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2, 
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -223,22 +281,36 @@ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
     for(unsigned int r=laneId; r<R; r+=32) { 
       tmp = tmp_val * dU2[idx2 * R + r] ;
       //atomicAdd(&dU0[idx0 * R + r], tmp); //2PR
-      auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                   ext::oneapi::memory_order::relaxed, 
-                   ext::oneapi::memory_scope::device, 
-                   access::address_space::global_space> (dU0[idx0 * R + r]);
-      atomic_obj_ref.fetch_add(tmp);
-
+      auto ao = ext::oneapi::atomic_ref<DTYPE,
+                ext::oneapi::memory_order::relaxed, 
+                ext::oneapi::memory_scope::device, 
+                access::address_space::global_space> (dU0[idx0 * R + r]);
+      ao.fetch_add(tmp);
     }    
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC,
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds3, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  const ITYPE *__restrict fbrPtr2,
+  const ITYPE *__restrict fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2,
+  const DTYPE *__restrict dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -264,22 +336,34 @@ void mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
       }
       for(unsigned int r=laneId; r<R; r+=32)  {
         //atomicAdd(&dU0[idx0 * R + r], tmp * dU2[idx2 * R + r] * dU3[idx3 * R + r]) ;  
-        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (dU0[idx0 * R + r]);
-        atomic_obj_ref.fetch_add(tmp * dU2[idx2 * R + r] * dU3[idx3 * R + r]);
+        auto ao = ext::oneapi::atomic_ref<DTYPE,
+                  ext::oneapi::memory_order::relaxed, 
+                  ext::oneapi::memory_scope::device, 
+                  access::address_space::global_space> (dU0[idx0 * R + r]);
+        ao.fetch_add(tmp * dU2[idx2 * R + r] * dU3[idx3 * R + r]);
       }
     }            
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcInds, ITYPE *dInds2, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE nFibers, DTYPE *dU0, DTYPE * dU1, DTYPE *dU2, 
-    ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC,
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds2, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2, 
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -304,22 +388,37 @@ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(DTYPE * vals, ITYPE *fbrLikeSlcIn
       for(unsigned int r=laneId; r<R; r+=32) {
         tmp_val = vals[x] * tmp;///dU1[idx1 * R + r] * dU2[idx2 * R + r] ; //2MR
         //atomicAdd(&dU0[idx0 * R + r], tmp_val);
-        auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (dU0[idx0 * R + r]);
-        atomic_obj_ref.fetch_add(tmp_val);
+        auto ao = ext::oneapi::atomic_ref<DTYPE,
+                  ext::oneapi::memory_order::relaxed, 
+                  ext::oneapi::memory_scope::device, 
+                  access::address_space::global_space> (dU0[idx0 * R + r]);
+        ao.fetch_add(tmp_val);
       }
     }         
   }
 }
 
 // fbr atomic sing slcLikeFbr
-void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSlcInds,  ITYPE *dInds3, 
-    ITYPE *fbrPtr0, ITYPE *fbrPtr1, ITYPE *fbrIdx1, ITYPE *fbrPtr2, ITYPE *fbrIdx2, ITYPE nFibers, DTYPE *dU0,
-    DTYPE * dU1, DTYPE *dU2, DTYPE *dU3, ITYPE  mode, ITYPE R, ITYPE warpPerSlice, int logOfWPC,
-    nd_item<1> &item){
-
+void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(
+  const DTYPE *__restrict vals,
+  const ITYPE *__restrict fbrLikeSlcInds,
+  const ITYPE *__restrict dInds3, 
+  const ITYPE *__restrict fbrPtr0,
+  const ITYPE *__restrict fbrPtr1,
+  const ITYPE *__restrict fbrIdx1,
+  const ITYPE *__restrict fbrPtr2,
+  const ITYPE *__restrict fbrIdx2,
+  ITYPE nFibers,
+        DTYPE *__restrict dU0,
+  const DTYPE *__restrict dU1,
+  const DTYPE *__restrict dU2,
+  const DTYPE *__restrict dU3,
+  ITYPE mode,
+  ITYPE R,
+  ITYPE warpPerSlice,
+  int logOfWPC,
+  nd_item<1> &item)
+{
   ITYPE tId = item.get_local_id(0);
   ITYPE laneId = tId & 31;
   ITYPE bdim = item.get_local_range(0);
@@ -346,11 +445,11 @@ void mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(DTYPE * vals, ITYPE *fbrLikeSl
         for(unsigned int r=laneId; r<R; r+=32) {
           tmp = vals[x] * dU3[idx3 * R + r] * tmp_val;//2MR
           //atomicAdd(&dU0[idx0 * R + r], tmp);
-          auto atomic_obj_ref = ext::oneapi::atomic_ref<DTYPE,
-                       ext::oneapi::memory_order::relaxed, 
-                       ext::oneapi::memory_scope::device, 
-                       access::address_space::global_space> (dU0[idx0 * R + r]);
-          atomic_obj_ref.fetch_add(tmp);
+          auto ao = ext::oneapi::atomic_ref<DTYPE,
+                    ext::oneapi::memory_order::relaxed, 
+                    ext::oneapi::memory_scope::device, 
+                    access::address_space::global_space> (dU0[idx0 * R + r]);
+          ao.fetch_add(tmp);
         }
       }
     }            
@@ -386,23 +485,28 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 #else
   cpu_selector dev_sel;
 #endif
-  sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel, property::queue::in_order());
 
   // Allocate Tensor on a device
-  buffer<DTYPE, 1> dVals (totNnz);
-  buffer<ITYPE, 1> dFbrPtr0 (totSlcPtr);
-  buffer<ITYPE, 1> dFbrIdx0 (totSlcIdx);
-  buffer<ITYPE, 1> dFbrPtr1 (totFbrPtr);
-  buffer<ITYPE, 1> dFbrIdx1 (totFbrIdx);
-  buffer<ITYPE, 1> dFbrLikeSlcInds (totFbrIdx);
+  DTYPE* dVals = malloc_device<DTYPE>(totNnz, q);
+  ITYPE* dFbrPtr0 = malloc_device<ITYPE>(totSlcPtr, q);
+  ITYPE* dFbrIdx0 = malloc_device<ITYPE>(totSlcIdx, q);
+  ITYPE* dFbrPtr1 = malloc_device<ITYPE>(totFbrPtr, q);
+  ITYPE* dFbrIdx1 = malloc_device<ITYPE>(totFbrIdx, q);
+  ITYPE* dFbrLikeSlcInds = malloc_device<ITYPE>(totFbrIdx, q);
 
   // conditional buffer allocation will produce undefined variables
   // ndim = 3
-  buffer<ITYPE, 1> dInds2 (totNnz);
+  ITYPE *dInds2, *dFbrIdx2, *dFbrPtr2, *dInds3;
+  if(TiledX[0].ndims == 3)
+    dInds2 = malloc_device<ITYPE>(totNnz, q);
+
   // ndim = 4
-  buffer<ITYPE, 1> dFbrIdx2 (totFbrPtr2);
-  buffer<ITYPE, 1> dFbrPtr2 (totFbrPtr2);
-  buffer<ITYPE, 1> dInds3 (totNnz);
+  if(TiledX[0].ndims == 4){
+    dFbrIdx2 = malloc_device<ITYPE>(totFbrPtr2, q);
+    dFbrPtr2 = malloc_device<ITYPE>(totFbrPtr2, q);
+    dInds3 = malloc_device<ITYPE>(totNnz, q);
+  }
 
   // device memory copy for tiled parts
   for (int m = 0; m < TiledX[0].ndims; ++m){  
@@ -422,58 +526,32 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
     if (TiledX[m].totNnz == 0) continue;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = dVals.get_access<sycl_write>(cgh, range<1>(TiledX[m].totNnz), id<1>(dLoc));
-      cgh.copy(&(TiledX[m].vals[0]), acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dFbrPtr0.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrPtr[0].size()), id<1>(dSlcLoc));
-      cgh.copy(&(TiledX[m].fbrPtr[0][0]), acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dFbrIdx0.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrIdx[0].size()), id<1>(dSlcIdxLoc));
-      cgh.copy(&(TiledX[m].fbrIdx[0][0]), acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dFbrPtr1.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrPtr[1].size()), id<1>(dFbrLoc));
-      cgh.copy(&(TiledX[m].fbrPtr[1][0]), acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dFbrIdx1.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrIdx[1].size()), id<1>(dFbrIdxLoc));
-      cgh.copy(&(TiledX[m].fbrIdx[1][0]), acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dFbrLikeSlcInds.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrIdx[1].size()), id<1>(dFbrIdxLoc));
-      cgh.copy(&(TiledX[m].fbrLikeSlcInds[0]), acc);
-    });
+    
+    q.memcpy(dVals + dLoc, &(TiledX[m].vals[0]),
+             TiledX[m].totNnz * sizeof(DTYPE));
+    q.memcpy(dFbrPtr0 + dSlcLoc, &(TiledX[m].fbrPtr[0][0]), 
+             TiledX[m].fbrPtr[0].size() * sizeof(ITYPE));
+    q.memcpy(dFbrIdx0 + dSlcIdxLoc, &(TiledX[m].fbrIdx[0][0]), 
+             TiledX[m].fbrIdx[0].size() * sizeof(ITYPE));
+    q.memcpy(dFbrPtr1 + dFbrLoc, &(TiledX[m].fbrPtr[1][0]), 
+             TiledX[m].fbrPtr[1].size() * sizeof(ITYPE));
+    q.memcpy(dFbrIdx1 + dFbrIdxLoc, &(TiledX[m].fbrIdx[1][0]), 
+             TiledX[m].fbrIdx[1].size() * sizeof(ITYPE));
+    q.memcpy(dFbrLikeSlcInds + dFbrIdxLoc, &(TiledX[m].fbrLikeSlcInds[0]), 
+             TiledX[m].fbrIdx[1].size() * sizeof(ITYPE));
 
     if(TiledX[m].ndims == 3){
       if(m <= 2)
-        q.submit([&] (handler &cgh) {
-          auto acc = dInds2.get_access<sycl_write>(cgh, range<1>(TiledX[m].totNnz), id<1>(dLoc));
-          cgh.copy(&(TiledX[m].inds[TiledX[m].modeOrder[2]][0]), acc);
-        });
+        q.memcpy(dInds2 + dLoc, &(TiledX[m].inds[TiledX[m].modeOrder[2]][0]), 
+                 TiledX[m].totNnz * sizeof(ITYPE));
     }
     if(TiledX[m].ndims == 4){      
-        q.submit([&] (handler &cgh) {
-          auto acc = dFbrPtr2.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrPtr[2].size()), id<1>(dFbrLoc2));
-          cgh.copy(&(TiledX[m].fbrPtr[2][0]), acc);
-        });
-
-        q.submit([&] (handler &cgh) {
-          auto acc = dFbrIdx2.get_access<sycl_write>(cgh, range<1>(TiledX[m].fbrIdx[2].size()), id<1>(dFbrLoc2));
-          cgh.copy(&(TiledX[m].fbrIdx[2][0]), acc);
-        });
-
-        q.submit([&] (handler &cgh) {
-          auto acc = dInds3.get_access<sycl_write>(cgh, range<1>(TiledX[m].totNnz), id<1>(dLoc));
-          cgh.copy(&(TiledX[m].inds[TiledX[m].modeOrder[3]][0]), acc);
-        });
+      q.memcpy(dFbrPtr2 + dFbrLoc2, &(TiledX[m].fbrPtr[2][0]),
+               TiledX[m].fbrPtr[2].size() * sizeof(ITYPE));
+      q.memcpy(dFbrIdx2 + dFbrLoc2, &(TiledX[m].fbrIdx[2][0]),
+               TiledX[m].fbrIdx[2].size() * sizeof(ITYPE));
+      q.memcpy(dInds3 + dLoc, &(TiledX[m].inds[TiledX[m].modeOrder[3]][0]),
+               TiledX[m].totNnz * sizeof(ITYPE));
     }
   }
 
@@ -485,32 +563,21 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
   ITYPE mtxSize = ((TiledX[0].ndims == 3) ? (U[mode0].nRows + U[mode1].nRows + U[mode2].nRows) * U[mode0].nCols
       : (U[mode0].nRows + U[mode1].nRows + U[mode2].nRows + U[mode3].nRows) * U[mode0].nCols );
 
-  buffer<DTYPE, 1> dU (mtxSize); 
+  DTYPE* dU = malloc_device<DTYPE>(mtxSize, q); 
 
   for (int m = 0; m < TiledX[0].ndims; ++m)
     szDU[m] = U[m].nRows * U[m].nCols;
 
-  q.submit([&] (handler &cgh) {
-    auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode0].nRows * U[mode0].nCols));
-    cgh.fill(acc, (DTYPE)0);
-  });
+  q.memset(dU, 0, U[mode0].nRows * U[mode0].nCols * sizeof(DTYPE));
 
-  q.submit([&] (handler &cgh) {
-    auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode1].nRows * U[mode1].nCols), id<1>(szDU[0]));
-    cgh.copy(&(U[mode1].vals[0]), acc);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode2].nRows * U[mode2].nCols), id<1>(szDU[0]+szDU[1]));
-    cgh.copy(&(U[mode2].vals[0]), acc);
-  });
+  q.memcpy(dU + szDU[0], &(U[mode1].vals[0]), 
+           U[mode1].nRows * U[mode1].nCols * sizeof(DTYPE));
+  q.memcpy(dU + szDU[0] + szDU[1], &(U[mode2].vals[0]),
+           U[mode2].nRows * U[mode2].nCols * sizeof(DTYPE));
 
   if(TiledX[0].ndims == 4)
-    q.submit([&] (handler &cgh) {
-      auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode3].nRows * U[mode3].nCols), 
-                                           id<1>(szDU[0]+szDU[1]+szDU[2]));
-      cgh.copy(&(U[mode3].vals[0]), acc);
-    });
+    q.memcpy(dU + szDU[0] + szDU[1] + szDU[2], &(U[mode3].vals[0]), 
+             U[mode3].nRows * U[mode3].nCols * sizeof(DTYPE));
 
 
   dLoc = 0, dSlcLoc = 0, dSlcIdxLoc = 0; dFbrLoc =0, dFbrIdxLoc = 0, dFbrLoc2= 0;
@@ -530,41 +597,19 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
       if(MTTKRPmode == 1){
 
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode0].nRows * U[mode0].nCols));
-          cgh.copy(&(U[mode0].vals[0]), acc);
-        });
-
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode1].nRows * U[mode1].nCols), id<1>(szDU[0]));
-          cgh.fill(acc, (DTYPE)0);
-        });
+        q.memcpy(dU, &(U[mode0].vals[0]), U[mode0].nRows * U[mode0].nCols * sizeof(DTYPE));
+        q.memset(dU + szDU[0], 0, U[mode1].nRows * U[mode1].nCols * sizeof(DTYPE));
 
       }
       else if(MTTKRPmode == 2){
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode1].nRows * U[mode1].nCols), id<1>(szDU[0]));
-          cgh.copy(&(U[mode1].vals[0]), acc);
-        });
-
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode2].nRows * U[mode2].nCols), 
-                                               id<1>(szDU[0]+szDU[1]));
-          cgh.fill(acc, (DTYPE)0);
-        });
+        q.memcpy(dU + szDU[0], &(U[mode1].vals[0]), 
+                 U[mode1].nRows * U[mode1].nCols * sizeof(DTYPE));
+        q.memset(dU + szDU[0] + szDU[1], 0, U[mode2].nRows * U[mode2].nCols * sizeof(DTYPE));
       }
       else if(MTTKRPmode == 3){
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode2].nRows * U[mode2].nCols), 
-                                               id<1>(szDU[0]+szDU[1]));
-          cgh.copy(&(U[mode2].vals[0]), acc);
-        });
-
-        q.submit([&] (handler &cgh) {
-          auto acc = dU.get_access<sycl_write>(cgh, range<1>(U[mode3].nRows * U[mode3].nCols), 
-                                               id<1>(szDU[0]+szDU[1]+szDU[2]));
-          cgh.fill(acc, (DTYPE)0);
-        });
+        q.memcpy(dU + szDU[0] + szDU[1] , &(U[mode2].vals[0]), 
+              U[mode2].nRows * U[mode2].nCols * sizeof(DTYPE));
+        q.memset(dU + szDU[0] + szDU[1] + szDU[2], 0, U[mode3].nRows * U[mode3].nCols * sizeof(DTYPE));
       }
     }
 
@@ -623,25 +668,21 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         if(TiledX[0].ndims == 3)
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds2_acc = dInds2.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
             cgh.parallel_for<class slc_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar(
-                dVals_acc.get_pointer() + dLoc, 
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds2_acc.get_pointer() + dLoc, 
-                dFbrPtr0_acc.get_pointer() + dSlcLoc, 
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
-                tile_nFibers, 
-                dU_acc.get_pointer() + dULoc[0], 
-                dU_acc.get_pointer() + dULoc[1],
-                dU_acc.get_pointer() + dULoc[2],
+                dVals + dLoc, 
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds2 + dLoc, 
+                dFbrPtr0 + dSlcLoc, 
+                dFbrPtr1 + dFbrLoc,
+                dFbrIdx1 + dFbrIdxLoc,
+                tile_nFibers,  // TiledX[m].nFibers
+                dU_dULoc0, //dU + dULoc[0], 
+                dU_dULoc1, //dU + dULoc[1],
+                dU_dULoc2, //dU + dULoc[2],
                 opt_mode, opt_R,
                 warpPerFbr, logOfWarpPerFbr, 
                 fbrPerWarp, logOfFbrPerWarp, 
@@ -651,37 +692,31 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         else if(TiledX[0].ndims == 4) {
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds3_acc = dInds3.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrPtr2_acc = dFbrPtr2.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dFbrIdx2_acc = dFbrIdx2.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
+            auto dU_dULoc3 = dU + dULoc[3];
             cgh.parallel_for<class slc_atomic_4d>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_slc_atomic_fbrLvlPar_4D(
-                dVals_acc.get_pointer() + dLoc, 
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds3_acc.get_pointer() + dLoc, 
-                dFbrPtr0_acc.get_pointer() + dSlcLoc,
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
-                dFbrPtr2_acc.get_pointer() + dFbrLoc2,
-                dFbrIdx2_acc.get_pointer() + dFbrLoc2, 
+                dVals + dLoc, 
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds3 + dLoc, 
+                dFbrPtr0 + dSlcLoc,
+                dFbrPtr1 + dFbrLoc,
+                dFbrIdx1 + dFbrIdxLoc,
+                dFbrPtr2 + dFbrLoc2,
+                dFbrIdx2 + dFbrLoc2, 
                 tile_nFibers, 
-                dU_acc.get_pointer() + dULoc[0], 
-                dU_acc.get_pointer() + dULoc[1], 
-                dU_acc.get_pointer() + dULoc[2], 
-                dU_acc.get_pointer() + dULoc[3], 
+                dU_dULoc0,
+                dU_dULoc1,
+                dU_dULoc2,
+                dU_dULoc3,
                 opt_mode, opt_R, 
                 warpPerFbr, logOfWarpPerFbr, 
                 fbrPerWarp, logOfFbrPerWarp,
                 item);
             });
           });
-	  q.wait();
         }
       }
 
@@ -703,36 +738,30 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
         range<1> lws (BLOCKSIZE);
 
         q.submit([&] (handler &cgh) {
-          auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-          auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-          auto dInds3_acc = dInds3.get_access<sycl_read>(cgh);
-          auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-          auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-          auto dFbrPtr2_acc = dFbrPtr2.get_access<sycl_read>(cgh);
-          auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-          auto dFbrIdx2_acc = dFbrIdx2.get_access<sycl_read>(cgh);
-          auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+          auto dU_dULoc0 = dU + dULoc[0];
+          auto dU_dULoc1 = dU + dULoc[1];
+          auto dU_dULoc2 = dU + dULoc[2];
+          auto dU_dULoc3 = dU + dULoc[3];
           cgh.parallel_for<class fbrs_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             mttkrp_MIHCSR_kernel_fbrS_atomic_fbrLvlPar_4D(
-              dVals_acc.get_pointer() + dLoc, 
-              dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-              dInds3_acc.get_pointer() + dLoc, 
-              dFbrPtr0_acc.get_pointer() + dSlcLoc, 
-              dFbrPtr1_acc.get_pointer() + dFbrLoc,
-              dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
-              dFbrPtr2_acc.get_pointer() + dFbrLoc2,
-              dFbrIdx2_acc.get_pointer() + dFbrLoc2,
+              dVals + dLoc, 
+              dFbrLikeSlcInds + dFbrIdxLoc, 
+              dInds3 + dLoc, 
+              dFbrPtr0 + dSlcLoc, 
+              dFbrPtr1 + dFbrLoc,
+              dFbrIdx1 + dFbrIdxLoc,
+              dFbrPtr2 + dFbrLoc2,
+              dFbrIdx2 + dFbrLoc2,
               tile_nFibers, 
-              dU_acc.get_pointer() + dULoc[1],
-              dU_acc.get_pointer() + dULoc[2],
-              dU_acc.get_pointer() + dULoc[3],
-              dU_acc.get_pointer() + dULoc[0], 
+              dU_dULoc1,
+              dU_dULoc2,
+              dU_dULoc3,
+              dU_dULoc0,
               opt_mode, opt_R, 
               warpPerFbr, logOfWarpPerFbr, 
               item);
           });
         });
-	q.wait();
       }
 
       else if(TiledX[m].modeOrder[TiledX[0].ndims-2] == MTTKRPmode && TiledX[m].totNnz){
@@ -754,25 +783,24 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         if(TiledX[0].ndims == 3)
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds2_acc = dInds2.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
             cgh.parallel_for<class fbr_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar(
-                dVals_acc.get_pointer() + dLoc, 
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds2_acc.get_pointer() + dLoc, 
-                dFbrPtr0_acc.get_pointer() + dSlcLoc, 
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,  
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc, 
+                dVals + dLoc, 
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds2 + dLoc, 
+                dFbrPtr0 + dSlcLoc, 
+                dFbrPtr1 + dFbrLoc,  
+                dFbrIdx1 + dFbrIdxLoc, 
                 tile_nFibers, 
-                dU_acc.get_pointer() + dULoc[1], 
-                dU_acc.get_pointer() + dULoc[2],
-                dU_acc.get_pointer() + dULoc[0],
+                //dU + dULoc[1], 
+                //dU + dULoc[2],
+                //dU + dULoc[0],
+                dU_dULoc1, 
+                dU_dULoc2,
+                dU_dULoc0,
                 opt_mode, opt_R, 
                 warpPerFbr, logOfWarpPerFbr,
                 item);
@@ -781,36 +809,30 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         else if (TiledX[0].ndims == 4) {
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds3_acc = dInds3.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dFbrPtr2_acc = dFbrPtr2.get_access<sycl_read>(cgh);
-            auto dFbrIdx2_acc = dFbrIdx2.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
+            auto dU_dULoc3 = dU + dULoc[3];
             cgh.parallel_for<class fbr_atomic_4d>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_fbr_atomic_fbrLvlPar_4D(
-                dVals_acc.get_pointer() + dLoc,
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds3_acc.get_pointer() + dLoc, 
-                dFbrPtr0_acc.get_pointer() + dSlcLoc,
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
-                dFbrPtr2_acc.get_pointer() + dFbrLoc2,
-                dFbrIdx2_acc.get_pointer() + dFbrLoc2, 
+                dVals + dLoc,
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds3 + dLoc, 
+                dFbrPtr0 + dSlcLoc,
+                dFbrPtr1 + dFbrLoc,
+                dFbrIdx1 + dFbrIdxLoc,
+                dFbrPtr2 + dFbrLoc2,
+                dFbrIdx2 + dFbrLoc2, 
                 tile_nFibers,
-                dU_acc.get_pointer() + dULoc[2],
-                dU_acc.get_pointer() + dULoc[3],
-                dU_acc.get_pointer() + dULoc[0],
-                dU_acc.get_pointer() + dULoc[1],
+                dU_dULoc2,
+                dU_dULoc3,
+                dU_dULoc0,
+                dU_dULoc1,
                 opt_mode, opt_R, 
                 warpPerFbr, logOfWarpPerFbr,
                 item);
             });
           });
-	  q.wait();
         }
       }
 
@@ -833,25 +855,21 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         if (TiledX[0].ndims == 3)
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds2_acc = dInds2.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
             cgh.parallel_for<class nnz_atomic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar(
-                dVals_acc.get_pointer() + dLoc, 
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds2_acc.get_pointer() + dLoc,
-                dFbrPtr0_acc.get_pointer() + dSlcLoc,
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
+                dVals + dLoc, 
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds2 + dLoc,
+                dFbrPtr0 + dSlcLoc,
+                dFbrPtr1 + dFbrLoc,
+                dFbrIdx1 + dFbrIdxLoc,
                 tile_nFibers, 
-                dU_acc.get_pointer() + dULoc[2],
-                dU_acc.get_pointer() + dULoc[0], 
-                dU_acc.get_pointer() + dULoc[1], 
+                dU_dULoc2, // dU + dULoc[2],
+                dU_dULoc0, // dU + dULoc[0], 
+                dU_dULoc1, // dU + dULoc[1], 
                 opt_mode, opt_R, 
                 warpPerFbr, logOfWarpPerFbr,
                 item); 
@@ -860,49 +878,59 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
 
         else if (TiledX[0].ndims == 4) {
           q.submit([&] (handler &cgh) {
-            auto dVals_acc = dVals.get_access<sycl_read>(cgh);
-            auto dFbrLikeSlcInds_acc = dFbrLikeSlcInds.get_access<sycl_read>(cgh);
-            auto dInds3_acc = dInds3.get_access<sycl_read>(cgh);
-            auto dFbrPtr0_acc = dFbrPtr0.get_access<sycl_read>(cgh);
-            auto dFbrPtr1_acc = dFbrPtr1.get_access<sycl_read>(cgh);
-            auto dFbrIdx1_acc = dFbrIdx1.get_access<sycl_read>(cgh);
-            auto dFbrPtr2_acc = dFbrPtr2.get_access<sycl_read>(cgh);
-            auto dFbrIdx2_acc = dFbrIdx2.get_access<sycl_read>(cgh);
-            auto dU_acc = dU.get_access<sycl_read_write>(cgh);
+            auto dU_dULoc0 = dU + dULoc[0];
+            auto dU_dULoc1 = dU + dULoc[1];
+            auto dU_dULoc2 = dU + dULoc[2];
+            auto dU_dULoc3 = dU + dULoc[3];
             cgh.parallel_for<class nnz_atomic_4d>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
               mttkrp_MIHCSR_kernel_all_atomic_fbrLvlPar_4D(
-                dVals_acc.get_pointer() + dLoc, 
-                dFbrLikeSlcInds_acc.get_pointer() + dFbrIdxLoc, 
-                dInds3_acc.get_pointer() + dLoc,
-                dFbrPtr0_acc.get_pointer() + dSlcLoc,
-                dFbrPtr1_acc.get_pointer() + dFbrLoc,
-                dFbrIdx1_acc.get_pointer() + dFbrIdxLoc,
-                dFbrPtr2_acc.get_pointer() + dFbrLoc2,
-                dFbrIdx2_acc.get_pointer() + dFbrLoc2, 
+                dVals + dLoc, 
+                dFbrLikeSlcInds + dFbrIdxLoc, 
+                dInds3 + dLoc,
+                dFbrPtr0 + dSlcLoc,
+                dFbrPtr1 + dFbrLoc,
+                dFbrIdx1 + dFbrIdxLoc,
+                dFbrPtr2 + dFbrLoc2,
+                dFbrIdx2 + dFbrLoc2, 
                 tile_nFibers,
-                dU_acc.get_pointer() + dULoc[3],
-                dU_acc.get_pointer() + dULoc[0],
-                dU_acc.get_pointer() + dULoc[1],
-                dU_acc.get_pointer() + dULoc[2],
+                dU_dULoc3,
+                dU_dULoc0,
+                dU_dULoc1,
+                dU_dULoc2,
                 opt_mode, opt_R, 
                 warpPerFbr, logOfWarpPerFbr,
                 item);
             });
           });
-	  q.wait();
 	}
       }
+      q.wait();
     }
   }
 
   /* Copying output matrix from GPU to CPU for correctness check */
-  int mttkrp_mode = TiledX[0].ndims - 1;
+  int MTTKRPmode = TiledX[0].ndims - 1;
   ITYPE loc = ((TiledX[0].ndims == 3) ? szDU[0] + szDU[1] : szDU[0] + szDU[1] + szDU[2]);
 
-  q.submit([&] (handler &cgh) {
-    auto dU_acc = dU.get_access<sycl_read>(cgh, range<1>( U[mttkrp_mode].nRows * U[mttkrp_mode].nCols), id<1>(loc));
-    cgh.copy(dU_acc, &U[mttkrp_mode].vals[0]);
-  });
+  q.memcpy(&U[MTTKRPmode].vals[0], dU + loc, 
+           U[MTTKRPmode].nRows * U[MTTKRPmode].nCols * sizeof(DTYPE)).wait();
+
+  free(dVals, q); 
+  free(dU, q);
+  free(dFbrIdx0, q);
+  free(dFbrIdx1, q);
+  free(dFbrPtr0, q); 
+  free(dFbrPtr1, q);
+  free(dFbrLikeSlcInds, q);
+
+  if(TiledX[0].ndims == 3)
+    free(dInds2, q); 
+
+  if(TiledX[0].ndims == 4){
+    free(dFbrIdx2, q);
+    free(dFbrPtr2, q);
+    free(dInds3, q); 
+  }
 
   delete[] dULoc;
   delete[] szDU;
@@ -921,7 +949,6 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
         totalMISfibers += TiledX[m].fbrPtr[1].size();
         totalMIfibers += TiledX[m].fbrPtr[2].size();
         totalMInnz += TiledX[m].totNnz;
-
       }
     }
   }
@@ -936,7 +963,5 @@ int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt){
       << ", nFibers:" << totalMIfibers << ", nnz:" << totalMInnz  
       << std::endl;
 
-  q.wait();
   return 0;
 }
-
