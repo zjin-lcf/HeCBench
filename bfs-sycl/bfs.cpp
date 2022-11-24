@@ -62,97 +62,95 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
 void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     int *h_graph_edges, char *h_graph_mask, char *h_updating_graph_mask,
     char *h_graph_visited, int *h_cost) noexcept(false) {
-  char h_over;
 
-  { // SYCL scopde
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<Node,1> d_graph_nodes(h_graph_nodes, no_of_nodes, props);
-    buffer<int,1> d_graph_edges(h_graph_edges, edge_list_size, props);
-    buffer<char,1> d_graph_mask(h_graph_mask, no_of_nodes, props);
-    buffer<char,1> d_updating_graph_mask(h_updating_graph_mask, no_of_nodes, props);
-    buffer<char,1> d_graph_visited(h_graph_visited, no_of_nodes, props);
-    buffer<int,1> d_cost(h_cost, no_of_nodes, props);
+  Node *d_graph_nodes = malloc_device<Node>(no_of_nodes, q);
+  q.memcpy(d_graph_nodes, h_graph_nodes, no_of_nodes * sizeof(Node));
 
-    d_graph_mask.set_final_data(nullptr);
-    d_updating_graph_mask.set_final_data(nullptr);
-    d_graph_visited.set_final_data(nullptr);
+  int *d_graph_edges = malloc_device<int>(edge_list_size, q); 
+  q.memcpy(d_graph_edges, h_graph_edges, edge_list_size * sizeof(int));
 
-    buffer<char,1> d_over(1);
+  char *d_graph_mask = malloc_device<char>(no_of_nodes, q);
+  q.memcpy(d_graph_mask, h_graph_mask, no_of_nodes * sizeof(char));
 
-    int global_work_size = (no_of_nodes + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK * MAX_THREADS_PER_BLOCK;
-    range<1> gws (global_work_size);
-    range<1> lws (MAX_THREADS_PER_BLOCK);
+  char *d_updating_graph_mask = malloc_device<char>(no_of_nodes, q);
+  q.memcpy(d_updating_graph_mask, h_updating_graph_mask, no_of_nodes * sizeof(char));
 
-    long time = 0;
-    do {
-      h_over = 0;
-      q.submit([&](handler& cgh) {
-        auto d_over_acc = d_over.get_access<sycl_write>(cgh);
-        cgh.copy(&h_over, d_over_acc);
-      }).wait();
-      
-      auto start = std::chrono::steady_clock::now();
+  char *d_graph_visited = malloc_device<char>(no_of_nodes, q);
+  q.memcpy(d_graph_visited, h_graph_visited, no_of_nodes * sizeof(char));
 
-      q.submit([&](handler& cgh) {
-        auto d_graph_nodes_acc = d_graph_nodes.get_access<sycl_read>(cgh);
-        auto d_graph_edges_acc = d_graph_edges.get_access<sycl_read>(cgh);
-        auto d_graph_mask_acc = d_graph_mask.get_access<sycl_write>(cgh);
-        auto d_updating_graph_mask_acc = d_updating_graph_mask.get_access<sycl_write>(cgh);
-        auto d_graph_visited_acc = d_graph_visited.get_access<sycl_read>(cgh);
-        auto d_cost_acc = d_cost.get_access<sycl_write>(cgh);
+  int *d_cost= malloc_device<int>(no_of_nodes, q);
+  q.memcpy(d_cost, h_cost, no_of_nodes * sizeof(int));
 
-        cgh.parallel_for<class kernel1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          int tid = item.get_global_id(0);
-          if (tid<no_of_nodes && d_graph_mask_acc[tid]) {
-            d_graph_mask_acc[tid]=0;
-            for(int i=d_graph_nodes_acc[tid].starting; 
-                    i<(d_graph_nodes_acc[tid].no_of_edges + d_graph_nodes_acc[tid].starting); i++){
-              int id = d_graph_edges_acc[i];
-              if(!d_graph_visited_acc[id]){
-                d_cost_acc[id]=d_cost_acc[tid]+1;
-                d_updating_graph_mask_acc[id]=1;
-              }
+  char h_over;
+  char *d_over = malloc_device<char>(1, q);
+
+  int global_work_size = (no_of_nodes + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK * MAX_THREADS_PER_BLOCK;
+  range<1> gws (global_work_size);
+  range<1> lws (MAX_THREADS_PER_BLOCK);
+
+  long time = 0;
+  do {
+    h_over = 0;
+    q.memcpy(d_over, &h_over, sizeof(char)).wait();
+    
+    auto start = std::chrono::steady_clock::now();
+
+    q.submit([&](handler& cgh) {
+      cgh.parallel_for<class kernel1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int tid = item.get_global_id(0);
+        if (tid<no_of_nodes && d_graph_mask[tid]) {
+          d_graph_mask[tid]=0;
+          const int num_edges = d_graph_nodes[tid].no_of_edges;
+          const int starting = d_graph_nodes[tid].starting;
+
+          for(int i=starting; i<(num_edges + starting); i++) {
+            int id = d_graph_edges[i];
+            if(!d_graph_visited[id]){
+              d_cost[id]=d_cost[tid]+1;
+              d_updating_graph_mask[id]=1;
             }
-          }    
-        });
-      });
-
-      q.submit([&](handler& cgh) {
-        auto d_graph_mask_acc = d_graph_mask.get_access<sycl_write>(cgh);
-        auto d_updating_graph_mask_acc = d_updating_graph_mask.get_access<sycl_read_write>(cgh);
-        auto d_graph_visited_acc = d_graph_visited.get_access<sycl_write>(cgh);
-        auto d_over_acc = d_over.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class kernel2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          int tid = item.get_global_id(0);
-          if (tid<no_of_nodes && d_updating_graph_mask_acc[tid]) {
-            d_graph_mask_acc[tid]=1;
-            d_graph_visited_acc[tid]=1;
-            d_over_acc[0]=1;
-            d_updating_graph_mask_acc[tid]=0;
           }
-        });
-      }).wait();
+        }    
+      });
+    });
 
-      auto end = std::chrono::steady_clock::now();
-      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    q.submit([&](handler& cgh) {
+      cgh.parallel_for<class kernel2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int tid = item.get_global_id(0);
+        if (tid<no_of_nodes && d_updating_graph_mask[tid]) {
+          d_graph_mask[tid]=1;
+          d_graph_visited[tid]=1;
+          d_over[0]=1;
+          d_updating_graph_mask[tid]=0;
+        }
+      });
+    }).wait();
 
-      q.submit([&](handler& cgh) {
-        auto d_over_acc = d_over.get_access<sycl_read>(cgh);
-        cgh.copy(d_over_acc, &h_over);
-      }).wait();
-    }
-    while (h_over);
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    printf("Total kernel execution time : %f (us)\n", time * 1e-3f);
+    q.memcpy(&h_over, d_over, sizeof(char)).wait();
+  }
+  while (h_over);
 
-  } // SYCL scope
+  printf("Total kernel execution time : %f (us)\n", time * 1e-3f);
+
+  q.memcpy(h_cost, d_cost, sizeof(int)*no_of_nodes).wait();
+
+  free(d_graph_nodes, q);
+  free(d_graph_edges, q);
+  free(d_graph_mask, q);
+  free(d_updating_graph_mask, q);
+  free(d_graph_visited, q);
+  free(d_cost, q);
+  free(d_over, q);
 }
 
 void Usage(int argc, char**argv){

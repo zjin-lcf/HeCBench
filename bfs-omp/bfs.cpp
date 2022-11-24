@@ -84,8 +84,10 @@ void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
       for (int tid = 0; tid < no_of_nodes; tid++) {
         if(d_graph_mask[tid]){
           d_graph_mask[tid]=0;
-          for(int i=d_graph_nodes[tid].starting; 
-              i<(d_graph_nodes[tid].no_of_edges + d_graph_nodes[tid].starting); i++){
+          const int num_edges = d_graph_nodes[tid].no_of_edges;
+          const int starting = d_graph_nodes[tid].starting;
+
+          for(int i=starting; i<(num_edges + starting); i++) {
             int id = d_graph_edges[i];
             if(!d_graph_visited[id]){
               d_cost[id]=d_cost[tid]+1;

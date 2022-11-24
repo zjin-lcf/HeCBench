@@ -29,8 +29,10 @@ Kernel(const Node* __restrict__ d_graph_nodes,
   if( tid<no_of_nodes && d_graph_mask[tid])
   {
     d_graph_mask[tid]=0;
-    for(int i=d_graph_nodes[tid].starting;
-        i<(d_graph_nodes[tid].no_of_edges + d_graph_nodes[tid].starting); i++)
+    const int num_edges = d_graph_nodes[tid].no_of_edges;
+    const int starting = d_graph_nodes[tid].starting;
+
+    for(int i=starting; i<(num_edges + starting); i++)
     {
       int id = d_graph_edges[i];
       if(!d_graph_visited[id])
@@ -167,6 +169,7 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
   cudaFree(d_updating_graph_mask);
   cudaFree(d_graph_visited);
   cudaFree(d_cost);
+  cudaFree(d_over);
 }
 
 //----------------------------------------------------------
