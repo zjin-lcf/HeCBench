@@ -103,16 +103,11 @@ kernel1 (int*__restrict__ d_input_itemsets,
   
   if (tx == 0) SCORE(tx, 0) = d_input_itemsets[index_nw + tx];
   
-  __syncthreads();
-  
   for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)  {
     REF(ty, tx) =  d_reference[index + max_cols * ty];
   }
-  __syncthreads();
   
   SCORE((tx + 1), 0) = d_input_itemsets[index_w + max_cols * tx];
-  
-  __syncthreads();
   
   SCORE(0, (tx + 1)) = d_input_itemsets[index_n];
   
@@ -130,29 +125,21 @@ kernel1 (int*__restrict__ d_input_itemsets,
      __syncthreads();
   }
   
-  __syncthreads();
-  
   for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-  
      if ( tx <= m){
-  
         int t_index_x =  tx + BLOCK_SIZE - m ;
         int t_index_y =  BLOCK_SIZE - tx;
   
         SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
               SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
               SCORE((t_index_y-1), (t_index_x))   - (penalty));
-  
      }
-  
      __syncthreads();
   }
-  
   
   for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++) {
      d_input_itemsets[index + max_cols * ty] = SCORE((ty+1), (tx+1));
   }
-  
 }
 
 __global__ void 
@@ -186,11 +173,7 @@ kernel2 (int*__restrict__ d_input_itemsets,
    for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
       REF(ty, tx) =  d_reference[index + max_cols * ty];
 
-   __syncthreads();
-
    SCORE((tx + 1), 0) = d_input_itemsets[index_w + max_cols * tx];
-
-   __syncthreads();
 
    SCORE(0, (tx + 1)) = d_input_itemsets[index_n];
 
@@ -211,9 +194,7 @@ kernel2 (int*__restrict__ d_input_itemsets,
    }
 
    for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-
       if ( tx <= m){
-
          int t_index_x =  tx + BLOCK_SIZE - m ;
          int t_index_y =  BLOCK_SIZE - tx;
 
