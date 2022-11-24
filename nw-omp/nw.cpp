@@ -188,16 +188,11 @@ int main(int argc, char **argv){
           
           if (tx == 0) SCORE(tx, 0) = input_itemsets[index_nw + tx];
           
-          #pragma omp barrier
-          
           for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)  {
             REF(ty, tx) =  reference[index + max_cols * ty];
           }
-          #pragma omp barrier
           
           SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
-          
-          #pragma omp barrier
           
           SCORE(0, (tx + 1)) = input_itemsets[index_n];
           
@@ -215,24 +210,17 @@ int main(int argc, char **argv){
              #pragma omp barrier
           }
           
-          #pragma omp barrier
-          
           for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-          
              if ( tx <= m){
-          
                 int t_index_x =  tx + BLOCK_SIZE - m ;
                 int t_index_y =  BLOCK_SIZE - tx;
           
                 SCORE(t_index_y, t_index_x) = maximum(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
                       SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
                       SCORE((t_index_y-1), (t_index_x))   - (penalty));
-          
              }
-          
              #pragma omp barrier
           }
-          
           
           for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++) {
              input_itemsets[index + max_cols * ty] = SCORE((ty+1), (tx+1));
@@ -274,18 +262,13 @@ int main(int argc, char **argv){
          for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
             REF(ty, tx) =  reference[index + max_cols * ty];
   
-         #pragma omp barrier
-  
          SCORE((tx + 1), 0) = input_itemsets[index_w + max_cols * tx];
-  
-         #pragma omp barrier
   
          SCORE(0, (tx + 1)) = input_itemsets[index_n];
   
          #pragma omp barrier
   
          for( int m = 0 ; m < BLOCK_SIZE ; m++){
-  
             if ( tx <= m ){
   
                int t_index_x =  tx + 1;
@@ -299,16 +282,13 @@ int main(int argc, char **argv){
          }
   
          for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
-  
             if ( tx <= m){
-  
                int t_index_x =  tx + BLOCK_SIZE - m ;
                int t_index_y =  BLOCK_SIZE - tx;
   
                SCORE(t_index_y, t_index_x) = maximum( SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
                      SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
                      SCORE((t_index_y-1), (t_index_x))   - (penalty));
-  
             }
             #pragma omp barrier
          }
