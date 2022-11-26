@@ -24,7 +24,7 @@ int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
   }
 
   int leader = ffs(mask) - 1; // select a leader
-  int res;
+  int res = 0;
   unsigned lane_id = item.get_local_id(0) % warpSize;
   if (lane_id == leader) {                 // leader does the update
     res = sycl::atomic<int>(sycl::global_ptr<int>(ptr))
