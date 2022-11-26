@@ -457,13 +457,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 
           }
 
-          weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
-
-          #pragma omp barrier
-
-          if(i < Nparticles){
-            weights_local[thread_id] = weights[i];
-          }
+          weights_local[thread_id] = (i < Nparticles) ?  weights[i] : 0.f;
 
           #pragma omp barrier
 

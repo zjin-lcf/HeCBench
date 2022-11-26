@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../particlefilter-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernel_find_index.h  kernel_likelihood.h  kernel_normalize_weights.h  kernel_sum.h Makefile
+%.o: %.cu ../particlefilter-cuda/kernel_find_index.h \
+          ../particlefilter-cuda/kernel_likelihood.h \
+          ../particlefilter-cuda/kernel_normalize_weights.h \
+          ../particlefilter-cuda/kernel_sum.h \
+          Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

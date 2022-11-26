@@ -1,13 +1,12 @@
 __global__ void
 kernel_normalize_weights (
-    float* weights,
-    const float* partial_sums,
-    float* CDF,
-    float* u,
-    int* seed,
+    float* __restrict__ weights,
+    const float* __restrict__ partial_sums,
+    float* __restrict__ CDF,
+    float* __restrict__ u,
+    int* __restrict__ seed,
     const int Nparticles )
 {
-
   __shared__ float u1;
   __shared__ float sumWeights;
   int local_id = threadIdx.x;

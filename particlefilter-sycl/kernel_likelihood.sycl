@@ -23,7 +23,6 @@ if(i < Nparticles){
   seed_acc[i] = (A*seed_acc[i] + C) % M;
   v = cl::sycl::fabs(seed_acc[i]/((float)M));
   arrayY_acc[i] += -2.0f + 2.0f*(cl::sycl::sqrt(-2.0f*cl::sycl::log(u))*cl::sycl::cos(2.0f*PI*v));
-
 }
 
 item.barrier(access::fence_space::local_space);
@@ -55,14 +54,7 @@ if(i < Nparticles)
 
 }
 
-weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
-
-item.barrier(access::fence_space::local_space);
-
-
-if(i < Nparticles){
-  weights_local[thread_id] = weights_acc[i];
-}
+weights_local[thread_id] = (i < Nparticles) ?  weights_acc[i] : 0.f;
 
 item.barrier(access::fence_space::local_space);
 

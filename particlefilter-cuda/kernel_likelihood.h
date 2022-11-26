@@ -1,15 +1,16 @@
 __global__ void
-kernel_likelihood (float* arrayX, 
-    float* arrayY, 
-    const float* xj,
-    const float* yj,
-    int* ind,
-    const int* objxy,
-    float* likelihood,
-    const unsigned char* I,
-    float* weights,
-    int* seed,
-    float* partial_sums,
+kernel_likelihood (
+    float*__restrict__ arrayX, 
+    float*__restrict__ arrayY, 
+    const float*__restrict__ xj,
+    const float*__restrict__ yj,
+    int*__restrict__ ind,
+    const int*__restrict__ objxy,
+    float*__restrict__ likelihood,
+    const unsigned char*__restrict__ I,
+    float*__restrict__ weights,
+    int*__restrict__ seed,
+    float*__restrict__ partial_sums,
     const int Nparticles,
     const int countOnes,
     const int IszY,
@@ -42,7 +43,6 @@ kernel_likelihood (float* arrayX,
     seed[i] = (A*seed[i] + C) % M;
     v = fabsf(seed[i]/((float)M));
     arrayY[i] += -2.0f + 2.0f*(sqrtf(-2.0f*logf(u))*cosf(2.0f*PI*v));
-
   }
 
   __syncthreads();
@@ -73,14 +73,7 @@ kernel_likelihood (float* arrayX,
 
   }
 
-  weights_local[thread_id] = 0.0f; //weights_local[thread_id] = i;
-
-  __syncthreads();
-
-
-  if(i < Nparticles){
-    weights_local[thread_id] = weights[i];
-  }
+  weights_local[thread_id] = (i < Nparticles) ? weights[i] : 0.f;
 
   __syncthreads();
 

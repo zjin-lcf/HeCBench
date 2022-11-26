@@ -1,11 +1,11 @@
 __global__ void
 kernel_find_index (
-    const float* arrayX,
-    const float* arrayY,
-    const float* CDF,
-    const float* u,
-    float* xj,
-    float* yj,
+    const float*__restrict__ arrayX,
+    const float*__restrict__ arrayY,
+    const float*__restrict__ CDF,
+    const float*__restrict__ u,
+          float*__restrict__ xj,
+          float*__restrict__ yj,
     const int Nparticles)
 {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -25,7 +25,5 @@ kernel_find_index (
 
     xj[i] = arrayX[index];
     yj[i] = arrayY[index];
-
-
   }
 }
