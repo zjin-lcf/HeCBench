@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, winograd
@@ -886,6 +886,9 @@ Early results are shown [here](results/README.md)
 
 ### overlay (cuda)
   Overlay grid in the DetectNet (https://github.com/dusty-nv/jetson-inference)
+
+### p2p (cuda)
+  Simple peer-to-peer accesses (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### p4 (cuda)
   PointPillar post-processing (https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars)
