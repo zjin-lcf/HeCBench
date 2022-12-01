@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     adam, attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd
@@ -338,6 +338,9 @@ Early results are shown [here](results/README.md)
 
 ### coordinates (cuda)
   Coordinates(latitude and longitude) transformation using the STL transform (https://github.com/rapidsai/cuspatial)
+
+### copy (cuda)
+  Memory copies using direct, zero, and managed memory accesses
 
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
