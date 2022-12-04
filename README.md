@@ -36,8 +36,8 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Geographic information system
     aidw, coordinates, geodesic, hausdorff, haversine
 
-### Graph
-    cc, floydwarshall, gc, hbc, hungarian, mis, sssp
+### Graph and Tree
+    cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
@@ -992,6 +992,9 @@ Early results are shown [here](results/README.md)
 ### rsbench (opencl)
   A proxy application for full neutron transport application like OpenMC that support multipole cross section representations
   (https://github.com/ANL-CESAR/RSBench/)
+
+### rsmt (cuda)
+  Rectilinear Steiner minimum tree (https://userweb.cs.txstate.edu/~burtscher/research/SFP/)
 
 ### rtm8 (hip)
   A structured-grid applications in the oil and gas industry (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/rtm8)
