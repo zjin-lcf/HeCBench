@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicIntrinsics, atomicCAS, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -185,6 +185,9 @@ Early results are shown [here](results/README.md)
 
 ### atomicReduction (hip)
   Integer sum reduction with atomics (https://github.com/ROCm-Developer-Tools/HIP-Examples/tree/master/reduction)
+
+### atomicSystemWide (cuda)
+  System-wide atomics (http://docs.nvidia.com/cuda/cuda-samples/index.html) 
 
 ### attention (pseudocodes)
   Ham, T.J., et al., 2020, February. A^ 3: Accelerating Attention Mechanisms in Neural Networks with Approximation. In 2020 IEEE International Symposium on High Performance Computer Architecture (HPCA) (pp. 328-341). IEEE.
