@@ -103,7 +103,7 @@ int main(int argc, char * argv[])
   printf("-------------------------------------------\n");
 
   #pragma omp target data map (to: inputImageData[0:width*height]) \
-                          map(from: outputImageData[0:width*height])
+                          map(tofrom: outputImageData[0:width*height])
   {
     auto start = std::chrono::steady_clock::now();
 

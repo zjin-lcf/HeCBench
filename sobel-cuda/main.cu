@@ -105,6 +105,7 @@ int main(int argc, char * argv[])
 
   uchar4 *outputImageBuffer;
   cudaMalloc((void**)&outputImageBuffer, imageSize); 
+  cudaMemset(outputImageBuffer, 0, imageSize); 
 
   // Enqueue a kernel run call.
   const int blockSizeX = 16;
