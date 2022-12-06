@@ -37,6 +37,11 @@ struct ApplesOnTrees
 
 int main(int argc, char * argv[])
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  
   const int iterations = atoi(argv[1]); // Number of iterations for kernel execution
   const int treeSize = TREE_SIZE;
   const int treeNumber = TREE_NUM;
@@ -44,18 +49,18 @@ int main(int argc, char * argv[])
 
   if(iterations < 1)
   {
-    std::cout<<"Error, iterations cannot be 0 or negative. Exiting..\n";
+    std::cout<<"Iterations cannot be 0 or negative. Exiting..\n";
     return -1;
   }
 
   if(treeNumber < GROUP_SIZE)
   {
-    std::cout<<"Because of the work group size ,this treeNumber is small"<<std::endl;
+    std::cout<<"treeNumber should be larger than the work group size"<<std::endl;
     return -1;
   }
   if(treeNumber % 256 !=0)
   {
-    std::cout<<"Because of the work group size ,should be a multiple of 256"<<std::endl;
+    std::cout<<"treeNumber should be a multiple of 256"<<std::endl;
     return -1;
   }
 
