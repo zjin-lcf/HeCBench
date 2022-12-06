@@ -41,35 +41,36 @@ void reference (uchar4 *verificationOutput,
                 const uint height,
                 const int pixelSize)
 {
-    // x-axis gradient mask
-    const int kx[][3] =
-    {
-        { 1, 0, -1},
-        { 2, 0, -2},
-        { 1, 0, -1}
-    };
+  // x-axis gradient mask
+  const int kx[][3] =
+  {
+    { 1, 0, -1},
+    { 2, 0, -2},
+    { 1, 0, -1}
+  };
 
-    // y-axis gradient mask
-    const int ky[][3] =
-    {
-        { 1, 2, 1},
-        { 0, 0, 0},
-        { -1,-2,-1}
-    };
+  // y-axis gradient mask
+  const int ky[][3] =
+  {
+    { 1, 2, 1},
+    { 0, 0, 0},
+    { -1,-2,-1}
+  };
 
-    // apply filter on each pixel (except boundary pixels)
-    for (uint y = 0; y < height; y++)
-      for (uint x = 0; x < width; x++) {
-        if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1) {
-          int c = x + y * width;
-            float4 gx, gy;
-            conv(gx, kx, inputImageData, c, width);
-            conv(gy, ky, inputImageData, c, width);
+  // apply filter on each pixel (except boundary pixels)
+  for (uint y = 0; y < height; y++) {
+    for (uint x = 0; x < width; x++) {
+      if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1) {
+        int c = x + y * width;
+          float4 gx, gy;
+          conv(gx, kx, inputImageData, c, width);
+          conv(gy, ky, inputImageData, c, width);
 
-            uchar4 result;
-	    magnitude(result, gx, gy);
+          uchar4 result;
+          magnitude(result, gx, gy);
 
-            *(verificationOutput + c) = result;  
-        }
+          *(verificationOutput + c) = result;  
+      }
     }
+  }
 }

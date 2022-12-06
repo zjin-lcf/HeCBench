@@ -39,7 +39,7 @@ static bool compare(const float *refData, const float *data,
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =sqrtf((float) ref);
+  float normRef = sqrtf((float) ref);
   if (fabs((float) ref) < 1e-7f)
   {
     return false;
@@ -77,17 +77,17 @@ int main(int argc, char * argv[])
   const int imageSize = width * height * pixelSize;
   printf("Image height = %d and width = %d\n", height, width);
 
-  // allocate memory for input & output image data
-  uchar4 *inputImageData  = (uchar4*)malloc(imageSize);
+  // allocate memory for input image data
+  uchar4 *inputImageData  = (uchar4*) malloc (imageSize);
   if (inputImageData == nullptr)
     printf("Failed to allocate memory! (inputImageData)");
 
   // allocate memory for output image data
-  uchar4 *outputImageData = (uchar4*)malloc(imageSize);
+  uchar4 *outputImageData = (uchar4*) malloc (imageSize);
   if (outputImageData == nullptr) 
     printf("Failed to allocate memory! (outputImageData)");
 
-  // initializa the data
+  // initialize the output
   memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
@@ -103,7 +103,7 @@ int main(int argc, char * argv[])
   if (verificationOutput == nullptr) 
     printf("verificationOutput heap allocation failed!");
 
-  // initialize the data
+  // initialize the output
   memset(verificationOutput, 0, imageSize);
 
 #ifdef USE_GPU

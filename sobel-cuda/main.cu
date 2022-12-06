@@ -27,11 +27,11 @@ static bool compare(const float *refData, const float *data,
   for(int i = 1; i < length; ++i)
   {
     float diff = refData[i] - data[i];
-    if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
+    // if (diff != 0) printf("mismatch @%d: %f %f\n", i, refData[i] , data[i]);
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =sqrtf((float) ref);
+  float normRef = sqrtf((float) ref);
   if (fabs((float) ref) < 1e-7f)
   {
     return false;
@@ -69,17 +69,17 @@ int main(int argc, char * argv[])
   const int imageSize = width * height * pixelSize;
   printf("Image height = %d and width = %d\n", height, width);
 
-  // allocate memory for input & output image data
-  uchar4 *inputImageData  = (uchar4*)malloc(imageSize);
+  // allocate memory for input image data
+  uchar4 *inputImageData  = (uchar4*) malloc (imageSize);
   if (inputImageData == NULL)
     printf("Failed to allocate memory! (inputImageData)");
 
   // allocate memory for output image data
-  uchar4 *outputImageData = (uchar4*)malloc(imageSize);
+  uchar4 *outputImageData = (uchar4*) malloc (imageSize);
   if (outputImageData == NULL) 
     printf("Failed to allocate memory! (outputImageData)");
 
-  // initializa the data
+  // initialize the output
   memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
@@ -91,11 +91,11 @@ int main(int argc, char * argv[])
   memcpy(inputImageData, pixelData, imageSize);
 
   // allocate memory for verification output
-  uchar4* verificationOutput = (uchar4*)malloc(imageSize);
+  uchar4* verificationOutput = (uchar4*) malloc (imageSize);
   if (verificationOutput == NULL) 
     printf("verificationOutput heap allocation failed!");
 
-  // initialize the data
+  // initialize the output
   memset(verificationOutput, 0, imageSize);
 
   // Create memory object for input Image
@@ -145,7 +145,7 @@ int main(int argc, char * argv[])
     printf("Failed to allocate host memory!" "(outputReference)");
 
   // copy uchar data to float array
-  for(int i = 0; i < (int)(width * height); i++)
+  for(int i = 0; i < width * height; i++)
   {
     outputDevice[i * 4 + 0] = outputImageData[i].x;
     outputDevice[i * 4 + 1] = outputImageData[i].y;

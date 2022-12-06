@@ -61,19 +61,18 @@ void sobel_filter(const uchar4*__restrict inputImage,
     float4 i02 = convert_float4(inputImage[c + 1 - width]);
 
     float4 i10 = convert_float4(inputImage[c - 1]);
-    //float4 i11 = convert_float4(inputImage[c]);
     float4 i12 = convert_float4(inputImage[c + 1]);
 
     float4 i20 = convert_float4(inputImage[c - 1 + width]);
     float4 i21 = convert_float4(inputImage[c + width]);
     float4 i22 = convert_float4(inputImage[c + 1 + width]);
+    
+    const float4 two = (float4)(2.f);
 
-    float4 Gx = i00 + (float4)(2) * i10 + i20 - i02  - (float4)(2) * i12 - i22;
-    float4 Gy = i00 - i20  + (float4)(2)*i01 - (float4)(2)*i21 + i02  -  i22;
+    float4 Gx = i00 + two * i10 + i20 - i02 - two * i12 - i22;
+    float4 Gy = i00 - i20  + two * i01 - two * i21 + i02 - i22;
 
     /* taking root of sums of squares of Gx and Gy */
-    //outputImage[c] = convert_uchar4(sycl::hypot(Gx, Gy)/(float4)(2));
     outputImage[c] = convert_uchar4(sycl::sqrt(Gx*Gx + Gy*Gy)/(float4)(2));
   }
 }
-
