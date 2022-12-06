@@ -32,7 +32,7 @@ static bool compare(const float *refData, const float *data,
     error += diff * diff;
     ref += refData[i] * refData[i];
   }
-  float normRef =sqrtf((float) ref);
+  float normRef = sqrtf((float) ref);
   if (fabs((float) ref) < 1e-7f)
   {
     return false;
@@ -70,17 +70,17 @@ int main(int argc, char * argv[])
   const int imageSize = width * height * pixelSize;
   printf("Image height = %d and width = %d\n", height, width);
 
-  // allocate memory for input & output image data
-  uchar4 *inputImageData  = (uchar4*)malloc(imageSize);
+  // allocate memory for input image data
+  uchar4 *inputImageData  = (uchar4*) malloc (imageSize);
   if (inputImageData == NULL)
     printf("Failed to allocate memory! (inputImageData)");
 
   // allocate memory for output image data
-  uchar4 *outputImageData = (uchar4*)malloc(imageSize);
+  uchar4 *outputImageData = (uchar4*) malloc (imageSize);
   if (outputImageData == NULL) 
     printf("Failed to allocate memory! (outputImageData)");
 
-  // initializa the data
+  // initialize the output
   memset(outputImageData, 0, imageSize);
 
   // get the pointer to pixel data
@@ -92,11 +92,11 @@ int main(int argc, char * argv[])
   memcpy(inputImageData, pixelData, imageSize);
 
   // allocate memory for verification output
-  uchar4* verificationOutput = (uchar4*)malloc(imageSize);
+  uchar4* verificationOutput = (uchar4*) malloc (imageSize);
   if (verificationOutput == NULL) 
     printf("verificationOutput heap allocation failed!");
 
-  // initialize the data
+  // initialize the output
   memset(verificationOutput, 0, imageSize);
 
   printf("Executing kernel for %d iterations", iterations);
@@ -113,20 +113,19 @@ int main(int argc, char * argv[])
       for (uint y = 1; y < height - 1; y++)
         for (uint x = 1; x < width - 1; x++) 
         {
-          const float4 two = {2, 2, 2, 2};
-
           int c = x + y * width;
           float4 i00 = convert_float4(inputImageData[c - 1 - width]);
           float4 i01 = convert_float4(inputImageData[c - width]);
           float4 i02 = convert_float4(inputImageData[c + 1 - width]);
 
           float4 i10 = convert_float4(inputImageData[c - 1]);
-          //float4 i11 = convert_float4(inputImageData[c]);
           float4 i12 = convert_float4(inputImageData[c + 1]);
 
           float4 i20 = convert_float4(inputImageData[c - 1 + width]);
           float4 i21 = convert_float4(inputImageData[c + width]);
           float4 i22 = convert_float4(inputImageData[c + 1 + width]);
+
+          const float4 two = {2.f, 2.f, 2.f, 2.f};
 
           float4 Gx = i00 + two * i10 + i20 - i02  - two * i12 - i22;
 

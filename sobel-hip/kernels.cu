@@ -40,15 +40,13 @@ inline __device__ uchar4 convert_uchar4(float4 v) {
 }
 
 __global__
-void sobel_filter(const uchar4*__restrict inputImage, 
-                        uchar4*__restrict outputImage, 
+void sobel_filter(const uchar4*__restrict__ inputImage, 
+                        uchar4*__restrict__ outputImage, 
                   const uint width,
                   const uint height)
 {
   uint x = blockDim.x * blockIdx.x + threadIdx.x;
   uint y = blockDim.y * blockIdx.y + threadIdx.y;
-
-  const float4 two = make_float4(2, 2, 2, 2);
 
   /* Read each texel component and calculate the filtered value using neighbouring texel components */
   if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
@@ -59,16 +57,17 @@ void sobel_filter(const uchar4*__restrict inputImage,
     float4 i02 = convert_float4(inputImage[c + 1 - width]);
 
     float4 i10 = convert_float4(inputImage[c - 1]);
-    //float4 i11 = convert_float4(inputImage[c]);
     float4 i12 = convert_float4(inputImage[c + 1]);
 
     float4 i20 = convert_float4(inputImage[c - 1 + width]);
     float4 i21 = convert_float4(inputImage[c + width]);
     float4 i22 = convert_float4(inputImage[c + 1 + width]);
 
-    float4 Gx = i00 + two * i10 + i20 - i02  - two * i12 - i22;
+    const float4 two = make_float4(2.f, 2.f, 2.f, 2.f);
 
-    float4 Gy = i00 - i20  + two * i01 - two * i21 + i02  -  i22;
+    float4 Gx = i00 + two * i10 + i20 - i02 - two * i12 - i22;
+
+    float4 Gy = i00 - i20  + two * i01 - two * i21 + i02 - i22;
 
     /* taking root of sums of squares of Gx and Gy */
     outputImage[c] = convert_uchar4(make_float4(sqrtf(Gx.x*Gx.x + Gy.x*Gy.x)/2.f,
@@ -77,4 +76,3 @@ void sobel_filter(const uchar4*__restrict inputImage,
                                                 sqrtf(Gx.w*Gx.w + Gy.w*Gy.w)/2.f));
   }
 }
-
