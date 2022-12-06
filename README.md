@@ -49,7 +49,7 @@ Each benchmark falls into a single category. While such classification is not ac
     alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
    
 ### Random number generation
-    mt, qrg, rng-wallace, sobol, urng
+    mt, permutate, qrg, rng-wallace, sobol, urng
 
 ### Search
     bfs, bsearch, b+tree, grep, keogh, ss, tsp
@@ -916,6 +916,9 @@ Early results are shown [here](results/README.md)
 
 ### pathfinder (opencl)
   PathFinder in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### permutate (cuda)
+  Parallel implementation of the permutation testing in NIST SP 800-90B (https://github.com/yeah1kim/yeah_GPU_SP800_90B_IID)
 
 ### perplexity (cuda)
   Perplexity search (https://github.com/rapidsai/cuml/)  
