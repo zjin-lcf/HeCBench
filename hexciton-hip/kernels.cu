@@ -1,17 +1,17 @@
 __global__ 
 void comm_empty(
-    real_2_t * __restrict sigma_in,
-    real_2_t * __restrict sigma_out, 
-    real_2_t * __restrict hamiltonian)
+    real_2_t * __restrict__ sigma_in,
+    real_2_t * __restrict__ sigma_out, 
+    real_2_t * __restrict__ hamiltonian)
 { 
 }
 
 
 __global__ 
 void comm_init (
-    const real_2_t * __restrict sigma_in,
-          real_2_t * __restrict sigma_out, 
-    const real_2_t * __restrict hamiltonian,
+    const real_2_t * __restrict__ sigma_in,
+          real_2_t * __restrict__ sigma_out, 
+    const real_2_t * __restrict__ hamiltonian,
     const int dim)
 {
 
@@ -43,9 +43,9 @@ void comm_init (
 
 __global__
 void comm_refactor(
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
 #define sigma_real(i, j) (sigma_id + 2 * ((i) * dim + (j)))
@@ -53,9 +53,9 @@ void comm_refactor(
 
 #define ham_real(i, j) (2 * ((i) * dim + (j)))
 #define ham_imag(i, j) (2 * ((i) * dim + (k)) + 1)
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   int sigma_id = gid * dim * dim * 2;
@@ -83,9 +83,9 @@ void comm_refactor(
 
 __global__
 void comm_refactor_direct_store(
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
 #define sigma_real(i, j) (sigma_id + 2 * ((i) * dim + (j)))
@@ -93,9 +93,9 @@ void comm_refactor_direct_store(
 #define ham_real(i, j) (2 * ((i) * dim + (j)))
 #define ham_imag(i, j) (2 * ((i) * dim + (k)) + 1)
 
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   int sigma_id = gid * dim * dim * 2;
@@ -118,14 +118,14 @@ void comm_refactor_direct_store(
 
 __global__ 
 void comm_aosoa_naive(
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -160,14 +160,14 @@ void comm_aosoa_naive(
 
 __global__ 
 void comm_aosoa_naive_constants (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -202,13 +202,13 @@ void comm_aosoa_naive_constants (
 
 __global__ 
 void comm_aosoa_naive_constants_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 #define package_id ((gid / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
@@ -257,14 +257,14 @@ void comm_aosoa_naive_constants_perm (
 
 __global__ 
 void comm_aosoa_naive_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -296,13 +296,13 @@ void comm_aosoa_naive_direct (
 
 __global__ 
 void comm_aosoa_naive_constants_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 #define package_id ((gid / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
@@ -333,13 +333,13 @@ void comm_aosoa_naive_constants_direct (
 
 __global__ 
 void comm_aosoa_naive_constants_direct_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 #define package_id ((gid / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
@@ -374,14 +374,14 @@ void comm_aosoa_naive_constants_direct_perm (
 
 __global__ 
 void comm_aosoa (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * dim * dim))
 #define sigma_id threadIdx.x
@@ -414,13 +414,13 @@ void comm_aosoa (
 
 __global__ 
 void comm_aosoa_constants (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
 #define sigma_id threadIdx.x
@@ -453,13 +453,13 @@ void comm_aosoa_constants (
 
 __global__ 
 void comm_aosoa_constants_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
 #define sigma_id threadIdx.x
@@ -506,14 +506,14 @@ void comm_aosoa_constants_perm (
 
 __global__ 
 void comm_aosoa_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * dim * dim))
 #define sigma_id threadIdx.x
 
@@ -541,13 +541,13 @@ void comm_aosoa_direct (
 
 __global__ 
 void comm_aosoa_constants_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
 #define sigma_id threadIdx.x
@@ -575,13 +575,13 @@ void comm_aosoa_constants_direct (
 
 __global__ 
 void comm_aosoa_constants_direct_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_t *__restrict sigma_in = (real_t*) sigma2_in;
-  real_t *__restrict sigma_out = (real_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_t *__restrict__ sigma_in = (real_t*) sigma2_in;
+  real_t *__restrict__ sigma_out = (real_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
 #define package_id ((PACKAGES_PER_WG * blockIdx.y + threadIdx.y) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
 #define sigma_id threadIdx.x
@@ -614,14 +614,14 @@ void comm_aosoa_constants_direct_perm (
 
 __global__ 
 void comm_manual_aosoa (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -657,13 +657,13 @@ void comm_manual_aosoa (
 
 __global__ 
 void comm_manual_aosoa_constants (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -697,13 +697,13 @@ void comm_manual_aosoa_constants (
 
 __global__ 
 void comm_manual_aosoa_constants_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -751,13 +751,13 @@ void comm_manual_aosoa_constants_perm (
 
 __global__ 
 void comm_manual_aosoa_constants_perm_prefetch (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -793,14 +793,14 @@ void comm_manual_aosoa_constants_perm_prefetch (
 
 __global__ 
 void comm_manual_aosoa_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2,
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2,
     const int dim)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -830,13 +830,13 @@ void comm_manual_aosoa_direct (
 
 __global__ 
 void comm_manual_aosoa_constants_direct (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -865,13 +865,13 @@ void comm_manual_aosoa_constants_direct (
 
 __global__ 
 void comm_manual_aosoa_constants_direct_prefetch (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -905,13 +905,13 @@ void comm_manual_aosoa_constants_direct_prefetch (
 
 __global__ 
 void comm_manual_aosoa_constants_direct_perm (
-    const real_2_t * __restrict sigma2_in,
-          real_2_t * __restrict sigma2_out, 
-    const real_2_t * __restrict hamiltonian2)
+    const real_2_t * __restrict__ sigma2_in,
+          real_2_t * __restrict__ sigma2_out, 
+    const real_2_t * __restrict__ hamiltonian2)
 {
-  real_vec_t *__restrict sigma_in = (real_vec_t*) sigma2_in;
-  real_vec_t *__restrict sigma_out = (real_vec_t*) sigma2_out;
-  real_t *__restrict hamiltonian = (real_t*) hamiltonian2;
+  real_vec_t *__restrict__ sigma_in = (real_vec_t*) sigma2_in;
+  real_vec_t *__restrict__ sigma_out = (real_vec_t*) sigma2_out;
+  real_t *__restrict__ hamiltonian = (real_t*) hamiltonian2;
 
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   #define package_id (gid * DIM * DIM * 2)
@@ -945,9 +945,9 @@ void comm_manual_aosoa_constants_direct_perm (
 
 __global__ 
 void final_gpu_kernel (
-    const real_2_t * __restrict sigma_in,
-          real_2_t * __restrict sigma_out, 
-    const real_2_t * __restrict hamiltonian,
+    const real_2_t * __restrict__ sigma_in,
+          real_2_t * __restrict__ sigma_out, 
+    const real_2_t * __restrict__ hamiltonian,
     const int num)
 {
   #define id_2d_to_1d(i,j) ((i) * DIM + (j))
