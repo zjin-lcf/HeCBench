@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     adam, attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
@@ -892,6 +892,9 @@ Early results are shown [here](results/README.md)
 
 ### openmp (cuda)
   Multi-threading over a single device (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
+### overlap (cuda)
+  Overlap data copies with compute kernels (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### overlay (cuda)
   Overlay grid in the DetectNet (https://github.com/dusty-nv/jetson-inference)
