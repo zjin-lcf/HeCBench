@@ -20,60 +20,57 @@
 #include <stdio.h>
 #include <math.h>
 #include <chrono>
-#include <cuda_runtime.h>
+#include "common.h"
 
-#define CUDACHECK(error)                                                                       \
-{                                                                                              \
-    cudaError_t localError = error;                                                            \
-    if (localError != cudaSuccess) {                                                           \
-        printf("error: %s at %s:%d\n", cudaGetErrorString(localError),  __FILE__, __LINE__);   \
-    }                                                                                          \
-}
+#define MEM_ADVISE_READ_MOSTLY  PI_MEM_ADVICE_CUDA_SET_READ_MOSTLY
 
-__global__
-void add(int n, const float *x, float *y)
+void add(int n, const float *x, float *y, nd_item<3> &item)
 {
-  int index = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride = blockDim.x * gridDim.x;
+  int index = item.get_global_id(2);
+  int stride = item.get_local_range(2) * item.get_group_range(2);
   for (int i = index; i < n; i += stride)
     y[i] += x[i];
 }
 
-void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
+void prefetch(queue &q, const int numElements, const int repeat)
 {
   printf("Concurrent managed access with prefetch\n");
 
-  float *A, *B;
-
-  CUDACHECK(cudaMallocManaged(&A, numElements*sizeof(float)));
-  CUDACHECK(cudaMallocManaged(&B, numElements*sizeof(float)));
+  float *A = sycl::malloc_shared<float>(numElements, q);
+  float *B = sycl::malloc_shared<float>(numElements, q);
 
   for (int i = 0; i < numElements; i++) {
     A[i] = 1.0f;
     B[i] = 2.0f;
   }
 
-  CUDACHECK(cudaDeviceSynchronize());
+  q.wait();
 
   float maxError = 0.0f;
 
   int blockSize = 256;
   int numBlocks = (numElements + blockSize - 1) / blockSize;
-  dim3 dimGrid(numBlocks, 1, 1);
-  dim3 dimBlock(blockSize, 1, 1);
+  sycl::range<3> gws (1, 1, numBlocks * blockSize);
+  sycl::range<3> lws (1, 1, blockSize);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
 
-    CUDACHECK(cudaMemAdvise(A, numElements*sizeof(float), cudaMemAdviseSetReadMostly, cudaCpuDeviceId));
-    CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
-    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
+    q.mem_advise(A, numElements * sizeof(float), MEM_ADVISE_READ_MOSTLY);
 
-    add <<< dimGrid, dimBlock >>> (numElements, A, B);
+    q.prefetch(A, numElements * sizeof(float));
+    q.prefetch(B, numElements * sizeof(float));
 
-    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), cudaCpuDeviceId));
-    CUDACHECK(cudaDeviceSynchronize());
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k1>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+        add(numElements, A, B, item);
+      });
+    });
+
+    q.prefetch(B, numElements * sizeof(float));
+
+    q.wait();
   }
 
   for (int i = 0; i < numElements; i++)
@@ -83,42 +80,42 @@ void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
 
-  CUDACHECK(cudaFree(A));
-  CUDACHECK(cudaFree(B));
+  free(A, q);
+  free(B, q);
 
   bool testResult = (maxError == 0.0f);
   printf("%s\n", testResult ? "PASS" : "FAIL");
 }
 
-void naive (const int numElements, const int repeat)
+void naive(queue &q, const int numElements, const int repeat)
 {
   printf("Concurrent managed access without prefetch\n");
 
-  float *A, *B;
-
-  CUDACHECK(cudaMallocManaged(&A, numElements*sizeof(float)));
-  CUDACHECK(cudaMallocManaged(&B, numElements*sizeof(float)));
+  float *A = sycl::malloc_shared<float>(numElements, q);
+  float *B = sycl::malloc_shared<float>(numElements, q);
 
   for (int i = 0; i < numElements; i++) {
     A[i] = 1.0f;
     B[i] = 2.0f;
   }
 
-  CUDACHECK(cudaDeviceSynchronize());
+  q.wait();
 
   float maxError = 0.0f;
 
   int blockSize = 256;
   int numBlocks = (numElements + blockSize - 1) / blockSize;
-  dim3 dimGrid(numBlocks, 1, 1);
-  dim3 dimBlock(blockSize, 1, 1);
+  sycl::range<3> gws (1, 1, numBlocks * blockSize);
+  sycl::range<3> lws (1, 1, blockSize);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    add <<< dimGrid, dimBlock >>> (numElements, A, B);
-
-    CUDACHECK(cudaDeviceSynchronize());
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class k2>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+        add(numElements, A, B, item);
+      });
+    }).wait();
   }
 
   for (int i = 0; i < numElements; i++)
@@ -128,8 +125,8 @@ void naive (const int numElements, const int repeat)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
 
-  CUDACHECK(cudaFree(A));
-  CUDACHECK(cudaFree(B));
+  free(A, q);
+  free(B, q);
 
   bool testResult = (maxError == 0.0f);
   printf("%s\n", testResult ? "PASS" : "FAIL");
@@ -143,16 +140,17 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  int p_gpuDevice = 0;
-  CUDACHECK(cudaSetDevice(p_gpuDevice));
-  printf("info: set device to %d\n", p_gpuDevice);
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel);
 
-  int concurrentManagedAccess = 0;
-  CUDACHECK(cudaDeviceGetAttribute(&concurrentManagedAccess,
-        cudaDevAttrConcurrentManagedAccess,
-        p_gpuDevice));
+  bool concurrentManagedAccess = q.get_device().get_info<info::device::usm_shared_allocations>();
+
   if(!concurrentManagedAccess) {
-    printf("info: concurrent managed access not supported on device %d\n Skipped\n", p_gpuDevice);
+    printf("info: concurrent managed access not supported on device. Skipped\n");
     return 0;
   }
 
@@ -161,13 +159,13 @@ int main(int argc, char *argv[])
   printf("------------\n");
   printf("   Warmup   \n");
   printf("------------\n");
-  prefetch(p_gpuDevice, numElements, repeat);
-  naive(numElements, repeat);
+  prefetch(q, numElements, repeat);
+  naive(q, numElements, repeat);
   printf("------------\n");
   printf("   Done     \n");
   printf("------------\n");
 
-  prefetch(p_gpuDevice, numElements, repeat);
-  naive(numElements, repeat);
+  prefetch(q, numElements, repeat);
+  naive(q, numElements, repeat);
   return 0;
 }
