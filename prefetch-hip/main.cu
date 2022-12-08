@@ -1,0 +1,154 @@
+#include <stdio.h>
+#include <math.h>
+#include <chrono>
+#include <hip/hip_runtime.h>
+
+#define HIPCHECK(error)                                                                        \
+{                                                                                              \
+    hipError_t localError = error;                                                             \
+    if (localError != hipSuccess) {                                                            \
+        printf("error: %s at %s:%d\n", hipGetErrorString(localError),  __FILE__, __LINE__);    \
+    }                                                                                          \
+}
+
+__global__
+void add(int n, const float *x, float *y)
+{
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride = blockDim.x * gridDim.x;
+  for (int i = index; i < n; i += stride)
+    y[i] += x[i];
+}
+
+void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
+{
+  printf("Concurrent managed access with prefetch\n");
+
+  float *A, *B;
+
+  HIPCHECK(hipMallocManaged(&A, numElements*sizeof(float)));
+  HIPCHECK(hipMallocManaged(&B, numElements*sizeof(float)));
+
+  for (int i = 0; i < numElements; i++) {
+    A[i] = 1.0f;
+    B[i] = 2.0f;
+  }
+
+  HIPCHECK(hipDeviceSynchronize());
+
+  float maxError = 0.0f;
+
+  int blockSize = 256;
+  int numBlocks = (numElements + blockSize - 1) / blockSize;
+  dim3 dimGrid(numBlocks, 1, 1);
+  dim3 dimBlock(blockSize, 1, 1);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+
+    HIPCHECK(hipMemAdvise(A, numElements*sizeof(float), hipMemAdviseSetReadMostly, hipCpuDeviceId));
+    HIPCHECK(hipMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
+    HIPCHECK(hipMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
+
+    hipLaunchKernelGGL(add, dimGrid, dimBlock, 0, 0, numElements, A, B);
+
+    HIPCHECK(hipMemPrefetchAsync(B, numElements*sizeof(float), hipCpuDeviceId));
+    HIPCHECK(hipDeviceSynchronize());
+  }
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  HIPCHECK(hipFree(A));
+  HIPCHECK(hipFree(B));
+
+  bool testResult = (maxError == 0.0f);
+  printf("%s\n", testResult ? "PASS" : "FAIL");
+}
+
+void naive (const int numElements, const int repeat)
+{
+  printf("Concurrent managed access without prefetch\n");
+
+  float *A, *B;
+
+  HIPCHECK(hipMallocManaged(&A, numElements*sizeof(float)));
+  HIPCHECK(hipMallocManaged(&B, numElements*sizeof(float)));
+
+  for (int i = 0; i < numElements; i++) {
+    A[i] = 1.0f;
+    B[i] = 2.0f;
+  }
+
+  HIPCHECK(hipDeviceSynchronize());
+
+  float maxError = 0.0f;
+
+  int blockSize = 256;
+  int numBlocks = (numElements + blockSize - 1) / blockSize;
+  dim3 dimGrid(numBlocks, 1, 1);
+  dim3 dimBlock(blockSize, 1, 1);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    hipLaunchKernelGGL(add, dimGrid, dimBlock, 0, 0, numElements, A, B);
+
+    HIPCHECK(hipDeviceSynchronize());
+  }
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  HIPCHECK(hipFree(A));
+  HIPCHECK(hipFree(B));
+
+  bool testResult = (maxError == 0.0f);
+  printf("%s\n", testResult ? "PASS" : "FAIL");
+}
+
+int main(int argc, char *argv[])
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
+  int p_gpuDevice = 0;
+  HIPCHECK(hipSetDevice(p_gpuDevice));
+  printf("info: set device to %d\n", p_gpuDevice);
+
+  int concurrentManagedAccess = 0;
+  HIPCHECK(hipDeviceGetAttribute(&concurrentManagedAccess,
+        hipDeviceAttributeConcurrentManagedAccess,
+        p_gpuDevice));
+  if(!concurrentManagedAccess) {
+    printf("info: concurrent managed access not supported on device %d\n Skipped\n", p_gpuDevice);
+    return 0;
+  }
+
+  const int numElements = 64 * 1024 * 1024;
+
+  printf("------------\n");
+  printf("   Warmup   \n");
+  printf("------------\n");
+  prefetch(p_gpuDevice, numElements, repeat);
+  naive(numElements, repeat);
+  printf("------------\n");
+  printf("   Done     \n");
+  printf("------------\n");
+
+  prefetch(p_gpuDevice, numElements, repeat);
+  naive(numElements, repeat);
+  return 0;
+}
