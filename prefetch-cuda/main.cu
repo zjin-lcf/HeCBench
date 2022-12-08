@@ -1,0 +1,154 @@
+#include <stdio.h>
+#include <math.h>
+#include <chrono>
+#include <cuda_runtime.h>
+
+#define CUDACHECK(error)                                                                       \
+{                                                                                              \
+    cudaError_t localError = error;                                                            \
+    if (localError != cudaSuccess) {                                                           \
+        printf("error: %s at %s:%d\n", cudaGetErrorString(localError),  __FILE__, __LINE__);   \
+    }                                                                                          \
+}
+
+__global__
+void add(int n, const float *x, float *y)
+{
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride = blockDim.x * gridDim.x;
+  for (int i = index; i < n; i += stride)
+    y[i] += x[i];
+}
+
+void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
+{
+  printf("Concurrent managed access with prefetch\n");
+
+  float *A, *B;
+
+  CUDACHECK(cudaMallocManaged(&A, numElements*sizeof(float)));
+  CUDACHECK(cudaMallocManaged(&B, numElements*sizeof(float)));
+
+  for (int i = 0; i < numElements; i++) {
+    A[i] = 1.0f;
+    B[i] = 2.0f;
+  }
+
+  CUDACHECK(cudaDeviceSynchronize());
+
+  float maxError = 0.0f;
+
+  int blockSize = 256;
+  int numBlocks = (numElements + blockSize - 1) / blockSize;
+  dim3 dimGrid(numBlocks, 1, 1);
+  dim3 dimBlock(blockSize, 1, 1);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+
+    CUDACHECK(cudaMemAdvise(A, numElements*sizeof(float), cudaMemAdviseSetReadMostly, cudaCpuDeviceId));
+    CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
+    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
+
+    add <<< dimGrid, dimBlock >>> (numElements, A, B);
+
+    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), cudaCpuDeviceId));
+    CUDACHECK(cudaDeviceSynchronize());
+  }
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  CUDACHECK(cudaFree(A));
+  CUDACHECK(cudaFree(B));
+
+  bool testResult = (maxError == 0.0f);
+  printf("%s\n", testResult ? "PASS" : "FAIL");
+}
+
+void naive (const int numElements, const int repeat)
+{
+  printf("Concurrent managed access without prefetch\n");
+
+  float *A, *B;
+
+  CUDACHECK(cudaMallocManaged(&A, numElements*sizeof(float)));
+  CUDACHECK(cudaMallocManaged(&B, numElements*sizeof(float)));
+
+  for (int i = 0; i < numElements; i++) {
+    A[i] = 1.0f;
+    B[i] = 2.0f;
+  }
+
+  CUDACHECK(cudaDeviceSynchronize());
+
+  float maxError = 0.0f;
+
+  int blockSize = 256;
+  int numBlocks = (numElements + blockSize - 1) / blockSize;
+  dim3 dimGrid(numBlocks, 1, 1);
+  dim3 dimBlock(blockSize, 1, 1);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    add <<< dimGrid, dimBlock >>> (numElements, A, B);
+
+    CUDACHECK(cudaDeviceSynchronize());
+  }
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  CUDACHECK(cudaFree(A));
+  CUDACHECK(cudaFree(B));
+
+  bool testResult = (maxError == 0.0f);
+  printf("%s\n", testResult ? "PASS" : "FAIL");
+}
+
+int main(int argc, char *argv[])
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
+  int p_gpuDevice = 0;
+  CUDACHECK(cudaSetDevice(p_gpuDevice));
+  printf("info: set device to %d\n", p_gpuDevice);
+
+  int concurrentManagedAccess = 0;
+  CUDACHECK(cudaDeviceGetAttribute(&concurrentManagedAccess,
+        cudaDevAttrConcurrentManagedAccess,
+        p_gpuDevice));
+  if(!concurrentManagedAccess) {
+    printf("info: concurrent managed access not supported on device %d\n Skipped\n", p_gpuDevice);
+    return 0;
+  }
+
+  const int numElements = 64 * 1024 * 1024;
+
+  printf("------------\n");
+  printf("   Warmup   \n");
+  printf("------------\n");
+  prefetch(p_gpuDevice, numElements, repeat);
+  naive(numElements, repeat);
+  printf("------------\n");
+  printf("   Done     \n");
+  printf("------------\n");
+
+  prefetch(p_gpuDevice, numElements, repeat);
+  naive(numElements, repeat);
+  return 0;
+}
