@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -503,9 +503,6 @@ Early results are shown [here](results/README.md)
 
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377- 388). ACM.)
-
-### fpdc (cuda)
-  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
 
 ### frechet (matlab)
   Compute the discrete Frechet distance between two curves specified by discrete ordered points in n-dimensional space (https://github.com/mp4096/discrete-frechet-distance)
