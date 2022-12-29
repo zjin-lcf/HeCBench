@@ -48,7 +48,7 @@ void init_vec(su3_vector *s) {
 //--------------------------------------------------------------------------------
 // initialize lattice data
 void make_data(su3_vector *src,  su3_matrix *fat, su3_matrix *lng, size_t n) {
-  for(int i=0;i<n;i++) {
+  for(size_t i=0;i<n;i++) {
     init_vec(src + i);
     for(int dir=0;dir<4;dir++){
       init_mat(fat + 4*i + dir);
