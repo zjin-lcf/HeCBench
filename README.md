@@ -1032,6 +1032,9 @@ Early results are shown [here](results/README.md)
 ### scan3 (cuda)
   Scan a large array using vendors' library (https://github.com/OpenCL/AMD_APP_samples)
 
+### score (cuda)
+  Find the top scores (https://github.com/opencv/)
+
 ### secp256k1 (cuda)
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
 
