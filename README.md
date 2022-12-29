@@ -42,8 +42,8 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Language and kernel features
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, popcount, prefetch, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
-### Machine learning  
-    adam, attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
+### Machine learning
+    adam, attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, score, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
@@ -1037,6 +1037,9 @@ Early results are shown [here](results/README.md)
 
 ### scan3 (cuda)
   Scan a large array using vendors' library (https://github.com/OpenCL/AMD_APP_samples)
+
+### score (cuda)
+  Find the top scores (https://github.com/opencv/)
 
 ### secp256k1 (cuda)
   Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
