@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
     
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -979,6 +979,9 @@ Early results are shown [here](results/README.md)
 
 ### recursiveGaussian (opencl)
   2-dimensional Gaussian Blur Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### resize (cuda)
+  Resize images (https://github.com/opencv/)
 
 ### resnet-kernels (cuda)
   ResNet kernels for inference (https://github.com/xuqiantong/CUDA-Winograd)
