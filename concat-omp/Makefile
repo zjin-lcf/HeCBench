@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = hipcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -13,23 +14,23 @@ DEBUG     = no
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../fpdc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
 
@@ -37,18 +38,24 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
+
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../fpdc-cuda/kernels.h Makefile
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.bin
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 255 8 100 2
+	./$(program) 1000

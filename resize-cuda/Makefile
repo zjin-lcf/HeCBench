@@ -3,9 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = hipcc
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 
 #===============================================================================
 # Program name & source code list
@@ -22,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../fpdc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
@@ -44,11 +45,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../fpdc-cuda/kernels.h Makefile
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.bin
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 255 8 100 2
+	./$(program) 1920 1080 256 256 512 100

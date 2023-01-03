@@ -49,9 +49,7 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) README*
+	rm -rf $(program) $(obj) *.bin
 
 run: $(program)
-	rm -rf README*
-	./$(program) 255 8 100 2 < ../README.md > README.fpc
-	./$(program) 100 < README.fpc > README
+	./$(program) 255 8 100 2

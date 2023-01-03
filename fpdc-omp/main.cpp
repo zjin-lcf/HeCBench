@@ -42,6 +42,7 @@ Using GPUs, pp. 7:1-7:7. March 2011.
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <chrono>
 #include <omp.h>
 
 #define ull unsigned long long
@@ -176,122 +177,39 @@ void CompressionKernel(
 
 /************************************************************************************/
 
-/*
-This is the GPU decompression kernel, which should be launched using the block count
-and warps/block:
-
-Inputs
-------
-dimensionalityd: dimensionality of trace
-dbufd: ptr to array of compressed data
-cutd: ptr to array of chunk boundaries
-
-Output
-------
-The decompressed data in fbufd
-*/
-
-void DecompressionKernel(
-  const int nTeams,
-  const int nThreads,
-  const int dimensionalityd,
-  const char *__restrict dbufd,
-  ull *__restrict fbufd,
-  const int *__restrict cutd)
+static void Compress(int blocks, int warpsperblock, int repeat, int dimensionality)
 {
-  #pragma omp target teams num_teams(nTeams) thread_limit(nThreads)
-  {
-    int ibufs[32 * (3 * WARPSIZE / 2)]; // shared space for prefix sum
-    #pragma omp parallel 
-    {
-      int offset, code, bcount, off, beg, end, lane, warp, iindex, lastidx, start, term;
-      ull diff, prev;
-      int lid = omp_get_thread_num();
-
-      // index within this warp
-      lane = lid & 31;
-      // index within shared prefix sum array
-      iindex = lid / WARPSIZE * (3 * WARPSIZE / 2) + lane;
-      ibufs[iindex] = 0;
-      iindex += WARPSIZE / 2;
-      lastidx = (lid / WARPSIZE + 1) * (3 * WARPSIZE / 2) - 1;
-      // warp id
-      warp = (lid + omp_get_team_num() * nThreads) / WARPSIZE;
-      // prediction index within previous subchunk
-      offset = WARPSIZE - (dimensionalityd - lane % dimensionalityd) - lane;
-
-      // determine start and end of chunk to decompress
-      start = 0;
-      if (warp > 0) start = cutd[warp-1];
-      term = cutd[warp];
-      off = ((start+1)/2*17);
-
-      prev = 0;
-      for (int i = start + lane; i < term; i += WARPSIZE) {
-        // read in half-bytes of size and leading-zero count information
-        if ((lane & 1) == 0) {
-          code = dbufd[off + (lane >> 1)];
-          ibufs[iindex] = code;
-          ibufs[iindex + 1] = code >> 4;
-        }
-        off += (WARPSIZE/2);
-        #pragma omp barrier
-        code = ibufs[iindex];
-
-        bcount = code & 7;
-        if (bcount >= 2) bcount++;
-
-        // calculate start positions of compressed data
-        ibufs[iindex] = bcount;
-        #pragma omp barrier
-        ibufs[iindex] += ibufs[iindex-1];
-        #pragma omp barrier
-        ibufs[iindex] += ibufs[iindex-2];
-        #pragma omp barrier
-        ibufs[iindex] += ibufs[iindex-4];
-        #pragma omp barrier
-        ibufs[iindex] += ibufs[iindex-8];
-        #pragma omp barrier
-        ibufs[iindex] += ibufs[iindex-16];
-        #pragma omp barrier
-
-        // read in compressed data (the non-zero bytes)
-        beg = off + ibufs[iindex-1];
-        off += ibufs[lastidx];
-        end = beg + bcount - 1;
-        diff = 0;
-        for (; beg <= end; end--) {
-          diff <<= 8;
-          diff |= dbufd[end];
-        }
-
-        // negate delta if sign bit indicates it was negated during compression
-        if ((code & 8) != 0) {
-          diff = -diff;
-        }
-
-        // write out the uncompressed word
-        fbufd[i] = prev + diff;
-        #pragma omp barrier
-
-        // save prediction for next subchunk
-        prev = fbufd[i + offset];
-      }
-    }
+  // generate a test file with fixed values
+  FILE *fp = fopen("input.bin", "wb");
+  if (fp == NULL) {
+    fprintf(stderr, "Failed to open input file input.bin for write.\n");
   }
-}
+  for (int i = 0; i < MAX; i++) {
+    double t = i;
+    fwrite(&t, 8, 1, fp);
+  }
+  fclose(fp);
 
+  fp = fopen("input.bin", "rb");
+  if (fp == NULL) {
+    fprintf(stderr, "Failed to open input file input.bin for read.\n");
+  }
 
-
-/************************************************************************************/
-
-static void Compress(int blocks, int warpsperblock, int dimensionality)
-{
   // allocate CPU buffers
   ull *cbuf = (ull *)malloc(sizeof(ull) * MAX); // uncompressed data
   if (cbuf == NULL) {
     fprintf(stderr, "cannot allocate cbuf\n");
   }
+
+  int doubles = fread(cbuf, 8, MAX, fp);
+  if (doubles != MAX) {
+    fprintf(stderr, "Error in reading input.bin. Exit\n");
+    if (cbuf != NULL) free(cbuf);
+    fclose(fp);
+    return ;
+  }
+  fclose(fp);
+
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data
   if (dbuf == NULL) {
     fprintf(stderr, "cannot allocate dbuf\n");
@@ -304,9 +222,6 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
   if (off == NULL) {
     fprintf(stderr, "cannot allocate off\n");
   }
-
-  // read in trace to cbuf
-  int doubles = fread(cbuf, 8, MAX, stdin);
 
   // calculate required padding for last chunk
   int padding = ((doubles + WARPSIZE - 1) & -WARPSIZE) - doubles;
@@ -342,31 +257,41 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
                           map (alloc: dbuf[0:(doubles+1)/2*17],\
                                        off[0:blocks * warpsperblock])
   {
+    auto start = std::chrono::steady_clock::now();
  
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < repeat; i++)
       CompressionKernel(blocks, WARPSIZE*warpsperblock,
         dimensionality, cbuf, dbuf, cut, off);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
     // transfer offsets back to CPU
     #pragma omp target update from (off[0:blocks * warpsperblock])
 
     // output header
+    fp = fopen("output.bin", "wb");
+    if (fp == NULL) {
+      fprintf(stderr, "Failed to open output file output.bin.\n");
+    }
+
     int num;
     int doublecnt = doubles-padding;
-    num = fwrite(&blocks, 1, 1, stdout);
+    num = fwrite(&blocks, 1, 1, fp);
     assert(1 == num);
-    num = fwrite(&warpsperblock, 1, 1, stdout);
+    num = fwrite(&warpsperblock, 1, 1, fp);
     assert(1 == num);
-    num = fwrite(&dimensionality, 1, 1, stdout);
+    num = fwrite(&dimensionality, 1, 1, fp);
     assert(1 == num);
-    num = fwrite(&doublecnt, 4, 1, stdout);
+    num = fwrite(&doublecnt, 4, 1, fp);
     assert(1 == num);
     // output offset table
     for(int i = 0; i < blocks * warpsperblock; i++) {
       int start = 0;
       if(i > 0) start = cut[i-1];
       off[i] -= ((start+1)/2*17);
-      num = fwrite(&off[i], 4, 1, stdout); // chunk's compressed size in bytes
+      num = fwrite(&off[i], 4, 1, fp); // chunk's compressed size in bytes
       assert(1 == num);
     }
     // output compressed data by chunk
@@ -376,107 +301,27 @@ static void Compress(int blocks, int warpsperblock, int dimensionality)
       offset = ((start+1)/2*17);
       // transfer compressed data back to CPU by chunk
       #pragma omp target update from (dbuf[offset:offset+off[i]])
-      num = fwrite(&dbuf[offset], 1, off[i], stdout);
+      num = fwrite(&dbuf[offset], 1, off[i], fp);
       assert(off[i] == num);
     }
+    fclose(fp);
+    
+    // compression ratio
+    fp = fopen("input.bin", "rb");
+    fseek (fp, 0, SEEK_END);
+    long input_size = ftell (fp);
+
+    fp = fopen("output.bin", "rb");
+    fseek (fp, 0, SEEK_END);
+    long output_size = ftell (fp);
+
+    fprintf(stderr, "Compression ratio = %lf\n", 1.0 * input_size / output_size);
 
     free(cbuf);
     free(dbuf);
     free(cut);
     free(off);
   }
-}
-
-/************************************************************************************/
-
-static void Decompress(int blocks, int warpsperblock, int dimensionality, int doubles)
-{
-#ifdef DEBUG
-  printf("[Decompress] allocate CPU buffers\n");
-#endif
-  char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data, divided by chunk
-  if (dbuf == NULL) { 
-    fprintf(stderr, "cannot allocate dbuf\n");
-  }
-  ull *fbuf = (ull *)malloc(sizeof(ull) * MAX); // decompressed data
-  if (fbuf == NULL) { 
-    fprintf(stderr, "cannot allocate fbuf\n");
-  }
-  int *cut = (int *)malloc(sizeof(int) * blocks * warpsperblock); // chunk boundaries
-  if (cut == NULL) { 
-    fprintf(stderr, "cannot allocate cut\n");
-  }
-  int *off = (int *)malloc(sizeof(int) * blocks * warpsperblock); // offset table
-  if(off == NULL) {
-    fprintf(stderr, "cannot allocate off\n");
-  }
-
-#ifdef DEBUG
-  printf("[Decompress] read in offset table\n");
-#endif
-  for(int i = 0; i < blocks * warpsperblock; i++) {
-    int num = fread(&off[i], 4, 1, stdin);
-    assert(1 == num);
-  }
-
-#ifdef DEBUG
-  printf("[Decompress] calculate required padding for last chunk\n");
-#endif
-  int padding = ((doubles + WARPSIZE - 1) & -WARPSIZE) - doubles;
-  doubles += padding;
-
-#ifdef DEBUG
-  printf("[Decompress] determine chunk assignments per warp\n");
-#endif
-  int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock); 
-  if (per < WARPSIZE) per = WARPSIZE;
-  per = (per + WARPSIZE - 1) & -WARPSIZE;
-  int curr = 0;
-  for (int i = 0; i < blocks * warpsperblock; i++) {
-    curr += per;
-    cut[i] = min(curr, doubles);
-  }
-
-#ifdef DEBUG
-  printf("[Decompress] allocate GPU buffers\n");
-#endif
-
-  #pragma omp target data map (to: cut[0:blocks * warpsperblock]) \
-                          map (alloc: dbuf[0:(doubles+1)/2*17]) \
-                          map (from: fbuf[0:doubles])
-  {
-
-#ifdef DEBUG
-    printf("[Decompress] read in input data and divide into chunks\n");
-#endif
-    for(int i = 0; i < blocks * warpsperblock; i++) {
-      int num, chbeg, start = 0;
-      if (i > 0) start = cut[i-1];
-      chbeg = ((start+1)/2*17);
-      // read in this chunk of data (based on offsets)
-      num = fread(&dbuf[chbeg], 1, off[i], stdin);
-      assert(off[i] == num);
-      // transfer the chunk to the GPU
-      #pragma omp target update to (dbuf[chbeg: chbeg+off[i]])
-    }
-
-#ifdef DEBUG
-    printf("[Decompress] run the kernel for 100 iterations\n");
-#endif
-    for (int i = 0; i < 100; i++)
-      DecompressionKernel(blocks, WARPSIZE*warpsperblock,
-        dimensionality, dbuf, fbuf, cut);
-  }
-
-#ifdef DEBUG
-  printf("[Decompress] output decompressed data\n");
-#endif
-  int num = fwrite(fbuf, 8, doubles-padding, stdout);
-  assert(num == doubles-padding);
-
-  free(dbuf);
-  free(fbuf);
-  free(cut);
 }
 
 /************************************************************************************/
@@ -506,46 +351,30 @@ int main(int argc, char *argv[])
   VerifySystemParameters();
 
   int blocks, warpsperblock, dimensionality;
+  int repeat;
 
-  if((3 == argc) || (4 == argc)) { /* compress */
-    char dummy;
+  if((4 == argc) || (5 == argc)) { /* compress */
     blocks = atoi(argv[1]);
     assert((0 < blocks) && (blocks < 256));
+
     warpsperblock = atoi(argv[2]);
     assert((0 < warpsperblock) && (warpsperblock < 256));
-    if(3 == argc) {
+
+    repeat = atoi(argv[3]);
+
+    if(4 == argc) {
       dimensionality = 1;
     } else {
-      dimensionality = atoi(argv[3]);
+      dimensionality = atoi(argv[4]);
     }
     assert((0 < dimensionality) && (dimensionality <= WARPSIZE));
 
-    Compress(blocks, warpsperblock, dimensionality);
-    assert(0 == fread(&dummy, 1, 1, stdin));
-  }
-  else if(1 == argc) { /* decompress */
-    int num, doubles;
-    num = fread(&blocks, 1, 1, stdin);
-    assert(1 == num);
-    blocks &= 255;
-    num = fread(&warpsperblock, 1, 1, stdin);
-    assert(1 == num);
-    warpsperblock &= 255;
-    num = fread(&dimensionality, 1, 1, stdin);
-    assert(1 == num);
-    dimensionality &= 255;
-    num = fread(&doubles, 4, 1, stdin);
-    assert(1 == num);
-
-#ifdef DEBUG
-    printf("blocks=%d warps/block=%d dim=%d doubles=%d\n", blocks, warpsperblock, dimensionality, doubles);
-#endif
-    Decompress(blocks, warpsperblock, dimensionality, doubles);
+    Compress(blocks, warpsperblock, repeat, dimensionality);
   }
   else {
     fprintf(stderr, "usage:\n");
-    fprintf(stderr, "compress: %s blocks warps/block (dimensionality) < file.in > file.gfc\n", argv[0]);
-    fprintf(stderr, "decompress: %s < file.gfc > file.out\n", argv[0]);
+    fprintf(stderr, "compress: %s <blocks> <warps/block> <repeat> <dimensionality>\n", argv[0]);
+    fprintf(stderr, "\ninput.bin is generated by the program and the compressed output file is output.bin.\n");
   }
 
   return 0;

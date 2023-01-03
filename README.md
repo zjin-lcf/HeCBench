@@ -19,13 +19,13 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
     
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, fpdc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -42,8 +42,8 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Language and kernel features
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, popcount, prefetch, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
-### Machine learning
-    adam, attention, attentionMultiHead, backprop, bn, clink, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, score, softmax, stddev, streamcluster, wedford, winograd, word2vec
+### Machine learning  
+    adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
@@ -327,6 +327,9 @@ Early results are shown [here](results/README.md)
 ### compute-score (opencl)
   Document filtering (https://www.intel.com/content/www/us/en/programmable/support/support-resources/design-examples/design-software/opencl/compute-score.html)
 
+### concat (cuda)
+  Concatenation of two tensors (https://github.com/bytedance/lightseq)
+
 ### concurrentKernels (cuda)
   Demonstrate the use of streams for concurrent execution of several kernels with dependency on a device (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/concurrentKernels)
 
@@ -503,9 +506,6 @@ Early results are shown [here](results/README.md)
 
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377- 388). ACM.)
-
-### fpdc (cuda)
-  Floating-point data compression and decompression (https://userweb.cs.txstate.edu/~burtscher/research/GFC/)
 
 ### frechet (matlab)
   Compute the discrete Frechet distance between two curves specified by discrete ordered points in n-dimensional space (https://github.com/mp4096/discrete-frechet-distance)
@@ -985,6 +985,9 @@ Early results are shown [here](results/README.md)
 
 ### recursiveGaussian (opencl)
   2-dimensional Gaussian Blur Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### resize (cuda)
+  Resize images (https://github.com/opencv/)
 
 ### resnet-kernels (cuda)
   ResNet kernels for inference (https://github.com/xuqiantong/CUDA-Winograd)

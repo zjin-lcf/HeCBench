@@ -22,14 +22,14 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../fpdc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
 
@@ -37,6 +37,7 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -44,11 +45,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../fpdc-cuda/kernels.h Makefile
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.bin
+	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 255 8 100 2
+	./$(program) 1920 1080 256 256 512 100
