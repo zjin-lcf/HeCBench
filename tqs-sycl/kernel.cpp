@@ -35,84 +35,83 @@
 
 #include "kernel.h"
 
-void TaskQueue_gpu(nd_item<1> &item,
-                   uint8_t *__restrict sm,
-                   const task_t *__restrict task_queue,
-                   int *__restrict data_queue,
+void TaskQueue_gpu(const task_t *__restrict queue,
+                   int *__restrict data,
                    int *__restrict consumed,
                    const int iterations,
                    const int offset,
-                   const int gpuQueueSize)
+                   const int gpuQueueSize,
+                   sycl::nd_item<1> &item,
+                   uint8_t *sm)
 {
   int* next = (int*) sm;
   task_t* t = (task_t*)&next[1];
 
-  const int tid       = item.get_local_id(0);
+  const int tid = item.get_local_id(0);
   const int tile_size = item.get_local_range(0);
 
   // Fetch task
   if(tid == 0) {
-    auto ao = ext::oneapi::atomic_ref<int, 
-              ext::oneapi::memory_order::relaxed,
-              ext::oneapi::memory_scope::device,
-              access::address_space::global_space> (*consumed);
+    auto ao = sycl::ext::oneapi::atomic_ref<int, 
+              sycl::ext::oneapi::memory_order::relaxed,
+              sycl::ext::oneapi::memory_scope::device,
+              sycl::access::address_space::global_space> (*consumed);
     *next = ao.fetch_add(1);
-    t->id = task_queue[*next].id;
-    t->op = task_queue[*next].op;
+    t->id = queue[*next].id;
+    t->op = queue[*next].op;
   }
-
-  item.barrier(access::fence_space::local_space);
-
+  item.barrier(sycl::access::fence_space::local_space);
   while(*next < gpuQueueSize) {
     // Compute task
     if(t->op == SIGNAL_WORK_KERNEL) {
       for(int i = 0; i < iterations; i++) {
-        data_queue[(t->id - offset) * tile_size + tid] += tile_size;
+        data[(t->id - offset) * tile_size + tid] += tile_size;
       }
 
-      data_queue[(t->id - offset) * tile_size + tid] += t->id;
+      data[(t->id - offset) * tile_size + tid] += t->id;
     }
     if(t->op == SIGNAL_NOTWORK_KERNEL) {
       for(int i = 0; i < 1; i++) {
-        data_queue[(t->id - offset) * tile_size + tid] += tile_size;
+        data[(t->id - offset) * tile_size + tid] += tile_size;
       }
 
-      data_queue[(t->id - offset) * tile_size + tid] += t->id;
+      data[(t->id - offset) * tile_size + tid] += t->id;
     }
     if(tid == 0) {
-      auto ao = ext::oneapi::atomic_ref<int, 
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::device,
-                access::address_space::global_space> (*consumed);
+      auto ao = sycl::ext::oneapi::atomic_ref<int, 
+                sycl::ext::oneapi::memory_order::relaxed,
+                sycl::ext::oneapi::memory_scope::device,
+                sycl::access::address_space::global_space> (*consumed);
       *next = ao.fetch_add(1);
       // Fetch task
-      t->id = task_queue[*next].id;
-      t->op = task_queue[*next].op;
+      t->id = queue[*next].id;
+      t->op = queue[*next].op;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
-void call_TaskQueue_gpu(queue &q,
+void call_TaskQueue_gpu(sycl::queue &q,
                         int blocks,
                         int threads,
-                        task_t *task_queue,
-                        int *data_queue,
+                        const task_t *queue,
+                        int *data,
                         int *consumed, 
                         int iterations,
                         int offset,
                         int gpuQueueSize,
                         int l_mem_size)
 {
-  range<1> lws (threads);
-  range<1> gws (blocks * threads);
+  sycl::range<1> gws (threads * blocks);
+  sycl::range<1> lws (threads);
 
-  q.submit([&] (handler &cgh) {
-    accessor<uint8_t, 1, sycl_read_write, access::target::local> sm (l_mem_size, cgh);
-    cgh.parallel_for<class tq>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      TaskQueue_gpu(
-        item, sm.get_pointer(),
-        task_queue, data_queue, consumed, iterations, offset, gpuQueueSize);
+  q.submit([&](sycl::handler &cgh) {
+    sycl::accessor<uint8_t, 1, sycl::access::mode::read_write, sycl::access::target::local>
+      sm (sycl::range<1>(l_mem_size), cgh);
+
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      TaskQueue_gpu(queue, data, consumed, iterations, offset,
+                    gpuQueueSize, item, sm.get_pointer());
     });
   });
 }
