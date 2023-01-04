@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
-OUTPUT    = no
+DEVICE    = gpu
 
 #===============================================================================
 # Program name & source code list
@@ -15,16 +14,16 @@ OUTPUT    = no
 
 program = main
 
-source = main.cu galois.cu jerasure.cu GCRSMatrix.cu utils.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -35,17 +34,16 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-# Dump output
-ifeq ($(OUTPUT),yes)
-  CFLAGS += -DDUMP
-endif
-
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -53,17 +51,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu 
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
-
-jerasure.o: jerasure.h galois.h
-galois.o: galois.h
-GCRSMatrix.o: GCRSMatrix.h jerasure.h galois.h
-main.o: utils.h GCRSMatrix.h kernels.cu
-utils.o: utils.h
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10 10 
+	./$(program) 10000000 100

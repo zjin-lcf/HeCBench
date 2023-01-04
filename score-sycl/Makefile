@@ -3,11 +3,18 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
-OUTPUT    = no
+
+SYCL      = yes
+GPU       = yes
+CUDA      = no
+CUDA_ARCH = sm_70
+HIP       = no
+HIP_ARCH  = gfx908
+GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+
 
 #===============================================================================
 # Program name & source code list
@@ -15,37 +22,46 @@ OUTPUT    = no
 
 program = main
 
-source = main.cu galois.cu jerasure.cu GCRSMatrix.cu utils.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -DSUB_GROUP_SIZE=32 \
+          -std=c++17 -Wall -I../include -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
+ifeq ($(CUDA), yes)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+endif
+
+ifeq ($(HIP), yes)
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
-
-# Dump output
-ifeq ($(OUTPUT),yes)
-  CFLAGS += -DDUMP
-endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(GPU),yes)
+  CFLAGS +=-DUSE_GPU
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -53,17 +69,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu 
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
-
-jerasure.o: jerasure.h galois.h
-galois.o: galois.h
-GCRSMatrix.o: GCRSMatrix.h jerasure.h galois.h
-main.o: utils.h GCRSMatrix.h kernels.cu
-utils.o: utils.h
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10 10 
+	./$(program) 100

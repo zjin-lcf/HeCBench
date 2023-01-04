@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
-OUTPUT    = no
+WAVE      = 64
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +14,7 @@ OUTPUT    = no
 
 program = main
 
-source = main.cu galois.cu jerasure.cu GCRSMatrix.cu utils.cu
+source = main.cu
 
 obj = $(source:.cu=.o)
 
@@ -24,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -DWAVEFRONT_SIZE=$(WAVE) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -35,12 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-# Dump output
-ifeq ($(OUTPUT),yes)
-  CFLAGS += -DDUMP
-endif
-
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -50,20 +43,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu 
+%.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
-
-jerasure.o: jerasure.h galois.h
-galois.o: galois.h
-GCRSMatrix.o: GCRSMatrix.h jerasure.h galois.h
-main.o: utils.h GCRSMatrix.h kernels.cu
-utils.o: utils.h
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10 10 
+	./$(program) 100
