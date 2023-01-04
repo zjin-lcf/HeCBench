@@ -104,10 +104,10 @@ float contribution(const Local& l, float f, const uint32_t x, const uint32_t y) 
 __device__ __forceinline__
 float4 __shfl_down(const float4 var, const uint32_t srcLane, const uint32_t width = 32) {
   float4 output;
-  output.x = __shfl_down(var.x, srcLane, width);
-  output.y = __shfl_down(var.y, srcLane, width);
-  output.z = __shfl_down(var.z, srcLane, width);
-  output.w = __shfl_down(var.w, srcLane, width);
+  output.x = __shfl_down_sync(0xFFFFFFFF, var.x, srcLane, width);
+  output.y = __shfl_down_sync(0xFFFFFFFF, var.y, srcLane, width);
+  output.z = __shfl_down_sync(0xFFFFFFFF, var.z, srcLane, width);
+  output.w = __shfl_down_sync(0xFFFFFFFF, var.w, srcLane, width);
   return output;
 }
 

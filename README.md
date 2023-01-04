@@ -40,13 +40,13 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, popcount, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, popcount, prefetch, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
-    alp, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
+    alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -173,6 +173,9 @@ Early results are shown [here](results/README.md)
 
 ### asta (cuda)
   Array of structure of tiled array for data layout transposition (https://github.com/chai-benchmarks/chai)
+
+### atan2 (cpp)
+  Approximate the atan2 math function (https://github.com/cms-patatrack/pixeltrack-standalone)
 
 ### atomicAggreate (cuda)
   Atomic aggregate (https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/) 
@@ -943,6 +946,9 @@ Early results are shown [here](results/README.md)
 
 ### popcount (opencl)
   Implementations of population count (Jin, Z. and Finkel, H., 2020, May. Population Count on Intel® CPU, GPU and FPGA. In 2020 IEEE International Parallel and Distributed Processing Symposium Workshops (IPDPSW) (pp. 432-439). IEEE.)
+
+### prefetch (hip)
+  Concurrent managed accesses (https://github.com/ROCm-Developer-Tools/HIP/)
 
 ### present (c)
   Lightweight cryptography (https://github.com/bozhu/PRESENT-C/blob/master/present.h)
