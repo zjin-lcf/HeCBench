@@ -186,17 +186,17 @@ int main(int argc, char **argv) {
     memset((void *)h_consumed, 0, sizeof(int));
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+    sycl::gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+    sycl::cpu_selector dev_sel;
 #endif
-    queue q(dev_sel, property::queue::in_order());
+    sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
-    task_t * d_task_queues = malloc_device<task_t>(p.queue_size, q);
+    task_t * d_task_queues = sycl::malloc_device<task_t>(p.queue_size, q);
 
-    int * d_data_queues = malloc_device<int>(p.queue_size * p.n_gpu_threads, q);
+    int * d_data_queues = sycl::malloc_device<int>(p.queue_size * p.n_gpu_threads, q);
 
-    int * d_consumed = malloc_device<int>(1, q);
+    int * d_consumed = sycl::malloc_device<int>(1, q);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -219,8 +219,9 @@ int main(int argc, char **argv) {
             call_TaskQueue_gpu(q, p.n_gpu_blocks, p.n_gpu_threads, d_task_queues, d_data_queues, d_consumed, 
                 p.iterations, n_consumed_tasks, p.queue_size, sizeof(int) + sizeof(task_t));
 
-            q.memcpy(&h_data_pool[n_consumed_tasks * p.n_gpu_threads], d_data_queues,
-                       p.queue_size * p.n_gpu_threads * sizeof(int)).wait();
+            q.memcpy(&h_data_pool[n_consumed_tasks * p.n_gpu_threads],
+                     d_data_queues,
+                     p.queue_size * p.n_gpu_threads * sizeof(int)).wait();
         }
     }
 
@@ -228,9 +229,9 @@ int main(int argc, char **argv) {
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Total task execution time for %d iterations: %f (ms)\n", p.n_reps + p.n_warmup, time * 1e-6f);
 
-    free(d_task_queues, q);
-    free(d_data_queues, q);
-    free(d_consumed, q);
+    sycl::free(d_task_queues, q);
+    sycl::free(d_data_queues, q);
+    sycl::free(d_consumed, q);
 
     // Verify answer
     verify(h_data_pool, h_pattern, p.pool_size, p.iterations, p.n_gpu_threads);

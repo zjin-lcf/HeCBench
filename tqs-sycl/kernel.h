@@ -33,11 +33,11 @@
  *
  */
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "support/task.h"
 
-void host_insert_tasks(task_t *task_queue, int *data_queue, task_t *task_pool, int *data, int *num_written_tasks,
+void host_insert_tasks(task_t *queue, int *data_queue, task_t *task_pool, int *data, int *num_written_tasks,
     int gpuQueueSize, int offset, int n_work_items);
 
-void call_TaskQueue_gpu(queue &q, int blocks, int threads, task_t *task_queue, int *data, int *consumed, 
+void call_TaskQueue_gpu(sycl::queue &q, int blocks, int threads, const task_t *queue, int *data, int *consumed, 
     int iterations, int offset, int gpuQueueSize, int l_mem_size);
