@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #include "support/setup.h"
@@ -245,6 +246,10 @@ int main(int argc, char **argv) {
         main_thread.join();
     }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Total padding execution time for %d iterations: %f (ms)\n", p.n_reps + p.n_warmup, time * 1e-6f);
+
 #ifndef DYNAMIC_PARTITION
     // Copy back
     if(p.alpha < 1.0) {
@@ -252,10 +257,6 @@ int main(int argc, char **argv) {
             in_size * sizeof(T) : n_tasks_gpu * p.n_gpu_threads * REGS * sizeof(T), hipMemcpyDeviceToHost);
     }
 #endif
-
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total task execution time for %d iterations: %f (ms)\n", p.n_reps + p.n_warmup, time * 1e-6f);
 
     // Verify answer
     verify(h_in_out, h_in_backup, p.n, p.m, p.n + p.pad);
