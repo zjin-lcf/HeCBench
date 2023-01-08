@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
-    alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, secp256k1, slu, sptrsv, thomas, wyllie 
+    alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, slu, sptrsv, thomas, wyllie 
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -1013,6 +1013,9 @@ Early results are shown [here](results/README.md)
 ### rsbench (opencl)
   A proxy application for full neutron transport application like OpenMC that support multipole cross section representations
   (https://github.com/ANL-CESAR/RSBench/)
+
+### rsc (cuda)
+  Random sample consensus based on task partitioning (https://github.com/chai-benchmarks/chai)
 
 ### rsmt (cuda)
   Rectilinear Steiner minimum tree (https://userweb.cs.txstate.edu/~burtscher/research/SFP/)
