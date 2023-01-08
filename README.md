@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, mpc, mtf, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicIntrinsics, atomicCAS, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -1037,6 +1037,9 @@ Early results are shown [here](results/README.md)
 
 ### saxpy-ompt (openmp)
   Perform the SAXPY operation on host and device (https://github.com/pc2/OMP-Offloading)
+
+### sc (cuda)
+  Stream compaction (https://github.com/chai-benchmarks/chai)
 
 ### scan (cuda)
   A block-level scan (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda)
