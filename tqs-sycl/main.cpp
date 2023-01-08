@@ -72,7 +72,7 @@ struct Params {
         queue_size    = 320;
         iterations    = 1000;
         int opt;
-        while((opt = getopt(argc, argv, "h:i:g:t:w:r:f:k:s:q:n:")) >= 0) {
+        while((opt = getopt(argc, argv, "hi:g:t:w:r:f:k:s:q:n:")) >= 0) {
             switch(opt) {
             case 'h':
                 usage();
