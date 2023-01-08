@@ -1,18 +1,8 @@
-
 Task queue system (TQ)
-
-Compilation instructions:
-
-    make
-
-Execution instructions
-
-    ./tq
 
 For more options:
 
-    ./tq -h
-
+    ./main -h
 
 Read more:
 L. Chen, O. Villa, S. Krishnamoorthy, and G. Gao, Dynamic load balancing on 

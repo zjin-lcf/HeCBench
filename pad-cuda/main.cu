@@ -70,14 +70,14 @@ struct Params {
         n             = 999;
         pad           = 1;
         int opt;
-        while((opt = getopt(argc, argv, "h:i:g:t:w:r:a:m:n:e:")) >= 0) {
+        while((opt = getopt(argc, argv, "hi:g:t:w:r:a:m:n:e:")) >= 0) {
             switch(opt) {
             case 'h':
                 usage();
                 exit(0);
                 break;
-            case 'i': n_gpu_threads  = atoi(optarg); break;
-            case 'g': n_gpu_blocks = atoi(optarg); break;
+            case 'i': n_gpu_threads = atoi(optarg); break;
+            case 'g': n_gpu_blocks  = atoi(optarg); break;
             case 't': n_threads     = atoi(optarg); break;
             case 'w': n_warmup      = atoi(optarg); break;
             case 'r': n_reps        = atoi(optarg); break;
