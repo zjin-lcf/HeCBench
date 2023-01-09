@@ -1,14 +1,6 @@
 
 RANSAC - task partitioning (RSCT)
 
-Compilation instructions:
-
-    make
-
-Execution instructions
-
-    ./rsct
-
 For more options:
 
     ./rsct -h

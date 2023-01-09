@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <chrono>
 #include <cuda.h>
 
 #include "kernel.h"
@@ -70,7 +71,7 @@ struct Params {
         error_threshold       = 3;
         convergence_threshold = 0.75;
         int opt;
-        while((opt = getopt(argc, argv, "h:i:g:t:w:r:f:m:e:c:")) >= 0) {
+        while((opt = getopt(argc, argv, "hi:g:t:w:r:f:m:e:c:")) >= 0) {
             switch(opt) {
             case 'h':
                 usage();
@@ -257,7 +258,7 @@ int main(int argc, char **argv) {
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Total task execution time for %d iterations: %f (ms)\n", p.n_reps + p.n_warmup, time * 1e-6f);
 
-    printf("Best model is %d\n", best_model);
+    printf("Best model (test) %d\n", best_model);
 
     // Verify answer
     verify(h_flow_vector_array, n_flow_vectors, h_random_numbers, p.max_iter, p.error_threshold,
