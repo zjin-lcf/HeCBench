@@ -67,13 +67,12 @@ inline void choose_better_model(flowvector *flow_vector_array, flowvector *ego_v
     float *model_param, int *model_candidate, int *outliers_candidate, int *count_candidates, int error_threshold,
     float convergence_threshold, int iter) {
   int   outlier_count = 0;
-  int   vx1, vy1;
   float vx_error, vy_error;
 
   // This loop calculates the no of outliers
   for(int i = 0; i < flow_vector_count; i++) {
-    vx1      = flow_vector_array[i].vx - flow_vector_array[i].x;
-    vy1      = flow_vector_array[i].vy - flow_vector_array[i].y;
+    //vx1      = flow_vector_array[i].vx - flow_vector_array[i].x;
+    //vy1      = flow_vector_array[i].vy - flow_vector_array[i].y;
     vx_error = flow_vector_array[i].x + ((int)((flow_vector_array[i].x - model_param[0]) * model_param[2]) -
         (int)((flow_vector_array[i].y - model_param[1]) * model_param[3])) -
       flow_vector_array[i].vx;
@@ -133,7 +132,6 @@ inline int gen_firstOrderFlow_model(
   int   rand_num;
   int   x1, x2, y1, y2, vx1, vx2, vy1, vy2;
   int   ret;
-  float highest_val = 0;
 
   // Select two motion vectors at random
   rand_num = random_numbers[iter * 2];
@@ -202,6 +200,7 @@ inline void verify(flowvector *flow_vector_array, int size_flow_vector_array, in
       best_model    = model_candidate[i];
     }
   }
+  printf("Best model (reference) %d\n", best_model);
   compare_output(candidates, count_candidates, best_outliers, b_outliers);
   free(model_candidate);
   free(outliers_candidate);
