@@ -229,13 +229,13 @@ void compute_tendencies_x(
     const int nx, 
     const int nz, 
     const double dx,
-    buffer<double,1> &d_state, 
-    buffer<double,1> &d_flux, 
-    buffer<double,1> &d_tend, 
-    buffer<double,1> &d_hy_dens_cell, 
-    buffer<double,1> &d_hy_dens_theta_cell, 
-    queue &q ) { 
-
+    double *d_state, 
+    double *d_flux, 
+    double *d_tend, 
+    double *d_hy_dens_cell, 
+    double *d_hy_dens_theta_cell,
+    queue &q )
+{ 
   range<3> flux_gws (1, (nz+15)/16*16, (nx+16)/16*16);
   range<3> flux_lws (1, 16, 16);
 
@@ -243,11 +243,6 @@ void compute_tendencies_x(
   double hv_coef = -hv_beta * dx / (16*dt);
   //Compute fluxes in the x-direction for each cell
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_read>(cgh);
-    auto flux = d_flux.get_access<sycl_write>(cgh);
-    auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-    auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-
     cgh.parallel_for<class compute_flux_x>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
@@ -258,7 +253,7 @@ void compute_tendencies_x(
         for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s < sten_size; s++) {
             int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+s;
-            stencil[s] = state[inds];
+            stencil[s] = d_state[inds];
           }
           //Fourth-order-accurate interpolation of the state
           vals[ll] = -stencil[0]/12 + 7*stencil[1]/12 + 7*stencil[2]/12 - stencil[3]/12;
@@ -267,17 +262,17 @@ void compute_tendencies_x(
         }
 
         //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
-        double r = vals[ID_DENS] + hy_dens_cell[k+hs];
+        double r = vals[ID_DENS] + d_hy_dens_cell[k+hs];
         double u = vals[ID_UMOM] / r;
         double w = vals[ID_WMOM] / r;
-        double t = ( vals[ID_RHOT] + hy_dens_theta_cell[k+hs] ) / r;
+        double t = ( vals[ID_RHOT] + d_hy_dens_theta_cell[k+hs] ) / r;
         double p = C0*sycl::pow((r*t),gamm);
 
         //Compute the flux vector
-        flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u     - hv_coef*d3_vals[ID_DENS];
-        flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*u+p - hv_coef*d3_vals[ID_UMOM];
-        flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*w   - hv_coef*d3_vals[ID_WMOM];
-        flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*t   - hv_coef*d3_vals[ID_RHOT];
+        d_flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u     - hv_coef*d3_vals[ID_DENS];
+        d_flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*u+p - hv_coef*d3_vals[ID_UMOM];
+        d_flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*w   - hv_coef*d3_vals[ID_WMOM];
+        d_flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*u*t   - hv_coef*d3_vals[ID_RHOT];
       }
     });
   });
@@ -287,8 +282,6 @@ void compute_tendencies_x(
   range<3> tend_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto flux = d_flux.get_access<sycl_read>(cgh);
-    auto tend = d_tend.get_access<sycl_write>(cgh);
     cgh.parallel_for<class compute_tend_x>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
@@ -297,7 +290,7 @@ void compute_tendencies_x(
         int indt  = ll* nz   * nx    + k* nx    + i  ;
         int indf1 = ll*(nz+1)*(nx+1) + k*(nx+1) + i  ;
         int indf2 = ll*(nz+1)*(nx+1) + k*(nx+1) + i+1;
-        tend[indt] = -( flux[indf2] - flux[indf1] ) / dx;
+        d_tend[indt] = -( d_flux[indf2] - d_flux[indf1] ) / dx;
       }
     });
   });
@@ -313,12 +306,12 @@ void compute_tendencies_z(
     const int nx, 
     const int nz,  
     const double dz,
-    buffer<double,1> &d_state, 
-    buffer<double,1> &d_flux, 
-    buffer<double,1> &d_tend, 
-    buffer<double,1> &d_hy_dens_int, 
-    buffer<double,1> &d_hy_dens_theta_int, 
-    buffer<double,1> &d_hy_pressure_int, 
+    double *d_state, 
+    double *d_flux, 
+    double *d_tend, 
+    double *d_hy_dens_int, 
+    double *d_hy_dens_theta_int, 
+    double *d_hy_pressure_int, 
     queue &q ) 
 {
   //Compute the hyperviscosity coeficient
@@ -330,12 +323,6 @@ void compute_tendencies_z(
   range<3> flux_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_read>(cgh);
-    auto flux = d_flux.get_access<sycl_write>(cgh);
-    auto hy_dens_int = d_hy_dens_int.get_access<sycl_read>(cgh);
-    auto hy_pressure_int = d_hy_pressure_int.get_access<sycl_read>(cgh);
-    auto hy_dens_theta_int = d_hy_dens_theta_int.get_access<sycl_read>(cgh);
-
     cgh.parallel_for<class compute_flux_z>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
@@ -346,7 +333,7 @@ void compute_tendencies_z(
         for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s<sten_size; s++) {
             int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+s)*(nx+2*hs) + i+hs;
-            stencil[s] = state[inds];
+            stencil[s] = d_state[inds];
           }
           //Fourth-order-accurate interpolation of the state
           vals[ll] = -stencil[0]/12 + 7*stencil[1]/12 + 7*stencil[2]/12 - stencil[3]/12;
@@ -355,11 +342,11 @@ void compute_tendencies_z(
         }
 
         //Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
-        double r = vals[ID_DENS] + hy_dens_int[k];
+        double r = vals[ID_DENS] + d_hy_dens_int[k];
         double u = vals[ID_UMOM] / r;
         double w = vals[ID_WMOM] / r;
-        double t = ( vals[ID_RHOT] + hy_dens_theta_int[k] ) / r;
-        double p = C0*sycl::pow((r*t),gamm) - hy_pressure_int[k];
+        double t = ( vals[ID_RHOT] + d_hy_dens_theta_int[k] ) / r;
+        double p = C0*sycl::pow((r*t),gamm) - d_hy_pressure_int[k];
         //Enforce vertical boundary condition and exact mass conservation
         if (k == 0 || k == nz) {
           w                = 0;
@@ -367,10 +354,10 @@ void compute_tendencies_z(
         }
 
         //Compute the flux vector with hyperviscosity
-        flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w     - hv_coef*d3_vals[ID_DENS];
-        flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*u   - hv_coef*d3_vals[ID_UMOM];
-        flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*w+p - hv_coef*d3_vals[ID_WMOM];
-        flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*t   - hv_coef*d3_vals[ID_RHOT];
+        d_flux[ID_DENS*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w     - hv_coef*d3_vals[ID_DENS];
+        d_flux[ID_UMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*u   - hv_coef*d3_vals[ID_UMOM];
+        d_flux[ID_WMOM*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*w+p - hv_coef*d3_vals[ID_WMOM];
+        d_flux[ID_RHOT*(nz+1)*(nx+1) + k*(nx+1) + i] = r*w*t   - hv_coef*d3_vals[ID_RHOT];
       }
     });
   });
@@ -380,9 +367,6 @@ void compute_tendencies_z(
   range<3> tend_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_read>(cgh);
-    auto flux = d_flux.get_access<sycl_read>(cgh);
-    auto tend = d_tend.get_access<sycl_read_write>(cgh);
     cgh.parallel_for<class compute_tend_z>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
@@ -391,10 +375,10 @@ void compute_tendencies_z(
         int indt  = ll* nz   * nx    + k* nx    + i  ;
         int indf1 = ll*(nz+1)*(nx+1) + (k  )*(nx+1) + i;
         int indf2 = ll*(nz+1)*(nx+1) + (k+1)*(nx+1) + i;
-        tend[indt] = -( flux[indf2] - flux[indf1] ) / dz;
+        d_tend[indt] = -( d_flux[indf2] - d_flux[indf1] ) / dz;
         if (ll == ID_WMOM) {
           int inds = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-          tend[indt] = tend[indt] - state[inds]*grav;
+          d_tend[indt] = d_tend[indt] - d_state[inds]*grav;
         }
       }
     });
@@ -409,13 +393,13 @@ void set_halo_values_x(
     const int nz,
     const int k_beg,
     const double dz,
-    buffer<double,1> &d_state, 
-    buffer<double,1> &d_hy_dens_cell , 
-    buffer<double,1> &d_hy_dens_theta_cell , 
-    buffer<double, 1> &d_sendbuf_l,
-    buffer<double, 1> &d_sendbuf_r,
-    buffer<double, 1> &d_recvbuf_l,
-    buffer<double, 1> &d_recvbuf_r,
+    double *d_state, 
+    double *d_hy_dens_cell, 
+    double *d_hy_dens_theta_cell, 
+    double *d_sendbuf_l,
+    double *d_sendbuf_r,
+    double *d_recvbuf_l,
+    double *d_recvbuf_r,
     queue &q ) 
 {
   int ierr;
@@ -430,28 +414,19 @@ void set_halo_values_x(
   range<3> buffer_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_read>(cgh);
-    auto sendbuf_l = d_sendbuf_l.get_access<sycl_write>(cgh);
-    auto sendbuf_r = d_sendbuf_r.get_access<sycl_write>(cgh);
     cgh.parallel_for<class pack_send_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
       if (s < hs && k < nz) { 
-        sendbuf_l[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
-        sendbuf_r[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
+        d_sendbuf_l[ll*nz*hs + k*hs + s] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
+        d_sendbuf_r[ll*nz*hs + k*hs + s] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
       }
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    auto sendbuf_l_acc = d_sendbuf_l.get_access<sycl_read>(cgh);
-    cgh.copy(sendbuf_l_acc, sendbuf_l);
-  });
-  q.submit([&] (handler &cgh) {
-    auto sendbuf_r_acc = d_sendbuf_r.get_access<sycl_read>(cgh);
-    cgh.copy(sendbuf_r_acc, sendbuf_r);
-  });
+  q.memcpy(sendbuf_l, d_sendbuf_l, sizeof(double)*hs*nz*NUM_VARS);
+  q.memcpy(sendbuf_r, d_sendbuf_r, sizeof(double)*hs*nz*NUM_VARS);
   q.wait();
 
   //#pragma omp target update from(sendbuf_l[:nz*hs*NUM_VARS],sendbuf_r[:nz*hs*NUM_VARS])
@@ -463,28 +438,18 @@ void set_halo_values_x(
   //Wait for receives to finish
   ierr = MPI_Waitall(2,req_r,MPI_STATUSES_IGNORE);
 
-  //#pragma omp target update to(recvbuf_l[:nz*hs*NUM_VARS],recvbuf_r[:nz*hs*NUM_VARS])
-  q.submit([&] (handler &cgh) {
-    auto recvbuf_l_acc = d_recvbuf_l.get_access<sycl_write>(cgh);
-    cgh.copy(recvbuf_l, recvbuf_l_acc);
-  });
-  q.submit([&] (handler &cgh) {
-    auto recvbuf_r_acc = d_recvbuf_r.get_access<sycl_write>(cgh);
-    cgh.copy(recvbuf_r, recvbuf_r_acc);
-  });
+  q.memcpy(d_recvbuf_l, recvbuf_l, sizeof(double)*hs*nz*NUM_VARS);
+  q.memcpy(d_recvbuf_r, recvbuf_r, sizeof(double)*hs*nz*NUM_VARS);
 
   //Unpack the receive buffers
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_write>(cgh);
-    auto recvbuf_l = d_recvbuf_l.get_access<sycl_read>(cgh);
-    auto recvbuf_r = d_recvbuf_r.get_access<sycl_read>(cgh);
     cgh.parallel_for<class unpack_recv_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
       if (s < hs && k < nz) { 
-        state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = recvbuf_l[ll*nz*hs + k*hs + s];
-        state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = recvbuf_r[ll*nz*hs + k*hs + s];
+        d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = d_recvbuf_l[ll*nz*hs + k*hs + s];
+        d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = d_recvbuf_r[ll*nz*hs + k*hs + s];
       }
     });
   });
@@ -498,9 +463,6 @@ void set_halo_values_x(
       range<3> inj_lws (1, 16, 16);
 
       q.submit([&] (handler &cgh) {
-        auto state = d_state.get_access<sycl_read_write>(cgh);
-        auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-        auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
         cgh.parallel_for<class update_state_x>(nd_range<3>(inj_gws, inj_lws), [=] (nd_item<3> item) {
           int k = item.get_global_id(1);
           int i = item.get_global_id(2);
@@ -510,8 +472,8 @@ void set_halo_values_x(
               int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
               int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
               int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
-              state[ind_u] = (state[ind_r]+hy_dens_cell[k+hs]) * 50.;
-              state[ind_t] = (state[ind_r]+hy_dens_cell[k+hs]) * 298. - hy_dens_theta_cell[k+hs];
+              d_state[ind_u] = (d_state[ind_r]+d_hy_dens_cell[k+hs]) * 50.;
+              d_state[ind_t] = (d_state[ind_r]+d_hy_dens_cell[k+hs]) * 298. - d_hy_dens_theta_cell[k+hs];
             }
           }
         });
@@ -528,25 +490,24 @@ void set_halo_values_z(
     const int i_beg,
     const double dx,
     const int data_spec_int,
-    buffer<double, 1> &d_state,
+    double *d_state,
     queue &q ) 
 {
   const double mnt_width = xlen/8;
 
-  range<3> gws (1, (NUM_VARS+15)/16*16, (nx+3*hs+15)/16*16);
+  range<3> gws (1, (NUM_VARS+15)/16*16, (nx+2*hs+15)/16*16);
   range<3> lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto state = d_state.get_access<sycl_read_write>(cgh);
     cgh.parallel_for<class update_state_z>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(1);
       int i = item.get_global_id(2);
       if (i < nx+2*hs && ll < NUM_VARS) { 
         if (ll == ID_WMOM) {
-          state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
-          state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = 0.;
-          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = 0.;
-          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = 0.;
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = 0.;
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = 0.;
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = 0.;
           //Impose the vertical momentum effects of an artificial cos^2 mountain at the lower boundary
           if (data_spec_int == DATA_SPEC_MOUNTAIN) {
             double x = (i_beg+i-hs+0.5)*dx;
@@ -555,15 +516,15 @@ void set_halo_values_z(
               //Compute the derivative of the fake mountain
               double mnt_deriv = -pi*sycl::cos(pi*xloc/2)*sycl::sin(pi*xloc/2)*10/dx;
               //w = (dz/dx)*u
-              state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (0)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
-              state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (1)*(nx+2*hs) + i] = mnt_deriv*state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
+              d_state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (0)*(nx+2*hs) + i] = mnt_deriv*d_state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
+              d_state[ID_WMOM*(nz+2*hs)*(nx+2*hs) + (1)*(nx+2*hs) + i] = mnt_deriv*d_state[ID_UMOM*(nz+2*hs)*(nx+2*hs) + hs*(nx+2*hs) + i];
             }
           }
         } else {
-          state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
-          state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
-          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
-          state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (hs     )*(nx+2*hs) + i];
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs  )*(nx+2*hs) + i] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
+          d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs+1)*(nx+2*hs) + i] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (nz+hs-1)*(nx+2*hs) + i];
         }
       }
     });
@@ -594,9 +555,7 @@ void init( int *argc , char ***argv ) {
 
 
   ////////////////////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////////////////////
   // YOU DON'T NEED TO ALTER ANYTHING BELOW THIS POINT IN THE CODE
-  ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
   //Vertical direction isn't MPI-ized, so the rank's local values = the global values
@@ -731,6 +690,15 @@ void finalize() {
 
 //Compute reduced quantities for error checking without resorting to the "ncdiff" tool
 //#pragma omp target teams distribute parallel for collapse(2) reduction(+:mass,te)
+
+static inline void atomicAdd(double& val, const double delta)
+{
+  sycl::ext::oneapi::atomic_ref<double, sycl::memory_order::relaxed,
+                                sycl::memory_scope::device,
+                                sycl::access::address_space::global_space> ref(val);
+  ref.fetch_add(delta);
+}
+
 void reductions( 
     double &mass, 
     double &te, 
@@ -739,50 +707,58 @@ void reductions(
     const int nz,
     const double dx,
     const double dz,
-    buffer<double, 1> &d_state, 
-    buffer<double, 1> &d_hy_dens_cell, 
-    buffer<double, 1> &d_hy_dens_theta_cell, 
+    const double *d_state, 
+    const double *d_hy_dens_cell, 
+    const double *d_hy_dens_theta_cell, 
     queue &q ) 
 {
-  double2 identity = {0, 0};
-  {
-    buffer<double2> d_identity (&identity, 1);
-    range<3> gws (1, (nz+15)/16*16, (nx+15)/16*16);
-    range<3> lws (1, 16, 16);
-    q.submit([&] (handler &cgh) {
-      auto reducer = reduction(d_identity, cgh, std::plus<double2>());
-      auto state = d_state.get_access<sycl_read>(cgh);
-      auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
-      auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class reduce>(nd_range<3>(gws, lws), reducer, 
-                                     [=] (nd_item<3> item, auto &sum) {
-        int k = item.get_global_id(1);
-        int i = item.get_global_id(2);
-        if (k < nz && i < nx) {
-          int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-          int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-          int ind_w = ID_WMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-          int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
-          double r  =   state[ind_r] + hy_dens_cell[hs+k];             // Density
-          double u  =   state[ind_u] / r;                              // U-wind
-          double w  =   state[ind_w] / r;                              // W-wind
-          double th = ( state[ind_t] + hy_dens_theta_cell[hs+k] ) / r; // Potential Temperature (theta)
-          double p  = C0*sycl::pow(r*th,gamm);                               // Pressure
-          double t  = th / sycl::pow(p0/p,rd/cp);                            // Temperature
-          double ke = r*(u*u+w*w);                                     // Kinetic Energy
-          double ie = r*cv*t;                                          // Internal Energy
+  double* d_mass, *d_te;
+  d_mass = malloc_device<double>(1, q);
+  d_te = malloc_device<double>(1, q);
 
-          // mass += r        *dx*dz; // Accumulate domain mass
-          // te   += (ke + ie)*dx*dz; // Accumulate domain total energy
-          sum.combine({r*dx*dz, (ke+ie)*dx*dz});
-        }
-      });
+  range<3> gws (1, (nz+15)/16*16, (nx+15)/16*16);
+  range<3> lws (1, 16, 16);
+
+  q.memset(d_mass, 0, sizeof(double));
+  q.memset(d_te, 0, sizeof(double));
+
+  q.submit([&] (handler &cgh) {
+    cgh.parallel_for<class reduce>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      int k = item.get_global_id(1);
+      int i = item.get_global_id(2);
+      if (k < nz && i < nx) {
+        int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+        int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+        int ind_w = ID_WMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+        int ind_t = ID_RHOT*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
+        double r  =  d_state[ind_r] + d_hy_dens_cell[hs+k];           // Density
+        double u  =  d_state[ind_u] / r;                              // U-wind
+        double w  =  d_state[ind_w] / r;                              // W-wind
+        double th = ( d_state[ind_t] + d_hy_dens_theta_cell[hs+k] ) / r; // Potential Temperature (theta)
+        double p  = C0*sycl::pow(r*th,gamm);                               // Pressure
+        double t  = th / sycl::pow(p0/p,rd/cp);                            // Temperature
+        double ke = r*(u*u+w*w);                                     // Kinetic Energy
+        double ie = r*cv*t;                                          // Internal Energy
+
+        // mass += r        *dx*dz; // Accumulate domain mass
+        // te   += (ke + ie)*dx*dz; // Accumulate domain total energy
+        atomicAdd(d_mass[0], r*dx*dz);
+        atomicAdd(d_te[0], (ke+ie)*dx*dz);
+      }
     });
-  }
+  });
+
   double glob[2], loc[2];
-  loc[0] = identity.x(); //mass;
-  loc[1] = identity.y(); //te;
+
+  q.memcpy(loc, d_mass, sizeof(double));
+  q.memcpy(loc+1, d_te, sizeof(double));
+  q.wait();
+
   int ierr = MPI_Allreduce(loc,glob,2,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+
+  free(d_mass, q);
+  free(d_te, q);
+
   mass = glob[0];
   te   = glob[1];
 }
@@ -801,20 +777,20 @@ void semi_discrete_step(
     const double dt , 
     int dir , 
     const int data_spec_int,
-    buffer<double,1> &d_state_init , 
-    buffer<double,1> &d_state_forcing , 
-    buffer<double,1> &d_state_out, 
-    buffer<double,1> &d_flux , 
-    buffer<double,1> &d_tend,
-    buffer<double,1> &d_hy_dens_cell , 
-    buffer<double,1> &d_hy_dens_theta_cell , 
-    buffer<double,1> &d_hy_dens_int , 
-    buffer<double,1> &d_hy_dens_theta_int , 
-    buffer<double,1> &d_hy_pressure_int , 
-    buffer<double,1> &d_sendbuf_l , 
-    buffer<double,1> &d_sendbuf_r , 
-    buffer<double,1> &d_recvbuf_l , 
-    buffer<double,1> &d_recvbuf_r , 
+    double *d_state_init , 
+    double *d_state_forcing , 
+    double *d_state_out, 
+    double *d_flux , 
+    double *d_tend,
+    double *d_hy_dens_cell , 
+    double *d_hy_dens_theta_cell , 
+    double *d_hy_dens_int , 
+    double *d_hy_dens_theta_int , 
+    double *d_hy_pressure_int , 
+    double *d_sendbuf_l , 
+    double *d_sendbuf_r , 
+    double *d_recvbuf_l , 
+    double *d_recvbuf_r , 
     queue &q  ) 
 {
   if (dir == DIR_X) {
@@ -849,17 +825,14 @@ void semi_discrete_step(
   range<3> tend_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
-    auto state_init = d_state_init.get_access<sycl_read>(cgh);
-    auto state_out = d_state_out.get_access<sycl_write>(cgh);
-    auto tend = d_tend.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class update_fluid_state>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
       if (i < nx && k < nz) { 
         int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
         int indt = ll*nz*nx + k*nx + i;
-        state_out[inds] = state_init[inds] + dt * tend[indt];
+        d_state_out[inds] = d_state_init[inds] + dt * d_tend[indt];
       }
     });
   });
@@ -874,19 +847,19 @@ void semi_discrete_step(
 // q**    = q[n] + dt/2 * rhs(q*  )
 // q[n+1] = q[n] + dt/1 * rhs(q** )
 void perform_timestep( 
-    buffer<double,1> &d_state , 
-    buffer<double,1> &d_state_tmp , 
-    buffer<double,1> &d_flux , 
-    buffer<double,1> &d_tend,
-    buffer<double,1> &d_hy_dens_cell , 
-    buffer<double,1> &d_hy_dens_theta_cell , 
-    buffer<double,1> &d_hy_dens_int , 
-    buffer<double,1> &d_hy_dens_theta_int , 
-    buffer<double,1> &d_hy_pressure_int , 
-    buffer<double,1> &d_sendbuf_l , 
-    buffer<double,1> &d_sendbuf_r , 
-    buffer<double,1> &d_recvbuf_l , 
-    buffer<double,1> &d_recvbuf_r , 
+    double *d_state , 
+    double *d_state_tmp , 
+    double *d_flux , 
+    double *d_tend ,
+    double *d_hy_dens_cell , 
+    double *d_hy_dens_theta_cell , 
+    double *d_hy_dens_int , 
+    double *d_hy_dens_theta_int , 
+    double *d_hy_pressure_int , 
+    double *d_sendbuf_l , 
+    double *d_sendbuf_r , 
+    double *d_recvbuf_l , 
+    double *d_recvbuf_r , 
     const double dt,
     queue &q ) {
 
@@ -943,25 +916,39 @@ int main(int argc, char **argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<double, 1> d_state_tmp (state, (nz+2*hs)*(nx+2*hs)*NUM_VARS);
-  d_state_tmp.set_final_data(nullptr);
+  const int state_size = (nz+2*hs)*(nx+2*hs)*NUM_VARS;
+  const int state_size_byte = (nz+2*hs)*(nx+2*hs)*NUM_VARS*sizeof(double);
+  double *d_state_tmp = malloc_device<double>(state_size, q);
+  q.memcpy(d_state_tmp, state, state_size_byte);
 
-  buffer<double, 1> d_state (state, (nz+2*hs)*(nx+2*hs)*NUM_VARS);
-  d_state.set_final_data(nullptr);
+  double *d_state = malloc_device<double>(state_size, q);
+  q.memcpy(d_state, state, state_size_byte);
 
-  buffer<double, 1> d_hy_dens_cell (hy_dens_cell, nz+2*hs);
-  buffer<double, 1> d_hy_dens_theta_cell (hy_dens_theta_cell, nz+2*hs);
-  buffer<double, 1> d_hy_dens_int (hy_dens_int, nz+1);
-  buffer<double, 1> d_hy_dens_theta_int (hy_dens_theta_int, nz+1);
-  buffer<double, 1> d_hy_pressure_int (hy_pressure_int, nz+1);
-  buffer<double, 1> d_flux ((nz+1)*(nx+1)*NUM_VARS);
-  buffer<double, 1> d_tend (nz*nx*NUM_VARS);
-  buffer<double, 1> d_sendbuf_l (hs*nz*NUM_VARS);
-  buffer<double, 1> d_sendbuf_r (hs*nz*NUM_VARS);
-  buffer<double, 1> d_recvbuf_l (hs*nz*NUM_VARS);
-  buffer<double, 1> d_recvbuf_r (hs*nz*NUM_VARS);
+  double *d_hy_dens_cell = malloc_device<double>(nz+2*hs, q);
+  q.memcpy(d_hy_dens_cell, hy_dens_cell, (nz+2*hs)*sizeof(double));
+
+  double *d_hy_dens_theta_cell = malloc_device<double>(nz+2*hs, q);
+  q.memcpy(d_hy_dens_theta_cell, hy_dens_theta_cell, (nz+2*hs)*sizeof(double));
+
+  double *d_hy_dens_int = malloc_device<double>(nz+1, q);
+  q.memcpy(d_hy_dens_int, hy_dens_int, (nz+1)*sizeof(double));
+
+  double *d_hy_dens_theta_int = malloc_device<double>(nz+1, q);
+  q.memcpy(d_hy_dens_theta_int, hy_dens_theta_int, (nz+1)*sizeof(double));
+
+  double *d_hy_pressure_int = malloc_device<double>(nz+1, q);
+  q.memcpy(d_hy_pressure_int, hy_pressure_int, (nz+1)*sizeof(double));
+
+  double *d_flux = malloc_device<double>((nz+1)*(nx+1)*NUM_VARS, q);
+
+  double *d_tend = malloc_device<double>(nz*nx*NUM_VARS, q);
+
+  double *d_sendbuf_l = malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_sendbuf_r = malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_recvbuf_l = malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_recvbuf_r = malloc_device<double>(hs*nz*NUM_VARS, q);
 
   //Initial reductions for mass, kinetic energy, and total energy
   reductions(mass0, te0, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);
@@ -1007,4 +994,20 @@ int main(int argc, char **argv) {
   printf( "d_te:   %le\n" , (te   - te0  ) / te0   );
 
   finalize();
+
+  free(d_state, q);
+  free(d_state_tmp, q);
+  free(d_flux, q);
+  free(d_tend, q);
+  free(d_hy_dens_cell, q); 
+  free(d_hy_dens_theta_cell, q); 
+  free(d_hy_dens_int, q); 
+  free(d_hy_dens_theta_int, q); 
+  free(d_hy_pressure_int, q); 
+  free(d_sendbuf_l, q); 
+  free(d_sendbuf_r, q); 
+  free(d_recvbuf_l, q); 
+  free(d_recvbuf_r, q); 
+
+  return 0;
 }
