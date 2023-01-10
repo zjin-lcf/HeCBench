@@ -157,8 +157,6 @@ int main(int argc, char **argv) {
     if (etime + dt > sim_time) { dt = sim_time - etime; }
     //Perform a single time step
     perform_timestep(state,state_tmp,flux,tend,dt);
-    //Inform the user
-    if (masterproc) { printf( "Elapsed Time: %lf / %lf\n", etime , sim_time ); }
     //Update the elapsed time and output counter
     etime = etime + dt;
   }
