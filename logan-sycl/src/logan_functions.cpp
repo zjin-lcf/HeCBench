@@ -75,22 +75,22 @@ inline void updateExtendedSeedL(
 }
 
 inline void computeAntidiag(
-    short *antiDiag1,
-    short *antiDiag2,
-    short *antiDiag3,
-    char* querySeg,
-    char* databaseSeg,
-    int &best,
-    int &scoreDropOff,
-    int &cols,
-    int &rows,
-    int &minCol,
-    int &maxCol,
-    int &antiDiagNo,
-    int &offset1,
-    int &offset2,
-    ExtensionDirectionL direction,
-    int n_threads ,
+    const short *antiDiag1,
+    const short *antiDiag2,
+          short *antiDiag3,
+    const char *querySeg,
+    const char *databaseSeg,
+    const int best,
+    const int scoreDropOff,
+    const int cols,
+    const int rows,
+    const int minCol,
+    const int maxCol,
+    const int antiDiagNo,
+    const int offset1,
+    const int offset2,
+    const ExtensionDirectionL direction,
+    int n_threads,
     sycl::nd_item<1> &item)
 {
   int tid = item.get_local_id(0);
@@ -182,24 +182,24 @@ inline void initAntiDiags(
 }
 
 void extendSeedLGappedXDropOneDirectionGlobal(
-    SeedL *seed,
-    char *querySegArray,
-    char *databaseSegArray,
-    ExtensionDirectionL direction,
-    int scoreDropOff,
-    int *res,
-    int *offsetQuery,
-    int *offsetTarget,
-    int offAntidiag,
-    short *antidiag,
-    int n_threads,
+    SeedL *__restrict seed,
+    const char *__restrict querySegArray,
+    const char *__restrict databaseSegArray,
+    const ExtensionDirectionL direction,
+    const int scoreDropOff,
+    int *__restrict res,
+    const int *__restrict offsetQuery,
+    const int *__restrict offsetTarget,
+    const int offAntidiag,
+    short *__restrict antidiag,
+    const int n_threads,
     sycl::nd_item<1> &item,
-    short *temp)
+    short *__restrict temp)
 {
   int myId = item.get_group(0);
   int myTId = item.get_local_id(0);
-  char *querySeg;
-  char *databaseSeg;
+  const char *querySeg;
+  const char *databaseSeg;
 
   if(myId==0){
     querySeg = querySegArray;
@@ -381,6 +381,22 @@ void extendSeedL(std::vector<SeedL> &seeds,
     cout<<"Error: Logan does not support gap opening penalty >= 0\n";
     exit(-1);
   }
+
+  auto const& gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+  int deviceCount = gpu_devices.size();
+
+  if (deviceCount == 0) {
+    std::cout << "Error: no device found\n";
+    return;
+  }
+
+  if (ngpus > deviceCount || ngpus > MAX_GPUS) {
+    std::cout << "Error: the maximum number of devices allowed is "
+              << std::min(deviceCount, MAX_GPUS) << std::endl;
+    return;
+  }
+
+
   //start measuring time
 #ifdef ADAPTABLE
   n_threads = (XDrop/WARP_DIM + 1)* WARP_DIM;
@@ -390,7 +406,6 @@ void extendSeedL(std::vector<SeedL> &seeds,
 
   //declare streams
   sycl::queue stream_r[MAX_GPUS], stream_l[MAX_GPUS];
-  auto const& gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
 
   for(int i = 0; i < ngpus; i++) {
     const auto& d = gpu_devices[i];
@@ -641,8 +656,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
   }
 
   auto end_c = NOW;
-  duration<double> compute = end_c-start_c;
-  std::cout << "GPU only time:\t\t" << compute.count() << std::endl;
+  duration<double> compute = end_c - start_c;
+  std::cout << "Device only time [seconds]:\t" << compute.count() << std::endl;
 
 #pragma omp parallel for
   for(int i = 0; i < ngpus; i++){
