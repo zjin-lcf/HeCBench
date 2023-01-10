@@ -236,8 +236,8 @@ void compute_tendencies_x(
     buffer<double,1> &d_hy_dens_theta_cell, 
     queue &q ) { 
 
-  range<2> flux_gws ((nz+15)/16*16, (nx+16)/16*16);
-  range<2> flux_lws (16, 16);
+  range<3> flux_gws (1, (nz+15)/16*16, (nx+16)/16*16);
+  range<3> flux_lws (1, 16, 16);
 
   //Compute the hyperviscosity coeficient
   double hv_coef = -hv_beta * dx / (16*dt);
@@ -248,9 +248,9 @@ void compute_tendencies_x(
     auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
     auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
 
-    cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
-      int k = item.get_global_id(0);
-      int i = item.get_global_id(1);
+    cgh.parallel_for<class compute_flux_x>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
+      int k = item.get_global_id(1);
+      int i = item.get_global_id(2);
       double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
       if (i < nx+1 && k < nz) { 
@@ -289,7 +289,7 @@ void compute_tendencies_x(
   q.submit([&] (handler &cgh) {
     auto flux = d_flux.get_access<sycl_read>(cgh);
     auto tend = d_tend.get_access<sycl_write>(cgh);
-    cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class compute_tend_x>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
@@ -326,8 +326,8 @@ void compute_tendencies_z(
 
   //Compute fluxes in the z-direction for each cell
 
-  range<2> flux_gws ((nz+16)/16*16, (nx+15)/16*16);
-  range<2> flux_lws (16, 16);
+  range<3> flux_gws (1, (nz+16)/16*16, (nx+15)/16*16);
+  range<3> flux_lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
     auto state = d_state.get_access<sycl_read>(cgh);
@@ -336,9 +336,9 @@ void compute_tendencies_z(
     auto hy_pressure_int = d_hy_pressure_int.get_access<sycl_read>(cgh);
     auto hy_dens_theta_int = d_hy_dens_theta_int.get_access<sycl_read>(cgh);
 
-    cgh.parallel_for(nd_range<2>(flux_gws, flux_lws), [=] (nd_item<2> item) {
-      int k = item.get_global_id(0);
-      int i = item.get_global_id(1);
+    cgh.parallel_for<class compute_flux_z>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
+      int k = item.get_global_id(1);
+      int i = item.get_global_id(2);
       double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
       if (i < nx && k < nz+1) { 
@@ -383,7 +383,7 @@ void compute_tendencies_z(
     auto state = d_state.get_access<sycl_read>(cgh);
     auto flux = d_flux.get_access<sycl_read>(cgh);
     auto tend = d_tend.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class compute_tend_z>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
@@ -433,7 +433,7 @@ void set_halo_values_x(
     auto state = d_state.get_access<sycl_read>(cgh);
     auto sendbuf_l = d_sendbuf_l.get_access<sycl_write>(cgh);
     auto sendbuf_r = d_sendbuf_r.get_access<sycl_write>(cgh);
-    cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class pack_send_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
@@ -478,7 +478,7 @@ void set_halo_values_x(
     auto state = d_state.get_access<sycl_write>(cgh);
     auto recvbuf_l = d_recvbuf_l.get_access<sycl_read>(cgh);
     auto recvbuf_r = d_recvbuf_r.get_access<sycl_read>(cgh);
-    cgh.parallel_for(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+    cgh.parallel_for<class unpack_recv_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
@@ -494,16 +494,16 @@ void set_halo_values_x(
 
   if (data_spec_int == DATA_SPEC_INJECTION) {
     if (myrank == 0) {
-      range<2> inj_gws ((nz+15)/16*16, (hs+15)/16*16);
-      range<2> inj_lws (16, 16);
+      range<3> inj_gws (1, (nz+15)/16*16, (hs+15)/16*16);
+      range<3> inj_lws (1, 16, 16);
 
       q.submit([&] (handler &cgh) {
         auto state = d_state.get_access<sycl_read_write>(cgh);
         auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
         auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-        cgh.parallel_for(nd_range<2>(inj_gws, inj_lws), [=] (nd_item<2> item) {
-          int k = item.get_global_id(0);
-          int i = item.get_global_id(1);
+        cgh.parallel_for<class update_state_x>(nd_range<3>(inj_gws, inj_lws), [=] (nd_item<3> item) {
+          int k = item.get_global_id(1);
+          int i = item.get_global_id(2);
           if (i < hs && k < nz) { 
             double z = (k_beg + k+0.5)*dz;
             if (sycl::fabs(z-3*zlen/4) <= zlen/16) {
@@ -533,14 +533,14 @@ void set_halo_values_z(
 {
   const double mnt_width = xlen/8;
 
-  range<2> gws ((NUM_VARS+15)/16*16, (nx+2*hs+15)/16*16);
-  range<2> lws (16, 16);
+  range<3> gws (1, (NUM_VARS+15)/16*16, (nx+3*hs+15)/16*16);
+  range<3> lws (1, 16, 16);
 
   q.submit([&] (handler &cgh) {
     auto state = d_state.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      int ll = item.get_global_id(0);
-      int i = item.get_global_id(1);
+    cgh.parallel_for<class update_state_z>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      int ll = item.get_global_id(1);
+      int i = item.get_global_id(2);
       if (i < nx+2*hs && ll < NUM_VARS) { 
         if (ll == ID_WMOM) {
           state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
@@ -747,18 +747,17 @@ void reductions(
   double2 identity = {0, 0};
   {
     buffer<double2> d_identity (&identity, 1);
-    range<2> gws ((nz+15)/16*16, (nx+15)/16*16);
-    range<2> lws (16, 16);
+    range<3> gws (1, (nz+15)/16*16, (nx+15)/16*16);
+    range<3> lws (1, 16, 16);
     q.submit([&] (handler &cgh) {
-      auto id_acc = d_identity.get_access<sycl_read_write>(cgh);
-      auto reducer = ext::oneapi::reduction(id_acc, identity, std::plus<double2>());
+      auto reducer = reduction(d_identity, cgh, std::plus<double2>());
       auto state = d_state.get_access<sycl_read>(cgh);
       auto hy_dens_cell = d_hy_dens_cell.get_access<sycl_read>(cgh);
       auto hy_dens_theta_cell = d_hy_dens_theta_cell.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class reduce>(nd_range<2>(gws, lws), reducer, 
-                                     [=] (nd_item<2> item, auto &sum) {
-        int k = item.get_global_id(0);
-        int i = item.get_global_id(1);
+      cgh.parallel_for<class reduce>(nd_range<3>(gws, lws), reducer, 
+                                     [=] (nd_item<3> item, auto &sum) {
+        int k = item.get_global_id(1);
+        int i = item.get_global_id(2);
         if (k < nz && i < nx) {
           int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
           int ind_u = ID_UMOM*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
