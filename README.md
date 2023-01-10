@@ -16,7 +16,7 @@ Each benchmark falls into a single category. While such classification is not ac
     babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, minibude, minimap2, nbnxm, nw, prna, snake  
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
     affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
@@ -724,6 +724,9 @@ Early results are shown [here](results/README.md)
 
 ### log2 (c)
   Approximate the log2 math function (https://adacenter.org/sites/default/files/milspec/Transcendentals.zip)
+
+### logan (cuda)
+  GPU-based X-Drop alignment (https://github.com/albertozeni/LOGAN)
 
 ### lombscargle (cuda)
   Lomb-Scargle periodogram (https://github.com/rapidsai/cusignal/)
