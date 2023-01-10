@@ -13,8 +13,14 @@ CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
-MPI_INCLUDE = "/usr/include/openmpi-ppc64le"
-MPI_LIB_DIR = "/usr/lib64/openmpi/lib"
+
+ifeq ($(CUDA), yes)
+  MPI_INCLUDE = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/include"
+  MPI_LIB_DIR = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/lib"
+else
+  MPI_INCLUDE = "/usr/lib/x86_64-linux-gnu/openmpi/include"
+  MPI_LIB_DIR = "/usr/lib/x86_64-linux-gnu/openmpi/lib"
+endif
 
 #===============================================================================
 # Program name & source code list
@@ -31,7 +37,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DNX=400 \
+CFLAGS := $(EXTRA_CFLAGS) \
+          -DNX=400 \
        	  -DNZ=200 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
