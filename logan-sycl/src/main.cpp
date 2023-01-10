@@ -155,9 +155,8 @@ int main(int argc, char **argv)
   auto start = NOW;
   LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt);  
   auto end = NOW;  
-  std::chrono::duration<double> tot_time = end-start;
-  double duration_tot = tot_time.count();
+  std::chrono::duration<double> tot_time = end - start;
+  std::cout << "Total execution time [seconds]:\t" << tot_time.count() << std::endl;
 
-  std::cout<< "Total Execution time:\t"<< duration_tot <<std::endl;
   return 0;
 }
