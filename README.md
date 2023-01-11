@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolutionSeperable, dct8x8, debayer, depixel, degrid, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -1236,6 +1236,8 @@ Early results are shown [here](results/README.md)
 ### zerocopy (cuda)
   kernels may read and write directly to pinned system memory from a user perspective (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/simpleZeroCopy)
 
+### zoom (cuda)
+  Zoom in and zoom out an image (https://github.com/rapidsai/cucim)
 
 ## Developer
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
