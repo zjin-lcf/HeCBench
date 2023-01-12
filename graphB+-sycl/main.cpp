@@ -32,13 +32,13 @@ URL: The latest version of this code is available at
 https://cs.txstate.edu/~burtscher/research/graphB/.
 */
 
-#include <CL/sycl.hpp>
 #include <cstdio>
 #include <chrono>
 #include <climits>
 #include <algorithm>
 #include <set>
 #include <map>
+#include <CL/sycl.hpp>
 #include "kernels.h"
 
 int main(int argc, char* argv[])
@@ -80,6 +80,15 @@ int main(int argc, char* argv[])
   sycl::cpu_selector dev_sel;
 #endif
   sycl::queue q(dev_sel, sycl::property::queue::in_order());
+
+  auto dev = q.get_device();
+  auto devName = dev.get_info<sycl::info::device::name>();
+  auto SMs = dev.get_info<sycl::info::device::max_compute_units>();
+  auto mTpSM = 2048;
+  auto clockRate = dev.get_info<sycl::info::device::max_clock_frequency>();
+  auto memClockRate = dev.get_info<sycl::ext::intel::info::device::memory_clock_rate>();
+  printf("Device: %s with %d SMs and %d mTpSM (%u MHz and %u MHz)\n",
+         devName.c_str(), SMs, mTpSM, clockRate, memClockRate);
 
   Graph d_g = g;
   EdgeInfo* d_einfo;
@@ -158,7 +167,7 @@ int main(int argc, char* argv[])
 
   q.memcpy(d_g.eweight, g.eweight, sizeof(int) * g.edges).wait();
 
-  const int blocks = 21; //SMs * mTpSM / ThreadsPerBlock;
+  const int blocks = SMs * mTpSM / ThreadsPerBlock;
 
   sycl::range<1> gws (blocks * ThreadsPerBlock);
   sycl::range<1> lws (ThreadsPerBlock);

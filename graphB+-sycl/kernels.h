@@ -16,7 +16,7 @@ T atomicCAS(
 }
 
 inline int __ffs(int x) {
-  return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
+  return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
 template <typename T>
