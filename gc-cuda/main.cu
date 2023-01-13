@@ -142,7 +142,7 @@ void init(const int nodes,
 }
 
 
-  __global__
+__global__
 void runLarge(const int nodes, 
     const int* const __restrict__ nidx,
     const int* const __restrict__ nlist,
@@ -254,7 +254,7 @@ void runLarge(const int nodes,
 }
 
 
-  __global__ 
+__global__ 
 void runSmall(const int nodes,
     const int* const __restrict__ nidx,
     const int* const __restrict__ nlist,
@@ -313,7 +313,7 @@ int main(int argc, char* argv[])
   printf("ECL-GC v1.2 (%s)\n", __FILE__);
   printf("Copyright 2020 Texas State University\n\n");
 
-  if (argc != 2) {printf("USAGE: %s input_file_name\n\n", argv[0]);  exit(-1);}
+  if (argc != 3) {printf("USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);  exit(-1);}
   if (WS != 32) {printf("ERROR: warp size must be 32\n\n");  exit(-1);}
   if (WS != sizeof(int) * 8) {printf("ERROR: bits per word must match warp size\n\n");  exit(-1);}
   if ((ThreadsPerBlock < WS) || ((ThreadsPerBlock % WS) != 0)) {
@@ -330,6 +330,8 @@ int main(int argc, char* argv[])
   printf("nodes: %d\n", g.nodes);
   printf("edges: %d\n", g.edges);
   printf("avg degree: %.2f\n", 1.0 * g.edges / g.nodes);
+
+  const int repeat = atoi(argv[2]);
 
   int* const color = new int [g.nodes];
 
@@ -361,18 +363,20 @@ int main(int argc, char* argv[])
   const int SMs = deviceProp.multiProcessorCount;
   const int mTpSM = deviceProp.maxThreadsPerMultiProcessor;
   const int blocks = SMs * mTpSM / ThreadsPerBlock;
-  printf("Number of thread blocks in a grid: %d\n", blocks);
+  printf("Total number of compute units: %d\n", SMs);
+  printf("Maximum resident threads per compute unit: %d\n", mTpSM);
+  printf("Work-group size: %d\n", ThreadsPerBlock);
+  printf("Total number of work-groups: %d\n", blocks);
 
   cudaFuncSetCacheConfig(init, cudaFuncCachePreferL1);
   cudaFuncSetCacheConfig(runLarge, cudaFuncCachePreferL1);
   cudaFuncSetCacheConfig(runSmall, cudaFuncCachePreferL1);
 
-
   cudaDeviceSynchronize();
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  for (int n = 0; n < 100; n++) {
+  for (int n = 0; n < repeat; n++) {
     cudaMemset(wlsize_d, 0, sizeof(int));
     init<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, nidx_d, nlist_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
     runLarge<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
@@ -383,9 +387,9 @@ int main(int argc, char* argv[])
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = elapsed_seconds.count() / 100;
+  float runtime = elapsed_seconds.count() / repeat;
 
-  printf("average runtime (100 runs):    %.6f s\n", runtime);
+  printf("average runtime (%d runs):    %.6f s\n", repeat, runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
