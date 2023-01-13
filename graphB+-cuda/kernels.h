@@ -1,6 +1,6 @@
 static const bool verify = true;  // set to false for better performance
 static const int Device = 0;
-static const int ThreadsPerBlock = 512;
+static const int ThreadsPerBlock = 256;
 static const int warpsize = 32;
 static const unsigned int mask = 0xffffffff;
 static __device__ unsigned long long hi = 0;

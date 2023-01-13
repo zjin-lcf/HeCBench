@@ -39,6 +39,7 @@ https://cs.txstate.edu/~burtscher/research/graphB/.
 #include <algorithm>
 #include <set>
 #include <map>
+#include <cuda.h>
 #include "kernels.h"
 
 int main(int argc, char* argv[])
