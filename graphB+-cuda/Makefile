@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+VERIFY    = no
 
 #===============================================================================
 # Program name & source code list
@@ -37,6 +38,10 @@ endif
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
+endif
+
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
 endif
 #===============================================================================
 # Targets to Build

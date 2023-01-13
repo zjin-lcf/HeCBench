@@ -51,7 +51,11 @@ int main(int argc, char* argv[])
   // process command line and read input
   if (argc != 4) {printf("USAGE: %s input_file_name iteration_count output_file_name\n", argv[0]); exit(-1);}
 
-  printf("verification: %s\n", verify ? "on" : "off");
+#ifdef VERIFY
+  printf("verification is on\n");
+#else
+  printf("verification is off\n");
+#endif
   printf("input: %s\n", argv[1]);
   Graph g = readGraph(argv[1]);
   printf("nodes: %d\n", g.nodes);
@@ -99,23 +103,56 @@ int main(int argc, char* argv[])
   bool* d_minus;
   bool* changed_gpu;
 
-  if (hipSuccess != hipMalloc((void **)&d_g.eweight, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_g.nindex, sizeof(int) * (g.nodes + 1))) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_g.nlist, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n");}
-  if (hipSuccess != hipMalloc((void **)&d_inTree, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_negCnt, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_inCC, sizeof(int) * g.nodes)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_einfo, sizeof(EdgeInfo) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_label, sizeof(int) * g.nodes)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_parent, sizeof(int) * g.nodes)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_border, sizeof(int) * (g.nodes + 2))) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_queue, sizeof(int) * g.nodes)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_tail, sizeof(int))) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_ws1, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_ws2, sizeof(int) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_wSize, sizeof(int))) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&d_minus, sizeof(bool) * g.edges)) {fprintf(stderr, "ERROR: could not allocate memory\n"); exit(-1);}
-  if (hipSuccess != hipMalloc((void **)&changed_gpu, sizeof(bool))) fprintf(stderr, "ERROR: could not allocate updated\n");
+  if (hipSuccess != hipMalloc((void **)&d_g.eweight, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+ 
+  if (hipSuccess != hipMalloc((void **)&d_g.nindex, sizeof(int) * (g.nodes + 1)))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_g.nlist, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_inTree, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_negCnt, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_inCC, sizeof(int) * g.nodes))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_einfo, sizeof(EdgeInfo) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_label, sizeof(int) * g.nodes))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_parent, sizeof(int) * g.nodes))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_border, sizeof(int) * (g.nodes + 2)))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_queue, sizeof(int) * g.nodes))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_tail, sizeof(int)))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_ws1, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_ws2, sizeof(int) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_wSize, sizeof(int)))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&d_minus, sizeof(bool) * g.edges))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
+
+  if (hipSuccess != hipMalloc((void **)&changed_gpu, sizeof(bool)))
+    fprintf(stderr, "ERROR: could not allocate memory\n");
 
   if (hipSuccess != hipMemcpy(d_g.nindex, g.nindex, sizeof(int) * (g.nodes + 1), hipMemcpyHostToDevice))
     fprintf(stderr, "ERROR: copying to device failed\n");
@@ -129,7 +166,7 @@ int main(int argc, char* argv[])
   const int blocks = SMs * mTpSM / ThreadsPerBlock;
 
   // use random pluses and minuses
-  hipLaunchKernelGGL(init, blocks, ThreadsPerBlock, 0, 0, g.edges, g.nodes, d_g.nlist, d_g.eweight, d_inCC, d_einfo, d_inTree, d_negCnt);
+  init<<<blocks, ThreadsPerBlock>>>(g.edges, g.nodes, d_g.nlist, d_g.eweight, d_inCC, d_einfo, d_inTree, d_negCnt);
 
   hipDeviceSynchronize();
 
@@ -142,13 +179,13 @@ int main(int argc, char* argv[])
 
   for (int iter = 0; iter < iterations; iter++) {
     // generate tree
-    hipLaunchKernelGGL(init2, blocks, ThreadsPerBlock, 0, 0, g.edges, g.nodes, root[iter % g.nodes], d_g.nlist, d_parent, d_queue, d_label, d_tail);
+    init2<<<blocks, ThreadsPerBlock>>>(g.edges, g.nodes, root[iter % g.nodes], d_g.nlist, d_parent, d_queue, d_label, d_tail);
     int level = 0;
     int tail = 1;
     border[0] = 0;
     border[1] = tail;
     while (border[level + 1] < g.nodes) {
-      hipLaunchKernelGGL(generateSpanningTree, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_g.nindex, d_g.nlist, iter + 17, d_einfo, d_parent, d_queue, level, d_tail, border[level],  border[level + 1]);
+      generateSpanningTree<<<blocks, ThreadsPerBlock>>>(g.nodes, d_g.nindex, d_g.nlist, iter + 17, d_einfo, d_parent, d_queue, level, d_tail, border[level],  border[level + 1]);
       if (hipSuccess != hipMemcpy(&tail, d_tail, sizeof(int), hipMemcpyDeviceToHost)) 
         fprintf(stderr, "ERROR: copying to host failed \n");
       level++;
@@ -162,23 +199,27 @@ int main(int argc, char* argv[])
     if (level < min_d) min_d = level;
     if (level > max_d) max_d = level;
 
-    if (verify) hipLaunchKernelGGL(verfiy_generateSpanningTree, blocks, ThreadsPerBlock, 0, 0, 
+
+#ifdef VERIFY
+    verify_generateSpanningTree<<<blocks, ThreadsPerBlock>>>(
       g.nodes, g.edges, d_g.nindex, d_g.nlist, iter, d_parent, level, d_tail, border[level + 1]);
+#endif
     //root count
     //#1
 
     for (int level = levels - 1; level > 0; level--) {
-      hipLaunchKernelGGL(rootcount, blocks, ThreadsPerBlock, 0, 0, d_parent, d_queue, d_label, level, border[level],  border[level + 1]);
+      rootcount<<<blocks, ThreadsPerBlock>>>(d_parent, d_queue, d_label, level, border[level],  border[level + 1]);
     }
-    if (verify) {
-      if (hipSuccess != hipMemcpy((void*)&label[root[iter % g.nodes]], 
-                                    (void*)&d_label[root[iter % g.nodes]],
-                                    sizeof(int), hipMemcpyDeviceToHost))
-        fprintf(stderr, "ERROR: copying to host failed\n");
 
-      if (label[root[iter % g.nodes]] != g.nodes)
-        printf("ERROR: root count mismatch\n");
-    }
+#ifdef VERIFY
+    if (hipSuccess != hipMemcpy((void*)&label[root[iter % g.nodes]], 
+                                  (void*)&d_label[root[iter % g.nodes]],
+                                  sizeof(int), hipMemcpyDeviceToHost))
+      fprintf(stderr, "ERROR: copying to host failed\n");
+
+    if (label[root[iter % g.nodes]] != g.nodes)
+      printf("ERROR: root count mismatch\n");
+#endif
 
     // tree label
     label[root[iter % g.nodes]] = 0;
@@ -187,24 +228,24 @@ int main(int argc, char* argv[])
 
     //#2
     for (int level = 0; level < levels; level++) {
-      hipLaunchKernelGGL(treelabel, blocks, ThreadsPerBlock, 0, 0, 
+      treelabel<<<blocks, ThreadsPerBlock>>>(
         g.nodes, d_g.nindex, d_g.nlist, d_einfo, d_inTree, d_negCnt, d_parent, 
         d_queue, d_label, level, border[level], border[level + 1]);
     }
 
     //#3
-    hipLaunchKernelGGL(inTreeUpdate, blocks, ThreadsPerBlock, 0, 0, g.edges, d_g.nlist, d_inTree);
-    hipLaunchKernelGGL(initMinus, blocks, ThreadsPerBlock, 0, 0, g.edges, g.nodes, d_g.nindex, d_g.nlist, d_einfo, d_minus);
+    inTreeUpdate<<<blocks, ThreadsPerBlock>>>(g.edges, d_g.nlist, d_inTree);
+    initMinus<<<blocks, ThreadsPerBlock>>>(g.edges, g.nodes, d_g.nindex, d_g.nlist, d_einfo, d_minus);
 
     //#4
-    hipLaunchKernelGGL(processCycles, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_g.nindex, d_g.nlist, d_label, d_einfo, d_minus);
+    processCycles<<<blocks, ThreadsPerBlock>>>(g.nodes, d_g.nindex, d_g.nlist, d_label, d_einfo, d_minus);
 
-    hipLaunchKernelGGL(init3, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue);
-    hipLaunchKernelGGL(compute1, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_g.nindex, d_g.nlist, d_label, d_minus, d_negCnt);
-    hipLaunchKernelGGL(flatten, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_label);
-    hipLaunchKernelGGL(ccSize, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_label, d_queue);
-    hipLaunchKernelGGL(largestCC, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_queue);
-    hipLaunchKernelGGL(ccHopCount, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue, d_ws1, d_ws2);
+    init3<<<blocks, ThreadsPerBlock>>> (g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue);
+    compute1<<<blocks, ThreadsPerBlock>>>(g.nodes, d_g.nindex, d_g.nlist, d_label, d_minus, d_negCnt);
+    flatten<<<blocks, ThreadsPerBlock>>>(g.nodes, d_label);
+    ccSize<<<blocks, ThreadsPerBlock>>>(g.nodes, d_label, d_queue);
+    largestCC<<<blocks, ThreadsPerBlock>>>(g.nodes, d_queue);
+    ccHopCount<<<blocks, ThreadsPerBlock>>>(g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue, d_ws1, d_ws2);
 
     bool changed;
     do {
@@ -212,34 +253,33 @@ int main(int argc, char* argv[])
       if (hipSuccess != hipMemset(changed_gpu, 0, sizeof(bool)))
         fprintf(stderr, "ERROR: setting changed failed\n");
 
-      hipLaunchKernelGGL(BellmanFord, blocks, ThreadsPerBlock, 0, 0, d_queue, changed_gpu, d_ws1, d_ws2);
-      hipLaunchKernelGGL(BellmanFord, blocks, ThreadsPerBlock, 0, 0, d_queue, changed_gpu, d_ws1, d_ws2);
-      hipLaunchKernelGGL(BellmanFord, blocks, ThreadsPerBlock, 0, 0, d_queue, changed_gpu, d_ws1, d_ws2);
+      BellmanFord<<<blocks, ThreadsPerBlock>>>(d_queue, changed_gpu, d_ws1, d_ws2);
+      BellmanFord<<<blocks, ThreadsPerBlock>>>(d_queue, changed_gpu, d_ws1, d_ws2);
+      BellmanFord<<<blocks, ThreadsPerBlock>>>(d_queue, changed_gpu, d_ws1, d_ws2);
 
       if (hipSuccess != hipMemcpy(&changed, changed_gpu, sizeof(bool), hipMemcpyDeviceToHost))
         fprintf(stderr, "ERROR: copying of changed from device failed\n");
     } while (changed);
 
-    hipLaunchKernelGGL(incrementCC, blocks, ThreadsPerBlock, 0, 0, g.nodes, d_label, d_queue, d_inCC);
+    incrementCC<<<blocks, ThreadsPerBlock>>>(g.nodes, d_label, d_queue, d_inCC);
   }
 
-  avg_d = sum_d/iterations;
-  if (hipSuccess != hipMemcpy(inCC, d_inCC, sizeof(int) * g.nodes, hipMemcpyDeviceToHost))
-    fprintf(stderr, "ERROR: copying incc from device failed\n");
-
+  hipDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   float runtime = elapsed_seconds.count();
   printf("Total graphB+ runtime:    %.6f s\n", runtime);
 
+  if (hipSuccess != hipMemcpy(inCC, d_inCC, sizeof(int) * g.nodes, hipMemcpyDeviceToHost))
+    fprintf(stderr, "ERROR: copying incc from device failed\n");
+
   // print results
-  if (verify) {
-    printf("number of trees %d\n", iterations);
-    printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n",min_d, max_d, avg_d);
-    for (int i = 0; i < g.nodes; i++) {
-      if (i >= 10) break;  // to limit output
-      printf("%6d: %6d   (%5.1f%%)  %d\n", i, inCC[i], 100.0 * inCC[i] / iterations, g.origID[i]);
-    }
+  avg_d = sum_d/iterations;
+  printf("number of trees %d\n", iterations);
+  printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n",min_d, max_d, avg_d);
+  for (int i = 0; i < g.nodes; i++) {
+    if (i >= 10) break;  // to limit output
+    printf("%6d: %6d   (%5.1f%%)  %d\n", i, inCC[i], 100.0 * inCC[i] / iterations, g.origID[i]);
   }
 
   // output results to file

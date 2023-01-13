@@ -1,4 +1,3 @@
-static const bool verify = true; // set to false for better performance
 static const int ThreadsPerBlock = 256;
 static const int warpsize = 32;
 
@@ -112,11 +111,9 @@ static Graph readGraph(const char* const name)
   if (wrongweights > 0) printf("  skipped %d edges with out-of-range weights\n", wrongweights);
   if (duplicates > 0) printf("  skipped %d duplicate edges\n", duplicates);
   if (inconsistent > 0) printf("  skipped %d inconsistent edges\n", inconsistent);
-  if (verify) {
-    if ((int)map.size() != cnt) {printf("ERROR: wrong node count\n"); exit(-1);}
-    printf("  number of unique nodes: %d\n", (int)map.size());
-    printf("  number of unique edges: %d\n", (int)set3.size());
-  }
+  if ((int)map.size() != cnt) printf("ERROR: wrong node count\n");
+  printf("  number of unique nodes: %d\n", (int)map.size());
+  printf("  number of unique edges: %d\n", (int)set3.size());
 
   // compute CCs with union find
   int* const label = new int [cnt];
@@ -183,10 +180,9 @@ static Graph readGraph(const char* const name)
       edges += 2;
     }
   }
-  if (verify) {
-    if (nodes > cnt) {printf("ERROR: too many nodes\n"); exit(-1);}
-    if (edges > (int)set3.size() * 2) {printf("ERROR: too many edges\n"); exit(-1);}
-  }
+
+  if (nodes > cnt) printf("ERROR: too many nodes\n");
+  if (edges > (int)set3.size() * 2) printf("ERROR: too many edges\n");
 
   // create graph in CSR format
   g.nodes = nodes;
@@ -206,9 +202,8 @@ static Graph readGraph(const char* const name)
     }
   }
   g.nindex[g.nodes] = acc;
-  if (verify) {
-    if (acc != edges) {printf("ERROR: wrong edge count in final graph\n"); exit(-1);}
-  }
+
+  if (acc != edges) printf("ERROR: wrong edge count in final graph\n");
 
   delete [] label;
   delete [] size;
@@ -303,6 +298,7 @@ static void generateSpanningTree(
   int end,
   sycl::nd_item<1> &item)
 {
+  auto sg = item.get_sub_group();
   const int from = item.get_global_id(0) / warpsize;
   const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
   const int lane = item.get_local_id(0) % warpsize;
@@ -331,11 +327,12 @@ static void generateSpanningTree(
           queue[val] = neighbor;
       }
     }
-    item.barrier();
+    sycl::group_barrier(sg);
   }
 }
 
-static void verfiy_generateSpanningTree(
+#ifdef VERIFY
+static void verify_generateSpanningTree(
   const int nodes,
   const int edges,
   const int* const nindex,
@@ -348,20 +345,19 @@ static void verfiy_generateSpanningTree(
         sycl::nd_item<1> &item,
         const sycl::stream &stream_ct1)
 {
-  if (verify) {
-    const int from = item.get_global_id(0);
-    const int incr = item.get_group_range(0) * ThreadsPerBlock;
-    if (end != *tail) { stream_ct1 << "ERROR: head mismatch\n"; }
-    if (*tail != nodes) {
-      stream_ct1 << "ERROR: tail mismatch tail %d nodes %d \n";
-    }
-    for (int i = from; i < nodes; i += incr) {
-      if (parent[i] < 0) {
-        stream_ct1 << "ERROR: found unvisited node %d\n";
-      }
+  const int from = item.get_global_id(0);
+  const int incr = item.get_group_range(0) * ThreadsPerBlock;
+  if (end != *tail) stream_ct1 << "ERROR: head mismatch\n";
+  if (*tail != nodes) {
+    stream_ct1 << "ERROR: tail mismatch tail " << *tail << " nodes " << nodes << "\n";
+  }
+  for (int i = from; i < nodes; i += incr) {
+    if (parent[i] < 0) {
+      stream_ct1 << "ERROR: found unvisited node " << i << "\n";
     }
   }
 }
+#endif
 
 static void rootcount(
   const int* const parent,
@@ -395,13 +391,16 @@ static void treelabel(
   const int level,
         int start,
         int end,
-        sycl::nd_item<1> &item,
-        const sycl::stream &stream_ct1)
+        sycl::nd_item<1> &item
+#ifdef VERIFY
+        , const sycl::stream &stream_ct1
+#endif
+        )
 {
+  auto sg = item.get_sub_group();
   const int from = item.get_global_id(0) / warpsize;
   const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
   const int lane = item.get_local_id(0) % warpsize;
-  auto sg = item.get_sub_group();
 
   //cuv
   // top down: label tree + set nlist flag + set edge info + move tree nodes to front + make parent edge first in list
@@ -616,21 +615,23 @@ static void treelabel(
         }
       }
     }
-    item.barrier();
+    sycl::group_barrier(sg);
 
-    if (verify && (lane == 0)) {
+#ifdef VERIFY
+    if (lane == 0) {
       if (i == 0) {
         if (lbl != nodes) {
-          stream_ct1 << "ERROR: lbl mismatch, lbl %d nodes %d\n";
+          stream_ct1 << "ERROR: lbl mismatch, lbl " << lbl << " nodes " << nodes << "\n";
         }
       }
       int j = beg;
       while ((j < end) && (nlist[j] & 1)) j++;
       while ((j < end) && !(nlist[j] & 1)) j++;
       if (j != end) {
-        stream_ct1 << "ERROR: not moved %d %d %d\n";
+        stream_ct1 << "ERROR: not moved " << beg << " " << j << " " << end;
       }
     }
+#endif
   }
 }
 
@@ -655,12 +656,17 @@ static void processCycles(
   const int* const __restrict label,
   const EdgeInfo* const __restrict einfo,
   bool* const  __restrict minus,
-  sycl::nd_item<1> &item,
-  const sycl::stream &stream_ct1)
+  sycl::nd_item<1> &item
+#ifdef VERIFY
+  , const sycl::stream &stream_ct1
+#endif
+  )
 {
+  auto sg = item.get_sub_group();
   const int from = item.get_global_id(0) / warpsize;
   const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
   const int lane = item.get_local_id(0) % warpsize;
+
   for (int i = from; i < nodes; i += incr) {
     const int target0 = label[i];
     const int target1 = target0 | 1;
@@ -672,11 +678,11 @@ static void processCycles(
         while (label[curr] != target0) {
           int k = nindex[curr];
           while ((einfo[k].beg & 1) == ((einfo[k].beg <= target1) && (target0 <= einfo[k].end))) k++;
-          if (verify) {
-            if ((k >= nindex[curr + 1]) || !(nlist[k] & 1)) {
-              stream_ct1 << "ERROR: couldn't find path\n";
-            }
+#ifdef VERIFY
+          if ((k >= nindex[curr + 1]) || !(nlist[k] & 1)) {
+            stream_ct1 << "ERROR: couldn't find path\n";
           }
+#endif
           sum += einfo[k].end & 1;
           curr = nlist[k] >> 1;
         }
@@ -684,7 +690,7 @@ static void processCycles(
       }
       j -= warpsize;
     }
-   item.barrier();
+    sycl::group_barrier(sg);
   }
 }
 

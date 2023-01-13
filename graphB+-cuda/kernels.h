@@ -1,4 +1,3 @@
-static const bool verify = true;  // set to false for better performance
 static const int Device = 0;
 static const int ThreadsPerBlock = 256;
 static const int warpsize = 32;
@@ -99,11 +98,10 @@ static Graph readGraph(const char* const name)
   if (wrongweights > 0) printf("  skipped %d edges with out-of-range weights\n", wrongweights);
   if (duplicates > 0) printf("  skipped %d duplicate edges\n", duplicates);
   if (inconsistent > 0) printf("  skipped %d inconsistent edges\n", inconsistent);
-  if (verify) {
-    if ((int)map.size() != cnt) {printf("ERROR: wrong node count\n"); exit(-1);}
-    printf("  number of unique nodes: %d\n", (int)map.size());
-    printf("  number of unique edges: %d\n", (int)set3.size());
-  }
+
+  if ((int)map.size() != cnt) printf("ERROR: wrong node count\n");
+  printf("  number of unique nodes: %d\n", (int)map.size());
+  printf("  number of unique edges: %d\n", (int)set3.size());
 
   // compute CCs with union find
   int* const label = new int [cnt];
@@ -170,10 +168,9 @@ static Graph readGraph(const char* const name)
       edges += 2;
     }
   }
-  if (verify) {
-    if (nodes > cnt) {printf("ERROR: too many nodes\n"); exit(-1);}
-    if (edges > (int)set3.size() * 2) {printf("ERROR: too many edges\n"); exit(-1);}
-  }
+
+  if (nodes > cnt) printf("ERROR: too many nodes\n");
+  if (edges > (int)set3.size() * 2) printf("ERROR: too many edges\n");
 
   // create graph in CSR format
   g.nodes = nodes;
@@ -193,9 +190,8 @@ static Graph readGraph(const char* const name)
     }
   }
   g.nindex[g.nodes] = acc;
-  if (verify) {
-    if (acc != edges) {printf("ERROR: wrong edge count in final graph\n"); exit(-1);}
-  }
+
+  if (acc != edges) printf("ERROR: wrong edge count in final graph\n");
 
   delete [] label;
   delete [] size;
@@ -317,7 +313,8 @@ static __global__ void generateSpanningTree(
   }
 }
 
-static __global__ void verfiy_generateSpanningTree(
+#ifdef VERIFY
+static __global__ void verify_generateSpanningTree(
   const int nodes,
   const int edges,
   const int* const nindex,
@@ -328,16 +325,15 @@ static __global__ void verfiy_generateSpanningTree(
   const int* const tail,
         int end)
 {
-  if (verify) {
-    const int from = threadIdx.x + blockIdx.x * ThreadsPerBlock;
-    const int incr = gridDim.x * ThreadsPerBlock;
-    if (end != *tail) {printf("ERROR: head mismatch\n"); asm("trap;");}
-    if (*tail != nodes) {printf("ERROR: tail mismatch tail %d nodes %d \n", *tail, nodes); asm("trap;");}
-    for (int i = from; i < nodes; i += incr) {
-      if (parent[i] < 0) {printf("ERROR: found unvisited node %d\n", i); asm("trap;");}
-    }
+  const int from = threadIdx.x + blockIdx.x * ThreadsPerBlock;
+  const int incr = gridDim.x * ThreadsPerBlock;
+  if (end != *tail) {printf("ERROR: head mismatch\n"); asm("trap;");}
+  if (*tail != nodes) {printf("ERROR: tail mismatch tail %d nodes %d \n", *tail, nodes); asm("trap;");}
+  for (int i = from; i < nodes; i += incr) {
+    if (parent[i] < 0) {printf("ERROR: found unvisited node %d\n", i); asm("trap;");}
   }
 }
+#endif
 
 static __global__ void rootcount(
   const int* const parent,
@@ -574,7 +570,8 @@ static __global__ void treelabel(
     }
     __syncwarp();
 
-    if (verify && (lane == 0)) {
+#ifdef VERIFY
+    if (lane == 0) {
       if (i == 0) {
         if (lbl != nodes) {printf("ERROR: lbl mismatch, lbl %d nodes %d\n", lbl, nodes); asm("trap;");}
       }
@@ -583,6 +580,7 @@ static __global__ void treelabel(
       while ((j < end) && !(nlist[j] & 1)) j++;
       if (j != end) {printf("ERROR: not moved %d %d %d\n", beg, j, end); asm("trap;");}
     }
+#endif
   }
 }
 
@@ -621,9 +619,9 @@ static __global__ void processCycles(
         while (label[curr] != target0) {
           int k = nindex[curr];
           while ((einfo[k].beg & 1) == ((einfo[k].beg <= target1) && (target0 <= einfo[k].end))) k++;
-          if (verify) {
-            if ((k >= nindex[curr + 1]) || !(nlist[k] & 1)) {printf("ERROR: couldn't find path\n"); asm("trap;");}
-          }
+#ifdef VERIFY
+          if ((k >= nindex[curr + 1]) || !(nlist[k] & 1)) {printf("ERROR: couldn't find path\n"); asm("trap;");}
+#endif
           sum += einfo[k].end & 1;
           curr = nlist[k] >> 1;
         }

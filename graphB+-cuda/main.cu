@@ -51,7 +51,11 @@ int main(int argc, char* argv[])
   // process command line and read input
   if (argc != 4) {printf("USAGE: %s input_file_name iteration_count output_file_name\n", argv[0]); exit(-1);}
 
-  printf("verification: %s\n", verify ? "on" : "off");
+#ifdef VERIFY
+  printf("verification is on\n");
+#else
+  printf("verification is off\n");
+#endif
   printf("input: %s\n", argv[1]);
   Graph g = readGraph(argv[1]);
   printf("nodes: %d\n", g.nodes);
@@ -196,23 +200,26 @@ int main(int argc, char* argv[])
     if (level > max_d) max_d = level;
 
 
-    if (verify) verfiy_generateSpanningTree<<<blocks, ThreadsPerBlock>>>(
+#ifdef VERIFY
+    verify_generateSpanningTree<<<blocks, ThreadsPerBlock>>>(
       g.nodes, g.edges, d_g.nindex, d_g.nlist, iter, d_parent, level, d_tail, border[level + 1]);
+#endif
     //root count
     //#1
 
     for (int level = levels - 1; level > 0; level--) {
       rootcount<<<blocks, ThreadsPerBlock>>>(d_parent, d_queue, d_label, level, border[level],  border[level + 1]);
     }
-    if (verify) {
-      if (cudaSuccess != cudaMemcpy((void*)&label[root[iter % g.nodes]], 
-                                    (void*)&d_label[root[iter % g.nodes]],
-                                    sizeof(int), cudaMemcpyDeviceToHost))
-        fprintf(stderr, "ERROR: copying to host failed\n");
 
-      if (label[root[iter % g.nodes]] != g.nodes)
-        printf("ERROR: root count mismatch\n");
-    }
+#ifdef VERIFY
+    if (cudaSuccess != cudaMemcpy((void*)&label[root[iter % g.nodes]], 
+                                  (void*)&d_label[root[iter % g.nodes]],
+                                  sizeof(int), cudaMemcpyDeviceToHost))
+      fprintf(stderr, "ERROR: copying to host failed\n");
+
+    if (label[root[iter % g.nodes]] != g.nodes)
+      printf("ERROR: root count mismatch\n");
+#endif
 
     // tree label
     label[root[iter % g.nodes]] = 0;
@@ -257,23 +264,22 @@ int main(int argc, char* argv[])
     incrementCC<<<blocks, ThreadsPerBlock>>>(g.nodes, d_label, d_queue, d_inCC);
   }
 
-  avg_d = sum_d/iterations;
-  if (cudaSuccess != cudaMemcpy(inCC, d_inCC, sizeof(int) * g.nodes, cudaMemcpyDeviceToHost))
-    fprintf(stderr, "ERROR: copying incc from device failed\n");
-
+  cudaDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   float runtime = elapsed_seconds.count();
   printf("Total graphB+ runtime:    %.6f s\n", runtime);
 
+  if (cudaSuccess != cudaMemcpy(inCC, d_inCC, sizeof(int) * g.nodes, cudaMemcpyDeviceToHost))
+    fprintf(stderr, "ERROR: copying incc from device failed\n");
+
   // print results
-  if (verify) {
-    printf("number of trees %d\n", iterations);
-    printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n",min_d, max_d, avg_d);
-    for (int i = 0; i < g.nodes; i++) {
-      if (i >= 10) break;  // to limit output
-      printf("%6d: %6d   (%5.1f%%)  %d\n", i, inCC[i], 100.0 * inCC[i] / iterations, g.origID[i]);
-    }
+  avg_d = sum_d/iterations;
+  printf("number of trees %d\n", iterations);
+  printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n",min_d, max_d, avg_d);
+  for (int i = 0; i < g.nodes; i++) {
+    if (i >= 10) break;  // to limit output
+    printf("%6d: %6d   (%5.1f%%)  %d\n", i, inCC[i], 100.0 * inCC[i] / iterations, g.origID[i]);
   }
 
   // output results to file

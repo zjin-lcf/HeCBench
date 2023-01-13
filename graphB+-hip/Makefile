@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+VERIFY    = no
 
 #===============================================================================
 # Program name & source code list
@@ -36,6 +37,10 @@ endif
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
+endif
+
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DVERIFY
 endif
 #===============================================================================
 # Targets to Build
