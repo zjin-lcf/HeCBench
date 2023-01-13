@@ -59,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../mis-cuda/internet.egr 256
+	./$(program) ../mis-cuda/internet.egr 256 100

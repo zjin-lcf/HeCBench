@@ -75,5 +75,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) $(inc)/internet.egr
-
+	./$(program) $(inc)/internet.egr 100

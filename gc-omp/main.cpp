@@ -301,10 +301,12 @@ int main(int argc, char* argv[])
   printf("ECL-GC OpenMP v1.2 (%s)\n", __FILE__);
   printf("Copyright 2020 Texas State University\n\n");
 
-  if (argc != 3) {printf("USAGE: %s input_file_name thread_count\n\n", argv[0]);  exit(-1);}
+  if (argc != 4) {printf("USAGE: %s <input_file_name> <thread_count> <repeat>\n\n", argv[0]);  exit(-1);}
   if (BPI != sizeof(int) * 8) {printf("ERROR: bits per int size must be %ld\n\n", sizeof(int) * 8);  exit(-1);}
   const int threads = atoi(argv[2]);
   if (threads < 1) {fprintf(stderr, "ERROR: thread_limit must be at least 1\n"); exit(-1);}
+
+  const int repeat = atoi(argv[3]);
 
   ECLgraph g = readECLgraph(argv[1]);
   printf("input: %s\n", argv[1]);
@@ -335,7 +337,7 @@ int main(int argc, char* argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    for (int n = 0; n < 100; n++) {
+    for (int n = 0; n < repeat; n++) {
       const int wlsize = init(g.nodes, g.edges, nindex, nlist, nlist2, posscol, posscol2, color, wl, threads);
       runLarge(nindex, nlist2, posscol, posscol2, color, wl, wlsize, threads);
       runSmall(g.nodes, nindex, nlist, posscol, color, threads);
@@ -343,13 +345,13 @@ int main(int argc, char* argv[])
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
-    runtime = elapsed_seconds.count() / 100;
+    runtime = elapsed_seconds.count() / repeat;
 
 #ifdef OMP_TARGET
   }
 #endif
 
-  printf("average runtime (100 runs):    %.6f s\n", runtime);
+  printf("average runtime (%d runs):    %.6f s\n", repeat, runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 

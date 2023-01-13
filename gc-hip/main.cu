@@ -40,55 +40,46 @@ Symposium on Principles and Practice of Parallel Programming, pp. 262-275.
 February 2020.
  */
 
+
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <hip/hip_runtime.h>
 #include "graph.h"
 
-// the maximum work-group size depends on the target device
 static const int ThreadsPerBlock = 512;
 static const int WS = 32;  // warp size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
-inline int ffs(int x) {
-  return (x == 0) ? 0 : sycl::ctz(x) + 1;
-}
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
-static unsigned int hash(unsigned int val)
+static __device__ unsigned int hash(unsigned int val)
 {
   val = ((val >> 16) ^ val) * 0x45d9f3b;
   val = ((val >> 16) ^ val) * 0x45d9f3b;
   return (val >> 16) ^ val;
 }
 
-
+__global__
 void init(const int nodes,
     const int edges, 
-    const int* const __restrict nidx,
-    const int* const __restrict nlist,
-    int* const __restrict nlist2,
-    int* const __restrict posscol,
-    int* const __restrict posscol2,
-    int* const __restrict color,
-    int* const __restrict wl,
-    int* __restrict wlsize,
-    sycl::nd_item<1> &item
-#ifdef SYCL_STREAM
-    , const sycl::stream &out
-#endif
-    )
+    const int* const __restrict__ nidx,
+    const int* const __restrict__ nlist,
+    int* const __restrict__ nlist2,
+    int* const __restrict__ posscol,
+    int* const __restrict__ posscol2,
+    int* const __restrict__ color,
+    int* const __restrict__ wl,
+    int* __restrict__ wlsize)
 {
-  const int lane = item.get_local_id(0) % WS;
-  const int thread = item.get_global_id(0);
-  const int threads = item.get_group_range(0) * ThreadsPerBlock;
-  auto sg = item.get_sub_group();
+  const int lane = threadIdx.x % WS;
+  const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
+  const int threads = gridDim.x * ThreadsPerBlock;
 
   int maxrange = -1;
-  for (int v = thread; sycl::any_of_group(sg, v < nodes); v += threads) {
+  for (int v = thread; __any(v < nodes); v += threads) {
     bool cond = false;
     int beg, end, pos, degv, active;
     if (v < nodes) {
@@ -97,15 +88,14 @@ void init(const int nodes,
       degv = end - beg;
       cond = (degv >= WS);
       if (cond) {
-        wl[sycl::atomic<int>(sycl::global_ptr<int>(wlsize)).fetch_add(1)] = v;
+        wl[atomicAdd(wlsize, 1)] = v;
       } else {
         active = 0;
         pos = beg;
         for (int i = beg; i < end; i++) {
           const int nei = nlist[i];
           const int degn = nidx[nei + 1] - nidx[nei];
-          if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || 
-             ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
+          if ((degv < degn) || ((degv == degn) && (hash(v) < hash(nei))) || ((degv == degn) && (hash(v) == hash(nei)) && (v < nei))) {
             active |= (unsigned int)MSB >> (i - beg);
             pos++;
           }
@@ -113,68 +103,63 @@ void init(const int nodes,
       }
     }
 
-    int bal = sycl::reduce_over_group(sg,
-        cond ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
+    int bal = __ballot(cond);
     while (bal != 0) {
-      const int who = ffs(bal) - 1;
+      const int who = __ffs(bal) - 1;
       bal &= bal - 1;
-      const int wv = sycl::select_from_group(sg, v, who);
-      const int wbeg = sycl::select_from_group(sg, beg, who);
-      const int wend = sycl::select_from_group(sg, end, who);
+      const int wv = __shfl(v, who);
+      const int wbeg = __shfl(beg, who);
+      const int wend = __shfl(end, who);
       const int wdegv = wend - wbeg;
       int wpos = wbeg;
-      for (int i = wbeg + lane; sycl::any_of_group(sg, i < wend); i += WS) {
+      for (int i = wbeg + lane; __any(i < wend); i += WS) {
         int wnei;
         bool prio = false;
         if (i < wend) {
           wnei = nlist[i];
           const int wdegn = nidx[wnei + 1] - nidx[wnei];
-          prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || 
-                 ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
+          prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
         }
-        const int b = sycl::reduce_over_group( sg, 
-                  prio ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
-        const int offs = sycl::popcount(b & ((1 << lane) - 1));
+        const int b = __ballot(prio);
+        const int offs = __popc(b & ((1 << lane) - 1));
         if (prio) nlist2[wpos + offs] = wnei;
-        wpos += sycl::popcount(b);
+        wpos += __popc(b);
       }
       if (who == lane) pos = wpos;
     }
 
     if (v < nodes) {
       const int range = pos - beg;
-      maxrange = sycl::max(maxrange, range);
+      maxrange = max(maxrange, range);
       color[v] = (cond || (range == 0)) ? (range << (WS / 2)) : active;
       posscol[v] = (range >= WS) ? -1 : (MSB >> range);
     }
   }
-#ifdef SYCL_STREAM
-  if (maxrange >= Mask) out << "too many active neighbors\n";
-#endif
+  //if (maxrange >= Mask) printf("too many active neighbors\n");
 
   for (int i = thread; i < edges / WS + 1; i += threads) posscol2[i] = -1;
 }
 
+
+__global__
 void runLarge(const int nodes, 
-    const int* const __restrict nidx,
-    const int* const __restrict nlist,
-    int* const __restrict posscol,
-    int* const __restrict posscol2,
-    volatile int* const __restrict color,
-    const int* const __restrict wl,
-    const int* __restrict wlsize,
-    sycl::nd_item<1> &item)
+    const int* const __restrict__ nidx,
+    const int* const __restrict__ nlist,
+    int* const __restrict__ posscol,
+    int* const __restrict__ posscol2,
+    volatile int* const __restrict__ color,
+    const int* const __restrict__ wl,
+    const int* __restrict__ wlsize)
 {
   const int stop = *wlsize;
   if (stop != 0) {
-    const int lane = item.get_local_id(0) % WS;
-    const int thread = item.get_global_id(0);
-    const int threads = item.get_group_range(0) * ThreadsPerBlock;
-    auto sg = item.get_sub_group();
+    const int lane = threadIdx.x % WS;
+    const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
+    const int threads = gridDim.x * ThreadsPerBlock;
     bool again;
     do {
       again = false;
-      for (int w = thread; sycl::any_of_group(sg, w < stop); w += threads) {
+      for (int w = thread; __any(w < stop); w += threads) {
         bool shortcut, done, cond = false;
         int v, data, range, beg, pcol;
         if (w < stop) {
@@ -188,23 +173,22 @@ void runLarge(const int nodes,
           }
         }
 
-        int bal = sycl::reduce_over_group(sg,
-            cond ? (0x1 << sg.get_local_linear_id()) : 0, sycl::plus<>());
+        int bal = __ballot(cond);
         while (bal != 0) {
-          const int who = ffs(bal) - 1;
+          const int who = __ffs(bal) - 1;
           bal &= bal - 1;
-          const int wdata = sycl::select_from_group(sg, data, who);
+          const int wdata = __shfl(data, who);
           const int wrange = wdata >> (WS / 2);
-          const int wbeg = sycl::select_from_group(sg, beg, who);
+          const int wbeg = __shfl(beg, who);
           const int wmincol = wdata & Mask;
           const int wmaxcol = wmincol + wrange;
           const int wend = wbeg + wmaxcol;
           const int woffs = wbeg / WS;
-          int wpcol = sycl::select_from_group(sg, pcol, who);
+          int wpcol = __shfl(pcol, who);
 
           bool wshortcut = true;
           bool wdone = true;
-          for (int i = wbeg + lane; sycl::any_of_group(sg, i < wend); i += WS) {
+          for (int i = wbeg + lane; __any(i < wend); i += WS) {
             int nei, neidata, neirange;
             if (i < wend) {
               nei = nlist[i];
@@ -218,9 +202,7 @@ void runLarge(const int nodes,
                   wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
                 } else {
                   if ((wmincol <= neicol) && (neicol < wmaxcol) && ((posscol2[woffs + neicol / WS] << (neicol % WS)) < 0)) {
-                    sycl::atomic<int>(sycl::global_ptr<int>(
-                            (int *)&posscol2[woffs + neicol / WS]))
-                        .fetch_and(~((unsigned int)MSB >> (neicol % WS)));
+                    atomicAnd((int*)&posscol2[woffs + neicol / WS], ~((unsigned int)MSB >> (neicol % WS)));
                   }
                 }
               } else {
@@ -230,13 +212,13 @@ void runLarge(const int nodes,
               }
             }
           }
-          wshortcut = sycl::all_of_group(sg, wshortcut);
-          wdone = sycl::all_of_group(sg, wdone);
-          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 1);
-          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 2);
-          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 4);
-          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 8);
-          wpcol &= sycl::permute_group_by_xor(sg, wpcol, 16);
+          wshortcut = __all(wshortcut);
+          wdone = __all(wdone);
+          wpcol &= __shfl_xor(wpcol, 1);
+          wpcol &= __shfl_xor(wpcol, 2);
+          wpcol &= __shfl_xor(wpcol, 4);
+          wpcol &= __shfl_xor(wpcol, 8);
+          wpcol &= __shfl_xor(wpcol, 16);
           if (who == lane) pcol = wpcol;
           if (who == lane) done = wdone;
           if (who == lane) shortcut = wshortcut;
@@ -248,10 +230,10 @@ void runLarge(const int nodes,
             int val = pcol, mc = 0;
             if (pcol == 0) {
               const int offs = beg / WS;
-              mc = sycl::max(1, (int)(mincol / WS));
+              mc = max(1, mincol / WS);
               while ((val = posscol2[offs + mc]) == 0) mc++;
             }
-            int newmincol = mc * WS + sycl::clz(val);
+            int newmincol = mc * WS + __clz(val);
             if (mincol != newmincol) shortcut = false;
             if (shortcut || done) {
               pcol = (newmincol < WS) ? ((unsigned int)MSB >> newmincol) : 0;
@@ -266,27 +248,28 @@ void runLarge(const int nodes,
           }
         }
       }
-    } while (sycl::any_of_group(sg, again));
+    } while (__any(again));
   }
 }
 
-  
+
+__global__ 
 void runSmall(const int nodes,
-    const int* const __restrict nidx,
-    const int* const __restrict nlist,
-    volatile int* const __restrict posscol,
-    int* const __restrict color,
-    sycl::nd_item<1> &item)
+    const int* const __restrict__ nidx,
+    const int* const __restrict__ nlist,
+    volatile int* const __restrict__ posscol,
+    int* const __restrict__ color)
+    //int* __restrict__ wlsize)
 {
-  const int thread = item.get_global_id(0);
-  const int threads = item.get_group_range(0) * ThreadsPerBlock;
+  const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
+  const int threads = gridDim.x * ThreadsPerBlock;
 
   bool again;
   do {
     again = false;
     for (int v = thread; v < nodes; v += threads) {
       int pcol = posscol[v];
-      if (sycl::popcount(pcol) > 1) {
+      if (__popc(pcol) > 1) {
         const int beg = nidx[v];
         int active = color[v];
         int allnei = 0;
@@ -295,27 +278,27 @@ void runSmall(const int nodes,
           const int old = active;
           active &= active - 1;
           const int curr = old ^ active;
-          const int i = beg + sycl::clz((int)curr);
+          const int i = beg + __clz(curr);
           const int nei = nlist[i];
           const int neipcol = posscol[nei];
           allnei |= neipcol;
           if ((pcol & neipcol) == 0) {
             pcol &= pcol - 1;
             keep ^= curr;
-          } else if (sycl::popcount(neipcol) == 1) {
+          } else if (__popc(neipcol) == 1) {
             pcol ^= neipcol;
             keep ^= curr;
           }
         } while (active != 0);
         if (keep != 0) {
-          const int best = (unsigned int)MSB >> sycl::clz(pcol);
+          const int best = (unsigned int)MSB >> __clz(pcol);
           if ((best & ~allnei) != 0) {
             pcol = best;
             keep = 0;
           }
         }
         again |= keep;
-        if (keep == 0) keep = sycl::clz(pcol);
+        if (keep == 0) keep = __clz(pcol);
         color[v] = keep;
         posscol[v] = pcol;
       }
@@ -323,7 +306,9 @@ void runSmall(const int nodes,
   } while (again);
 }
 
-int main(int argc, char *argv[]) {
+
+int main(int argc, char* argv[])
+{
   printf("ECL-GC v1.2 (%s)\n", __FILE__);
   printf("Copyright 2020 Texas State University\n\n");
 
@@ -339,137 +324,94 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
 
-  printf("input: %s\n", argv[1]);
   ECLgraph g = readECLgraph(argv[1]);
-
-  const int nodes = g.nodes;
-  const int edges = g.edges;
-
-  printf("nodes: %d\n", nodes);
-  printf("edges: %d\n", edges);
-  printf("avg degree: %.2f\n", 1.0 * edges / nodes);
+  printf("input: %s\n", argv[1]);
+  printf("nodes: %d\n", g.nodes);
+  printf("edges: %d\n", g.edges);
+  printf("avg degree: %.2f\n", 1.0 * g.edges / g.nodes);
 
   const int repeat = atoi(argv[2]);
 
-  int* const color = new int [nodes];
+  int* const color = new int [g.nodes];
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
+  int *nidx_d, *nlist_d, *nlist2_d, *posscol_d, *posscol2_d, *color_d, *wl_d, *wlsize_d;
+  if (hipSuccess != hipMalloc((void **)&nidx_d, (g.nodes + 1) * sizeof(int))) 
+    printf("ERROR: could not allocate nidx_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&nlist_d, g.edges * sizeof(int)))
+    printf("ERROR: could not allocate nlist_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&nlist2_d, g.edges * sizeof(int)))
+    printf("ERROR: could not allocate nlist2_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&posscol_d, g.nodes * sizeof(int))) 
+    printf("ERROR: could not allocate posscol_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&posscol2_d, (g.edges / WS + 1) * sizeof(int))) 
+    printf("ERROR: could not allocate posscol2_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&color_d, g.nodes * sizeof(int))) 
+    printf("ERROR: could not allocate color_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&wl_d, g.nodes * sizeof(int))) 
+    printf("ERROR: could not allocate wl_d\n\n");
+  if (hipSuccess != hipMalloc((void **)&wlsize_d, sizeof(int))) 
+    printf("ERROR: could not allocate wlsize\n\n");
 
-  buffer<int, 1> nidx_d (g.nindex, nodes + 1);
-  buffer<int, 1> nlist_d (g.nlist, edges);
-  buffer<int, 1> nlist2_d (edges);
-  buffer<int, 1> posscol_d (nodes);
-  buffer<int, 1> posscol2_d (g.edges / WS + 1);
-  buffer<int, 1> color_d (nodes);
-  buffer<int, 1> wl_d (nodes);
-  buffer<int, 1> wlsize_d (1);
+  if (hipSuccess != hipMemcpy(nidx_d, g.nindex, (g.nodes + 1) * sizeof(int), hipMemcpyHostToDevice)) 
+    printf("ERROR: copying nidx to device failed\n\n");
+  if (hipSuccess != hipMemcpy(nlist_d, g.nlist, g.edges * sizeof(int), hipMemcpyHostToDevice)) 
+    printf("ERROR: copying nlist to device failed\n\n");
 
-  const int SMs = q.get_device().get_info<info::device::max_compute_units>();
-  const int mTpSM = 2048;
+  hipDeviceProp_t deviceProp;
+  hipGetDeviceProperties(&deviceProp, 0);
+  const int SMs = deviceProp.multiProcessorCount;
+  const int mTpSM = deviceProp.maxThreadsPerMultiProcessor;
   const int blocks = SMs * mTpSM / ThreadsPerBlock;
   printf("Total number of compute units: %d\n", SMs);
   printf("Maximum resident threads per compute unit: %d\n", mTpSM);
   printf("Work-group size: %d\n", ThreadsPerBlock);
   printf("Total number of work-groups: %d\n", blocks);
 
-  q.wait();
+  hipDeviceSynchronize();
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  range<1> gws (blocks * ThreadsPerBlock);
-  range<1> lws (ThreadsPerBlock);
-
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      auto wlsize = wlsize_d.get_access<sycl_write>(cgh);
-      cgh.fill(wlsize, 0);
-    });
-
-    q.submit([&] (handler &cgh) {
-#ifdef SYCL_STREAM
-      stream out(64*1024, 256, cgh);
-#endif
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nlist2 = nlist2_d.get_access<sycl_write>(cgh);
-      auto posscol = posscol_d.get_access<sycl_write>(cgh);
-      auto posscol2 = posscol2_d.get_access<sycl_write>(cgh);
-      auto color = color_d.get_access<sycl_write>(cgh);
-      auto wl = wl_d.get_access<sycl_write>(cgh);
-      auto wlsize = wlsize_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class init_kernel>(nd_range<1>(gws, lws),
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        init(nodes, edges, nidx.get_pointer(), nlist.get_pointer(), nlist2.get_pointer(),
-             posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
-             wl.get_pointer(), wlsize.get_pointer(), item
-#ifdef SYCL_STREAM
-             , out
-#endif
-             );
-      });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist2 = nlist2_d.get_access<sycl_read>(cgh);
-      auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
-      auto posscol2 = posscol2_d.get_access<sycl_read_write>(cgh);
-      auto color = color_d.get_access<sycl_read_write>(cgh);
-      auto wl = wl_d.get_access<sycl_read>(cgh);
-      auto wlsize = wlsize_d.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class runLarge_kernel>(nd_range<1>(gws, lws),
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        runLarge(nodes, nidx.get_pointer(), nlist2.get_pointer(),
-                 posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
-                 wl.get_pointer(), wlsize.get_pointer(), item);
-        });
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
-      auto color = color_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class runSmall_kernel>(nd_range<1>(gws, lws), 
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        runSmall(nodes, nidx.get_pointer(), nlist.get_pointer(), 
-                 posscol.get_pointer(), color.get_pointer(), item);
-      });
-    });
+    hipMemset(wlsize_d, 0, sizeof(int));
+    init<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, nidx_d, nlist_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
+    runLarge<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist2_d, posscol_d, posscol2_d, color_d, wl_d, wlsize_d);
+    runSmall<<<blocks, ThreadsPerBlock>>>(g.nodes, nidx_d, nlist_d, posscol_d, color_d);
   }
 
-  q.wait();
+  hipDeviceSynchronize();
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  double runtime = elapsed_seconds.count() / repeat;
+  float runtime = elapsed_seconds.count() / repeat;
 
-  printf("average runtime: (%d runs):   %.6f s\n", repeat, runtime);
+  printf("average runtime (%d runs):    %.6f s\n", repeat, runtime);
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = color_d.get_access<sycl_read>(cgh);
-    cgh.copy(acc, color);
-  }).wait();
+  if (hipSuccess != hipMemcpy(color, color_d, g.nodes * sizeof(int), hipMemcpyDeviceToHost)) 
+    printf("ERROR: copying color from device failed\n\n");
+
+  hipFree(wlsize_d);
+  hipFree(wl_d);
+  hipFree(color_d);
+  hipFree(posscol2_d);
+  hipFree(posscol_d);
+  hipFree(nlist2_d);
+  hipFree(nlist_d);
+  hipFree(nidx_d);
 
   bool ok = true;
   for (int v = 0; v < g.nodes; v++) {
     if (color[v] < 0) {
       printf("ERROR: found unprocessed node in graph (node %d with deg %d)\n\n",
-          v, g.nindex[v + 1] - g.nindex[v]);
+             v, g.nindex[v + 1] - g.nindex[v]);
       ok = false;
       break;
     }
     for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
       if (color[g.nlist[i]] == color[v]) {
         printf("ERROR: found adjacent nodes with same color %d (%d %d)\n\n",
-            color[v], v, g.nlist[i]);
+               color[v], v, g.nlist[i]);
         ok = false;
         break;
       }
