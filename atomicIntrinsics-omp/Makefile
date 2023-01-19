@@ -34,14 +34,13 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -49,10 +48,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../atomicIntrinsics-cuda/reference.h Makefile
+%.o: %.cpp ../atomicIntrinsics-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -60,4 +59,3 @@ clean:
 
 run: $(program)
 	./$(program) 100
-

@@ -37,7 +37,7 @@ void testcase(const int repeat)
   hipMalloc((void **) &dOData, memSize);
 
   for (int i = 0; i < repeat; i++) {
-    // copy host memory to device to initialize to zero
+    // copy host memory to device for result verification
     hipMemcpy(dOData, gpuData, memSize, hipMemcpyHostToDevice);
 
     // execute the kernel
@@ -48,6 +48,18 @@ void testcase(const int repeat)
   hipMemcpy(gpuData, dOData, memSize, hipMemcpyDeviceToHost);
 
   computeGold<T>(gpuData, numThreads * numBlocks);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    // ignore result verification
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(testKernel<T>), numBlocks, numThreads, 0, 0, dOData);
+  }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   hipFree(dOData);
 }

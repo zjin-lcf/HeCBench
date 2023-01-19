@@ -12,6 +12,7 @@ template <class T>
 void computeGold(T *gpuData, const int len)
 {
   T val = 0;
+  bool ok = true;
 
   for (int i = 0; i < len; ++i)
   {
@@ -21,6 +22,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[0])
   {
     printf("Add failed %d %d\n", val, gpuData[0]);
+    ok = false;
   }
 
   val = 0;
@@ -33,6 +35,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[1])
   {
     printf("Sub failed: %d %d\n", val, gpuData[1]);
+    ok = false;
   }
 
   val = (T)(-256);
@@ -45,6 +48,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[2])
   {
     printf("Max failed: %d %d\n", val, gpuData[2]);
+    ok = false;
   }
 
   val = (T)256;
@@ -57,6 +61,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[3])
   {
     printf("Min failed: %d %d\n", val, gpuData[3]);
+    ok = false;
   }
 
   val = 0xff;
@@ -69,6 +74,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[4])
   {
     printf("And failed: %d %d\n", val, gpuData[4]);
+    ok = false;
   }
 
   val = 0;
@@ -81,6 +87,7 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[5])
   {
     printf("Or failed: %d %d\n", val, gpuData[5]);
+    ok = false;
   }
 
   val = 0xff;
@@ -93,7 +100,8 @@ void computeGold(T *gpuData, const int len)
   if (val != gpuData[6])
   {
     printf("Xor failed %d %d\n", val, gpuData[6]);
+    ok = false;
   }
 
-  printf("PASS\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
 }
