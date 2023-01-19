@@ -17,12 +17,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
+#include <chrono>
+
 #include "common.h"
 #include "reference.h"
 
 template <typename T>
 class test_atomics;
+
+template <typename T>
+class test_atomics2;
 
 template <class T>
 void testcase(queue &q, const int repeat)
@@ -41,11 +45,13 @@ void testcase(queue &q, const int repeat)
   range<1> lws (localWorkSize);
 
   for (int i = 0; i < repeat; i++) {
+    // copy host memory to device for result verification
     q.submit([&](handler &h) {
       auto d = dOData.template get_access<sycl_discard_write>(h);
       h.copy(gpuData, d);
     });
 
+    // execute the kernel
     q.submit([&](handler &h) {
       auto gpuData = dOData.template get_access<sycl_atomic>(h);
       h.parallel_for<class test_atomics<T>>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
@@ -67,6 +73,30 @@ void testcase(queue &q, const int repeat)
   }).wait();
 
   computeGold<T>(gpuData, globalWorkSize);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    // ignore result verification
+    q.submit([&](handler &h) {
+      auto gpuData = dOData.template get_access<sycl_atomic>(h);
+      h.parallel_for<class test_atomics2<T>>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        int i = item.get_global_id(0);
+        atomic_fetch_add(gpuData[0], (T)10);
+        atomic_fetch_sub(gpuData[1], (T)10);
+        atomic_fetch_max(gpuData[2], (T)i);
+        atomic_fetch_min(gpuData[3], (T)i);
+        atomic_fetch_and(gpuData[4], (T)(2*i+7));
+        atomic_fetch_or (gpuData[5], (T)(1<<i));
+        atomic_fetch_xor(gpuData[6], (T)i);
+      });
+    });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 }
 
 int main(int argc, char **argv)

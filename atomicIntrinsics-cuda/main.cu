@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 
 #include <cuda.h>
 #include "kernel.h"
@@ -37,7 +38,7 @@ void testcase(const int repeat)
   cudaMalloc((void **) &dOData, memSize);
 
   for (int i = 0; i < repeat; i++) {
-    // copy host memory to device to initialize to zero
+    // copy host memory to device for result verification
     cudaMemcpy(dOData, gpuData, memSize, cudaMemcpyHostToDevice);
 
     // execute the kernel
@@ -48,6 +49,18 @@ void testcase(const int repeat)
   cudaMemcpy(gpuData, dOData, memSize, cudaMemcpyDeviceToHost);
 
   computeGold<T>(gpuData, numThreads * numBlocks);
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    // ignore result verification
+    testKernel<T><<<numBlocks, numThreads>>>(dOData);
+  }
+
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   cudaFree(dOData);
 }
