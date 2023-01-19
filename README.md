@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, saxpy-ompt, shuffle, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
@@ -1088,6 +1088,9 @@ Early results are shown [here](results/README.md)
 
 ### simplemoc (opencl)
   The attentuation of neutron fluxes across an individual geometrical segment (https://github.com/ANL-CESAR/SimpleMOC-kernel)
+
+### simpleMultiDevice (cuda)
+  Execute kernels on multiple devices (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### slu (cuda)
   Sparse LU factorization (https://github.com/sheldonucr/GLU_public)
