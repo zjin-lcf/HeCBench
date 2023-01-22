@@ -55,7 +55,7 @@ Each benchmark falls into a single category. While such classification is not ac
     bfs, bsearch, b+tree, grep, keogh, ss, tsp
 
 ### Signal processing
-    extrema, fft, lombscargle, sosfil
+    extrema, fft, lombscargle, sosfil, zmddft
 
 ### Simulation
     ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, xlqc, xsbench
@@ -1247,6 +1247,9 @@ Early results are shown [here](results/README.md)
 
 ### zerocopy (cuda)
   kernels may read and write directly to pinned system memory from a user perspective (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/simpleZeroCopy)
+
+### zmddft (cuda)
+  3D complex FFT in a 256^3 cube (https://github.com/spiral-software/fftx)
 
 ### zoom (cuda)
   Zoom in and zoom out an image (https://github.com/rapidsai/cucim)
