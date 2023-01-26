@@ -20,46 +20,55 @@
 template <typename T>
 void testMin (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     cudaMemcpy(d_ptr, h_ptr, sizeof(T), cudaMemcpyHostToDevice);
     atomicMinDerived<T><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_ptr);
   }
+
   cudaDeviceSynchronize();
-  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic min for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
 }
 
 template <typename T>
 void testMax (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     cudaMemcpy(d_ptr, h_ptr, sizeof(T), cudaMemcpyHostToDevice);
     atomicMaxDerived<T><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_ptr);
   }
+
   cudaDeviceSynchronize();
-  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic max for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
 }
 
 template <typename T>
 void testAdd (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     cudaMemcpy(d_ptr, h_ptr, sizeof(T), cudaMemcpyHostToDevice);
     atomicAddDerived<T><<<NUM_BLOCKS, BLOCK_SIZE>>> (d_ptr);
   }
+
   cudaDeviceSynchronize();
-  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic add for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  cudaMemcpy(h_ptr, d_ptr, sizeof(T), cudaMemcpyDeviceToHost);
 }
 
 int main(int argc, char** argv) {
