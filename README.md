@@ -1261,7 +1261,7 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Henry Gabb, Ian Karlin, Istvan Reguly, Jason Lau, Jeff Hammond, Jianxin Qiu, Wayne Joubert, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Robert Harrison, Robin Kobus, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Ye Luo, Yongbin Gu, Zhe Chen
+Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Robert Harrison, Robin Kobus, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
 
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
