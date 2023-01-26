@@ -20,46 +20,55 @@
 template <typename T>
 void testMin (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMinDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
+
   hipDeviceSynchronize();
-  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic min for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
 }
 
 template <typename T>
 void testMax (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMaxDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
+
   hipDeviceSynchronize();
-  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic max for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
 }
 
 template <typename T>
 void testAdd (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicAddDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
+
   hipDeviceSynchronize();
-  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic add for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  hipMemcpy(h_ptr, d_ptr, sizeof(T), hipMemcpyDeviceToHost);
 }
 
 int main(int argc, char** argv) {

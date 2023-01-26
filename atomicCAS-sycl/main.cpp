@@ -225,6 +225,7 @@ void testMin (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
   range<1> lws (BLOCK_SIZE);
 
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     q.memcpy(d_ptr, h_ptr, sizeof(T));
     q.submit([&] (handler &cgh) {
@@ -233,12 +234,14 @@ void testMin (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
       });
     });
   }
+
   q.wait();
-  q.memcpy(h_ptr, d_ptr, sizeof(T));
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic min for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(h_ptr, d_ptr, sizeof(T)).wait();
 }
 
 template <typename T>
@@ -247,6 +250,7 @@ void testMax (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
   range<1> lws (BLOCK_SIZE);
 
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     q.memcpy(d_ptr, h_ptr, sizeof(T));
     q.submit([&] (handler &cgh) {
@@ -255,12 +259,14 @@ void testMax (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
       });
     });
   }
+
   q.wait();
-  q.memcpy(h_ptr, d_ptr, sizeof(T));
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic max for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(h_ptr, d_ptr, sizeof(T)).wait();
 }
 
 template <typename T>
@@ -269,6 +275,7 @@ void testAdd (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
   range<1> lws (BLOCK_SIZE);
 
   auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < repeat; n++) {
     q.memcpy(d_ptr, h_ptr, sizeof(T));
     q.submit([&] (handler &cgh) {
@@ -277,12 +284,14 @@ void testAdd (queue &q, T *h_ptr, T *d_ptr, const int repeat, const char* name) 
       });
     });
   }
+
   q.wait();
-  q.memcpy(h_ptr, d_ptr, sizeof(T));
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Atomic add for data type %s | ", name);
   printf("Average execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(h_ptr, d_ptr, sizeof(T)).wait();
 }
 
 
@@ -303,7 +312,7 @@ int main(int argc, char** argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   unsigned long long *d_res_u64 = sycl::malloc_device<unsigned long long>(3, q);
   long long *d_res_s64 = sycl::malloc_device<long long>(3, q);
