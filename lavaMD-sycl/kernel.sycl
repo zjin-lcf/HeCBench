@@ -93,24 +93,32 @@ if(bx<dim_cpu_number_boxes) {
     // loop for the number of particles in the home box
     while(wtx<NUMBER_PAR_PER_BOX){
 
+      auto fv_acc = d_fv_gpu_acc[first_i+wtx];
+      auto rA = rA_shared[wtx];
+
       // loop for the number of particles in the current nei box
       for (j=0; j<NUMBER_PAR_PER_BOX; j++){
+        auto rB = rB_shared[j];
+        auto qB = qB_shared[j];
 
-        r2 = rA_shared[wtx].v + rB_shared[j].v - DOT(rA_shared[wtx],rB_shared[j]); 
+        r2 = rA.v + rB.v - DOT(rA, rB); 
         u2 = a2*r2;
-        vij= cl::sycl::exp(-u2);
+        vij= sycl::exp(-u2);
         fs = 2*vij;
-        d.x = rA_shared[wtx].x  - rB_shared[j].x;
+        d.x = rA.x  - rB.x;
         fxij=fs*d.x;
-        d.y = rA_shared[wtx].y  - rB_shared[j].y;
+        d.y = rA.y  - rB.y;
         fyij=fs*d.y;
-        d.z = rA_shared[wtx].z  - rB_shared[j].z;
+        d.z = rA.z  - rB.z;
         fzij=fs*d.z;
-        d_fv_gpu_acc[first_i+wtx].v +=  qB_shared[j]*vij;
-        d_fv_gpu_acc[first_i+wtx].x +=  qB_shared[j]*fxij;
-        d_fv_gpu_acc[first_i+wtx].y +=  qB_shared[j]*fyij;
-        d_fv_gpu_acc[first_i+wtx].z +=  qB_shared[j]*fzij;
+
+        fv_acc.v += qB * vij;
+        fv_acc.x += qB * fxij;
+        fv_acc.y += qB * fyij;
+        fv_acc.z += qB * fzij;
       }
+
+      d_fv_gpu_acc[first_i+wtx] = fv_acc;
 
       // increment work thread index
       wtx = wtx + NUMBER_THREADS;
