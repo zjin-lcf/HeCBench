@@ -36,7 +36,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O3 --use_fast_math
 endif
 #===============================================================================
 # Targets to Build
@@ -52,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10000000 100
+	./$(program) 10000 200 100

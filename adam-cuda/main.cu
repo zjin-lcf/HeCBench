@@ -17,38 +17,44 @@ void adam (
   const float eps,
   const float grad_scale,
   const float step_size,
-  const size_t tsize,
+  const int time_step,
+  const size_t vector_size,
   adamMode_t mode,
   const float decay)
 {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  const int totThreads = gridDim.x*blockDim.x;
+  const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+  const size_t totThreads = gridDim.x*blockDim.x;
 
-  for (size_t j = i; j < tsize; j += totThreads) {
-    T scaled_grad = g[j]/grad_scale;
-    m[j] = b1*m[j] + (1.f-b1)*scaled_grad;
-    v[j] = b2*v[j] + (1.f-b2)*scaled_grad*scaled_grad;
-    float denom;
-    if (mode == ADAM_MODE_0)
-      denom = sqrtf(v[j] + eps);
-    else // Mode 1
-      denom = sqrtf(v[j]) + eps;
-    float update = (m[j]/denom) + (decay*p[j]);
-    p[j] -= (step_size*update);
+  for (size_t j = i; j < vector_size; j += totThreads) {
+    for (int t = 0; t < time_step; t++) {
+      T scaled_grad = g[j]/grad_scale;
+      m[j] = b1*m[j] + (1.f-b1)*scaled_grad;
+      v[j] = b2*v[j] + (1.f-b2)*scaled_grad*scaled_grad;
+      float m_corrected = m[j] / (1.f-powf(b1, t));
+      float v_corrected = v[j] / (1.f-powf(b2, t));
+      float denom;
+      if (mode == ADAM_MODE_0)
+        denom = sqrtf(v_corrected + eps);
+      else // Mode 1
+        denom = sqrtf(v_corrected) + eps;
+      float update = (m_corrected/denom) + (decay*p[j]);
+      p[j] -= (step_size*update);
+    }
   }
 }
 
 int main(int argc, char* argv[])
 {
-  if (argc != 3) {
-    printf("Usage: %s <size> <repeat>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <vector size> <number of time steps> <repeat>\n", argv[0]);
     return 1;
   }
 
-  const int tsize = atoi(argv[1]);
-  const int repeat = atoi(argv[2]);
+  const int vector_size = atoi(argv[1]);
+  const int time_step = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  size_t size_bytes = tsize * sizeof(float);
+  size_t size_bytes = vector_size * sizeof(float);
 
   float *m = (float*) malloc (size_bytes);
   float *v = (float*) malloc (size_bytes);
@@ -57,7 +63,7 @@ int main(int argc, char* argv[])
   float *r = (float*) malloc (size_bytes);
 
   srand(123);
-  for (int i = 0; i < tsize; i++) {
+  for (int i = 0; i < vector_size; i++) {
     m[i] = rand() / (float)RAND_MAX;
     v[i] = rand() / (float)RAND_MAX;
     g[i] = rand() / (float)RAND_MAX;
@@ -83,11 +89,11 @@ int main(int argc, char* argv[])
   const float decay = 0.5f;
   const float beta1 = 0.9f;
   const float beta2 = 0.999f;
-  const float eps = 1e-10f;
+  const float eps = 1e-8f;
   const float grad_scale = 256.f;
 
   const int threadsPerBlock = 256;
-  const dim3 grids ((tsize+threadsPerBlock-1) / threadsPerBlock);
+  const dim3 grids ((vector_size+threadsPerBlock-1) / threadsPerBlock);
   const dim3 blocks (threadsPerBlock);
 
   adamMode_t mode = ADAM_MODE_0;
@@ -102,7 +108,8 @@ int main(int argc, char* argv[])
       eps,
       grad_scale,
       step_size,
-      tsize,
+      time_step,
+      vector_size,
       mode,
       decay);
   }
@@ -127,12 +134,13 @@ int main(int argc, char* argv[])
     eps,
     grad_scale,
     step_size,
-    tsize,
+    time_step,
+    vector_size,
     mode,
     decay);
 
   bool ok = true; 
-  for (int i = 0; i < tsize; i++) {
+  for (int i = 0; i < vector_size; i++) {
     if (r[i] - p[i] > 1e-3f) {
       ok = false;
       break;

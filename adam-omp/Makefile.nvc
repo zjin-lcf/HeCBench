@@ -41,7 +41,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM),fastmath
 else
   CFLAGS +=
 endif
@@ -59,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10000000 100
+	./$(program) 10000 200 100
