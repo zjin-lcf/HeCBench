@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <chrono>
+#include <random>
+#include <vector>
 #include <omp.h>
 
 int main(int argc, char **argv) {
@@ -11,20 +14,22 @@ int main(int argc, char **argv) {
   const int num_elems = atoi(argv[1]);
   const int block_size = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
-
-  int *data_to_filter, *filtered_data;
-  int nres[1];
-
-  data_to_filter = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
-  filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
+    
+  std::vector<int> input (num_elems);
+  std::vector<int> output (num_elems);
 
   // Generate input data.
-  srand(2);
   for (int i = 0; i < num_elems; i++) {
-    data_to_filter[i] = rand() % 20;
+    input[i] = i - num_elems / 2;
   }
 
-  int n = num_elems;
+  std::mt19937 g;
+  g.seed(19937);
+  std::shuffle(input.begin(), input.end(), g);
+
+  int *data_to_filter = input.data();
+  int *filtered_data = output.data();
+  int nres[1];
 
   #pragma omp target data map(to: data_to_filter[0:num_elems]) \
                           map(from: nres[0:1]) \
@@ -48,7 +53,7 @@ int main(int argc, char **argv) {
           #pragma omp barrier
           int d, pos;
         
-          if(i < n) {
+          if(i < num_elems) {
             d = data_to_filter[i];
             if(d > 0) {
               #pragma omp atomic capture
@@ -71,7 +76,7 @@ int main(int argc, char **argv) {
           #pragma omp barrier
         
           // threads with true predicates write their elements
-          if(i < n && d > 0) {
+          if(i < num_elems && d > 0) {
             pos += l_n; // increment local pos by global counter
             filtered_data[pos] = d;
           }
@@ -82,25 +87,29 @@ int main(int argc, char **argv) {
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average kernel execution time %lf (ms)\n", (time * 1e-6) / repeat);
   }
 
-  int *host_filtered_data =
-      reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
+  std::vector<int> h_output (num_elems);
 
   // Generate host output with host filtering code.
-  int host_flt_count = 0;
+  int h_flt_count = 0;
   for (int i = 0; i < num_elems; i++) {
-    if (data_to_filter[i] > 0) {
-      host_filtered_data[host_flt_count++] = data_to_filter[i];
+    if (input[i] > 0) {
+      h_output[h_flt_count++] = input[i];
     }
   }
 
-  printf("\nFilter using shared memory %s \n",
-         host_flt_count == nres[0] ? "PASS" : "FAIL");
+  // Verify
+  std::sort(h_output.begin(), h_output.begin() + h_flt_count);
+  std::sort(output.begin(), output.begin() + nres[0]);
 
-  free(data_to_filter);
-  free(filtered_data);
-  free(host_filtered_data);
+  bool equal = (h_flt_count == nres[0]) && 
+               std::equal(h_output.begin(),
+                          h_output.begin() + h_flt_count, output.begin());
+
+  printf("\nFilter using shared memory %s \n",
+         equal ? "PASS" : "FAIL");
+
   return 0;
 }

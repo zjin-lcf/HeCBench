@@ -11,7 +11,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <chrono>
+#include <random>
+#include <vector>
 #include "common.h"
 
 int main(int argc, char **argv) {
@@ -22,80 +25,85 @@ int main(int argc, char **argv) {
   const int num_elems = atoi(argv[1]);
   const int block_size = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
-
+    
   int nres;
-  int *data_to_filter = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
-  int *filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
+  int *d_input, *d_output, *d_nres;
+
+  std::vector<int> input (num_elems);
 
   // Generate input data.
-  srand(2);
   for (int i = 0; i < num_elems; i++) {
-    data_to_filter[i] = rand() % 20;
+    input[i] = i - num_elems / 2;
   }
 
-  {
-#ifdef USE_GPU 
+  std::mt19937 g;
+  g.seed(19937);
+  std::shuffle(input.begin(), input.end(), g);
+
+#ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<int, 1> d_data_to_filter (data_to_filter, num_elems);
-  buffer<int, 1> d_filtered_data (filtered_data, num_elems);
-  buffer<int, 1> d_nres (&nres, 1);
+  d_input = malloc_device<int>(num_elems, q);
+  d_output = malloc_device<int>(num_elems, q);
+  d_nres = malloc_device<int>(1, q);
 
-  range<1> local_work_size(block_size);
-  range<1> global_work_size((num_elems + block_size - 1) / block_size * block_size);
+  q.memcpy(d_input, input.data(), sizeof(int) * num_elems);
 
-  int n = num_elems;
+  range<1> lws (block_size);
+  range<1> gws ((num_elems + block_size - 1) / block_size * block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler &h) {
-      auto nres = d_nres.get_access<sycl_discard_write>(h);
-      h.fill(nres, 0);
-    });
+    q.memset(d_nres, 0, sizeof(int));
 
     q.submit([&](handler &h) {
-      accessor <int, 1, sycl_atomic, access::target::local> l_n (1, h);
-      auto src = d_data_to_filter.get_access<sycl_read>(h);
-      auto dst = d_filtered_data.get_access<sycl_discard_write>(h);
-      auto nres = d_nres.get_access<sycl_atomic>(h);
-      h.parallel_for(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+      accessor <int, 1, sycl_read_write, access::target::local> l_n (1, h);
+      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
 
-      int i = item.get_global_id(0); 
+        int i = item.get_global_id(0); 
 
-      // zero the counter
-      if (item.get_local_id(0) == 0)
-        l_n[0].store(0);
-      item.barrier(access::fence_space::local_space);
+        // zero the counter
+        if (item.get_local_id(0) == 0) l_n[0] = 0;
+        item.barrier(access::fence_space::local_space);
 
-      // get the value, evaluate the predicate, and
-      // increment the counter if needed
-      int d, pos;
+        // get the value, evaluate the predicate, and
+        // increment the counter if needed
+        int d, pos;
 
-      if(i < n) {
-        d = src[i];
-        if(d > 0)
-          pos = atomic_fetch_add(l_n[0], 1);
-      }
-      item.barrier(access::fence_space::local_space);
+        if(i < num_elems) {
+          d = d_input[i];
+          if(d > 0) {
+            auto ao = atomic_ref<int, 
+                                 memory_order::relaxed,
+                                 memory_scope::work_group,
+                                 access::address_space::local_space> (l_n[0]);
+            pos = ao.fetch_add(1);
+          }
+        }
+        item.barrier(access::fence_space::local_space);
 
-      // leader increments the global counter
-      if(item.get_local_id(0) == 0) {
-        l_n[0].store(atomic_fetch_add(nres[0], atomic_load(l_n[0])));
-      }
-      item.barrier(access::fence_space::local_space);
+        // leader increments the global counter
+        if(item.get_local_id(0) == 0) {
+          auto ao = atomic_ref<int, 
+                               memory_order::relaxed,
+                               memory_scope::device,
+                               access::address_space::global_space> (d_nres[0]);
+          l_n[0] = ao.fetch_add(l_n[0]);
+        }
+        item.barrier(access::fence_space::local_space);
 
-      // threads with true predicates write their elements
-      if(i < n && d > 0) {
-        pos += atomic_load(l_n[0]); // increment local pos by global counter
-        dst[pos] = d;
-      }
-      item.barrier(access::fence_space::local_space);
+        // threads with true predicates write their elements
+        if(i < num_elems && d > 0) {
+          pos += l_n[0]; // increment local pos by global counter
+          d_output[pos] = d;
+        }
+        item.barrier(access::fence_space::local_space);
 
       });
     });
@@ -104,24 +112,38 @@ int main(int argc, char **argv) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %lf (ms)\n", (time * 1e-6f) / repeat);
 
-  } // sycl scope
+  q.memcpy(&nres, d_nres, sizeof(int)).wait();
 
-  int *host_filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
+  std::vector<int> output (nres);
+
+  q.memcpy(output.data(), d_output, sizeof(int) * nres).wait();
+
+  std::vector<int> h_output (num_elems);
 
   // Generate host output with host filtering code.
-  int host_flt_count = 0;
+  int h_flt_count = 0;
   for (int i = 0; i < num_elems; i++) {
-    if (data_to_filter[i] > 0) {
-      host_filtered_data[host_flt_count++] = data_to_filter[i];
+    if (input[i] > 0) {
+      h_output[h_flt_count++] = input[i];
     }
   }
 
-  printf("\nFilter using shared memory %s \n",
-         host_flt_count == nres ? "PASS" : "FAIL");
+  // Verify
+  std::sort(h_output.begin(), h_output.begin() + h_flt_count);
+  std::sort(output.begin(), output.end());
 
-  free(data_to_filter);
-  free(filtered_data);
-  free(host_filtered_data);
+  bool equal = (h_flt_count == nres) && 
+               std::equal(h_output.begin(),
+                          h_output.begin() + h_flt_count, output.begin());
+
+  printf("\nFilter using shared memory %s \n",
+         equal ? "PASS" : "FAIL");
+
+  free(d_input, q);
+  free(d_output, q);
+  free(d_nres, q);
+
+  return 0;
 }
