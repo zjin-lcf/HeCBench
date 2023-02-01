@@ -5,7 +5,7 @@
 
 // sparse matrix vector multiply using the CSR format
 __global__ void mv_csr(const int num_rows,
-                       const int *row_indices,
+                       const size_t *row_indices,
                        const int *col_indices,
                        const REAL *values,
                        const REAL *x,
@@ -13,11 +13,11 @@ __global__ void mv_csr(const int num_rows,
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < num_rows) {
-    int row_start = row_indices[i];
-    int row_end = row_indices[i+1];
+    size_t row_start = row_indices[i];
+    size_t row_end = row_indices[i+1];
 
     REAL temp = 0;
-    for(int n = row_start; n < row_end; n++){
+    for(size_t n = row_start; n < row_end; n++){
       temp += values[n] * x[col_indices[n]];
     }
     y[i] = temp;
@@ -78,27 +78,28 @@ long mv_csr_parallel(const int repeat,
                      const int bs,
                      const int num_rows,
                      const REAL* x,
-                     const int nnz,
+                     const size_t nnz,
                      REAL* matrix,
                      REAL* y)
 {
-  int *row_indices = (int *) malloc((num_rows+1) * sizeof(int));
+  size_t *row_indices = (size_t *) malloc((num_rows+1) * sizeof(size_t));
   int *col_indices = (int *) malloc(nnz * sizeof(int));
   REAL *values = (REAL *) malloc(nnz * sizeof(REAL));
 
   // initialize csr structure
   init_csr(row_indices, values, col_indices, matrix, num_rows, nnz);
 
-  int *d_row_indices, * d_col_indices;
-  REAL *d_values, * d_x, *d_y;
+  size_t *d_row_indices;
+  int *d_col_indices;
+  REAL *d_values, *d_x, *d_y;
 
-  hipMalloc(&d_row_indices, (num_rows+1)*sizeof(int));
+  hipMalloc(&d_row_indices, (num_rows+1)*sizeof(size_t));
   hipMalloc(&d_col_indices, nnz*sizeof(int));
   hipMalloc(&d_values, nnz*sizeof(REAL));
   hipMalloc(&d_x, num_rows*sizeof(REAL));
   hipMalloc(&d_y, num_rows*sizeof(REAL));
 
-  hipMemcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(size_t), hipMemcpyHostToDevice);
   hipMemcpy(d_col_indices, col_indices, nnz*sizeof(int), hipMemcpyHostToDevice);
   hipMemcpy(d_values, values, nnz*sizeof(REAL), hipMemcpyHostToDevice);
   hipMemcpy(d_x, x, num_rows*sizeof(REAL), hipMemcpyHostToDevice);

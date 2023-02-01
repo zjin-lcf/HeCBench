@@ -6,7 +6,7 @@
 // sparse matrix vector multiply using the CSR format
 void mv_csr(nd_item<1> &item,
             const int num_rows,
-            const int *row_indices,
+            const size_t *row_indices,
             const int *col_indices,
             const REAL *values,
             const REAL *x,
@@ -14,11 +14,11 @@ void mv_csr(nd_item<1> &item,
 {
   int i = item.get_global_id(0);
   if (i < num_rows) {
-    int row_start = row_indices[i];
-    int row_end = row_indices[i+1];
+    size_t row_start = row_indices[i];
+    size_t row_end = row_indices[i+1];
 
     REAL temp = 0;
-    for(int n = row_start; n < row_end; n++){
+    for(size_t n = row_start; n < row_end; n++){
       temp += values[n] * x[col_indices[n]];
     }
     y[i] = temp;
@@ -56,13 +56,15 @@ long mv_dense_parallel(const int repeat,
 #endif
   queue q(dev_sel);
 
+  size_t num_elems = (size_t)num_rows * num_rows; 
+
   REAL *d_x, *d_matrix, *d_y;
   d_x = malloc_device<REAL>(num_rows, q);
-  d_matrix = malloc_device<REAL>(num_rows * num_rows, q);
+  d_matrix = malloc_device<REAL>(num_elems, q);
   d_y = malloc_device<REAL>(num_rows, q);
 
   q.memcpy(d_x, x, num_rows*sizeof(REAL));
-  q.memcpy(d_matrix, matrix, num_rows*num_rows*sizeof(REAL));
+  q.memcpy(d_matrix, matrix, num_elems*sizeof(REAL));
 
   range<1> gws ((num_rows + bs - 1) / bs * bs);
   range<1> lws (bs);
@@ -94,11 +96,11 @@ long mv_csr_parallel(const int repeat,
                      const int bs,
                      const int num_rows,
                      const REAL* x,
-                     const int nnz,
+                     const size_t nnz,
                      REAL* matrix,
                      REAL* y)
 {
-  int *row_indices = (int *) malloc((num_rows+1) * sizeof(int));
+  size_t *row_indices = (size_t *) malloc((num_rows+1) * sizeof(size_t));
   int *col_indices = (int *) malloc(nnz * sizeof(int));
   REAL *values = (REAL *) malloc(nnz * sizeof(REAL));
 
@@ -112,16 +114,13 @@ long mv_csr_parallel(const int repeat,
 #endif
   queue q(dev_sel);
 
-  int *d_row_indices, * d_col_indices;
-  REAL *d_values, * d_x, *d_y;
+  size_t *d_row_indices = malloc_device<size_t>(num_rows+1, q);
+  int *d_col_indices = malloc_device<int>(nnz, q);
+  REAL *d_values = malloc_device<REAL>(nnz, q);
+  REAL *d_x = malloc_device<REAL>(num_rows, q);
+  REAL *d_y = malloc_device<REAL>(num_rows, q);
 
-  d_row_indices = malloc_device<int>(num_rows+1, q);
-  d_col_indices = malloc_device<int>(nnz, q);
-  d_values = malloc_device<REAL>(nnz, q);
-  d_x = malloc_device<REAL>(num_rows, q);
-  d_y = malloc_device<REAL>(num_rows, q);
-
-  q.memcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(int));
+  q.memcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(size_t));
   q.memcpy(d_col_indices, col_indices, nnz*sizeof(int));
   q.memcpy(d_values, values, nnz*sizeof(REAL));
   q.memcpy(d_x, x, num_rows*sizeof(REAL));
@@ -134,7 +133,7 @@ long mv_csr_parallel(const int repeat,
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class smvm>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class spmv>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         mv_csr(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
       });
     });
