@@ -43,11 +43,11 @@ long mv_csr_parallel(const int repeat,
                      const int bs,
                      const int num_rows,
                      const REAL* x,
-                     const int nnz,
+                     const size_t nnz,
                      REAL* matrix,
                      REAL* y)
 {
-  int *row_indices = (int *) malloc((num_rows+1) * sizeof(int));
+  size_t *row_indices = (size_t *) malloc((num_rows+1) * sizeof(size_t));
   int *col_indices = (int *) malloc(nnz * sizeof(int));
   REAL *values = (REAL *) malloc(nnz * sizeof(REAL));
 
@@ -67,11 +67,11 @@ long mv_csr_parallel(const int repeat,
     for (int n = 0; n < repeat; n++) {
       #pragma omp target teams distribute parallel for num_threads(bs)
       for (int i = 0; i < num_rows; i++) {
-        int row_start = row_indices[i];
-        int row_end = row_indices[i+1];
+        size_t row_start = row_indices[i];
+        size_t row_end = row_indices[i+1];
 
         REAL temp = 0;
-        for(int j = row_start; j < row_end; j++){
+        for(size_t j = row_start; j < row_end; j++){
           temp += values[j] * x[col_indices[j]];
         }
         y[i] = temp;

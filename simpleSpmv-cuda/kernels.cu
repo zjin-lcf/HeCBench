@@ -5,7 +5,7 @@
 
 // sparse matrix vector multiply using the CSR format
 __global__ void mv_csr(const int num_rows,
-                       const int *row_indices,
+                       const size_t *row_indices,
                        const int *col_indices,
                        const REAL *values,
                        const REAL *x,
@@ -13,11 +13,11 @@ __global__ void mv_csr(const int num_rows,
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < num_rows) {
-    int row_start = row_indices[i];
-    int row_end = row_indices[i+1];
+    size_t row_start = row_indices[i];
+    size_t row_end = row_indices[i+1];
 
     REAL temp = 0;
-    for(int n = row_start; n < row_end; n++){
+    for(size_t n = row_start; n < row_end; n++){
       temp += values[n] * x[col_indices[n]];
     }
     y[i] = temp;
@@ -78,27 +78,28 @@ long mv_csr_parallel(const int repeat,
                      const int bs,
                      const int num_rows,
                      const REAL* x,
-                     const int nnz,
+                     const size_t nnz,
                      REAL* matrix,
                      REAL* y)
 {
-  int *row_indices = (int *) malloc((num_rows+1) * sizeof(int));
+  size_t *row_indices = (size_t *) malloc((num_rows+1) * sizeof(size_t));
   int *col_indices = (int *) malloc(nnz * sizeof(int));
   REAL *values = (REAL *) malloc(nnz * sizeof(REAL));
 
   // initialize csr structure
   init_csr(row_indices, values, col_indices, matrix, num_rows, nnz);
 
-  int *d_row_indices, * d_col_indices;
-  REAL *d_values, * d_x, *d_y;
+  size_t *d_row_indices;
+  int *d_col_indices;
+  REAL *d_values, *d_x, *d_y;
 
-  cudaMalloc(&d_row_indices, (num_rows+1)*sizeof(int));
+  cudaMalloc(&d_row_indices, (num_rows+1)*sizeof(size_t));
   cudaMalloc(&d_col_indices, nnz*sizeof(int));
   cudaMalloc(&d_values, nnz*sizeof(REAL));
   cudaMalloc(&d_x, num_rows*sizeof(REAL));
   cudaMalloc(&d_y, num_rows*sizeof(REAL));
 
-  cudaMemcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(size_t), cudaMemcpyHostToDevice);
   cudaMemcpy(d_col_indices, col_indices, nnz*sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_values, values, nnz*sizeof(REAL), cudaMemcpyHostToDevice);
   cudaMemcpy(d_x, x, num_rows*sizeof(REAL), cudaMemcpyHostToDevice);
