@@ -17,6 +17,26 @@
 #include <vector>
 #include "common.h"
 
+// compare device results with host results
+bool check(queue &q, int *d_nres, int *d_output, int h_nres, std::vector<int> &h_output) {
+  int nres;
+  q.memcpy(&nres, d_nres, sizeof(int)).wait();
+
+  std::vector<int> output (nres);
+
+  q.memcpy(output.data(), d_output, sizeof(int) * nres).wait();
+
+  // clear device output
+  q.memset(d_output, 0, sizeof(int) * nres);
+
+  std::sort(output.begin(), output.end());
+
+  bool equal = (h_nres == nres) && 
+               std::equal(h_output.begin(),
+                          h_output.begin() + h_nres, output.begin());
+  return equal;
+}
+
 int main(int argc, char **argv) {
   if (argc != 4) {
     printf("Usage: %s <number of elements> <block size> <repeat>\n", argv[0]);
@@ -26,9 +46,6 @@ int main(int argc, char **argv) {
   const int block_size = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
     
-  int nres;
-  int *d_input, *d_output, *d_nres;
-
   std::vector<int> input (num_elems);
 
   // Generate input data.
@@ -40,12 +57,26 @@ int main(int argc, char **argv) {
   g.seed(19937);
   std::shuffle(input.begin(), input.end(), g);
 
+  // Generate host output with host filtering code.
+  std::vector<int> h_output (num_elems);
+
+  int h_flt_count = 0;
+  for (int i = 0; i < num_elems; i++) {
+    if (input[i] > 0) {
+      h_output[h_flt_count++] = input[i];
+    }
+  }
+  // Sort the result for comparison
+  std::sort(h_output.begin(), h_output.begin() + h_flt_count);
+
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
   queue q(dev_sel, property::queue::in_order());
+
+  int *d_input, *d_output, *d_nres;
 
   d_input = malloc_device<int>(num_elems, q);
   d_output = malloc_device<int>(num_elems, q);
@@ -112,34 +143,11 @@ int main(int argc, char **argv) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %lf (ms)\n", (time * 1e-6f) / repeat);
+  printf("Average execution time of filter (shared memory) %lf (ms)\n",
+         (time * 1e-6) / repeat);
 
-  q.memcpy(&nres, d_nres, sizeof(int)).wait();
-
-  std::vector<int> output (nres);
-
-  q.memcpy(output.data(), d_output, sizeof(int) * nres).wait();
-
-  std::vector<int> h_output (num_elems);
-
-  // Generate host output with host filtering code.
-  int h_flt_count = 0;
-  for (int i = 0; i < num_elems; i++) {
-    if (input[i] > 0) {
-      h_output[h_flt_count++] = input[i];
-    }
-  }
-
-  // Verify
-  std::sort(h_output.begin(), h_output.begin() + h_flt_count);
-  std::sort(output.begin(), output.end());
-
-  bool equal = (h_flt_count == nres) && 
-               std::equal(h_output.begin(),
-                          h_output.begin() + h_flt_count, output.begin());
-
-  printf("\nFilter using shared memory %s \n",
-         equal ? "PASS" : "FAIL");
+  bool match = check(q, d_nres, d_output, h_flt_count, h_output);
+  printf("%s\n", match ? "PASS" : "FAIL");
 
   free(d_input, q);
   free(d_output, q);
