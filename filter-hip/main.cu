@@ -11,7 +11,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <chrono>
+#include <random>
+#include <vector>
 #include <hip/hip_runtime.h>
 
 __global__ 
@@ -52,6 +55,7 @@ void filter(int *__restrict__ dst,
   __syncthreads();
 }
 
+
 int main(int argc, char **argv) {
   if (argc != 4) {
     printf("Usage: %s <number of elements> <block size> <repeat>\n", argv[0]);
@@ -61,22 +65,25 @@ int main(int argc, char **argv) {
   const int block_size = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
     
-  int *data_to_filter, *filtered_data, nres;
-  int *d_data_to_filter, *d_filtered_data, *d_nres;
+  int nres;
+  int *d_input, *d_output, *d_nres;
 
-  data_to_filter = reinterpret_cast<int*>(malloc(sizeof(int) * num_elems));
+  std::vector<int> input (num_elems);
 
   // Generate input data.
-  srand(2);
   for (int i = 0; i < num_elems; i++) {
-    data_to_filter[i] = rand() % 20;
+    input[i] = i - num_elems / 2;
   }
 
-  hipMalloc(&d_data_to_filter, sizeof(int) * num_elems);
-  hipMalloc(&d_filtered_data, sizeof(int) * num_elems);
+  std::mt19937 g;
+  g.seed(19937);
+  std::shuffle(input.begin(), input.end(), g);
+
+  hipMalloc(&d_input, sizeof(int) * num_elems);
+  hipMalloc(&d_output, sizeof(int) * num_elems);
   hipMalloc(&d_nres, sizeof(int));
 
-  hipMemcpy(d_data_to_filter, data_to_filter,
+  hipMemcpy(d_input, input.data(),
              sizeof(int) * num_elems, hipMemcpyHostToDevice);
 
   dim3 dimBlock (block_size);
@@ -87,39 +94,44 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < repeat; i++) {
     hipMemset(d_nres, 0, sizeof(int));
-    hipLaunchKernelGGL(filter, dimGrid, dimBlock, 0, 0, d_filtered_data, d_nres, d_data_to_filter, num_elems);
+    filter<<<dimGrid, dimBlock>>>(d_output, d_nres, d_input, num_elems);
   }
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %lf (ms)\n", (time * 1e-6) / repeat);
 
   hipMemcpy(&nres, d_nres, sizeof(int), hipMemcpyDeviceToHost);
 
-  filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * nres));
+  std::vector<int> output (nres);
 
-  hipMemcpy(filtered_data, d_filtered_data, sizeof(int) * nres, hipMemcpyDeviceToHost);
+  hipMemcpy(output.data(), d_output, sizeof(int) * nres, hipMemcpyDeviceToHost);
 
-  int *host_filtered_data = reinterpret_cast<int *>(malloc(sizeof(int) * num_elems));
+  std::vector<int> h_output (num_elems);
 
   // Generate host output with host filtering code.
-  int host_flt_count = 0;
+  int h_flt_count = 0;
   for (int i = 0; i < num_elems; i++) {
-    if (data_to_filter[i] > 0) {
-      host_filtered_data[host_flt_count++] = data_to_filter[i];
+    if (input[i] > 0) {
+      h_output[h_flt_count++] = input[i];
     }
   }
 
-  printf("\nFilter using shared memory %s \n",
-         host_flt_count == nres ? "PASS" : "FAIL");
+  // Verify
+  std::sort(h_output.begin(), h_output.begin() + h_flt_count);
+  std::sort(output.begin(), output.end());
 
-  hipFree(d_data_to_filter);
-  hipFree(d_filtered_data);
+  bool equal = (h_flt_count == nres) && 
+               std::equal(h_output.begin(),
+                          h_output.begin() + h_flt_count, output.begin());
+
+  printf("\nFilter using shared memory %s \n",
+         equal ? "PASS" : "FAIL");
+
+  hipFree(d_input);
+  hipFree(d_output);
   hipFree(d_nres);
-  free(data_to_filter);
-  free(filtered_data);
-  free(host_filtered_data);
 
   return 0;
 }
