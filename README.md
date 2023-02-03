@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
-    alp, atan2, complex, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie
+    alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -359,6 +359,9 @@ Early results are shown [here](results/README.md)
 
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
+
+### cross (cuda)
+  Cross product of two 2D tensors (https://pytorch.org/)
 
 ### crossEntropy (sycl)
   Cross entropy loss in the backward phase (https://github.com/intel/llvm/issues/5969)
