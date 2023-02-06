@@ -40,6 +40,12 @@ __global__ void testKernel(T *g_odata)
 
     // Atomic XOR
     atomicXor(&g_odata[6], (T)tid);
+
+    // Atomic increment (modulo 17+1)
+    atomicInc((unsigned int *)&g_odata[7], 17);
+
+    // Atomic decrement
+    atomicDec((unsigned int *)&g_odata[8], 137);
 }
 
 #endif // #ifndef _SIMPLEATOMICS_KERNEL_H_

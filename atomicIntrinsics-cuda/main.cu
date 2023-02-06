@@ -29,9 +29,8 @@ void testcase(const int repeat)
   unsigned int len = 1 << 27;
   unsigned int numThreads = 256;
   unsigned int numBlocks = (len + numThreads - 1) / numThreads;
-  unsigned int numData = 7;
-  unsigned int memSize = sizeof(T) * numData;
-  T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255};
+  T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255, 0, 0};
+  unsigned int memSize = sizeof(gpuData);
 
   // allocate device memory for result
   T *dOData;

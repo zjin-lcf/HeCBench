@@ -21,7 +21,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[0])
   {
-    printf("Add failed %d %d\n", val, gpuData[0]);
+    printf("Add failed: %d != %d\n", val, gpuData[0]);
     ok = false;
   }
 
@@ -34,7 +34,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[1])
   {
-    printf("Sub failed: %d %d\n", val, gpuData[1]);
+    printf("Sub failed: %d != %d\n", val, gpuData[1]);
     ok = false;
   }
 
@@ -47,7 +47,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[2])
   {
-    printf("Max failed: %d %d\n", val, gpuData[2]);
+    printf("Max failed: %d != %d\n", val, gpuData[2]);
     ok = false;
   }
 
@@ -60,7 +60,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[3])
   {
-    printf("Min failed: %d %d\n", val, gpuData[3]);
+    printf("Min failed: %d != %d\n", val, gpuData[3]);
     ok = false;
   }
 
@@ -73,7 +73,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[4])
   {
-    printf("And failed: %d %d\n", val, gpuData[4]);
+    printf("And failed: %d != %d\n", val, gpuData[4]);
     ok = false;
   }
 
@@ -86,7 +86,7 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[5])
   {
-    printf("Or failed: %d %d\n", val, gpuData[5]);
+    printf("Or failed: %d != %d\n", val, gpuData[5]);
     ok = false;
   }
 
@@ -99,7 +99,31 @@ void computeGold(T *gpuData, const int len)
 
   if (val != gpuData[6])
   {
-    printf("Xor failed %d %d\n", val, gpuData[6]);
+    printf("Xor failed: %d != %d\n", val, gpuData[6]);
+    ok = false;
+  }
+
+  T limit = 17;
+  val = 0;
+
+  for (int i = 0; i < len; ++i) {
+    val = (val >= limit) ? 0 : val + 1;
+  }
+
+  if (val != gpuData[7]) {
+    printf("atomicInc failed: %d != %d\n", val, gpuData[7]);
+    ok = false;
+  }
+
+  limit = 137;
+  val = 0;
+
+  for (int i = 0; i < len; ++i) {
+    val = ((val == 0) || (val > limit)) ? limit : val - 1;
+  }
+
+  if (val != gpuData[8]) {
+    printf("atomicDec failed: %d != %d\n", val, gpuData[8]);
     ok = false;
   }
 
