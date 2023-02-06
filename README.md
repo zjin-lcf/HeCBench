@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dropout, expdist, gd, gelu, ge-spmm, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
-    alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie
+    alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -1256,6 +1256,9 @@ Early results are shown [here](results/README.md)
 
 ### zerocopy (cuda)
   kernels may read and write directly to pinned system memory from a user perspective (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/simpleZeroCopy)
+
+### zeropoint (cuda)
+  find zero-points and scales in quantization (https://pytorch.org/)
 
 ### zmddft (cuda)
   3D complex FFT in a 256^3 cube (https://github.com/spiral-software/fftx)
