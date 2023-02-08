@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, gd, gelu, ge-spmm, glu, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
+    accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, gd, gelu, ge-spmm, glu, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
@@ -884,6 +884,9 @@ Early results are shown [here](results/README.md)
 
 ### multimaterial (sycl)
   Multi-material simulations (https://github.com/reguly/multimaterial)
+
+### multinomial (cuda)
+  Multinomial sampling ((https://pytorch.org)
 
 ### murmurhash3 (c)
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
