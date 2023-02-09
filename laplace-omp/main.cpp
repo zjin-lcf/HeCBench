@@ -247,7 +247,6 @@ int main (void) {
   }
 
   double runtime = GetTimer();
-  printf("GPU\n");
   printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
 }
 
