@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, gd, gelu, ge-spmm, glu, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
@@ -1031,6 +1031,9 @@ Early results are shown [here](results/README.md)
 
 ### rfs (cuda)
   Reproducible floating sum (https://github.com/facebookarchive/fbcuda)
+
+### ring (sycl)
+  Non-P2P transfers in a circular manner among GPU devices
 
 ### rng-wallace (cuda)
   Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
