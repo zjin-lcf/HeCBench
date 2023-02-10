@@ -40,7 +40,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, gd, gelu, ge-spmm, glu, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
@@ -965,6 +965,9 @@ Early results are shown [here](results/README.md)
 
 ### phmm (cuda)
   Pair hidden Markov model (https://github.com/lienliang/Pair_HMM_forward_GPU)
+
+### pitch (cuda)
+  Pitched memory allocation (https://docs.nvidia.com/cuda/cuda-c-programming-guide)
 
 ### pnpoly (cuda)
   Solve the point-in-polygon problem using the crossing number algorithm (https://github.com/benvanwerkhoven/kernel_tuner)
