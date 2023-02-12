@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, gd, gelu, ge-spmm, glu, gmm, kalman, kmc, kmeans, knn, lda, lif, lr, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, wedford, winograd, word2vec
 
 ### Math
-    alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
+    alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -650,6 +650,9 @@ Early results are shown [here](results/README.md)
 
 ### interleave (cuda)
   Interleaved and non-interleaved global memory accesses (Shane Cook. 2012. CUDA Programming: A Developer's Guide to Parallel Computing with GPUs (1st. ed.). Morgan Kaufmann Publishers Inc., San Francisco, CA, USA.)
+
+### interval (cuda)
+  Interval arithmetic operators example (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### inversek2j (cuda)
   The inverse kinematics for 2-joint arm (http://axbench.org/)
