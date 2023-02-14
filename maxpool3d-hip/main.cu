@@ -48,6 +48,12 @@ int main(int argc, char** argv)
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
   int i_img_count = atoi(argv[3]);
+
+  if (i_img_width % 16 != 0 || i_img_height % 16 != 0) {
+    printf("image dimension is a multiple of 16\n");
+    return 1;
+  }
+
   int repeat = atoi(argv[4]);
 
   int Hstride=2, Vstride=2;
@@ -66,10 +72,8 @@ int main(int argc, char** argv)
 
   srand(2);
 
-  for(int j=0;j<i_img_count;j++)
-  {
-    for(int i=0;i<size_image;i++)
-    {
+  for(int j=0;j<i_img_count;j++) {
+    for(int i=0;i<size_image;i++) {
       h_image[(j*size_image)+i] = rand()%256 / (DTYPE)255;
     }
   }
@@ -100,8 +104,8 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipLaunchKernelGGL(maxpool3d, grid_dim, block_dim, 0, 0, d_image, d_result, Hstride, Vstride, 
-        pool_width, pool_height, i_img_width, i_img_height, o_img_width, o_img_height);
+    maxpool3d<<<grid_dim, block_dim>>>(d_image, d_result, Hstride, Vstride, 
+      pool_width, pool_height, i_img_width, i_img_height, o_img_width, o_img_height);
   }
 
   hipDeviceSynchronize();
@@ -109,11 +113,11 @@ int main(int argc, char** argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
+  // verification using the CPU results
   hipMemcpy(d_output, d_result, mem_size_output*i_img_count, hipMemcpyDeviceToHost);
 
-  // verification using the CPU results
-  for (int z = 0; z < i_img_count; z++)
-    for (int y = 0; y < o_img_height; y++)
+  for (int z = 0; z < i_img_count; z++) {
+    for (int y = 0; y < o_img_height; y++) {
       for (int x = 0; x < o_img_width; x++) {
         const int xidx = Hstride*x;
         const int yidx = Vstride*y;
@@ -129,12 +133,11 @@ int main(int argc, char** argv)
         }
         h_output[(((z*o_img_height)+y)*o_img_width)+x] = maxval;
       }
+    }
+  }
 
   int status = memcmp(h_output, d_output, sizeof(DTYPE)*i_img_count*o_img_width*o_img_height);
-  if (status == 0)
-    printf("PASS\n");
-  else
-    printf("FAIL\n");
+  printf("%s\n", (status == 0) ? "PASS" : "FAIL");
 
   free(h_image);
   free(h_output);
