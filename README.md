@@ -37,7 +37,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aidw, coordinates, geodesic, hausdorff, haversine
 
 ### Graph and Tree
-    cc, floydwarshall, gc, hbc, hungarian, mis, sssp, rsmt
+    cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
