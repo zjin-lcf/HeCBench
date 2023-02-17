@@ -369,21 +369,6 @@ Early results are shown [here](results/README.md)
 ### crs (cuda)
   Cauchy Reed-Solomon encoding (https://www.comp.hkbu.edu.hk/~chxw/gcrs.html)
 
-### d2q9_bgk (sycl)
-  A lattice boltzmann scheme with a 2D grid, 9 velocities, and Bhatnagar-Gross-Krook collision step (https://github.com/WSJHawkins/ExploringSycl)
-
-### d3q19_bgk (cuda)
-  Lattice Boltzmann simulation framework based on C++ parallel algorithms (https://gitlab.com/unigehpfs/stlbm)
-
-### daphne (cuda)
-  The Darmstadt automotive parallel heterogeneous benchmark suite (https://github.com/esa-tu-darmstadt/daphne-benchmark)
-
-### damage (opencl)
-  The continuum level damage in a peridynamic body (https://github.com/alan-turing-institute/PeriPy)
-
-### dct8x8 (opencl)
-  Discrete Cosine Transform (DCT) and inverse DCT for 8x8 blocks (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
-
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
 
@@ -1283,10 +1268,10 @@ Early results are shown [here](results/README.md)
   A proxy application for full neutron transport application like OpenMC (https://github.com/ANL-CESAR/XSBench/)
 
 ### zerocopy (cuda)
-  kernels may read and write directly to pinned system memory from a user perspective (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/simpleZeroCopy)
+  Kernels may read and write directly to pinned system memory from a user perspective (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/simpleZeroCopy)
 
 ### zeropoint (cuda)
-  find zero-points and scales in quantization (https://pytorch.org/)
+  Find zero-points and scales in quantization (https://pytorch.org/)
 
 ### zmddft (cuda)
   3D complex FFT in a 256^3 cube (https://github.com/spiral-software/fftx)
