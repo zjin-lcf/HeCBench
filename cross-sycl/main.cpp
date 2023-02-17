@@ -1,12 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <math.h>
 #include <chrono>
 #include <random>
 #include "common.h"
 
 // Reference
 // https://pytorch.org/docs/stable/generated/torch.linalg.cross.html#torch.linalg.cross
+
+template <typename T>
+class cross1;
+
+template <typename T>
+class cross2;
+
+template <typename T>
+class cross3;
 
 template <typename T, typename StrideType>
 void cross_kernel(
@@ -112,27 +121,21 @@ void cross3_kernel(
   }
 }
 
-int main(int argc, char* argv[])
-{
-  if (argc != 3) {
-    printf("Usage: %s <number of rows in a 2D tensor> <repeat>\n", argv[0]);
-    return 1;
-  }
-  const int nrows = atoi(argv[1]);
-  const int repeat = atoi(argv[2]);
 
+template <typename T>
+void eval(const int nrows, const int repeat) {
   const int num_elems = nrows * 3;
-  const int size_bytes = num_elems * sizeof(float); 
+  const int size_bytes = num_elems * sizeof(T); 
 
-  float *a, *b, *o, *o2, *o3;
-  a = (float*) malloc (size_bytes);
-  b = (float*) malloc (size_bytes);
-  o = (float*) malloc (size_bytes);
-  o2 = (float*) malloc (size_bytes);
-  o3 = (float*) malloc (size_bytes);
+  T *a, *b, *o, *o2, *o3;
+  a = (T*) malloc (size_bytes);
+  b = (T*) malloc (size_bytes);
+  o = (T*) malloc (size_bytes);
+  o2 = (T*) malloc (size_bytes);
+  o3 = (T*) malloc (size_bytes);
 
   std::default_random_engine g (123);
-  std::uniform_real_distribution<float> distr (-2.f, 2.f);
+  std::uniform_real_distribution<T> distr (-2.f, 2.f);
   for (int i = 0; i < num_elems; i++) {
     a[i] = distr(g);
     b[i] = distr(g);
@@ -145,10 +148,10 @@ int main(int argc, char* argv[])
 #endif
   queue q(dev_sel);
 
-  float *d_a, *d_b, *d_o;
-  d_o = malloc_device<float>(num_elems, q);
-  d_a = malloc_device<float>(num_elems, q);
-  d_b = malloc_device<float>(num_elems, q);
+  T *d_a, *d_b, *d_o;
+  d_o = malloc_device<T>(num_elems, q);
+  d_a = malloc_device<T>(num_elems, q);
+  d_b = malloc_device<T>(num_elems, q);
 
   q.memcpy(d_a, a, size_bytes);
   q.memcpy(d_b, b, size_bytes);
@@ -161,7 +164,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class cross1<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         cross_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
       });
     });
@@ -178,7 +181,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class cross2<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         cross2_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
       });
     });
@@ -195,7 +198,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class cross3<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         cross3_kernel(item, nrows, d_o, d_a, d_b);
       });
     });
@@ -210,7 +213,7 @@ int main(int argc, char* argv[])
 
   bool ok = true;
   for (int i = 0; i < num_elems; i++) {
-    if (fabsf(o[i] - o2[i]) > 1e-3f || fabsf(o[i] - o3[i]) > 1e-3f) {
+    if (fabs(o[i] - o2[i]) > 1e-3 || fabs(o[i] - o3[i]) > 1e-3) {
       ok = false;
       break;
     }
@@ -226,6 +229,22 @@ int main(int argc, char* argv[])
   free(o);
   free(o2);
   free(o3);
+}
+
+int main(int argc, char* argv[])
+{
+  if (argc != 3) {
+    printf("Usage: %s <number of rows in a 2D tensor> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int nrows = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
+  printf("=========== Data type is FP32 ==========\n");
+  eval<float>(nrows, repeat);
+
+  printf("=========== Data type is FP64 ==========\n");
+  eval<double>(nrows, repeat);
 
   return 0;
 }

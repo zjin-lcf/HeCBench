@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <math.h>
 #include <chrono>
 #include <random>
 #include <cuda.h>
@@ -109,33 +109,26 @@ __global__ void cross3_kernel(
   }
 }
 
-int main(int argc, char* argv[])
-{
-  if (argc != 3) {
-    printf("Usage: %s <number of rows in a 2D tensor> <repeat>\n", argv[0]);
-    return 1;
-  }
-  const int nrows = atoi(argv[1]);
-  const int repeat = atoi(argv[2]);
-
+template <typename T>
+void eval(const int nrows, const int repeat) {
   const int num_elems = nrows * 3;
-  const int size_bytes = num_elems * sizeof(float); 
+  const int size_bytes = num_elems * sizeof(T); 
 
-  float *a, *b, *o, *o2, *o3;
-  a = (float*) malloc (size_bytes);
-  b = (float*) malloc (size_bytes);
-  o = (float*) malloc (size_bytes);
-  o2 = (float*) malloc (size_bytes);
-  o3 = (float*) malloc (size_bytes);
+  T *a, *b, *o, *o2, *o3;
+  a = (T*) malloc (size_bytes);
+  b = (T*) malloc (size_bytes);
+  o = (T*) malloc (size_bytes);
+  o2 = (T*) malloc (size_bytes);
+  o3 = (T*) malloc (size_bytes);
 
   std::default_random_engine g (123);
-  std::uniform_real_distribution<float> distr (-2.f, 2.f);
+  std::uniform_real_distribution<T> distr (-2.f, 2.f);
   for (int i = 0; i < num_elems; i++) {
     a[i] = distr(g);
     b[i] = distr(g);
   }
 
-  float *d_a, *d_b, *d_o;
+  T *d_a, *d_b, *d_o;
   cudaMalloc((void**)&d_o, size_bytes);
 
   cudaMalloc((void**)&d_a, size_bytes);
@@ -186,7 +179,7 @@ int main(int argc, char* argv[])
 
   bool ok = true;
   for (int i = 0; i < num_elems; i++) {
-    if (fabsf(o[i] - o2[i]) > 1e-3f || fabsf(o[i] - o3[i]) > 1e-3f) {
+    if (fabs(o[i] - o2[i]) > 1e-3 || fabs(o[i] - o3[i]) > 1e-3) {
       ok = false;
       break;
     }
@@ -202,6 +195,22 @@ int main(int argc, char* argv[])
   free(o);
   free(o2);
   free(o3);
+}
+
+int main(int argc, char* argv[])
+{
+  if (argc != 3) {
+    printf("Usage: %s <number of rows in a 2D tensor> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int nrows = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+
+  printf("=========== Data type is FP32 ==========\n");
+  eval<float>(nrows, repeat);
+
+  printf("=========== Data type is FP64 ==========\n");
+  eval<double>(nrows, repeat);
 
   return 0;
 }
