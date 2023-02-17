@@ -25,8 +25,9 @@ void Forward(int repeat)
   std::vector<float> src(wk_size, 0);
   std::vector<float> dst(wk_size, 0);
 
+  srand(123);
   for (int64_t i = 0; i < wk_size; i++) { 
-    src[i] = std::cos(i / 10.f);
+    src[i] = rand() / (float)RAND_MAX;
   }
 
   float *src_mem;
@@ -94,8 +95,9 @@ void Backward(int repeat)
   std::vector<float> dst(wk_size, 0);
   std::vector<float> diff_src(wk_size, 0);
 
+  srand(123);
   for (int64_t i = 0; i < wk_size; i++) { 
-    diff_src[i] = src[i] = std::cos(i / 10.f);
+    diff_src[i] = src[i] = rand() / (float)RAND_MAX;
   }
 
   float *src_mem;

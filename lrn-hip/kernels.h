@@ -173,7 +173,7 @@ void  lrn_bwd_kernel (
         const auto off = data_off(mb, c, od, oh, ow);
         const auto omega = get_omega(mb, c, od, oh, ow);
         const auto omega_in_beta
-          = sqrt(1.0f / (sqrt(omega) * omega));
+          = sqrtf(1.0f / (sqrtf(omega) * omega));
 
         const auto dst_val = dst_[off];
         const auto tmp = omega_in_beta * dst_val;
