@@ -25,8 +25,9 @@ void Forward(queue &q, int repeat)
   std::vector<float> src(wk_size, 0);
   std::vector<float> dst(wk_size, 0);
 
+  srand(123);
   for (int64_t i = 0; i < wk_size; i++) { 
-    src[i] = std::cos(i / 10.f);
+    src[i] = rand() / (float)RAND_MAX;
   }
 
   size_t bytes_to_copy_s = wk_size * sizeof(float);
@@ -99,8 +100,9 @@ void Backward(queue &q, int repeat)
   std::vector<float> dst(wk_size, 0);
   std::vector<float> diff_src(wk_size, 0);
 
+  srand(123);
   for (int64_t i = 0; i < wk_size; i++) { 
-    diff_src[i] = src[i] = std::cos(i / 10.f);
+    diff_src[i] = src[i] = rand() / (float)RAND_MAX;
   }
 
   size_t bytes_to_copy_s = wk_size * sizeof(float);
@@ -131,7 +133,7 @@ void Backward(queue &q, int repeat)
     q.submit([&] (handler &cgh) {
       cgh.parallel_for<class bwd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         lrn_bwd_kernel(item, src_mem, dst_mem, diff_src_mem, N, C, D, H, W,
-                        stride_mb, ndims, wk_size, size, alpha, beta, k);
+                       stride_mb, ndims, wk_size, size, alpha, beta, k);
       });
     });
   }
