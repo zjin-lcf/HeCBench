@@ -40,29 +40,30 @@ void Forward(int repeat)
   cudaMalloc((void**)&dst_mem, bytes_to_copy_d);
   cudaMemcpy(dst_mem, dst.data(), bytes_to_copy_d, cudaMemcpyHostToDevice);
 
-  const int64_t block_size = 16;
-  const int64_t wg_size = 32;
-  int64_t wg_work = wg_size * block_size;
-  int64_t wg_cnt = (wk_size + wg_work -1) / wg_work;        
+  printf("Sweep the work-group sizes from 64 to 512\n");
+  for (int wg_size = 64; wg_size <= 512; wg_size = wg_size * 2) {
 
-  cudaDeviceSynchronize();
-  auto start = high_resolution_clock::now();
+    int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-  for (int i = 0; i < repeat; i++) {
-    lrn_fwd_kernel<<<wg_cnt, wg_size>>>(
-      src_mem, dst_mem, N, C, D, H, W, stride_mb, ndims, wk_size, size, alpha, beta, k);
+    cudaDeviceSynchronize();
+    auto start = high_resolution_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
+      lrn_fwd_kernel<<<wg_cnt, wg_size>>>(
+        src_mem, dst_mem, N, C, D, H, W, stride_mb, ndims, wk_size, size, alpha, beta, k);
+    }
+
+    cudaDeviceSynchronize();
+    auto stop = high_resolution_clock::now();
+
+    auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
+    printf("Average execution time of lrn_fwd_kernel: %.6f sec \n", time / repeat);
+
+    auto data_inGB = (2 * wk_size * sizeof(float)) / 1e9f;
+    auto bandwidth = data_inGB * repeat / time;
+
+    printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
   }
-
-  cudaDeviceSynchronize();
-  auto stop = high_resolution_clock::now();
-
-  auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
-  printf("Average execution time of lrn_fwd_kernel: %.6f sec \n", time / repeat);
-
-  auto data_inGB = (2 * wk_size * sizeof(float)) / 1e9f;
-  auto bandwidth = data_inGB * repeat / time;
-
-  printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
 
   cudaMemcpy(dst.data(), dst_mem, bytes_to_copy_d, cudaMemcpyDeviceToHost);
   double checksum = 0;
@@ -115,30 +116,31 @@ void Backward(int repeat)
   cudaMalloc((void**)&dst_mem, bytes_to_copy_d);
   cudaMemcpy(dst_mem, src.data(), bytes_to_copy_d, cudaMemcpyHostToDevice);
 
-  cudaDeviceSynchronize();
+  printf("Sweep the work-group sizes from 64 to 512\n");
+  for (int wg_size = 64; wg_size <= 512; wg_size = wg_size * 2) {
 
-  auto start = high_resolution_clock::now();
+    int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-  const int64_t block_size = 16;
-  const int64_t wg_size = 32;
-  int64_t wg_work = wg_size * block_size;
-  int64_t wg_cnt = (wk_size + wg_work -1) / wg_work;        
+    cudaDeviceSynchronize();
+    auto start = high_resolution_clock::now();
 
-  for (int i = 0; i < repeat; i++) {
-    lrn_bwd_kernel<<<wg_cnt, wg_size>>>(
-      src_mem, dst_mem, diff_src_mem, N, C, D, H, W, stride_mb, ndims, wk_size, size, alpha, beta, k);
+    for (int i = 0; i < repeat; i++) {
+      lrn_bwd_kernel<<<wg_cnt, wg_size>>>(
+        src_mem, dst_mem, diff_src_mem, N, C, D, H, W, stride_mb, ndims, wk_size, size, alpha, beta, k);
+    }
+
+    cudaDeviceSynchronize();
+    auto stop = high_resolution_clock::now();
+
+    auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
+    printf("Average execution time of lrn_bwd_kernel: %.6f sec \n", time / repeat);
+
+    auto data_inGB = (3 * wk_size * sizeof(float)) / 1e9f;
+    auto bandwidth = data_inGB * repeat / time;
+
+    printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
   }
 
-  cudaDeviceSynchronize();
-  auto stop = high_resolution_clock::now();
-
-  auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
-  printf("Average execution time of lrn_bwd_kernel: %.6f sec \n", time / repeat);
-
-  auto data_inGB = (3 * wk_size * sizeof(float)) / 1e9f;
-  auto bandwidth = data_inGB * repeat / time;
-
-  printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
 
   cudaMemcpy(dst.data(), dst_mem, bytes_to_copy_d, cudaMemcpyDeviceToHost);
   double checksum = 0;

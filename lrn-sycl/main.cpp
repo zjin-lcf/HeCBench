@@ -38,36 +38,37 @@ void Forward(queue &q, int repeat)
   float *dst_mem = malloc_device<float>(wk_size, q);
   q.memcpy(dst_mem, dst.data(), bytes_to_copy_d);
 
-  const int64_t block_size = 16;
-  const int64_t wg_size = 32;
-  int64_t wg_work = wg_size * block_size;
-  int64_t wg_cnt = (wk_size + wg_work -1) / wg_work;        
+  printf("Sweep the work-group sizes from 64 to 512\n");
+  for (int wg_size = 64; wg_size <= 512; wg_size = wg_size * 2) {
 
-  range<1> gws (wg_work * wg_cnt);
-  range<1> lws (wg_work);
+    int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-  q.wait();
-  auto start = high_resolution_clock::now();
+    range<1> gws (wg_size * wg_cnt);
+    range<1> lws (wg_size);
 
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class fwd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        lrn_fwd_kernel(item, src_mem, dst_mem, N, C, D, H, W,
-                       stride_mb, ndims, wk_size, size, alpha, beta, k);
+    q.wait();
+    auto start = high_resolution_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (handler &cgh) {
+        cgh.parallel_for<class fwd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          lrn_fwd_kernel(item, src_mem, dst_mem, N, C, D, H, W,
+                         stride_mb, ndims, wk_size, size, alpha, beta, k);
+        });
       });
-    });
+    }
+
+    q.wait();
+    auto stop = high_resolution_clock::now();
+
+    auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
+    printf("Average execution time of lrn_fwd_kernel: %.6f sec \n", time / repeat);
+
+    auto data_inGB = (2 * wk_size * sizeof(float)) / 1e9f;
+    auto bandwidth = data_inGB * repeat / time;
+
+    printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
   }
-
-  q.wait();
-  auto stop = high_resolution_clock::now();
-
-  auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
-  printf("Average execution time of lrn_fwd_kernel: %.6f sec \n", time / repeat);
-
-  auto data_inGB = (2 * wk_size * sizeof(float)) / 1e9f;
-  auto bandwidth = data_inGB * repeat / time;
-
-  printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
 
   q.memcpy(dst.data(), dst_mem, bytes_to_copy_d).wait();
   double checksum = 0;
@@ -79,7 +80,6 @@ void Forward(queue &q, int repeat)
   free(src_mem, q);
   free(dst_mem, q);
 }
-
 
 void Backward(queue &q, int repeat)
 {
@@ -106,7 +106,7 @@ void Backward(queue &q, int repeat)
   }
 
   size_t bytes_to_copy_s = wk_size * sizeof(float);
-  float *src_mem = malloc_device<float>(wk_size, q);;
+  float *src_mem = malloc_device<float>(wk_size, q);
   q.memcpy(src_mem, src.data(), bytes_to_copy_s);
 
   size_t bytes_to_copy_diff = wk_size * sizeof(float);
@@ -115,39 +115,40 @@ void Backward(queue &q, int repeat)
 
   size_t bytes_to_copy_d = wk_size * sizeof(float);
   float *dst_mem = malloc_device<float>(wk_size, q);
-  q.memcpy(dst_mem, dst.data(), bytes_to_copy_d);
+  q.memcpy(dst_mem, src.data(), bytes_to_copy_d);
 
-  q.wait();
+  printf("Sweep the work-group sizes from 64 to 512\n");
+  for (int wg_size = 64; wg_size <= 512; wg_size = wg_size * 2) {
 
-  auto start = high_resolution_clock::now();
+    int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-  const int64_t block_size = 16;
-  const int64_t wg_size = 32;
-  int64_t wg_work = wg_size * block_size;
-  int64_t wg_cnt = (wk_size + wg_work -1) / wg_work;        
+    range<1> gws (wg_size * wg_cnt);
+    range<1> lws (wg_size);
 
-  range<1> gws (wg_work * wg_cnt);
-  range<1> lws (wg_work);
+    q.wait();
+    auto start = high_resolution_clock::now();
 
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class bwd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        lrn_bwd_kernel(item, src_mem, dst_mem, diff_src_mem, N, C, D, H, W,
-                       stride_mb, ndims, wk_size, size, alpha, beta, k);
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (handler &cgh) {
+        cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+           lrn_bwd_kernel(item, src_mem, dst_mem, diff_src_mem, N, C,
+                          D, H, W, stride_mb, ndims, wk_size,
+                          size, alpha, beta, k);
+         });
       });
-    });
+    }
+
+    q.wait();
+    auto stop = high_resolution_clock::now();
+
+    auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
+    printf("Average execution time of lrn_bwd_kernel: %.6f sec \n", time / repeat);
+
+    auto data_inGB = (3 * wk_size * sizeof(float)) / 1e9f;
+    auto bandwidth = data_inGB * repeat / time;
+
+    printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
   }
-
-  q.wait();
-  auto stop = high_resolution_clock::now();
-
-  auto time = (duration_cast<microseconds>(stop - start)).count()/1e6f;
-  printf("Average execution time of lrn_bwd_kernel: %.6f sec \n", time / repeat);
-
-  auto data_inGB = (3 * wk_size * sizeof(float)) / 1e9f;
-  auto bandwidth = data_inGB * repeat / time;
-
-  printf("Kernel bandwidth: %.6f GB/s \n", bandwidth);
 
   q.memcpy(dst.data(), dst_mem, bytes_to_copy_d).wait();
   double checksum = 0;
@@ -155,12 +156,10 @@ void Backward(queue &q, int repeat)
     checksum += dst[i];
   }
   printf("Checksum: %lf\n", checksum / wk_size);
-
   free(src_mem, q);
   free(diff_src_mem, q);
   free(dst_mem, q);
 }
-
 
 int main(int argc, char* argv[])
 {
