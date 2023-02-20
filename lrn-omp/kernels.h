@@ -1,7 +1,9 @@
 #ifndef KERNELS
 #define KERNELS
 
-__global__
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 void lrn_fwd_kernel(
     const float* __restrict__ src_, 
           float* __restrict__ dst_,
@@ -12,14 +14,16 @@ void lrn_fwd_kernel(
     int64_t W_, 
     int64_t stride_mb_, 
     int64_t ndims_, 
+    int64_t wg_cnt_, 
+    int64_t wg_size_, 
     int64_t wk_size_, 
     int64_t size_, 
     float alpha_, 
     float beta_, 
     float k_)
 {
-  for (int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-               idx < wk_size_ ; idx += blockDim.x * gridDim.x) {
+  #pragma omp target teams distribute parallel for num_teams(wg_cnt_), num_threads (wg_size_)
+  for (int64_t idx = 0; idx < wk_size_ ; idx++) {
 
     auto data_off = [=](int64_t mb, int64_t c, int64_t d, int64_t h, int64_t w) {
       int64_t tag = 0;
@@ -91,7 +95,6 @@ void lrn_fwd_kernel(
   }
 }
 
-__global__
 void  lrn_bwd_kernel(
     const float* __restrict__ src_, 
           float* __restrict__ dst_,
@@ -103,14 +106,16 @@ void  lrn_bwd_kernel(
     int64_t W_, 
     int64_t stride_mb_, 
     int64_t ndims_, 
+    int64_t wg_cnt_, 
+    int64_t wg_size_, 
     int64_t wk_size_, 
     int64_t size_, 
     float alpha_, 
     float beta_, 
     float k_)
 {
-  for (int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-               idx < wk_size_; idx += blockDim.x * gridDim.x) {
+  #pragma omp target teams distribute parallel for num_teams(wg_cnt_), num_threads (wg_size_)
+  for (int64_t idx = 0; idx < wk_size_ ; idx++) {
 
     auto data_off = [=](int64_t mb, int64_t c, int64_t d, int64_t h, int64_t w) {
       int64_t tag = 0;
