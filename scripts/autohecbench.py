@@ -6,6 +6,10 @@ import re, time, sys, subprocess, multiprocessing, os
 import argparse
 import json
 
+def die(msg, code=1):
+    print(msg, file=stderr)
+    exit(code)
+
 class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
@@ -16,8 +20,15 @@ class Benchmark:
             elif args.sycl_type == 'hip':
                 self.MAKE_ARGS.append('HIP=yes')
                 self.MAKE_ARGS.append('HIP_ARCH={}'.format(args.amd_arch))
+            elif args.sycl_type == 'opencl':
+                self.MAKE_ARGS.append('CUDA=no')
+                self.MAKE_ARGS.append('HIP=no')
         else:
             self.MAKE_ARGS = []
+
+        if args.extra_compile_flags:
+            flags = args.extra_compile_flags.replace(',',' ')
+            self.MAKE_ARGS.append('EXTRA_CFLAGS={}'.format(flags))
 
         if args.bench_dir:
             self.path = os.path.realpath(os.path.join(args.bench_dir, name))
@@ -39,9 +50,16 @@ class Benchmark:
 
         out = subprocess.DEVNULL
         if self.verbose:
-            out = None
+            out = subprocess.PIPE
 
-        subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=out).check_returncode()
+        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=subprocess.STDOUT, encoding="ascii")
+        try:
+            proc.check_returncode()
+        except subprocess.CalledProcessError as e:
+            die(f'Failed compilation.\n({e})', e.errno)
+
+        if self.verbose:
+            print(proc.stdout)
 
     def run(self):
         cmd = ["./" + self.binary] + self.args
@@ -71,7 +89,7 @@ def main():
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
                         help='Run a warmup iteration')
-    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip'], default='cuda',
+    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip', 'opencl'], default='cuda',
                         help='Type of SYCL device to use')
     parser.add_argument('--nvidia-sm', type=int, default=60,
                         help='NVIDIA SM version')
@@ -79,6 +97,8 @@ def main():
                         help='AMD Architecture')
     parser.add_argument('--gcc-toolchain', default='',
                         help='GCC toolchain location')
+    parser.add_argument('--extra-compile-flags', '-e', default='',
+                        help='Additional compilation flags (inserted before the predefined CFLAGS)')
     parser.add_argument('--clean', '-c', action='store_true',
                         help='Clean the builds')
     parser.add_argument('--verbose', '-v', action='store_true',
