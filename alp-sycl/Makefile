@@ -6,14 +6,13 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-CHECK     = no
 
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -30,7 +29,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../alp-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -57,10 +56,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(CHECK),yes)
-  CFLAGS += -DCHECK
-endif
-
 ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
@@ -78,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100000
