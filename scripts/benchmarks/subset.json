@@ -20,9 +20,6 @@
       "--height=2160"
     ]
   ],
-  "mandelbrot-sycl": [
-    "(?:parallel time: )([0-9.+-e]+)(?:s)"
-  ],
   "nbody-sycl": [
     "(?:Total Time \\(s\\)[ ]*: )([0-9.+-e]+)",
     [
@@ -31,7 +28,7 @@
     ]
   ],
   "su3-sycl": [
-    "(?:Total execution time = )([0-9.+-e]+)(?: secs)"
+    "(?:Total kernel execution time = )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "adv-sycl": [
     "(?:elapsed time=)([0-9.+-e]+)(?: )",
@@ -50,7 +47,7 @@
     ]
   ],
   "all-pairs-distance-sycl": [
-    "(?:GPU time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
@@ -151,7 +148,7 @@
     "(?:Kernel time: )([0-9.+-e]+)(?: seconds)"
   ],
   "cobahh-sycl": [
-    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000000",
       "10"
@@ -176,7 +173,7 @@
     ]
   ],
   "crs-sycl": [
-    "(?:Total elapsed time )([0-9.+-e]+)(?: \\(ms\\))",
+    "(?:Total encoding time )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1",
       "1"
@@ -259,7 +256,7 @@
     "(?:elapsed time: )([0-9.+-e]+)(?: sec)"
   ],
   "iso2dfd-sycl": [
-    "(?:Elapsed time: )([0-9.+-e]+)(?: ms)",
+    "(?:Total kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "5000",
       "5000",
@@ -267,10 +264,10 @@
     ]
   ],
   "jacobi-sycl": [
-    "(?:Run time = )([0-9.+-e]+)(?: seconds)"
+    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
   ],
   "laplace-sycl": [
-    "(?:Total time: )([0-9.+-e]+)(?: s)"
+    "(?:iterations: )([0-9.+-e]+)(?: s)"
   ],
   "lavaMD-sycl": [
     "(?:Device offloading time:\\s)([0-9.+-e]+)(?: s)",
@@ -283,10 +280,10 @@
     "(?: )([0-9.+-e]+)(?: ms)"
   ],
   "minimod-sycl": [
-    "(?:Time kernel: )([0-9.+-e]+)(?: s)"
+    "(?:Average kernel time per iteration: )([0-9.+-e]+)(?: s)"
   ],
   "minisweep-sycl": [
-    "(?:time: )([0-9.+-e]+)(?:  )",
+    "(?:kernel time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "--niterations",
       "5"
@@ -299,7 +296,7 @@
     ]
   ],
   "mr-sycl": [
-    "(?:\\| *)([0-9.+-e]+)(?: ns *\\|)"
+    "(?:Total kernel execution time \\([a-z]+\\) )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "murmurhash3-sycl": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
@@ -309,19 +306,23 @@
     ]
   ],
   "nbnxm-sycl": [
-    "(?:Total kernel time \\(w/o? shift\\): )([0-9.+-e]+)"
+    "(?:Average kernel execution time \\(w/o shift\\): )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
   ],
   "page-rank-sycl": [
-    "(?:\"time\": )([0-9.+-e]+)(?: )",
+    "(?:Total kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1000",
       "1000"
     ]
   ],
   "particle-diffusion-sycl": [
-    "(?:Time: )([0-9.+-e]+)(?: ms)",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "10"
+      "10",
+      "5"
     ]
   ],
   "particlefilter-sycl": [
@@ -369,7 +370,7 @@
     ]
   ],
   "vanGenuchten-sycl": [
-    "(?:Total kernel time : )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "100",
       "100",
@@ -378,10 +379,10 @@
     ]
   ],
   "black-scholes-sycl": [
-    "(?:GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "attention-sycl": [
-    "(?:Device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average execution time of kernels )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "10000",
       "10000",
@@ -396,16 +397,16 @@
     ]
   ],
   "bn-sycl": [
-    "(?:Total duration is )([0-9.+-e]+)(?: seconds)",
+    "(?:Kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "/dev/null"
     ]
   ],
   "sheath-sycl": [
-    "(?:Time per time step: )([0-9.+-e]+)(?: ms)"
+    "(?:Time per time step: )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "ace-sycl": [
-    "(?:Offload time = )([0-9.+-e]+)(?:ms)",
+    "(?:Offload time = )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "1"
     ]
@@ -836,9 +837,6 @@
       "--width=3840",
       "--height=2160"
     ]
-  ],
-  "mandelbrot-hip": [
-    "(?:parallel time: )([0-9.+-e]+)(?:s)"
   ],
   "nbody-hip": [
     "(?:Total Time \\(s\\)[ ]*: )([0-9.+-e]+)",
