@@ -6,7 +6,6 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-CHECK     = no
 
 #===============================================================================
 # Program name & source code list
@@ -39,9 +38,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(CHECK),yes)
-  CFLAGS += -DCHECK
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -56,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	./$(program) 100000

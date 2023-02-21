@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
+DEVICE    = gpu
+SM        = cc70
 
 #===============================================================================
 # Program name & source code list
@@ -14,24 +15,24 @@ ARCH      = sm_60
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I../alp-cuda
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
-  LDFLAGS  += -g
+  CFLAGS += -g
+  LDFLAGS  += -g 
 endif
 
 # Optimization Flags
@@ -39,14 +40,19 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+else
+  CFLAGS +=
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h reference.h Makefile
+%.o: %.cpp ../alp-cuda/reference.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
