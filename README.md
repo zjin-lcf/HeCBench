@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, attention, attentionMultiHead, backprop, bn, clink, concat, crossEntropy, dense-embedding, dropout, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, vol2col, wedford, winograd, word2vec
+    accuracy, adam, attention, attentionMultiHead, backprop, bn, channelShuffle, clink, concat, crossEntropy, dense-embedding, dropout, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, multinomial, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, vol2col, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
@@ -296,6 +296,9 @@ Early results are shown [here](results/README.md)
 
 ### chacha20 (c)
   ChaCha20 stream cipher (https://github.com/983/ChaCha20)
+
+### channelShuffle (cuda)
+  Divide the channels in a tensor into groups and rearrange them (https://pytorch.org/)
 
 ### che (cuda)
   Phase-field simulation of spinodal decomposition using the Cahn-Hilliard equation (https://github.com/myousefi2016/Cahn-Hilliard-CUDA)
