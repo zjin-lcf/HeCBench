@@ -69,7 +69,7 @@ template <typename T>
 bool ChannelShuffleNCHW (queue &q, T *X, int N, int C, int G, int numel, T *Y,
                          long &time, int repeat)
 {
-  if (C % G != 0 || numel < N * C) return false; 
+  if (C % G != 0 || numel < N * C) return false;
 
   const int K = C / G;
   const int HxW = numel / (N * C);
@@ -114,7 +114,7 @@ template <typename T>
 bool ChannelShuffleNHWC (queue &q, T *X, int N, int C, int G, int numel, T *Y,
                          long &time, int repeat)
 {
-  if (C % G != 0 || numel < N * C) return false; 
+  if (C % G != 0 || numel < N * C) return false;
 
   const int K = C / G;
   const int HxW = numel / (N * C);
@@ -187,8 +187,7 @@ int main(int argc, char* argv[])
 
       printf("\n(N=%d C=%d W=%d H=%d)\n", N, C, W, H);
 
-      size_t numel = N * C * W * H; 
-      //size_t data_size_bytes = numel * sizeof(float);
+      const int numel = N * C * W * H; // assume no integer overflow
 
       float *d_X = malloc_device<float>(numel, q);
       float *d_Y = malloc_device<float>(numel, q);
