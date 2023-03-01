@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   printf("Checking for multiple GPUs...\n");
   int gpu_n;
   hipGetDeviceCount(&gpu_n);
-  printf("HIP-capable device count: %i\n", gpu_n);
+  printf("There are %d GPUs\n", gpu_n);
 
   if (gpu_n < 2)
   {
@@ -58,7 +58,6 @@ int main(int argc, char **argv)
 
   // Query device properties
   hipDeviceProp_t prop[64];
-  int gpuid[2]; // we want to find the first two GPU's that can support P2P
 
   for (int i=0; i < gpu_n; i++)
   {
@@ -68,8 +67,7 @@ int main(int argc, char **argv)
   printf("\nChecking GPU(s) for support of peer to peer memory access...\n");
 
   int can_access_peer;
-  int p2pCapableGPUs[2]; // We take only 1 pair of P2P capable GPUs
-  p2pCapableGPUs[0] = p2pCapableGPUs[1] = -1;
+  int p2pCapableGPUs[2] = {-1, -1}; // We take only 1 pair of P2P capable GPUs
 
   // Show all the combinations of supported P2P GPUs
   for (int i = 0; i < gpu_n; i++)
@@ -82,7 +80,7 @@ int main(int argc, char **argv)
       }
       hipDeviceCanAccessPeer(&can_access_peer, i, j);
       printf("> Peer access from %s (GPU%d) -> %s (GPU%d) : %s\n", prop[i].name, i,
-          prop[j].name, j, can_access_peer ? "Yes" : "No");
+             prop[j].name, j, can_access_peer ? "Yes" : "No");
       if (can_access_peer && p2pCapableGPUs[0] == -1)
       {
         p2pCapableGPUs[0] = i;
@@ -99,6 +97,7 @@ int main(int argc, char **argv)
   }
 
   // Use first pair of p2p capable GPUs detected.
+  int gpuid[2]; // we want to find the first two GPU's that can support P2P
   gpuid[0] = p2pCapableGPUs[0];
   gpuid[1] = p2pCapableGPUs[1];
 
@@ -112,7 +111,8 @@ int main(int argc, char **argv)
 
   // Allocate buffers
   const size_t buf_size = 1024 * 1024 * 16 * sizeof(float);
-  printf("Allocating buffers (%iMB on GPU%d, GPU%d and CPU Host)...\n", int(buf_size / 1024 / 1024), gpuid[0], gpuid[1]);
+  printf("Allocating buffers (%iMB on GPU%d, GPU%d and CPU Host)...\n",
+         int(buf_size / 1024 / 1024), gpuid[0], gpuid[1]);
 
   // GPU0
   hipSetDevice(gpuid[0]);
@@ -148,8 +148,8 @@ int main(int argc, char **argv)
   auto end = std::chrono::steady_clock::now();
   auto time_memcpy = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  printf("hipMemcpyPeer / hipMemcpy between GPU%d and GPU%d: %.2fGB/s\n", gpuid[0], gpuid[1],
-      1.0f / time_memcpy * (repeat * buf_size));
+  printf("Peer-to-peer copy between GPU%d and GPU%d: %.2fGB/s\n", gpuid[0], gpuid[1],
+         1.0f / time_memcpy * (repeat * buf_size));
 
   // Prepare host buffer and copy to GPU 0
   printf("Preparing host buffer and memcpy to GPU%d...\n", gpuid[0]);
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
   // Run kernel on GPU 1, reading input from the GPU 0 buffer, writing
   // output to the GPU 1 buffer
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
-      gpuid[1], gpuid[0], gpuid[1]);
+         gpuid[1], gpuid[0], gpuid[1]);
 
   hipSetDevice(gpuid[1]);
   hipLaunchKernelGGL(SimpleKernel, blocks, threads, 0, 0, g0, g1);
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
   // Run kernel on GPU 0, reading input from the GPU 1 buffer, writing
   // output to the GPU 0 buffer
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
-      gpuid[0], gpuid[1], gpuid[0]);
+         gpuid[0], gpuid[1], gpuid[0]);
 
   hipSetDevice(gpuid[0]);
   hipLaunchKernelGGL(SimpleKernel, blocks, threads, 0, 0, g1, g0);
