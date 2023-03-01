@@ -44,33 +44,74 @@ int main(int argc, char **argv)
   }
 
   printf("Checking for multiple GPUs...\n");
-  std::vector<sycl::device> Devs;
+  std::vector<device> Devs;
   // look through all platforms (https://github.com/intel/llvm/issues/6749)
-  for (const auto &platform : platform::get_platforms()) {
+  for (const auto &p: platform::get_platforms()) {
     // if it is a cuda "platform" then add the device to the list
-    if (platform.get_backend() == backend::cuda)
-      Devs.push_back(platform.get_devices()[0]);
+    if (p.get_backend() == backend::cuda)
+      Devs.push_back(p.get_devices()[0]);
   }
 
-  if (Devs.size() < 2)
+  int gpu_n = Devs.size();
+  printf("There are %d GPUs\n", gpu_n);
+
+  if (gpu_n < 2)
   {
     printf("Two or more GPUs with Peer-to-Peer access capability are required for %s.\n", argv[0]);
     printf("Waiving test.\n");
     exit(0);
   }
 
-  printf("There are %d GPUs\n", Devs.size());
+  bool can_access_peer;
+  int p2pCapableGPUs[2] = {-1, -1}; // We take only 1 pair of P2P capable GPUs
+
+  for (int i = 0; i < gpu_n; i++)
+  {
+    for (int j = 0; j < gpu_n; j++)
+    {
+      if (i == j)
+      {
+        continue;
+      }
+      can_access_peer = Devs[i].ext_oneapi_can_access_peer(Devs[j], 
+          ext::oneapi::peer_access::access_supported);
+      printf("> Peer access from %s (GPU%d) -> %s (GPU%d) : %s\n", 
+             Devs[i].get_info<info::device::name>().c_str(), i,
+             Devs[j].get_info<info::device::name>().c_str(), j,
+             can_access_peer ? "Yes" : "No");
+      if (can_access_peer && p2pCapableGPUs[0] == -1)
+      {
+        p2pCapableGPUs[0] = i;
+        p2pCapableGPUs[1] = j;
+      }
+    }
+  }
+
+  if (p2pCapableGPUs[0] == -1 || p2pCapableGPUs[1] == -1)
+  {
+    printf("Two or more GPUs with Peer-to-Peer access capability are required for %s.\n", argv[0]);
+    printf("Peer to Peer access is not available amongst GPUs in the system, waiving test.\n");
+    exit(0);
+  }
+  
+  // Use first pair of p2p capable GPUs detected.
+  int gpuid[2]; // we want to find the first two GPU's that can support P2P
+  gpuid[0] = p2pCapableGPUs[0];
+  gpuid[1] = p2pCapableGPUs[1];
+
+  printf("Enabling peer access between GPU%d and GPU%d...\n", gpuid[0], gpuid[1]);
+
+  Devs[gpuid[0]].ext_oneapi_enable_peer_access(Devs[gpuid[1]]);
+  Devs[gpuid[1]].ext_oneapi_enable_peer_access(Devs[gpuid[0]]);
 
   // create queues as desired
-  auto q0 = queue{Devs[0], property::queue::in_order()}; // this corresponds to the lowest cuda ID available (usually 0)
-  auto q1 = queue{Devs[1], property::queue::in_order()}; // this corresponds to the second lowest cuda ID available (usually 1)
-
-  // hardcoded
-  int gpuid[2] = {0, 1};
+  auto q0 = queue{Devs[gpuid[0]], property::queue::in_order()};
+  auto q1 = queue{Devs[gpuid[1]], property::queue::in_order()};
 
   // Allocate buffers
   const size_t buf_size = 1024 * 1024 * 16 * sizeof(float);
-  printf("Allocating buffers (%iMB on GPU%d, GPU%d and CPU Host)...\n", int(buf_size / 1024 / 1024), gpuid[0], gpuid[1]);
+  printf("Allocating buffers (%iMB on GPU%d, GPU%d and CPU Host)...\n",
+         int(buf_size / 1024 / 1024), gpuid[0], gpuid[1]);
 
   // GPU0
   float *g0 = (float*) malloc_device(buf_size, q0);
@@ -99,8 +140,8 @@ int main(int argc, char **argv)
   auto end = std::chrono::steady_clock::now();
   auto time_memcpy = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  printf("memcpy between GPU%d and GPU%d: %.2fGB/s\n", gpuid[0], gpuid[1],
-      1.0f / time_memcpy * (repeat * buf_size));
+  printf("Peer-to-peer copy between GPU%d and GPU%d: %.2fGB/s\n", gpuid[0], gpuid[1],
+         1.0f / time_memcpy * (repeat * buf_size));
 
   // Prepare host buffer and copy to GPU 0
   printf("Preparing host buffer and memcpy to GPU%d...\n", gpuid[0]);
@@ -120,24 +161,24 @@ int main(int argc, char **argv)
   // Run kernel on GPU 1, reading input from the GPU 0 buffer, writing
   // output to the GPU 1 buffer
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
-      gpuid[1], gpuid[0], gpuid[1]);
+         gpuid[1], gpuid[0], gpuid[1]);
 
   q1.submit([&] (handler &cgh) {
     cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       SimpleKernel(item, g0, g1);
     });
-  });
+  }).wait();
 
   // Run kernel on GPU 0, reading input from the GPU 1 buffer, writing
   // output to the GPU 0 buffer
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
-      gpuid[0], gpuid[1], gpuid[0]);
+         gpuid[0], gpuid[1], gpuid[0]);
 
   q0.submit([&] (handler &cgh) {
     cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       SimpleKernel(item, g1, g0);
     });
-  });
+  }).wait();
 
   // Copy data back to host and verify
   printf("Copy data back to host from GPU%d and verify results...\n", gpuid[0]);
@@ -159,6 +200,12 @@ int main(int argc, char **argv)
       }
     }
   }
+
+  // Disable peer access (also unregisters memory for non-UVA cases)
+  printf("Disabling peer access...\n");
+
+  Devs[gpuid[0]].ext_oneapi_disable_peer_access(Devs[gpuid[1]]);
+  Devs[gpuid[1]].ext_oneapi_disable_peer_access(Devs[gpuid[0]]);
 
   // Cleanup and shutdown
   printf("Shutting down...\n");
