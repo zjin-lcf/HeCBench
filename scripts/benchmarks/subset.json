@@ -379,7 +379,10 @@
     ]
   ],
   "black-scholes-sycl": [
-    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100"
+    ]
   ],
   "attention-sycl": [
     "(?:Average execution time of kernels )([0-9.+-e]+)(?: \\(ms\\))",
