@@ -18,7 +18,6 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-
 #include <cuda.h>
 #include "kernel.h"
 #include "reference.h"
@@ -55,8 +54,8 @@ void testcase(const int repeat)
     // ignore result verification
     testKernel<T><<<numBlocks, numThreads>>>(dOData);
   }
-
   cudaDeviceSynchronize();
+
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
