@@ -20,13 +20,40 @@
 #include "common.h"
 #include "reference.h"
 
-template <typename T>
-class test_atomics;
-
-template <typename T>
-class test_atomics2;
+#define ATOMIC_REF(v) \
+  atomic_ref<T, memory_order::relaxed, memory_scope::device,\
+             access::address_space::generic_space>(v)
 
 template <class T>
+void testKernel(nd_item<1> &item, T *g_odata)
+{
+  const int i = item.get_global_id(0);
+
+  auto ao0 = ATOMIC_REF(g_odata[0]);
+  ao0.fetch_add((T)10);
+
+  auto ao1 = ATOMIC_REF(g_odata[1]);
+  ao1.fetch_sub((T)10);
+
+  auto ao2 = ATOMIC_REF(g_odata[2]);
+  ao2.fetch_max((T)i);
+
+  auto ao3 = ATOMIC_REF(g_odata[3]);
+  ao3.fetch_min((T)i);
+
+  auto ao4 = ATOMIC_REF(g_odata[4]);
+  ao4.fetch_and((T)(2*i+7));
+
+  auto ao5 = ATOMIC_REF(g_odata[5]);
+  ao5.fetch_or((T)(1<<i));
+
+  auto ao6 = ATOMIC_REF(g_odata[6]);
+  ao6.fetch_xor((T)(i));
+
+  // atomicInc and atomicDec are not implemented yet
+}
+
+template <typename T>
 void testcase(queue &q, const int repeat)
 {
   unsigned int len = 1 << 27;
@@ -35,66 +62,43 @@ void testcase(queue &q, const int repeat)
                                 localWorkSize * localWorkSize;
   unsigned int numData = 9;
   T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255, 0, 0};
+  unsigned int memSize = sizeof(gpuData);
 
   // allocate device memory for result
-  buffer<T, 1> dOData(numData);
+  T *dOData = malloc_shared<T>(numData, q);
 
   range<1> gws (globalWorkSize);
   range<1> lws (localWorkSize);
 
   for (int i = 0; i < repeat; i++) {
-    // copy host memory to device for result verification
-    q.submit([&](handler &h) {
-      auto d = dOData.template get_access<sycl_discard_write>(h);
-      h.copy(gpuData, d);
-    });
+    q.memcpy(dOData, gpuData, memSize);
 
-    // execute the kernel
     q.submit([&](handler &h) {
-      auto gpuData = dOData.template get_access<sycl_atomic>(h);
-      h.parallel_for<class test_atomics<T>>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        int i = item.get_global_id(0);
-        atomic_fetch_add(gpuData[0], (T)10);
-        atomic_fetch_sub(gpuData[1], (T)10);
-        atomic_fetch_max(gpuData[2], (T)i);
-        atomic_fetch_min(gpuData[3], (T)i);
-        atomic_fetch_and(gpuData[4], (T)(2*i+7));
-        atomic_fetch_or (gpuData[5], (T)(1<<i));
-        atomic_fetch_xor(gpuData[6], (T)i);
+      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        testKernel(item, dOData);
       });
     });
   }
+  q.wait();
 
-  q.submit([&](handler &h) {
-    auto d = dOData.template get_access<sycl_read>(h);
-    h.copy(d, gpuData);
-  }).wait();
-
-  computeGold<T>(gpuData, globalWorkSize);
+  computeGold<T>(dOData, globalWorkSize);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    // ignore result verification
     q.submit([&](handler &h) {
-      auto gpuData = dOData.template get_access<sycl_atomic>(h);
-      h.parallel_for<class test_atomics2<T>>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        int i = item.get_global_id(0);
-        atomic_fetch_add(gpuData[0], (T)10);
-        atomic_fetch_sub(gpuData[1], (T)10);
-        atomic_fetch_max(gpuData[2], (T)i);
-        atomic_fetch_min(gpuData[3], (T)i);
-        atomic_fetch_and(gpuData[4], (T)(2*i+7));
-        atomic_fetch_or (gpuData[5], (T)(1<<i));
-        atomic_fetch_xor(gpuData[6], (T)i);
+      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        testKernel(item, dOData);
       });
     });
   }
-
   q.wait();
+
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+
+  free(dOData, q);
 }
 
 int main(int argc, char **argv)
@@ -109,7 +113,7 @@ int main(int argc, char **argv)
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   const int repeat = atoi(argv[1]);
   testcase<int>(q, repeat);

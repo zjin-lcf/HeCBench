@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernel.h"
 #include "reference.h"
@@ -30,31 +31,29 @@ void testcase(const int repeat)
   T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255, 0, 0};
   unsigned int memSize = sizeof(gpuData);
 
-  // allocate device memory for result
+  // allocate managed memory for result
   T *dOData;
-  hipMalloc((void **) &dOData, memSize);
+  hipMallocManaged((void **) &dOData, memSize);
 
   for (int i = 0; i < repeat; i++) {
     // copy host memory to device for result verification
     hipMemcpy(dOData, gpuData, memSize, hipMemcpyHostToDevice);
 
     // execute the kernel
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(testKernel<T>), numBlocks, numThreads, 0, 0, dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData);
   }
+  hipDeviceSynchronize();
 
-  //Copy result from device to host
-  hipMemcpy(gpuData, dOData, memSize, hipMemcpyDeviceToHost);
-
-  computeGold<T>(gpuData, numThreads * numBlocks);
+  computeGold<T>(dOData, numThreads * numBlocks);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     // ignore result verification
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(testKernel<T>), numBlocks, numThreads, 0, 0, dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData);
   }
-  hipDeviceSynchronize();
 
+  hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
