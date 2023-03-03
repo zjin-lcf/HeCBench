@@ -23,6 +23,8 @@ class Benchmark:
             elif args.sycl_type == 'opencl':
                 self.MAKE_ARGS.append('CUDA=no')
                 self.MAKE_ARGS.append('HIP=no')
+        elif name.endswith('cuda'):
+            self.MAKE_ARGS = ['CUDA_ARCH=sm_{}'.format(args.nvidia_sm)]
         else:
             self.MAKE_ARGS = []
 
@@ -156,17 +158,21 @@ def main():
         outfile = open(args.output, 'w')
 
     for b in benches:
-        if args.verbose:
-            print("running: {}".format(b.name))
+        try:
+            if args.verbose:
+                print("running: {}".format(b.name))
 
-        if args.warmup:
-            b.run()
+            if args.warmup:
+                b.run()
 
-        res = []
-        for i in range(args.repeat):
-            res.append(str(b.run()))
+            res = []
+            for i in range(args.repeat):
+                res.append(str(b.run()))
 
-        print(b.name + "," + ", ".join(res), file=outfile)
+            print(b.name + "," + ", ".join(res), file=outfile)
+        except Exception as err:
+            print("Error running: ", b.name)
+            print(err)
 
     if args.output:
         outfile.close()
