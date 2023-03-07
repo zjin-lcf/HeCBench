@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, attention, attentionMultiHead, backprop, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, resnet-kernels, sampling, softmax, stddev, streamcluster, vol2col, wedford, winograd, word2vec
+ e  accuracy, adam, attention, attentionMultiHead, backprop, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, resnet-kernels, sampling, softmax, stddev, streamcluster, vol2col, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
@@ -1040,6 +1040,9 @@ Early results are shown [here](results/README.md)
 
 ### recursiveGaussian (opencl)
   2-dimensional Gaussian Blur Filter of RGBA image (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### remap (cuda)
+  Map unique values to indices (https://pytorch.org/)
 
 ### resize (cuda)
   Resize images (https://github.com/opencv/)
