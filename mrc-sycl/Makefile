@@ -30,7 +30,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
+          -I../include -I../mrc-cuda/ -fsycl
 
 # Linker Flags
 LDFLAGS = 
@@ -67,7 +68,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../mrc-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

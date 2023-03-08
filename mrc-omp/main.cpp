@@ -4,20 +4,7 @@
 #include <chrono>
 #include <random>
 #include <omp.h>
-
-void reference (
-    const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
-    const float margin, float* dX1, float* dX2) {
-  for (int i = 0; i < N; i++) {
-    float dist = -Y[i] * (X1[i] - X2[i]) + margin;
-    if (dist < 0.f) {
-      dX1[i] = dX2[i] = 0.f;
-    } else {
-      dX1[i] = -Y[i] * dOutput[i];
-      dX2[i] = Y[i] * dOutput[i];
-    }
-  }
-}
+#include "reference.h"
 
 void MRCGradient (
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
@@ -75,7 +62,7 @@ int main(int argc, char* argv[])
     h_X1[i] = distr(g);
     h_X2[i] = distr(g);
     h_O[i] = distr(g);
-    h_Y[i] = (distr(g) < 0) ? -1 : 1 ;
+    h_Y[i] = (distr(g) < 0) ? -1 : 1;
   }
 
   #pragma omp target data map(to: h_X1[0:length], \
@@ -130,4 +117,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
