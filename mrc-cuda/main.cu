@@ -4,25 +4,13 @@
 #include <chrono>
 #include <random>
 #include <cuda.h>
-
-void reference (
-    const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
-    const float margin, float* dX1, float* dX2) {
-  for (int i = 0; i < N; i++) {
-    float dist = -Y[i] * (X1[i] - X2[i]) + margin;
-    if (dist < 0.f) {
-      dX1[i] = dX2[i] = 0.f;
-    } else {
-      dX1[i] = -Y[i] * dOutput[i];
-      dX2[i] = Y[i] * dOutput[i];
-    }
-  }
-}
+#include "reference.h"
 
 __global__
 void MRCGradient (
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
-    const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
+    const float margin, float*__restrict__ dX1, float*__restrict__ dX2)
+{
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < N) {
     float dist = -Y[i] * (X1[i] - X2[i]) + margin;
@@ -38,7 +26,8 @@ void MRCGradient (
 __global__
 void MRCGradient2(
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
-    const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
+    const float margin, float*__restrict__ dX1, float*__restrict__ dX2)
+{
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < N) {
     float y = Y[i];
@@ -77,7 +66,7 @@ int main(int argc, char* argv[])
     h_X1[i] = distr(g);
     h_X2[i] = distr(g);
     h_O[i] = distr(g);
-    h_Y[i] = (distr(g) < 0) ? -1 : 1 ;
+    h_Y[i] = (distr(g) < 0) ? -1 : 1;
   }
 
   float *d_X1, *d_X2, *d_O, *d_dX1, *d_dX2;
@@ -158,4 +147,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
