@@ -129,6 +129,9 @@ Early results are shown [here](results/README.md)
 ### accuracy (cuda)
   Accuracy of prediction (https://pytorch.org/)
 
+### ace (cuda)
+  Phase-field simulation of dendritic solidification (https://github.com/myousefi2016/Allen-Cahn-CUDA)
+
 ### adam (cuda)
   Adaptive moment estimation (https://github.com/hpcaitech/ColossalAI)
 
