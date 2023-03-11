@@ -22,7 +22,7 @@ obj = main.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../mtf-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -44,11 +44,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: ../mtf-cuda/main.cu Makefile
+main.o: ../mtf-cuda/main.cu ../mtf-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) WikipediaBananaaa 100
+	./$(program) 1024 100
