@@ -1,78 +1,102 @@
+#include <chrono>
+#include <cstdio>
+#include <vector>
+#include <algorithm>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <thrust/find.h>
+#include "reference.h"
 
-#include <chrono>
-#include <cstdio>
-#include <cstring>
-#include <vector>
-
-void mtf(std::vector<char> &word, bool output)
+thrust::host_vector<char> mtf(const std::vector<char> &word)
 {
+  thrust::host_vector<char> h_list(256);
   thrust::device_vector<char> d_list(256);
-  thrust::host_vector<char> list(256);
-  thrust::device_vector<char> d_word(word.size());
+
+  // store the mtf result since input word is read-only
+  thrust::host_vector<char> h_word(word.size());
+
+  // copy word from host to device
+  thrust::device_vector<char> d_word(word);
+
+  thrust::device_vector<char>::iterator iter;
 
   size_t counter;
-  thrust::device_vector<char>::iterator iter, count;
-  thrust::host_vector<char> h_word(word.size());
-  h_word = word;
-  d_word = h_word;
 
   for (counter = 0; counter < word.size(); counter++)
   {
-    thrust::copy(list.begin(), list.end(), d_list.begin());
+    thrust::copy(h_list.begin(), h_list.end(), d_list.begin());
 
-    h_word[0] = d_word[counter];
-    iter = thrust::find(d_list.begin(), d_list.end(), d_word[counter]);
+    // find the location of the symbol in the list
+    auto w = word[counter];
+    iter = thrust::find(d_list.begin(), d_list.end(), w);
 
-    if (d_list[0] != h_word[0])
+    // update the list when the first symbols are not the same
+    if (h_list[0] != w)
     {
-      thrust::copy(d_list.begin(), iter, list.begin()+1);
-      list[0] = h_word[0];
+      // shift portion [begin, iter) right by one
+      thrust::copy(d_list.begin(), iter, h_list.begin()+1);
+      h_list[0] = w;
     }
   }
 
-  thrust::copy(list.begin(), list.end(), d_list.begin());
-  thrust::copy(word.begin(), word.end(), d_word.begin());
-  for (counter = 0; counter < list.size(); counter++)
+  for (counter = 0; counter < h_list.size(); counter++)
   {
-    iter = thrust::find(d_word.begin(), d_word.end(), d_list[counter]);
+    iter = thrust::find(d_word.begin(), d_word.end(), h_list[counter]);
     while (iter != d_word.end())
     {
+      // replace word symbol with its index (counter)
       *iter = counter;
-      iter = thrust::find(d_word.begin(), d_word.end(), d_list[counter]);
+      iter = thrust::find(d_word.begin(), d_word.end(), h_list[counter]);
     }
   }
-  thrust::copy(d_word.begin(), d_word.end(), h_word.begin());
 
-  if (output) {
-    for (counter = 0; counter < word.size(); counter++)
-      printf("%d ", h_word[counter]);
-    printf("\n");
-  }
+  // copy from device to host
+  h_word = d_word;
+
+  return h_word;
 }
 
 int main(int argc, char *argv[])
 {
   if (argc != 3)
   {
-    printf("Usage: %s <string_input> <repeat>\n", argv[0]);
+    printf("Usage: %s <string length> <repeat>\n", argv[0]);
     exit(1);
   }
 
-  const int len = strlen(argv[1]);
-  std::vector<char> word(argv[1], argv[1] + len);
-
+  const size_t len = atol(argv[1]);
   const int repeat = atoi(argv[2]);
+  const char* a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-  // output MTF result
-  mtf(word, true);
+  std::vector<char> word(len);
+
+  srand(123);
+  for (size_t i = 0; i < len; i++) word[i] = a[rand() % 52];
+
+  auto d_result = mtf(word);
+  auto h_result = reference(word);
+  bool ok = d_result == h_result;
+  if (ok) {
+    printf("PASS\n");
+  }
+  else {
+    if (len < 16) {
+      printf("host: ");
+      for (size_t i = 0; i < len; i++) 
+        printf("%d ", h_result[i]);
+      printf("\ndevice: ");
+      for (size_t i = 0; i < len; i++) 
+        printf("%d ", d_result[i]);
+      printf("\n");
+    }
+    printf("FAIL\n");
+    return 1;
+  }
 
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++) mtf(word, false);
+  for (int i = 0; i < repeat; i++) mtf(word);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
