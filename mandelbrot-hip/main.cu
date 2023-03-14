@@ -38,8 +38,10 @@ void Execute() {
 
   // Report the results
   cout << std::setw(20) << "Serial time: " << serial_time.count() << " s\n";
-  cout << std::setw(20) << "Average parallel time: " << (parallel_time / repetitions).count() << " s\n";
-  cout << std::setw(20) << "Average kernel execution time: " << kernel_time / repetitions << " s\n";
+  cout << std::setw(20) << "Average parallel time: "
+                        << (parallel_time / repetitions).count() * 1e3 << " ms\n";
+  cout << std::setw(20) << "Average kernel execution time: "
+                        << kernel_time / repetitions * 1e3 << " ms\n";
 
   // Validating
   m_par.Verify(m_ser);

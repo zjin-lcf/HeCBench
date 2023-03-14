@@ -170,10 +170,11 @@ public:
     const int rows = p.row_count();
     const int cols = p.col_count();
 
-    //buffer<int, 2> data_buf(data(), range<2>(rows, cols));
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<int,1> data_buf (data(), rows * cols, props);
-    //buffer<MandelParameters,1> p_buf(&p, 1);
+    const int data_size = rows * cols;
+    const size_t data_size_bytes = data_size * sizeof(int);
+
+    int *data_buf = malloc_device<int>(data_size, q);
+    q.memcpy(data_buf, data(), data_size_bytes).wait();
 
     size_t block_x = (rows + THREADS_PER_BLOCK_X - 1)/THREADS_PER_BLOCK_X * THREADS_PER_BLOCK_X;
     size_t block_y = (cols + THREADS_PER_BLOCK_Y - 1)/THREADS_PER_BLOCK_Y * THREADS_PER_BLOCK_Y;
@@ -181,30 +182,24 @@ public:
     size_t global_work_size[] = {block_x, block_y};
     size_t local_work_size[] = {THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y};
 
-    //mandel <<< dim3(block_x, block_y), dim3(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y) >>> (data_buf, p_buf, rows, cols);
-    q.wait();
     common::MyTimer t_ker;
 
     q.submit([&](handler &h) {
-      // Get access to the buffer.
-      auto b = data_buf.get_access<sycl_write>(h);
       h.parallel_for<class mandel_kernel>(
       nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
                   range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
-      int i = item.get_global_id(0);
-      int j = item.get_global_id(1);
-      if (i < rows && j < cols) 
-        b[i * cols + j] = p.Point({p.ScaleRow(i), p.ScaleCol(j)});
+        int i = item.get_global_id(0);
+        int j = item.get_global_id(1);
+        if (i < rows && j < cols)
+          data_buf[i * cols + j] = p.Point({p.ScaleRow(i), p.ScaleCol(j)});
       });
-    });
+    }).wait();
 
-    q.wait();
     common::Duration kernel_time = t_ker.elapsed();
 
-    q.submit([&](handler &h) {
-      auto b = data_buf.get_access<sycl_read>(h);
-      h.copy(b, data());
-    });
+    q.memcpy(data(), data_buf, data_size_bytes).wait();
+
+    free(data_buf, q);
 
     return kernel_time.count();
   }

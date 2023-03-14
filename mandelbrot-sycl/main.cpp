@@ -37,8 +37,10 @@ void Execute(queue &q) {
 
   // Report the results
   std::cout << std::setw(20) << "Serial time: " << serial_time.count() << " s\n";
-  std::cout << std::setw(20) << "Average parallel time: " << (parallel_time / repetitions).count() << " s\n";
-  std::cout << std::setw(20) << "Average kernel execution time: " << kernel_time / repetitions << " s\n";
+  std::cout << std::setw(20) << "Average parallel time: "
+                             << (parallel_time / repetitions).count() * 1e3 << " ms\n";
+  std::cout << std::setw(20) << "Average kernel execution time: "
+                             << kernel_time / repetitions * 1e3 << " ms\n";
 
   // Validating
   m_par.Verify(m_ser);
@@ -63,7 +65,7 @@ int main(int argc, char *argv[]) {
 #else
     cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+    queue q(dev_sel, property::queue::in_order());
 
     repetitions = atoi(argv[1]);
     Execute(q);

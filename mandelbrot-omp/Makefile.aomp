@@ -52,14 +52,14 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) mandel.hpp util.hpp Makefile
+$(program): $(obj) mandel.hpp util.hpp
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp mandel.hpp util.hpp Makefile
+%.o: %.cpp mandel.hpp util.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100
+	./$(program) 1000
