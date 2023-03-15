@@ -4,7 +4,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 
-// scan over N elements
+// N is the number of elements to scan in a thread block
 #define N 512
 
 template<typename T>
@@ -20,15 +20,19 @@ void verify(const T* cpu_out, const T* gpu_out, int n)
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 
 template<typename T>
-__global__ void prescan_bcao (
+__global__ void scan_bcao (
         T *__restrict__ g_odata,
-  const T *__restrict__ g_idata,
-  const int n)
+  const T *__restrict__ g_idata)
 {
   __shared__ T temp[2*N];
+
+  int bid = blockIdx.x;
+  g_idata += bid * N;
+  g_odata += bid * N;
+
   int thid = threadIdx.x; 
   int a = thid;
-  int b = a + (n/2);
+  int b = a + (N/2);
   int oa = OFFSET(a);
   int ob = OFFSET(b);
 
@@ -36,7 +40,7 @@ __global__ void prescan_bcao (
   temp[b + ob] = g_idata[b];
 
   int offset = 1;
-  for (int d = n >> 1; d > 0; d >>= 1) 
+  for (int d = N >> 1; d > 0; d >>= 1) 
   {
     __syncthreads();
     if (thid < d) 
@@ -50,11 +54,11 @@ __global__ void prescan_bcao (
     offset *= 2;
   }
 
-  if (thid == 0) temp[n-1+OFFSET(n-1)] = 0; // clear the last elem
-  for (int d = 1; d < n; d *= 2) // traverse down
+  if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
+  for (int d = 1; d < N; d *= 2) // traverse down
   {
-    offset >>= 1;     
-    __syncthreads();      
+    offset >>= 1;
+    __syncthreads();
     if (thid < d)
     {
       int ai = offset*(2*thid+1)-1;
@@ -73,20 +77,24 @@ __global__ void prescan_bcao (
 }
 
 template<typename T>
-__global__ void prescan(
+__global__ void scan(
         T *__restrict__ g_odata,
-  const T *__restrict__ g_idata,
-  const int n)
+  const T *__restrict__ g_idata)
 {
   __shared__ T temp[N];
+
+  int bid = blockIdx.x;
+  g_idata += bid * N;
+  g_odata += bid * N;
+
   int thid = threadIdx.x; 
   int offset = 1;
   temp[2*thid]   = g_idata[2*thid];
   temp[2*thid+1] = g_idata[2*thid+1];
-  for (int d = n >> 1; d > 0; d >>= 1) 
+  for (int d = N >> 1; d > 0; d >>= 1) 
   {
     __syncthreads();
-    if (thid < d) 
+    if (thid < d)
     {
       int ai = offset*(2*thid+1)-1;
       int bi = offset*(2*thid+2)-1;
@@ -95,10 +103,10 @@ __global__ void prescan(
     offset *= 2;
   }
 
-  if (thid == 0) temp[n-1] = 0; // clear the last elem
-  for (int d = 1; d < n; d *= 2) // traverse down
+  if (thid == 0) temp[N-1] = 0; // clear the last elem
+  for (int d = 1; d < N; d *= 2) // traverse down
   {
-    offset >>= 1;     
+    offset >>= 1;
     __syncthreads();      
     if (thid < d)
     {
@@ -114,81 +122,98 @@ __global__ void prescan(
 }
 
 template <typename T>
-void runTest (const int repeat, bool timing = false) 
+void runTest (const size_t n, const int repeat, bool timing = false) 
 {
-  T in[N];
-  T cpu_out[N];
-  T gpu_out[N];
+  const size_t num_blocks = (n + N - 1) / N;
 
-  int n = N;
+  const size_t nelems = num_blocks * N; // actual total number of elements
 
-  for (int i = 0; i < n; i++) in[i] = (i % 5)+1;
-  cpu_out[0] = 0;
-  for (int i = 1; i < n; i++) cpu_out[i] = cpu_out[i-1] + in[i-1];
+  size_t bytes = nelems * sizeof(T);
+
+  T *in = (T*) malloc (bytes);
+  T *cpu_out = (T*) malloc (bytes);
+  T *gpu_out = (T*) malloc (bytes);
+
+  srand(123);
+  for (size_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
+
+  T *t_in = in;
+  T *t_out = cpu_out;
+  for (size_t n = 0; n < num_blocks; n++) { 
+    t_out[0] = 0;
+    for (int i = 1; i < N; i++) 
+      t_out[i] = t_out[i-1] + t_in[i-1];
+    t_out += N;
+    t_in += N;
+  }
 
   T *d_in, *d_out;
 
-  hipMalloc((void**)&d_in, n*sizeof(T));
-  hipMemcpy(d_in, in, n*sizeof(T), hipMemcpyHostToDevice); 
+  hipMalloc((void**)&d_in, bytes);
+  hipMemcpy(d_in, in, bytes, hipMemcpyHostToDevice); 
 
-  hipMalloc((void**)&d_out, n*sizeof(T));
+  hipMalloc((void**)&d_out, bytes);
 
-  dim3 grids (1);
-  dim3 blocks (n/2);
+  dim3 grids (num_blocks);
+  dim3 blocks (N/2);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(prescan, grids, blocks, 0, 0, d_out, d_in, n);
+    scan<<<grids, blocks>>>(d_out, d_in);
   }
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   if (timing) {
-    printf("Element size in bytes is %zu. Average execution time of block scan (w/  bank conflicts): %f (us)\n",
+    printf("Element size in bytes is %zu. Average execution time of scan (w/  bank conflicts): %f (us)\n",
            sizeof(T), (time * 1e-3f) / repeat);
   }
-  hipMemcpy(gpu_out, d_out, n*sizeof(T), hipMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, n);
+  hipMemcpy(gpu_out, d_out, bytes, hipMemcpyDeviceToHost);
+  if (!timing) verify(cpu_out, gpu_out, nelems);
 
   // bcao
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(prescan_bcao, grids, blocks, 0, 0, d_out, d_in, n);
+    scan_bcao<<<grids, blocks>>>(d_out, d_in);
   }
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   auto bcao_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   if (timing) {
-    printf("Element size in bytes is %zu. Average execution time of block scan (w/o bank conflicts): %f (us). ",
+    printf("Element size in bytes is %zu. Average execution time of scan (w/o bank conflicts): %f (us). ",
            sizeof(T), (bcao_time * 1e-3f) / repeat);
     printf("Reduce the time by %.1f%%\n", (time - bcao_time) * 1.0 / time * 100);
   }
-  hipMemcpy(gpu_out, d_out, n*sizeof(T), hipMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, n);
+  hipMemcpy(gpu_out, d_out, bytes, hipMemcpyDeviceToHost);
+  if (!timing) verify(cpu_out, gpu_out, nelems);
 
   hipFree(d_in);
   hipFree(d_out);
+  free(in);
+  free(cpu_out);
+  free(gpu_out);
 }
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int n = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
     
   for (int i = 0; i < 2; i++) {
     bool timing = i > 0;
-    runTest<char>(repeat, timing);
-    runTest<short>(repeat, timing);
-    runTest<int>(repeat, timing);
-    runTest<long>(repeat, timing);
+    runTest<char>(n, repeat, timing);
+    runTest<short>(n, repeat, timing);
+    runTest<int>(n, repeat, timing);
+    runTest<long>(n, repeat, timing);
   }
 
   return 0; 

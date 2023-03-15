@@ -4,11 +4,11 @@
 #include <chrono>
 #include <omp.h>
 
-// scan over N elements
+// N is the number of elements to scan in a thread block
 #define N 512
 
 template<typename T>
-void verify(const T* ref_out, const T* out, int n)
+void verify(const T* ref_out, const T* out, size_t n)
 {
   int error = memcmp(ref_out, out, n * sizeof(T));
   printf("%s\n", error ? "FAIL" : "PASS");
@@ -19,33 +19,52 @@ void verify(const T* ref_out, const T* out, int n)
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 
 template<typename T>
-void runTest (const int repeat, bool timing = false)
+void runTest (const size_t n, const int repeat, bool timing = false) 
 {
-  T in[N];
-  T ref_out[N];
-  T out[N];
+  const size_t num_blocks = (n + N - 1) / N;
 
-  int n = N;
+  const size_t nelems = num_blocks * N; // actual total number of elements
 
-  for (int i = 0; i < n; i++) in[i] = (i % 5)+1;
-  ref_out[0] = 0;
-  for (int i = 1; i < n; i++) ref_out[i] = ref_out[i-1] + in[i-1];
+  size_t bytes = nelems * sizeof(T);
 
-  #pragma omp target data map(to: in[0:n]) map(alloc: out[0:n])
+  T *in = (T*) malloc (bytes);
+  T *out = (T*) malloc (bytes);
+  T *ref_out = (T*) malloc (bytes);
+
+  srand(123);
+  for (size_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
+
+  T *t_in = in;
+  T *t_out = ref_out;
+  for (size_t n = 0; n < num_blocks; n++) { 
+    t_out[0] = 0;
+    for (int i = 1; i < N; i++) 
+      t_out[i] = t_out[i-1] + t_in[i-1];
+    t_out += N;
+    t_in += N;
+  }
+
+  #pragma omp target data map(to: in[0:nelems]) map(alloc: out[0:nelems])
   {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      #pragma omp target teams num_teams(1) thread_limit(n/2)
+      #pragma omp target teams num_teams(num_blocks) thread_limit(N/2)
       {
         T temp[N];
         #pragma omp parallel 
         {
+          int bid = omp_get_team_num();
+          T *t_in  = in + bid * N;
+          T *t_out = out + bid * N;
+
           int thid = omp_get_thread_num();
           int offset = 1;
-          temp[2*thid]   = in[2*thid];
-          temp[2*thid+1] = in[2*thid+1];
-          for (int d = n >> 1; d > 0; d >>= 1) 
+
+          temp[2*thid]   = t_in[2*thid];
+          temp[2*thid+1] = t_in[2*thid+1];
+
+          for (int d = N >> 1; d > 0; d >>= 1) 
           {
             #pragma omp barrier
             if (thid < d) 
@@ -57,8 +76,8 @@ void runTest (const int repeat, bool timing = false)
             offset *= 2;
           }
 
-          if (thid == 0) temp[n-1] = 0; // clear the last elem
-          for (int d = 1; d < n; d *= 2) // traverse down
+          if (thid == 0) temp[N-1] = 0; // clear the last elem
+          for (int d = 1; d < N; d *= 2) // traverse down
           {
             offset >>= 1;     
             #pragma omp barrier
@@ -71,8 +90,8 @@ void runTest (const int repeat, bool timing = false)
               temp[bi] += t;
             }
           }
-          out[2*thid] = temp[2*thid];
-          out[2*thid+1] = temp[2*thid+1];
+          t_out[2*thid] = temp[2*thid];
+          t_out[2*thid+1] = temp[2*thid+1];
 	}
       }
     }
@@ -80,31 +99,35 @@ void runTest (const int repeat, bool timing = false)
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     if (timing) {
-      printf("Element size in bytes is %zu. Average execution time of block scan (w/  bank conflicts): %f (us)\n",
+      printf("Element size in bytes is %zu. Average execution time of scan (w/  bank conflicts): %f (us)\n",
              sizeof(T), (time * 1e-3f) / repeat);
     }
-    #pragma omp target update from (out[0:n])
-    if (!timing) verify(ref_out, out, n);
+    #pragma omp target update from (out[0:nelems])
+    if (!timing) verify(ref_out, out, nelems);
 
     // bcao
     start = std::chrono::steady_clock::now();
     for (int i = 0; i < repeat; i++) {
-      #pragma omp target teams num_teams(1) thread_limit(n/2)
+      #pragma omp target teams num_teams(num_blocks) thread_limit(N/2)
       {
         T temp[2*N];
         #pragma omp parallel 
         {
+          int bid = omp_get_team_num();
+          T *t_in  = in + bid * N;
+          T *t_out = out + bid * N;
+
           int thid = omp_get_thread_num();
           int a = thid;
-          int b = a + (n/2);
+          int b = a + (N/2);
           int oa = OFFSET(a);
           int ob = OFFSET(b);
 
-          temp[a + oa] = in[a];
-          temp[b + ob] = in[b];
+          temp[a + oa] = t_in[a];
+          temp[b + ob] = t_in[b];
 
           int offset = 1;
-          for (int d = n >> 1; d > 0; d >>= 1) 
+          for (int d = N >> 1; d > 0; d >>= 1) 
           {
             #pragma omp barrier
             if (thid < d) 
@@ -118,8 +141,8 @@ void runTest (const int repeat, bool timing = false)
             offset *= 2;
           }
 
-          if (thid == 0) temp[n-1+OFFSET(n-1)] = 0; // clear the last elem
-          for (int d = 1; d < n; d *= 2) // traverse down
+          if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
+          for (int d = 1; d < N; d *= 2) // traverse down
           {
             offset >>= 1;     
             #pragma omp barrier      
@@ -136,8 +159,8 @@ void runTest (const int repeat, bool timing = false)
           }
           #pragma omp barrier // required
 
-          out[a] = temp[a + oa];
-          out[b] = temp[b + ob];
+          t_out[a] = temp[a + oa];
+          t_out[b] = temp[b + ob];
         }
       }
     }
@@ -145,30 +168,31 @@ void runTest (const int repeat, bool timing = false)
     end = std::chrono::steady_clock::now();
     auto bcao_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     if (timing) {
-      printf("Element size in bytes is %zu. Average execution time of block scan (w/o bank conflicts): %f (us). ",
+      printf("Element size in bytes is %zu. Average execution time of scan (w/o bank conflicts): %f (us). ",
              sizeof(T), (bcao_time * 1e-3f) / repeat);
       printf("Reduce the time by %.1f%%\n", (time - bcao_time) * 1.0 / time * 100);
     }
  
-    #pragma omp target update from (out[0:n])
-    if (!timing) verify(ref_out, out, n);
+    #pragma omp target update from (out[0:nelems])
+    if (!timing) verify(ref_out, out, nelems);
   }
 }
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int n = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
     
   for (int i = 0; i < 2; i++) {
     bool timing = i > 0;
-    runTest<char>(repeat, timing);
-    runTest<short>(repeat, timing);
-    runTest<int>(repeat, timing);
-    runTest<long>(repeat, timing);
+    runTest<char>(n, repeat, timing);
+    runTest<short>(n, repeat, timing);
+    runTest<int>(n, repeat, timing);
+    runTest<long>(n, repeat, timing);
   }
 
   return 0; 
