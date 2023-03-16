@@ -5,7 +5,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
-#include <thrust/system/cuda/execution_policy.h>
+#include <thrust/execution_policy.h>
 #include <thrust/unique.h>
 #include <thrust/version.h>
 
@@ -49,76 +49,121 @@ void eval_remap(const int N, const int repeat) {
 
   int *h_output = (int*) malloc (output_size_bytes);
 
-  T *d_input;
-  cudaMalloc((void**)&d_input, input_size_bytes);
-  cudaMemcpy(d_input, h_input, input_size_bytes, cudaMemcpyHostToDevice);
+  long seq_time = 0,
+       sort_time = 0,
+       unique_time = 0,
+       kernel_time = 0,
+       copy_time = 0,
+       alloc_time = 0,
+       dealloc_time = 0;
 
-  int *d_output;
-  cudaMalloc((void**)&d_output, output_size_bytes);
+  auto offload_start = std::chrono::steady_clock::now();
 
-  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) {
 
-  // Create two vectors of {0, 1, ..., N-1} on device
-  thrust::device_vector<int> order1(N), order2(N);
-  thrust::sequence(order1.begin(), order1.end());
-  thrust::sequence(order2.begin(), order2.end());
+    auto start = std::chrono::steady_clock::now();
 
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Execution time of sequence : %f (us)\n", (time * 1e-3f));
+    T *d_input;
+    cudaMalloc((void**)&d_input, input_size_bytes);
 
-  // Sort the input along with order vector. So now we know where each element
-  // is permutated to. For example:
-  //    input1 = 1,3,5,1,5,7,9
-  //    order1 = 0,1,2,3,4,5,6
-  // Now we have:
-  //    output = 1,1,3,5,5,7,9
-  //    order1 = 0,3,1,2,4,5,6
-  start = std::chrono::steady_clock::now();
+    int *d_output;
+    cudaMalloc((void**)&d_output, output_size_bytes);
 
-  auto buffer = thrust::device_pointer_cast(d_input);
-  thrust::sort_by_key(buffer, buffer + N, order1.begin());
+    // Create two vectors of {0, 1, ..., N-1} on device
+    thrust::device_vector<int> order1(N), order2(N);
 
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Execution time of sort-by-key : %f (us)\n", (time * 1e-3f));
+    auto end = std::chrono::steady_clock::now();
+    alloc_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  // Use consequent unique op to get another order_buffer
-  //    input2 = 1,1,3,5,5,7,9
-  //    order2 = 0,1,2,3,4,5,6
-  // Now we have:
-  //    output = 1,3,5,7,9
-  //    order2 = 0,2,3,5,6
-  start = std::chrono::steady_clock::now();
+    start = std::chrono::steady_clock::now();
 
-  auto result = thrust::unique_by_key(buffer, buffer + N, order2.begin());
+    cudaMemcpy(d_input, h_input, input_size_bytes, cudaMemcpyHostToDevice);
 
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Execution time of unique-by-key : %f (us)\n", (time * 1e-3f));
+    end = std::chrono::steady_clock::now();
+    copy_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  int K = result.first - buffer;
-  printf("Percentage of unique elements: %.1f %%\n", (float) K * 100 / N);
+    start = std::chrono::steady_clock::now();
 
-  // Compute the remapping. For example, for the number 1, if we look at
-  // order2[0] and order2[1], we know that input2[0:2) are all 1. They are all
-  // remapped to 0 in final input. And from order1, we know where they come from.
-  dim3 grid ((K + NUM_THREADS - 1) / NUM_THREADS);
-  dim3 block (NUM_THREADS);
+    thrust::sequence(order1.begin(), order1.end());
+    thrust::sequence(order2.begin(), order2.end());
 
-  cudaDeviceSynchronize();
-  start = std::chrono::steady_clock::now();
+    end = std::chrono::steady_clock::now();
+    seq_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  for (int i = 0; i < repeat; i++)
+    // Sort the input along with order vector. So now we know where each element
+    // is permutated to. For example:
+    //    input1 = 1,3,5,1,5,7,9
+    //    order1 = 0,1,2,3,4,5,6
+    // Now we have:
+    //    output = 1,1,3,5,5,7,9
+    //    order1 = 0,3,1,2,4,5,6
+    start = std::chrono::steady_clock::now();
+
+    auto buffer = thrust::device_pointer_cast(d_input);
+    thrust::sort_by_key(buffer, buffer + N, order1.begin());
+
+    end = std::chrono::steady_clock::now();
+    sort_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    // Use consequent unique op to get another order_buffer
+    //    input2 = 1,1,3,5,5,7,9
+    //    order2 = 0,1,2,3,4,5,6
+    // Now we have:
+    //    output = 1,3,5,7,9
+    //    order2 = 0,2,3,5,6
+    start = std::chrono::steady_clock::now();
+
+    auto result = thrust::unique_by_key(buffer, buffer + N, order2.begin());
+
+    end = std::chrono::steady_clock::now();
+    unique_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    int K = result.first - buffer;
+
+    if (i == 0) printf("Percentage of unique elements: %.1f %%\n", (float) K * 100 / N);
+
+    // Compute the remapping. For example, for the number 1, if we look at
+    // order2[0] and order2[1], we know that input2[0:2) are all 1. They are all
+    // remapped to 0 in final input. And from order1, we know where they come from.
+    dim3 grid ((K + NUM_THREADS - 1) / NUM_THREADS);
+    dim3 block (NUM_THREADS);
+
+    cudaDeviceSynchronize();
+    start = std::chrono::steady_clock::now();
+
     remap_kernel<<<grid, block>>>(order2.data(), order1.data(), d_output, N, K);
 
-  cudaDeviceSynchronize();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of remap kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
+    cudaDeviceSynchronize();
+    end = std::chrono::steady_clock::now();
+    kernel_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  cudaMemcpy(h_output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
+    start = std::chrono::steady_clock::now();
+
+    cudaMemcpy(h_output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
+
+    end = std::chrono::steady_clock::now();
+    copy_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    start = std::chrono::steady_clock::now();
+
+    cudaFree(d_output);
+    cudaFree(d_input);
+
+    end = std::chrono::steady_clock::now();
+    dealloc_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }
+
+  auto offload_end = std::chrono::steady_clock::now();
+  auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
+
+  printf("Average offload time: %f (s)\n", offload_time * 1e-9f / repeat);
+  printf("Average execution time of memory allocation : %f (us)\n", (alloc_time * 1e-3f) / repeat);
+  printf("Average execution time of memory deallocation : %f (us)\n", (dealloc_time * 1e-3f) / repeat);
+  printf("Average execution time of data copy : %f (us)\n", (copy_time * 1e-3f) / repeat);
+  printf("Average execution time of Thrust sequence : %f (us)\n", (seq_time * 1e-3f) / repeat);
+  printf("Average execution time of Thrust sort-by-key : %f (us)\n", (sort_time * 1e-3f) / repeat);
+  printf("Average execution time of Thrust unique-by-key : %f (us)\n", (unique_time * 1e-3f) / repeat);
+  printf("Average execution time of remap kernel: %f (us)\n", (kernel_time * 1e-3f) / repeat);
 
   int cs1 = 0, cs2 = 0;
   for (int i = 0; i < N-1; i++) {
@@ -135,9 +180,6 @@ void eval_remap(const int N, const int repeat) {
   }
   printf("\n");
 #endif
-
-  cudaFree(d_output);
-  cudaFree(d_input);
 
   free(h_output);
   free(h_input);
@@ -158,7 +200,7 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[2]);
 
   // warmup and run 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 2; i++) {
     printf("\nRun %d\n", i);
     eval_remap<int>(N, repeat);
   }

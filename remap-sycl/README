@@ -1,0 +1,10 @@
+Dependency
+
+Before building the SYCL program, clone the oneDPL and oneTBB repos in the current directory 
+
+https://github.com/oneapi-src/oneDPL
+https://github.com/oneapi-src/oneTBB
+
+And install SYCLomatic from https://github.com/oneapi-src/SYCLomatic
+
+

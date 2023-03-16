@@ -1,25 +1,21 @@
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/algorithm>
+#include <sycl/sycl.hpp>
+#include <dpct/dpct.hpp>
+#include <dpct/dpl_utils.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
-#include <thrust/device_vector.h>
-#include <thrust/device_ptr.h>
-#include <thrust/sequence.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
-#include <thrust/unique.h>
-#include <thrust/version.h>
 
 #define NUM_THREADS 256
 
-__global__
-void remap_kernel(
-  thrust::device_ptr<const int> second_order,
-  thrust::device_ptr<const int> first_order,
-  int *output,
-  const int N,
-  const int K)
+void remap_kernel(dpct::device_pointer<const int> second_order,
+                  dpct::device_pointer<const int> first_order,
+                  int *output,
+                  const int N, const int K,
+                  sycl::nd_item<1> &item)
 {
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  int i = item.get_global_id(0);
   if (i >= K) return;
   int idx = second_order[i];
   output[first_order[idx]] = i;
@@ -29,7 +25,7 @@ void remap_kernel(
 }
 
 template <typename T>
-void eval_remap(const int N, const int repeat) {
+void eval_remap(sycl::queue &q, const int N, const int repeat) {
 
   size_t input_size_bytes = N * sizeof(T);
   size_t output_size_bytes = N * sizeof(int);
@@ -57,35 +53,35 @@ void eval_remap(const int N, const int repeat) {
        alloc_time = 0,
        dealloc_time = 0;
 
+  auto policy = oneapi::dpl::execution::make_device_policy(q);
+
   auto offload_start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
 
     auto start = std::chrono::steady_clock::now();
 
-    T *d_input;
-    hipMalloc((void**)&d_input, input_size_bytes);
+    T *d_input = sycl::malloc_device<T>(N, q);
 
-    int *d_output;
-    hipMalloc((void**)&d_output, output_size_bytes);
+    int *d_output = sycl::malloc_device<int>(N, q);
 
-    // Create two vectors of {0, 1, ..., N-1} on device
-    thrust::device_vector<int> order1(N), order2(N);
+    dpct::device_vector<int> order1(N), order2(N);
 
     auto end = std::chrono::steady_clock::now();
     alloc_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     start = std::chrono::steady_clock::now();
 
-    hipMemcpy(d_input, h_input, input_size_bytes, hipMemcpyHostToDevice);
+    q.memcpy(d_input, h_input, input_size_bytes).wait();
 
     end = std::chrono::steady_clock::now();
     copy_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     start = std::chrono::steady_clock::now();
-
-    thrust::sequence(order1.begin(), order1.end());
-    thrust::sequence(order2.begin(), order2.end());
+     
+    // Create two vectors of {0, 1, ..., N-1} on device
+    dpct::iota(policy, order1.begin(), order1.end());
+    dpct::iota(policy, order2.begin(), order2.end());
 
     end = std::chrono::steady_clock::now();
     seq_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -99,8 +95,8 @@ void eval_remap(const int N, const int repeat) {
     //    order1 = 0,3,1,2,4,5,6
     start = std::chrono::steady_clock::now();
 
-    auto buffer = thrust::device_pointer_cast(d_input);
-    thrust::sort_by_key(buffer, buffer + N, order1.begin());
+    auto buffer = dpct::get_device_pointer(d_input);
+    dpct::sort(policy, buffer, buffer + N, order1.begin());
 
     end = std::chrono::steady_clock::now();
     sort_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -113,41 +109,45 @@ void eval_remap(const int N, const int repeat) {
     //    order2 = 0,2,3,5,6
     start = std::chrono::steady_clock::now();
 
-    auto result = thrust::unique_by_key(buffer, buffer + N, order2.begin());
+    auto result = dpct::unique(policy, buffer, buffer + N, order2.begin());
 
     end = std::chrono::steady_clock::now();
     unique_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     int K = result.first - buffer;
-
     if (i == 0) printf("Percentage of unique elements: %.1f %%\n", (float) K * 100 / N);
 
     // Compute the remapping. For example, for the number 1, if we look at
     // order2[0] and order2[1], we know that input2[0:2) are all 1. They are all
     // remapped to 0 in final input. And from order1, we know where they come from.
-    dim3 grid ((K + NUM_THREADS - 1) / NUM_THREADS);
-    dim3 block (NUM_THREADS);
+    sycl::range<1> gws ((K + NUM_THREADS - 1) / NUM_THREADS * NUM_THREADS);
+    sycl::range<1> lws (NUM_THREADS);
 
-    hipDeviceSynchronize();
+    q.wait();
     start = std::chrono::steady_clock::now();
 
-    remap_kernel<<<grid, block>>>(order2.data(), order1.data(), d_output, N, K);
+    q.submit([&](sycl::handler &cgh) {
+      auto order2_ptr = order2.data();
+      auto order1_ptr = order1.data();
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        remap_kernel(order2_ptr, order1_ptr, d_output, N, K, item);
+      });
+    }).wait();
 
-    hipDeviceSynchronize();
     end = std::chrono::steady_clock::now();
     kernel_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     start = std::chrono::steady_clock::now();
 
-    hipMemcpy(h_output, d_output, output_size_bytes, hipMemcpyDeviceToHost);
+    q.memcpy(h_output, d_output, output_size_bytes).wait();
 
     end = std::chrono::steady_clock::now();
     copy_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     start = std::chrono::steady_clock::now();
 
-    hipFree(d_output);
-    hipFree(d_input);
+    sycl::free(d_output, q);
+    sycl::free(d_input, q);
 
     end = std::chrono::steady_clock::now();
     dealloc_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -160,9 +160,9 @@ void eval_remap(const int N, const int repeat) {
   printf("Average execution time of memory allocation : %f (us)\n", (alloc_time * 1e-3f) / repeat);
   printf("Average execution time of memory deallocation : %f (us)\n", (dealloc_time * 1e-3f) / repeat);
   printf("Average execution time of data copy : %f (us)\n", (copy_time * 1e-3f) / repeat);
-  printf("Average execution time of Thrust sequence : %f (us)\n", (seq_time * 1e-3f) / repeat);
-  printf("Average execution time of Thrust sort-by-key : %f (us)\n", (sort_time * 1e-3f) / repeat);
-  printf("Average execution time of Thrust unique-by-key : %f (us)\n", (unique_time * 1e-3f) / repeat);
+  printf("Average execution time of oneDPL sequence : %f (us)\n", (seq_time * 1e-3f) / repeat);
+  printf("Average execution time of oneDPL sort-by-key : %f (us)\n", (sort_time * 1e-3f) / repeat);
+  printf("Average execution time of oneDPL unique-by-key : %f (us)\n", (unique_time * 1e-3f) / repeat);
   printf("Average execution time of remap kernel: %f (us)\n", (kernel_time * 1e-3f) / repeat);
 
   int cs1 = 0, cs2 = 0;
@@ -199,10 +199,17 @@ int main(int argc, char* argv[])
 #endif
   const int repeat = atoi(argv[2]);
 
+#ifdef USE_GPU
+  sycl::gpu_selector dev_sel;
+#else
+  sycl::cpu_selector dev_sel;
+#endif
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
+
   // warmup and run 
   for (int i = 0; i < 2; i++) {
     printf("\nRun %d\n", i);
-    eval_remap<int>(N, repeat);
+    eval_remap<int>(q, N, repeat);
   }
 
   return 0;
