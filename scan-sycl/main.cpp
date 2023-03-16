@@ -4,9 +4,6 @@
 #include <chrono>
 #include "common.h"
 
-// N is the number of elements to scan in a thread block
-#define N 512
-
 template<typename T>
 void verify(const T* cpu_out, const T* gpu_out, size_t n)
 {
@@ -18,14 +15,14 @@ void verify(const T* cpu_out, const T* gpu_out, size_t n)
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 #define __syncthreads() item.barrier(access::fence_space::local_space)
 
-template<typename T>
-class opt_block_scan;
+template<typename T, int N>
+class opt;
 
-template <typename T>
-class block_scan;
+template <typename T, int N>
+class base;
 
 // bank conflict aware optimization
-template<typename T>
+template<typename T, int N>
 void scan_bcao (
         nd_item<1> &item,
         local_ptr<T> temp,
@@ -82,7 +79,7 @@ void scan_bcao (
   g_odata[b] = temp[b + ob];
 }
 
-template<typename T>
+template<typename T, int N>
 void scan (
         nd_item<1> &item,
         local_ptr<T> temp,
@@ -128,7 +125,7 @@ void scan (
 }
 
 
-template <typename T>
+template <typename T, int N>
 void runTest (queue &q, const size_t n, const int repeat, bool timing = false) 
 {
   const size_t num_blocks = (n + N - 1) / N;
@@ -168,8 +165,8 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       accessor<T, 1, sycl_read_write, access::target::local> temp (N, cgh);
-      cgh.parallel_for<class block_scan<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        scan(item, temp.get_pointer(), d_out, d_in);
+      cgh.parallel_for<class base<T, N>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        scan<T, N>(item, temp.get_pointer(), d_out, d_in);
       });
     });
   }
@@ -190,8 +187,8 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
       accessor<T, 1, sycl_read_write, access::target::local> temp (N*2, cgh);
-      cgh.parallel_for<class opt_block_scan<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        scan_bcao(item, temp.get_pointer(), d_out, d_in);
+      cgh.parallel_for<class opt<T, N>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        scan_bcao<T, N>(item, temp.get_pointer(), d_out, d_in);
       });
     });
   }
@@ -214,6 +211,18 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
   free(gpu_out);
 }
 
+template<int N>
+void run (queue &q, const int n, const int repeat) {
+  for (int i = 0; i < 2; i++) {
+    bool report_timing = i > 0;
+    printf("\nThe number of elements to scan in a thread block: %d\n", N);
+    runTest< char, N>(q, n, repeat, report_timing);
+    runTest<short, N>(q, n, repeat, report_timing);
+    runTest<  int, N>(q, n, repeat, report_timing);
+    runTest< long, N>(q, n, repeat, report_timing);
+  }
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 3) {
@@ -230,13 +239,11 @@ int main(int argc, char* argv[])
 #endif
   queue q(dev_sel);
     
-  for (int i = 0; i < 2; i++) {
-    bool timing = i > 0;
-    runTest<char>(q, n, repeat, timing);
-    runTest<short>(q, n, repeat, timing);
-    runTest<int>(q, n, repeat, timing);
-    runTest<long>(q, n, repeat, timing);
-  }
+  run< 128>(q, n, repeat);  
+  run< 256>(q, n, repeat);  
+  run< 512>(q, n, repeat);  
+  run<1024>(q, n, repeat);  
+  run<2048>(q, n, repeat);  
 
   return 0; 
 }

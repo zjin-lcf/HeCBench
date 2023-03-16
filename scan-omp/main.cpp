@@ -4,9 +4,6 @@
 #include <chrono>
 #include <omp.h>
 
-// N is the number of elements to scan in a thread block
-#define N 512
-
 template<typename T>
 void verify(const T* ref_out, const T* out, size_t n)
 {
@@ -18,7 +15,7 @@ void verify(const T* ref_out, const T* out, size_t n)
 #define LOG_MEM_BANKS 5
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 
-template<typename T>
+template<typename T, int N>
 void runTest (const size_t n, const int repeat, bool timing = false) 
 {
   const size_t num_blocks = (n + N - 1) / N;
@@ -178,6 +175,18 @@ void runTest (const size_t n, const int repeat, bool timing = false)
   }
 }
 
+template<int N>
+void run (const int n, const int repeat) {
+  for (int i = 0; i < 2; i++) {
+    bool report_timing = i > 0;
+    printf("\nThe number of elements to scan in a thread block: %d\n", N);
+    runTest< char, N>(n, repeat, report_timing);
+    runTest<short, N>(n, repeat, report_timing);
+    runTest<  int, N>(n, repeat, report_timing);
+    runTest< long, N>(n, repeat, report_timing);
+  }
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 3) {
@@ -186,14 +195,12 @@ int main(int argc, char* argv[])
   }
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
-    
-  for (int i = 0; i < 2; i++) {
-    bool timing = i > 0;
-    runTest<char>(n, repeat, timing);
-    runTest<short>(n, repeat, timing);
-    runTest<int>(n, repeat, timing);
-    runTest<long>(n, repeat, timing);
-  }
+
+  run< 128>(n, repeat);  
+  run< 256>(n, repeat);  
+  run< 512>(n, repeat);  
+  run<1024>(n, repeat);  
+  run<2048>(n, repeat);  
 
   return 0; 
 }
