@@ -4,9 +4,6 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 
-// N is the number of elements to scan in a thread block
-#define N 512
-
 template<typename T>
 void verify(const T* cpu_out, const T* gpu_out, int n)
 {
@@ -19,7 +16,8 @@ void verify(const T* cpu_out, const T* gpu_out, int n)
 #define LOG_MEM_BANKS 5
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 
-template<typename T>
+// N is the number of elements to scan in a thread block
+template<typename T, int N>
 __global__ void scan_bcao (
         T *__restrict__ g_odata,
   const T *__restrict__ g_idata)
@@ -76,7 +74,7 @@ __global__ void scan_bcao (
   g_odata[b] = temp[b + ob];
 }
 
-template<typename T>
+template<typename T, int N>
 __global__ void scan(
         T *__restrict__ g_odata,
   const T *__restrict__ g_idata)
@@ -121,7 +119,7 @@ __global__ void scan(
   g_odata[2*thid+1] = temp[2*thid+1];
 }
 
-template <typename T>
+template <typename T, int N>
 void runTest (const size_t n, const int repeat, bool timing = false) 
 {
   const size_t num_blocks = (n + N - 1) / N;
@@ -161,7 +159,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    scan<<<grids, blocks>>>(d_out, d_in);
+    scan<T, N><<<grids, blocks>>>(d_out, d_in);
   }
 
   hipDeviceSynchronize();
@@ -178,7 +176,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    scan_bcao<<<grids, blocks>>>(d_out, d_in);
+    scan_bcao<T, N><<<grids, blocks>>>(d_out, d_in);
   }
 
   hipDeviceSynchronize();
@@ -199,6 +197,18 @@ void runTest (const size_t n, const int repeat, bool timing = false)
   free(gpu_out);
 }
 
+template<int N>
+void run (const int n, const int repeat) {
+  for (int i = 0; i < 2; i++) {
+    bool report_timing = i > 0;
+    printf("\nThe number of elements to scan in a thread block: %d\n", N);
+    runTest< char, N>(n, repeat, report_timing);
+    runTest<short, N>(n, repeat, report_timing);
+    runTest<  int, N>(n, repeat, report_timing);
+    runTest< long, N>(n, repeat, report_timing);
+  }
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 3) {
@@ -207,14 +217,12 @@ int main(int argc, char* argv[])
   }
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
-    
-  for (int i = 0; i < 2; i++) {
-    bool timing = i > 0;
-    runTest<char>(n, repeat, timing);
-    runTest<short>(n, repeat, timing);
-    runTest<int>(n, repeat, timing);
-    runTest<long>(n, repeat, timing);
-  }
+
+  run< 128>(n, repeat);  
+  run< 256>(n, repeat);  
+  run< 512>(n, repeat);  
+  run<1024>(n, repeat);  
+  run<2048>(n, repeat);  
 
   return 0; 
 }
