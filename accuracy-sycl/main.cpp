@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
   const int data_size = nrows * ndims;
 
   const int label_size_bytes = nrows * sizeof(int); 
-  const int data_size_bytes = data_size * sizeof(float); 
+  const size_t data_size_bytes = data_size * sizeof(float);
 
   int *label = (int*) malloc (label_size_bytes);
 
