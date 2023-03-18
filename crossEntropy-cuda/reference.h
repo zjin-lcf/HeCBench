@@ -8,9 +8,8 @@ using namespace std;
 
 // This version fused the log_softmax
 #define tolerance 4e-3
-#define iterations 1
 
-// Param for computaiton, tunable
+// tunable thread block size
 #define threadX  64
 #define threadBS 1
 
