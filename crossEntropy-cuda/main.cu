@@ -132,7 +132,7 @@ float loss_bwd_kernel(
   int64_t* mask, gscalar_t* grad_predict)
 {
   dim3 blocks ( threadX, threadBS );
-  dim3 grids ( H, bs );
+  dim3 grids ( (H + threadX - 1) / threadX, bs );
 
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -147,7 +147,7 @@ float loss_bwd_kernel(
 
 // compute cross entropy in the backward phase
 template <typename scalar_t, typename gscalar_t>
-void LossNLL_BWD() {
+void LossNLL_BWD(int iterations) {
 
   vector<double> durations(3, 0.0); // timing
 
@@ -291,26 +291,32 @@ void LossNLL_BWD() {
 
 int main(int argc, char** argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
   printf("Tensor size (BatchSize * Width * Height) = %d * %d * %d \n", bs, W, H);
 
   printf("=========== Data type is FP16 ==========\n");
 
-  LossNLL_BWD<__half, __half>();
-  LossNLL_BWD<__half, __half>();
+  LossNLL_BWD<__half, __half>(repeat);
+  LossNLL_BWD<__half, __half>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 
   printf("=========== Data type is FP32 ==========\n");
 
-  LossNLL_BWD<float, float>();
-  LossNLL_BWD<float, float>();
+  LossNLL_BWD<float, float>(repeat);
+  LossNLL_BWD<float, float>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 
   printf("=========== Data type is FP64 ==========\n");
 
-  LossNLL_BWD<double, double>();
-  LossNLL_BWD<double, double>();
+  LossNLL_BWD<double, double>(repeat);
+  LossNLL_BWD<double, double>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 

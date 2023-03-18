@@ -19,7 +19,7 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include <CL/sycl.hpp>  
+#include <CL/sycl.hpp>
 
 using namespace std;
 
@@ -31,9 +31,8 @@ using namespace std;
 
 // This version fused the log_softmax
 #define tolerance 4e-3
-#define iterations 1
 
-// Param for computaiton, tunable
+// tunable thread block size
 #define threadX  64
 #define threadBS 1
 
@@ -170,7 +169,7 @@ void verify(scalar_t* output, scalar_t* output_device, size_t sz) {
 
 // compute cross entropy in the backward phase
 template <typename scalar_t, typename gscalar_t>
-void LossNLL_BWD(sycl::queue& q) {
+void LossNLL_BWD(sycl::queue& q, int iterations) {
 
   vector<double> durations(3, 0.0); // timing
 
@@ -262,33 +261,39 @@ void LossNLL_BWD(sycl::queue& q) {
 
 int main(int argc, char** argv) {
 
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+
 #ifdef USE_GPU
   sycl::gpu_selector dev_sel;
 #else
   sycl::cpu_selector dev_sel;
 #endif
-  sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   printf("Tensor size (BatchSize * Width * Height) = %d * %d * %d \n", bs, W, H);
 
   printf("=========== Data type is FP16 ==========\n");
 
-  LossNLL_BWD<sycl::half, sycl::half>(q);
-  LossNLL_BWD<sycl::half, sycl::half>(q);
+  LossNLL_BWD<sycl::half, sycl::half>(q, repeat);
+  LossNLL_BWD<sycl::half, sycl::half>(q, repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 
   printf("=========== Data type is FP32 ==========\n");
 
-  LossNLL_BWD<float, float>(q);
-  LossNLL_BWD<float, float>(q);
+  LossNLL_BWD<float, float>(q, repeat);
+  LossNLL_BWD<float, float>(q, repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 
   printf("=========== Data type is FP64 ==========\n");
 
-  LossNLL_BWD<double, double>(q);
-  LossNLL_BWD<double, double>(q);
+  LossNLL_BWD<double, double>(q, repeat);
+  LossNLL_BWD<double, double>(q, repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
 
