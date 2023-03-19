@@ -1,49 +1,73 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <chrono>
 #include <random>
 #include "common.h"
 #include "kernel.h"
 
+template <typename FP, int dim>
+FP cost (FP *A, FP *B, FP *scale_A, FP *scale_B, int m, int n) {
+  double sum = 0;
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      FP dist = 0;
+      for (int d = 0; d < dim; d++) {
+        dist += (A[i + d * m] - B[j + d * n]) *
+                (A[i + d * m] - B[j + d * n]);
+      }
+      sum += exp(-dist/(scale_A[i] + scale_B[j]));
+    }
+  }
+  return sum;
+}
+
 template <typename FP>
 void test(const int size, const int repeat) {
-  const int max_blocks = (int)(ceilf(size * size / 256.f)); 
 
-  std::default_random_engine rng (123);
-  std::normal_distribution<FP> distribution(0, 1);
+  const int nblocks = ceilf(size / (block_size_x * tile_size_x)) * 
+                      ceilf(size / (block_size_y * tile_size_y));
 
-  FP *A = (FP*) malloc (sizeof(FP) * size * 2);
-  FP *B = (FP*) malloc (sizeof(FP) * size * 2);
+  size_t point_size_bytes = sizeof(FP) * size * 2;
+  size_t scale_size_bytes = sizeof(FP) * size;
+  size_t cost_size_bytes = sizeof(FP) * nblocks;
+
+  FP *A = (FP*) malloc (point_size_bytes);
+  FP *B = (FP*) malloc (point_size_bytes);
   for (int i = 0; i < size * 2; i++) {
-    A[i] = distribution(rng);
-    B[i] = A[i] + distribution(rng);
+    A[i] = 1;
+    B[i] = 0;
   }
 
-  FP *scaleA = (FP*) malloc (sizeof(FP) * size);
-  FP *scaleB = (FP*) malloc (sizeof(FP) * size);
+  FP *scaleA = (FP*) malloc (scale_size_bytes);
+  FP *scaleB = (FP*) malloc (scale_size_bytes);
   for (int i = 0; i < size; i++) {
-    scaleA[i] = (FP)0.01 * distribution(rng);
-    if (scaleA[i] < (FP)0.0) scaleA[i] = -scaleA[i];
-    scaleB[i] = (FP)0.01 * distribution(rng);
-    if (scaleB[i] < (FP)0.0) scaleB[i] = -scaleB[i];
+    scaleA[i] = 1;
+    scaleB[i] = 1;
   }
-
   FP output;
 
-  { // sycl scope
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<FP, 1> d_A (A, size*2);
-  buffer<FP, 1> d_B (B, size*2);
-  buffer<FP, 1> d_scaleA (scaleA, size);
-  buffer<FP, 1> d_scaleB (scaleB, size);
-  buffer<FP, 1> d_cost (max_blocks);
-  buffer<FP, 1> d_output (&output, 1);
+  FP *d_A = malloc_device<FP>(size*2, q);
+  q.memcpy(d_A, A, point_size_bytes);
+
+  FP *d_B = malloc_device<FP>(size*2, q);
+  q.memcpy(d_B, B, point_size_bytes);
+
+  FP *d_scaleA = malloc_device<FP>(size, q);
+  q.memcpy(d_scaleA, scaleA, scale_size_bytes);
+
+  FP *d_scaleB = malloc_device<FP>(size, q);
+  q.memcpy(d_scaleB, scaleB, scale_size_bytes);
+
+  FP *d_cost = malloc_device<FP>(nblocks, q);
+  FP *d_output = malloc_device<FP>(1, q);
 
   range<2> gws (size / (block_size_y * tile_size_y) * block_size_y,
                 size / (block_size_x * tile_size_x) * block_size_x);
@@ -52,22 +76,11 @@ void test(const int size, const int repeat) {
   range<1> gws2 (reduce_block_size);
   range<1> lws2 (reduce_block_size);
 
-  const int nblocks = ceilf(size / (block_size_x * tile_size_x)) * 
-                      ceilf(size / (block_size_y * tile_size_y));
-
-  const int m = size;
-  const int n = size;
-
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      auto A = d_A.template get_access<sycl_read>(cgh);
-      auto B = d_B.template get_access<sycl_read>(cgh);
-      auto sA = d_scaleA.template get_access<sycl_read>(cgh);
-      auto sB = d_scaleB.template get_access<sycl_read>(cgh);
-      auto c = d_cost.template get_access<sycl_discard_write>(cgh);
       accessor<FP, 1, sycl_read_write, access::target::local> sh_A (2 * block_size_x * tile_size_x, cgh);
       accessor<FP, 1, sycl_read_write, access::target::local> sh_B (2 * block_size_y * tile_size_y, cgh);
       accessor<FP, 1, sycl_read_write, access::target::local> sh_scaleA (block_size_x * tile_size_x, cgh);
@@ -75,21 +88,17 @@ void test(const int size, const int repeat) {
       accessor<FP, 1, sycl_read_write, access::target::local> sum (1, cgh);
       cgh.parallel_for<class computeCost<FP>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         distance_tiled<FP>(
-          item, A.get_pointer(), B.get_pointer(), m, n, 
-          sA.get_pointer(), sB.get_pointer(), c.get_pointer(),
+          item, d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost,
           sh_A.get_pointer(), sh_B.get_pointer(), 
           sh_scaleA.get_pointer(), sh_scaleB.get_pointer(), sum.get_pointer());
       });
     });
 
     q.submit([&] (handler &cgh) {
-      auto o = d_output.template get_access<sycl_discard_write>(cgh);
-      auto c = d_cost.template get_access<sycl_read>(cgh);
       accessor<FP, 1, sycl_read_write, access::target::local> sum (1, cgh);
       cgh.parallel_for<class reduceBlock<FP>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
          reduce_cross_term<FP>(
-           item, o.get_pointer(), c.get_pointer(), 
-           sum.get_pointer(), m, n, nblocks);
+           item, d_output, d_cost, sum.get_pointer(), size, size, nblocks);
       });
     });
   }
@@ -99,9 +108,20 @@ void test(const int size, const int repeat) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  } // sycl scope
-  printf("output value: %lf\n", output);
+  q.memcpy(&output, d_output, sizeof(FP)).wait();
+  printf("    device result: %lf\n", (double)output);
 
+  output = cost<FP, 2>(A, B, scaleA, scaleB, size, size);
+  printf("      host result: %lf\n", (double)output);
+
+  printf("analytical result: %lf\n\n", size * size * exp(-1.0));
+
+  free(d_A, q);
+  free(d_B, q);
+  free(d_scaleA, q);
+  free(d_scaleB, q);
+  free(d_output, q);
+  free(d_cost, q);
   free(A);
   free(B);
   free(scaleA);
