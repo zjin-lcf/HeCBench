@@ -47,14 +47,15 @@ void flip_kernel(
 void property (const char* name, std::vector<int64_t> p)
 {
   printf("%s: ( ", name);
-  for (int64_t i = 0; i < p.size(); i++) {
+  for (uint64_t i = 0; i < p.size(); i++) {
     printf("%lu ", p[i]);
   }
   printf(")\n");
 }
 
 template <typename scalar_t>
-void flip (const int64_t num_dims, const int64_t num_flip_dims, const int32_t repeat)
+void flip (const int64_t num_dims, const int64_t num_flip_dims,
+           const int32_t dim_size, const int32_t repeat)
 {
   std::vector<int64_t> flip;
   std::vector<int64_t> shape;
@@ -64,7 +65,7 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims, const int32_t re
 #ifdef EXAMPLE
     shape.push_back(2);
 #else
-    shape.push_back(1024); // arbitrary positive numbers
+    shape.push_back(dim_size);
 #endif
   }
 
@@ -143,14 +144,14 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims, const int32_t re
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <number of dimensions> <size of each dimension> <repeat>\n", argv[0]);
     return 1;
   }
-  const int32_t repeat = atoi(argv[1]);
 
-  // the number of dimensions is fixed for simplicity
-  const int64_t num_dims = 3;
+  const int64_t num_dims = atoi(argv[1]);
+  const int64_t dim_size = atoi(argv[2]);
+  const int32_t repeat = atoi(argv[3]);
 
 #ifdef EXAMPLE
   const int64_t num_flip_dims = 2;
@@ -159,10 +160,10 @@ int main(int argc, char* argv[])
 #endif
 
   printf("=========== Data type is FP32 ==========\n");
-  flip<float>(num_dims, num_flip_dims, repeat);
+  flip<float>(num_dims, num_flip_dims, dim_size, repeat);
 
   printf("=========== Data type is FP64 ==========\n");
-  flip<double>(num_dims, num_flip_dims, repeat);
+  flip<double>(num_dims, num_flip_dims, dim_size, repeat);
 
   return 0;
 }
