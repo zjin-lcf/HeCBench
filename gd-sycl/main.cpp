@@ -30,7 +30,7 @@ int main(int argc, const char *argv[]) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   buffer<float, 1> d_x(x.data(), n);
 
@@ -59,6 +59,7 @@ int main(int argc, const char *argv[]) {
   float obj_val = 0.f;
   float train_error = 0.f;
 
+  q.wait();
   long long train_start = get_time();
 
   for (int k = 0; k < iters; k++) {
@@ -111,33 +112,30 @@ int main(int argc, const char *argv[]) {
           }
 
           // compute objective 
-          float v = cl::sycl::log(1+cl::sycl::exp(-1*A_y_label[i]*xp));
-          auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (total_obj_val[0]);
+          float v = sycl::log(1+sycl::exp(-1*A_y_label[i]*xp));
+          auto atomic_obj_ref = atomic_ref<float,
+            memory_order::relaxed, memory_scope::device,
+            access::address_space::global_space> (total_obj_val[0]);
           atomic_obj_ref.fetch_add(v);
 
           // compute errors
-          float prediction = 1.f/(1.f + cl::sycl::exp(-xp));
+          float prediction = 1.f/(1.f + sycl::exp(-xp));
           int t = (prediction >= 0.5f) ? 1 : -1;
           if (A_y_label[i] == t) {
-            auto atomic_correct_ref = ext::oneapi::atomic_ref<int, 
-                       ext::oneapi::memory_order::relaxed, 
-                       ext::oneapi::memory_scope::device, 
-                       access::address_space::global_space> (correct[0]);
+            auto atomic_correct_ref = atomic_ref<int,
+              memory_order::relaxed, memory_scope::device,
+              access::address_space::global_space> (correct[0]);
             atomic_correct_ref.fetch_add(1);
 	  }
 
           // compute gradient at x
-          float accum = cl::sycl::exp(-A_y_label[i] * xp);
+          float accum = sycl::exp(-A_y_label[i] * xp);
           accum = accum / (1.f + accum);
           for(int j = A_row_ptr[i]; j < A_row_ptr[i+1]; ++j){
             float temp = -accum*A_value[j]*A_y_label[i];
-            auto atomic_grad_ref = ext::oneapi::atomic_ref<float, 
-                       ext::oneapi::memory_order::relaxed, 
-                       ext::oneapi::memory_scope::device, 
-                       access::address_space::global_space> (grad[A_col_index[j]]);
+            auto atomic_grad_ref = atomic_ref<float,
+              memory_order::relaxed, memory_scope::device,
+              access::address_space::global_space> (grad[A_col_index[j]]);
             atomic_grad_ref.fetch_add(temp);
           }
         }
@@ -151,10 +149,9 @@ int main(int argc, const char *argv[]) {
       cgh.parallel_for<class norm>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
-          auto atomic_l2norm_ref = ext::oneapi::atomic_ref<float, 
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (l2_norm[0]);
+          auto atomic_l2norm_ref = atomic_ref<float,
+            memory_order::relaxed, memory_scope::device,
+            access::address_space::global_space> (l2_norm[0]);
           atomic_l2norm_ref.fetch_add(x[i]*x[i]);
         }
       });
@@ -194,9 +191,10 @@ int main(int argc, const char *argv[]) {
     });
   }
 
+  q.wait();
   long long train_end = get_time();
-  printf("Training time takes %lld(us) for %d iterations\n\n", 
-         train_end - train_start, iters);
+  printf("Training time takes %lf (s) for %d iterations\n\n", 
+         (train_end - train_start) * 1e-6, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
   printf("object value = %f train_error = %f\n", obj_val, train_error);
