@@ -128,6 +128,7 @@ int main(int argc, const char *argv[]) {
   float obj_val = 0.f;
   float train_error = 0.f;
 
+  hipDeviceSynchronize();
   long long train_start = get_time();
 
   for (int k = 0; k < iters; k++) {
@@ -147,7 +148,7 @@ int main(int argc, const char *argv[]) {
     hipMemcpy(d_grad, grad.data(), n * sizeof(float), hipMemcpyHostToDevice);
 
     // compute the total objective, correct rate, and gradient
-    hipLaunchKernelGGL(compute, grid, block, 0, 0, 
+    compute<<<grid, block>>>(
         d_x, 
         d_grad, 
         d_row_ptr,
@@ -160,7 +161,7 @@ int main(int argc, const char *argv[]) {
       ); 
 
     // display training status for verification
-    hipLaunchKernelGGL(L2_norm, grid2, block2, 0, 0, d_x, d_l2_norm, n);
+    L2_norm<<<grid2, block2>>>(d_x, d_l2_norm, n);
 
     hipMemcpy(&total_obj_val, d_total_obj_val, sizeof(float), hipMemcpyDeviceToHost);
     hipMemcpy(&l2_norm, d_l2_norm, sizeof(float), hipMemcpyDeviceToHost);
@@ -170,12 +171,13 @@ int main(int argc, const char *argv[]) {
     train_error = 1.f-(correct/(float)m); 
 
     // update x (gradient does not need to be updated)
-    hipLaunchKernelGGL(update, grid2, block2, 0, 0, d_x, d_grad, m, n, lambda, alpha);
+    update<<<grid2, block2>>>(d_x, d_grad, m, n, lambda, alpha);
   }
 
+  hipDeviceSynchronize();
   long long train_end = get_time();
-  printf("Training time takes %lld(us) for %d iterations\n\n", 
-         train_end - train_start, iters);
+  printf("Training time takes %lf (s) for %d iterations\n\n",
+         (train_end - train_start) * 1e-6, iters);
 
   // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
   printf("object value = %f train_error = %f\n", obj_val, train_error);
