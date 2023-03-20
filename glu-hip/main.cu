@@ -30,22 +30,26 @@ void glu_kernel(
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <number of dimensions> <size of each dimension> <repeat>\n", argv[0]);
     return 1;
   }
 
-  const int repeat = atoi(argv[1]);
+  const int ndims = atoi(argv[1]);
+  const int dim_size = atoi(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  // N-dimensional tensor (N is not limited to 3)
-  std::vector<int> Xshape = {1024, 1024, 1024};
+  std::vector<int> Xshape;
+
+  for (int i = 0; i < ndims; i++) {
+    Xshape.push_back(dim_size);
+  }
+
   std::vector<int> Yshape;
   Yshape.insert(Yshape.end(), Xshape.begin(), Xshape.end());
 
-  const int ndims = Yshape.size() - 1;
-
   printf("Shape of input tensor: ( ");
-  for (int i = 0; i < ndims + 1; i++)
+  for (int i = 0; i < ndims; i++)
     printf("%d ", Xshape[i]);
   printf(")\n");
 
@@ -72,9 +76,9 @@ int main(int argc, char* argv[])
 
   const int block_size = 256; 
 
-  for (int input_dim = -1; input_dim < 3 * ndims; input_dim++) {
+  for (int input_dim = -1; input_dim < 3 * (ndims-1); input_dim++) {
 
-    const int split_index = (input_dim == -1) ? ndims : (input_dim % (ndims+1));
+    const int split_index = (input_dim == -1) ? ndims - 1 : (input_dim % ndims);
 
     if (Yshape[split_index] % 2 != 0) {
       printf("Split dimension %d should be divided by two. Skip\n", Yshape[split_index]);
