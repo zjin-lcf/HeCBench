@@ -23,7 +23,7 @@ std::vector<char> reference (const std::vector<char> &word) {
     while (iter != d_word.end())
     {
       *iter = counter;
-      iter = std::find(d_word.begin(), d_word.end(), d_list[counter]);
+      iter = std::find(iter + 1, d_word.end(), d_list[counter]);
     }
   }
   return d_word;

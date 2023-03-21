@@ -25,6 +25,7 @@ thrust::host_vector<char> mtf(const std::vector<char> &word)
 
   for (counter = 0; counter < word.size(); counter++)
   {
+    // copy list from host to device
     thrust::copy(h_list.begin(), h_list.end(), d_list.begin());
 
     // find the location of the symbol in the list
@@ -34,8 +35,8 @@ thrust::host_vector<char> mtf(const std::vector<char> &word)
     // update the list when the first symbols are not the same
     if (h_list[0] != w)
     {
-      // shift portion [begin, iter) right by one
-      thrust::copy(d_list.begin(), iter, h_list.begin()+1);
+      // shift the sublist [begin, iter) right by one
+      thrust::copy(d_list.begin(), iter, h_list.begin() + 1);
       h_list[0] = w;
     }
   }
@@ -47,7 +48,7 @@ thrust::host_vector<char> mtf(const std::vector<char> &word)
     {
       // replace word symbol with its index (counter)
       *iter = counter;
-      iter = thrust::find(d_word.begin(), d_word.end(), h_list[counter]);
+      iter = thrust::find(iter + 1, d_word.end(), h_list[counter]);
     }
   }
 
