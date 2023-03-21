@@ -1,74 +1,86 @@
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
 #include <CL/sycl.hpp>
-
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include "reference.h"
 
-void mtf(sycl::queue &q, std::vector<char> &word, bool output)
+std::vector<char> mtf(sycl::queue &q, std::vector<char> &word)
 {
   auto policy = oneapi::dpl::execution::make_device_policy(q);
 
-  std::vector<char> d_list(256);
-
-  std::vector<char> list(256);
-  
-  std::vector<char> d_word (word.size());
-
-  size_t counter;
+  std::vector<char> h_list(256);
   std::vector<char> h_word(word.size());
-  h_word = word;
-  d_word = h_word;
 
-  for (counter = 0; counter < word.size(); counter++)
   {
-    std::copy(policy, list.begin(), list.end(), d_list.begin());
+    sycl::buffer<char, 1> d_list(256);
 
-    h_word[0] = d_word[counter];
+    // copy word from host to device
+    sycl::buffer<char, 1> d_word (word.data(), word.size());
+  
+    // store the mtf result since input word is read-only
+    d_word.set_final_data(h_word.data());
 
-    auto iter = std::find(policy, d_list.begin(), d_list.end(), d_word[counter]);
+    size_t counter;
 
-    if (d_list[0] != h_word[0])
-    {
-      std::copy(policy, d_list.begin(), iter, list.begin() + 1);
-      list[0] = h_word[0];
-    }
-  }
+    auto d_list_beg = oneapi::dpl::begin(d_list);
+    auto d_list_end = oneapi::dpl::end(d_list);
+    auto d_word_beg = oneapi::dpl::begin(d_word);
+    auto d_word_end = oneapi::dpl::end(d_word);
 
-  std::copy(policy, list.begin(), list.end(), d_list.begin());
-  std::copy(policy, word.begin(), word.end(), d_word.begin());
-  for (counter = 0; counter < list.size(); counter++)
-  {
-    auto iter = std::find(policy, d_word.begin(), d_word.end(), d_list[counter]);
-    while (iter != d_word.end())
-    {
-      *iter = counter;
-      iter = std::find(policy, d_word.begin(), d_word.end(), d_list[counter]);
-    }
-  }
-  std::copy(policy, d_word.begin(), d_word.end(), h_word.begin());
-
-  if (output) {
     for (counter = 0; counter < word.size(); counter++)
-      printf("%d ", h_word[counter]);
-    printf("\n");
+    {
+      // copy list from host to device
+      std::copy(policy, h_list.begin(), h_list.end(), d_list_beg);
+
+      // find the location of the symbol in the list
+      auto w = word[counter];
+      auto iter = oneapi::dpl::find(policy, d_list_beg, d_list_end, w);
+
+      // update the list when the first symbols are not the same
+      if (h_list[0] != w)
+      {
+        // shift the sublist [begin, iter) right by one
+        std::copy(policy, d_list_beg, iter, h_list.begin() + 1);
+        h_list[0] = w;
+      }
+    }
+
+    for (counter = 0; counter < h_list.size(); counter++)
+    {
+      auto iter = oneapi::dpl::find(policy, d_word_beg, d_word_end, h_list[counter]);
+      while (iter != d_word_end)
+      {
+        // replace word symbol with its index (counter)
+        // https://github.com/oneapi-src/oneDPL/issues/840
+        oneapi::dpl::fill(policy, iter, iter + 1, counter);
+        iter = oneapi::dpl::find(policy, iter + 1, d_word_end, h_list[counter]);
+      }
+    }
   }
+  //std::copy(policy, d_word_beg, d_word_end, h_word.begin());
+  return h_word;
 }
+
 
 int main(int argc, char *argv[])
 {
   if (argc != 3)
   {
-    printf("Usage: %s <string_input> <repeat>\n", argv[0]);
+    printf("Usage: %s <string length> <repeat>\n", argv[0]);
     exit(1);
   }
 
-  const int len = strlen(argv[1]);
-  std::vector<char> word(argv[1], argv[1] + len);
-
+  const size_t len = atol(argv[1]);
   const int repeat = atoi(argv[2]);
+  const char* a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+  std::vector<char> word(len);
+
+  srand(123);
+  for (size_t i = 0; i < len; i++) word[i] = a[rand() % 52];
 
 #ifdef USE_GPU
   sycl::gpu_selector dev_sel;
@@ -77,12 +89,31 @@ int main(int argc, char *argv[])
 #endif
   sycl::queue q(dev_sel);
 
-  // output MTF result
-  mtf(q, word, true);
+  auto d_result = mtf(q, word);
+  auto h_result = reference(word);
+  bool ok = d_result == h_result;
+  if (ok) {
+    printf("PASS\n");
+  }
+  else {
+    printf("FAIL\n");
+
+    // output MTF result
+    if (len < 16) {
+      printf("host: ");
+      for (size_t i = 0; i < len; i++) 
+        printf("%d ", h_result[i]);
+      printf("\ndevice: ");
+      for (size_t i = 0; i < len; i++) 
+        printf("%d ", d_result[i]);
+      printf("\n");
+    }
+    return 1;
+  }
 
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++) mtf(q, word, false);
+  for (int i = 0; i < repeat; i++) mtf(q, word);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
