@@ -1,2 +1,5 @@
 ace-sycl
 minimod-cuda
+aop-sycl
+bn-hip
+jacobi-hip
