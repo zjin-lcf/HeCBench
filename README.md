@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, resnet-kernels, sampling, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
+    accuracy, adam, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, resnet-kernels, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
     alp, atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
@@ -116,7 +116,7 @@ Not all programs automate the verification of host and device results
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
 Not all programs have OpenMP target offloading implementations  
 Raw performance of any program may be suboptimal  
-Some programs may take longer to complete on an integrated GPU  
+Some programs may take long to complete on an integrated GPU  
 Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
 
 # Feedback
@@ -1117,6 +1117,9 @@ Early results are shown [here](results/README.md)
 ### scan3 (cuda)
   Scan a large array using vendors' library (https://github.com/OpenCL/AMD_APP_samples)
 
+### scel (cuda)
+  Sigmoid cross-entropy with logits (https://pytorch.org/)
+
 ### score (cuda)
   Find the top scores (https://github.com/opencv/)
 
@@ -1253,7 +1256,7 @@ Early results are shown [here](results/README.md)
   The 2-point correlation function (https://users.ncsa.illinois.edu/kindr/projects/hpca/index.html)
 
 ### tqs (cuda)
-  A task queue system (https://github.com/chai-benchmarks/chai)
+  Simulation of a task queue system (https://github.com/chai-benchmarks/chai)
 
 ### triad (opencl)
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
@@ -1280,7 +1283,7 @@ Early results are shown [here](results/README.md)
   Computes expectation values (6D integrals) associated with the helium atom (https://github.com/wadejong/Summer-School-Materials/tree/master/Examples/vmc)
 
 ### vol2col (cuda)
-  Volumn-to-column transform (https://pytorch.org/)
+  Volume-to-column transform (https://pytorch.org/)
 
 ### vote (cuda)
   Demonstrate the usage of the vote intrinsics (https://github.com/NVIDIA/cuda-samples/)
@@ -1328,7 +1331,7 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kinman Lei, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Robert Harrison, Robin Kobus, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
+Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kinman Lei, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Robert Harrison, Robin Kobus, Rod Burns, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
 
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
