@@ -53,15 +53,14 @@ unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
 __global__ void row_kernel (
     const uchar4* __restrict__ ucSource, 
             uint* __restrict__ uiDest,
-    const unsigned int uiWidth, 
+    const unsigned int uiWidth,
     const unsigned int uiHeight,
     const int iRadius,
     const int iRadiusAligned, 
     const float fScale, 
     const unsigned int uiNumOutputPix)
 {
-
-  HIP_DYNAMIC_SHARED(uchar4, uc4LocalData)
+  extern __shared__ uchar4 uc4LocalData[];
 
   int lid = threadIdx.x;
   int gidx = blockIdx.x;
@@ -105,8 +104,8 @@ __global__ void row_kernel (
 }
 
 __global__ void col_kernel (
-    const uint* __restrict__ uiSource, 
-          uint* __restrict__ uiDest, 
+    const uint* __restrict__ uiSource,
+          uint* __restrict__ uiDest,
     const unsigned int uiWidth, 
     const unsigned int uiHeight, 
     const int iRadius, 
@@ -115,24 +114,27 @@ __global__ void col_kernel (
   size_t globalPosX = blockIdx.x * blockDim.x + threadIdx.x;
   const uint* uiInputImage = &uiSource[globalPosX];
   uint* uiOutputImage = &uiDest[globalPosX];
-  // do left edge
+
   float4 f4Sum;
-  // convert from "const int" to "float4" 
-  f4Sum = rgbaUintToFloat4(uiInputImage[0]) * 
+
+  float4 top_color = rgbaUintToFloat4(uiInputImage[0]);
+  float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
+
+  f4Sum = top_color *
           make_float4((float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius); 
   for (int y = 0; y < iRadius + 1; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
   }
   uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
+
   for(int y = 1; y < iRadius + 1; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-    f4Sum -= rgbaUintToFloat4(uiInputImage[0]);
+    f4Sum -= top_color;
     uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
   }
 
-  // main loop
   for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
   {
     f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
@@ -140,10 +142,9 @@ __global__ void col_kernel (
     uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
   }
 
-  // do right edge
   for (int y = uiHeight - iRadius; y < uiHeight; y++) 
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
+    f4Sum += bot_color;
     f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
     uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
   }
@@ -168,7 +169,7 @@ void BoxFilterGPU (uchar4* cmBufIn,
   dim3 row_block((size_t)(iRadiusAligned + uiNumOutputPix + iRadius), 1);
 
   // Launch row kernel
-  hipLaunchKernelGGL(row_kernel, dim3(row_grid), dim3(row_block), sizeof(uchar4)*(iRadiusAligned+uiNumOutputPix+iRadius), 0, 
+  row_kernel<<<row_grid, row_block, sizeof(uchar4)*(iRadiusAligned+uiNumOutputPix+iRadius)>>> (
       cmBufIn, cmBufTmp, uiWidth, uiHeight, iRadius, iRadiusAligned, fScale, uiNumOutputPix);
 
   // Set global and local work sizes for column kernel
@@ -176,7 +177,7 @@ void BoxFilterGPU (uchar4* cmBufIn,
   dim3 col_block(64);
 
   // Launch column kernel
-  hipLaunchKernelGGL(col_kernel, dim3(col_grid), dim3(col_block), 0, 0, cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
+  col_kernel<<<col_grid, col_block>>>(cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
 }
 
 int main(int argc, char** argv)
@@ -193,8 +194,8 @@ int main(int argc, char** argv)
   unsigned int* uiHostOutput = NULL;      
 
   shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
-  printf("Image Width = %i, Height = %i, bpp = %i, Mask Radius = %i\n", 
-      uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3, RADIUS);
+  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n", 
+      uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
   printf("Using Local Memory for Row Processing\n\n");
 
   size_t szBuff= uiImageWidth * uiImageHeight;
@@ -236,7 +237,7 @@ int main(int argc, char** argv)
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average device execution time %f (s)\n", (time * 1e-9f) / iCycles);
+  printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
 
   // Copy output from device to host
   hipMemcpy(uiDevOutput, cmDevBufOut, szBuffBytes, hipMemcpyDeviceToHost);
@@ -251,7 +252,7 @@ int main(int argc, char** argv)
   // Verification 
   // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
   int error = 0;
-  for (int i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
+  for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
   {
     if (uiDevOutput[i] != uiHostOutput[i]) {
       printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
@@ -259,10 +260,7 @@ int main(int argc, char** argv)
       break;
     }
   }
-  if (error) 
-    printf("FAIL\n");
-  else
-    printf("PASS\n");
+  printf("%s\n", error ? "FAIL" : "PASS");
 
   free(uiInput);
   free(uiTmp);
