@@ -33,13 +33,10 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
-
 
 #===============================================================================
 # Targets to Build
@@ -47,7 +44,6 @@ endif
 
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
-
 
 main.o: main.cu $(SPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -65,4 +61,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../boxfilter-sycl/data/lenaRGB.ppm 1000
+	./$(program) ../boxfilter-sycl/data/lenaRGB.ppm 10000

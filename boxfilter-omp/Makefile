@@ -69,4 +69,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../boxfilter-sycl/data/lenaRGB.ppm 1000
+	./$(program) ../boxfilter-sycl/data/lenaRGB.ppm 10000
