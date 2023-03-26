@@ -13,7 +13,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/packages/gcc/10.2.0/"
+#GCC_TOOLCHAIN = "/packages/gcc/10.2.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -75,4 +75,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100000
+	./$(program) 102400 1024 100
