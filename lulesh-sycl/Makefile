@@ -3,7 +3,8 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+# if clang++ unavailable, use icpx if found, else leave as clang++
+CC        = $(shell which clang++ > /dev/null 2>&1 || (which icpx > /dev/null 2>&1 && echo icpx || echo clang++))
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
