@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 #include <chrono>
 #include "common.h"
 
@@ -10,7 +11,7 @@
 template <typename T>
 void vol2col_kernel(
     nd_item<1> &item,
-    const size_t range,
+    const uint64_t range,
     const T* data_vol,
     const int depth,
     const int height,
@@ -64,14 +65,86 @@ void vol2col_kernel(
   }
 }
 
-int get_blocks (queue &q, size_t n) {
-  size_t numBlocks = (n - threadsPerBlock) / threadsPerBlock + 1;
+template <typename T, typename accT>
+void col2vol_kernel(
+    nd_item<1> &item,
+    const uint64_t n,
+    const T* data_col,
+    const unsigned depth,
+    const unsigned height,
+    const unsigned width,
+    const unsigned kernel_t,
+    const unsigned kernel_h,
+    const unsigned kernel_w,
+    const unsigned pad_t,
+    const unsigned pad_h,
+    const unsigned pad_w,
+    const unsigned stride_t,
+    const unsigned stride_h,
+    const unsigned stride_w,
+    const unsigned dilation_t,
+    const unsigned dilation_h,
+    const unsigned dilation_w,
+    const unsigned depth_col,
+    const unsigned height_col,
+    const unsigned width_col,
+    T* data_vol)
+{
+  for (int64_t index = item.get_global_id(0); index < n;
+               index += item.get_group_range(0) * item.get_local_range(0)) {
+    accT val = static_cast<accT>(0);
+    const unsigned w_im = index % width + pad_w;
+    const unsigned h_im = (index / width) % height + pad_h;
+    const unsigned t_im = (index / width / height) % depth + pad_t;
+    const unsigned c_im = index / (width * height * depth);
+    auto kernel_extent_w = (kernel_w - 1) * dilation_w + 1;
+    auto kernel_extent_h = (kernel_h - 1) * dilation_h + 1;
+    auto kernel_extent_t = (kernel_t - 1) * dilation_t + 1;
+    // compute the start and end of the output
+    const auto w_col_start =
+        (w_im < kernel_extent_w) ? 0 : (w_im - kernel_extent_w) / stride_w + 1;
+    const auto w_col_end = sycl::min(w_im / stride_w + 1, width_col);
+    const auto h_col_start =
+        (h_im < kernel_extent_h) ? 0 : (h_im - kernel_extent_h) / stride_h + 1;
+    const auto h_col_end = sycl::min(h_im / stride_h + 1, height_col);
+    const auto t_col_start =
+        (t_im < kernel_extent_t) ? 0 : (t_im - kernel_extent_t) / stride_t + 1;
+    const auto t_col_end = sycl::min(t_im / stride_t + 1, depth_col);
+    // TODO: use LCM of stride and dilation to avoid unnecessary loops
+    for (unsigned t_col = t_col_start; t_col < t_col_end; t_col += 1) {
+      for (unsigned h_col = h_col_start; h_col < h_col_end; h_col += 1) {
+        for (unsigned w_col = w_col_start; w_col < w_col_end; w_col += 1) {
+          uint64_t t_k = (t_im - t_col * stride_t);
+          uint64_t h_k = (h_im - h_col * stride_h);
+          uint64_t w_k = (w_im - w_col * stride_w);
+          if (t_k % dilation_t == 0 && h_k % dilation_h == 0 &&
+              w_k % dilation_w == 0) {
+            t_k /= dilation_t;
+            h_k /= dilation_h;
+            w_k /= dilation_w;
+            const uint64_t idx_k =
+                ((c_im * kernel_t + t_k) * kernel_h + h_k) * kernel_w + w_k;
+            const uint64_t data_col_index =
+                ((idx_k * depth_col + t_col) *
+                    height_col + h_col) *
+                  width_col + w_col;
+            val += data_col[data_col_index];
+          }
+        }
+      }
+    }
+    data_vol[index] = static_cast<T>(val);
+  }
+}
+
+int get_blocks (queue &q, uint64_t n) {
+  uint64_t numBlocks = (n - threadsPerBlock) / threadsPerBlock + 1;
 
 #ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
   id<3> groups = q.get_device().get_info<ext::oneapi::experimental::info::device::max_work_groups<3>>();
-  size_t blocksPerGrid = min((size_t)groups[2], numBlocks);
+  uint64_t blocksPerGrid = std::min((uint64_t)groups[2], numBlocks);
 #else
-  size_t blocksPerGrid = min((size_t)0x7FFFFFFF, numBlocks);
+  uint64_t blocksPerGrid = std::min((uint64_t)0x7FFFFFFF, numBlocks);
 #endif
 
   return blocksPerGrid;
@@ -100,17 +173,17 @@ void eval (
     const int dilation_h,
     const int dilation_w)
 {
-  size_t vol_size = (size_t) channels * (2*pad_t+depth) * (2*pad_h+height) * (2*pad_w+width);
-  size_t col_size = ((size_t) channels * ksize_t * ksize_h * ksize_w + 1) * 
+  uint64_t vol_size = (uint64_t) channels * (2*pad_t+depth) * (2*pad_h+height) * (2*pad_w+width);
+  uint64_t col_size = ((uint64_t) channels * ksize_t * ksize_h * ksize_w + 1) * 
                     (depth_col+pad_t) * (height_col+pad_h) * (width_col+pad_w);
                          
-  size_t vol_size_bytes = sizeof(T) * vol_size;
-  size_t col_size_bytes = sizeof(T) * col_size;
+  uint64_t vol_size_bytes = sizeof(T) * vol_size;
+  uint64_t col_size_bytes = sizeof(T) * col_size;
   
   T *h_data_vol = (T*) malloc (vol_size_bytes);
   T *h_data_col = (T*) malloc (col_size_bytes);
 
-  for (size_t i = 0; i < vol_size; i++) {
+  for (uint64_t i = 0; i < vol_size; i++) {
     h_data_vol[i] = (T)1; 
   }
 
@@ -130,7 +203,7 @@ void eval (
   // each of "channels * depth_col * height_col * width_col"
   // blocks responsible for copying a single-channel grid.
   // We cast an operand to int64 so that the product will not overflow
-  size_t n = static_cast<size_t>(channels) * depth_col * height_col * width_col;
+  uint64_t n = static_cast<uint64_t>(channels) * depth_col * height_col * width_col;
 
   int blocksPerGrid = get_blocks(q, n);
 
@@ -166,10 +239,43 @@ void eval (
   q.memcpy(h_data_col, d_data_col, col_size_bytes).wait();
 
   float checksum = 0;
-  for (size_t i = 0; i < col_size; i++) {
+  for (uint64_t i = 0; i < col_size; i++) {
     checksum += h_data_col[i];
   }
   printf("Checksum = %f\n", checksum / col_size);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class c2v>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        col2vol_kernel<T, T>(
+          item,
+          n,
+          d_data_col,
+          depth, height, width,
+          ksize_t, ksize_h, ksize_w,
+          pad_t, pad_h, pad_w,
+          stride_t, stride_h, stride_w,
+          dilation_t, dilation_h, dilation_w,
+          depth_col, height_col, width_col,
+          d_data_vol);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of col2vol kernel: %f (us)\n", (time * 1e-3f) / repeat);
+
+  q.memcpy(h_data_vol, d_data_vol, vol_size_bytes).wait();
+
+  checksum = 0;
+  for (uint64_t i = 0; i < vol_size; i++) {
+    checksum += h_data_vol[i];
+  }
+  printf("Checksum = %f\n", checksum / vol_size);
 
   free(d_data_vol, q);
   free(d_data_col, q);
@@ -195,9 +301,9 @@ int main(int argc, char* argv[])
   int stride_t = 2;
   int stride_h = 2;
   int stride_w = 2;
-  int dilation_t = 1;
-  int dilation_h = 1;
-  int dilation_w = 1;
+  int dilation_t = 2;
+  int dilation_h = 2;
+  int dilation_w = 2;
   int depth_col = 3;
   int height_col = 255;
   int width_col = 255;
