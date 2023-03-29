@@ -6,6 +6,7 @@ import re, time, sys, subprocess, multiprocessing, os
 import argparse
 import json
 
+
 class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
@@ -16,8 +17,17 @@ class Benchmark:
             elif args.sycl_type == 'hip':
                 self.MAKE_ARGS.append('HIP=yes')
                 self.MAKE_ARGS.append('HIP_ARCH={}'.format(args.amd_arch))
+            elif args.sycl_type == 'opencl':
+                self.MAKE_ARGS.append('CUDA=no')
+                self.MAKE_ARGS.append('HIP=no')
+        elif name.endswith('cuda'):
+            self.MAKE_ARGS = ['CUDA_ARCH=sm_{}'.format(args.nvidia_sm)]
         else:
             self.MAKE_ARGS = []
+
+        if args.extra_compile_flags:
+            flags = args.extra_compile_flags.replace(',',' ')
+            self.MAKE_ARGS.append('EXTRA_CFLAGS={}'.format(flags))
 
         if args.bench_dir:
             self.path = os.path.realpath(os.path.join(args.bench_dir, name))
@@ -39,9 +49,19 @@ class Benchmark:
 
         out = subprocess.DEVNULL
         if self.verbose:
-            out = None
+            out = subprocess.PIPE
 
-        subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=out).check_returncode()
+        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=subprocess.STDOUT, encoding="ascii")
+        try:
+            proc.check_returncode()
+        except subprocess.CalledProcessError as e:
+            print(f'Failed compilation in {self.path}.\n{e}')
+            if e.stderr:
+                print(e.stderr, file=sys.stderr)
+            raise(e)
+
+        if self.verbose:
+            print(proc.stdout)
 
     def run(self):
         cmd = ["./" + self.binary] + self.args
@@ -71,7 +91,7 @@ def main():
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
                         help='Run a warmup iteration')
-    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip'], default='cuda',
+    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip', 'opencl'], default='cuda',
                         help='Type of SYCL device to use')
     parser.add_argument('--nvidia-sm', type=int, default=60,
                         help='NVIDIA SM version')
@@ -79,6 +99,8 @@ def main():
                         help='AMD Architecture')
     parser.add_argument('--gcc-toolchain', default='',
                         help='GCC toolchain location')
+    parser.add_argument('--extra-compile-flags', '-e', default='',
+                        help='Additional compilation flags (inserted before the predefined CFLAGS)')
     parser.add_argument('--clean', '-c', action='store_true',
                         help='Clean the builds')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -126,8 +148,12 @@ def main():
         benches.append(Benchmark(args, b, *benchmarks[b]))
 
     t0 = time.time()
-    with multiprocessing.Pool() as p:
-        p.map(comp, benches)
+    try:
+        with multiprocessing.Pool() as p:
+            p.map(comp, benches)
+    except Exception as e:
+        print("Compilation failed, exiting")
+        sys.exit(1)
 
     t_compiled = time.time()
 
@@ -136,17 +162,21 @@ def main():
         outfile = open(args.output, 'w')
 
     for b in benches:
-        if args.verbose:
-            print("running: {}".format(b.name))
+        try:
+            if args.verbose:
+                print("running: {}".format(b.name))
 
-        if args.warmup:
-            b.run()
+            if args.warmup:
+                b.run()
 
-        res = []
-        for i in range(args.repeat):
-            res.append(str(b.run()))
+            res = []
+            for i in range(args.repeat):
+                res.append(str(b.run()))
 
-        print(b.name + "," + ", ".join(res), file=outfile)
+            print(b.name + "," + ", ".join(res), file=outfile)
+        except Exception as err:
+            print("Error running: ", b.name)
+            print(err)
 
     if args.output:
         outfile.close()

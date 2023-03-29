@@ -20,9 +20,6 @@
       "--height=2160"
     ]
   ],
-  "mandelbrot-sycl": [
-    "(?:parallel time: )([0-9.+-e]+)(?:s)"
-  ],
   "nbody-sycl": [
     "(?:Total Time \\(s\\)[ ]*: )([0-9.+-e]+)",
     [
@@ -31,7 +28,7 @@
     ]
   ],
   "su3-sycl": [
-    "(?:Total execution time = )([0-9.+-e]+)(?: secs)"
+    "(?:Total kernel execution time = )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "adv-sycl": [
     "(?:elapsed time=)([0-9.+-e]+)(?: )",
@@ -50,13 +47,16 @@
     ]
   ],
   "all-pairs-distance-sycl": [
-    "(?:GPU time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
   ],
   "alp-sycl": [
-    "(?:Total execution time )([0-9.+-e]+)(?: \\(s\\))"
+    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1"
+    ]
   ],
   "aobench-sycl": [
     "(?:Average render time: )([0-9.+-e]+)(?: sec)",
@@ -151,7 +151,7 @@
     "(?:Kernel time: )([0-9.+-e]+)(?: seconds)"
   ],
   "cobahh-sycl": [
-    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000000",
       "10"
@@ -176,7 +176,7 @@
     ]
   ],
   "crs-sycl": [
-    "(?:Total elapsed time )([0-9.+-e]+)(?: \\(ms\\))",
+    "(?:Total encoding time )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1",
       "1"
@@ -259,7 +259,7 @@
     "(?:elapsed time: )([0-9.+-e]+)(?: sec)"
   ],
   "iso2dfd-sycl": [
-    "(?:Elapsed time: )([0-9.+-e]+)(?: ms)",
+    "(?:Total kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "5000",
       "5000",
@@ -267,10 +267,10 @@
     ]
   ],
   "jacobi-sycl": [
-    "(?:Run time = )([0-9.+-e]+)(?: seconds)"
+    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
   ],
   "laplace-sycl": [
-    "(?:Total time: )([0-9.+-e]+)(?: s)"
+    "(?:iterations: )([0-9.+-e]+)(?: s)"
   ],
   "lavaMD-sycl": [
     "(?:Device offloading time:\\s)([0-9.+-e]+)(?: s)",
@@ -283,10 +283,10 @@
     "(?: )([0-9.+-e]+)(?: ms)"
   ],
   "minimod-sycl": [
-    "(?:Time kernel: )([0-9.+-e]+)(?: s)"
+    "(?:Average kernel time per iteration: )([0-9.+-e]+)(?: s)"
   ],
   "minisweep-sycl": [
-    "(?:time: )([0-9.+-e]+)(?:  )",
+    "(?:kernel time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "--niterations",
       "5"
@@ -299,7 +299,7 @@
     ]
   ],
   "mr-sycl": [
-    "(?:\\| *)([0-9.+-e]+)(?: ns *\\|)"
+    "(?:Total kernel execution time \\([a-z]+\\) )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "murmurhash3-sycl": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
@@ -309,19 +309,23 @@
     ]
   ],
   "nbnxm-sycl": [
-    "(?:Total kernel time \\(w/o? shift\\): )([0-9.+-e]+)"
+    "(?:Average kernel execution time \\(w/o shift\\): )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
   ],
   "page-rank-sycl": [
-    "(?:\"time\": )([0-9.+-e]+)(?: )",
+    "(?:Total kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1000",
       "1000"
     ]
   ],
   "particle-diffusion-sycl": [
-    "(?:Time: )([0-9.+-e]+)(?: ms)",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "10"
+      "10",
+      "5"
     ]
   ],
   "particlefilter-sycl": [
@@ -369,7 +373,7 @@
     ]
   ],
   "vanGenuchten-sycl": [
-    "(?:Total kernel time : )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "100",
       "100",
@@ -378,10 +382,13 @@
     ]
   ],
   "black-scholes-sycl": [
-    "(?:GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100"
+    ]
   ],
   "attention-sycl": [
-    "(?:Device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average execution time of kernels )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "10000",
       "10000",
@@ -396,23 +403,23 @@
     ]
   ],
   "bn-sycl": [
-    "(?:Total duration is )([0-9.+-e]+)(?: seconds)",
+    "(?:Kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "/dev/null"
     ]
   ],
   "sheath-sycl": [
-    "(?:Time per time step: )([0-9.+-e]+)(?: ms)"
+    "(?:Time per time step: )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "ace-sycl": [
-    "(?:Offload time = )([0-9.+-e]+)(?:ms)",
+    "(?:Offload time = )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "1"
     ]
   ],
   "black-scholes-cuda": [
     "(?:GPU: )([0-9.+-e]+)(?: \\(ms\\))",
-    [],
+    ["1"],
     "BlackScholesEngine"
   ],
   "backprop-cuda": [
@@ -444,7 +451,7 @@
     ]
   ],
   "ace-cuda": [
-    "(?:Offload time = )([0-9.+-e]+)(?:ms)",
+    "(?:Offload time: )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "1"
     ]
@@ -466,13 +473,16 @@
     ]
   ],
   "all-pairs-distance-cuda": [
-    "(?:GPU time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
   ],
   "alp-cuda": [
-    "(?:Total execution time )([0-9.+-e]+)(?: \\(s\\))"
+    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1"
+    ]
   ],
   "asmooth-cuda": [
     "(?:Average filtering time )([0-9.+-e]+)(?: \\(s\\))",
@@ -487,7 +497,7 @@
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "attention-cuda": [
-    "(?:Device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average execution time of kernels )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "10000",
       "10000",
@@ -522,7 +532,7 @@
     ]
   ],
   "bn-cuda": [
-    "(?:Total duration is )([0-9.+-e]+)(?: seconds)",
+    "(?:Kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "/dev/null"
     ]
@@ -570,7 +580,7 @@
     "test"
   ],
   "cobahh-cuda": [
-    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000000",
       "10"
@@ -595,7 +605,7 @@
     ]
   ],
   "crs-cuda": [
-    "(?:Total elapsed time )([0-9.+-e]+)(?: \\(ms\\))",
+    "(?:Total encoding time )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1",
       "1"
@@ -675,10 +685,10 @@
     "(?:elapsed time: )([0-9.+-e]+)(?: sec)"
   ],
   "jacobi-cuda": [
-    "(?:Run time = )([0-9.+-e]+)(?: seconds)"
+    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
   ],
   "laplace-cuda": [
-    "(?:Total time: )([0-9.+-e]+)(?: s)"
+    "(?:iterations: )([0-9.+-e]+)(?: s)"
   ],
   "lavaMD-cuda": [
     "(?:Device offloading time:\\s)([0-9.+-e]+)(?: s)",
@@ -691,7 +701,7 @@
     "(?:Time kernel: )([0-9.+-e]+)(?: s)"
   ],
   "minisweep-cuda": [
-    "(?:time: )([0-9.+-e]+)(?:  )",
+    "(?:kernel time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "--niterations",
       "5"
@@ -720,7 +730,7 @@
     ]
   ],
   "page-rank-cuda": [
-    "(?:\"time\": )([0-9.+-e]+)(?: )",
+    "(?:Total kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1000",
       "1000"
@@ -728,9 +738,10 @@
     "page-rank"
   ],
   "particle-diffusion-cuda": [
-    "(?:Time: )([0-9.+-e]+)(?: ms)",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "10"
+      "10",
+      "5"
     ],
     "motionsim"
   ],
@@ -766,7 +777,7 @@
     "s3d"
   ],
   "sheath-cuda": [
-    "(?:Time per time step: )([0-9.+-e]+)(?: ms)"
+    "(?:Time per time step: )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "tridiagonal-cuda": [
     "(?:Time = )([0-9.+-e]+)(?: s)",
@@ -775,7 +786,7 @@
     ]
   ],
   "vanGenuchten-cuda": [
-    "(?:Total kernel time : )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "100",
       "100",
@@ -784,7 +795,7 @@
     ]
   ],
   "su3-cuda": [
-    "(?:Total execution time = )([0-9.+-e]+)(?: secs)"
+    "(?:Total kernel execution time = )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "aobench-cuda": [
     "(?:Average render time: )([0-9.+-e]+)(?: sec)",
@@ -814,7 +825,9 @@
     ]
   ],
   "black-scholes-hip": [
-    "(?:GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:GPU: )([0-9.+-e]+)(?: \\(ms\\))",
+    ["1"],
+    "BlackScholesEngine"
   ],
   "backprop-hip": [
     "(?:time = )([0-9.+-e]+)(?:\\(s\\))",
@@ -837,9 +850,6 @@
       "--height=2160"
     ]
   ],
-  "mandelbrot-hip": [
-    "(?:parallel time: )([0-9.+-e]+)(?:s)"
-  ],
   "nbody-hip": [
     "(?:Total Time \\(s\\)[ ]*: )([0-9.+-e]+)",
     [
@@ -848,10 +858,10 @@
     ]
   ],
   "su3-hip": [
-    "(?:Total execution time = )([0-9.+-e]+)(?: secs)"
+    "(?:Total kernel execution time = )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "ace-hip": [
-    "(?:Offload time = )([0-9.+-e]+)(?:ms)",
+    "(?:Offload time: )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "1"
     ]
@@ -873,19 +883,23 @@
     ]
   ],
   "all-pairs-distance-hip": [
-    "(?:GPU time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
   ],
   "alp-hip": [
-    "(?:Total execution time )([0-9.+-e]+)(?: \\(s\\))"
+    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1"
+    ]
   ],
   "aobench-hip": [
     "(?:Average render time: )([0-9.+-e]+)(?: sec)",
     [
       "1000"
-    ]
+    ],
+    "ao"
   ],
   "aop-hip": [
     "(?:elapsed time for each run *: )([0-9.+-e]+)(?:ms)",
@@ -907,7 +921,7 @@
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "attention-hip": [
-    "(?:Device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average execution time of kernels )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "10000",
       "10000",
@@ -921,7 +935,8 @@
       "10",
       "-n",
       "500"
-    ]
+    ],
+    "bs"
   ],
   "bh-hip": [
     "(?:Total kernel execution time: )([0-9.+-e]+)(?: s)",
@@ -951,7 +966,7 @@
     ]
   ],
   "bn-hip": [
-    "(?:Total duration is )([0-9.+-e]+)(?: seconds)",
+    "(?:Kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "/dev/null"
     ]
@@ -968,12 +983,6 @@
   ],
   "bspline-vgh-hip": [
     "(?:Total kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
-  ],
-  "btree-hip": [
-    "(?:Total device execution time = )([0-9.+-e]+)(?: s)",
-    [
-      "10000000"
-    ]
   ],
   "burger-hip": [
     "(?:Total kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
@@ -995,13 +1004,16 @@
     [
       "200",
       "200"
-    ]
+    ],
+    "test"
   ],
   "clenergy-hip": [
-    "(?:Kernel time: )([0-9.+-e]+)(?: seconds)"
+    "(?:Kernel time: )([0-9.+-e]+)(?: seconds)",
+    [],
+    "clenergy"
   ],
   "cobahh-hip": [
-    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000000",
       "10"
@@ -1026,7 +1038,7 @@
     ]
   ],
   "crs-hip": [
-    "(?:Total elapsed time )([0-9.+-e]+)(?: \\(ms\\))",
+    "(?:Total encoding time )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1",
       "1"
@@ -1103,21 +1115,22 @@
     ]
   ],
   "gpp-hip": [
-    "(?:[*]* Kernel Time Taken [*]*= )([0-9.+-e]+)(?: secs)"
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
   ],
   "ising-hip": [
     "(?:elapsed time: )([0-9.+-e]+)(?: sec)"
   ],
   "iso2dfd-hip": [
-    "(?:Elapsed time: )([0-9.+-e]+)(?: ms)",
+    "(?:Total kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
     [
       "5000",
       "5000",
       "10"
-    ]
+    ],
+    "iso2dfd"
   ],
   "jacobi-hip": [
-    "(?:Run time = )([0-9.+-e]+)(?: seconds)"
+    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
   ],
   "keccaktreehash-hip": [
     "(?:GPU speed : )([0-9.+-e]+)(?: kB/s)",
@@ -1126,12 +1139,13 @@
       "100",
       "100"
     ],
+    "keccektree",
     {
       "invert": true
     }
   ],
   "laplace-hip": [
-    "(?:Total time: )([0-9.+-e]+)(?: s)"
+    "(?:iterations: )([0-9.+-e]+)(?: s)"
   ],
   "lavaMD-hip": [
     "(?:Device offloading time:\\s)([0-9.+-e]+)(?: s)",
@@ -1144,10 +1158,10 @@
     "(?: )([0-9.+-e]+)(?: ms)"
   ],
   "minimod-hip": [
-    "(?:Time kernel: )([0-9.+-e]+)(?: s)"
+    "(?:Average kernel time per iteration: )([0-9.+-e]+)(?: s)"
   ],
   "minisweep-hip": [
-    "(?:time: )([0-9.+-e]+)(?:  )",
+    "(?:kernel time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "--niterations",
       "5"
@@ -1170,28 +1184,32 @@
     ]
   ],
   "myocyte-hip": [
-    "(?:Device offloading time:\n)([0-9.+-e]+)(?: s)",
+    "([0-9.+-e]+)(?: s, [0-9.+-e]+ % : RUN COMPUTATION)",
     [
-      "-time",
       "100"
-    ],
-    "myocyte.out"
+    ]
   ],
   "nbnxm-hip": [
-    "(?:Total kernel time \\(w/o? shift\\): )([0-9.+-e]+)"
+    "(?:Average kernel execution time \\(w/o shift\\): )([0-9.+-e]+)(?: \\(s\\))",
+   [
+     "100"
+   ]
   ],
   "page-rank-hip": [
-    "(?:\"time\": )([0-9.+-e]+)(?: )",
+    "(?:Total kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1000",
       "1000"
-    ]
+    ],
+    "page-rank"
   ],
   "particle-diffusion-hip": [
-    "(?:Time: )([0-9.+-e]+)(?: ms)",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "10"
-    ]
+      "10",
+      "5"
+    ],
+    "motionsim"
   ],
   "particlefilter-hip": [
     "(?:Device offloading time: )([0-9.+-e]+)(?: \\(s\\))",
@@ -1207,7 +1225,7 @@
     ]
   ],
   "pathfinder-hip": [
-    "(?:Device offloading time = )([0-9.+-e]+)(?:\\(s\\))",
+    "(?:Device offloading time = )([0-9.+-e]+)(?: \\(s\\))",
     [
       "1000",
       "1000",
@@ -1229,10 +1247,11 @@
       "3",
       "-n",
       "100"
-    ]
+    ],
+    "s3d"
   ],
   "sheath-hip": [
-    "(?:Time per time step: )([0-9.+-e]+)(?: ms)"
+    "(?:Time per time step: )([0-9.+-e]+)(?: \\(ms\\))"
   ],
   "tridiagonal-hip": [
     "(?:Time = )([0-9.+-e]+)(?: s)",
@@ -1241,7 +1260,7 @@
     ]
   ],
   "vanGenuchten-hip": [
-    "(?:Total kernel time : )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
     [
       "100",
       "100",
