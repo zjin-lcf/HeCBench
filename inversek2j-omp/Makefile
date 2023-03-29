@@ -59,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../inverse2kj-sycl/coord_in.txt 100000
+	./$(program) ../inversek2j-sycl/coord_in.txt 100000
