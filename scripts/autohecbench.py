@@ -6,9 +6,6 @@ import re, time, sys, subprocess, multiprocessing, os
 import argparse
 import json
 
-def die(msg, code=1):
-    print(msg, file=stderr)
-    exit(code)
 
 class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
@@ -58,7 +55,10 @@ class Benchmark:
         try:
             proc.check_returncode()
         except subprocess.CalledProcessError as e:
-            die(f'Failed compilation.\n({e})', e.errno)
+            print(f'Failed compilation in {self.path}.\n{e}')
+            if e.stderr:
+                print(e.stderr, file=sys.stderr)
+            raise(e)
 
         if self.verbose:
             print(proc.stdout)
@@ -148,8 +148,12 @@ def main():
         benches.append(Benchmark(args, b, *benchmarks[b]))
 
     t0 = time.time()
-    with multiprocessing.Pool() as p:
-        p.map(comp, benches)
+    try:
+        with multiprocessing.Pool() as p:
+            p.map(comp, benches)
+    except Exception as e:
+        print("Compilation failed, exiting")
+        sys.exit(1)
 
     t_compiled = time.time()
 
