@@ -53,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../mis-cuda/internet.egr
+	./$(program) ../mis-cuda/internet.egr 100
