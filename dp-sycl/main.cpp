@@ -36,28 +36,39 @@ int main(int argc, char **argv)
   const int iNumIterations = atoi(argv[2]);
 
   // set and log Global and Local work size dimensions
-  int szLocalWorkSize = 256;
+  const int szLocalWorkSize = 256;
+
   // rounded up to the nearest multiple of the LocalWorkSize
-  int szGlobalWorkSize = shrRoundUp((int)szLocalWorkSize, iNumElements);  
+  const int szGlobalWorkSize = shrRoundUp((int)szLocalWorkSize, iNumElements);  
+
+  const size_t src_size = szGlobalWorkSize * 4;
+  const size_t src_size_bytes = src_size * sizeof(float);
+
+  const size_t dst_size = szGlobalWorkSize;
+  const size_t dst_size_bytes = dst_size * sizeof(float);
 
   // Allocate and initialize host arrays
-  float* srcA = (float *)malloc(sizeof(float) * szGlobalWorkSize * 4);
-  float* srcB = (float *)malloc(sizeof(float) * szGlobalWorkSize * 4);
-  float*  dst = (float *)malloc(sizeof(float) * szGlobalWorkSize);
-  float* Golden = (float *)malloc(sizeof(float) * iNumElements);
+  float* srcA = (float*) malloc (src_size_bytes);
+  float* srcB = (float*) malloc (src_size_bytes);
+  float*  dst = (float*) malloc (dst_size_bytes);
+  float* Golden = (float*) malloc (sizeof(float) * iNumElements);
   shrFillArray(srcA, 4 * iNumElements);
   shrFillArray(srcB, 4 * iNumElements);
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
-#endif
+endif
   queue q(dev_sel);
-  buffer<float, 1> d_srcA (srcA, szGlobalWorkSize * 4);
-  buffer<float, 1> d_srcB (srcB, szGlobalWorkSize * 4);
-  buffer<float, 1> d_dst (dst, szGlobalWorkSize);
+
+  float *d_srcA = malloc_device<float>(src_size, q);
+  q.memcpy(d_srcA, srcA, src_size_bytes);
+
+  float *d_srcB = malloc_device<float>(src_size, q);
+  q.memcpy(d_srcB, srcB, src_size_bytes);
+
+  float *d_dst = malloc_device<float>(dst_size, q);
 
   printf("Global Work Size \t\t= %d\nLocal Work Size \t\t= %d\n# of Work Groups \t\t= %d\n\n", 
            szGlobalWorkSize, szLocalWorkSize, (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize)); 
@@ -69,17 +80,14 @@ int main(int argc, char **argv)
 
   for (int i = 0; i < iNumIterations; i++) {
     q.submit([&] (handler &cgh) {
-      auto a = d_srcA.get_access<sycl_read>(cgh);
-      auto b = d_srcB.get_access<sycl_read>(cgh);
-      auto c = d_dst.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class dot_product>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int iGID = item.get_global_id(0);
         if (iGID < iNumElements) {
           int iInOffset = iGID << 2;
-          c[iGID] = a[iInOffset] * b[iInOffset] 
-                     + a[iInOffset + 1] * b[iInOffset + 1]
-                     + a[iInOffset + 2] * b[iInOffset + 2]
-                     + a[iInOffset + 3] * b[iInOffset + 3];
+          d_dst[iGID] = d_srcA[iInOffset    ] * d_srcB[iInOffset    ] +
+                        d_srcA[iInOffset + 1] * d_srcB[iInOffset + 1] +
+                        d_srcA[iInOffset + 2] * d_srcB[iInOffset + 2] +
+                        d_srcA[iInOffset + 3] * d_srcB[iInOffset + 3];
         }
       });
     });
@@ -90,7 +98,7 @@ int main(int argc, char **argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
-  } // sycl scope
+  q.memcpy(dst, d_dst, dst_size_bytes).wait();
 
   // Compute and compare results for golden-host and report errors and pass/fail
   printf("Comparing against Host/C++ computation...\n\n"); 
