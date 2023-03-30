@@ -59,8 +59,8 @@ int main(int argc, char **argv)
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
-endif
-  queue q(dev_sel);
+#endif
+  queue q(dev_sel, property::queue::in_order());
 
   float *d_srcA = malloc_device<float>(src_size, q);
   q.memcpy(d_srcA, srcA, src_size_bytes);

@@ -27,7 +27,11 @@
 void DotProductHost(const float* pfData1, const float* pfData2, float* pfResult, int iNumElements);
 
 __global__
-void dot_product(const float *a, const float *b, float *c, const int n) {
+void dot_product(const float *__restrict__ a,
+                 const float *__restrict__ b,
+                       float *__restrict__ c,
+                 const int n)
+{
   int iGID = blockIdx.x * blockDim.x + threadIdx.x;
   if (iGID < n) {
     int iInOffset = iGID << 2;
