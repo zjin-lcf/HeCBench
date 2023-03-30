@@ -101,8 +101,8 @@ __global__ void bincount (
       d_output,                                              \
       d_input,                                               \
       nbins,                                                 \
-      minvalue,                                              \
-      maxvalue,                                              \
+      input_minvalue,                                        \
+      input_maxvalue,                                        \
       input_size,                                            \
       output_size);                                          \
   hipDeviceSynchronize();                                   \
@@ -138,6 +138,7 @@ void eval(IndexType input_size, int repeat)
 
   input_t *input = (input_t*) malloc (input_size_bytes); 
 
+  // https://cplusplus.com/reference/random/normal_distribution/
   std::default_random_engine generator (123);
   std::normal_distribution<input_t> distribution(5.0,2.0);
   for (int i = 0; i < input_size; i++) {
@@ -147,9 +148,9 @@ void eval(IndexType input_size, int repeat)
   auto min_iter = std::min_element(input, input+input_size);
   auto max_iter = std::max_element(input, input+input_size);
   
-  input_t minvalue = *min_iter;
-  input_t maxvalue = *max_iter;
-  printf("Input min, max values: (%f %f)\n", (float)minvalue, (float)maxvalue);
+  input_t input_minvalue = *min_iter;
+  input_t input_maxvalue = *max_iter;
+  printf("Input min, max values: (%f %f)\n", (float)input_minvalue, (float)input_maxvalue);
 
   input_t *d_input;
   hipMalloc((void**)&d_input, input_size_bytes);
@@ -157,11 +158,13 @@ void eval(IndexType input_size, int repeat)
 
   int maxSharedMemory;
   hipDeviceGetAttribute(&maxSharedMemory, hipDeviceAttributeMaxSharedMemoryPerBlock, 0);
-  int th = maxSharedMemory / sizeof(output_t);
 
-  printf("Max number of bins allocated in shared local memory: %d\n", th);
+  printf("Maximum shared local memory size per block in bytes: %d\n", maxSharedMemory);
 
-  for (IndexType nbins = th / 16; nbins <= 2 * th; nbins = nbins * 2) {
+  for (IndexType nbins = 768; nbins <= 768 * 32; nbins = nbins * 2) {
+
+    printf("\nNumber of bins: %d\n", nbins);
+    IndexType sharedMem = nbins * sizeof(output_t);
 
     IndexType output_size = nbins;
     size_t output_size_bytes = sizeof(output_t) * output_size;
@@ -169,26 +172,18 @@ void eval(IndexType input_size, int repeat)
 
     output_t *d_output;
     hipMalloc((void**)&d_output, output_size_bytes);
-    hipMemset(d_output, 0, output_size_bytes);
-
-    printf("\nNumber of bins: %d\n", nbins);
-    IndexType sharedMem = nbins * sizeof(output_t);
 
     dim3 grid ((input_size + threadsPerBlock - 1) / threadsPerBlock);
     dim3 block (threadsPerBlock);
 
     // determine memory type to use in the kernel
-    DeviceMemoryType memType = DeviceMemoryType::GLOBAL;
     printf("bincount using global atomics\n");
+
+    DeviceMemoryType memType = DeviceMemoryType::GLOBAL;
+    hipMemset(d_output, 0, output_size_bytes);
     HANDLE_SWITCH_CASE(memType)
-
-    if (sharedMem <= maxSharedMemory) {
-      printf("bincount using global and local atomics\n");
-      memType = DeviceMemoryType::SHARED;
-      HANDLE_SWITCH_CASE(memType)
-    }
-
     hipMemcpy(output, d_output, output_size_bytes, hipMemcpyDeviceToHost);
+
     auto min_iter = std::min_element(output, output+output_size);
     auto max_iter = std::max_element(output, output+output_size);
     output_t minvalue = *min_iter;
@@ -197,6 +192,25 @@ void eval(IndexType input_size, int repeat)
            (int64_t)minvalue / repeat,
            (int64_t)output[output_size/2] / repeat,
            (int64_t)maxvalue / repeat);
+
+    if (sharedMem <= maxSharedMemory) {
+      printf("\n");
+      printf("bincount using global and local atomics\n");
+
+      hipMemset(d_output, 0, output_size_bytes);
+      memType = DeviceMemoryType::SHARED;
+      HANDLE_SWITCH_CASE(memType)
+      hipMemcpy(output, d_output, output_size_bytes, hipMemcpyDeviceToHost);
+
+      auto min_iter = std::min_element(output, output+output_size);
+      auto max_iter = std::max_element(output, output+output_size);
+      output_t minvalue = *min_iter;
+      output_t maxvalue = *max_iter;
+      printf("Output min, median, max values: (%ld %ld %ld)\n\n",
+             (int64_t)minvalue / repeat,
+             (int64_t)output[output_size/2] / repeat,
+             (int64_t)maxvalue / repeat);
+    }
 
     hipFree(d_output);
     free(output);
