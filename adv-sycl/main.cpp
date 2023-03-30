@@ -27,6 +27,12 @@ dfloat *drandAlloc(int N){
   return v;
 }
 
+dfloat *deviceAlloc(queue &q, const dfloat *h, int N){
+  dfloat *d = malloc_device<dfloat>(N, q);
+  q.memcpy(d, h, N * sizeof(dfloat));
+  return d;
+}
+
 int main(int argc, char **argv) {
 
   if (argc < 4) {
@@ -50,42 +56,36 @@ int main(int argc, char **argv) {
   printf("Data type in bytes: %zu\n", sizeof(dfloat));
 
   srand48(123);
-  dfloat *vgeo           = drandAlloc(Np*Nelements*p_Nvgeo);
-  dfloat *cubvgeo        = drandAlloc(cubNp*Nelements*p_Nvgeo);
-  dfloat *cubDiffInterpT = drandAlloc(3*cubNp*Nelements);
-  dfloat *cubInterpT     = drandAlloc(Np*cubNp);
-  dfloat *u              = drandAlloc(3*Np*Nelements);
-  dfloat *adv            = drandAlloc(3*Np*Nelements);
+  dfloat *h_vgeo           = drandAlloc(Np*Nelements*p_Nvgeo);
+  dfloat *h_cubvgeo        = drandAlloc(cubNp*Nelements*p_Nvgeo);
+  dfloat *h_cubDiffInterpT = drandAlloc(3*cubNp*Nelements);
+  dfloat *h_cubInterpT     = drandAlloc(Np*cubNp);
+  dfloat *h_u              = drandAlloc(3*Np*Nelements);
+  dfloat *h_adv            = drandAlloc(3*Np*Nelements);
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<dfloat, 1> d_vgeo (vgeo, Np*Nelements*p_Nvgeo);
-  buffer<dfloat, 1> d_cubvgeo (cubvgeo, cubNp*Nelements*p_Nvgeo);
-  buffer<dfloat, 1> d_cubDiffInterpT (cubDiffInterpT, 3*cubNp*Nelements);
-  buffer<dfloat, 1> d_cubInterpT (cubInterpT, Np*cubNp);
-  buffer<dfloat, 1> d_u (u, 3*Np*Nelements);
-  buffer<dfloat, 1> d_adv (adv, 3*Np*Nelements);
+  dfloat *vgeo           = deviceAlloc(q, h_vgeo, Np*Nelements*p_Nvgeo);
+  dfloat *cubvgeo        = deviceAlloc(q, h_cubvgeo, cubNp*Nelements*p_Nvgeo);
+  dfloat *cubDiffInterpT = deviceAlloc(q, h_cubDiffInterpT, 3*cubNp*Nelements);
+  dfloat *cubInterpT     = deviceAlloc(q, h_cubInterpT, Np*cubNp);
+  dfloat *u              = deviceAlloc(q, h_u, 3*Np*Nelements);
+  dfloat *adv            = deviceAlloc(q, h_adv, 3*Np*Nelements);
 
   q.wait();
   auto start = std::chrono::high_resolution_clock::now();
 
   range<2> gws (16, Nelements*16);
   range<2> lws (16, 16);
+
   // run kernel
-  for(int test=0;test<Ntests;++test) 
+  for(int test=0;test<Ntests;++test) {
     q.submit([&] (handler &cgh) {
-      auto vgeo = d_vgeo.get_access<sycl_read>(cgh);
-      auto cubvgeo = d_cubvgeo.get_access<sycl_read>(cgh);
-      auto cubD = d_cubDiffInterpT.get_access<sycl_read>(cgh);
-      auto cubInterpT = d_cubInterpT.get_access<sycl_read>(cgh);
-      auto u = d_u.get_access<sycl_read>(cgh);
-      auto adv = d_adv.get_access<sycl_discard_write>(cgh);
       accessor<dfloat, 2, sycl_read_write, access::target::local> s_cubD({16,16}, cgh);
       accessor<dfloat, 2, sycl_read_write, access::target::local> s_cubInterpT({8,16}, cgh);
       accessor<dfloat, 2, sycl_read_write, access::target::local> s_U({8,8}, cgh);
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
         const int id = j * 16 + i;
 
         if (id < 8 * 16) s_cubInterpT[j][i] = cubInterpT[id];
-        s_cubD[j][i] = cubD[id];
+        s_cubD[j][i] = cubDiffInterpT[id];
 
         for (int k = 0; k < 16; ++k) {
           r_U[k] = 0;
@@ -267,16 +267,29 @@ int main(int argc, char **argv) {
         }
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::high_resolution_clock::now();
   const double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / Ntests;
 
+  q.memcpy(h_adv, adv, 3*Np*Nelements*sizeof(dfloat)).wait();
 
-#ifdef OUTPUT
-  for (int i = 0; i < 3*Np*Nelements; i++)
-    std::cout << adv[i] << "\n";
-#endif
+  free(vgeo          , q);
+  free(cubvgeo       , q);
+  free(cubDiffInterpT, q);
+  free(cubInterpT    , q);
+  free(u             , q);
+  free(adv           , q);
+
+  double checksum = 0;
+  for (int i = 0; i < 3*Np*Nelements; i++) {
+    checksum += h_adv[i];
+    #ifdef OUTPUT
+    std::cout << h_adv[i] << "\n";
+    #endif
+  }
+  std::cout << "Checksum=" << checksum << "\n";
 
   // statistics
   const dfloat GDOFPerSecond = (N*N*N)*Nelements/elapsed;
@@ -288,14 +301,11 @@ int main(int argc, char **argv) {
             << " GDOF/s=" << GDOFPerSecond
             << "\n";
 
-  } // sycl scope
-
-  free(vgeo          );
-  free(cubvgeo       );
-  free(cubDiffInterpT);
-  free(cubInterpT    );
-  free(u             );
-  free(adv           );
+  free(h_vgeo          );
+  free(h_cubvgeo       );
+  free(h_cubDiffInterpT);
+  free(h_cubInterpT    );
+  free(h_u             );
+  free(h_adv           );
   return 0;
 }
-

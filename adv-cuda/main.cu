@@ -103,11 +103,14 @@ int main(int argc, char **argv) {
   cudaFree(d_u);
   cudaFree(d_adv);
 
-
-#ifdef OUTPUT
-  for (int i = 0; i < 3*Np*Nelements; i++)
+  double checksum = 0;
+  for (int i = 0; i < 3*Np*Nelements; i++) {
+    checksum += adv[i];
+    #ifdef OUTPUT
     std::cout << adv[i] << "\n";
-#endif
+    #endif
+  }
+  std::cout << "Checksum=" << checksum << "\n";
 
   // statistics
   const dfloat GDOFPerSecond = (N*N*N)*Nelements/elapsed;
@@ -127,4 +130,3 @@ int main(int argc, char **argv) {
   free(adv           );
   return 0;
 }
-
