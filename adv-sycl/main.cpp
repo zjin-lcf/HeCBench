@@ -77,11 +77,11 @@ int main(int argc, char **argv) {
   dfloat *u              = deviceAlloc(q, h_u, 3*Np*Nelements);
   dfloat *adv            = deviceAlloc(q, h_adv, 3*Np*Nelements);
 
-  q.wait();
-  auto start = std::chrono::high_resolution_clock::now();
-
   range<2> gws (16, Nelements*16);
   range<2> lws (16, 16);
+
+  q.wait();
+  auto start = std::chrono::high_resolution_clock::now();
 
   // run kernel
   for(int test=0;test<Ntests;++test) {
