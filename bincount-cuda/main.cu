@@ -101,8 +101,8 @@ __global__ void bincount (
       d_output,                                              \
       d_input,                                               \
       nbins,                                                 \
-      minvalue,                                              \
-      maxvalue,                                              \
+      input_minvalue,                                        \
+      input_maxvalue,                                        \
       input_size,                                            \
       output_size);                                          \
   cudaDeviceSynchronize();                                   \
@@ -148,9 +148,9 @@ void eval(IndexType input_size, int repeat)
   auto min_iter = std::min_element(input, input+input_size);
   auto max_iter = std::max_element(input, input+input_size);
   
-  input_t minvalue = *min_iter;
-  input_t maxvalue = *max_iter;
-  printf("Input min, max values: (%f %f)\n", (float)minvalue, (float)maxvalue);
+  input_t input_minvalue = *min_iter;
+  input_t input_maxvalue = *max_iter;
+  printf("Input min, max values: (%f %f)\n", (float)input_minvalue, (float)input_maxvalue);
 
   input_t *d_input;
   cudaMalloc((void**)&d_input, input_size_bytes);
@@ -172,23 +172,18 @@ void eval(IndexType input_size, int repeat)
 
     output_t *d_output;
     cudaMalloc((void**)&d_output, output_size_bytes);
-    cudaMemset(d_output, 0, output_size_bytes);
 
     dim3 grid ((input_size + threadsPerBlock - 1) / threadsPerBlock);
     dim3 block (threadsPerBlock);
 
     // determine memory type to use in the kernel
-    DeviceMemoryType memType = DeviceMemoryType::GLOBAL;
     printf("bincount using global atomics\n");
+
+    DeviceMemoryType memType = DeviceMemoryType::GLOBAL;
+    cudaMemset(d_output, 0, output_size_bytes);
     HANDLE_SWITCH_CASE(memType)
-
-    if (sharedMem <= maxSharedMemory) {
-      printf("bincount using global and local atomics\n");
-      memType = DeviceMemoryType::SHARED;
-      HANDLE_SWITCH_CASE(memType)
-    }
-
     cudaMemcpy(output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
+
     auto min_iter = std::min_element(output, output+output_size);
     auto max_iter = std::max_element(output, output+output_size);
     output_t minvalue = *min_iter;
@@ -197,6 +192,25 @@ void eval(IndexType input_size, int repeat)
            (int64_t)minvalue / repeat,
            (int64_t)output[output_size/2] / repeat,
            (int64_t)maxvalue / repeat);
+
+    if (sharedMem <= maxSharedMemory) {
+      printf("\n");
+      printf("bincount using global and local atomics\n");
+
+      cudaMemset(d_output, 0, output_size_bytes);
+      memType = DeviceMemoryType::SHARED;
+      HANDLE_SWITCH_CASE(memType)
+      cudaMemcpy(output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
+
+      auto min_iter = std::min_element(output, output+output_size);
+      auto max_iter = std::max_element(output, output+output_size);
+      output_t minvalue = *min_iter;
+      output_t maxvalue = *max_iter;
+      printf("Output min, median, max values: (%ld %ld %ld)\n\n",
+             (int64_t)minvalue / repeat,
+             (int64_t)output[output_size/2] / repeat,
+             (int64_t)maxvalue / repeat);
+    }
 
     cudaFree(d_output);
     free(output);
