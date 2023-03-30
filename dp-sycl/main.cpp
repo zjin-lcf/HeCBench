@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::enable_profiling{});
   buffer<float, 1> d_srcA (srcA, szGlobalWorkSize * 4);
   buffer<float, 1> d_srcB (srcB, szGlobalWorkSize * 4);
   buffer<float, 1> d_dst (dst, szGlobalWorkSize);
@@ -64,11 +64,12 @@ int main(int argc, char **argv)
   range<1> gws (szGlobalWorkSize);
   range<1> lws (szLocalWorkSize);
 
-  q.wait();
-  auto start = std::chrono::steady_clock::now();
+  std::vector<event> events;
+  events.reserve(iNumIterations);
+  info::event_profiling::command_start::return_type kernelTime{0};
 
   for (int i = 0; i < iNumIterations; i++) {
-    q.submit([&] (handler &cgh) {
+    events.push_back(q.submit([&] (handler &cgh) {
       auto a = d_srcA.get_access<sycl_read>(cgh);
       auto b = d_srcB.get_access<sycl_read>(cgh);
       auto c = d_dst.get_access<sycl_discard_write>(cgh);
@@ -82,13 +83,17 @@ int main(int argc, char **argv)
                      + a[iInOffset + 3] * b[iInOffset + 3];
         }
       });
-    });
+    }));
+  }
+  q.wait();
+
+  for (event& ev : events) {
+    const auto kernelStart = ev.get_profiling_info<info::event_profiling::command_start>();
+    const auto kernelEnd = ev.get_profiling_info<info::event_profiling::command_end>();
+    kernelTime += kernelEnd - kernelStart;
   }
 
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average kernel execution time %f (s)\n", (kernelTime * 1e-9f) / iNumIterations);
 
   } // sycl scope
 
