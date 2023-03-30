@@ -10,6 +10,7 @@
  */
 
 #include <assert.h>
+#include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
 #include "common.h"
 #include "conv.h"
 
@@ -22,6 +23,7 @@
 #define ROWS_HALO_STEPS       1
 #define COLUMNS_HALO_STEPS    1
 
+using namespace sycl::ext::oneapi::experimental::cuda;
 
 void convolutionRows(
     queue &q,
@@ -62,27 +64,28 @@ void convolutionRows(
         //Load main data
         #pragma unroll
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src_new[i * ROWS_BLOCKDIM_X];
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = ldg(&src_new[i * ROWS_BLOCKDIM_X]);
 
         //Load left halo
         #pragma unroll
         for(int i = 0; i < ROWS_HALO_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? ldg(&src_new[i * ROWS_BLOCKDIM_X]) : 0;
 
         //Load right halo
         #pragma unroll
         for(int i = ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS + ROWS_HALO_STEPS; i++)
-            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
+            l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? ldg(&src_new[i * ROWS_BLOCKDIM_X]) : 0;
 
         //Compute and store results
         item.barrier(access::fence_space::local_space);
+
         #pragma unroll
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++) {
             float sum = 0;
 
             #pragma unroll
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
-                sum += kernel[KERNEL_RADIUS - j] * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
+                sum += ldg(&kernel[KERNEL_RADIUS - j]) * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
 
             dst_new[i * ROWS_BLOCKDIM_X] = sum;
         }
@@ -131,27 +134,28 @@ void convolutionColumns(
         //Load main data
         #pragma unroll
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
-            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src_new[i * COLUMNS_BLOCKDIM_Y * pitch];
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = ldg(&src_new[i * COLUMNS_BLOCKDIM_Y * pitch]);
 
         //Load upper halo
         #pragma unroll
         for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
-            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? ldg(&src_new[i * COLUMNS_BLOCKDIM_Y * pitch]) : 0;
 
         //Load lower halo
         #pragma unroll
         for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
-            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
+            l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? ldg(&src_new[i * COLUMNS_BLOCKDIM_Y * pitch]) : 0;
 
         //Compute and store results
         item.barrier(access::fence_space::local_space);
+
         #pragma unroll
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++) {
             float sum = 0;
 
             #pragma unroll
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
-                sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
+                sum += ldg(&kernel[KERNEL_RADIUS - j]) * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
 
             dst_new[i * COLUMNS_BLOCKDIM_Y * pitch] = sum;
         }
