@@ -240,8 +240,11 @@ void runBlackScholesAnalyticEngine(const int repeat)
       queue q(dev_sel);
 
       //allocate space for data on GPU
-      buffer<optionInputStruct,1> optionsGpu (values, numVals);
-      buffer<float,1> outputValsGpu (outputVals, numVals);
+      optionInputStruct* optionsGpu = malloc_device<optionInputStruct>(numVals, q);
+      float* outputValsGpu = malloc_device<float>(numVals, q);
+
+      //copy the data from the CPU to the GPU
+      q.memcpy(optionsGpu, values, numVals * sizeof(optionInputStruct)).wait();
 
       // setup execution parameters
       size_t global_work_size = (numVals + THREAD_BLOCK_SIZE - 1) / THREAD_BLOCK_SIZE * THREAD_BLOCK_SIZE;
@@ -254,15 +257,13 @@ void runBlackScholesAnalyticEngine(const int repeat)
 
       for (int i = 0; i < repeat; i++) {
         q.submit([&](handler& cgh) {
-          auto options = optionsGpu.get_access<sycl_read>(cgh);
-          auto outputVals = outputValsGpu.get_access<sycl_discard_write>(cgh);
           cgh.parallel_for<class blackScholesKernel>( nd_range<1>(gws, lws), [=] (nd_item<1> item) {
             int optionNum = item.get_global_id(0);
 
             //check if within current options
             if (optionNum < numVals)
             {
-              optionInputStruct threadOption = options[optionNum];
+              optionInputStruct threadOption = optionsGpu[optionNum];
 
               payoffStruct currPayoff;
               currPayoff.type = threadOption.type;
@@ -308,7 +309,7 @@ void runBlackScholesAnalyticEngine(const int repeat)
               float resultVal = getResultVal(blackCalc);
 
               //write the resulting value to global memory
-              outputVals[optionNum] = resultVal;
+              outputValsGpu[optionNum] = resultVal;
             }
           });
         });
@@ -320,6 +321,11 @@ void runBlackScholesAnalyticEngine(const int repeat)
       kseconds  = kend.tv_sec  - kstart.tv_sec;
       kuseconds = kend.tv_usec - kstart.tv_usec;
       ktimeGpu = ((kseconds) * 1000 + ((float)kuseconds)/1000.0) + 0.5f;
+
+      q.memcpy(outputVals, outputValsGpu, numVals * sizeof(float)).wait();
+
+      free(optionsGpu, q);
+      free(outputValsGpu, q);
     }
 
     struct timeval end;
