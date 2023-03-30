@@ -5,7 +5,6 @@
 #include <math.h>
 #include <sys/time.h>
 #include <time.h>
-#include <CL/sycl.hpp>
 #include "common.h"
 
 #define NUM_DIFF_SETTINGS 37
@@ -216,8 +215,6 @@ void runBlackScholesAnalyticEngine(const int repeat)
       }
     }
 
-
-
     // Run GPU code
 
     //initialize the arrays
@@ -231,102 +228,100 @@ void runBlackScholesAnalyticEngine(const int repeat)
     struct timeval start;
     gettimeofday(&start, NULL);
 
-    {
 #ifdef USE_GPU
-      gpu_selector dev_sel;
+    gpu_selector dev_sel;
 #else
-      cpu_selector dev_sel;
+    cpu_selector dev_sel;
 #endif
-      queue q(dev_sel);
+    queue q(dev_sel, property::queue::in_order());
 
-      //allocate space for data on GPU
-      optionInputStruct* optionsGpu = malloc_device<optionInputStruct>(numVals, q);
-      float* outputValsGpu = malloc_device<float>(numVals, q);
+    //allocate space for data on GPU
+    optionInputStruct* optionsGpu = malloc_device<optionInputStruct>(numVals, q);
+    float* outputValsGpu = malloc_device<float>(numVals, q);
 
-      //copy the data from the CPU to the GPU
-      q.memcpy(optionsGpu, values, numVals * sizeof(optionInputStruct)).wait();
+    //copy the data from the CPU to the GPU
+    q.memcpy(optionsGpu, values, numVals * sizeof(optionInputStruct)).wait();
 
-      // setup execution parameters
-      size_t global_work_size = (numVals + THREAD_BLOCK_SIZE - 1) / THREAD_BLOCK_SIZE * THREAD_BLOCK_SIZE;
-      size_t local_work_size = THREAD_BLOCK_SIZE;
-      range<1> gws (global_work_size);
-      range<1> lws (local_work_size);
+    // setup execution parameters
+    size_t global_work_size = (numVals + THREAD_BLOCK_SIZE - 1) / THREAD_BLOCK_SIZE * THREAD_BLOCK_SIZE;
+    size_t local_work_size = THREAD_BLOCK_SIZE;
+    range<1> gws (global_work_size);
+    range<1> lws (local_work_size);
 
-      struct timeval kstart;
-      gettimeofday(&kstart, NULL);
+    struct timeval kstart;
+    gettimeofday(&kstart, NULL);
 
-      for (int i = 0; i < repeat; i++) {
-        q.submit([&](handler& cgh) {
-          cgh.parallel_for<class blackScholesKernel>( nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int optionNum = item.get_global_id(0);
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&](handler& cgh) {
+        cgh.parallel_for<class blackScholesKernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          int optionNum = item.get_global_id(0);
 
-            //check if within current options
-            if (optionNum < numVals)
-            {
-              optionInputStruct threadOption = optionsGpu[optionNum];
+          //check if within current options
+          if (optionNum < numVals)
+          {
+            optionInputStruct threadOption = optionsGpu[optionNum];
 
-              payoffStruct currPayoff;
-              currPayoff.type = threadOption.type;
-              currPayoff.strike = threadOption.strike;
+            payoffStruct currPayoff;
+            currPayoff.type = threadOption.type;
+            currPayoff.strike = threadOption.strike;
 
-              yieldTermStruct qTS;
-              qTS.timeYearFraction = threadOption.t;
-              qTS.forward = threadOption.q;
+            yieldTermStruct qTS;
+            qTS.timeYearFraction = threadOption.t;
+            qTS.forward = threadOption.q;
 
-              yieldTermStruct rTS;
-              rTS.timeYearFraction = threadOption.t;
-              rTS.forward = threadOption.r;
+            yieldTermStruct rTS;
+            rTS.timeYearFraction = threadOption.t;
+            rTS.forward = threadOption.r;
 
-              blackVolStruct volTS;
-              volTS.timeYearFraction = threadOption.t;
-              volTS.volatility = threadOption.vol;
+            blackVolStruct volTS;
+            volTS.timeYearFraction = threadOption.t;
+            volTS.volatility = threadOption.vol;
 
-              blackScholesMertStruct stochProcess;
-              stochProcess.x0 = threadOption.spot;
-              stochProcess.dividendTS = qTS;
-              stochProcess.riskFreeTS = rTS;
-              stochProcess.blackVolTS = volTS;
+            blackScholesMertStruct stochProcess;
+            stochProcess.x0 = threadOption.spot;
+            stochProcess.dividendTS = qTS;
+            stochProcess.riskFreeTS = rTS;
+            stochProcess.blackVolTS = volTS;
 
-              optionStruct currOption;
-              currOption.payoff = currPayoff;
-              currOption.yearFractionTime = threadOption.t;
-              currOption.pricingEngine = stochProcess; 
+            optionStruct currOption;
+            currOption.payoff = currPayoff;
+            currOption.yearFractionTime = threadOption.t;
+            currOption.pricingEngine = stochProcess; 
 
-              float variance = getBlackVolBlackVar(currOption.pricingEngine.blackVolTS);
-              float dividendDiscount = getDiscountOnDividendYield(currOption.yearFractionTime, currOption.pricingEngine.dividendTS);
-              float riskFreeDiscount = getDiscountOnRiskFreeRate(currOption.yearFractionTime, currOption.pricingEngine.riskFreeTS);
-              float spot = currOption.pricingEngine.x0; 
+            float variance = getBlackVolBlackVar(currOption.pricingEngine.blackVolTS);
+            float dividendDiscount = getDiscountOnDividendYield(currOption.yearFractionTime, currOption.pricingEngine.dividendTS);
+            float riskFreeDiscount = getDiscountOnRiskFreeRate(currOption.yearFractionTime, currOption.pricingEngine.riskFreeTS);
+            float spot = currOption.pricingEngine.x0; 
 
-              float forwardPrice = spot * dividendDiscount / riskFreeDiscount;
+            float forwardPrice = spot * dividendDiscount / riskFreeDiscount;
 
-              //declare the blackCalcStruct
-              blackCalcStruct blackCalc;
+            //declare the blackCalcStruct
+            blackCalcStruct blackCalc;
 
-              //initialize the calculator
-              initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, cl::sycl::sqrt(variance), riskFreeDiscount);
+            //initialize the calculator
+            initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sycl::sqrt(variance), riskFreeDiscount);
 
-              //retrieve the results values
-              float resultVal = getResultVal(blackCalc);
+            //retrieve the results values
+            float resultVal = getResultVal(blackCalc);
 
-              //write the resulting value to global memory
-              outputValsGpu[optionNum] = resultVal;
-            }
-          });
+            //write the resulting value to global memory
+            outputValsGpu[optionNum] = resultVal;
+          }
         });
-      }
-      q.wait();
-
-      struct timeval kend;
-      gettimeofday(&kend, NULL);
-      kseconds  = kend.tv_sec  - kstart.tv_sec;
-      kuseconds = kend.tv_usec - kstart.tv_usec;
-      ktimeGpu = ((kseconds) * 1000 + ((float)kuseconds)/1000.0) + 0.5f;
-
-      q.memcpy(outputVals, outputValsGpu, numVals * sizeof(float)).wait();
-
-      free(optionsGpu, q);
-      free(outputValsGpu, q);
+      });
     }
+    q.wait();
+
+    struct timeval kend;
+    gettimeofday(&kend, NULL);
+    kseconds  = kend.tv_sec  - kstart.tv_sec;
+    kuseconds = kend.tv_usec - kstart.tv_usec;
+    ktimeGpu = ((kseconds) * 1000 + ((float)kuseconds)/1000.0) + 0.5f;
+
+    q.memcpy(outputVals, outputValsGpu, numVals * sizeof(float)).wait();
+
+    free(optionsGpu, q);
+    free(outputValsGpu, q);
 
     struct timeval end;
     gettimeofday(&end, NULL);
