@@ -156,27 +156,34 @@ int main(int argc, char ** argv) {
   int spline_y_grid_delta_inv=45;
   int spline_z_grid_delta_inv=45;
 
-  {
 #ifdef USE_GPU 
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<float, 1> d_walkers_vals (walkers_vals, WSIZE*NSIZE);
-  buffer<float, 1> d_walkers_grads (walkers_grads, WSIZE*MSIZE);
-  buffer<float, 1> d_walkers_hess (walkers_hess, WSIZE*OSIZE);
-  buffer<float, 1> d_spline_coefs (spline_coefs, SSIZE);
-  buffer<float, 1> d_a(4);
-  buffer<float, 1> d_b(4);
-  buffer<float, 1> d_c(4);
-  buffer<float, 1> d_da(4);
-  buffer<float, 1> d_db(4);
-  buffer<float, 1> d_dc(4);
-  buffer<float, 1> d_d2a(4);
-  buffer<float, 1> d_d2b(4);
-  buffer<float, 1> d_d2c(4);
+  float *d_walkers_vals = malloc_device<float>(WSIZE*NSIZE, q);
+  q.memcpy(d_walkers_vals, walkers_vals, WSIZE*NSIZE*sizeof(float));
+
+  float *d_walkers_grads = malloc_device<float>(WSIZE*MSIZE, q);
+  q.memcpy(d_walkers_grads, walkers_grads, WSIZE*MSIZE*sizeof(float));
+
+  float *d_walkers_hess = malloc_device<float>(WSIZE*OSIZE, q);
+  q.memcpy(d_walkers_hess, walkers_hess, WSIZE*OSIZE*sizeof(float));
+
+  float *d_spline_coefs = malloc_device<float>(SSIZE, q);
+  q.memcpy(d_spline_coefs, spline_coefs, SSIZE*sizeof(float));
+
+  float *d_a = malloc_device<float>(4, q);
+  float *d_b = malloc_device<float>(4, q);
+  float *d_c = malloc_device<float>(4, q);
+  float *d_da = malloc_device<float>(4, q);
+  float *d_db = malloc_device<float>(4, q);
+  float *d_dc = malloc_device<float>(4, q);
+  float *d_d2a = malloc_device<float>(4, q);
+  float *d_d2b = malloc_device<float>(4, q);
+  float *d_d2c = malloc_device<float>(4, q);
 
   double total_time = 0.0;
 
@@ -200,103 +207,61 @@ int main(int argc, char ** argv) {
     ipartz = (int) uz; tz = uz-ipartz; int iz = min(max(0,(int) ipartz),spline_z_grid_num-1);
 
     eval_abc(Af,tx,&a[0]);
-
-    q.submit([&] (handler &h) {
-      auto d_a_acc = d_a.get_access<sycl_discard_write>(h);
-      h.copy(a, d_a_acc);
-    });
+    q.memcpy(d_a, a, sizeof(float)*4);
 
     eval_abc(Af,ty,&b[0]);
-    q.submit([&] (handler &h) {
-      auto d_b_acc = d_b.get_access<sycl_discard_write>(h);
-      h.copy(b, d_b_acc);
-    });
+    q.memcpy(d_b, b, sizeof(float)*4);
 
     eval_abc(Af,tz,&c[0]);
-    q.submit([&] (handler &h) {
-      auto d_c_acc = d_c.get_access<sycl_discard_write>(h);
-      h.copy(c, d_c_acc);
-    });
+    q.memcpy(d_c, c, sizeof(float)*4);
 
     eval_abc(dAf,tx,&da[0]);
-    q.submit([&] (handler &h) {
-      auto d_da_acc = d_da.get_access<sycl_discard_write>(h);
-      h.copy(da, d_da_acc);
-    });
+    q.memcpy(d_da, da, sizeof(float)*4);
 
     eval_abc(dAf,ty,&db[0]);
-    q.submit([&] (handler &h) {
-      auto d_db_acc = d_db.get_access<sycl_discard_write>(h);
-      h.copy(db, d_db_acc);
-    });
+    q.memcpy(d_db, db, sizeof(float)*4);
 
     eval_abc(dAf,tz,&dc[0]);
-    q.submit([&] (handler &h) {
-      auto d_dc_acc = d_dc.get_access<sycl_discard_write>(h);
-      h.copy(dc, d_dc_acc);
-    });
+    q.memcpy(d_dc, dc, sizeof(float)*4);
 
     eval_abc(d2Af,tx,&d2a[0]);
-    q.submit([&] (handler &h) {
-      auto d_d2a_acc = d_d2a.get_access<sycl_discard_write>(h);
-      h.copy(d2a, d_d2a_acc);
-    });
+    q.memcpy(d_d2a, d2a, sizeof(float)*4);
 
     eval_abc(d2Af,ty,&d2b[0]);
-    q.submit([&] (handler &h) {
-      auto d_d2b_acc = d_d2b.get_access<sycl_discard_write>(h);
-      h.copy(d2b, d_d2b_acc);
-    });
+    q.memcpy(d_d2b, d2b, sizeof(float)*4);
 
     eval_abc(d2Af,tz,&d2c[0]);              
-    q.submit([&] (handler &h) {
-      auto d_d2c_acc = d_d2c.get_access<sycl_discard_write>(h);
-      h.copy(d2c, d_d2c_acc);
-    });
+    q.memcpy(d_d2c, d2c, sizeof(float)*4);
 
-    range<1> global_size((spline_num_splines+255)/256*256);
-    range<1> local_size(256);
+    range<1> gws ((spline_num_splines+255)/256*256);
+    range<1> lws (256);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (handler &h) {
-      auto walkers_vals = d_walkers_vals.get_access<sycl_discard_write>(h);
-      auto walkers_grads = d_walkers_grads.get_access<sycl_discard_write>(h);
-      auto walkers_hess = d_walkers_hess.get_access<sycl_discard_write>(h);
-      auto a = d_a.get_access<sycl_read>(h);
-      auto b = d_b.get_access<sycl_read>(h);
-      auto c = d_c.get_access<sycl_read>(h);
-      auto da = d_da.get_access<sycl_read>(h);
-      auto db = d_db.get_access<sycl_read>(h);
-      auto dc = d_dc.get_access<sycl_read>(h);
-      auto d2a = d_d2a.get_access<sycl_read>(h);
-      auto d2b = d_d2b.get_access<sycl_read>(h);
-      auto d2c = d_d2c.get_access<sycl_read>(h);
-      auto spline_coefs = d_spline_coefs.get_access<sycl_read>(h);
-
-      h.parallel_for<class vgh_spline>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+      h.parallel_for<class vgh_spline>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         const int n = item.get_global_id(0);
         if (n < spline_num_splines)
           eval_UBspline_3d_s_vgh ( 
-            spline_coefs.get_pointer()+ix*xs+iy*ys+iz*zs+n,
+            d_spline_coefs+ix*xs+iy*ys+iz*zs+n,
             xs, ys, zs, 
-            walkers_vals.get_pointer()+i*NSIZE+n,
-            walkers_grads.get_pointer()+i*MSIZE+n*3,
-            walkers_hess.get_pointer()+i*OSIZE+n*9,
-            a.get_pointer(),
-            b.get_pointer(),
-            c.get_pointer(),
-            da.get_pointer(),
-            db.get_pointer(),
-            dc.get_pointer(),
-            d2a.get_pointer(),
-            d2b.get_pointer(),
-            d2c.get_pointer(),
+            d_walkers_vals+i*NSIZE+n,
+            d_walkers_grads+i*MSIZE+n*3,
+            d_walkers_hess+i*OSIZE+n*9,
+            d_a,
+            d_b,
+            d_c,
+            d_da,
+            d_db,
+            d_dc,
+            d_d2a,
+            d_d2b,
+            d_d2c,
             spline_x_grid_delta_inv,
             spline_y_grid_delta_inv,
             spline_z_grid_delta_inv );
-        });
+      });
     }).wait();
 
     auto end = std::chrono::steady_clock::now();
@@ -305,7 +270,10 @@ int main(int argc, char ** argv) {
   }
   printf("Total kernel execution time %lf (s)\n", total_time * 1e-9);
 
-  }
+  q.memcpy(walkers_vals, d_walkers_vals, sizeof(float)*WSIZE*NSIZE);
+  q.memcpy(walkers_grads, d_walkers_grads, sizeof(float)*WSIZE*MSIZE);
+  q.memcpy(walkers_hess, d_walkers_hess, sizeof(float)*WSIZE*OSIZE);
+  q.wait();
 
   // collect results for the first walker
   float resVal = 0.0;
@@ -316,7 +284,7 @@ int main(int argc, char ** argv) {
   for( int i = 0; i < MSIZE; i++ ) resGrad = resGrad + walkers_grads[i];
   for( int i = 0; i < OSIZE; i++ ) resHess = resHess + walkers_hess[i];
   printf("walkers[0]->collect([resVal resGrad resHess]) = [%e %e %e]\n",
-      resVal,resGrad, resHess);  
+         resVal,resGrad, resHess);
 
   free(Af);
   free(dAf);
@@ -329,9 +297,18 @@ int main(int argc, char ** argv) {
   free(walkers_z);
   free(spline_coefs);
 
+  free(d_walkers_vals, q);
+  free(d_walkers_grads, q);
+  free(d_walkers_hess, q);
+  free(d_spline_coefs, q);
+  free(d_a, q);
+  free(d_b, q);
+  free(d_c, q);
+  free(d_da, q);
+  free(d_db, q);
+  free(d_dc, q);
+  free(d_d2a, q);
+  free(d_d2b, q);
+  free(d_d2c, q);
   return 0;
 }
-
-
-
-

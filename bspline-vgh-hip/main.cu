@@ -212,7 +212,6 @@ int main(int argc, char ** argv) {
   hipMemcpy(walkers_vals, d_walkers_vals, sizeof(float)*WSIZE*NSIZE, hipMemcpyDeviceToHost);
   hipMemcpy(walkers_grads, d_walkers_grads, sizeof(float)*WSIZE*MSIZE, hipMemcpyDeviceToHost);
   hipMemcpy(walkers_hess, d_walkers_hess, sizeof(float)*WSIZE*OSIZE, hipMemcpyDeviceToHost);
-  hipDeviceSynchronize();
 
   // collect results for the first walker
   float resVal = 0.f;
@@ -223,7 +222,7 @@ int main(int argc, char ** argv) {
   for( int i = 0; i < MSIZE; i++ ) resGrad = resGrad + walkers_grads[i];
   for( int i = 0; i < OSIZE; i++ ) resHess = resHess + walkers_hess[i];
   printf("walkers[0]->collect([resVal resGrad resHess]) = [%e %e %e]\n",
-         resVal,resGrad, resHess);  
+         resVal,resGrad, resHess);
 
   free(Af);
   free(dAf);
