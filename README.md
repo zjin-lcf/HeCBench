@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -869,6 +869,9 @@ Early results are shown [here](results/README.md)
 
 ### minkowski (cuda)
   Minkowski distance (https://github.com/rapidsai/raft)
+
+### minmax (cuda)
+  Find the smallest and largest elements (https://github.com/rapidsai/cuspatial)
 
 ### mis (cuda)
   Maximal independent set (http://www.cs.txstate.edu/~burtscher/research/ECL-MIS/)
