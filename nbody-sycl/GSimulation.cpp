@@ -102,7 +102,7 @@ void GSimulation::Start() {
   double gflops = 1e-9 * ((11. + 18.) * n * n + n * 19.);
   int nf = 0;
   double av = 0.0, dev = 0.0;
-  auto r = range<1>(n);
+
   // Create a queue to the selected device and enabled asynchronous exception
   // handling for that queue
 #ifdef USE_GPU 
@@ -112,8 +112,10 @@ void GSimulation::Start() {
 #endif
   queue q(dev_sel);
 
-  buffer<Particle, 1> pbuf(particles_.data(), r);
-  buffer<RealType, 1> ebuf(r);
+  range<2> r{(static_cast<size_t>(n)+255)/256, 256};
+
+  buffer<Particle, 1> pbuf(particles_.data(), n);
+  buffer<RealType, 1> ebuf(n);
   pbuf.set_final_data(nullptr);
 
   TimeInterval t0;
@@ -126,7 +128,8 @@ void GSimulation::Start() {
     // particles
     q.submit([&](handler& h) {
        auto p = pbuf.get_access<sycl_read_write>(h);
-       h.parallel_for<class compute_acceleration>(r, [=](id<1> i) {
+       h.parallel_for<class compute_acceleration>(r, [=](item<2> it) {
+         auto i = it.get_linear_id();
          RealType acc0 = p[i].acc[0];
          RealType acc1 = p[i].acc[1];
          RealType acc2 = p[i].acc[2];
@@ -159,7 +162,8 @@ void GSimulation::Start() {
     q.submit([&](handler& h) {
        auto p = pbuf.get_access<sycl_read_write>(h);
        auto e = ebuf.get_access<sycl_discard_read_write>(h);
-       h.parallel_for<class update_velocity_position>(r, [=](id<1> i) {
+       h.parallel_for<class update_velocity_position>(r, [=](item<2> it) {
+         auto i = it.get_linear_id();
          p[i].vel[0] += p[i].acc[0] * dt;  // 2flops
          p[i].vel[1] += p[i].acc[1] * dt;  // 2flops
          p[i].vel[2] += p[i].acc[2] * dt;  // 2flops
