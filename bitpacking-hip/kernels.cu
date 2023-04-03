@@ -160,14 +160,13 @@ __global__ void bitPackConfigFinalizeKernel(
     *outMinValPtr = static_cast<INPUT>(minBuffer[0]);
     // we need to update the number of bits
     if (sizeof(LIMIT) > sizeof(int)) {
-      const long long int range = static_cast<uint64_t>(maxBuffer[0]) - static_cast<uint64_t>(minBuffer[0]);
+      const uint64_t range = static_cast<uint64_t>(maxBuffer[0]) - static_cast<uint64_t>(minBuffer[0]);
       // need 64 bit clz
-      *numBitsPtr = sizeof(long long int) * 8
-                     - __clzll(range);
+      *numBitsPtr = sizeof(uint64_t)  * 8 - __clzll(range);
     } else {
-      const int range = static_cast<uint32_t>(maxBuffer[0]) - static_cast<uint32_t>(minBuffer[0]);
+      const uint32_t range = static_cast<uint32_t>(maxBuffer[0]) - static_cast<uint32_t>(minBuffer[0]);
       // can use 32 bit clz
-      *numBitsPtr = sizeof(int) * 8 - __clz(range);
+      *numBitsPtr = sizeof(uint32_t) * 8 - __clz(range);
     }
   }
 }
