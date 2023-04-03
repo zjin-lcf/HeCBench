@@ -33,7 +33,7 @@ void runBitPackingOnGPU(
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   T* input;
 
