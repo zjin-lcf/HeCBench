@@ -998,7 +998,7 @@ dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
 }
 
 
-void getBondsResultsGpu(
+void bonds (
     nd_item<1> &item,
     bondsYieldTermStruct* __restrict discountCurve,
     bondsYieldTermStruct* __restrict repoCurve,
@@ -1081,4 +1081,51 @@ void getBondsResultsGpu(
 
     cleanPrice[bondNum] = dirtyPrice[bondNum] - accruedAmountCurrDate[bondNum];
   }
+}
+
+void getBondsResultsGpu(queue &q, inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+{
+  buffer<bondsYieldTermStruct, 1> discountCurveGpu (inArgsHost.discountCurve, numBonds);
+  buffer<bondsYieldTermStruct, 1> repoCurveGpu (inArgsHost.repoCurve, numBonds);
+  buffer<bondsDateStruct, 1> currDateGpu (inArgsHost.currDate, numBonds);
+  buffer<bondsDateStruct, 1> maturityDateGpu (inArgsHost.maturityDate, numBonds);
+  buffer<dataType, 1> bondCleanPriceGpu (inArgsHost.bondCleanPrice, numBonds);
+  buffer<bondStruct, 1> bondGpu (inArgsHost.bond, numBonds);
+  buffer<dataType, 1> dummyStrikeGpu (inArgsHost.dummyStrike, numBonds);
+  buffer<dataType, 1> dirtyPriceGpu (resultsFromGpu.dirtyPrice, numBonds);
+  buffer<dataType, 1> accruedAmountCurrDateGpu (resultsFromGpu.accruedAmountCurrDate, numBonds);
+  buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
+  buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
+
+  range<1> gws ((numBonds + 255)/256*256);
+  range<1> lws (256);
+
+  q.submit([&] (handler &cgh) {
+    auto discountCurve = discountCurveGpu.get_access<sycl_read>(cgh);
+    auto repoCurve = repoCurveGpu.get_access<sycl_read>(cgh);
+    auto currDate = currDateGpu.get_access<sycl_read>(cgh);
+    auto maturityDate = maturityDateGpu.get_access<sycl_read>(cgh);
+    auto bondCleanPrice = bondCleanPriceGpu.get_access<sycl_read>(cgh);
+    auto bond = bondGpu.get_access<sycl_read>(cgh);
+    auto dummyStrike = dummyStrikeGpu.get_access<sycl_read>(cgh);
+    auto dirtyPrice = dirtyPriceGpu.get_access<sycl_discard_write>(cgh);
+    auto accruedAmountCurrDate = accruedAmountCurrDateGpu.get_access<sycl_discard_write>(cgh);
+    auto cleanPrice = cleanPriceGpu.get_access<sycl_discard_write>(cgh);
+    auto bondForwardVal = bondForwardValGpu.get_access<sycl_discard_write>(cgh);
+    cgh.parallel_for<class kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      bonds(item,
+        discountCurve.get_pointer(),
+        repoCurve.get_pointer(),
+        currDate.get_pointer(),
+        maturityDate.get_pointer(),
+        bondCleanPrice.get_pointer(),
+        bond.get_pointer(),
+        dummyStrike.get_pointer(),
+        dirtyPrice.get_pointer(),
+        accruedAmountCurrDate.get_pointer(),
+        cleanPrice.get_pointer(),
+        bondForwardVal.get_pointer(),
+        numBonds);
+    });
+  });
 }

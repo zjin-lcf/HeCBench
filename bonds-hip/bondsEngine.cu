@@ -5,13 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h> 
-#include <hip/hip_runtime.h>
 #include "bondsStructs.h"
 #include "bondsKernelsGpu.cu"
 #include "bondsKernelsCpu.cu"
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+
 
 int monthLengthCpu(int month, bool leapYear) 
 {
@@ -25,6 +25,7 @@ int monthLengthCpu(int month, bool leapYear)
 
   return (leapYear? MonthLeapLength[month-1] : MonthLength[month-1]);
 }
+
 
 int monthOffsetCpu(int m, bool leapYear) 
 {
@@ -42,6 +43,7 @@ int monthOffsetCpu(int m, bool leapYear)
 
   return (leapYear? MonthLeapOffset[m-1] : MonthOffset[m-1]);
 }
+
 
 int yearOffsetCpu(int y)
 {
@@ -115,6 +117,7 @@ int yearOffsetCpu(int y)
   return YearOffset[y-1900];
 }
 
+
 bool isLeapCpu(int y) 
 {
   bool YearIsLeap[] = {
@@ -187,6 +190,7 @@ bool isLeapCpu(int y)
   return YearIsLeap[y-1900];
 }
 
+
 bondsDateStruct intializeDateCpu(int d, int m, int y) 
 {
   bondsDateStruct currDate;
@@ -203,7 +207,7 @@ bondsDateStruct intializeDateCpu(int d, int m, int y)
   return currDate;
 }
 
-void runBoundsEngine() 
+void runBoundsEngine(const int repeat)
 {
   //can run multiple times with different number of bonds by uncommenting these lines
   int nBondsArray[] = {1000000};
@@ -293,45 +297,14 @@ void runBoundsEngine()
     resultsStruct resultsFromGpu;
 
     resultsHost.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
+    resultsHost.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsHost.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsHost.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
+
     resultsFromGpu.dirtyPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
-    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
-
-    bondsYieldTermStruct* discountCurveGpu;
-    bondsYieldTermStruct* repoCurveGpu;
-    bondsDateStruct* currDateGpu;
-    bondsDateStruct* maturityDateGpu;
-    dataType* bondCleanPriceGpu;
-    bondStruct* bondGpu;
-    dataType* dummyStrikeGpu;
-    dataType* dirtyPriceGpu;
-    dataType* accruedAmountCurrDateGpu;
-    dataType* cleanPriceGpu;
-    dataType* bondForwardValGpu;
-
-    hipMalloc((void**)&discountCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
-    hipMalloc((void**)&repoCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
-    hipMalloc((void**)&currDateGpu, numBonds*sizeof(bondsDateStruct));
-    hipMalloc((void**)&maturityDateGpu, numBonds*sizeof(bondsDateStruct));
-    hipMalloc((void**)&bondCleanPriceGpu, numBonds*sizeof(dataType));
-    hipMalloc((void**)&bondGpu, numBonds*sizeof(bondStruct));
-    hipMalloc((void**)&dummyStrikeGpu, numBonds*sizeof(dataType));
-    hipMalloc((void**)&dirtyPriceGpu, numBonds*sizeof(dataType));
-    hipMalloc((void**)&accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
-    hipMalloc((void**)&cleanPriceGpu, numBonds*sizeof(dataType));
-    hipMalloc((void**)&bondForwardValGpu, numBonds*sizeof(dataType));
-
-    hipMemcpy(discountCurveGpu, inArgsHost.discountCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
-    hipMemcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
-    hipMemcpy(currDateGpu, inArgsHost.currDate, numBonds*sizeof(bondsDateStruct), hipMemcpyHostToDevice);
-    hipMemcpy(maturityDateGpu, inArgsHost.maturityDate, numBonds*sizeof(bondsDateStruct), hipMemcpyHostToDevice);
-    hipMemcpy(bondCleanPriceGpu, inArgsHost.bondCleanPrice, numBonds*sizeof(dataType), hipMemcpyHostToDevice);
-    hipMemcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct), hipMemcpyHostToDevice);
-    hipMemcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType), hipMemcpyHostToDevice);
+    resultsFromGpu.accruedAmountCurrDate = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
+    resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
 
     long seconds, useconds;    
     float mtimeCpu;
@@ -340,43 +313,19 @@ void runBoundsEngine()
     struct timeval start;
     struct timeval end;
 
-    inArgsStruct inArgs;
-    inArgs.discountCurve  = discountCurveGpu;
-    inArgs.repoCurve      = repoCurveGpu;
-    inArgs.currDate       = currDateGpu;
-    inArgs.maturityDate   = maturityDateGpu;
-    inArgs.bondCleanPrice = bondCleanPriceGpu;
-    inArgs.bond           = bondGpu;
-    inArgs.dummyStrike    = dummyStrikeGpu;
-
-    resultsStruct results;
-    results.dirtyPrice            = dirtyPriceGpu;
-    results.accruedAmountCurrDate = accruedAmountCurrDateGpu;
-    results.cleanPrice            = cleanPriceGpu;
-    results.bondForwardVal        = bondForwardValGpu;
-
-    dim3  grid((numBonds+255)/256, 1, 1);
-    dim3  threads(256, 1, 1);
-
-    hipDeviceSynchronize();
     gettimeofday(&start, NULL);
 
-    hipLaunchKernelGGL(getBondsResultsGpu, dim3(grid), dim3(threads), 0, 0, inArgs, results, numBonds);
+    for (int i = 0; i < repeat; i++)
+      getBondsResultsGpu(inArgsHost, resultsFromGpu, numBonds);
 
-    hipDeviceSynchronize();
     gettimeofday(&end, NULL);
-
-    hipMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
-    hipMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
-    hipMemcpy(resultsFromGpu.cleanPrice, cleanPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
-    hipMemcpy(resultsFromGpu.bondForwardVal, bondForwardValGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Processing time on GPU: %f (ms)\n\n", mtimeGpu);
+    printf("Average processing time on GPU: %f (ms)  \n\n", mtimeGpu / repeat);
 
     double totPrice = 0.0;
     int numBond1;
@@ -394,7 +343,8 @@ void runBoundsEngine()
 
     gettimeofday(&start, NULL);
 
-    getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
+    for (int i = 0; i < 2; i++)
+      getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
 
     gettimeofday(&end, NULL);
 
@@ -403,7 +353,7 @@ void runBoundsEngine()
 
     mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on CPU\n");
-    printf("Processing time on CPU: %f (ms)\n\n", mtimeCpu);
+    printf("Average processing time on CPU: %f (ms)  \n\n", mtimeCpu / 2);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -419,26 +369,16 @@ void runBoundsEngine()
 
     printf("Speedup using GPU: %f\n", mtimeCpu/mtimeGpu);
 
-    hipFree(discountCurveGpu);
-    hipFree(repoCurveGpu);
-    hipFree(currDateGpu);
-    hipFree(maturityDateGpu);
-    hipFree(bondCleanPriceGpu);
-    hipFree(bondGpu);
-    hipFree(dummyStrikeGpu);
-    hipFree(dirtyPriceGpu);
-    hipFree(accruedAmountCurrDateGpu);
-    hipFree(cleanPriceGpu);
-    hipFree(bondForwardValGpu);
-
     free(resultsHost.dirtyPrice);
-    free(resultsHost.accruedAmountCurrDate);
-    free(resultsHost.cleanPrice);
-    free(resultsHost.bondForwardVal);
+    free(resultsHost.accruedAmountCurrDate);;
+    free(resultsHost.cleanPrice);;
+    free(resultsHost.bondForwardVal);;
+
     free(resultsFromGpu.dirtyPrice);
-    free(resultsFromGpu.accruedAmountCurrDate);
-    free(resultsFromGpu.cleanPrice);
+    free(resultsFromGpu.accruedAmountCurrDate);;
+    free(resultsFromGpu.cleanPrice);;
     free(resultsFromGpu.bondForwardVal);
+
     free(inArgsHost.discountCurve);
     free(inArgsHost.repoCurve);
     free(inArgsHost.currDate);
@@ -449,8 +389,13 @@ void runBoundsEngine()
   }
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char* argv[])
 {
-  runBoundsEngine();
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+  runBoundsEngine(repeat);
   return 0;
 }

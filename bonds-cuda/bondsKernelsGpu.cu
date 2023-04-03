@@ -2,6 +2,7 @@
 //Scott Grauer-Gray
 //Bonds kernels to run on the GPU
 
+#include <cuda.h>
 #include "bondsKernelsGpu.h"
 
 
@@ -1040,7 +1041,7 @@ __device__ dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
 }
 
 
-__global__ void getBondsResultsGpu(inArgsStruct inArgs, resultsStruct results, int n)
+__global__ void bonds(inArgsStruct inArgs, resultsStruct results, int n)
 {
   int bondNum = blockIdx.x*blockDim.x + threadIdx.x;
   if (bondNum < n)
@@ -1108,4 +1109,79 @@ __global__ void getBondsResultsGpu(inArgsStruct inArgs, resultsStruct results, i
     results.accruedAmountCurrDate[bondNum] = getAccruedAmountGpu(inArgs, inArgs.currDate[bondNum], bondNum, cashFlows, numLegs);
     results.cleanPrice[bondNum] = results.dirtyPrice[bondNum] - results.accruedAmountCurrDate[bondNum];
   }
+}
+
+void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+{
+  bondsYieldTermStruct* discountCurveGpu;
+  bondsYieldTermStruct* repoCurveGpu;
+  bondsDateStruct* currDateGpu;
+  bondsDateStruct* maturityDateGpu;
+  dataType* bondCleanPriceGpu;
+  bondStruct* bondGpu;
+  dataType* dummyStrikeGpu;
+
+  dataType* dirtyPriceGpu;
+  dataType* accruedAmountCurrDateGpu;
+  dataType* cleanPriceGpu;
+  dataType* bondForwardValGpu;
+
+  cudaMalloc((void**)&discountCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
+  cudaMalloc((void**)&repoCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
+  cudaMalloc((void**)&currDateGpu, numBonds*sizeof(bondsDateStruct));
+  cudaMalloc((void**)&maturityDateGpu, numBonds*sizeof(bondsDateStruct));
+  cudaMalloc((void**)&bondCleanPriceGpu, numBonds*sizeof(dataType));
+  cudaMalloc((void**)&bondGpu, numBonds*sizeof(bondStruct));
+  cudaMalloc((void**)&dummyStrikeGpu, numBonds*sizeof(dataType));
+
+  cudaMalloc((void**)&dirtyPriceGpu, numBonds*sizeof(dataType));
+  cudaMalloc((void**)&accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
+  cudaMalloc((void**)&cleanPriceGpu, numBonds*sizeof(dataType));
+  cudaMalloc((void**)&bondForwardValGpu, numBonds*sizeof(dataType));
+
+  cudaMemcpy(discountCurveGpu, inArgsHost.discountCurve, numBonds*sizeof(bondsYieldTermStruct), cudaMemcpyHostToDevice);
+  cudaMemcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct), cudaMemcpyHostToDevice);
+  cudaMemcpy(currDateGpu, inArgsHost.currDate, numBonds*sizeof(bondsDateStruct), cudaMemcpyHostToDevice);
+  cudaMemcpy(maturityDateGpu, inArgsHost.maturityDate, numBonds*sizeof(bondsDateStruct), cudaMemcpyHostToDevice);
+  cudaMemcpy(bondCleanPriceGpu, inArgsHost.bondCleanPrice, numBonds*sizeof(dataType), cudaMemcpyHostToDevice);
+  cudaMemcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct), cudaMemcpyHostToDevice);
+  cudaMemcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType), cudaMemcpyHostToDevice);
+
+  inArgsStruct inArgs;
+  inArgs.discountCurve    = discountCurveGpu;
+  inArgs.repoCurve        = repoCurveGpu;
+  inArgs.currDate   = currDateGpu;
+  inArgs.maturityDate     = maturityDateGpu;
+  inArgs.bondCleanPrice   = bondCleanPriceGpu;
+  inArgs.bond             = bondGpu;
+  inArgs.dummyStrike      = dummyStrikeGpu;
+
+  resultsStruct results;
+  results.dirtyPrice                = dirtyPriceGpu;
+  results.accruedAmountCurrDate  = accruedAmountCurrDateGpu;
+  results.cleanPrice                = cleanPriceGpu;
+  results.bondForwardVal         = bondForwardValGpu;
+
+  dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
+  dim3  threads(256, 1, 1);
+
+  bonds <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+
+  cudaMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
+  cudaMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
+  cudaMemcpy(resultsFromGpu.cleanPrice, cleanPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
+  cudaMemcpy(resultsFromGpu.bondForwardVal, bondForwardValGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
+
+  cudaFree(discountCurveGpu);
+  cudaFree(repoCurveGpu);
+  cudaFree(currDateGpu);
+  cudaFree(maturityDateGpu);
+  cudaFree(bondCleanPriceGpu);
+  cudaFree(bondGpu);
+  cudaFree(dummyStrikeGpu);
+
+  cudaFree(dirtyPriceGpu);
+  cudaFree(accruedAmountCurrDateGpu);
+  cudaFree(cleanPriceGpu);
+  cudaFree(bondForwardValGpu);
 }

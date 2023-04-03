@@ -2,6 +2,7 @@
 //Scott Grauer-Gray
 //Bonds kernels to run on the GPU
 
+#include <hip/hip_runtime.h>
 #include "bondsKernelsGpu.h"
 
 
@@ -1040,7 +1041,7 @@ __device__ dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
 }
 
 
-__global__ void getBondsResultsGpu(inArgsStruct inArgs, resultsStruct results, int n)
+__global__ void bonds(inArgsStruct inArgs, resultsStruct results, int n)
 {
   int bondNum = blockIdx.x*blockDim.x + threadIdx.x;
   if (bondNum < n)
@@ -1108,4 +1109,79 @@ __global__ void getBondsResultsGpu(inArgsStruct inArgs, resultsStruct results, i
     results.accruedAmountCurrDate[bondNum] = getAccruedAmountGpu(inArgs, inArgs.currDate[bondNum], bondNum, cashFlows, numLegs);
     results.cleanPrice[bondNum] = results.dirtyPrice[bondNum] - results.accruedAmountCurrDate[bondNum];
   }
+}
+
+void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+{
+  bondsYieldTermStruct* discountCurveGpu;
+  bondsYieldTermStruct* repoCurveGpu;
+  bondsDateStruct* currDateGpu;
+  bondsDateStruct* maturityDateGpu;
+  dataType* bondCleanPriceGpu;
+  bondStruct* bondGpu;
+  dataType* dummyStrikeGpu;
+
+  dataType* dirtyPriceGpu;
+  dataType* accruedAmountCurrDateGpu;
+  dataType* cleanPriceGpu;
+  dataType* bondForwardValGpu;
+
+  hipMalloc((void**)&discountCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
+  hipMalloc((void**)&repoCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
+  hipMalloc((void**)&currDateGpu, numBonds*sizeof(bondsDateStruct));
+  hipMalloc((void**)&maturityDateGpu, numBonds*sizeof(bondsDateStruct));
+  hipMalloc((void**)&bondCleanPriceGpu, numBonds*sizeof(dataType));
+  hipMalloc((void**)&bondGpu, numBonds*sizeof(bondStruct));
+  hipMalloc((void**)&dummyStrikeGpu, numBonds*sizeof(dataType));
+
+  hipMalloc((void**)&dirtyPriceGpu, numBonds*sizeof(dataType));
+  hipMalloc((void**)&accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
+  hipMalloc((void**)&cleanPriceGpu, numBonds*sizeof(dataType));
+  hipMalloc((void**)&bondForwardValGpu, numBonds*sizeof(dataType));
+
+  hipMemcpy(discountCurveGpu, inArgsHost.discountCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
+  hipMemcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct), hipMemcpyHostToDevice);
+  hipMemcpy(currDateGpu, inArgsHost.currDate, numBonds*sizeof(bondsDateStruct), hipMemcpyHostToDevice);
+  hipMemcpy(maturityDateGpu, inArgsHost.maturityDate, numBonds*sizeof(bondsDateStruct), hipMemcpyHostToDevice);
+  hipMemcpy(bondCleanPriceGpu, inArgsHost.bondCleanPrice, numBonds*sizeof(dataType), hipMemcpyHostToDevice);
+  hipMemcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct), hipMemcpyHostToDevice);
+  hipMemcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType), hipMemcpyHostToDevice);
+
+  inArgsStruct inArgs;
+  inArgs.discountCurve    = discountCurveGpu;
+  inArgs.repoCurve        = repoCurveGpu;
+  inArgs.currDate   = currDateGpu;
+  inArgs.maturityDate     = maturityDateGpu;
+  inArgs.bondCleanPrice   = bondCleanPriceGpu;
+  inArgs.bond             = bondGpu;
+  inArgs.dummyStrike      = dummyStrikeGpu;
+
+  resultsStruct results;
+  results.dirtyPrice                = dirtyPriceGpu;
+  results.accruedAmountCurrDate  = accruedAmountCurrDateGpu;
+  results.cleanPrice                = cleanPriceGpu;
+  results.bondForwardVal         = bondForwardValGpu;
+
+  dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
+  dim3  threads(256, 1, 1);
+
+  bonds <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+
+  hipMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
+  hipMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
+  hipMemcpy(resultsFromGpu.cleanPrice, cleanPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
+  hipMemcpy(resultsFromGpu.bondForwardVal, bondForwardValGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
+
+  hipFree(discountCurveGpu);
+  hipFree(repoCurveGpu);
+  hipFree(currDateGpu);
+  hipFree(maturityDateGpu);
+  hipFree(bondCleanPriceGpu);
+  hipFree(bondGpu);
+  hipFree(dummyStrikeGpu);
+
+  hipFree(dirtyPriceGpu);
+  hipFree(accruedAmountCurrDateGpu);
+  hipFree(cleanPriceGpu);
+  hipFree(bondForwardValGpu);
 }

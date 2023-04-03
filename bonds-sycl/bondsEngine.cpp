@@ -203,7 +203,7 @@ bondsDateStruct intializeDateCpu(int d, int m, int y)
   return currDate;
 }
 
-void runBoundsEngine() 
+void runBoundsEngine(const int repeat)
 {
   //can run multiple times with different number of bonds by uncommenting these lines
   int nBondsArray[] = {1000000};
@@ -309,7 +309,6 @@ void runBoundsEngine()
     struct timeval start;
     struct timeval end;
 
-    { // sycl scope
 #ifdef USE_GPU
     gpu_selector dev_sel;
 #else
@@ -317,63 +316,19 @@ void runBoundsEngine()
 #endif
     queue q(dev_sel);
 
-    buffer<bondsYieldTermStruct, 1> discountCurveGpu (inArgsHost.discountCurve, numBonds);
-    buffer<bondsYieldTermStruct, 1> repoCurveGpu (inArgsHost.repoCurve, numBonds);
-    buffer<bondsDateStruct, 1> currDateGpu (inArgsHost.currDate, numBonds);
-    buffer<bondsDateStruct, 1> maturityDateGpu (inArgsHost.maturityDate, numBonds);
-    buffer<dataType, 1> bondCleanPriceGpu (inArgsHost.bondCleanPrice, numBonds);
-    buffer<bondStruct, 1> bondGpu (inArgsHost.bond, numBonds);
-    buffer<dataType, 1> dummyStrikeGpu (inArgsHost.dummyStrike, numBonds);
-    buffer<dataType, 1> dirtyPriceGpu (resultsFromGpu.dirtyPrice, numBonds);
-    buffer<dataType, 1> accruedAmountCurrDateGpu (resultsFromGpu.accruedAmountCurrDate, numBonds);
-    buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
-    buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
-
-    range<1> gws ((numBonds + 255)/256*256);
-    range<1> lws (256);
-
-    q.wait();
     gettimeofday(&start, NULL);
 
-    q.submit([&] (handler &cgh) {
-      auto discountCurve = discountCurveGpu.get_access<sycl_read>(cgh);
-      auto repoCurve = repoCurveGpu.get_access<sycl_read>(cgh);
-      auto currDate = currDateGpu.get_access<sycl_read>(cgh);
-      auto maturityDate = maturityDateGpu.get_access<sycl_read>(cgh);
-      auto bondCleanPrice = bondCleanPriceGpu.get_access<sycl_read>(cgh);
-      auto bond = bondGpu.get_access<sycl_read>(cgh);
-      auto dummyStrike = dummyStrikeGpu.get_access<sycl_read>(cgh);
-      auto dirtyPrice = dirtyPriceGpu.get_access<sycl_discard_write>(cgh);
-      auto accruedAmountCurrDate = accruedAmountCurrDateGpu.get_access<sycl_discard_write>(cgh);
-      auto cleanPrice = cleanPriceGpu.get_access<sycl_discard_write>(cgh);
-      auto bondForwardVal = bondForwardValGpu.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        getBondsResultsGpu(item,
-          discountCurve.get_pointer(),
-          repoCurve.get_pointer(),
-          currDate.get_pointer(),
-          maturityDate.get_pointer(),
-          bondCleanPrice.get_pointer(),
-          bond.get_pointer(),
-          dummyStrike.get_pointer(),
-          dirtyPrice.get_pointer(),
-          accruedAmountCurrDate.get_pointer(),
-          cleanPrice.get_pointer(),
-          bondForwardVal.get_pointer(),
-          numBonds);
-      });
-    }).wait();
+    for (int i = 0; i < repeat; i++)
+      getBondsResultsGpu(q, inArgsHost, resultsFromGpu, numBonds);
 
     gettimeofday(&end, NULL);
-
-    }
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Processing time on GPU: %f (ms)\n\n", mtimeGpu);
+    printf("Average processing time on GPU: %f (ms)\n\n", mtimeGpu / repeat);
 
     double totPrice = 0.0;
     int numBond1;
@@ -391,7 +346,8 @@ void runBoundsEngine()
 
     gettimeofday(&start, NULL);
 
-    getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
+    for (int i = 0; i < 2; i++)
+      getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
 
     gettimeofday(&end, NULL);
 
@@ -400,7 +356,7 @@ void runBoundsEngine()
 
     mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on CPU\n");
-    printf("Processing time on CPU: %f (ms)\n\n", mtimeCpu);
+    printf("Average processing time on CPU: %f (ms)\n\n", mtimeCpu / 2);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -434,8 +390,13 @@ void runBoundsEngine()
   }
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char* argv[])
 {
-  runBoundsEngine();
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+  runBoundsEngine(repeat);
   return 0;
 }
