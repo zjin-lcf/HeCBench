@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h> 
-#include <cuda.h>
 #include "bondsStructs.h"
 #include "bondsKernelsGpu.cu"
 #include "bondsKernelsCpu.cu"
@@ -208,9 +207,7 @@ bondsDateStruct intializeDateCpu(int d, int m, int y)
   return currDate;
 }
 
-
-
-void runBoundsEngine() 
+void runBoundsEngine(const int repeat)
 {
   //can run multiple times with different number of bonds by uncommenting these lines
   int nBondsArray[] = {1000000};
@@ -309,43 +306,6 @@ void runBoundsEngine()
     resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));;
     resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));;
 
-    bondsYieldTermStruct* discountCurveGpu;
-    bondsYieldTermStruct* repoCurveGpu;
-    bondsDateStruct* currDateGpu;
-    bondsDateStruct* maturityDateGpu;
-    dataType* bondCleanPriceGpu;
-    bondStruct* bondGpu;
-    dataType* dummyStrikeGpu;
-
-    dataType* dirtyPriceGpu;
-    dataType* accruedAmountCurrDateGpu;
-    dataType* cleanPriceGpu;
-    dataType* bondForwardValGpu;
-
-
-    cudaMalloc((void**)&discountCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
-    cudaMalloc((void**)&repoCurveGpu, numBonds*sizeof(bondsYieldTermStruct));
-    cudaMalloc((void**)&currDateGpu, numBonds*sizeof(bondsDateStruct));
-    cudaMalloc((void**)&maturityDateGpu, numBonds*sizeof(bondsDateStruct));
-    cudaMalloc((void**)&bondCleanPriceGpu, numBonds*sizeof(dataType));
-    cudaMalloc((void**)&bondGpu, numBonds*sizeof(bondStruct));
-    cudaMalloc((void**)&dummyStrikeGpu, numBonds*sizeof(dataType));
-
-    cudaMalloc((void**)&dirtyPriceGpu, numBonds*sizeof(dataType));
-    cudaMalloc((void**)&accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
-    cudaMalloc((void**)&cleanPriceGpu, numBonds*sizeof(dataType));
-    cudaMalloc((void**)&bondForwardValGpu, numBonds*sizeof(dataType));
-
-
-    cudaMemcpy(discountCurveGpu, inArgsHost.discountCurve, numBonds*sizeof(bondsYieldTermStruct), cudaMemcpyHostToDevice);
-    cudaMemcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct), cudaMemcpyHostToDevice);
-    cudaMemcpy(currDateGpu, inArgsHost.currDate, numBonds*sizeof(bondsDateStruct), cudaMemcpyHostToDevice);
-    cudaMemcpy(maturityDateGpu, inArgsHost.maturityDate, numBonds*sizeof(bondsDateStruct), cudaMemcpyHostToDevice);
-    cudaMemcpy(bondCleanPriceGpu, inArgsHost.bondCleanPrice, numBonds*sizeof(dataType), cudaMemcpyHostToDevice);
-    cudaMemcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct), cudaMemcpyHostToDevice);
-    cudaMemcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType), cudaMemcpyHostToDevice);
-
-
     long seconds, useconds;    
     float mtimeCpu;
     float mtimeGpu;
@@ -353,43 +313,19 @@ void runBoundsEngine()
     struct timeval start;
     struct timeval end;
 
-    inArgsStruct inArgs;
-    inArgs.discountCurve    = discountCurveGpu;
-    inArgs.repoCurve        = repoCurveGpu;
-    inArgs.currDate   = currDateGpu;
-    inArgs.maturityDate     = maturityDateGpu;
-    inArgs.bondCleanPrice   = bondCleanPriceGpu;
-    inArgs.bond             = bondGpu;
-    inArgs.dummyStrike      = dummyStrikeGpu;
-
-    resultsStruct results;
-    results.dirtyPrice                = dirtyPriceGpu;
-    results.accruedAmountCurrDate  = accruedAmountCurrDateGpu;
-    results.cleanPrice                = cleanPriceGpu;
-    results.bondForwardVal         = bondForwardValGpu;
-
-    dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
-    dim3  threads(256, 1, 1);
-
-    cudaDeviceSynchronize();
     gettimeofday(&start, NULL);
 
-    getBondsResultsGpu <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+    for (int i = 0; i < repeat; i++)
+      getBondsResultsGpu(inArgsHost, resultsFromGpu, numBonds);
 
-    cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
-
-    cudaMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
-    cudaMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
-    cudaMemcpy(resultsFromGpu.cleanPrice, cleanPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
-    cudaMemcpy(resultsFromGpu.bondForwardVal, bondForwardValGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
     mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Processing time on GPU: %f (ms)  \n\n", mtimeGpu);
+    printf("Average processing time on GPU: %f (ms)  \n\n", mtimeGpu / repeat);
 
     double totPrice = 0.0;
     int numBond1;
@@ -398,7 +334,6 @@ void runBoundsEngine()
       totPrice += resultsFromGpu.dirtyPrice[numBond1];
     }
 
-
     printf("Sum of output dirty prices on GPU: %f\n", totPrice);
     printf("Outputs on GPU for bond with index %d: \n", numBonds/2);
     printf("Dirty Price: %f\n", resultsFromGpu.dirtyPrice[numBonds/2]);
@@ -406,20 +341,19 @@ void runBoundsEngine()
     printf("Clean Price: %f\n", resultsFromGpu.cleanPrice[numBonds/2]);
     printf("Bond Forward Val: %f\n\n", resultsFromGpu.bondForwardVal[numBonds/2]);
 
-
     gettimeofday(&start, NULL);
 
-    getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
+    for (int i = 0; i < 2; i++)
+      getBondsResultsCpu(inArgsHost, resultsHost, numBonds);
 
     gettimeofday(&end, NULL);
-
 
     seconds  = end.tv_sec  - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
 
     mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on CPU\n");
-    printf("Processing time on CPU: %f (ms)  \n\n", mtimeCpu);
+    printf("Average processing time on CPU: %f (ms)  \n\n", mtimeCpu / 2);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -434,20 +368,6 @@ void runBoundsEngine()
     printf("Bond Forward Val: %f\n\n", resultsHost.bondForwardVal[numBonds/2]);
 
     printf("Speedup using GPU: %f\n", mtimeCpu/mtimeGpu);
-
-
-    cudaFree(discountCurveGpu);
-    cudaFree(repoCurveGpu);
-    cudaFree(currDateGpu);
-    cudaFree(maturityDateGpu);
-    cudaFree(bondCleanPriceGpu);
-    cudaFree(bondGpu);
-    cudaFree(dummyStrikeGpu);
-
-    cudaFree(dirtyPriceGpu);
-    cudaFree(accruedAmountCurrDateGpu);
-    cudaFree(cleanPriceGpu);
-    cudaFree(bondForwardValGpu);
 
     free(resultsHost.dirtyPrice);
     free(resultsHost.accruedAmountCurrDate);;
@@ -469,11 +389,13 @@ void runBoundsEngine()
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Program main
-////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv) 
+int main(int argc, char* argv[])
 {
-  runBoundsEngine();
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
+  runBoundsEngine(repeat);
   return 0;
 }
