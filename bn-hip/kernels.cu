@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #ifndef _ORDERGRAPH_KERNEL_H_
 #define _ORDERGRAPH_KERNEL_H_
 #include <stdio.h>
@@ -99,7 +98,7 @@ __global__ void computeKernel(const int taskperthr,
                               float *D_Score,
                               int *D_resP)
 {
-  HIP_DYNAMIC_SHARED(float, lsinblock);
+  extern __shared__ float lsinblock[];
   const unsigned int id = blockIdx.x*256 + threadIdx.x;
   const unsigned int tid = threadIdx.x;
   const unsigned int bid = blockIdx.x;
@@ -138,7 +137,6 @@ __global__ void computeKernel(const int taskperthr,
       for(tmp=0;tmp<4;tmp++)
         bestparent[tmp]=parent[tmp+1];
     }
-
   }
 
   lsinblock[tid]=bestls;
@@ -178,23 +176,15 @@ __global__ void computeKernel(const int taskperthr,
     }
 
     lsinblock[0]=(float)t;
-
-
   }
 
   __syncthreads();
 
-
   if(tid==(int)lsinblock[0]){
     for(i=0;i<4;i++){
       D_resP[bid*4+i]=bestparent[i];
-
-
     }
-
-
   }
-
 }
 
 
@@ -294,7 +284,6 @@ __device__ int D_findindex(int *arr, int size){  //reminder: arr[0] has to be 0 
   index+=arr[size]-arr[size-1];
 
   return index;
-
 }
 
 __device__ int D_C(int n, int a){

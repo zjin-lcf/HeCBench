@@ -70,7 +70,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) result
 
 run: $(program)
-	./$(program) result
+	./$(program) result 10

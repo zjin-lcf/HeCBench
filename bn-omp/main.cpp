@@ -46,12 +46,19 @@ int C(int n, int a);
 
 int main(int argc, char** argv) {
 
+  if (argc != 3) {
+    printf("Usage: ./%s <path to output file> <repeat>\n", argv[0]);
+    return 1;
+  }
+
   // save output in a file
   FILE *fpout = fopen(argv[1], "w");
   if (fpout == NULL) {
-    printf("Usage: ./%s <path to output file>\n", argv[0]);
+    printf("Error: failed to open %s. Exit..\n", argv[1]);
     return -1;
   }
+
+  const int repeat = atoi(argv[2]);
 
   int i, j, c = 0, tmp, a, b;
   float tmpd;
@@ -71,98 +78,107 @@ int main(int argc, char** argv) {
   bool *D_parent = (bool*) malloc (NODE_N * sizeof(bool));
   int* D_resP = (int*) malloc ((sizepernode / (256 * WORKLOAD) + 1)*4 * sizeof(int));
 
-#pragma omp target data map(to: data[0:NODE_N * DATA_N],\
-                                LG[0:DATA_N+2]) \
-                        map(alloc: localscore[0:NODE_N * sizepernode], \
-                                   D_Score[0:(sizepernode / (256 * WORKLOAD) + 1)], \
-                                   D_parent[0:NODE_N], \
-                                   D_resP[0:(sizepernode / (256 * WORKLOAD) + 1) * 4])
-{
-  auto start = std::chrono::steady_clock::now();
-
-  genScoreKernel(sizepernode, localscore, data, LG);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
-
-#ifdef DEBUG
-  for (int i = 0; i < NODE_N * sizepernode; i=i+sizepernode)
-    printf("%f\n", localscore[i]);
-#endif
-    
-  i = 0;
-  while (i != ITER) {
-
-    i++;
-    score = 0;
-
-    for (a = 0; a < NODE_N; a++) {
-      for (j = 0; j < NODE_N; j++) {
-        orders[a][j] = preOrders[a][j];
-      }
-    }
-
-    tmp = rand() % 6;
-    for (j = 0; j < tmp; j++)
-      genOrders();
-
-    score = findBestGraph(localscore, D_resP, D_Score, D_parent);
-
-    ConCore();
-
-    // store the top HIGHEST highest orders
-    if (c < HIGHEST) {
-      tmp = 1;
-      for (j = 0; j < c; j++) {
-        if (maxScore[j] == preScore) {
-          tmp = 0;
+  #pragma omp target data map(to: data[0:NODE_N * DATA_N],\
+                                  LG[0:DATA_N+2]) \
+                          map(alloc: localscore[0:NODE_N * sizepernode], \
+                                     D_Score[0:(sizepernode / (256 * WORKLOAD) + 1)], \
+                                     D_parent[0:NODE_N], \
+                                     D_resP[0:(sizepernode / (256 * WORKLOAD) + 1) * 4])
+  {
+    auto start = std::chrono::steady_clock::now();
+  
+    for (i = 0; i < repeat; i++)
+      genScoreKernel(sizepernode, localscore, data, LG);
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of genScoreKernel: %f (s)\n", time * 1e-9f / repeat);
+  
+    #ifdef DEBUG
+      for (int i = 0; i < NODE_N * sizepernode; i=i+sizepernode)
+        printf("%f\n", localscore[i]);
+    #endif
+      
+    long findBestGraph_time = 0;
+    i = 0;
+    while (i != ITER) {
+  
+      i++;
+      score = 0;
+  
+      for (a = 0; a < NODE_N; a++) {
+        for (j = 0; j < NODE_N; j++) {
+          orders[a][j] = preOrders[a][j];
         }
       }
-      if (tmp != 0) {
-        maxScore[c] = preScore;
-        for (a = 0; a < NODE_N; a++) {
-          for (b = 0; b < NODE_N; b++) {
-            bestGraph[c][a][b] = preGraph[a][b];
+  
+      tmp = rand() % 6;
+      for (j = 0; j < tmp; j++)
+        genOrders();
+  
+      start = std::chrono::steady_clock::now();
+
+      score = findBestGraph(localscore, D_resP, D_Score, D_parent);
+  
+      end = std::chrono::steady_clock::now();
+      findBestGraph_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+      ConCore();
+  
+      // store the top HIGHEST highest orders
+      if (c < HIGHEST) {
+        tmp = 1;
+        for (j = 0; j < c; j++) {
+          if (maxScore[j] == preScore) {
+            tmp = 0;
           }
         }
+        if (tmp != 0) {
+          maxScore[c] = preScore;
+          for (a = 0; a < NODE_N; a++) {
+            for (b = 0; b < NODE_N; b++) {
+              bestGraph[c][a][b] = preGraph[a][b];
+            }
+          }
+          c++;
+        }
+  
+      } else if (c == HIGHEST) {
+        sortGraph();
         c++;
-      }
-
-    } else if (c == HIGHEST) {
-      sortGraph();
-      c++;
-    } else {
-
-      tmp = 1;
-      for (j = 0; j < HIGHEST; j++) {
-        if (maxScore[j] == preScore) {
-          tmp = 0;
-          break;
-        }
-      }
-      if (tmp != 0 && preScore > maxScore[HIGHEST - 1]) {
-        maxScore[HIGHEST - 1] = preScore;
-        for (a = 0; a < NODE_N; a++) {
-          for (b = 0; b < NODE_N; b++) {
-            bestGraph[HIGHEST - 1][a][b] = preGraph[a][b];
+      } else {
+  
+        tmp = 1;
+        for (j = 0; j < HIGHEST; j++) {
+          if (maxScore[j] == preScore) {
+            tmp = 0;
+            break;
           }
         }
-        b = HIGHEST - 1;
-        for (a = HIGHEST - 2; a >= 0; a--) {
-          if (maxScore[b] > maxScore[a]) {
-            swap(a, b);
-            tmpd = maxScore[a];
-            maxScore[a] = maxScore[b];
-            maxScore[b] = tmpd;
-            b = a;
+        if (tmp != 0 && preScore > maxScore[HIGHEST - 1]) {
+          maxScore[HIGHEST - 1] = preScore;
+          for (a = 0; a < NODE_N; a++) {
+            for (b = 0; b < NODE_N; b++) {
+              bestGraph[HIGHEST - 1][a][b] = preGraph[a][b];
+            }
+          }
+          b = HIGHEST - 1;
+          for (a = HIGHEST - 2; a >= 0; a--) {
+            if (maxScore[b] > maxScore[a]) {
+              swap(a, b);
+              tmpd = maxScore[a];
+              maxScore[a] = maxScore[b];
+              maxScore[b] = tmpd;
+              b = a;
+            }
           }
         }
       }
-    }
+  
+    } // endwhile
 
-  } // endwhile
-}
+    printf("Find best graph time %lf (s)\n", findBestGraph_time * 1e-9);
+  }
 
   free(LG);
   free(localscore);

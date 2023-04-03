@@ -33,11 +33,8 @@ void incrS(int *bit, int n); // STATE_N code increases 1 each time
 // get every possible combination of state for a parent set
 bool getState( int parN, int *state, int time); 
 float logGamma(int N); // log and gamma
-float findBestGraph(queue &q, 
-                    buffer<float, 1> &D_localscore, 
-                    buffer<int, 1> &D_resP, 
-                    buffer<float, 1> &D_Score, 
-                    buffer<bool, 1> &D_parent) ;
+float findBestGraph(queue &q, float* D_localscore, int* D_resP,
+                    float* D_Score, bool *D_parent);
 void genScore();
 void sortGraph();
 void swap(int a, int b);
@@ -47,12 +44,19 @@ int C(int n, int a);
 
 int main(int argc, char** argv) {
 
+  if (argc != 3) {
+    printf("Usage: ./%s <path to output file> <repeat>\n", argv[0]);
+    return 1;
+  }
+
   // save output in a file
   FILE *fpout = fopen(argv[1], "w");
   if (fpout == NULL) {
-    printf("Usage: ./%s <path to output file>\n", argv[0]);
+    printf("Error: failed to open %s. Exit..\n", argv[1]);
     return -1;
   }
+
+  const int repeat = atoi(argv[2]);
 
   int i, j, c = 0, tmp, a, b;
   float tmpd;
@@ -62,7 +66,7 @@ int main(int argc, char** argv) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   printf("NODE_N=%d\nInitialization...\n", NODE_N);
 
@@ -73,45 +77,46 @@ int main(int argc, char** argv) {
 
   Pre_logGamma();
 
-  buffer<int, 1> D_data(data, NODE_N * DATA_N);
-  buffer<float, 1> D_LG(LG, (DATA_N + 2));
-  buffer<float, 1> D_localscore(NODE_N * sizepernode);
-  buffer<float, 1> D_Score(sizepernode / (256 * WORKLOAD) + 1);
-  buffer<bool, 1> D_parent(NODE_N);
-  buffer<int, 1> D_resP((sizepernode / (256 * WORKLOAD) + 1) * 4);
+  int *D_data = malloc_device<int>(NODE_N * DATA_N, q);
+  q.memcpy(D_data, data, NODE_N * DATA_N * sizeof(int));
+
+  float *D_LG = malloc_device<float>(DATA_N + 2, q);
+  q.memcpy(D_LG, LG, (DATA_N + 2) * sizeof(float));
+
+  float *D_localscore = malloc_device<float>(NODE_N * sizepernode, q);
+
+  float *D_Score = malloc_device<float>(sizepernode / (256 * WORKLOAD) + 1, q);
+
+  bool *D_parent = malloc_device<bool>(NODE_N, q);
+
+  int *D_resP = malloc_device<int>((sizepernode / (256 * WORKLOAD) + 1) * 4, q);
 
   range<1> gws((sizepernode+255)/256*256);
   range<1> lws(256);
 
   const int sizePerNode = sizepernode;  // global variable not allowed by lambda
 
-  q.submit([&] (handler &cgh) {
-    auto ls = D_localscore.get_access<sycl_discard_write>(cgh);
-    cgh.fill(ls, 0.f);
-  });
+  q.memset(D_localscore, 0, NODE_N * sizepernode * sizeof(float));
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto ls = D_localscore.get_access<sycl_read_write>(cgh);
-    auto data = D_data.get_access<sycl_read>(cgh);
-    auto lg = D_LG.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class genScore>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      genScoreKernel(sizePerNode, ls.get_pointer(), data.get_pointer(), lg.get_pointer(), item);
+  for (i = 0; i < repeat; i++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class genScore>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        genScoreKernel(sizePerNode, D_localscore, D_data, D_LG, item);
+      });
     });
-  });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
+  printf("Average execution time of genScoreKernel: %f (s)\n", time * 1e-9f / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto ls = D_localscore.get_access<sycl_read>(cgh);
-    cgh.copy(ls, localscore);
-  }).wait();
+  q.memcpy(localscore, D_localscore, NODE_N * sizepernode * sizeof(float)).wait();
 
+  long findBestGraph_time = 0;
   i = 0;
   while (i != ITER) {
 
@@ -128,7 +133,12 @@ int main(int argc, char** argv) {
     for (j = 0; j < tmp; j++)
       genOrders();
 
+    start = std::chrono::steady_clock::now();
+
     score = findBestGraph(q, D_localscore, D_resP, D_Score, D_parent);
+
+    end = std::chrono::steady_clock::now();
+    findBestGraph_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     ConCore();
 
@@ -184,10 +194,18 @@ int main(int argc, char** argv) {
 
   } // endwhile
 
+  printf("Find best graph time %lf (s)\n", findBestGraph_time * 1e-9);
+
   free(LG);
   free(localscore);
   free(scores);
   free(parents);
+  free(D_LG, q);
+  free(D_data, q);
+  free(D_localscore, q);
+  free(D_parent, q);
+  free(D_Score, q);
+  free(D_resP, q);
 
   for(j=0;j<HIGHEST;j++){
     fprintf(fpout,"score:%f\n",maxScore[j]);
@@ -204,8 +222,8 @@ int main(int argc, char** argv) {
 }
 
 
-float findBestGraph(queue &q, buffer<float, 1> &D_localscore, 
-                    buffer<int, 1> &D_resP, buffer<float, 1> &D_Score, buffer<bool, 1> &D_parent) {
+float findBestGraph(queue &q, float *D_localscore, int *D_resP,
+                    float *D_Score, bool *D_parent) {
   float bestls = -99999999.f;
   int bestparent[5];
   int bestpN, total;
@@ -235,46 +253,25 @@ float findBestGraph(queue &q, buffer<float, 1> &D_localscore,
       total = C(posN, 4) + C(posN, 3) + C(posN, 2) + posN + 1;
       blocknum = total / (256 * WORKLOAD) + 1;
 
-      q.submit([&] (handler &cgh) {
-        auto resP = D_resP.get_access<sycl_discard_write>(cgh);
-        cgh.fill(resP, 0);
-      });
-
-      q.submit([&] (handler &cgh) {
-        auto score = D_Score.get_access<sycl_discard_write>(cgh);
-        cgh.fill(score, -999999.f);
-      });
-
-      q.submit([&] (handler &cgh) {
-        auto parent = D_parent.get_access<sycl_discard_write>(cgh);
-        cgh.copy(orders[node], parent);
-      });
+      q.memset(D_resP, 0, blocknum * 4 * sizeof(int));
+      q.memset(D_Score, -999999.f, blocknum * sizeof(float));
+      q.memcpy(D_parent, orders[node], NODE_N * sizeof(bool));
 
       const int sizePerNode = sizepernode;
       range<1> gws(blocknum * 256);
       range<1> lws(256);
+
       q.submit([&] (handler &cgh) {
-        auto localscore = D_localscore.get_access<sycl_read>(cgh);
-        auto parent = D_parent.get_access<sycl_read>(cgh);
-        auto score = D_Score.get_access<sycl_discard_write>(cgh);
-        auto resP = D_resP.get_access<sycl_discard_write>(cgh);
         accessor<float, 1, sycl_read_write, access::target::local> sinblock(256, cgh);
         cgh.parallel_for<class compute>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          computeKernel(WORKLOAD, sizePerNode, localscore.get_pointer(), 
-            parent.get_pointer(), node, total, score.get_pointer(), resP.get_pointer(),
+          computeKernel(WORKLOAD, sizePerNode, D_localscore,
+            D_parent, node, total, D_Score, D_resP,
             sinblock.get_pointer(), item);
         });
       });
 
-      q.submit([&] (handler &cgh) {
-        auto resP = D_resP.get_access<sycl_read>(cgh, blocknum * 4); 
-        cgh.copy(resP, parents);
-      });
- 
-      q.submit([&] (handler &cgh) {
-        auto score = D_Score.get_access<sycl_read>(cgh, blocknum);
-        cgh.copy(score, scores);
-      });
+      q.memcpy(parents, D_resP, blocknum * 4 * sizeof(int));
+      q.memcpy(scores, D_Score, blocknum * sizeof(float));
 
       q.wait();
 

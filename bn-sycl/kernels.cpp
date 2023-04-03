@@ -165,13 +165,11 @@ void computeKernel(const int taskperthr,
     item.barrier(access::fence_space::local_space);
   }
 
-  item.barrier(access::fence_space::local_space);
-
   if(tid==0){
     D_Score[bid]=lsinblock[0];
     t=0;
     for(i=0;i<7&&t<128&&t>=0;i++){
-      t=(int)lsinblock[(int)cl::sycl::powr(2.f,(float)i)+t];
+      t=(int)lsinblock[(int)sycl::powr(2.f,(float)i)+t];
     }
     lsinblock[0]=(float)t;
   }
