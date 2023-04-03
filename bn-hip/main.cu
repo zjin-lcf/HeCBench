@@ -44,12 +44,19 @@ int C(int n, int a);
 
 int main(int argc, char** argv) {
 
+  if (argc != 3) {
+    printf("Usage: ./%s <path to output file> <repeat>\n", argv[0]);
+    return 1;
+  }
+
   // save output in a file
   FILE *fpout = fopen(argv[1], "w");
   if (fpout == NULL) {
-    printf("Usage: ./%s <path to output file>\n", argv[0]);
+    printf("Error: failed to open %s. Exit..\n", argv[1]);
     return -1;
   }
+
+  const int repeat = atoi(argv[2]);
 
   int i, j, c = 0, tmp, a, b;
   float tmpd;
@@ -87,15 +94,17 @@ int main(int argc, char** argv) {
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
-  hipLaunchKernelGGL(genScoreKernel, grid, threads, 0, 0, sizepernode, D_localscore, D_data, D_LG);
+  for (i = 0; i < repeat; i++)
+    genScoreKernel<<<grid, threads>>>(sizepernode, D_localscore, D_data, D_LG);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Kernel execution time: %f (s)\n", time * 1e-9f);
+  printf("Average execution time of genScoreKernel: %f (s)\n", time * 1e-9f / repeat);
 
   hipMemcpy(localscore, D_localscore, NODE_N * sizepernode * sizeof(float), hipMemcpyDeviceToHost);
 
+  long findBestGraph_time = 0;
   i = 0;
   while (i != ITER) {
 
@@ -112,7 +121,12 @@ int main(int argc, char** argv) {
     for (j = 0; j < tmp; j++)
       genOrders();
 
+    start = std::chrono::steady_clock::now();
+
     score = findBestGraph(D_localscore, D_resP, D_Score, D_parent);
+
+    end = std::chrono::steady_clock::now();
+    findBestGraph_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     ConCore();
 
@@ -167,6 +181,8 @@ int main(int argc, char** argv) {
     }
 
   } // endwhile
+
+  printf("Find best graph time %lf (s)\n", findBestGraph_time * 1e-9);
 
   free(localscore);
   free(scores);
