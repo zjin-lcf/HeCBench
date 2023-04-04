@@ -77,16 +77,14 @@ void motion_device(float* particleX, float* particleY,
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   auto device = q.get_device();
   auto deviceName = device.get_info<info::device::name>();
   auto maxBlockSize = device.get_info<info::device::max_work_group_size>();
-  auto maxEUCount = device.get_info<info::device::max_compute_units>();
 
   std::cout << " Running on " << deviceName << std::endl;
-  std::cout << " The Device Max Work Group Size is " << maxBlockSize << std::endl;
-  std::cout << " The Device Max EUCount is " << maxEUCount << "\n";
+  std::cout << " The device max work-group size is " << maxBlockSize << std::endl;
   std::cout << " The number of iterations is " << nIterations << std::endl;
   std::cout << " The number of kernel execution is " << nRepeat << std::endl;
   std::cout << " The number of particles is " << n_particles << std::endl;
@@ -104,15 +102,17 @@ void motion_device(float* particleX, float* particleY,
     randomY[i] = rand() % scale;
   }
 
-  const size_t MAP_SIZE = n_particles * grid_size * grid_size;
+  const size_t map_size = n_particles * grid_size * grid_size;
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float,1> d_randomX(randomX, n_particles * nIterations, props);
-  buffer<float,1> d_randomY(randomY, n_particles * nIterations, props);
+  float *d_randomX = malloc_device<float>(n_particles * nIterations, q);
+  q.memcpy(d_randomX, randomX, n_particles * nIterations * sizeof(float));
 
-  buffer<float,1> d_particleX(n_particles);
-  buffer<float,1> d_particleY(n_particles);
-  buffer<size_t,1> d_map(MAP_SIZE);
+  float *d_randomY = malloc_device<float>(n_particles * nIterations, q);
+  q.memcpy(d_randomY, randomY, n_particles * nIterations * sizeof(float));
+
+  float *d_particleX = malloc_device<float>(n_particles, q);
+  float *d_particleY = malloc_device<float>(n_particles, q);
+  size_t *d_map = malloc_device<size_t>(map_size, q);
 
   range<1> gws ((n_particles + 255) / 256 * 256);
   range<1> lws (256);
@@ -121,44 +121,26 @@ void motion_device(float* particleX, float* particleY,
 
   for (int i = 0; i < nRepeat; i++) {
 
-    q.submit([&](handler& cgh) {
-      auto acc = d_particleX.get_access<sycl_discard_write>(cgh);
-      cgh.copy(particleX, acc);
-    });
-
-    q.submit([&](handler& cgh) {
-      auto acc = d_particleY.get_access<sycl_discard_write>(cgh);
-      cgh.copy(particleY, acc);
-    });
-
-    q.submit([&](handler& cgh) {
-      auto acc = d_map.get_access<sycl_discard_write>(cgh);
-      cgh.copy(map, acc);
-    });
+    q.memcpy(d_particleX, particleX, n_particles * sizeof(float));
+    q.memcpy(d_particleY, particleY, n_particles * sizeof(float));
+    q.memcpy(d_map, map, map_size * sizeof(size_t));
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     q.submit([&](handler& cgh) {
-      auto a_particleX = d_particleX.get_access<sycl_read_write>(cgh);
-      auto a_particleY = d_particleY.get_access<sycl_read_write>(cgh);
-      auto a_randomX = d_randomX.get_access<sycl_read>(cgh);
-      auto a_randomY = d_randomY.get_access<sycl_read>(cgh);
-      auto a_map = d_map.get_access<sycl_write>(cgh);
-
       cgh.parallel_for<class motionsim>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         size_t ii = item.get_global_id(0);
         if (ii >= n_particles) return;
-        size_t randnumX = 0;
-        size_t randnumY = 0;
-        float displacementX = 0.0f;
-        float displacementY = 0.0f;
 
         // Start iterations
         // Each iteration:
         //  1. Updates the position of all water molecules
         //  2. Checks if water molecule is inside a cell or not.
         //  3. Updates counter in cells array
+        float pX = d_particleX[ii];
+        float pY = d_particleY[ii];
+        size_t map_base = ii * grid_size * grid_size;
         size_t iter = 0;
         while (iter < nIterations) {
           // Computes random displacement for each molecule
@@ -166,44 +148,43 @@ void motion_device(float* particleX, float* particleY,
           // -0.05 units and 0.05 units in both X and Y directions
           // Moves each water molecule by a random vector
 
-          randnumX = a_randomX[iter * n_particles + ii];
-          randnumY = a_randomY[iter * n_particles + ii];
+          float randnumX = d_randomX[iter * n_particles + ii];
+          float randnumY = d_randomY[iter * n_particles + ii];
 
           // Transform the scaled random numbers into small displacements
-          displacementX = (float)randnumX / 1000.0f - 0.0495f;
-          displacementY = (float)randnumY / 1000.0f - 0.0495f;
+          float displacementX = (float)randnumX / 1000.0f - 0.0495f;
+          float displacementY = (float)randnumY / 1000.0f - 0.0495f;
 
           // Move particles using random displacements
-          a_particleX[ii] += displacementX;
-          a_particleY[ii] += displacementY;
+          pX += displacementX;
+          pY += displacementY;
 
           // Compute distances from particle position to grid point
-          float dX = a_particleX[ii] - sycl::trunc(a_particleX[ii]);
-          float dY = a_particleY[ii] - sycl::trunc(a_particleY[ii]);
+          float dX = pX - sycl::trunc(pX);
+          float dY = pY - sycl::trunc(pY);
 
           // Compute grid point indices
-          int iX = sycl::floor(a_particleX[ii]);
-          int iY = sycl::floor(a_particleY[ii]);
+          int iX = sycl::floor(pX);
+          int iY = sycl::floor(pY);
 
           // Check if particle is still in computation grid
-          if ((a_particleX[ii] < grid_size) &&
-              (a_particleY[ii] < grid_size) && (a_particleX[ii] >= 0) &&
-              (a_particleY[ii] >= 0)) {
-             // Check if particle is (or remained) inside cell.
-             // Increment cell counter in map array if so
-             if ((dX * dX + dY * dY <= radius * radius)) {
-               // The map array is organized as (particle, y, x)
-               a_map[ii * grid_size * grid_size + iY * grid_size + iX]++;
-             }
+          if ((pX < grid_size) & (pY < grid_size) & (pX >= 0) & (pY >= 0)) {
+            // Check if particle is (or remained) inside cell.
+            // Increment cell counter in map array if so
+            if (dX * dX + dY * dY <= radius * radius)
+              // The map array is organized as (particle, y, x)
+              d_map[map_base + iY * grid_size + iX]++;
           }
 
           iter++;
+        }  // Next iteration
 
-         }  // Next iteration
-       });
-    });
+        d_particleX[ii] = pX;
+        d_particleY[ii] = pY;
 
-    q.wait();
+      });
+    }).wait();
+
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     time_total += time;
@@ -213,10 +194,7 @@ void motion_device(float* particleX, float* particleY,
   std::cout << "Average kernel execution time: " << (time_total * 1e-9) / nRepeat << " (s)";
   std::cout << std::endl;
 
-  q.submit([&](handler& cgh) {
-    auto a_map = d_map.get_access<sycl_read>(cgh);
-    cgh.copy(a_map, map);
-  }).wait();
+  q.memcpy(map, d_map, map_size * sizeof(size_t)).wait();
 
   // For every cell in the grid, add all the counters from different
   // particles (workers) which are stored in the 3rd dimension of the 'map'
@@ -230,6 +208,12 @@ void motion_device(float* particleX, float* particleY,
       }
     }
   }  // End loop for number of particles
+
+  free(d_randomX, q);
+  free(d_randomY, q);
+  free(d_particleX, q);
+  free(d_particleY, q);
+  free(d_map, q);
 }  // End of function motion_device()
 
 

@@ -105,57 +105,56 @@ void motion_device(float* particleX, float* particleY,
       #pragma omp target teams distribute parallel for simd thread_limit(256) 
       for (int ii = 0; ii < n_particles; ii++) {
 
-        size_t randnumX = 0;
-        size_t randnumY = 0;
-        float displacementX = 0.0f;
-        float displacementY = 0.0f;
-
         // Start iterations
         // Each iteration:
         //  1. Updates the position of all water molecules
         //  2. Checks if water molecule is inside a cell or not.
         //  3. Updates counter in cells array
         size_t iter = 0;
+        float pX = particleX[ii];
+        float pY = particleY[ii];
+        size_t map_base = ii * grid_size * grid_size;
+
         while (iter < nIterations) {
           // Computes random displacement for each molecule
           // This example shows random distances between
           // -0.05 units and 0.05 units in both X and Y directions
           // Moves each water molecule by a random vector
 
-          randnumX = randomX[iter * n_particles + ii];
-          randnumY = randomY[iter * n_particles + ii];
+          float randnumX = randomX[iter * n_particles + ii];
+          float randnumY = randomY[iter * n_particles + ii];
 
           // Transform the scaled random numbers into small displacements
-          displacementX = (float)randnumX / 1000.0f - 0.0495f;
-          displacementY = (float)randnumY / 1000.0f - 0.0495f;
+          float displacementX = randnumX / 1000.0f - 0.0495f;
+          float displacementY = randnumY / 1000.0f - 0.0495f;
 
           // Move particles using random displacements
-          particleX[ii] += displacementX;
-          particleY[ii] += displacementY;
+          pX += displacementX;
+          pY += displacementY;
 
           // Compute distances from particle position to grid point
-          float dX = particleX[ii] - truncf(particleX[ii]);
-          float dY = particleY[ii] - truncf(particleY[ii]);
+          float dX = pX - truncf(pX);
+          float dY = pY - truncf(pY);
 
           // Compute grid point indices
-          int iX = floorf(particleX[ii]);
-          int iY = floorf(particleY[ii]);
+          int iX = floorf(pX);
+          int iY = floorf(pY);
 
           // Check if particle is still in computation grid
-          if ((particleX[ii] < grid_size) &&
-              (particleY[ii] < grid_size) && (particleX[ii] >= 0) &&
-              (particleY[ii] >= 0)) {
+          if ((pX < grid_size) && (pY < grid_size) && (pX >= 0) && (pY >= 0)) {
             // Check if particle is (or remained) inside cell.
             // Increment cell counter in map array if so
-            if ((dX * dX + dY * dY <= radius * radius)) {
+            if ((dX * dX + dY * dY <= radius * radius))
               // The map array is organized as (particle, y, x)
-              map[ii * grid_size * grid_size + iY * grid_size + iX]++;
-            }
+              map[map_base + iY * grid_size + iX]++;
           }
 
           iter++;
 
         }  // Next iteration
+
+        particleX[ii] = pX;
+        particleY[ii] = pY;
       }
 
       auto end = std::chrono::steady_clock::now();
