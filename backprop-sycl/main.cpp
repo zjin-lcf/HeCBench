@@ -61,80 +61,75 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   printf("Performing GPU computation\n");
 
   double offload_start = get_time();
-  { // SYCL scope
+
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-    const property_list props = property::buffer::use_host_ptr();
+  float *d_input = malloc_device<float>(in+1, q);
+  q.memcpy(d_input, net->input_units, sizeof(float)*(in+1));
 
-    buffer<float,1> input_sycl (net->input_units, in+1, props);
-    buffer<float,1> input_weights_sycl (input_weights_one_dim, (in+1)*(hid+1), props);
-    buffer<float,1> hidden_partial_sum (num_blocks*WIDTH);
+  float *d_input_weights = malloc_device<float>((in+1)*(hid+1), q);
+  q.memcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-    // set global and local workitems
-    range<2> global_work(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
-    range<2> local_work(BLOCK_SIZE, BLOCK_SIZE);
+  float *d_hidden_partial_sum = malloc_device<float>(num_blocks*WIDTH, q);
 
-    q.submit([&](handler& cgh) {
-      auto input_acc = input_sycl.get_access<sycl_read>(cgh);
-      auto input_weights_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
-      auto hidden_partial_sum_acc = hidden_partial_sum.get_access<sycl_write>(cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
-      cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
-#include "bpnn_layerforward.sycl"
-      });
+  // set global and local workitems
+  range<2> global_work(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
+  range<2> local_work(BLOCK_SIZE, BLOCK_SIZE);
+
+  q.submit([&](handler& cgh) {
+    accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
+    accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
+    cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+      #include "bpnn_layerforward.sycl"
     });
+  });
 
-    q.submit([&](handler& cgh) {
-      accessor<float, 1, access::mode::read, access::target::global_buffer> 
-      hidden_partial_sum_acc(hidden_partial_sum, cgh, range<1>(num_blocks * WIDTH), id<1>(0));
-      cgh.copy(hidden_partial_sum_acc, partial_sum);
-    });
-    q.wait();
+  q.memcpy(partial_sum, d_hidden_partial_sum, sizeof(float)*num_blocks*WIDTH).wait();
 
-    for (int j = 1; j <= hid; j++) {
-      sum = 0.0;
-      for (int k = 0; k < num_blocks; k++) {  
-        sum += partial_sum[k * hid + j-1] ;
-      }
+  for (int j = 1; j <= hid; j++) {
+    sum = 0.0;
+    for (int k = 0; k < num_blocks; k++) {  
+      sum += partial_sum[k * hid + j-1] ;
+    }
 #ifdef DEBUG
       printf("j=%d sum=%f\n", j,sum);
 #endif
-      sum += net->input_weights[0][j];
-      net-> hidden_units[j] = float(1.0 / (1.0 + std::exp(-sum)));
-    }
+    sum += net->input_weights[0][j];
+    net-> hidden_units[j] = float(1.0 / (1.0 + std::exp(-sum)));
+  }
 
-    bpnn_layerforward(net->hidden_units, net->output_units, net->hidden_weights, hid, out);
-    bpnn_output_error(net->output_delta, net->target, net->output_units, out, &out_err);
-    bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);  
-    bpnn_adjust_weights(net->output_delta, out, net->hidden_units, hid, net->hidden_weights, net->hidden_prev_weights);
+  bpnn_layerforward(net->hidden_units, net->output_units, net->hidden_weights, hid, out);
+  bpnn_output_error(net->output_delta, net->target, net->output_units, out, &out_err);
+  bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);  
+  bpnn_adjust_weights(net->output_delta, out, net->hidden_units, hid, net->hidden_weights, net->hidden_prev_weights);
 
-    buffer<float,1> hidden_delta_sycl (net->hidden_delta, hid+1, props);
-    buffer<float,1> input_prev_weights_sycl (input_weights_prev_one_dim, (in+1)*(hid+1), props);
-    input_prev_weights_sycl.set_final_data(nullptr);
+  // input_weights_sycl has been written in the first kernel, so it needs to be restored.
+  q.memcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-    // input_weights_sycl has been written in the first kernel, so it needs to be restored.
-    q.submit([&](handler& cgh) {
-      accessor<float, 1, access::mode::write, access::target::global_buffer> 
-      input_weights_acc(input_weights_sycl, cgh, range<1>((in + 1) * (hid + 1)), id<1>(0));
-      cgh.copy(input_weights_one_dim, input_weights_acc);
+  float *d_hidden_delta = malloc_device<float>(hid+1, q);
+  q.memcpy(d_hidden_delta, net->hidden_delta, sizeof(float)*(hid+1));
+
+  float *d_input_prev_weights = malloc_device<float>((in+1)*(hid+1), q);
+  q.memcpy(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1));
+
+  q.submit([&](handler& cgh) {
+    cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+      #include "bpnn_adjust_weights.sycl"
     });
+  });
 
-    q.submit([&](handler& cgh) {
-      auto delta_acc = hidden_delta_sycl.get_access<sycl_read>(cgh);
-      auto ly_acc = input_sycl.get_access<sycl_read>(cgh);
-      auto w_acc = input_weights_sycl.get_access<sycl_read_write>(cgh);
-      auto oldw_acc = input_prev_weights_sycl.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
-#include "bpnn_adjust_weights.sycl"
-      });
-    });
-  } // SYCL scope
+  q.memcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1)).wait();
+
+  free(d_input, q);
+  free(d_input_weights, q);
+  free(d_hidden_partial_sum, q);
+  free(d_hidden_delta, q);
+  free(d_input_prev_weights, q);
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);

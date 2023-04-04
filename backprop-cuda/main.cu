@@ -113,14 +113,14 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   kernel_adjust_weights<<<grid, threads>>>(d_input, d_input_weights, d_hidden_delta, d_input_prev_weights, hid);
   cudaMemcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1), cudaMemcpyDeviceToHost);
 
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
-
   cudaFree(d_input);
   cudaFree(d_input_weights);
   cudaFree(d_hidden_partial_sum);
   cudaFree(d_hidden_delta);
   cudaFree(d_input_prev_weights);
+
+  double offload_end = get_time();
+  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
 #ifdef OUTPUT
   for (int i = 0; i < (in+1); i++) 
