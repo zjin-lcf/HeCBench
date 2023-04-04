@@ -80,57 +80,55 @@ void Simulation(float*__restrict__ a_particleX,
 {
   size_t ii = blockDim.x * blockIdx.x + threadIdx.x;
   if (ii >= n_particles) return;
-  size_t randnumX = 0;
-  size_t randnumY = 0;
-  float displacementX = 0.0f;
-  float displacementY = 0.0f;
-
   // Start iterations
   // Each iteration:
   //  1. Updates the position of all water molecules
   //  2. Checks if water molecule is inside a cell or not.
   //  3. Updates counter in cells array
   size_t iter = 0;
+  float pX = a_particleX[ii];
+  float pY = a_particleY[ii];
+  size_t map_base = ii * grid_size * grid_size;
   while (iter < nIterations) {
     // Computes random displacement for each molecule
     // This example shows random distances between
     // -0.05 units and 0.05 units in both X and Y directions
     // Moves each water molecule by a random vector
 
-    randnumX = a_randomX[iter * n_particles + ii];
-    randnumY = a_randomY[iter * n_particles + ii];
+    float randnumX = a_randomX[iter * n_particles + ii];
+    float randnumY = a_randomY[iter * n_particles + ii];
 
     // Transform the scaled random numbers into small displacements
-    displacementX = (float)randnumX / 1000.0f - 0.0495f;
-    displacementY = (float)randnumY / 1000.0f - 0.0495f;
+    float displacementX = randnumX / 1000.0f - 0.0495f;
+    float displacementY = randnumY / 1000.0f - 0.0495f;
 
     // Move particles using random displacements
-    a_particleX[ii] += displacementX;
-    a_particleY[ii] += displacementY;
+    pX += displacementX;
+    pY += displacementY;
 
     // Compute distances from particle position to grid point
-    float dX = a_particleX[ii] - trunc(a_particleX[ii]);
-    float dY = a_particleY[ii] - trunc(a_particleY[ii]);
+    float dX = pX - trunc(pX);
+    float dY = pY - trunc(pY);
 
     // Compute grid point indices
-    int iX = floor(a_particleX[ii]);
-    int iY = floor(a_particleY[ii]);
+    int iX = floor(pX);
+    int iY = floor(pY);
 
     // Check if particle is still in computation grid
-    if ((a_particleX[ii] < grid_size) &&
-        (a_particleY[ii] < grid_size) && (a_particleX[ii] >= 0) &&
-        (a_particleY[ii] >= 0)) {
+    if ((pX < grid_size) && (pY < grid_size) && (pX >= 0) && (pY >= 0)) {
       // Check if particle is (or remained) inside cell.
       // Increment cell counter in map array if so
-      if ((dX * dX + dY * dY <= radius * radius)) {
+      if ((dX * dX + dY * dY <= radius * radius))
         // The map array is organized as (particle, y, x)
-        a_map[ii * grid_size * grid_size + iY * grid_size + iX]++;
-      }
+        a_map[map_base + iY * grid_size + iX]++;
     }
 
     iter++;
 
   }  // Next iteration
+
+  a_particleX[ii] = pX;
+  a_particleY[ii] = pY;
 }
 
 // This function distributes simulation work across workers
@@ -143,7 +141,7 @@ void motion_device(float* particleX, float* particleY,
   hipGetDeviceProperties(&devProp, 0);
 
   std::cout << " Running on " << devProp.name << std::endl;
-  std::cout << " The Device Max Work Group Size is " << devProp.maxThreadsPerBlock << std::endl;
+  std::cout << " The device max work-group size is " << devProp.maxThreadsPerBlock << std::endl;
   std::cout << " The number of iterations is " << nIterations << std::endl;
   std::cout << " The number of kernel execution is " << nRepeat << std::endl;
   std::cout << " The number of particles is " << n_particles << std::endl;
@@ -187,7 +185,7 @@ void motion_device(float* particleX, float* particleY,
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    hipLaunchKernelGGL(Simulation, dim3((n_particles + 255) / 256), dim3(256), 0, 0, 
+    Simulation<<< dim3((n_particles + 255) / 256), dim3(256) >>> (
       d_particleX, 
       d_particleY, 
       d_randomX, 
