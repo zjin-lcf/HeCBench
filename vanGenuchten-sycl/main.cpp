@@ -25,31 +25,30 @@ void vanGenuchten(
     // Compute the volumetric moisture content [eqn 21]
     _psi = psi[i] * 100.0;
     if ( _psi < 0.0 )
-      _theta = (theta_S - theta_R) / sycl::pow<double>(
-               1.0 + sycl::pow<double>((alpha * (-_psi)), n), m) + theta_R;
+      _theta = (theta_S - theta_R) / sycl::pow(
+               1.0 + sycl::pow((alpha * (-_psi)), n), m) + theta_R;
     else
       _theta = theta_S;
 
     theta[i] = _theta;
 
-    // Compute the effective saturation [eqn 2]
-    Se = (_theta - theta_R)/(theta_S - theta_R);
+   // Compute the effective saturation [eqn 2]
+   Se = (_theta - theta_R)/(theta_S - theta_R);
 
-    /* . . .Compute the hydraulic conductivity [eqn 8] . . .*/
-    K[i] = Ksat[i] * sycl::sqrt(Se) *
-           (1.0 - sycl::pow<double>(1.0 - sycl::pow<double>(Se, 1.0 / m), m)) *
-           (1.0 - sycl::pow<double>(1.0 - sycl::pow<double>(Se, 1.0 / m), m));
+   // Compute the hydraulic conductivity [eqn 8]
+   double t = 1.0 - sycl::pow(1.0 - sycl::pow(Se, 1.0 / m), m);
+   K[i] = Ksat[i] * sycl::sqrt(Se) * t * t;
 
-    // Compute the specific moisture storage derivative of eqn (21).
-    // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-    if (_psi < 0.0)
-      C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
-             sycl::pow<double>(alpha * sycl::fabs(_psi), n - 1.0) *
-             (theta_R - theta_S) *
-             sycl::pow<double>(sycl::pow<double>(alpha * sycl::fabs(_psi), n) + 1.0,
-                            1.0 / n - 2.0);
-    else
-      C[i] = 0.0;
+   // Compute the specific moisture storage derivative of eqn (21).
+   // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
+   if (_psi < 0.0)
+     C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
+            sycl::pow(alpha * sycl::fabs(_psi), n - 1.0) *
+            (theta_R - theta_S) *
+            sycl::pow(sycl::pow(alpha * sycl::fabs(_psi), n) + 1.0,
+                           1.0 / n - 2.0);
+   else
+     C[i] = 0.0;
   }
 }
 
@@ -95,7 +94,7 @@ int main(int argc, char* argv[])
 #else
   sycl::cpu_selector dev_sel;
 #endif
-  sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   double *d_Ksat, *d_psi, *d_C, *d_theta, *d_K;
   d_Ksat = (double *)sycl::malloc_device(size_byte, q);
