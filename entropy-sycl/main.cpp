@@ -11,39 +11,6 @@ void entropy(
   const char*__restrict d_val, 
   int height, int width)
 {
-  const int x = item.get_global_id(1);
-  const int y = item.get_global_id(0);
-
-  // value of matrix element ranges from 0 inclusive to 16 exclusive
-  char count[16];
-  for (int i = 0; i < 16; i++) count[i] = 0;
-
-  // total number of valid elements
-  char total = 0;
-
-  // 5x5 window
-  for(int dy = -2; dy <= 2; dy++) {
-    for(int dx = -2; dx <= 2; dx++) {
-      int xx = x + dx;
-      int yy = y + dy;
-      if(xx >= 0 && yy >= 0 && yy < height && xx < width) {
-        count[d_val[yy * width + xx]]++;
-        total++;
-      }
-    }
-  }
-
-  float entropy = 0;
-  if (total < 1) {
-    total = 1;
-  } else {
-    for(int k = 0; k < 16; k++) {
-      float p = sycl::native::divide((float)count[k], (float)total);
-      entropy -= p * sycl::log2(p);
-    }
-  }
-
-  if(y < height && x < width) d_entropy[y * width + x] = entropy;
 }
 
 int main(int argc, char* argv[]) {
@@ -66,16 +33,17 @@ int main(int argc, char* argv[]) {
     for (int j = 0; j < width; j++)
       input[i * width + j] = rand() % 16;
 
-  {
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<char, 1> d_input (input, width * height);
-  buffer<float, 1> d_output (output, width * height);
+  char* d_input = malloc_device<char>(width * height, q);
+  q.memcpy(d_input, input, input_bytes);
+
+  float* d_output = malloc_device<float>(width * height, q);
 
   range<2> gws ((height+15)/16*16, (width+15)/16*16);
   range<2> lws (16, 16);
@@ -83,14 +51,45 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      auto in = d_input.get_access<sycl_read>(cgh);
-      auto out = d_output.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class base>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        entropy (item, out.get_pointer(), in.get_pointer(), height, width);
+        const int x = item.get_global_id(1);
+        const int y = item.get_global_id(0);
+
+        // value of matrix element ranges from 0 inclusive to 16 exclusive
+        char count[16];
+        for (int i = 0; i < 16; i++) count[i] = 0;
+
+        // total number of valid elements
+        char total = 0;
+
+        // 5x5 window
+        for(int dy = -2; dy <= 2; dy++) {
+          for(int dx = -2; dx <= 2; dx++) {
+            int xx = x + dx;
+            int yy = y + dy;
+            if(xx >= 0 && yy >= 0 && yy < height && xx < width) {
+              count[d_input[yy * width + xx]]++;
+              total++;
+            }
+          }
+        }
+
+        float entropy = 0;
+        if (total < 1) {
+          total = 1;
+        } else {
+          for(int k = 0; k < 16; k++) {
+            float p = sycl::native::divide((float)count[k], (float)total);
+            entropy -= p * sycl::log2(p);
+          }
+        }
+
+        if(y < height && x < width) d_output[y * width + x] = entropy;
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
@@ -99,17 +98,16 @@ int main(int argc, char* argv[]) {
 
   float logTable[26];
   for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
-  buffer<float, 1> d_logTable (logTable, 26);
+
+  float *d_logTable = malloc_device<float>(26, q);
+  q.memcpy(d_logTable, logTable, 26 * sizeof(float));
 
   q.wait();
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (handler &cgh) {
-      auto input = d_input.get_access<sycl_read>(cgh);
-      auto logTable = d_logTable.get_access<sycl_read>(cgh);
-      auto output = d_output.get_access<sycl_discard_write>(cgh);
-      accessor<char, 2, sycl_read_write, access::target::local> sd_count ({16, 256}, cgh);
+      accessor<int, 2, sycl_read_write, access::target::local> sd_count ({16, 256}, cgh);
       cgh.parallel_for<class opt>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         const int x = item.get_global_id(1);
         const int y = item.get_global_id(0);
@@ -124,7 +122,7 @@ int main(int argc, char* argv[]) {
                 yy = y + dy;
 
             if(xx >= 0 && yy >= 0 && yy < height && xx < width) {
-              sd_count[input[yy*width+xx]][idx]++;
+              sd_count[d_input[yy*width+xx]][idx]++;
               total++;
             }
           }
@@ -132,19 +130,24 @@ int main(int argc, char* argv[]) {
 
         float entropy = 0;
         for(int k = 0; k < 16; k++)
-          entropy -= logTable[sd_count[k][idx]];
+          entropy -= d_logTable[sd_count[k][idx]];
         
         entropy = entropy / total + sycl::log2((float)total);
-        if(y < height && x < width) output[y*width+x] = entropy;
+        if(y < height && x < width) d_output[y*width+x] = entropy;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel (optimized) execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(output, d_output, output_bytes).wait();
+
+  free(d_input, q);
+  free(d_output, q);
+  free(d_logTable, q);
 
   // verify
   reference(output_ref, input, height, width);

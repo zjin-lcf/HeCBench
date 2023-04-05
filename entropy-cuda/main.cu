@@ -147,6 +147,7 @@ int main(int argc, char* argv[]) {
 
   cudaFree(d_input);
   cudaFree(d_output);
+  cudaFree(d_logTable);
 
   // verify
   reference(output_ref, input, height, width);
