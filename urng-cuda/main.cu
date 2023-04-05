@@ -83,6 +83,7 @@ int main(int argc, char** argv)
 
   uchar4 *inputImageBuffer;
   cudaMalloc((void**)&inputImageBuffer, imageSize);
+  cudaMemcpy(inputImageBuffer, inputImageData, imageSize, cudaMemcpyHostToDevice);
 
   uchar4 *outputImageBuffer;
   cudaMalloc((void**)&outputImageBuffer, imageSize);
@@ -92,11 +93,6 @@ int main(int argc, char** argv)
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
-
-  cudaMemcpy(inputImageBuffer, inputImageData, imageSize, cudaMemcpyHostToDevice);
-
-  // warmup 
-  noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, factor);
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();

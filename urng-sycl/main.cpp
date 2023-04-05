@@ -81,59 +81,49 @@ int main(int argc, char** argv)
 
   const int factor = FACTOR;
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-    buffer<uchar4, 1> inputImageBuffer (inputImageData, width * height);
-    buffer<uchar4, 1> outputImageBuffer (outputImageData, width * height);
-    range<1> gws (height * width);
-    range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
+  uchar4 *d_input = malloc_device<uchar4>(width * height, q);
+  q.memcpy(d_input, inputImageData, width * height * sizeof(uchar4));
 
-    std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
-    std::cout << "-------------------------------------------" << std::endl;
+  uchar4 *d_output = malloc_device<uchar4>(width * height, q);
 
+  range<1> gws (height * width);
+  range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
+
+  std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
+  std::cout << "-------------------------------------------" << std::endl;
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for(int i = 0; i < iterations; i++) {
     q.submit([&] (handler &cgh) {
-      auto input = inputImageBuffer.get_access<sycl_read>(cgh);
-      auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
       accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
-      cgh.parallel_for<class noise_uniform_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        kernel_noise_uniform(input.get_pointer(), 
-          output.get_pointer(), 
-          factor, 
-          iv.get_pointer(), 
-          item);    
+      cgh.parallel_for<class noise_uniform>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        kernel_noise_uniform(
+          d_input,
+          d_output,
+          factor,
+          iv.get_pointer(),
+          item);
       });
     });
-
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
-
-    for(int i = 0; i < iterations; i++)
-    {
-      q.submit([&] (handler &cgh) {
-        auto input = inputImageBuffer.get_access<sycl_read>(cgh);
-        auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
-        cgh.parallel_for<class noise_uniform>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          kernel_noise_uniform(input.get_pointer(), 
-            output.get_pointer(), 
-            factor, 
-            iv.get_pointer(), 
-            item);    
-        });
-      });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
+
+  q.memcpy(outputImageData, d_output, width * height * sizeof(uchar4)).wait();
+  free(d_input, q);
+  free(d_output, q);
 
   // verify
   float mean = 0;
