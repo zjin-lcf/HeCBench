@@ -5,15 +5,14 @@
 class k_mat_nn;
 
 double su3_mat_nn(const std::vector<site> &a, const std::vector<su3_matrix> &b, std::vector<site> &c, 
-    const size_t total_sites, const size_t iterations, size_t wgsize, const int target)
+                  const size_t total_sites, const size_t iterations, size_t wgsize, const int target)
 { 
-
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   // check to make sure the workgroup size is sufficient for the algorithm
   if (wgsize == 0)
@@ -44,39 +43,30 @@ double su3_mat_nn(const std::vector<site> &a, const std::vector<su3_matrix> &b, 
 
     // create a command_group to issue commands
     q.submit([&](handler& cgh) {
-        // request access to the host buffers
-        auto d_a = a_buf.get_access<sycl_read>(cgh);
-        auto d_b = b_buf.get_access<sycl_read>(cgh);
-        auto d_c = c_buf.get_access<sycl_write>(cgh);
+      // request access to the device buffers
+      auto a = a_buf.get_access<sycl_read>(cgh);
+      auto b = b_buf.get_access<sycl_read>(cgh);
+      auto c = c_buf.get_access<sycl_write>(cgh);
 
-        // Lambda function defines the kernel scope
-        cgh.parallel_for<class k_mat_nn>(nd_range<1> {total_wi, wgsize}, [=](nd_item<1> item) {
-            size_t id = item.get_global_id(0);
-            size_t i = id/36;
-            if (i < total_sites) {
-              int j = (id%36)/9;
-              int k = (id%9)/3;
-              int l = id%3;
-              Complx cc = {0.0, 0.0};
-              for (int m=0;m<3;m++) {
-#ifndef USE_WORKAROUND
-                // This is the nominal code
-                const auto aa = d_a[i].link[j].e[k][m];
-                const auto bb = d_b[j].e[m][l];
-#else
-                // This code derefrences both d_a and d_b to Complx pointers
-                const auto aa = (d_a.get_pointer() + i)->link[j].e[k][m];
-                const auto bb = (d_b.get_pointer() + j)->e[m][l];
-#endif
-#ifndef MILC_COMPLEX
-                cc += aa * bb;
-#else
-                CMULSUM(aa, bb, cc);
-#endif
-            }
-            d_c[i].link[j].e[k][l] = cc;
+      // Lambda function defines the kernel scope
+      cgh.parallel_for<class k_mat_nn>(nd_range<1> {total_wi, wgsize}, [=](nd_item<1> item) {
+        size_t id = item.get_global_id(0);
+        size_t i = id/36;
+        if (i < total_sites) {
+          int j = (id%36)/9;
+          int k = (id%9)/3;
+          int l = id%3;
+          Complx cc = {0.0, 0.0};
+          for (int m=0;m<3;m++) {
+            #ifdef MILC_COMPLEX
+            CMULSUM(a[i].link[j].e[k][m], b[j].e[m][l], cc);
+            #else
+            cc += a[i].link[j].e[k][m] * b[j].e[m][l];
+            #endif
           }
-       }); // end of the kernel lambda function
+          c[i].link[j].e[k][l] = cc;
+        }
+      }); // end of the kernel lambda function
     });   // end of command group
   } // end of iteration loop
   q.wait();
