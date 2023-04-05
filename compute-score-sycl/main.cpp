@@ -283,7 +283,7 @@ int main(int argc, char** argv)
   printf("Allocating and setting up data\n");
   setupData();
 
-  {
+  { // SYCL scope
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
@@ -291,10 +291,10 @@ int main(int argc, char** argv)
 #endif
   queue q(dev_sel);
 
-  size_t global_size = total_doc_size / 2 / MANUAL_VECTOR;
-  size_t local_size = (block_size / MANUAL_VECTOR); 
-  size_t global_size_reduction = total_num_docs;
-  size_t local_size_reduction = 1;
+  size_t gws_compute = total_doc_size / 2 / MANUAL_VECTOR;
+  size_t lws_compute = (block_size / MANUAL_VECTOR); 
+  size_t gws_reduce = total_num_docs;
+  size_t lws_reduce = block_size;
 
   buffer<uint, 1> d_docWordFrequencies_dimm1 (h_docWordFrequencies_dimm1, total_doc_size/2);
   buffer<uint, 1> d_docWordFrequencies_dimm2 (h_docWordFrequencies_dimm2, total_doc_size/2);
@@ -317,7 +317,7 @@ int main(int argc, char** argv)
       auto isWordInProfileHash = d_isWordInProfileHash.get_access<sycl_read>(h);
       auto profileScorePerGroup_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_write>(h);
       auto profileScorePerGroup_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_write>(h);
-      h.parallel_for<class compute>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+      h.parallel_for<class compute>(nd_range<1>(gws_compute, lws_compute), [=] (nd_item<1> item) {
         uint curr_entry[MANUAL_VECTOR];
         uint word_id[MANUAL_VECTOR];
         uint freq[MANUAL_VECTOR];
@@ -376,21 +376,21 @@ int main(int argc, char** argv)
       auto partial_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_read>(h);
       auto partial_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_read>(h);
       auto result = d_profileScore.get_access<sycl_discard_write>(h);
-      h.parallel_for<class reduction>(nd_range<1>(global_size_reduction, local_size_reduction), [=] (nd_item<1> item) {
-       ulong info = docInfo[item.get_global_id(0)]; 
-       uint start = info >> 32;
-       uint end = info & 0xFFFFFFFF;
+      h.parallel_for<class reduction>(nd_range<1>(gws_reduce, lws_reduce), [=] (nd_item<1> item) {
+        ulong info = docInfo[item.get_global_id(0)];
+        uint start = info >> 32;
+        uint end = info & 0xFFFFFFFF;
 
-       ulong total = 0;
-       //#pragma unroll 2
-       for (uint i=start; i<=end; i++) {
-          ulong upper = partial_highbits_dimm1[i];
-          ulong lower = partial_lowbits_dimm2[i];
-          ulong sum = (upper << 32) | lower;
-          total += sum;
-       }
+        ulong total = 0;
+        #pragma unroll 2
+        for (uint i=start; i<=end; i++) {
+           ulong upper = partial_highbits_dimm1[i];
+           ulong lower = partial_lowbits_dimm2[i];
+           ulong sum = (upper << 32) | lower;
+           total += sum;
+        }
 
-       result[item.get_global_id(0)] = total;
+        result[item.get_global_id(0)] = total;
       });
     });
   }
