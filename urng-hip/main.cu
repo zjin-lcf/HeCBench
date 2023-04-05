@@ -83,6 +83,7 @@ int main(int argc, char** argv)
 
   uchar4 *inputImageBuffer;
   hipMalloc((void**)&inputImageBuffer, imageSize);
+  hipMemcpy(inputImageBuffer, inputImageData, imageSize, hipMemcpyHostToDevice);
 
   uchar4 *outputImageBuffer;
   hipMalloc((void**)&outputImageBuffer, imageSize);
@@ -92,11 +93,6 @@ int main(int argc, char** argv)
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
-
-  hipMemcpy(inputImageBuffer, inputImageData, imageSize, hipMemcpyHostToDevice);
-
-  // warmup
-  hipLaunchKernelGGL(noise_uniform, grid, block, 0, 0, inputImageBuffer, outputImageBuffer, factor);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
