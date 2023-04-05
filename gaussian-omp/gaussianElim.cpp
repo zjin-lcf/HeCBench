@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size,int timing){    
+void ForwardSub(float *a, float *b, float *m, int size, int timing) {
 #pragma omp target data map(tofrom: a[0:size*size], b[0:size], m[0:size*size])
   {
     auto start = get_time();
@@ -203,8 +203,9 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
     } // for (t=0; t<(size-1); t++) 
 
     auto end = get_time();
-    printf("Total kernel execution time %lld (us)\n", (end - start));
-  } 
+    if (timing)
+      printf("Total kernel execution time %lld (us)\n", (end - start));
+  }
 }
 
 // Ke Wang add a function to generate input internally
