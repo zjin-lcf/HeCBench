@@ -147,6 +147,7 @@ int main(int argc, char* argv[]) {
 
   hipFree(d_input);
   hipFree(d_output);
+  hipFree(d_logTable);
 
   // verify
   reference(output_ref, input, height, width);

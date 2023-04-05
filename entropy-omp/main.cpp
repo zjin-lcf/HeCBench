@@ -11,7 +11,7 @@ void entropy(
   int height, int width)
 {
   #pragma omp target teams distribute parallel for collapse(2) thread_limit(256) 
-  for (int y = 0; y < height; y++)
+  for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       // value of matrix element ranges from 0 inclusive to 16 exclusive
       char count[16];
@@ -44,6 +44,7 @@ void entropy(
 
       d_entropy[y * width + x] = entropy;
     }
+  }
 }
 
 template<int bsize_x, int bsize_y>
@@ -93,7 +94,7 @@ void entropy_opt(
       entropy = entropy / total + log2f(total);
       if(y < m && x < n) d_entropy[y*n+x] = entropy;
     }
-  } 
+  }
 }
 
 int main(int argc, char* argv[]) {
