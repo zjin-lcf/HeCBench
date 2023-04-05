@@ -212,7 +212,7 @@ fan2 (float*__restrict__ a,
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size, int timing){    
+void ForwardSub(float *a, float *b, float *m, int size, int timing) {
 
   dim3 blockDim_fan1 (BLOCK_SIZE_0);
   dim3 gridDim_fan1 ((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0);
@@ -240,7 +240,8 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing){
 
   cudaDeviceSynchronize();
   auto end = get_time();
-  printf("Total kernel execution time %lld (us)\n", (end - start));
+  if (timing)
+    printf("Total kernel execution time %lld (us)\n", (end - start));
 
   cudaMemcpy(a, d_a, size*size*sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(b, d_b, size*sizeof(float), cudaMemcpyDeviceToHost);

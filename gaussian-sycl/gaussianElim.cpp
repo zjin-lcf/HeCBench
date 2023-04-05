@@ -182,26 +182,34 @@ int main(int argc, char *argv[]) {
  ** elimination.
  **------------------------------------------------------
  */
-void ForwardSub(float *a, float *b, float *m, int size,int timing){    
+void ForwardSub(float *a, float *b, float *m, int size, int timing) {
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
-
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float,1> d_a (a, size*size, props);
-  buffer<float,1> d_b(b, size, props);
-  buffer<float,1> d_m(m, size*size, props);
+  queue q(dev_sel, property::queue::in_order());
 
   range<1> lws(BLOCK_SIZE_0);
-  range<1> gws((size + BLOCK_SIZE_0 - 1)/ BLOCK_SIZE_0 * BLOCK_SIZE_0);
+  range<1> gws((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0 * BLOCK_SIZE_0);
 
-  range<2> lws2(BLOCK_SIZE_1_Y, BLOCK_SIZE_1_X);
-  range<2> gws2((size + BLOCK_SIZE_1_Y - 1)/ BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y,
-                (size + BLOCK_SIZE_1_X - 1)/ BLOCK_SIZE_1_X * BLOCK_SIZE_1_X);
+  range<2> lws2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
+  range<2> gws2((size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
+                (size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y);
+
+  size_t nelem = size * size;
+  size_t nelems_bytes = nelem * sizeof(float);
+  size_t size_bytes = size * sizeof(float);
+
+  float *d_a = malloc_device<float>(nelem, q);
+  q.memcpy(d_a, a, nelems_bytes);
+
+  float *d_b = malloc_device<float>(size, q);
+  q.memcpy(d_b, b, size_bytes);
+
+  float *d_m = malloc_device<float>(nelem, q);
+  q.memcpy(d_m, m, nelems_bytes);
 
   q.wait();
   auto start = get_time();
@@ -209,31 +217,26 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
   // Run kernels
   for (int t=0; t<(size-1); t++) {
     q.submit([&](handler& cgh) {
-      auto a_acc = d_a.get_access<sycl_read>(cgh);
-      auto m_acc = d_m.get_access<sycl_write>(cgh);
       cgh.parallel_for<class fan1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int globalId = item.get_global_id(0);
         if (globalId < size-1-t) {
-          m_acc[size * (globalId + t + 1) + t] = 
-          a_acc[size * (globalId + t + 1) + t] / a_acc[size * t + t];
+          d_m[size * (globalId + t + 1) + t] = 
+          d_a[size * (globalId + t + 1) + t] / d_a[size * t + t];
         }
       });
     });
 
     q.submit([&](handler& cgh) {
-      auto a_acc = d_a.get_access<sycl_read_write>(cgh);
-      auto b_acc = d_b.get_access<sycl_read_write>(cgh);
-      auto m_acc = d_m.get_access<sycl_read>(cgh);
       cgh.parallel_for<class fan2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
-        int globalIdx = item.get_global_id(1);
-        int globalIdy = item.get_global_id(0);
+        int globalIdx = item.get_global_id(0);
+        int globalIdy = item.get_global_id(1);
         if (globalIdx < size-1-t && globalIdy < size-t) {
-          a_acc[size * (globalIdx+1+t) + (globalIdy+t)] -= 
-          m_acc[size * (globalIdx+1+t) + t] * a_acc[size*t + (globalIdy+t)];
+          d_a[size * (globalIdx+1+t) + (globalIdy+t)] -= 
+          d_m[size * (globalIdx+1+t) + t] * d_a[size*t + (globalIdy+t)];
 
           if(globalIdy == 0) {
-            b_acc[globalIdx+1+t] -= 
-            m_acc[size * (globalIdx+1+t) + (globalIdy+t)] * b_acc[t];
+            d_b[globalIdx+1+t] -= 
+            d_m[size * (globalIdx+1+t) + (globalIdy+t)] * d_b[t];
           }
         }
       });
@@ -242,7 +245,17 @@ void ForwardSub(float *a, float *b, float *m, int size,int timing){
 
   q.wait();
   auto end = get_time();
-  printf("Total kernel execution time %lld (us)\n", (end - start));
+  if (timing)
+    printf("Total kernel execution time %lld (us)\n", (end - start));
+
+  q.memcpy(a, d_a, nelems_bytes);
+  q.memcpy(b, d_b, size_bytes);
+  q.memcpy(m, d_m, nelems_bytes);
+  q.wait();
+
+  free(d_a, q);
+  free(d_b, q);
+  free(d_m, q);
 }
 
 int parseCommandline(int argc, char *argv[], char* filename,
