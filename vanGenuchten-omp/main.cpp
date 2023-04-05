@@ -16,7 +16,7 @@ void vanGenuchten(
   #pragma omp target teams distribute parallel for thread_limit(256)
   for (int i = 0; i < size; i++) {
 
-    double Se, _theta, _psi, lambda, m;
+    double Se, _theta, _psi, lambda, m, t;
 
     lambda = n - 1.0;
     m = lambda/n;
@@ -33,8 +33,9 @@ void vanGenuchten(
     // Compute the effective saturation [eqn 2]
     Se = (_theta - theta_R)/(theta_S - theta_R);
 
-    /* . . .Compute the hydraulic conductivity [eqn 8] . . .*/
-    K[i] = Ksat[i] * sqrt(Se) * (1.0 - pow( 1.0-pow(Se,1.0/m), m) ) * (1.0 - pow( 1.0-pow( Se, 1.0/m), m ));
+    // Compute the hydraulic conductivity [eqn 8]
+    t = 1.0 - pow(1.0-pow(Se,1.0/m), m);
+    K[i] = Ksat[i] * sqrt(Se) * t * t;
 
     // Compute the specific moisture storage derivative of eqn (21).
     // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
