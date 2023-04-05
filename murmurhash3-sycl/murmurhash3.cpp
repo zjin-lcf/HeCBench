@@ -174,7 +174,7 @@ int main(int argc, char** argv)
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   buffer<uint8_t, 1> dev_keys(d_keys, total_length);
   buffer<uint64_t, 1> dev_out(d_out, 2*numKeys);
@@ -184,9 +184,25 @@ int main(int argc, char** argv)
   range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
   range<1> local_work_size (BLOCK_SIZE);
 
+  // warmup
+  for (uint32_t n = 0; n < repeat; n++) {
+    q.submit([&](handler &h) {
+      auto d_keys = dev_keys.get_access<sycl_read>(h);
+      auto d_length = dev_length.get_access<sycl_read>(h);
+      auto length = key_length.get_access<sycl_read>(h);
+      auto d_out = dev_out.get_access<sycl_discard_write>(h);
+      h.parallel_for<class warmup>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+        int i = item.get_global_id(0); 
+        if (i < numKeys) 
+          MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
+        });
+    });
+  }
+  q.wait();
+
   auto start = std::chrono::steady_clock::now();
 
-  for (uint32_t n = 0; n < repeat; n++)
+  for (uint32_t n = 0; n < repeat; n++) {
     q.submit([&](handler &h) {
       auto d_keys = dev_keys.get_access<sycl_read>(h);
       auto d_length = dev_length.get_access<sycl_read>(h);
@@ -198,6 +214,7 @@ int main(int argc, char** argv)
           MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
         });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
