@@ -78,7 +78,7 @@ void reduce(      float *__restrict__ page_ranks,
     }
 
     new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
-    dif[j] = fabsf(new_rank - old_rank) > dif[j] ? fabsf(new_rank - old_rank) : dif[j];
+    dif[j] = fmaxf(fabsf(new_rank - old_rank), dif[j]);
     page_ranks[j] = new_rank;
   }
 }
