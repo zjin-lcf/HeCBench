@@ -4,9 +4,9 @@ void linear_regression(
   float4 *__restrict interns,
   float4 *__restrict result)
 {
-  size_t glob_id  = item.get_global_id(0);
   size_t loc_id   = item.get_local_id(0);
   size_t loc_size = item.get_local_range(0); 
+  size_t glob_id  = item.get_group(0) * loc_size + loc_id;
 
   /* Initialize local buffer */
   interns[loc_id].x() = dataset[glob_id].x();
@@ -40,9 +40,9 @@ void rsquared(
   float2 *__restrict dist,
   float2 *__restrict result)
 {
-  size_t glob_id  = item.get_global_id(0);
   size_t loc_id   = item.get_local_id(0);
   size_t loc_size = item.get_local_range(0); 
+  size_t glob_id  = item.get_group(0) * loc_size + loc_id;
 
   dist[loc_id].x() = sycl::pow((dataset[glob_id].y() - mean), 2.f);
 
