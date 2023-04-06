@@ -66,8 +66,28 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Robotics
     inversek2j, rodrigues
 
+
 # Run a benchmark
-  Option 1: Go to a benchmark and type `make run`  
+  Option 1: Makefile scripts  
+  
+      Navigate to a benchmark in CUDA (benchmark-cuda) and type  
+      `make ARCH=sm_70 run`  // run on a NIVIDA GPU device with compute capability 7.0
+      
+      Navigate to a benchmark in HIP (benchmark-hip) and type  
+      `make run`
+      
+      Navigate to a benchmark in SYCL (benchmark-sycl) and type   
+     `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN="" run` (targeting NVIDIA GPUs)
+     `make HIP=yes HIP_ARCH=gfx908 run`                   (targeting AMD GPUs)  
+     `make run` or `make CC=icpx run`                     (targeting Intel GPUs)
+     
+      Navigate to a benchmark in OpenMP (benchmark-omp) and type  
+      `make -f Makefile.nvc run`  (targeting NVIDIA GPUs)
+      `make -f Makefile.aomp run` (targeting AMD GPUs)
+      `make run`                  (targeting Intel GPUs) 
+      
+      Users need to choose appropriate values (e.g., `sm_80`, `sm_90`, `gfx906`, `gfx1030`) for their target devices  
+      
   Option 2: Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
 
     It works with a `.json` file containing the benchmark names, a regex to
