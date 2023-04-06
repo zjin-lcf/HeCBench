@@ -1,4 +1,4 @@
-#include "hip/hip_runtime.h"
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 #include <hip/hip_runtime.h>
@@ -75,8 +75,8 @@ __global__ void SumWithinBlocks(const int n, const FLOAT* data, FLOAT* blocksums
 
 void sum_stats(const int Npoint, const FLOAT* stats, FLOAT* statsum, FLOAT* blocksums) {
   for (int what=0; what<4; what++) {
-    hipLaunchKernelGGL(SumWithinBlocks, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, Npoint, stats+what*Npoint, blocksums);
-    hipLaunchKernelGGL(SumWithinBlocks, dim3(1), dim3(NBLOCK), 0, 0, NBLOCK, blocksums, statsum+what);
+    SumWithinBlocks<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats+what*Npoint, blocksums);
+    SumWithinBlocks<<<1,NBLOCK>>>(NBLOCK, blocksums, statsum+what);
   }
 }
 
@@ -188,24 +188,36 @@ int main() {
   CHECK(hipMalloc((void **)&statsum, 4 * sizeof(FLOAT))); // workspace for summation
   CHECK(hipMalloc((void **)&ranstates, Npoint*sizeof(unsigned int)));
 
-  hipLaunchKernelGGL(initran, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, 5551212, ranstates);
-  hipLaunchKernelGGL(initialize, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, x1, y1, z1, x2, y2, z2, psi, ranstates);
-  hipLaunchKernelGGL(zero_stats, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, Npoint, stats);
+  initran<<<NBLOCK,NTHR_PER_BLK>>>(5551212, ranstates);
+  initialize<<<NBLOCK,NTHR_PER_BLK>>>(x1, y1, z1, x2, y2, z2, psi, ranstates);
+  zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
 
   // Equilibrate
-  hipLaunchKernelGGL(propagate, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+  propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
 
   // Accumulators for averages over blocks --- use doubles
   double r1_tot = ZERO,  r1_sq_tot = ZERO;
   double r2_tot = ZERO,  r2_sq_tot = ZERO;
   double r12_tot = ZERO, r12_sq_tot = ZERO;
   double naccept = ZERO;  // Keeps track of propagation efficiency
+
+  double time = 0.0;
+
   for (int sample=0; sample<Nsample; sample++) {
-    hipLaunchKernelGGL(zero_stats, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, Npoint, stats);
-    hipLaunchKernelGGL(propagate, dim3(NBLOCK), dim3(NTHR_PER_BLK), 0, 0, Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
+
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
+    propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
 
     struct {FLOAT r1, r2, r12, accept;} s;
     sum_stats(Npoint, stats, statsum, blocksums);
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     CHECK(hipMemcpy(&s, statsum, sizeof(s), hipMemcpyDeviceToHost));
 
     naccept += s.accept;
@@ -213,7 +225,9 @@ int main() {
     s.r2 /= Ngen_per_block*Npoint;  
     s.r12 /= Ngen_per_block*Npoint;
 
+#ifdef DEBUG
     printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
+#endif
 
     r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
     r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
@@ -232,7 +246,10 @@ int main() {
   printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
   printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
 
-  printf(" acceptance ratio=%.1f%%\n",100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+  printf(" acceptance ratio=%.1f%%\n",
+         100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / Nsample);
 
   CHECK(hipFree(x1));
   CHECK(hipFree(y1));

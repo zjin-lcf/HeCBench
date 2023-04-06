@@ -19,9 +19,9 @@ const FLOAT ONE  = 1.0;
 const FLOAT HALF = 0.5;
 const FLOAT ZERO = 0.0;
 
-FLOAT EXP(FLOAT x) {return cl::sycl::exp(x);}
+FLOAT EXP(FLOAT x) {return sycl::exp(x);}
 
-FLOAT SQRT(FLOAT x) {return cl::sycl::sqrt(x);}
+FLOAT SQRT(FLOAT x) {return sycl::sqrt(x);}
 
 float LCG_random(unsigned int * seed) {
   const unsigned int m = 2147483648;
@@ -160,79 +160,59 @@ int main(int argc, char* argv[]) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
   
-  buffer<FLOAT, 1> d_x1(Npoint);
-  buffer<FLOAT, 1> d_y1(Npoint);
-  buffer<FLOAT, 1> d_z1(Npoint);
-  buffer<FLOAT, 1> d_x2(Npoint);
-  buffer<FLOAT, 1> d_y2(Npoint);
-  buffer<FLOAT, 1> d_z2(Npoint);
-  buffer<FLOAT, 1> d_psi(Npoint);
-  buffer<FLOAT, 1> d_stats(4*Npoint);
-  buffer<FLOAT, 1> d_statsum(4);
-  buffer<FLOAT, 1> d_blocksums(NBLOCK);
-  buffer<unsigned int, 1> d_ranstates(Npoint);
+  FLOAT *d_x1 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_y1 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_z1 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_x2 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_y2 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_z2 = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_psi = malloc_device<FLOAT>(Npoint, q);
+  FLOAT *d_stats = malloc_device<FLOAT>(4*Npoint, q);
+  FLOAT *d_statsum = malloc_device<FLOAT>(4, q);
+  FLOAT *d_blocksums = malloc_device<FLOAT>(NBLOCK, q);
+  unsigned int *d_ranstates = malloc_device<unsigned int>(Npoint, q);
 
   //initran<<<NBLOCK,NTHR_PER_BLK>>>(5551212, ranstates);
   range<1> gws (Npoint);
   range<1> lws (NTHR_PER_BLK);
 
   q.submit([&](handler &cgh) {
-    auto states = d_ranstates.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class init_random_states>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int i = item.get_global_id(0);
-      states[i] = 5551212 ^ i;      
-      LCG_random_init(&states[i]);
+      d_ranstates[i] = 5551212 ^ i;
+      LCG_random_init(&d_ranstates[i]);
     });
   });
 
   // initialize<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, x1, y1, z1, x2, y2, z2, psi, ranstates);
   q.submit([&](handler &cgh) {
-    auto states = d_ranstates.get_access<sycl_read>(cgh);
-    auto x1 = d_x1.get_access<sycl_discard_read_write>(cgh);
-    auto y1 = d_y1.get_access<sycl_discard_read_write>(cgh);
-    auto z1 = d_z1.get_access<sycl_discard_read_write>(cgh);
-    auto x2 = d_x2.get_access<sycl_discard_read_write>(cgh);
-    auto y2 = d_y2.get_access<sycl_discard_read_write>(cgh);
-    auto z2 = d_z2.get_access<sycl_discard_read_write>(cgh);
-    auto psi = d_psi.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int i = item.get_global_id(0);
-      x1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      y1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      z1[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      x2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      y2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      z2[i] = (LCG_random(states.get_pointer()+i) - HALF)*FOUR;
-      psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
+      d_x1[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_y1[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_z1[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_x2[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_y2[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_z2[i] = (LCG_random(d_ranstates+i) - HALF)*FOUR;
+      d_psi[i] = wave_function(d_x1[i], d_y1[i], d_z1[i], d_x2[i], d_y2[i], d_z2[i]);
     });
   });
 
   //zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
   q.submit([&](handler &cgh) {
-    auto stats = d_stats.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class reset_stats>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      zero_stats(stats.get_pointer(), item);
+      zero_stats(d_stats, item);
     });
   });
     
   // Equilibrate
   //propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Neq, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
   q.submit([&](handler &cgh) {
-    auto x1 = d_x1.get_access<sycl_read_write>(cgh);
-    auto y1 = d_y1.get_access<sycl_read_write>(cgh);
-    auto z1 = d_z1.get_access<sycl_read_write>(cgh);
-    auto x2 = d_x2.get_access<sycl_read_write>(cgh);
-    auto y2 = d_y2.get_access<sycl_read_write>(cgh);
-    auto z2 = d_z2.get_access<sycl_read_write>(cgh);
-    auto psi = d_psi.get_access<sycl_read_write>(cgh);
-    auto stats = d_stats.get_access<sycl_read_write>(cgh);
-    auto ranstates = d_ranstates.get_access<sycl_read>(cgh);
     cgh.parallel_for<class prop2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      propagate(Neq, x1.get_pointer(), y1.get_pointer(), z1.get_pointer(),
-           x2.get_pointer(), y2.get_pointer(), z2.get_pointer(),
-           psi.get_pointer(), stats.get_pointer(), ranstates.get_pointer(), item);
+      propagate(Neq, d_x1, d_y1, d_z1, d_x2, d_y2, d_z2,
+                d_psi, d_stats, d_ranstates, item);
     });
   });
 
@@ -248,29 +228,18 @@ int main(int argc, char* argv[]) {
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    //  zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
+    //zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
     q.submit([&](handler &cgh) {
-      auto stats = d_stats.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class reset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        zero_stats(stats.get_pointer(), item);
+        zero_stats(d_stats, item);
       });
     });
 
     //propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
     q.submit([&](handler &cgh) {
-      auto x1 = d_x1.get_access<sycl_read_write>(cgh);
-      auto y1 = d_y1.get_access<sycl_read_write>(cgh);
-      auto z1 = d_z1.get_access<sycl_read_write>(cgh);
-      auto x2 = d_x2.get_access<sycl_read_write>(cgh);
-      auto y2 = d_y2.get_access<sycl_read_write>(cgh);
-      auto z2 = d_z2.get_access<sycl_read_write>(cgh);
-      auto psi = d_psi.get_access<sycl_read_write>(cgh);
-      auto stats = d_stats.get_access<sycl_read_write>(cgh);
-      auto ranstates = d_ranstates.get_access<sycl_read>(cgh);
       cgh.parallel_for<class prop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        propagate(Ngen_per_block, x1.get_pointer(), y1.get_pointer(), z1.get_pointer(),
-             x2.get_pointer(), y2.get_pointer(), z2.get_pointer(),
-             psi.get_pointer(), stats.get_pointer(), ranstates.get_pointer(), item);
+        propagate(Ngen_per_block, d_x1, d_y1, d_z1, d_x2, d_y2, d_z2,
+                  d_psi, d_stats, d_ranstates, item);
       });
     });
     
@@ -278,23 +247,19 @@ int main(int argc, char* argv[]) {
     for (int what=0; what<4; what++) {
       // SumWithinBlocks<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats+what*Npoint, blocksums);
       q.submit([&] (handler &cgh) {
-        auto stats = d_stats.get_access<sycl_read>(cgh);
-        auto blocksums = d_blocksums.get_access<sycl_write>(cgh);
         accessor<FLOAT, 1, sycl_read_write, access::target::local> sdata(512, cgh);
         cgh.parallel_for<class sum_blocks>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          SumWithinBlocks(Npoint, stats.get_pointer() + what * Npoint, 
-                          blocksums.get_pointer(), sdata.get_pointer(), item); 
+          SumWithinBlocks(Npoint, d_stats + what * Npoint, d_blocksums,
+                          sdata.get_pointer(), item);
         });
       });
 
      //SumWithinBlocks<<<1,NBLOCK>>>(NBLOCK, blocksums, statsum+what);
       q.submit([&] (handler &cgh) {
-        auto blocksums = d_blocksums.get_access<sycl_read>(cgh);
-        auto statsum = d_statsum.get_access<sycl_write>(cgh);
         accessor<FLOAT, 1, sycl_read_write, access::target::local> sdata(512, cgh);
         cgh.parallel_for<class final_sum_blocks>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
-          SumWithinBlocks(NBLOCK, blocksums.get_pointer(), 
-                          statsum.get_pointer() + what, sdata.get_pointer(), item);
+          SumWithinBlocks(NBLOCK, d_blocksums, d_statsum + what,
+                          sdata.get_pointer(), item);
         });
       });
     }
@@ -305,10 +270,7 @@ int main(int argc, char* argv[]) {
 
     struct {FLOAT r1, r2, r12, accept;} s;
 
-    q.submit([&] (handler &cgh) {
-      auto a = d_statsum.get_access<sycl_read>(cgh);  
-      cgh.copy(a, &s);
-    }).wait();
+    q.memcpy(&s, d_statsum, sizeof(s)).wait();
 
     naccept += s.accept;
     s.r1 /= Ngen_per_block*Npoint;  
@@ -338,9 +300,20 @@ int main(int argc, char* argv[]) {
   
   // avoid int overflow
   printf(" acceptance ratio=%.1f%%\n",
-    100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample));
+         100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample));
 
   printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / Nsample);
 
+  free(d_x1, q);
+  free(d_y1, q);
+  free(d_z1, q);
+  free(d_x2, q);
+  free(d_y2, q);
+  free(d_z2, q);
+  free(d_psi, q);
+  free(d_stats, q);
+  free(d_blocksums, q);
+  free(d_statsum, q);
+  free(d_ranstates, q);
   return 0;
 }

@@ -13,7 +13,7 @@ DEBUG     = no
 
 program = main
 
-source = vmc.cu
+source = vmc2.cu
 
 obj = $(source:.cu=.o)
 
@@ -22,11 +22,11 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall \
-          -I/opt/rocm/hiprand/include -I/opt/rocm/rocrand/include 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+          #-I/opt/rocm/hiprand/include -I/opt/rocm/rocrand/include 
 
 # Linker Flags
-LDFLAGS = -L/opt/rocm/lib -lhiprand
+LDFLAGS = #-L/opt/rocm/lib -lhiprand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
