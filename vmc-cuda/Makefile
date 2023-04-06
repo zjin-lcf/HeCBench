@@ -14,7 +14,7 @@ ARCH      = sm_60
 
 program = main
 
-source = vmc.cu
+source = vmc2.cu
 
 obj = $(source:.cu=.o)
 

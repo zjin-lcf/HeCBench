@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 #include <cuda.h>
@@ -199,12 +200,24 @@ int main() {
   double r2_tot = ZERO,  r2_sq_tot = ZERO;
   double r12_tot = ZERO, r12_sq_tot = ZERO;
   double naccept = ZERO;  // Keeps track of propagation efficiency
+
+  double time = 0.0;
+
   for (int sample=0; sample<Nsample; sample++) {
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
     zero_stats<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, stats);
     propagate<<<NBLOCK,NTHR_PER_BLK>>>(Npoint, Ngen_per_block, x1, y1, z1, x2, y2, z2, psi, stats, ranstates);
 
     struct {FLOAT r1, r2, r12, accept;} s;
     sum_stats(Npoint, stats, statsum, blocksums);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
     CHECK(cudaMemcpy(&s, statsum, sizeof(s), cudaMemcpyDeviceToHost));
 
     naccept += s.accept;
@@ -212,7 +225,9 @@ int main() {
     s.r2 /= Ngen_per_block*Npoint;  
     s.r12 /= Ngen_per_block*Npoint;
 
+#ifdef DEBUG
     printf(" block %6d  %.6f  %.6f  %.6f\n", sample, s.r1, s.r2, s.r12);
+#endif
 
     r1_tot += s.r1;   r1_sq_tot += s.r1*s.r1;
     r2_tot += s.r2;   r2_sq_tot += s.r2*s.r2;
@@ -231,7 +246,10 @@ int main() {
   printf(" <r2>  = %.6f +- %.6f\n", r2_tot, r2s);
   printf(" <r12> = %.6f +- %.6f\n", r12_tot, r12s);
 
-  printf(" acceptance ratio=%.1f%%\n",100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+  printf(" acceptance ratio=%.1f%%\n",
+         100.0*naccept/double(Npoint)/double(Ngen_per_block)/double(Nsample)); // avoid int overflow
+
+  printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / Nsample);
 
   CHECK(cudaFree(x1));
   CHECK(cudaFree(y1));
