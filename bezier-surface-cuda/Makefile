@@ -12,7 +12,7 @@ ARCH      = sm_60
 # Program name & source code list
 #===============================================================================
 
-program = bs
+program = main
 
 source = main.cu
 

@@ -67,7 +67,7 @@ struct Params {
 
   Params(int argc, char **argv) {
     work_group_size = 256;
-    file_name     = "input/control.txt";
+    file_name = "input/control.txt";
     in_size_i = in_size_j = 3;
     out_size_i = out_size_j = 300;
     int opt;
@@ -78,7 +78,7 @@ struct Params {
           exit(0);
           break;
         case 'g': work_group_size = atoi(optarg); break;
-        case 'f': file_name     = optarg; break;
+        case 'f': file_name = optarg; break;
         case 'm': in_size_i = in_size_j = atoi(optarg); break;
         case 'n': out_size_i = out_size_j = atoi(optarg); break;
         default:
@@ -91,7 +91,7 @@ struct Params {
 
   void usage() {
     fprintf(stderr,
-        "\nUsage:  ./bs [options]"
+        "\nUsage:  ./main [options]"
         "\n"
         "\nGeneral options:"
         "\n    -h        help"
@@ -236,7 +236,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::cout << "host execution time: " << time << " ms" << std::endl;
 
-  start = std::chrono::steady_clock::now();
   #pragma omp target data map(to: in[0:(in_size_i+1)*(in_size_j+1)]) \
                           map(from: gpu_out [0:out_size_i*out_size_j])
   {
@@ -267,10 +266,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
     auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
     std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
   }
-
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "device execution time: " << time << " ms" << std::endl;
 
   // Verify
   int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);

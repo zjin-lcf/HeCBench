@@ -68,7 +68,7 @@ struct Params {
 
   Params(int argc, char **argv) {
     work_group_size = 256;
-    file_name     = "input/control.txt";
+    file_name = "input/control.txt";
     in_size_i = in_size_j = 3;
     out_size_i = out_size_j = 300;
     int opt;
@@ -79,7 +79,7 @@ struct Params {
           exit(0);
           break;
         case 'g': work_group_size = atoi(optarg); break;
-        case 'f': file_name     = optarg; break;
+        case 'f': file_name = optarg; break;
         case 'm': in_size_i = in_size_j = atoi(optarg); break;
         case 'n': out_size_i = out_size_j = atoi(optarg); break;
         default:
@@ -92,7 +92,7 @@ struct Params {
 
   void usage() {
     fprintf(stderr,
-        "\nUsage:  ./bs [options]"
+        "\nUsage:  ./main [options]"
         "\n"
         "\nGeneral options:"
         "\n    -h        help"
@@ -258,7 +258,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   // Device run
 
-  start = std::chrono::steady_clock::now();
   XYZ *d_in;
   XYZ *d_out;
   int in_size   = (in_size_i + 1) * (in_size_j + 1) * sizeof(XYZ);
@@ -284,10 +283,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   hipMemcpy(gpu_out, d_out, out_size, hipMemcpyDeviceToHost);
 
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "device execution time: " << time << " ms" << std::endl;
-
   // Verify
   int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   printf("%s\n", (status == 0) ? "PASS" : "FAIL");
@@ -296,7 +291,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   free(gpu_out);
   hipFree(d_in);
   hipFree(d_out);
-
 }
 
 int main(int argc, char **argv) {
