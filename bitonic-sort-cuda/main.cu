@@ -35,6 +35,7 @@
 // data to the kernel. The kernel swaps the elements accordingly in parallel.
 //
 #include <math.h>
+#include <string.h>
 #include <chrono>
 #include <iostream>
 #include <limits>
@@ -42,8 +43,9 @@
 
 #define BLOCK_SIZE 256
 
-__global__ void bs (const int seq_len, const int two_power, int *a) {
-
+__global__
+void bitonic_sort (const int seq_len, const int two_power, int *a)
+{
   int i = blockDim.x * blockIdx.x + threadIdx.x;
 
   // Assign the bitonic sequence number.
@@ -78,16 +80,17 @@ __global__ void bs (const int seq_len, const int two_power, int *a) {
   }
 }
 
-void ParallelBitonicSort(int data_gpu[], int n) {
+void ParallelBitonicSort(int input[], int n) {
 
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
+  size_t size_bytes = sizeof(int) * size;
 
-  int *a;
-  cudaMalloc((void**)&a, sizeof(int) * size);
-  cudaMemcpy(a, data_gpu, sizeof(int) * size, cudaMemcpyHostToDevice);
+  int *d_input;
+  cudaMalloc((void**)&d_input, size_bytes);
+  cudaMemcpy(d_input, input, size_bytes, cudaMemcpyHostToDevice);
   
-  long time = 0; // kernel execution time
+  auto start = std::chrono::steady_clock::now();
 
   // step from 0, 1, 2, ...., n-1
   for (int step = 0; step < n; step++) {
@@ -98,27 +101,19 @@ void ParallelBitonicSort(int data_gpu[], int n) {
       // at each stage. seq_len stores the length of the bitonic sequence at
       // each stage.
       int seq_len = pow(2, stage + 1);
-#if DEBUG
-      int num_seq = pow(2, (n - stage - 1));  // Used for debug purpose.
-      std::cout << "step num:" << step << " stage num:" << stage
-                << " num_seq:" << num_seq << "(" << seq_len << ") => ";
-#endif
       // Constant used in the kernel: 2**(step-stage).
       int two_power = 1 << (step - stage);
-      auto start = std::chrono::steady_clock::now();
-
-      bs<<< dim3(size/BLOCK_SIZE), dim3(BLOCK_SIZE) >>> (seq_len, two_power, a);
-
-      cudaDeviceSynchronize();
-      auto end = std::chrono::steady_clock::now();
-      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      bitonic_sort<<< size/BLOCK_SIZE, BLOCK_SIZE >>> (seq_len, two_power, d_input);
     }  // end stage
   } // end step
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
 
-  cudaMemcpy(data_gpu, a, sizeof(int) * size, cudaMemcpyDeviceToHost);
-  cudaFree( a );
+  cudaMemcpy(input, d_input, size_bytes, cudaMemcpyDeviceToHost);
+  cudaFree(d_input);
 }
 
 // Loop over the bitonic sequences at each stage in serial.
@@ -163,12 +158,6 @@ inline void BitonicSort(int a[], int n) {
   }
 }
 
-// Function showing the array.
-void DisplayArray(int a[], int array_size) {
-  for (int i = 0; i < array_size; ++i) std::cout << a[i] << " ";
-  std::cout << "\n";
-}
-
 void Usage(std::string prog_name, int exponent) {
   std::cout << " Incorrect parameters\n";
   std::cout << " Usage: " << prog_name << " n k \n\n";
@@ -203,11 +192,13 @@ int main(int argc, char *argv[]) {
 
   std::cout << "\nArray size: " << size << ", seed: " << seed << "\n";
 
+  size_t size_bytes = size * sizeof(int);
+
   // Memory allocated for host access only.
-  int *data_cpu = (int *)malloc(size * sizeof(int));
+  int *data_cpu = (int *)malloc(size_bytes);
 
   // Memory allocated to store gpu results
-  int *data_gpu = (int *)malloc(size * sizeof(int));
+  int *data_gpu = (int *)malloc(size_bytes);
 
   // Initialize the array randomly using a seed.
   srand(seed);
@@ -216,47 +207,25 @@ int main(int argc, char *argv[]) {
     data_gpu[i] = data_cpu[i] = rand() % 1000;
   }
 
-
-#if DEBUG
-  std::cout << "\ndata before:\n";
-  DisplayArray(data_gpu, size);
-#endif
-
+  std::cout << "Bitonic sort (parallel)..\n";
   auto start = std::chrono::steady_clock::now();
 
   ParallelBitonicSort(data_gpu, n);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Parallel bitonic time " << (time * 1e-9f) << " (s)\n";
+  std::cout << "Total execution time " << (time * 1e-9f) << " (s)\n";
 
-#if DEBUG
-  std::cout << "\ndata after sorting using parallel bitonic sort:\n";
-  DisplayArray(data_gpu, size);
-#endif
-
-  // Bitonic sort in CPU (serial)
+  std::cout << "Bitonic sort (serial)..\n";
   BitonicSort(data_cpu, n);
 
-  // Verify both bitonic sort algorithms in kernel and in CPU.
-  bool pass = true;
-  for (int i = 0; i < size - 1; i++) {
-    // Validate the sequence order is increasing in both kernel and CPU.
-    if ((data_gpu[i] > data_gpu[i + 1]) || (data_gpu[i] != data_cpu[i])) {
-      pass = false;
-      break;
-    }
-  }
+  // Verify
+  bool unequal = memcmp(data_gpu, data_cpu, size_bytes);
+  std::cout << (unequal ? "FAIL" : "PASS") << std::endl;
 
   // Clean CPU memory.
   free(data_cpu);
   free(data_gpu);
 
-  if (!pass) {
-    std::cout << "\nFailed!\n";
-    return -2;
-  }
-
-  std::cout << "\nSuccess!\n";
   return 0;
 }

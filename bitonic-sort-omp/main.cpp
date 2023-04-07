@@ -35,79 +35,74 @@
 // data to the kernel. The kernel swaps the elements accordingly in parallel.
 //
 #include <math.h>
+#include <string.h>
 #include <chrono>
 #include <iostream>
 #include <limits>
 #include <omp.h>
 
-void ParallelBitonicSort(int data_gpu[], int n) {
+void ParallelBitonicSort(int input[], int n) {
 
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
 
-  long time = 0; // kernel execution time
-
   // step from 0, 1, 2, ...., n-1
-#pragma omp target data map(tofrom: data_gpu[0:size]) 
-  for (int step = 0; step < n; step++) {
-    // for each step s, stage goes s, s-1, ..., 0
-    for (int stage = step; stage >= 0; stage--) {
-      // In each state, construct a number (num_seq) of bitonic sequences of
-      // size seq_len (2, 4, ...) num_seq stores the number of bitonic sequences
-      // at each stage. seq_len stores the length of the bitonic sequence at
-      // each stage.
-      int seq_len = pow(2, stage + 1);
-#if DEBUG
-      int num_seq = pow(2, (n - stage - 1));  // Used for debug purpose.
-      std::cout << "step num:" << step << " stage num:" << stage
-                << " num_seq:" << num_seq << "(" << seq_len << ") => ";
-#endif
-      // Constant used in the kernel: 2**(step-stage).
-      int two_power = 1 << (step - stage);
+  #pragma omp target data map(tofrom: input[0:size]) 
+  {
+    auto start = std::chrono::steady_clock::now();
 
-      // Offload the work to kernel.
-      auto start = std::chrono::steady_clock::now();
+    for (int step = 0; step < n; step++) {
+      // for each step s, stage goes s, s-1, ..., 0
+      for (int stage = step; stage >= 0; stage--) {
+        // In each state, construct a number (num_seq) of bitonic sequences of
+        // size seq_len (2, 4, ...) num_seq stores the number of bitonic sequences
+        // at each stage. seq_len stores the length of the bitonic sequence at
+        // each stage.
+        int seq_len = pow(2, stage + 1);
+        // Constant used in the kernel: 2**(step-stage).
+        int two_power = 1 << (step - stage);
 
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int i = 0; i < size; i++) {
-        // Assign the bitonic sequence number.
-        int seq_num = i / seq_len;
+        // Offload the work to kernel.
+        #pragma omp target teams distribute parallel for thread_limit(256)
+        for (int i = 0; i < size; i++) {
+          // Assign the bitonic sequence number.
+          int seq_num = i / seq_len;
 
-        // Variable used to identified the swapped element.
-        int swapped_ele = -1;
+          // Variable used to identified the swapped element.
+          int swapped_ele = -1;
 
-        // Because the elements in the first half in the bitonic
-        // sequence may swap with elements in the second half,
-        // only the first half of elements in each sequence is
-        // required (seq_len/2).
-        int h_len = seq_len / 2;
+          // Because the elements in the first half in the bitonic
+          // sequence may swap with elements in the second half,
+          // only the first half of elements in each sequence is
+          // required (seq_len/2).
+          int h_len = seq_len / 2;
 
-        if (i < (seq_len * seq_num) + h_len) swapped_ele = i + h_len;
+          if (i < (seq_len * seq_num) + h_len) swapped_ele = i + h_len;
 
-        // Check whether increasing or decreasing order.
-        int odd = seq_num / two_power;
+          // Check whether increasing or decreasing order.
+          int odd = seq_num / two_power;
 
-        // Boolean variable used to determine "increasing" or
-        // "decreasing" order.
-        bool increasing = ((odd % 2) == 0);
+          // Boolean variable used to determine "increasing" or
+          // "decreasing" order.
+          bool increasing = ((odd % 2) == 0);
 
-        // Swap the elements in the bitonic sequence if needed
-        if (swapped_ele != -1) {
-          if (((data_gpu[i] > data_gpu[swapped_ele]) && increasing) ||
-              ((data_gpu[i] < data_gpu[swapped_ele]) && !increasing)) {
-            int temp = data_gpu[i];
-            data_gpu[i] = data_gpu[swapped_ele];
-            data_gpu[swapped_ele] = temp;
+          // Swap the elements in the bitonic sequence if needed
+          if (swapped_ele != -1) {
+            if (((input[i] > input[swapped_ele]) && increasing) ||
+                ((input[i] < input[swapped_ele]) && !increasing)) {
+              int temp = input[i];
+              input[i] = input[swapped_ele];
+              input[swapped_ele] = temp;
+            }
           }
         }
-      }
+      }  // end stage
+    } // end step
 
-      auto end = std::chrono::steady_clock::now();
-      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    }  // end stage
-  } // end step
-
-  printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
+  }
 }
 
 // Loop over the bitonic sequences at each stage in serial.
@@ -192,11 +187,13 @@ int main(int argc, char *argv[]) {
 
   std::cout << "\nArray size: " << size << ", seed: " << seed << "\n";
 
+  size_t size_bytes = size * sizeof(int);
+
   // Memory allocated for host access only.
-  int *data_cpu = (int *)malloc(size * sizeof(int));
+  int *data_cpu = (int *)malloc(size_bytes);
 
   // Memory allocated to store gpu results
-  int *data_gpu = (int *)malloc(size * sizeof(int));
+  int *data_gpu = (int *)malloc(size_bytes);
 
   // Initialize the array randomly using a seed.
   srand(seed);
@@ -205,48 +202,25 @@ int main(int argc, char *argv[]) {
     data_gpu[i] = data_cpu[i] = rand() % 1000;
   }
 
-
-#if DEBUG
-  std::cout << "\ndata before:\n";
-  DisplayArray(data_gpu, size);
-#endif
-
+  std::cout << "Bitonic sort (parallel)..\n";
   auto start = std::chrono::steady_clock::now();
 
   ParallelBitonicSort(data_gpu, n);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Parallel bitonic time " << (time * 1e-9f) << " (s)\n";
+  std::cout << "Total execution time " << (time * 1e-9f) << " (s)\n";
 
-#if DEBUG
-  std::cout << "\ndata after sorting using parallel bitonic sort:\n";
-  DisplayArray(data_gpu, size);
-#endif
-
-  // Bitonic sort in CPU (serial)
+  std::cout << "Bitonic sort (serial)..\n";
   BitonicSort(data_cpu, n);
 
-
-  // Verify both bitonic sort algorithms in kernel and in CPU.
-  bool pass = true;
-  for (int i = 0; i < size - 1; i++) {
-    // Validate the sequence order is increasing in both kernel and CPU.
-    if ((data_gpu[i] > data_gpu[i + 1]) || (data_gpu[i] != data_cpu[i])) {
-      pass = false;
-      break;
-    }
-  }
+  // Verify
+  bool unequal = memcmp(data_gpu, data_cpu, size_bytes);
+  std::cout << (unequal ? "FAIL" : "PASS") << std::endl;
 
   // Clean CPU memory.
   free(data_cpu);
   free(data_gpu);
 
-  if (!pass) {
-    std::cout << "\nFailed!\n";
-    return -2;
-  }
-
-  std::cout << "\nSuccess!\n";
   return 0;
 }
