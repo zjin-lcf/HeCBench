@@ -79,7 +79,7 @@ struct Params {
           exit(0);
           break;
         case 'g': work_group_size = atoi(optarg); break;
-        case 'f': file_name     = optarg; break;
+        case 'f': file_name = optarg; break;
         case 'm': in_size_i = in_size_j = atoi(optarg); break;
         case 'n': out_size_i = out_size_j = atoi(optarg); break;
         default:
@@ -92,7 +92,7 @@ struct Params {
 
   void usage() {
     fprintf(stderr,
-        "\nUsage:  ./bs [options]"
+        "\nUsage:  ./main [options]"
         "\n"
         "\nGeneral options:"
         "\n    -h        help"
@@ -228,21 +228,20 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   std::cout << "host execution time: " << time << " ms" << std::endl;
 
   // Device run
-  
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  start = std::chrono::steady_clock::now();
   int in_size   = (in_size_i + 1) * (in_size_j + 1);
   int out_size  = out_size_i * out_size_j;
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<XYZ, 1> d_in (in, in_size, props);
-  buffer<XYZ, 1> d_out (out_size);
+  XYZ *d_in = malloc_device<XYZ>(in_size, q);
+  q.memcpy(d_in, in, sizeof(XYZ) * in_size);
+
+  XYZ *d_out = malloc_device<XYZ>(out_size, q);
 
   size_t lws = p.work_group_size;
   size_t gws = (out_size_i + p.work_group_size - 1) / p.work_group_size * p.work_group_size;
@@ -251,8 +250,6 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   auto kstart = std::chrono::steady_clock::now();
 
   q.submit([&](handler& cgh) {
-    auto inp = d_in.get_access<sycl_read>(cgh);
-    auto outp = d_out.get_access<sycl_discard_write>(cgh);
     cgh.parallel_for<class bs>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
       int i, j, ki, kj;
       FLOAT   mui, muj, bi, bj;
@@ -271,12 +268,12 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
           //#pragma unroll
           for(kj = 0; kj <= in_size_j; kj++) {
             bj = BezierBlend(kj, muj, in_size_j);
-            out.x += (inp[ki * (in_size_j + 1) + kj].x * bi * bj);
-            out.y += (inp[ki * (in_size_j + 1) + kj].y * bi * bj);
-            out.z += (inp[ki * (in_size_j + 1) + kj].z * bi * bj);
+            out.x += (d_in[ki * (in_size_j + 1) + kj].x * bi * bj);
+            out.y += (d_in[ki * (in_size_j + 1) + kj].y * bi * bj);
+            out.z += (d_in[ki * (in_size_j + 1) + kj].z * bi * bj);
           }
         }
-        outp[i * out_size_j + j] = out;
+        d_out[i * out_size_j + j] = out;
       }
     });
   });
@@ -286,14 +283,7 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
   std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
 
-  q.submit([&](handler& cgh) {
-    auto outp = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(outp, gpu_out);
-  }).wait();
-  
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "device execution time: " << time << " ms" << std::endl;
+  q.memcpy(gpu_out, d_out, sizeof(XYZ) * out_size).wait();
 
   // Verify
   int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
@@ -301,6 +291,8 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   free(cpu_out);
   free(gpu_out);
+  free(d_in, q)
+  free(d_out, q);
 }
 
 int main(int argc, char **argv) {
