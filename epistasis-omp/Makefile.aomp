@@ -3,9 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = $(HIPCL_LLVM)/bin/clang++
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
+ARCH      = gfx906
 
 #===============================================================================
 # Program name & source code list
@@ -13,19 +15,19 @@ DEBUG     = no
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -pthread -fPIE `hipcl_config -C`
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../epistasis-cuda
 
 # Linker Flags
-LDFLAGS = -Wl,-rpath,$(HIPCL)/lib -L$(HIPCL)/lib -lhipcl 
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -39,19 +41,26 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=$(ARCH)
+else
+  CFLAGS +=-fopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj)
-	$(CC) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu
+%.o: %.cpp ../epistasis-cuda/reference.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 146 31339 10
-
+	./$(program) 146 31339 100

@@ -6,7 +6,8 @@
 #include <sstream>
 #include <iostream>
 #include <chrono>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
+#include "reference.h"
 
 using namespace std::chrono;
 typedef high_resolution_clock myclock;
@@ -43,9 +44,7 @@ __global__ void epi(const unsigned int* dev_data_zeros,
                     const int mask_zeros, 
                     const int mask_ones) 
 {
-
   int i, j, tid, p, k;
-  float score = FLT_MAX;
 
   j = blockDim.x * blockIdx.x + threadIdx.x; 
   i = blockDim.y * blockIdx.y + threadIdx.y;
@@ -170,10 +169,11 @@ __global__ void epi(const unsigned int* dev_data_zeros,
     ft[17] += __popc(t22);
 
     // compute score
-    score = 0.0f;
+    float score = 0.0f;
     for(k = 0; k < 9; k++)
-      score += gammafunction(ft[k] + ft[9 + k] + 1) - gammafunction(ft[k]) - gammafunction(ft[9 + k]);
-    score = fabs(score);
+      score += gammafunction(ft[k] + ft[9 + k] + 1) -
+               gammafunction(ft[k]) - gammafunction(ft[9 + k]);
+    score = fabsf(score);
     if(score == 0.0f)
       score = FLT_MAX;
     dev_scores[tid] = score;
@@ -183,6 +183,10 @@ __global__ void epi(const unsigned int* dev_data_zeros,
 
 int main(int argc, char **argv)
 {
+  if (argc != 4) {
+    printf("Usage: %s <number of samples> <number of SNPs> <repeat>\n", argv[0]);
+    return 1;
+  }
   int i, j, x;
   int num_pac = atoi(argv[1]);  // #samples
   int num_snp = atoi(argv[2]);  // #SNPs
@@ -289,22 +293,24 @@ int main(int argc, char **argv)
     }
 
   float *scores = mem_alloc<float>(64, num_snp * num_snp);
-  for(x = 0; x < num_snp * num_snp; x++) scores[x] = FLT_MAX;
-
-  auto start = myclock::now();
+  float *scores_ref = mem_alloc<float>(64, num_snp * num_snp);
+  for(x = 0; x < num_snp * num_snp; x++) {
+    scores[x] = scores_ref[x] = FLT_MAX;
+  }
 
   unsigned int* d_data_zeros;
-  cudaMalloc((void**)&d_data_zeros, num_snp*PP_zeros*2*sizeof(unsigned int));
-  cudaMemcpy(d_data_zeros, bin_data_zeros_trans, 
-             num_snp*PP_zeros*2*sizeof(unsigned int), cudaMemcpyHostToDevice);
+  hipMalloc((void**)&d_data_zeros, num_snp*PP_zeros*2*sizeof(unsigned int));
+  hipMemcpy(d_data_zeros, bin_data_zeros_trans, 
+             num_snp*PP_zeros*2*sizeof(unsigned int), hipMemcpyHostToDevice);
 
   unsigned int* d_data_ones;
-  cudaMalloc((void**)&d_data_ones, num_snp*PP_ones*2*sizeof(unsigned int));
-  cudaMemcpy(d_data_ones, bin_data_ones_trans, 
-             num_snp*PP_ones*2*sizeof(unsigned int), cudaMemcpyHostToDevice);
+  hipMalloc((void**)&d_data_ones, num_snp*PP_ones*2*sizeof(unsigned int));
+  hipMemcpy(d_data_ones, bin_data_ones_trans, 
+             num_snp*PP_ones*2*sizeof(unsigned int), hipMemcpyHostToDevice);
 
   float* d_scores;
-  cudaMalloc((void**)&d_scores, num_snp*num_snp*sizeof(float));
+  hipMalloc((void**)&d_scores, num_snp*num_snp*sizeof(float));
+  hipMemcpy(d_scores, scores, sizeof(float) * num_snp * num_snp, hipMemcpyHostToDevice);
 
   // setup kernel ND-range
   int num_snp_m = num_snp;
@@ -314,52 +320,43 @@ int main(int argc, char **argv)
   dim3 block(block_snp, 1);
 
   // epistasis detection kernel
-  float total_ktime = 0.f;
+
+  auto kstart = myclock::now();
 
   for (int i = 0; i < iteration; i++) {
-    cudaMemcpy(d_scores, scores, sizeof(float) * num_snp * num_snp, cudaMemcpyHostToDevice);
-    auto kstart = myclock::now();
     epi<<<grid, block>>>(d_data_zeros, d_data_ones, d_scores, num_snp, 
                          PP_zeros, PP_ones, mask_zeros, mask_ones);
-    cudaDeviceSynchronize();
-    myduration ktime = myclock::now() - kstart;
-    total_ktime += ktime.count();
-  }
-  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
-
-  cudaMemcpy(scores, d_scores, sizeof(float) * num_snp * num_snp, cudaMemcpyDeviceToHost);
-
-  auto end = myclock::now();
-  myduration elapsed = end - start;
-  std::cout << "Total offloading time: " << elapsed.count() << " sec" << std::endl;
-
-  // compute the minimum score on a host
-  float score = scores[0];
-  int solution = 0;
-  for (int i = 1; i < num_snp * num_snp; i++) {
-    if (score > scores[i]) {
-      score = scores[i];
-      solution = i;
-    }
   }
 
-  std::cout << "Score: " << score << std::endl;
-  std::cout << "Solution: " << solution / num_snp << ", " << solution % num_snp << std::endl;
-  if ( (fabsf(score - 83.844f) > 1e-3f) || (solution / num_snp != 1253) || 
-      (solution % num_snp != 25752) )
-    std::cout << "FAIL\n";
-  else
-    std::cout << "PASS\n";
+  hipDeviceSynchronize();
+  myduration ktime = myclock::now() - kstart;
+  auto total_ktime = ktime.count();
 
-  cudaFree(d_data_zeros);
-  cudaFree(d_data_ones);
-  cudaFree(d_scores);
+  std::cout << "Average kernel execution time: "
+            << total_ktime / iteration << " (s)" << std::endl;
+
+  hipMemcpy(scores, d_scores, sizeof(float) * num_snp * num_snp, hipMemcpyDeviceToHost);
+
+  int p1 = min_score(scores, num_snp, num_snp);
+
+  reference (bin_data_zeros_trans, bin_data_ones_trans, scores_ref, num_snp, 
+             PP_zeros, PP_ones, mask_zeros, mask_ones);
+
+  int p2 = min_score(scores_ref, num_snp, num_snp);
+  
+  bool ok = (p1 == p2) && (fabsf(scores[p1] - scores_ref[p2]) < 1e-3f);
+  std::cout << (ok ? "PASS" : "FAIL") << std::endl;
+
+  hipFree(d_data_zeros);
+  hipFree(d_data_ones);
+  hipFree(d_scores);
 
   mem_free(bin_data_zeros);
   mem_free(bin_data_ones);
   mem_free(bin_data_zeros_trans);
   mem_free(bin_data_ones_trans);
   mem_free(scores);
+  mem_free(scores_ref);
   mem_free(SNP_Data);
   mem_free(SNP_Data_trans);
   mem_free(Ph_Data);

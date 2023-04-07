@@ -1,12 +1,9 @@
 #include <math.h>
 #include <float.h>
-#include <fstream>
-#include <string>
-#include <cstring>
-#include <sstream>
 #include <iostream>
 #include <chrono>
 #include "common.h"
+#include "reference.h"
 
 using namespace std::chrono;
 typedef high_resolution_clock myclock;
@@ -142,20 +139,28 @@ int main(int argc, char **argv)
     }
 
   float *scores = mem_alloc<float>(64, num_snp * num_snp);
-  for(x = 0; x < num_snp * num_snp; x++) scores[x] = FLT_MAX;
+  float *scores_ref = mem_alloc<float>(64, num_snp * num_snp);
+  for(x = 0; x < num_snp * num_snp; x++) {
+    scores[x] = scores_ref[x] = FLT_MAX;
+  }
 
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  auto start = myclock::now();
+  unsigned int* d_data_zeros = malloc_device<unsigned int>(num_snp*PP_zeros*2, q);
+  q.memcpy(d_data_zeros, bin_data_zeros_trans,
+           num_snp*PP_zeros*2*sizeof(unsigned int));
 
-  buffer<unsigned int, 1> d_data_zeros(bin_data_zeros_trans, num_snp * PP_zeros * 2);
-  buffer<unsigned int, 1> d_data_ones(bin_data_ones_trans, num_snp * PP_ones * 2);
-  buffer<float, 1> d_scores(num_snp * num_snp);
+  unsigned int* d_data_ones = malloc_device<unsigned int>(num_snp*PP_ones*2, q);
+  q.memcpy(d_data_ones, bin_data_ones_trans,
+           num_snp*PP_ones*2*sizeof(unsigned int));
+
+  float *d_scores= malloc_device<float>(num_snp * num_snp, q);
+  q.memcpy(d_scores, scores, sizeof(float) * num_snp * num_snp);
 
   // setup kernel ND-range
   int num_snp_m = num_snp;
@@ -164,23 +169,14 @@ int main(int argc, char **argv)
   range<2> local_epi(1, block_snp);
 
   // epistasis detection kernel
-  float total_ktime = 0.f;
+
+  auto kstart = myclock::now();
 
   for (int i = 0; i < iteration; i++) {
-    q.submit([&](handler& h) {
-      auto acc = d_scores.get_access<sycl_discard_write>(h);
-      h.copy(scores, acc);
-    }).wait();
-
-    auto kstart = myclock::now();
 
     q.submit([&](handler& h) {
-      auto dev_data_zeros = d_data_zeros.get_access<sycl_read>(h);
-      auto dev_data_ones = d_data_ones.get_access<sycl_read>(h);
-      auto dev_scores = d_scores.get_access<sycl_write>(h);
       h.parallel_for<class kernel_epi>(nd_range<2>(global_epi, local_epi), [=](nd_item<2> id) {
         int i, j, tid, p, k;
-        float score = FLT_MAX;
 
         i = id.get_global_id(0);
         j = id.get_global_id(1);
@@ -196,8 +192,8 @@ int main(int argc, char **argv)
           unsigned int* SNPj;
 
           // Phenotype 0
-          SNPi = (unsigned int*) &dev_data_zeros[i * 2];
-          SNPj = (unsigned int*) &dev_data_zeros[j * 2];
+          SNPi = (unsigned int*) &d_data_zeros[i * 2];
+          SNPj = (unsigned int*) &d_data_zeros[j * 2];
           for (p = 0; p < 2 * PP_zeros * num_snp - 2 * num_snp; p += 2 * num_snp) {
             di2 = ~(SNPi[p] | SNPi[p + 1]);
             dj2 = ~(SNPj[p] | SNPj[p + 1]);
@@ -251,8 +247,8 @@ int main(int argc, char **argv)
           ft[8] += sycl::popcount(t22);
 
           // Phenotype 1
-          SNPi = (unsigned int*) &dev_data_ones[i * 2];
-          SNPj = (unsigned int*) &dev_data_ones[j * 2];
+          SNPi = (unsigned int*) &d_data_ones[i * 2];
+          SNPj = (unsigned int*) &d_data_ones[j * 2];
           for(p = 0; p < 2 * PP_ones * num_snp - 2 * num_snp; p += 2 * num_snp)
           {
             di2 = ~(SNPi[p] | SNPi[p + 1]);
@@ -305,54 +301,48 @@ int main(int argc, char **argv)
           ft[17] += sycl::popcount(t22);
 
           // compute score
-          score = 0.0f;
+          float score = 0.0f;
           for(k = 0; k < 9; k++)
-            score += gammafunction(ft[k] + ft[9 + k] + 1) - gammafunction(ft[k]) - gammafunction(ft[9 + k]);
-          score = sycl::fabs((float) score);
+            score += gammafunction(ft[k] + ft[9 + k] + 1) -
+                     gammafunction(ft[k]) - gammafunction(ft[9 + k]);
+          score = sycl::fabs(score);
           if(score == 0.0f)
             score = FLT_MAX;
-          dev_scores[tid] = score;
+          d_scores[tid] = score;
         }
       });
-    }).wait();
-
-    myduration ktime = myclock::now() - kstart;
-    total_ktime += ktime.count();
-  }
-  std::cout << "Average kernel time: " << total_ktime / iteration << " sec" << std::endl;
-
-  q.submit([&](handler& h) {
-    auto acc = d_scores.get_access<sycl_read>(h);
-    h.copy(acc, scores);
-  }).wait();
-
-  auto end = myclock::now();
-  myduration elapsed = end - start;
-  std::cout << "Total offloading time: " << elapsed.count() << " sec" << std::endl;
-
-  // compute the minimum score on a host
-  float score = scores[0];
-  int solution = 0;
-  for (int i = 1; i < num_snp * num_snp; i++) {
-    if (score > scores[i]) {
-      score = scores[i];
-      solution = i;
-    }
+    });
   }
 
-  std::cout << "Score: " << score << std::endl;
-  std::cout << "Solution: " << solution / num_snp << ", " << solution % num_snp << std::endl;
-  if ( (fabsf(score - 83.844f) > 1e-3f) || (solution / num_snp != 1253) || 
-       (solution % num_snp != 25752) )
-    printf("FAIL\n");
-  else
-    printf("PASS\n");
+  q.wait();
+  myduration ktime = myclock::now() - kstart;
+  auto total_ktime = ktime.count();
+
+  std::cout << "Average kernel execution time: "
+            << total_ktime / iteration << " (s)" << std::endl;
+
+  q.memcpy(scores, d_scores, sizeof(float) * num_snp * num_snp).wait();
+
+  int p1 = min_score(scores, num_snp, num_snp);
+
+  reference (bin_data_zeros_trans, bin_data_ones_trans, scores_ref, num_snp, 
+             PP_zeros, PP_ones, mask_zeros, mask_ones);
+
+  int p2 = min_score(scores_ref, num_snp, num_snp);
+  
+  bool ok = (p1 == p2) && (fabsf(scores[p1] - scores_ref[p2]) < 1e-3f);
+  std::cout << (ok ? "PASS" : "FAIL") << std::endl;
+
+  free(d_data_zeros, q);
+  free(d_data_ones, q);
+  free(d_scores, q);
 
   mem_free(bin_data_zeros);
   mem_free(bin_data_ones);
   mem_free(bin_data_zeros_trans);
   mem_free(bin_data_ones_trans);
   mem_free(scores);
+  mem_free(scores_ref);
   mem_free(SNP_Data);
   mem_free(SNP_Data_trans);
   mem_free(Ph_Data);
