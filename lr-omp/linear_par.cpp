@@ -106,7 +106,8 @@ void r_squared(linear_param_t *params, data_t *dataset, sum_t *linreg, result_t 
 
       auto start = std::chrono::steady_clock::now();
 
-      rsquared(nTeams, dataset, mean, equation, results);
+      for (int i = 0; i < params->repeat; i++)
+        rsquared(nTeams, dataset, mean, equation, results);
 
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -153,9 +154,6 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
   size_t gpu_global_size;
   gpu_global_size = globalWorkSize - cpu_global_size;
 
-  data_t* d_dataset = NULL;
-  sum_t* d_result = NULL;
-    
   if (gpu_global_size > 0) {
     /* Create data buffer */
     #pragma omp target data map (to: dataset[0:size])\
@@ -165,7 +163,8 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
 
       auto start = std::chrono::steady_clock::now();
 
-      linear_regression(nTeams, d_dataset, d_result);
+      for (int i = 0; i < params->repeat; i++)
+        linear_regression(nTeams, dataset, results);
 
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

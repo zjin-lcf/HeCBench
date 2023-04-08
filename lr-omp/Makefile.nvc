@@ -59,9 +59,8 @@ linear_par.o: linear_par.cpp linear.h kernel.h
 linear_iter.o: linear_iter.cpp linear.h
 main.o: main.cpp linear.h
 
-
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 0
+	./$(program) 100000 0

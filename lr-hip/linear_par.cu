@@ -113,7 +113,8 @@ void r_squared(linear_param_t *params, data_t *dataset, sum_t *linreg, result_t 
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    rsquared<<<grids, blocks, wg_size * sizeof(rsquared_t)>>>(d_dataset, mean, equation, d_result);
+    for (int i = 0; i < params->repeat; i++)
+      rsquared<<<grids, blocks, wg_size * sizeof(rsquared_t)>>>(d_dataset, mean, equation, d_result);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -181,7 +182,8 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    linear_regression<<<grids, blocks, wg_size * sizeof(sum_t)>>>(d_dataset, d_result);
+    for (int i = 0; i < params->repeat; i++)
+      linear_regression<<<grids, blocks, wg_size * sizeof(sum_t)>>>(d_dataset, d_result);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
