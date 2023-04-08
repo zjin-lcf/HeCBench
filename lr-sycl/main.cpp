@@ -26,7 +26,7 @@ static void create_dataset(linear_param_t * params, data_t * dataset) {
   char *token;
   char buf[1024];
 
-  for (int i = 0; i < params->size && fgets(buf, 1024, ptr_file) != NULL; i++) {
+  for (size_t i = 0; i < params->size && fgets(buf, 1024, ptr_file) != NULL; i++) {
     token = strtok(buf, "\t");
     dataset[i].x() = atof(token);
     token = strtok(NULL, "\t");
@@ -36,20 +36,23 @@ static void create_dataset(linear_param_t * params, data_t * dataset) {
   fclose(ptr_file);
 }
 
-static void temperature_regression(queue &q, results_t * results) {
+static void temperature_regression(results_t * results, int repeat) {
   linear_param_t params;
+  params.repeat = repeat;
   params.filename = TEMP_FILENAME;
   params.size = TEMP_SIZE;
   params.wg_size = TEMP_WORKGROUP_SIZE;
   params.wg_count = TEMP_WORKGROUP_NBR;
 
-  data_t dataset[TEMP_SIZE];
+  data_t *dataset = (data_t*) malloc (sizeof(data_t) * params.size);
   create_dataset(&params, dataset);
 
   results->parallelized.ktime = 0;
 
-  parallelized_regression(q, &params, dataset, &results->parallelized);
+  parallelized_regression(&params, dataset, &results->parallelized);
   iterative_regression(&params, dataset, &results->iterative);
+
+  free(dataset);
 }
 
 static void print_results(results_t * results) {
@@ -67,35 +70,25 @@ static void write_results(results_t * results, const char * restricts) {
 int main(int argc, char* argv[]) {
   results_t results = {{0}};
   if (argc != 3) {
-    printf("Usage: linear <num of loops> <cpu offset>\b");
+    printf("Usage: linear <repeat> <cpu offset>\n");
     printf("Device execution only when cpu offset is 0\n");
     printf("Host execution only when cpu offset is 100\n");
     exit(0);
   }
 
-  int loops = atoi(argv[1]);
+  int repeat = atoi(argv[1]);
   cpu_offset = atoi(argv[2]);
+  printf("CPU offset: %d\n", cpu_offset);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel, property::queue::in_order());
-
-  double total_ktime = 0;
   double starttime = gettime();
 
-  for (int i = 0; i < loops; i++) {
-    temperature_regression(q, &results);
-    //write_results(&results, "a");
-    total_ktime += results.parallelized.ktime; // kernel time on a device
-  }
+  temperature_regression(&results, repeat);
 
   double endtime = gettime();
-  printf("CPU offset: %d\n", cpu_offset);
-  printf("Time: %lf ms\n", 1000.0 * (endtime - starttime));
-  printf("Average kernel execution time: %lf us\n", (total_ktime * 1e-3) / loops);
+  printf("Total execution time: %lf ms\n", 1000.0 * (endtime - starttime));
+
+  printf("Average kernel execution time: %lf us\n",
+         results.parallelized.ktime * 1e-3 / repeat);
 
   write_results(&results, "a");
 

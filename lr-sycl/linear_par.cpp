@@ -113,12 +113,15 @@ void r_squared(queue &q, linear_param_t *params, data_t *dataset, sum_t *linreg,
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      accessor<rsquared_t, 1, sycl_read_write, access::target::local> sm (wg_size, cgh);
-      cgh.parallel_for<class rs>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        rsquared(item, d_dataset, mean, equation, sm.get_pointer(), d_result);
+    for (int i = 0; i < params->repeat; i++) {
+      q.submit([&] (handler &cgh) {
+        accessor<rsquared_t, 1, sycl_read_write, access::target::local> sm (wg_size, cgh);
+        cgh.parallel_for<class rs>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          rsquared(item, d_dataset, mean, equation, sm.get_pointer(), d_result);
+        });
       });
-    }).wait();
+    }
+    q.wait();
    
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -149,7 +152,7 @@ void r_squared(queue &q, linear_param_t *params, data_t *dataset, sum_t *linreg,
   }
 }
 
-void parallelized_regression(queue &q, linear_param_t *params, data_t *dataset, result_t *response) 
+void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *response) 
 {
   const size_t size = params->size;
   const size_t wg_size = params->wg_size;
@@ -172,24 +175,35 @@ void parallelized_regression(queue &q, linear_param_t *params, data_t *dataset, 
 
   data_t *d_dataset = nullptr;
   sum_t *d_result = nullptr;
+  queue *d_q = nullptr;
 
   if (gpu_global_size > 0) {
-    d_dataset = malloc_device<data_t>(size, q);
-    q.memcpy(d_dataset, dataset, sizeof(data_t) * size);
-    d_result = malloc_device<sum_t>(wg_count, q);
+    #ifdef USE_GPU
+    gpu_selector dev_sel;
+    #else
+    cpu_selector dev_sel;
+    #endif
+    d_q = new queue(dev_sel, property::queue::in_order());
+
+    d_dataset = malloc_device<data_t>(size, *d_q);
+    d_q->memcpy(d_dataset, dataset, sizeof(data_t) * size);
+    d_result = malloc_device<sum_t>(wg_count, *d_q);
 
     range<1> gws (gpu_global_size);
     range<1> lws (wg_size);
 
-    q.wait();
+    d_q->wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      accessor<sum_t, 1, sycl_read_write, access::target::local> sm (wg_size, cgh);
-      cgh.parallel_for<class lr>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-       linear_regression(item, d_dataset, sm.get_pointer(), d_result);
+    for (int i = 0; i < params->repeat; i++) {
+      d_q->submit([&] (handler &cgh) {
+        accessor<sum_t, 1, sycl_read_write, access::target::local> sm (wg_size, cgh);
+        cgh.parallel_for<class lr>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+         linear_regression(item, d_dataset, sm.get_pointer(), d_result);
+        });
       });
-    }).wait();
+    }
+    d_q->wait();
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -201,7 +215,7 @@ void parallelized_regression(queue &q, linear_param_t *params, data_t *dataset, 
   }
 
   if (gpu_global_size > 0) {
-    q.memcpy(results, d_result, sizeof(sum_t) * wg_count * (100-cpu_offset) / 100).wait();
+    d_q->memcpy(results, d_result, sizeof(sum_t) * wg_count * (100-cpu_offset) / 100).wait();
   }
 
   /* Finalize algorithm */
@@ -224,9 +238,11 @@ void parallelized_regression(queue &q, linear_param_t *params, data_t *dataset, 
   /* Deallocate resources  */
   free(results);
   if (gpu_global_size > 0) {
-    free(d_dataset, q);
-    free(d_result, q);
+    free(d_dataset, *d_q);
+    free(d_result, *d_q);
   }
 
-  r_squared(q, params, dataset, &final_result, response);
+  r_squared(*d_q, params, dataset, &final_result, response);
+
+  if (d_q != nullptr) delete(d_q);
 }

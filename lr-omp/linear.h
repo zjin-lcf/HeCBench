@@ -6,11 +6,11 @@
 #include <omp.h>
 
 #define RESULT_FILENAME "assets/_results.txt"
-#define TEMP_FILENAME "assets/data2_arrival.txt"
+#define TEMP_FILENAME "assets/temperature.txt"
 
-#define TEMP_SIZE 16298
-#define TEMP_WORKGROUP_SIZE 58
-#define TEMP_WORKGROUP_NBR TEMP_SIZE / TEMP_WORKGROUP_SIZE  // 281
+#define TEMP_SIZE 96453
+#define TEMP_WORKGROUP_SIZE 63
+#define TEMP_WORKGROUP_NBR (TEMP_SIZE / TEMP_WORKGROUP_SIZE)
 
 #define CALC_TIME (((double)(end - start)) / CLOCKS_PER_SEC) * 1000
 #define START_TIME start = clock();
@@ -40,6 +40,7 @@
     result.a0);
 
 typedef struct {
+    int repeat;
  char * filename;
  size_t size;
  size_t wg_size;
