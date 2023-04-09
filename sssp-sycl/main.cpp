@@ -42,7 +42,6 @@
 #include "support/timer.h"
 #include "support/verify.h"
 
-
 // Params
 struct Params {
 
@@ -192,11 +191,11 @@ void SSSP_gpu(
     int *__restrict__ color,
     const int *__restrict__ q1,
           int *__restrict__ q2,
-          int *__restrict__ n_t,
+    const int *__restrict__ n_t,
     int *__restrict__ head,
     int *__restrict__ tail,
     int *__restrict__ overflow,
-    int *__restrict__ gray_shade,
+    const int *__restrict__ gray_shade,
     int *__restrict__ iter,
     const nd_item<1> &item,
     int *l_mem,
@@ -210,10 +209,8 @@ void SSSP_gpu(
   const int WG_SIZE = item.get_local_range(0);
   const int gtid = item.get_group(0) * WG_SIZE + tid;
 
-  int iter_local = atomicAdd(iter, 0);
-  int n_t_local = atomicAdd(n_t, 0);
-
-  int gray_shade_local = atomicAdd(gray_shade, 0);
+  int n_t_local = *n_t; //atomicAdd(n_t, 0);
+  int gray_shade_local = *gray_shade; //atomicAdd(gray_shade, 0);
 
   if(tid == 0) {
     // Reset queue
@@ -255,7 +252,7 @@ void SSSP_gpu(
       int pid = q1[my_base + tid];
       //////////////// Visit node ///////////////////////////
       atomicExch(color+pid, BLACK); // Node visited
-      int cur_cost = atomicAdd(cost+pid, 0); // Look up shortest-path distance to this node
+      int cur_cost = cost[pid]; // atomicAdd(cost+pid, 0); // Look up shortest-path distance to this node
       Node cur_node;
       cur_node.x = graph_nodes_av[pid].x;
       cur_node.y = graph_nodes_av[pid].y;
@@ -544,7 +541,7 @@ int main(int argc, char **argv) {
             local_accessor<int, 1> l_mem_acc(range<1>(W_QUEUE_SIZE+2), cgh);
             local_accessor<int, 0> tail_bin_acc(cgh);
 
-            cgh.parallel_for(nd_range<1>(dimGrid * dimBlock, dimBlock),
+            cgh.parallel_for<class kernel>(nd_range<1>(dimGrid * dimBlock, dimBlock),
               [=](nd_item<1> item) {
                 SSSP_gpu(d_nodes, d_edges, d_cost, d_color,
                          d_qin, d_qout, d_num_t, d_head, d_tail,
