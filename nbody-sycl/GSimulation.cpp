@@ -30,7 +30,6 @@ void GSimulation::SetNumberOfSteps(int N) { set_nsteps(N); }
 /* Initialize the position of all the particles using random number generator
  * between 0 and 1.0 */
 void GSimulation::InitPos() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0, 1.0);
 
@@ -44,7 +43,6 @@ void GSimulation::InitPos() {
 /* Initialize the velocity of all the particles using random number generator
  * between -1.0 and 1.0 */
 void GSimulation::InitVel() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(-1.0, 1.0);
 
@@ -68,7 +66,6 @@ void GSimulation::InitAcc() {
  * between 0 and 1 */
 void GSimulation::InitMass() {
   RealType n = static_cast<RealType>(get_npart());
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0.0, 1.0);
 
@@ -110,13 +107,15 @@ void GSimulation::Start() {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  range<2> r{(static_cast<size_t>(n)+255)/256, 256};
+  range<1> gws ((n+255)/256 * 256);
+  range<1> lws (256);
 
-  buffer<Particle, 1> pbuf(particles_.data(), n);
-  buffer<RealType, 1> ebuf(n);
-  pbuf.set_final_data(nullptr);
+  Particle *p = malloc_device<Particle>(n, q);
+  q.memcpy(p, particles_.data(), n * sizeof(Particle)).wait();
+
+  RealType *e = malloc_device<RealType>(n, q);
 
   TimeInterval t0;
   int nsteps = get_nsteps();
@@ -127,80 +126,80 @@ void GSimulation::Start() {
     // Submitting first kernel to device which computes acceleration of all
     // particles
     q.submit([&](handler& h) {
-       auto p = pbuf.get_access<sycl_read_write>(h);
-       h.parallel_for<class compute_acceleration>(r, [=](item<2> it) {
-         auto i = it.get_linear_id();
-         RealType acc0 = p[i].acc[0];
-         RealType acc1 = p[i].acc[1];
-         RealType acc2 = p[i].acc[2];
-         for (int j = 0; j < n; j++) {
-           RealType dx, dy, dz;
-           RealType distance_sqr = 0.0f;
-           RealType distance_inv = 0.0f;
+      h.parallel_for<class compute_acceleration>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i >= n) return;
 
-           dx = p[j].pos[0] - p[i].pos[0];  // 1flop
-           dy = p[j].pos[1] - p[i].pos[1];  // 1flop
-           dz = p[j].pos[2] - p[i].pos[2];  // 1flop
+        auto pi = p[i];
+        RealType acc0 = pi.acc[0];
+        RealType acc1 = pi.acc[1];
+        RealType acc2 = pi.acc[2];
+        for (int j = 0; j < n; j++) {
+          RealType dx, dy, dz;
+          RealType distance_sqr = 0.0f;
+          RealType distance_inv = 0.0f;
 
-           distance_sqr =
-               dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-           distance_inv = 1.0f / sycl::sqrt(distance_sqr);       // 1div+1sqrt
+          auto pj = p[j];
+          dx = pj.pos[0] - pi.pos[0];  // 1flop
+          dy = pj.pos[1] - pi.pos[1];  // 1flop
+          dz = pj.pos[2] - pi.pos[2];  // 1flop
 
-           acc0 += dx * kG * p[j].mass * distance_inv * distance_inv *
-                   distance_inv;  // 6flops
-           acc1 += dy * kG * p[j].mass * distance_inv * distance_inv *
-                   distance_inv;  // 6flops
-           acc2 += dz * kG * p[j].mass * distance_inv * distance_inv *
-                   distance_inv;  // 6flops
-         }
-         p[i].acc[0] = acc0;
-         p[i].acc[1] = acc1;
-         p[i].acc[2] = acc2;
-       });
-     });
+          distance_sqr =
+              dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
+          distance_inv = 1.0f / sycl::sqrt(distance_sqr);       // 1div+1sqrt
+
+          acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
+          acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
+          acc2 += dz * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
+        }
+        pi.acc[0] = acc0;
+        pi.acc[1] = acc1;
+        pi.acc[2] = acc2;
+        p[i] = pi;
+      });
+    });
     // Second kernel updates the velocity and position for all particles
     q.submit([&](handler& h) {
-       auto p = pbuf.get_access<sycl_read_write>(h);
-       auto e = ebuf.get_access<sycl_discard_read_write>(h);
-       h.parallel_for<class update_velocity_position>(r, [=](item<2> it) {
-         auto i = it.get_linear_id();
-         p[i].vel[0] += p[i].acc[0] * dt;  // 2flops
-         p[i].vel[1] += p[i].acc[1] * dt;  // 2flops
-         p[i].vel[2] += p[i].acc[2] * dt;  // 2flops
+      h.parallel_for<class update_velocity_position>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        auto i = item.get_global_id(0);
+        if (i >= n) return;
 
-         p[i].pos[0] += p[i].vel[0] * dt;  // 2flops
-         p[i].pos[1] += p[i].vel[1] * dt;  // 2flops
-         p[i].pos[2] += p[i].vel[2] * dt;  // 2flops
+        auto pi = p[i];
 
-         p[i].acc[0] = 0.f;
-         p[i].acc[1] = 0.f;
-         p[i].acc[2] = 0.f;
+        pi.vel[0] += pi.acc[0] * dt;  // 2flops
+        pi.vel[1] += pi.acc[1] * dt;  // 2flops
+        pi.vel[2] += pi.acc[2] * dt;  // 2flops
 
-         e[i] = p[i].mass *
-                (p[i].vel[0] * p[i].vel[0] + p[i].vel[1] * p[i].vel[1] +
-                 p[i].vel[2] * p[i].vel[2]);  // 7flops
-       });
-     });
+        pi.pos[0] += pi.vel[0] * dt;  // 2flops
+        pi.pos[1] += pi.vel[1] * dt;  // 2flops
+        pi.pos[2] += pi.vel[2] * dt;  // 2flops
+
+        pi.acc[0] = 0.f;
+        pi.acc[1] = 0.f;
+        pi.acc[2] = 0.f;
+
+        e[i] = pi.mass *
+               (pi.vel[0] * pi.vel[0] + pi.vel[1] * pi.vel[1] +
+                pi.vel[2] * pi.vel[2]);  // 7flops
+
+        p[i] = pi;
+      });
+    });
     /* Third kernel accumulates the energy of this Nbody system
      * Reduction operation can be done using reducer interface in SYCL 2020
      */
     q.submit([&](handler& h) {
-       auto e = ebuf.get_access<sycl_read_write>(h);
-       h.single_task<class accumulate_energy>([=]() {
-         for (int i = 1; i < n; i++) e[0] += e[i];
-       });
+      h.single_task<class accumulate_energy>([=]() {
+        for (int i = 1; i < n; i++) e[0] += e[i];
+      });
     });
 
     q.wait();
     double elapsed_seconds = ts0.Elapsed();
 
-    q.submit([&](handler& h) {
-      auto e = ebuf.get_access<sycl_read>(h, range<1>(1));
-      h.copy(e, energy.data());
-    }).wait();
+    q.memcpy(energy.data(), e, sizeof(RealType)).wait();
 
     kenergy_ = 0.5 * energy[0];
-    energy[0] = 0;
     if ((s % get_sfreq()) == 0) {
       nf += 1;
 #ifdef DEBUG
@@ -219,16 +218,21 @@ void GSimulation::Start() {
       }
     }
   }  // end of the time step loop
+
   total_time_ = t0.Elapsed();
   total_flops_ = gflops * get_nsteps();
   av /= (double)(nf - 2);
   dev = std::sqrt(dev / (double)(nf - 2) - av * av);
 
   std::cout << "\n";
-  std::cout << "# Total Time (s)     : " << total_time_ << "\n";
+  std::cout << "# Total Energy        : " << kenergy_ << "\n";
+  std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
-  std::cout << "==============================="
-            << "\n";
+  std::cout << "===============================";
+  std::cout << "\n";
+
+  free(p, q);
+  free(e, q);
 }
 
 #ifdef DEBUG

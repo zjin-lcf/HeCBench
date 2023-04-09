@@ -31,7 +31,6 @@ void GSimulation::SetNumberOfSteps(int N) { set_nsteps(N); }
 /* Initialize the position of all the particles using random number generator
  * between 0 and 1.0 */
 void GSimulation::InitPos() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0, 1.0);
 
@@ -45,7 +44,6 @@ void GSimulation::InitPos() {
 /* Initialize the velocity of all the particles using random number generator
  * between -1.0 and 1.0 */
 void GSimulation::InitVel() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(-1.0, 1.0);
 
@@ -69,7 +67,6 @@ void GSimulation::InitAcc() {
  * between 0 and 1 */
 void GSimulation::InitMass() {
   RealType n = static_cast<RealType>(get_npart());
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0.0, 1.0);
 
@@ -104,12 +101,10 @@ void GSimulation::Start() {
   int nf = 0;
   double av = 0.0, dev = 0.0;
 
-  //buffer<Particle, 1> pbuf(particles_.data(), r, {property::buffer::use_host_ptr()});
   Particle *p;
   hipMalloc((void**)&p, sizeof(Particle) * n);
   hipMemcpyAsync(p, particles_.data(), sizeof(Particle) * n, hipMemcpyHostToDevice, 0);
 
-  //buffer<RealType, 1> ebuf(energy.data(), r, {property::buffer::use_host_ptr()});
   RealType *e;
   hipMalloc((void**)&e, sizeof(RealType) * n);
   hipMemcpyAsync(e, energy.data(), sizeof(RealType) * n, hipMemcpyHostToDevice, 0);
@@ -123,9 +118,9 @@ void GSimulation::Start() {
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
 
-    hipLaunchKernelGGL(accelerate_particles, grids, threads, 0, 0, p, n, kSofteningSquared, kG);
-    hipLaunchKernelGGL(update_particles, grids, threads, 0, 0, p, e, n, dt);
-    hipLaunchKernelGGL(accumulate_energy, 1, 1, 0, 0, e, n);
+    accelerate_particles<<<grids, threads>>>(p, n, kSofteningSquared, kG);
+    update_particles<<<grids, threads>>>(p, e, n, dt);
+    accumulate_energy<<<1,1>>>(e, n);
 
     hipDeviceSynchronize();
     double elapsed_seconds = ts0.Elapsed();
@@ -133,7 +128,6 @@ void GSimulation::Start() {
     hipMemcpy(energy.data(), e, sizeof(RealType), hipMemcpyDeviceToHost);
 
     kenergy_ = 0.5 * energy[0];
-    energy[0] = 0;
     if ((s % get_sfreq()) == 0) {
       nf += 1;
 #ifdef DEBUG
@@ -158,10 +152,14 @@ void GSimulation::Start() {
   dev = sqrt(dev / (double)(nf - 2) - av * av);
 
   std::cout << "\n";
-  std::cout << "# Total Time (s)     : " << total_time_ << "\n";
+  std::cout << "# Total Energy        : " << kenergy_ << "\n";
+  std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
   std::cout << "==============================="
             << "\n";
+
+  hipFree(p);
+  hipFree(e);
 }
 
 #ifdef DEBUG

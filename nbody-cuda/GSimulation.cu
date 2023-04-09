@@ -31,7 +31,6 @@ void GSimulation::SetNumberOfSteps(int N) { set_nsteps(N); }
 /* Initialize the position of all the particles using random number generator
  * between 0 and 1.0 */
 void GSimulation::InitPos() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0, 1.0);
 
@@ -45,7 +44,6 @@ void GSimulation::InitPos() {
 /* Initialize the velocity of all the particles using random number generator
  * between -1.0 and 1.0 */
 void GSimulation::InitVel() {
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(-1.0, 1.0);
 
@@ -69,7 +67,6 @@ void GSimulation::InitAcc() {
  * between 0 and 1 */
 void GSimulation::InitMass() {
   RealType n = static_cast<RealType>(get_npart());
-  std::random_device rd;  // random number generator
   std::mt19937 gen(42);
   std::uniform_real_distribution<RealType> unif_d(0.0, 1.0);
 
@@ -131,7 +128,6 @@ void GSimulation::Start() {
     cudaMemcpy(energy.data(), e, sizeof(RealType), cudaMemcpyDeviceToHost);
 
     kenergy_ = 0.5 * energy[0];
-    energy[0] = 0;
     if ((s % get_sfreq()) == 0) {
       nf += 1;
 #ifdef DEBUG
@@ -156,10 +152,14 @@ void GSimulation::Start() {
   dev = sqrt(dev / (double)(nf - 2) - av * av);
 
   std::cout << "\n";
-  std::cout << "# Total Time (s)     : " << total_time_ << "\n";
+  std::cout << "# Total Energy        : " << kenergy_ << "\n";
+  std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
   std::cout << "==============================="
             << "\n";
+
+  cudaFree(p);
+  cudaFree(e);
 }
 
 #ifdef DEBUG
