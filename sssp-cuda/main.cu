@@ -171,11 +171,11 @@ __global__ void SSSP_gpu(
     int *__restrict__ color,
     const int *__restrict__ q1,
           int *__restrict__ q2,
-          int *__restrict__ n_t,
+    const int *__restrict__ n_t,
     int *__restrict__ head,
     int *__restrict__ tail,
     int *__restrict__ overflow,
-    int *__restrict__ gray_shade,
+    const int *__restrict__ gray_shade,
     int *__restrict__ iter)
 {
   __shared__ int l_mem[W_QUEUE_SIZE+2];
@@ -188,11 +188,8 @@ __global__ void SSSP_gpu(
   const int gtid    = blockIdx.x * blockDim.x + threadIdx.x;
   const int WG_SIZE = blockDim.x;
 
-  int iter_local = atomicAdd(&iter[0], 0);
-
-  int n_t_local = atomicAdd(n_t, 0);
-
-  int gray_shade_local = atomicAdd(&gray_shade[0], 0);
+  int n_t_local = *n_t; // atomicAdd(n_t, 0);
+  int gray_shade_local = *gray_shade; // atomicAdd(&gray_shade[0], 0);
 
   if(tid == 0) {
     // Reset queue
@@ -233,7 +230,7 @@ __global__ void SSSP_gpu(
       int pid = q1[my_base + tid];
       //////////////// Visit node ///////////////////////////
       atomicExch(&color[pid], BLACK); // Node visited
-      int  cur_cost = atomicAdd(&cost[pid], 0); // Look up shortest-path distance to this node
+      int  cur_cost = cost[pid]; // atomicAdd(&cost[pid], 0); // Look up shortest-path distance to this node
       Node cur_node;
       cur_node.x = graph_nodes_av[pid].x;
       cur_node.y = graph_nodes_av[pid].y;
