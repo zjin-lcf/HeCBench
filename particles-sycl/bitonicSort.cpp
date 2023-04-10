@@ -28,10 +28,10 @@ static unsigned int factorRadix2(unsigned int& log2L, unsigned int L){
 
 void bitonicSort(
     queue &q,
-    buffer<unsigned int, 1> &d_DstKey,
-    buffer<unsigned int, 1> &d_DstVal,
-    buffer<unsigned int, 1> &d_SrcKey,
-    buffer<unsigned int, 1> &d_SrcVal,
+    unsigned int *d_dstKey,
+    unsigned int *d_dstVal,
+    unsigned int *d_srcKey,
+    unsigned int *d_srcVal,
     unsigned int batch,
     unsigned int arrayLength,
     unsigned int dir
@@ -59,18 +59,14 @@ void bitonicSort(
         range<1> bs_lws (localWorkSize);
 
         q.submit([&] (handler &cgh) {
-          auto dstKey = d_DstKey.get_access<sycl_read_write>(cgh);
-          auto dstVal = d_DstVal.get_access<sycl_read_write>(cgh);
-          auto srcKey = d_SrcKey.get_access<sycl_read_write>(cgh);
-          auto srcVal = d_SrcVal.get_access<sycl_read_write>(cgh);
           accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
           accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
           cgh.parallel_for<class BitonicSortLocal>(nd_range<1>(bs_gws, bs_lws), [=] (nd_item<1> item) {
             bitonicSortLocal(item, 
-                             dstKey.get_pointer(),  
-                             dstVal.get_pointer(),  
-                             srcKey.get_pointer(),  
-                             srcVal.get_pointer(),  
+                             d_dstKey,  
+                             d_dstVal,  
+                             d_srcKey,  
+                             d_srcVal,  
                              l_key.get_pointer(),
                              l_val.get_pointer(),
                              arrayLength,
@@ -86,18 +82,14 @@ void bitonicSort(
         range<1> bs1_gws (globalWorkSize);
         range<1> bs1_lws (localWorkSize);
         q.submit([&] (handler &cgh) {
-          auto dstKey = d_DstKey.get_access<sycl_write>(cgh);
-          auto dstVal = d_DstVal.get_access<sycl_write>(cgh);
-          auto srcKey = d_SrcKey.get_access<sycl_read>(cgh);
-          auto srcVal = d_SrcVal.get_access<sycl_read>(cgh);
           accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
           accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
           cgh.parallel_for<class BitonicSortLocal1>(nd_range<1>(bs1_gws, bs1_lws), [=] (nd_item<1> item) {
             bitonicSortLocal1(item, 
-                              dstKey.get_pointer(),
-                              dstVal.get_pointer(),
-                              srcKey.get_pointer(),
-                              srcVal.get_pointer(),
+                              d_dstKey,
+                              d_dstVal,
+                              d_srcKey,
+                              d_srcVal,
                               l_key.get_pointer(),
                               l_val.get_pointer());
           });
@@ -116,16 +108,12 @@ void bitonicSort(
                     range<1> bmg_lws (localWorkSize);
 
                     q.submit([&] (handler &cgh) {
-                      auto dstKey = d_DstKey.get_access<sycl_read_write>(cgh);
-                      auto dstVal = d_DstVal.get_access<sycl_read_write>(cgh);
-                      accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
-                      accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
                       cgh.parallel_for<class BitonicMergeGlobal>(nd_range<1>(bmg_gws, bmg_lws), [=] (nd_item<1> item) {
                         bitonicMergeGlobal(item, 
-                                           dstKey.get_pointer(),
-                                           dstVal.get_pointer(),
-                                           dstKey.get_pointer(),
-                                           dstVal.get_pointer(),
+                                           d_dstKey,
+                                           d_dstVal,
+                                           d_dstKey,
+                                           d_dstVal,
                                            arrayLength,
                                            size,
                                            stride,
@@ -143,16 +131,14 @@ void bitonicSort(
                     range<1> bml_lws (localWorkSize);
 
                     q.submit([&] (handler &cgh) {
-                      auto dstKey = d_DstKey.get_access<sycl_read_write>(cgh);
-                      auto dstVal = d_DstVal.get_access<sycl_read_write>(cgh);
                       accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
                       accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
                       cgh.parallel_for<class BitonicMergeLocal>(nd_range<1>(bml_gws, bml_lws), [=] (nd_item<1> item) {
                         bitonicMergeLocal(item,
-                                          dstKey.get_pointer(),
-                                          dstVal.get_pointer(),
-                                          dstKey.get_pointer(),
-                                          dstVal.get_pointer(),
+                                          d_dstKey,
+                                          d_dstVal,
+                                          d_dstKey,
+                                          d_dstVal,
                                           l_key.get_pointer(),
                                           l_val.get_pointer(),
                                           arrayLength,

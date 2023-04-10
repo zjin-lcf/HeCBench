@@ -43,12 +43,12 @@ inline void ComparatorLocal(
 ////////////////////////////////////////////////////////////////////////////////
 void bitonicSortLocal(
     nd_item<1> &item, 
-    global_ptr<unsigned int> d_DstKey,
-    global_ptr<unsigned int> d_DstVal,
-    global_ptr<unsigned int> d_SrcKey,
-    global_ptr<unsigned int> d_SrcVal,
-    local_ptr<unsigned int> l_key,
-    local_ptr<unsigned int> l_val,
+    unsigned int *__restrict d_DstKey,
+    unsigned int *__restrict d_DstVal,
+    unsigned int *__restrict d_SrcKey,
+    unsigned int *__restrict d_SrcVal,
+    unsigned int *__restrict l_key,
+    unsigned int *__restrict l_val,
     const unsigned int arrayLength,
     const unsigned int dir)
 {
@@ -105,12 +105,12 @@ void bitonicSortLocal(
 //sorted in opposite directions
 void bitonicSortLocal1(
     nd_item<1> &item, 
-    global_ptr<unsigned int> d_DstKey,
-    global_ptr<unsigned int> d_DstVal,
-    global_ptr<unsigned int> d_SrcKey,
-    global_ptr<unsigned int> d_SrcVal,
-    local_ptr<unsigned int> l_key,
-    local_ptr<unsigned int> l_val)
+    unsigned int *__restrict d_DstKey,
+    unsigned int *__restrict d_DstVal,
+    unsigned int *__restrict d_SrcKey,
+    unsigned int *__restrict d_SrcVal,
+    unsigned int *__restrict l_key,
+    unsigned int *__restrict l_val)
 {
     //Offset to the beginning of subarray and load data
     d_SrcKey += item.get_group(0) * LOCAL_SIZE_LIMIT + item.get_local_id(0);
@@ -163,10 +163,10 @@ void bitonicSortLocal1(
 //Bitonic merge iteration for 'stride' >= LOCAL_SIZE_LIMIT
 void bitonicMergeGlobal(
     nd_item<1> &item, 
-    global_ptr<unsigned int> d_DstKey,
-    global_ptr<unsigned int> d_DstVal,
-    global_ptr<unsigned int> d_SrcKey,
-    global_ptr<unsigned int> d_SrcVal,
+    unsigned int *__restrict d_DstKey,
+    unsigned int *__restrict d_DstVal,
+    unsigned int *__restrict d_SrcKey,
+    unsigned int *__restrict d_SrcVal,
     const unsigned int arrayLength,
     const unsigned int size,
     const unsigned int stride,
@@ -199,12 +199,12 @@ void bitonicMergeGlobal(
 //'size' > LOCAL_SIZE_LIMIT and 'stride' = [1 .. LOCAL_SIZE_LIMIT / 2]
 void bitonicMergeLocal(
     nd_item<1> &item, 
-    global_ptr<unsigned int> d_DstKey,
-    global_ptr<unsigned int> d_DstVal,
-    global_ptr<unsigned int> d_SrcKey,
-    global_ptr<unsigned int> d_SrcVal,
-    local_ptr<unsigned int> l_key,
-    local_ptr<unsigned int> l_val,
+    unsigned int *__restrict d_DstKey,
+    unsigned int *__restrict d_DstVal,
+    unsigned int *__restrict d_SrcKey,
+    unsigned int *__restrict d_SrcVal,
+    unsigned int *__restrict l_key,
+    unsigned int *__restrict l_val,
     const unsigned int arrayLength,
     const unsigned int size,
     unsigned int stride,

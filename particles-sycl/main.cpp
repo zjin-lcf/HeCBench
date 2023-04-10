@@ -129,19 +129,23 @@ int main(int argc, char** argv)
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<sycl::float4, 1> dPos ((sycl::float4*)hPos, numParticles);
-  buffer<sycl::float4, 1> dVel ((sycl::float4*)hVel, numParticles);
-  buffer<sycl::float4, 1> dReorderedPos (numParticles);
-  buffer<sycl::float4, 1> dReorderedVel (numParticles);
-  buffer<unsigned int, 1> dHash (numParticles);
-  buffer<unsigned int, 1> dIndex (numParticles);
-  buffer<unsigned int, 1> dCellStart (numGridCells);
-  buffer<unsigned int, 1> dCellEnd (numGridCells);
-  dPos.set_final_data(nullptr);
-  dVel.set_final_data(nullptr);
+  float4 *dPos = malloc_device<float4>(numParticles, q);
+  q.memcpy(dPos, (sycl::float4*)hPos, sizeof(float4) * numParticles);
 
+  float4 *dVel = malloc_device<float4>(numParticles, q);
+  q.memcpy(dVel, (sycl::float4*)hVel, sizeof(float4) * numParticles);
+
+  float4 *dReorderedPos = malloc_device<float4>(numParticles, q);
+  float4 *dReorderedVel = malloc_device<float4>(numParticles, q);
+
+  unsigned int *dHash = malloc_device<unsigned int>(numParticles, q);
+  unsigned int *dIndex = malloc_device<unsigned int>(numParticles, q);
+  unsigned int *dCellStart = malloc_device<unsigned int>(numGridCells, q);
+  unsigned int *dCellEnd = malloc_device<unsigned int>(numGridCells, q);
+
+  q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++)
@@ -199,16 +203,8 @@ int main(int argc, char** argv)
   printf("Average execution time of a loop iteration: %f (us)\n", (time * 1e-3f) / iterations);
 
 #ifdef DEBUG
-  q.submit([&] (handler &cgh) {
-    auto acc = dPos.get_access<sycl_read>(cgh);
-    cgh.copy(acc, (sycl::float4*)hPos);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = dVel.get_access<sycl_read>(cgh);
-    cgh.copy(acc, (sycl::float4*)hVel);
-  });
-
+  q.memcpy((float4*)hVel, dVel, numParticles * sizeof(float4));
+  q.memcpy((float4*)hPos, dPos, numParticles * sizeof(float4));
   q.wait();
   for (unsigned int i = 0; i < numParticles; i++) {
     printf("%d: ", i);
@@ -227,6 +223,14 @@ int main(int argc, char** argv)
   free(hIndex       );
   free(hCellStart   );
   free(hCellEnd     );
+  free(dPos, q);
+  free(dVel, q);
+  free(dReorderedPos, q); 
+  free(dReorderedVel, q);
+  free(dHash, q);
+  free(dIndex, q);
+  free(dCellStart, q);
+  free(dCellEnd, q);
 
   return EXIT_SUCCESS;
 }
