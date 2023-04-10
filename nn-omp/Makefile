@@ -12,7 +12,7 @@ DEVICE    = gpu
 # Program name & source code list
 #===============================================================================
 
-program = nn
+program = main
 
 source = nearestNeighbor.cpp utils.cpp 
 
