@@ -24,8 +24,8 @@ static size_t uSnap(size_t a, size_t b){
 
 void integrateSystem(
     queue &q,
-    buffer<sycl::float4,1> &d_Pos,
-    buffer<sycl::float4,1> &d_Vel,
+    float4 *d_Pos,
+    float4 *d_Vel,
     const simParams_t &params,
     const float deltaTime,
     const unsigned int numParticles
@@ -35,20 +35,17 @@ void integrateSystem(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto pos = d_Pos.get_access<sycl_read_write>(cgh);
-      auto vel = d_Vel.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class Integrate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        integrateSystemK(item, pos.get_pointer(), vel.get_pointer(), 
-                         params, deltaTime, numParticles);
+        integrateSystemK(item, d_Pos, d_Vel, params, deltaTime, numParticles);
       });
     });
 }
 
 void calcHash(
     queue &q,
-    buffer<unsigned int, 1> &d_Hash,
-    buffer<unsigned int, 1> &d_Index,
-    buffer<sycl::float4, 1> &d_Pos,
+    unsigned int *d_Hash,
+    unsigned int *d_Index,
+    float4 *d_Pos,
     const simParams_t &params,
     const int numParticles
 ){
@@ -57,19 +54,15 @@ void calcHash(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto pos = d_Pos.get_access<sycl_read>(cgh);
-      auto hash = d_Hash.get_access<sycl_discard_write>(cgh);
-      auto index = d_Index.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class CalcHash>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        calcHashK(item, hash.get_pointer(), index.get_pointer(), 
-                  pos.get_pointer(), params, numParticles);
+        calcHashK(item, d_Hash, d_Index, d_Pos, params, numParticles);
       });
     });
 }
 
 void memSet(
     queue &q,
-    buffer<unsigned int, 1> &d_Data,
+    unsigned int *d_Data,
     unsigned int val,
     unsigned int N
 ){
@@ -79,23 +72,22 @@ void memSet(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto data = d_Data.get_access<sycl_discard_write>(cgh);
       cgh.parallel_for<class Memset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        memSetK(item, data.get_pointer(), val, N);
+        memSetK(item, d_Data, val, N);
       });
     });
 }
 
 void findCellBoundsAndReorder(
     queue &q,
-    buffer<unsigned int, 1> &d_CellStart,
-    buffer<unsigned int, 1> &d_CellEnd,
-    buffer<sycl::float4, 1> &d_ReorderedPos,
-    buffer<sycl::float4, 1> &d_ReorderedVel,
-    buffer<unsigned int, 1> &d_Hash,
-    buffer<unsigned int, 1> &d_Index,
-    buffer<sycl::float4, 1> &d_Pos,
-    buffer<sycl::float4, 1> &d_Vel,
+    unsigned int *d_CellStart,
+    unsigned int *d_CellEnd,
+    float4 *d_ReorderedPos,
+    float4 *d_ReorderedVel,
+    unsigned int *d_Hash,
+    unsigned int *d_Index,
+    float4 *d_Pos,
+    float4 *d_Vel,
     const unsigned int numParticles,
     const unsigned int numCells
 ){
@@ -106,26 +98,18 @@ void findCellBoundsAndReorder(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto pos = d_Pos.get_access<sycl_read>(cgh);
-      auto rpos = d_ReorderedPos.get_access<sycl_discard_write>(cgh);
-      auto rvel = d_ReorderedVel.get_access<sycl_discard_write>(cgh);
-      auto cellstart = d_CellStart.get_access<sycl_discard_write>(cgh);
-      auto cellend = d_CellEnd.get_access<sycl_discard_write>(cgh);
-      auto index = d_Index.get_access<sycl_read>(cgh);
-      auto hash = d_Hash.get_access<sycl_read>(cgh);
-      auto vel = d_Vel.get_access<sycl_read>(cgh);
       accessor<unsigned int, 1, sycl_read_write, access::target::local> localHash (wgSize + 1, cgh);
       cgh.parallel_for<class FindCellBoundsAndReorder>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         findCellBoundsAndReorderK(item, 
-                                 cellstart.get_pointer(),
-                                 cellend.get_pointer(), 
-                                 rpos.get_pointer(),
-                                 rvel.get_pointer(), 
-                                 hash.get_pointer(), 
-                                 index.get_pointer(), 
-                                 pos.get_pointer(), 
-                                 vel.get_pointer(),
-                                 localHash.get_pointer(),
+                                 d_CellStart,
+                                 d_CellEnd, 
+                                 d_ReorderedPos,
+                                 d_ReorderedVel, 
+                                 d_Hash, 
+                                 d_Index, 
+                                 d_Pos, 
+                                 d_Vel,
+                                 localHash,
                                  numParticles);
       });
     });
@@ -133,15 +117,15 @@ void findCellBoundsAndReorder(
 
 void collide(
     queue &q,
-    buffer<sycl::float4, 1> &d_Vel,
-    buffer<sycl::float4, 1> &d_ReorderedPos,
-    buffer<sycl::float4, 1> &d_ReorderedVel,
-    buffer<unsigned int, 1> &d_Index,
-    buffer<unsigned int, 1> &d_CellStart,
-    buffer<unsigned int, 1> &d_CellEnd,
+    float4 *d_Vel,
+    float4 *d_ReorderedPos,
+    float4 *d_ReorderedVel,
+    unsigned int *d_Index,
+    unsigned int *d_CellStart,
+    unsigned int *d_CellEnd,
     const simParams_t &params,
-    const unsigned int   numParticles,
-    const unsigned int   numCells
+    const unsigned int numParticles,
+    const unsigned int numCells
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
 
@@ -149,15 +133,9 @@ void collide(
     range<1> lws (wgSize);
 
     q.submit([&] (handler &cgh) {
-      auto vel = d_Vel.get_access<sycl_discard_write>(cgh);
-      auto rpos = d_ReorderedPos.get_access<sycl_read>(cgh);
-      auto rvel = d_ReorderedVel.get_access<sycl_read>(cgh);
-      auto cellstart = d_CellStart.get_access<sycl_read>(cgh);
-      auto cellend = d_CellEnd.get_access<sycl_read>(cgh);
-      auto index = d_Index.get_access<sycl_read>(cgh);
       cgh.parallel_for<class Collide>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        collideK(item, vel.get_pointer(), rpos.get_pointer(), rvel.get_pointer(), 
-                index.get_pointer(), cellstart.get_pointer(), cellend.get_pointer(), 
+        collideK(item, d_Vel, d_ReorderedPos, d_ReorderedVel, 
+                d_Index, d_CellStart, d_CellEnd, 
                 params, numParticles);
       });
     });
