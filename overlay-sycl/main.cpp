@@ -34,10 +34,10 @@ template<typename T>
 void DetectionOverlayBox(
   nd_item<2> &item,
   const T*__restrict input,
-        T*__restrict  output,
+        T*__restrict output,
   int imgWidth, int imgHeight,
   int x0, int y0, int boxWidth, int boxHeight,
-  const float4 color) 
+  const float4 color)
 {
   const int box_x = item.get_global_id(1); 
   const int box_y = item.get_global_id(0);
@@ -64,9 +64,8 @@ void DetectionOverlayBox(
 template<typename T>
 int DetectionOverlay(
   queue &q,
-  buffer<T, 1> &input, buffer<T, 1> &output,
-  uint32_t width, uint32_t height, 
-  Box *detections, int numDetections, float4 colors )
+  T *input, T *output, uint32_t width, uint32_t height,
+  Box *detections, int numDetections, float4 colors)
 {
   if( width == 0 || height == 0 || !detections || numDetections == 0)
     return 1;
@@ -86,10 +85,8 @@ int DetectionOverlay(
     const range<2> gws ((boxHeight+7)/8*8, (boxWidth+7)/8*8);
 
     q.submit([&] (handler &cgh) {
-      auto in = input.template get_access<sycl_read>(cgh); 
-      auto out = output.template get_access<sycl_discard_write>(cgh); 
       cgh.parallel_for<class overlay<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        DetectionOverlayBox<T>(item, in.get_pointer(), out.get_pointer(), 
+        DetectionOverlayBox<T>(item, input, output,
           width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
       });
     });
@@ -131,15 +128,12 @@ int main(int argc, char* argv[]) {
     ref_output[i].y() = input[i].y() = rand() % 256; 
     ref_output[i].z() = input[i].z() = rand() % 256; 
   }
-   
-  buffer<float3, 1> d_input (input, img_size);
-  buffer<float3, 1> d_output (img_size);
 
-  q.submit([&] (handler &cgh) {
-    auto out = d_output.get_access<sycl_write>(cgh);
-    auto in = d_input.get_access<sycl_read>(cgh);
-    cgh.copy(in, out);
-  });
+  float3 *d_input = malloc_device<float3>(img_size, q);
+  q.memcpy(d_input, input, img_size_byte);
+
+  float3 *d_output = malloc_device<float3>(img_size, q);
+  q.memcpy(d_output, d_input, img_size_byte);
 
   const int numDetections = img_size * 0.8f;
   Box* detections = (Box*) malloc (numDetections * sizeof(Box));
@@ -150,16 +144,13 @@ int main(int argc, char* argv[]) {
     detections[i].top = rand() % (height - 64);
   }
    
-  float4 colors = {255, 204, 203, 1}; 
+  float4 colors = {255, 204, 203, 1};
 
   DetectionOverlay<float3>(q, d_input, d_output, width, height, detections, numDetections, colors);  
 
   reference<float3>(input, ref_output, width, height, detections, numDetections, colors);  
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, output);
-  }).wait();
+  q.memcpy(output, d_output, img_size_byte).wait();
 
   bool ok = true;
   for (int i = 0; i < img_size; i++) 
@@ -173,6 +164,8 @@ int main(int argc, char* argv[]) {
 
   printf("%s\n", ok ? "PASS" : "FAIL");
 
+  free(d_input, q);
+  free(d_output, q);
   free(input);
   free(output);
   free(ref_output);
