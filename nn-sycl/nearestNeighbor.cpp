@@ -63,68 +63,43 @@ void SyclFindNearestNeighbors(
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-#ifdef DEBUG
-  try {
-#endif
+  LatLong* d_locations = malloc_device<LatLong>(numRecords, q);
+  q.memcpy(d_locations, locations.data(), sizeof(LatLong) * numRecords);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<LatLong,1> d_locations(locations.data(), numRecords,props);
-    buffer<float,1> d_distances(distances, numRecords,props);
+  float *d_distances = malloc_device<float>(numRecords, q);
 
-    size_t localWorkSize  = 64;
-    size_t globalWorkSize = (numRecords + localWorkSize-1) / localWorkSize * localWorkSize;
-#ifdef DEBUG
-    printf("Global Work Size: %zu\n",globalWorkSize);      
-    printf("Local Work Size: %zu\n",localWorkSize);      
-#endif
+  size_t localWorkSize  = 64;
+  size_t globalWorkSize = (numRecords + localWorkSize-1) / localWorkSize * localWorkSize;
+  range<1> gws (globalWorkSize);
+  range<1> lws (localWorkSize);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-    // measure the total kernel execution time
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&](handler& cgh) {
-        auto d_locations_acc = d_locations.get_access<sycl_read>(cgh);
-        auto d_distances_acc = d_distances.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class nn>(nd_range<1>(
-          range<1>(globalWorkSize), range<1>(localWorkSize)), [=] (nd_item<1> item) {
-          int gid = item.get_global_id(0);
-          if (gid < numRecords) {
-            LatLong latLong = d_locations_acc[gid];
-            d_distances_acc[gid] = cl::sycl::sqrt(
-             (lat-latLong.lat)*(lat-latLong.lat)+(lng-latLong.lng)*(lng-latLong.lng));
-          }
-        });
+  // measure the total kernel execution time
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](handler& cgh) {
+      cgh.parallel_for<class nn>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        int gid = item.get_global_id(0);
+        if (gid < numRecords) {
+          LatLong latLong = d_locations[gid];
+          d_distances[gid] = sycl::sqrt(
+           (lat-latLong.lat)*(lat-latLong.lat)+(lng-latLong.lng)*(lng-latLong.lng));
+        }
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
-
-#ifdef DEBUG
-    auto h_distances_acc =  d_distances.get_access<sycl_read>();
-    for (int i = 0; i < 10; i++) {
-      printf("%f ", h_distances_acc[i]);
-    }
-    printf("\n");
-  } catch (cl::sycl::exception e) {
-    std::cout << e.what() << std::endl;
-    return;
-  }
-  catch (std::exception e) {
-    std::cout << e.what() << std::endl;
-    return;
-  }
-  catch (const char * e) {
-    std::cout << e << std::endl;
-    return;
+    });
   }
 
-#endif
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+
+  q.memcpy(distances, d_distances, numRecords * sizeof(float)).wait();
+  free(d_locations, q);
+  free(d_distances, q);
 }
 
 int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &locations){
