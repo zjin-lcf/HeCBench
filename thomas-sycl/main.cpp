@@ -41,30 +41,31 @@ int main(int argc, char const *argv[])
   const int BlockSize = std::stoi(argv[3]);  // GPU thread block size
   const int repeat = std::stoi(argv[4]);
 
-  const int matrix_byte_size = M * N * sizeof(double);
+  const size_t matrix_size = (size_t)M * N;
+  const size_t matrix_size_bytes = matrix_size * sizeof(double);
 
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
   // Allocate host arrays for CPU execution 
-  double* u_seq = (double*) malloc(matrix_byte_size);
-  double* u_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* u_input = (double*) malloc(matrix_byte_size);
+  double* u_seq = (double*) malloc(matrix_size_bytes);
+  double* u_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* u_input = (double*) malloc(matrix_size_bytes);
 
-  double* d_seq = (double*) malloc(matrix_byte_size);
-  double* d_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* d_input = (double*) malloc(matrix_byte_size);
+  double* d_seq = (double*) malloc(matrix_size_bytes);
+  double* d_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* d_input = (double*) malloc(matrix_size_bytes);
 
-  double* l_seq = (double*) malloc(matrix_byte_size);
-  double* l_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* l_input = (double*) malloc(matrix_byte_size);
+  double* l_seq = (double*) malloc(matrix_size_bytes);
+  double* l_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* l_input = (double*) malloc(matrix_size_bytes);
 
-  double* rhs_seq = (double*) malloc(matrix_byte_size);
-  double* rhs_Thomas_host = (double*) malloc(matrix_byte_size);
-  double* rhs_input = (double*) malloc(matrix_byte_size);
+  double* rhs_seq = (double*) malloc(matrix_size_bytes);
+  double* rhs_Thomas_host = (double*) malloc(matrix_size_bytes);
+  double* rhs_input = (double*) malloc(matrix_size_bytes);
 
-  double* rhs_seq_output = (double*) malloc(matrix_byte_size);
-  double* rhs_seq_interleave = (double*) malloc(matrix_byte_size);
+  double* rhs_seq_output = (double*) malloc(matrix_size_bytes);
+  double* rhs_seq_interleave = (double*) malloc(matrix_size_bytes);
 
   for (int i = 0; i < N; ++i)
   {
@@ -96,7 +97,7 @@ int main(int argc, char const *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average serial execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  for (int i = 0; i < M*N; ++i) {
+  for (size_t i = 0; i < matrix_size; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
   }
 
@@ -133,21 +134,24 @@ int main(int argc, char const *argv[])
     }
   }
 
-  { // sycl scope
- 
 #ifdef USE_GPU
   gpu_selector dev_sel;
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<double, 1> u_device (u_Thomas_host, N * M);
-  buffer<double, 1> d_device (d_Thomas_host, N * M);
-  buffer<double, 1> l_device (l_Thomas_host, N * M);
-  buffer<double, 1> rhs_device (rhs_Thomas_host, N * M);
-  d_device.set_final_data(nullptr);
-  u_device.set_final_data(nullptr);
+  double *u_d = malloc_device<double>(matrix_size, q);
+  q.memcpy(u_d, u_Thomas_host, matrix_size_bytes); 
+
+  double *d_d = malloc_device<double>(matrix_size, q);
+  q.memcpy(d_d, d_Thomas_host, matrix_size_bytes); 
+
+  double *l_d = malloc_device<double>(matrix_size, q);
+  q.memcpy(l_d, l_Thomas_host, matrix_size_bytes); 
+
+  double *rhs_d = malloc_device<double>(matrix_size, q);
+  q.memcpy(rhs_d, rhs_Thomas_host, matrix_size_bytes); 
 
   range<1> gws = (N + BlockSize - 1) / BlockSize * BlockSize; 
   range<1> lws = BlockSize;
@@ -157,30 +161,26 @@ int main(int argc, char const *argv[])
 
   for (int n = 0; n < repeat; n++) {
     q.submit([&] (handler &cgh) {
-      auto L = l_device.get_access<sycl_read>(cgh);
-      auto D = d_device.get_access<sycl_read>(cgh);
-      auto U = u_device.get_access<sycl_read_write>(cgh);
-      auto RHS = rhs_device.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class thomas>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         int tid = item.get_global_id(0);
         if (tid < N) {
           int first = tid;
           int last  = N*(M-1)+tid;
 
-          U[first] /= D[first];
-          RHS[first] /= D[first];
+          u_d[first] /= d_d[first];
+          rhs_d[first] /= d_d[first];
 
           for (int i = first + N; i < last; i+=N) {
-            U[i] /= D[i] - L[i] * U[i-N];
-            RHS[i] = ( RHS[i] - L[i] * RHS[i-N] ) / 
-                     ( D[i] - L[i] * U[i-N] );
+            u_d[i] /= d_d[i] - l_d[i] * u_d[i-N];
+            rhs_d[i] = ( rhs_d[i] - l_d[i] * rhs_d[i-N] ) / 
+                     ( d_d[i] - l_d[i] * u_d[i-N] );
           }
 
-          RHS[last] = ( RHS[last] - L[last] * RHS[last-N] ) / 
-                      ( D[last] - L[last] * U[last-N] );
+          rhs_d[last] = ( rhs_d[last] - l_d[last] * rhs_d[last-N] ) / 
+                      ( d_d[last] - l_d[last] * u_d[last-N] );
 
           for (int i = last-N; i >= first; i-=N) {
-            RHS[i] -= U[i] * RHS[i+N];
+            rhs_d[i] -= u_d[i] * rhs_d[i+N];
           }
         }
       });
@@ -192,10 +192,10 @@ int main(int argc, char const *argv[])
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  }
+  q.memcpy(rhs_Thomas_host, rhs_d, matrix_size_bytes).wait();
 
   // verify
-  calcError(rhs_seq_interleave,rhs_Thomas_host,N*M);
+  calcError(rhs_seq_interleave, rhs_Thomas_host, matrix_size);
 
   free(u_seq);  
   free(u_Thomas_host);
@@ -216,5 +216,9 @@ int main(int argc, char const *argv[])
   free(rhs_seq_output);
   free(rhs_seq_interleave);
 
+  free(l_d, q);
+  free(d_d, q);
+  free(u_d, q);
+  free(rhs_d, q);
   return 0;
 }
