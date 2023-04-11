@@ -12,10 +12,12 @@
 #include <sys/time.h>
 #include <hip/hip_runtime.h>
 
+/*
 #define HIP_ERRCK \
   { hipError_t err = hipGetLastError(); \
     if (err) fprintf(stderr, "HIP error: %s\n", hipGetErrorString(err)); \
   }
+*/
 
 /*
 // Place and Transition are implicitly included in the code
@@ -157,13 +159,9 @@ void PetrinetOnDevice(long long &time)
   float* g_vars;
   int* g_maxs;
   
-  g_places = (int*)AllocateDeviceMemory((unit_size- sizeof(float)-
-					      sizeof(int))*block_num);
-  HIP_ERRCK
+  g_places = (int*)AllocateDeviceMemory((unit_size- sizeof(float) - sizeof(int))*block_num);
   g_vars = (float*)AllocateDeviceMemory(block_num*sizeof(float));
-  HIP_ERRCK
   g_maxs = (int*)AllocateDeviceMemory(block_num*sizeof(int));
-  HIP_ERRCK
 
   // Setup the execution configuration
   dim3  grid(block_num);  // number of blocks
@@ -175,27 +173,30 @@ void PetrinetOnDevice(long long &time)
   // Launch the device computation threads!
   for (i = 0; i<t-block_num; i+=block_num) 
   {
+    hipDeviceSynchronize();
     auto start = get_time();
 
-    hipLaunchKernelGGL(PetrinetKernel, grid, threads, 0, 0, g_places, g_vars, g_maxs, N, s, 5489*(i+1));
+    PetrinetKernel<<<grid, threads>>>
+      (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
 
     hipDeviceSynchronize();
     auto end = get_time();
     time += end - start;
 
     CopyFromDeviceMemory(p_hmaxs, g_maxs, block_num*sizeof(int));
-    HIP_ERRCK
     CopyFromDeviceMemory(p_hvars, g_vars, block_num*sizeof(float));
-    HIP_ERRCK
 
     p_hmaxs += block_num;
     p_hvars += block_num;
   }
-	
+
   dim3 grid1(t-i);
+
+  hipDeviceSynchronize();
   auto start = get_time();
 
-  hipLaunchKernelGGL(PetrinetKernel, grid1, threads, 0, 0, g_places, g_vars, g_maxs, N, s, 5489*(i+1));
+  PetrinetKernel<<<grid1, threads>>>
+    (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
 
   hipDeviceSynchronize();
   auto end = get_time();
@@ -203,17 +204,12 @@ void PetrinetOnDevice(long long &time)
 
   // Read result from the device
   CopyFromDeviceMemory(p_hmaxs, g_maxs, (t-i)*sizeof(int));
-  HIP_ERRCK
   CopyFromDeviceMemory(p_hvars, g_vars, (t-i)*sizeof(float));
-  HIP_ERRCK
 
   // Free device matrices
   FreeDeviceMemory(g_places);
-  HIP_ERRCK
   FreeDeviceMemory(g_vars);
-  HIP_ERRCK
   FreeDeviceMemory(g_maxs);
-  HIP_ERRCK
 }
 
 // Allocate a device matrix of same size as M.
@@ -228,12 +224,14 @@ void* AllocateDeviceMemory(int size)
 void CopyFromDeviceMemory(void* h_p, void* d_p, int size)
 {
   hipMemcpy(h_p, d_p, size, hipMemcpyDeviceToHost);
+  //HIP_ERRCK
 }
 
 // Copy device memory from host memory
 void CopyFromHostMemory(void* d_p, void* h_p, int size)
 {
   hipMemcpy(d_p, h_p, size, hipMemcpyHostToDevice);
+  //HIP_ERRCK
 }
 
 // Free a device matrix.
@@ -241,4 +239,5 @@ void FreeDeviceMemory(void* mem)
 {
   if (mem!=NULL)
     hipFree(mem);
+  //HIP_ERRCK
 }
