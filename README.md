@@ -13,7 +13,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    babelstream, memcpy, memtest, randomAccess, shmembench, triad 
+    cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
@@ -346,6 +346,9 @@ Early results are shown [here](results/README.md)
 
 ### cm (cuda)
   Gene expression connectivity mapping (https://pubmed.ncbi.nlm.nih.gov/24112435/)
+
+### cmembench (cuda)
+  The constant memory microbenchmark (https://github.com/ekondis/gpumembench)
 
 ### cmp (cuda)
   Seismic processing using the classic common midpoint (CMP) method (https://github.com/hpg-cepetro/IPDPS-CRS-CMP-code)
