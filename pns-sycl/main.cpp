@@ -48,7 +48,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 static int N, S, T, NSQUARE2;
 uint32 host_mt[MERS_N];
 
-void PetrinetOnDevice(queue &q, long long &time);
+void PetrinetOnDevice(long long &time);
 void compute_statistics();
 
 float results[4];
@@ -88,19 +88,11 @@ int main(int argc, char** argv)
   h_vars = (float*)malloc(T*sizeof(float));
   h_maxs = (int*)malloc(T*sizeof(int));
   
-  // compute the simulation on the GPU
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
   long long ktime = 0;
 
   auto start = get_time();
 
-  PetrinetOnDevice(q, ktime);
+  PetrinetOnDevice(ktime);
 
   auto end = get_time();
 
@@ -139,7 +131,7 @@ void compute_statistics()
   results[3] = sum_max_vars/T - results[2]*results[2];
 }
 
-void PetrinetOnDevice(queue &q, long long &time)
+void PetrinetOnDevice(long long &time)
 {
   // Allocate memory
   int i;
@@ -150,9 +142,17 @@ void PetrinetOnDevice(queue &q, long long &time)
 
   const int g_places_size = (unit_size - sizeof(float) - sizeof(int))*block_num / sizeof(int);
 
-  buffer<int, 1> g_places (g_places_size);
-  buffer<float, 1> g_vars (block_num);
-  buffer<int, 1> g_maxs (block_num);
+  // compute the simulation on the GPU
+#ifdef USE_GPU
+  gpu_selector dev_sel;
+#else
+  cpu_selector dev_sel;
+#endif
+  queue q(dev_sel, property::queue::in_order());
+
+  int *g_places = malloc_device<int>(g_places_size, q);
+  float *g_vars = malloc_device<float>(block_num, q);
+  int *g_maxs = malloc_device<int>(block_num, q);
 
   // Setup the execution configuration
   range<1> gws (256 * block_num);
@@ -171,72 +171,55 @@ void PetrinetOnDevice(queue &q, long long &time)
     auto start = get_time(); 
 
     q.submit([&] (handler &cgh) {
-      auto p = g_places.get_access<sycl_read_write>(cgh);
-      auto v = g_vars.get_access<sycl_write>(cgh);
-      auto m = g_maxs.get_access<sycl_write>(cgh);
       accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
       cgh.parallel_for<class pn_loop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
         PetrinetKernel(
           item, 
           mt.get_pointer(),
-          p.get_pointer(),
-          v.get_pointer(),
-          m.get_pointer(),
+          g_places,
+          g_vars,
+          g_maxs,
           n, s, 5489*(i+1));
       });
-    });
+    }).wait();
     
-    q.wait();
     auto end = get_time();
     time += end - start;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = g_maxs.get_access<sycl_read>(cgh);
-      cgh.copy(acc, p_hmaxs);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = g_vars.get_access<sycl_read>(cgh);
-      cgh.copy(acc, p_hvars);
-    });
+    q.memcpy(p_hmaxs, g_maxs, block_num*sizeof(int));
+    q.memcpy(p_hvars, g_vars, block_num*sizeof(float));
 
     p_hmaxs += block_num;
     p_hvars += block_num;
   }
-	
+
   range<1> gws1 (256*(T-i));
 
   q.wait();
   auto start = get_time();
 
   q.submit([&] (handler &cgh) {
-    auto p = g_places.get_access<sycl_read_write>(cgh);
-    auto v = g_vars.get_access<sycl_write>(cgh);
-    auto m = g_maxs.get_access<sycl_write>(cgh);
     accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
     cgh.parallel_for<class pn_final>(nd_range<1>(gws1, lws), [=] (nd_item<1> item) {
       PetrinetKernel(
         item, 
         mt.get_pointer(),
-        p.get_pointer(),
-        v.get_pointer(),
-        m.get_pointer(),
+        g_places,
+        g_vars,
+        g_maxs,
         n, s, 5489*(i+1));
     });
-  });
+  }).wait();
 
-  q.wait();
   auto end = get_time();
   time += end - start;
 
   // Read result from the device
-  q.submit([&] (handler &cgh) {
-    auto acc = g_maxs.get_access<sycl_read>(cgh, range<1>(T-i));
-    cgh.copy(acc, p_hmaxs);
-  });
+  q.memcpy(p_hmaxs, g_maxs, (T-i)*sizeof(int));
+  q.memcpy(p_hvars, g_vars, (T-i)*sizeof(float));
+  q.wait();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = g_vars.get_access<sycl_read>(cgh, range<1>(T-i));
-    cgh.copy(acc, p_hvars);
-  });
+  free(g_places, q);
+  free(g_vars, q);
+  free(g_maxs, q);
 }

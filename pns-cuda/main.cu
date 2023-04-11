@@ -12,10 +12,12 @@
 #include <sys/time.h>
 #include <cuda.h>
 
+/*
 #define CUDA_ERRCK \
   { cudaError_t err = cudaGetLastError(); \
     if (err) fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err)); \
   }
+*/
 
 /*
 // Place and Transition are implicitly included in the code
@@ -157,13 +159,9 @@ void PetrinetOnDevice(long long &time)
   float* g_vars;
   int* g_maxs;
   
-  g_places = (int*)AllocateDeviceMemory((unit_size- sizeof(float)-
-					      sizeof(int))*block_num);
-  CUDA_ERRCK
+  g_places = (int*)AllocateDeviceMemory((unit_size- sizeof(float) - sizeof(int))*block_num);
   g_vars = (float*)AllocateDeviceMemory(block_num*sizeof(float));
-  CUDA_ERRCK
   g_maxs = (int*)AllocateDeviceMemory(block_num*sizeof(int));
-  CUDA_ERRCK
 
   // Setup the execution configuration
   dim3  grid(block_num);  // number of blocks
@@ -175,6 +173,7 @@ void PetrinetOnDevice(long long &time)
   // Launch the device computation threads!
   for (i = 0; i<t-block_num; i+=block_num) 
   {
+    cudaDeviceSynchronize();
     auto start = get_time();
 
     PetrinetKernel<<<grid, threads>>>
@@ -185,15 +184,15 @@ void PetrinetOnDevice(long long &time)
     time += end - start;
 
     CopyFromDeviceMemory(p_hmaxs, g_maxs, block_num*sizeof(int));
-    CUDA_ERRCK
     CopyFromDeviceMemory(p_hvars, g_vars, block_num*sizeof(float));
-    CUDA_ERRCK
 
     p_hmaxs += block_num;
     p_hvars += block_num;
   }
-	
+
   dim3 grid1(t-i);
+
+  cudaDeviceSynchronize();
   auto start = get_time();
 
   PetrinetKernel<<<grid1, threads>>>
@@ -205,17 +204,12 @@ void PetrinetOnDevice(long long &time)
 
   // Read result from the device
   CopyFromDeviceMemory(p_hmaxs, g_maxs, (t-i)*sizeof(int));
-  CUDA_ERRCK
   CopyFromDeviceMemory(p_hvars, g_vars, (t-i)*sizeof(float));
-  CUDA_ERRCK
 
   // Free device matrices
   FreeDeviceMemory(g_places);
-  CUDA_ERRCK
   FreeDeviceMemory(g_vars);
-  CUDA_ERRCK
   FreeDeviceMemory(g_maxs);
-  CUDA_ERRCK
 }
 
 // Allocate a device matrix of same size as M.
@@ -230,12 +224,14 @@ void* AllocateDeviceMemory(int size)
 void CopyFromDeviceMemory(void* h_p, void* d_p, int size)
 {
   cudaMemcpy(h_p, d_p, size, cudaMemcpyDeviceToHost);
+  //CUDA_ERRCK
 }
 
 // Copy device memory from host memory
 void CopyFromHostMemory(void* d_p, void* h_p, int size)
 {
   cudaMemcpy(d_p, h_p, size, cudaMemcpyHostToDevice);
+  //CUDA_ERRCK
 }
 
 // Free a device matrix.
@@ -243,4 +239,5 @@ void FreeDeviceMemory(void* mem)
 {
   if (mem!=NULL)
     cudaFree(mem);
+  //CUDA_ERRCK
 }
