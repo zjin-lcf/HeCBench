@@ -51,82 +51,96 @@ int main(int argv, char **argc) {
   const int dim_output = 3;
   const int dim_input = 3;
 
-  {
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  gpu_selector dev_sel;
 #else
-    cpu_selector dev_sel;
+  cpu_selector dev_sel;
 #endif
-    queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-    buffer<double, 1> d_output(output, data_size);
-    buffer<double, 1> d_input(input, data_size);
-    buffer<int, 1> d_shape_input(shape_input, dim_input);
-    buffer<float, 1> d_shape_input_r(shape_input_r, dim_input);
-    buffer<int, 1> d_shape_output(shape_output, dim_output);
-    buffer<float, 1> d_shape_output_r(shape_output_r, dim_output);
-    buffer<int, 1> d_stride_input(stride_input, dim_input);
-    buffer<int, 1> d_stride_output_local(stride_output_local, dim_output);
-    buffer<int, 1> d_stride_output_global(stride_output_global, dim_output);
+  double *d_output = malloc_device<double>(data_size, q);
 
-    range<1> gws (nblocks * NTHREADS);
-    range<1> lws (NTHREADS);
+  double *d_input = malloc_device<double>(data_size, q);
+  q.memcpy(d_input, input, data_size * sizeof(double));
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  int *d_shape_input = malloc_device<int>(dim_input, q);
+  q.memcpy(d_shape_input, shape_input, dim_input * sizeof(int));
 
-    for (size_t i = 0; i < repeat; ++i) {
-      q.submit([&] (handler &cgh) {
-        auto output = d_output.get_access<sycl_discard_write>(cgh);
-        auto input = d_input.get_access<sycl_read>(cgh);
-        auto shape_input = d_shape_input.get_access<sycl_read>(cgh);
-        auto shape_input_r = d_shape_input_r.get_access<sycl_read>(cgh);
-        auto shape_output = d_shape_output.get_access<sycl_read>(cgh);
-        auto shape_output_r = d_shape_output_r.get_access<sycl_read>(cgh);
-        auto stride_input = d_stride_input.get_access<sycl_read>(cgh);
-        auto stride_output_local = d_stride_output_local.get_access<sycl_read>(cgh);
-        auto stride_output_global = d_stride_output_global.get_access<sycl_read>(cgh);
+  float *d_shape_input_r = malloc_device<float>(dim_output, q);
+  q.memcpy(d_shape_input_r, shape_input_r, dim_input * sizeof(float));
 
-        accessor<double, 1, sycl_read_write, access::target::local> tile(TILE_SIZE, cgh);
-        cgh.parallel_for<class transpose>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          for (int block_idx = item.get_group(0); block_idx < nblocks;
-                   block_idx += item.get_group_range(0)) {
-            int it = block_idx, im = 0, offset1 = 0;
-            for (int i = 0; i < dim_input; i++) {
-              im = it * shape_input_r[i];
-              offset1 += stride_input[i] * (it - im * shape_input[i]);
+  int *d_shape_output = malloc_device<int>(dim_output, q);
+  q.memcpy(d_shape_output, shape_output, dim_output * sizeof(int));
+
+  float *d_shape_output_r = malloc_device<float>(dim_output, q);
+  q.memcpy(d_shape_output_r, shape_output_r, dim_output * sizeof(float));
+
+  int *d_stride_input = malloc_device<int>(dim_input, q);
+  q.memcpy(d_stride_input, stride_input, dim_input * sizeof(int));
+
+  int *d_stride_output_local = malloc_device<int>(dim_output, q);
+  q.memcpy(d_stride_output_local, stride_output_local, dim_output * sizeof(int));
+
+  int *d_stride_output_global = malloc_device<int>(dim_output, q);
+  q.memcpy(d_stride_output_global, stride_output_global, dim_output * sizeof(int));
+
+  range<1> gws (nblocks * NTHREADS);
+  range<1> lws (NTHREADS);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (size_t i = 0; i < repeat; ++i) {
+    q.submit([&] (handler &cgh) {
+      accessor<double, 1, sycl_read_write, access::target::local> tile(TILE_SIZE, cgh);
+      cgh.parallel_for<class transpose>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        for (int block_idx = item.get_group(0); block_idx < nblocks;
+                 block_idx += item.get_group_range(0)) {
+          int it = block_idx, im = 0, offset1 = 0;
+          for (int i = 0; i < dim_input; i++) {
+            im = it * d_shape_input_r[i];
+            offset1 += d_stride_input[i] * (it - im * d_shape_input[i]);
+            it = im;
+          }
+
+          for (int i = item.get_local_id(0); i < tile_size; i += item.get_local_range(0)) {
+            tile[i] = d_input[i + block_idx * tile_size];
+          }
+
+          item.barrier(access::fence_space::local_space);
+
+          for (int i = item.get_local_id(0); i < tile_size; i += item.get_local_range(0)) {
+            it = i;
+            int offset2 = 0, local_offset = 0;
+            for (int j = 0; j < dim_output; j++) {
+              im = it * d_shape_output_r[j];
+              int tmp = it - im * d_shape_output[j];
+              offset2 += d_stride_output_global[j] * tmp;
+              local_offset += d_stride_output_local[j] * tmp;
               it = im;
             }
-
-            for (int i = item.get_local_id(0); i < tile_size; i += item.get_local_range(0)) {
-              tile[i] = input[i + block_idx * tile_size];
-            }
-
-            item.barrier(access::fence_space::local_space);
-
-            for (int i = item.get_local_id(0); i < tile_size; i += item.get_local_range(0)) {
-              it = i;
-              int offset2 = 0, local_offset = 0;
-              for (int j = 0; j < dim_output; j++) {
-                im = it * shape_output_r[j];
-                int tmp = it - im * shape_output[j];
-                offset2 += stride_output_global[j] * tmp;
-                local_offset += stride_output_local[j] * tmp;
-                it = im;
-              }
-              output[offset1 + offset2] = tile[local_offset];
-            }
-            item.barrier(access::fence_space::local_space);
+            d_output[offset1 + offset2] = tile[local_offset];
           }
-        });
+          item.barrier(access::fence_space::local_space);
+        }
       });
-    }
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    });
   }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+
+  q.memcpy(output, d_output, data_size * sizeof(double)).wait();
+  free(d_output, q);
+  free(d_input, q);
+  free(d_shape_input, q);
+  free(d_shape_input_r, q);
+  free(d_shape_output, q);
+  free(d_shape_output_r, q);
+  free(d_stride_input, q);
+  free(d_stride_output_local, q);
+  free(d_stride_output_global, q);
 
   verify(input, output);
   delete [] input;
