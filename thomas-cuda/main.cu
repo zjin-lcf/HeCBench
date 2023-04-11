@@ -44,29 +44,30 @@ int main(int argc, char const *argv[])
   const int BlockSize = std::stoi(argv[3]);  // GPU thread block size
   const int repeat = std::stoi(argv[4]);
 
-  const int matrix_byte_size = M * N * sizeof(double);
+  const size_t matrix_size = (size_t)M * N;
+  const size_t matrix_size_bytes = matrix_size * sizeof(double);
 
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
-  double* u_seq = (double*) malloc(matrix_byte_size);
-  double* u_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* u_input = (double*) malloc(matrix_byte_size);
+  double* u_seq = (double*) malloc(matrix_size_bytes);
+  double* u_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* u_input = (double*) malloc(matrix_size_bytes);
 
-  double* d_seq = (double*) malloc(matrix_byte_size);
-  double* d_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* d_input = (double*) malloc(matrix_byte_size);
+  double* d_seq = (double*) malloc(matrix_size_bytes);
+  double* d_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* d_input = (double*) malloc(matrix_size_bytes);
 
-  double* l_seq = (double*) malloc(matrix_byte_size);
-  double* l_Thomas_host =  (double*) malloc(matrix_byte_size);
-  double* l_input = (double*) malloc(matrix_byte_size);
+  double* l_seq = (double*) malloc(matrix_size_bytes);
+  double* l_Thomas_host =  (double*) malloc(matrix_size_bytes);
+  double* l_input = (double*) malloc(matrix_size_bytes);
 
-  double* rhs_seq = (double*) malloc(matrix_byte_size);
-  double* rhs_Thomas_host = (double*) malloc(matrix_byte_size);
-  double* rhs_input = (double*) malloc(matrix_byte_size);
+  double* rhs_seq = (double*) malloc(matrix_size_bytes);
+  double* rhs_Thomas_host = (double*) malloc(matrix_size_bytes);
+  double* rhs_input = (double*) malloc(matrix_size_bytes);
 
-  double* rhs_seq_output = (double*) malloc(matrix_byte_size);
-  double* rhs_seq_interleave = (double*) malloc(matrix_byte_size);
+  double* rhs_seq_output = (double*) malloc(matrix_size_bytes);
+  double* rhs_seq_interleave = (double*) malloc(matrix_size_bytes);
 
   for (int i = 0; i < N; ++i)
   {
@@ -97,7 +98,7 @@ int main(int argc, char const *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average serial execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  for (int i = 0; i < M*N; ++i) {
+  for (size_t i = 0; i < matrix_size; ++i) {
     rhs_seq_output[i] = rhs_seq[i];
   }
 
@@ -141,21 +142,21 @@ int main(int argc, char const *argv[])
   double *l_device;
   double *rhs_device;
 
-  cudaMalloc((void**)&u_device, matrix_byte_size);
-  cudaMalloc((void**)&l_device, matrix_byte_size);
-  cudaMalloc((void**)&d_device, matrix_byte_size);
-  cudaMalloc((void**)&rhs_device, matrix_byte_size);
+  cudaMalloc((void**)&u_device, matrix_size_bytes);
+  cudaMalloc((void**)&l_device, matrix_size_bytes);
+  cudaMalloc((void**)&d_device, matrix_size_bytes);
+  cudaMalloc((void**)&rhs_device, matrix_size_bytes);
 
-  cudaMemcpyAsync(u_device, u_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(l_device, l_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(d_device, d_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice, 0);
-  cudaMemcpyAsync(rhs_device, rhs_Thomas_host, matrix_byte_size, cudaMemcpyHostToDevice,  0);
+  cudaMemcpy(u_device, u_Thomas_host, matrix_size_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(l_device, l_Thomas_host, matrix_size_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_device, d_Thomas_host, matrix_size_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(rhs_device, rhs_Thomas_host, matrix_size_bytes, cudaMemcpyHostToDevice);
 
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    cuThomasBatch<<<(N/BlockSize)+1, BlockSize>>> (l_device, d_device, u_device, rhs_device, M, N);
+    cuThomasBatch<<<(N/BlockSize)+1, BlockSize>>>(l_device, d_device, u_device, rhs_device, M, N);
   }
 
   cudaDeviceSynchronize();
@@ -163,11 +164,11 @@ int main(int argc, char const *argv[])
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  cudaMemcpyAsync(rhs_Thomas_host, rhs_device, matrix_byte_size, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpy(rhs_Thomas_host, rhs_device, matrix_size_bytes, cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
 
   // verify
-  calcError(rhs_seq_interleave, rhs_Thomas_host, N*M);
+  calcError(rhs_seq_interleave, rhs_Thomas_host, matrix_size);
 
   free(u_seq);  
   free(u_Thomas_host);
