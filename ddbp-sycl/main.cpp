@@ -387,11 +387,29 @@ void backprojectionDDb(
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
-  buffer<double, 1> d_pProj (nDetXMap*nDetYMap*nProj);
-  buffer<double, 1> d_sliceI (nPixXMap*nPixYMap);
-  buffer<double, 1> d_pVolume (h_pVolume, nPixX*nPixY*nSlices);
+  double *d_pProj = malloc_device<double>(nDetXMap*nDetYMap*nProj, q);
+  double *d_sliceI = malloc_device<double>(nPixXMap*nPixYMap, q);
+  double *d_pVolume = malloc_device<double>(nPixX*nPixY*nSlices, q);
+
+  // device memory for projections coordinates
+  double *d_pDetX = malloc_device<double>( nDetXMap , q);
+  double *d_pDetY = malloc_device<double>( nDetYMap , q);
+  double *d_pDetZ = malloc_device<double>( nDetYMap , q);
+  double *d_pObjX = malloc_device<double>( nPixXMap , q);
+  double *d_pObjY = malloc_device<double>( nPixYMap , q);
+  double *d_pObjZ = malloc_device<double>( nSlices , q);
+
+  // device memory for mapped coordinates
+  double *d_pDetmY = malloc_device<double>( nDetYMap , q);
+  double *d_pDetmX = malloc_device<double>( nDetYMap * nDetXMap , q);
+
+  // device memory for rotated detector coords
+  double *d_pRdetY = malloc_device<double>( nDetYMap , q);
+  double *d_pRdetZ = malloc_device<double>( nDetYMap , q);
+
+  auto start = std::chrono::steady_clock::now();
 
   // Will reuse grid configurations
   range<3> gws (1,1,1);
@@ -403,6 +421,7 @@ void backprojectionDDb(
 
   // Initialize first column and row with zeros
   const double* h_pProj_tmp;
+  double* d_pProj_tmp;
 
   lws[2] = maxThreadsPerBlock;
   gws[2] = (nDetXMap / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
@@ -411,46 +430,24 @@ void backprojectionDDb(
 
     // Pad on X coord direction
     q.submit([&] (handler &cgh) {
-      auto proj = d_pProj.get_access<sycl_write>(cgh);
       cgh.parallel_for<class pad>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        pad_projections_kernel (item, proj.get_pointer(), 
+        pad_projections_kernel (item, d_pProj,
                                 nDetXMap, nDetYMap, nDetXMap, np);
       });
     });
 
     // Pad on Y coord direction
-    q.submit([&] (handler &cgh) {
-      auto acc = d_pProj.get_access<sycl_write>(cgh, nPixY, (nDetXMap*nDetYMap*np) + 1);
-      cgh.fill(acc, 0.0);
-    });
+    d_pProj_tmp = d_pProj + (nDetXMap*nDetYMap*np) + 1;
+    q.memset(d_pProj_tmp, 0, nPixY * sizeof(double));
   }
 
   // Copy projections data from host to device
   for (int np = 0; np < nProj; np++)
     for (int c = 0; c < nDetX; c++) {
       h_pProj_tmp = h_pProj + (c * nDetY) + (nDetX*nDetY*np);
-      q.submit([&] (handler &cgh) {
-        auto acc = d_pProj.get_access<sycl_write>(cgh, nDetY, 
-                   (c + 1) * nDetYMap + 1 + nDetXMap*nDetYMap*np);
-        cgh.copy(h_pProj_tmp, acc);
-      });
+      d_pProj_tmp = d_pProj + (((c + 1) * nDetYMap) + 1) + (nDetXMap*nDetYMap*np);
+      q.memcpy(d_pProj_tmp, h_pProj_tmp, nDetY * sizeof(double));
     }
-
-  // device memory for projections coordinates
-  buffer<double, 1> d_pDetX ( nDetXMap );
-  buffer<double, 1> d_pDetY ( nDetYMap );
-  buffer<double, 1> d_pDetZ ( nDetYMap );
-  buffer<double, 1> d_pObjX ( nPixXMap );
-  buffer<double, 1> d_pObjY ( nPixYMap );
-  buffer<double, 1> d_pObjZ ( nSlices );
-
-  // device memory for mapped coordinates
-  buffer<double, 1> d_pDetmY ( nDetYMap );
-  buffer<double, 1> d_pDetmX ( nDetYMap * nDetXMap );
-
-  // device memory for rotated detector coords
-  buffer<double, 1> d_pRdetY ( nDetYMap );
-  buffer<double, 1> d_pRdetZ ( nDetYMap );
 
   // Generate detector and object boudaries
 
@@ -459,58 +456,46 @@ void backprojectionDDb(
   gws[2] = (nDetX / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
   q.submit([&] (handler &cgh) {
-    auto detX = d_pDetX.get_access<sycl_write>(cgh);
     cgh.parallel_for<class map_detX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      map_boudaries_kernel(item, detX.get_pointer(), nDetXMap, (double)nDetX, -du, 0.0);
+      map_boudaries_kernel(item, d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
     });
   });
 
   gws[2] = (nDetY / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
   q.submit([&] (handler &cgh) {
-    auto detY = d_pDetY.get_access<sycl_write>(cgh);
     cgh.parallel_for<class map_detY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      map_boudaries_kernel(item, detY.get_pointer(), nDetYMap, nDetY / 2.0, dv, 0.0);
+      map_boudaries_kernel(item, d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
     });
   });
 
   gws[2] = (nPixX / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
   q.submit([&] (handler &cgh) {
-    auto objX = d_pObjX.get_access<sycl_write>(cgh);
     cgh.parallel_for<class map_pixX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      map_boudaries_kernel(item, objX.get_pointer(), nPixXMap, (double)nPixX, -dx, 0.0);
+      map_boudaries_kernel(item, d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
     });
   });
 
   gws[2] = (nPixY / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
   q.submit([&] (handler &cgh) {
-    auto objY = d_pObjY.get_access<sycl_write>(cgh);
     cgh.parallel_for<class map_pixY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      map_boudaries_kernel(item, objY.get_pointer(), nPixYMap, nPixY / 2.0, dy, 0.0);
+      map_boudaries_kernel(item, d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
     });
   });
 
   gws[2] = (nSlices / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
   q.submit([&] (handler &cgh) {
-    auto objZ = d_pObjZ.get_access<sycl_write>(cgh);
     cgh.parallel_for<class map_pixZ>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      map_boudaries_kernel(item, objZ.get_pointer(), nSlices, 0.0, dz, DAG + (dz / 2.0));
+      map_boudaries_kernel(item, d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
     });
   });
 
   // Initiate variables value with 0
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pDetZ.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, 0.0);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pVolume.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, 0.0);
-  });
+  q.memset(d_pDetZ, 0, nDetYMap * sizeof(double));
+  q.memset(d_pVolume, 0, nPixX * nPixY * nSlices * sizeof(double));
 
   // X - ray tube initial position
   double tubeX = 0;
@@ -537,9 +522,8 @@ void backprojectionDDb(
   for (int k = 0; k < Xk; k++) {
 
     q.submit([&] (handler &cgh) {
-      auto proj = d_pProj.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class img_integralX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        img_integration_kernel(item, proj.get_pointer(), 
+        img_integration_kernel(item, d_pProj,
           nDetXMap, nDetYMap, integrateXcoord, 0, k * 9, nProj);
       });
     });
@@ -558,9 +542,8 @@ void backprojectionDDb(
   for (int k = 0; k < Yk; k++) {
 
     q.submit([&] (handler &cgh) {
-      auto proj = d_pProj.get_access<sycl_read_write>(cgh);
       cgh.parallel_for<class img_integralY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        img_integration_kernel(item, proj.get_pointer(), 
+        img_integration_kernel(item, d_pProj,
             nDetXMap, nDetYMap, integrateYcoord, k * 9, 0, nProj);
       });
     });
@@ -606,13 +589,8 @@ void backprojectionDDb(
     gws[0] = 1;
 
     q.submit([&] (handler &cgh) {
-      auto RdetY = d_pRdetY.get_access<sycl_discard_write>(cgh);
-      auto RdetZ = d_pRdetZ.get_access<sycl_discard_write>(cgh);
-      auto DetY = d_pDetY.get_access<sycl_read>(cgh);
-      auto DetZ = d_pDetZ.get_access<sycl_read>(cgh);
       cgh.parallel_for<class rot_det>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        rot_detector_kernel(item, RdetY.get_pointer(), RdetZ.get_pointer(),
-                            DetY.get_pointer(), DetZ.get_pointer(),
+        rot_detector_kernel(item, d_pRdetY, d_pRdetZ, d_pDetY, d_pDetZ,
                             isoY, isoZ, phi, nDetYMap);
       });
     });
@@ -631,18 +609,12 @@ void backprojectionDDb(
       gws[0] = 1;
 
       q.submit([&] (handler &cgh) {
-        auto DetmX = d_pDetmX.get_access<sycl_discard_write>(cgh);
-        auto DetmY = d_pDetmY.get_access<sycl_discard_write>(cgh); 
-        auto DetX = d_pDetX.get_access<sycl_read>(cgh);
-        auto RdetY = d_pRdetY.get_access<sycl_read>(cgh); 
-        auto RdetZ = d_pRdetZ.get_access<sycl_read>(cgh);
-        auto ObjZ = d_pObjZ.get_access<sycl_read>(cgh);
         cgh.parallel_for<class mapDet2Slice>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
           mapDet2Slice_kernel (
             item,
-            DetmX.get_pointer(), DetmY.get_pointer(), tubeX, rtubeY, rtubeZ, 
-            DetX.get_pointer(), RdetY.get_pointer(), RdetZ.get_pointer(),
-            ObjZ.get_pointer(), nDetXMap, nDetYMap, nz);
+            d_pDetmX, d_pDetmY, tubeX, rtubeY, rtubeZ, 
+            d_pDetX, d_pRdetY, d_pRdetZ,
+            d_pObjZ, nDetXMap, nDetYMap, nz);
         });
       });
 
@@ -652,17 +624,11 @@ void backprojectionDDb(
       gws[1] = (nPixXMap / 16 + 1) * 16;
 
       q.submit([&] (handler &cgh) {
-        auto sliceI = d_sliceI.get_access<sycl_discard_write>(cgh);
-        auto Proj = d_pProj.get_access<sycl_read>(cgh); 
-        auto ObjX = d_pObjX.get_access<sycl_read>(cgh);
-        auto ObjY = d_pObjY.get_access<sycl_read>(cgh);
-        auto DetmX = d_pDetmX.get_access<sycl_read>(cgh);
-        auto DetmY = d_pDetmY.get_access<sycl_read>(cgh);
         cgh.parallel_for<class bilinear_interp>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
           bilinear_interpolation_kernel (item,
-            sliceI.get_pointer(), Proj.get_pointer(),
-            ObjX.get_pointer(), ObjY.get_pointer(), 
-            DetmX.get_pointer() + nDetYMap * (nDetXMap-2), DetmY.get_pointer(),
+            d_sliceI, d_pProj,
+            d_pObjX, d_pObjY, 
+            d_pDetmX + nDetYMap * (nDetXMap-2), d_pDetmY,
             nPixXMap, nPixYMap, nDetXMap, nDetYMap, nDetX, nDetY, p);
         });
       });
@@ -673,16 +639,11 @@ void backprojectionDDb(
       gws[1] = (nPixX / 16 + 1) * 16;
 
       q.submit([&] (handler &cgh) {
-        auto volume = d_pVolume.get_access<sycl_read_write>(cgh);
-        auto sliceI = d_sliceI.get_access<sycl_read>(cgh);
-        auto ObjX = d_pObjX.get_access<sycl_read>(cgh);
-        auto ObjY = d_pObjY.get_access<sycl_read>(cgh);
-        auto ObjZ = d_pObjZ.get_access<sycl_read>(cgh);
         cgh.parallel_for<class diff>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
           differentiation_kernel (
-            item, volume.get_pointer(), sliceI.get_pointer(), 
+            item, d_pVolume, d_sliceI, 
             tubeX, rtubeY, rtubeZ,
-            ObjX.get_pointer(), ObjY.get_pointer(), ObjZ.get_pointer(),
+            d_pObjX, d_pObjY, d_pObjZ,
             nPixX, nPixY, nPixXMap, nPixYMap, du, dv, dx, dy, dz, nz);
         });
       });
@@ -702,12 +663,31 @@ void backprojectionDDb(
   gws[0] = (nSlices / 4 + 1) * 4;
 
   q.submit([&] (handler &cgh) {
-    auto volume = d_pVolume.get_access<sycl_read_write>(cgh);
     cgh.parallel_for<class div>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      division_kernel (item, volume.get_pointer(), 
+      division_kernel (item, d_pVolume, 
                        nPixX, nPixY, nSlices, nProj2Run);
     });
-  });
+  }).wait();
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time %f (s)\n", time * 1e-9f);
+
+  q.memcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double));
+
+  free(d_pProj, q);
+  free(d_sliceI, q);
+  free(d_pVolume, q);
+  free(d_pDetX, q);
+  free(d_pDetY, q);
+  free(d_pDetZ, q);
+  free(d_pObjX, q);
+  free(d_pObjY, q);
+  free(d_pObjZ, q);
+  free(d_pDetmY, q);
+  free(d_pDetmX, q);
+  free(d_pRdetY, q);
+  free(d_pRdetZ, q);
 }
 
 int main() 
@@ -759,8 +739,6 @@ int main()
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
-  auto start = std::chrono::steady_clock::now();
-
   backprojectionDDb(
     h_pVolume,
     h_pProj,
@@ -775,10 +753,6 @@ int main()
     du, dv,
     DSD, DDR, DAG);
 
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("backprojectionDDb execution time %f (s)\n", time * 1e-9f);
-  
   double checkSum = 0;
   for (size_t i = 0; i < pixVol; i++)
     checkSum += h_pVolume[i];

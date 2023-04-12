@@ -375,13 +375,35 @@ void backprojectionDDb(
   const int nPixXMap = nPixX + 1;
   const int nPixYMap = nPixY + 1;
 
-  double* d_pProj;
-  double* d_sliceI;
-  double* d_pVolume;
+  double *d_pProj, *d_sliceI, *d_pVolume;
 
   cudaMalloc((void **)&d_pProj, nDetXMap*nDetYMap*nProj * sizeof(double)); 
   cudaMalloc((void **)&d_sliceI, nPixXMap*nPixYMap * sizeof(double));
   cudaMalloc((void **)&d_pVolume, nPixX*nPixY*nSlices * sizeof(double));
+
+  // device memory for projections coordinates
+  double *d_pDetX, *d_pDetY, *d_pDetZ, *d_pObjX, *d_pObjY, *d_pObjZ;
+
+  cudaMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
+  cudaMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
+  cudaMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
+  cudaMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
+  cudaMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
+  cudaMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
+
+  // device memory for mapped coordinates
+  double *d_pDetmY, *d_pDetmX;
+
+  cudaMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
+  cudaMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
+
+  // device memory for rotated detector coords
+  double *d_pRdetY, *d_pRdetZ;
+
+  cudaMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
+  cudaMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
+
+  auto start = std::chrono::steady_clock::now();
 
   // Will reuse grid configurations
   dim3 threadsPerBlock (1,1,1);
@@ -415,35 +437,6 @@ void backprojectionDDb(
       d_pProj_tmp = d_pProj + (((c + 1) * nDetYMap) + 1) + (nDetXMap*nDetYMap*np);
       cudaMemcpy(d_pProj_tmp, h_pProj_tmp, nDetY * sizeof(double), cudaMemcpyHostToDevice);
     }
-
-  // device memory for projections coordinates
-  double* d_pDetX;
-  double* d_pDetY;
-  double* d_pDetZ;
-  double* d_pObjX;
-  double* d_pObjY;
-  double* d_pObjZ;
-
-  cudaMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
-  cudaMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
-
-  // device memory for mapped coordinates
-  double* d_pDetmY;
-  double* d_pDetmX;
-
-  cudaMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
-
-  // device memory for rotated detector coords
-  double* d_pRdetY;
-  double* d_pRdetZ;
-
-  cudaMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
-  cudaMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
 
   // Generate detector and object boudaries
 
@@ -611,6 +604,11 @@ void backprojectionDDb(
 
   division_kernel <<<blockSize, threadsPerBlock>>> (d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
 
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution %f (s)\n", time * 1e-9f);
+
   cudaMemcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double), cudaMemcpyDeviceToHost);
 
   cudaFree(d_pProj);
@@ -677,8 +675,6 @@ int main()
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
-  auto start = std::chrono::steady_clock::now();
-
   backprojectionDDb(
     h_pVolume,
     h_pProj,
@@ -692,10 +688,6 @@ int main()
     dx, dy, dz,
     du, dv,
     DSD, DDR, DAG);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("backprojectionDDb execution time %f (s)\n", time * 1e-9f);
 
   double checkSum = 0;
   for (size_t i = 0; i < pixVol; i++)

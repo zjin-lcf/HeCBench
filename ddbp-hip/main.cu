@@ -375,13 +375,35 @@ void backprojectionDDb(
   const int nPixXMap = nPixX + 1;
   const int nPixYMap = nPixY + 1;
 
-  double* d_pProj;
-  double* d_sliceI;
-  double* d_pVolume;
+  double *d_pProj, *d_sliceI, *d_pVolume;
 
   hipMalloc((void **)&d_pProj, nDetXMap*nDetYMap*nProj * sizeof(double)); 
   hipMalloc((void **)&d_sliceI, nPixXMap*nPixYMap * sizeof(double));
   hipMalloc((void **)&d_pVolume, nPixX*nPixY*nSlices * sizeof(double));
+
+  // device memory for projections coordinates
+  double *d_pDetX, *d_pDetY, *d_pDetZ, *d_pObjX, *d_pObjY, *d_pObjZ;
+
+  hipMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
+  hipMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
+  hipMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
+  hipMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
+
+  // device memory for mapped coordinates
+  double *d_pDetmY, *d_pDetmX;
+
+  hipMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
+
+  // device memory for rotated detector coords
+  double *d_pRdetY, *d_pRdetZ;
+
+  hipMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
+  hipMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
+
+  auto start = std::chrono::steady_clock::now();
 
   // Will reuse grid configurations
   dim3 threadsPerBlock (1,1,1);
@@ -401,7 +423,7 @@ void backprojectionDDb(
   for (int np = 0; np < nProj; np++) {
 
     // Pad on X coord direction
-    hipLaunchKernelGGL(pad_projections_kernel, blockSize, threadsPerBlock, 0, 0, d_pProj, nDetXMap, nDetYMap, nDetXMap, np);
+    pad_projections_kernel <<<blockSize, threadsPerBlock>>> (d_pProj, nDetXMap, nDetYMap, nDetXMap, np);
 
     // Pad on Y coord direction
     d_pProj_tmp = d_pProj + (nDetXMap*nDetYMap*np) + 1;
@@ -416,58 +438,29 @@ void backprojectionDDb(
       hipMemcpy(d_pProj_tmp, h_pProj_tmp, nDetY * sizeof(double), hipMemcpyHostToDevice);
     }
 
-  // device memory for projections coordinates
-  double* d_pDetX;
-  double* d_pDetY;
-  double* d_pDetZ;
-  double* d_pObjX;
-  double* d_pObjY;
-  double* d_pObjZ;
-
-  hipMalloc((void **)&d_pDetX, nDetXMap * sizeof(double));
-  hipMalloc((void **)&d_pDetY, nDetYMap * sizeof(double));
-  hipMalloc((void **)&d_pDetZ, nDetYMap * sizeof(double));
-  hipMalloc((void **)&d_pObjX, nPixXMap * sizeof(double));
-  hipMalloc((void **)&d_pObjY, nPixYMap * sizeof(double));
-  hipMalloc((void **)&d_pObjZ, nSlices * sizeof(double));
-
-  // device memory for mapped coordinates
-  double* d_pDetmY;
-  double* d_pDetmX;
-
-  hipMalloc((void **)&d_pDetmY, nDetYMap * sizeof(double));
-  hipMalloc((void **)&d_pDetmX, nDetYMap * nDetXMap * sizeof(double));
-
-  // device memory for rotated detector coords
-  double* d_pRdetY;
-  double* d_pRdetZ;
-
-  hipMalloc((void **)&d_pRdetY, nDetYMap * sizeof(double));
-  hipMalloc((void **)&d_pRdetZ, nDetYMap * sizeof(double));
-
   // Generate detector and object boudaries
 
   threadsPerBlock.x = maxThreadsPerBlock;
 
   blockSize.x = (nDetX / maxThreadsPerBlock) + 1;
 
-  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
+  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
 
   blockSize.x = (nDetY / maxThreadsPerBlock) + 1;
 
-  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
+  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
 
   blockSize.x = (nPixX / maxThreadsPerBlock) + 1;
 
-  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
+  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
 
   blockSize.x = (nPixY / maxThreadsPerBlock) + 1;
 
-  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
+  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
 
   blockSize.x = (nSlices / maxThreadsPerBlock) + 1;
 
-  hipLaunchKernelGGL(map_boudaries_kernel, blockSize, threadsPerBlock, 0, 0, d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
+  map_boudaries_kernel <<<blockSize, threadsPerBlock>>> (d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
 
   // Initiate variables value with 0
   hipMemset(d_pDetZ, 0, nDetYMap * sizeof(double));
@@ -497,7 +490,7 @@ void backprojectionDDb(
   int Xk = (int)ceilf((float)nDetXMap / (threadsPerBlock.x - 1));
   for (int k = 0; k < Xk; k++) {
 
-    hipLaunchKernelGGL(img_integration_kernel, blockSize, threadsPerBlock, 0, 0, 
+    img_integration_kernel <<<blockSize, threadsPerBlock>>> (
         d_pProj, nDetXMap, nDetYMap, integrateXcoord, 0, k * 9, nProj);
   }
 
@@ -513,7 +506,7 @@ void backprojectionDDb(
   int Yk = (int)ceilf((float)nDetYMap / (threadsPerBlock.y - 1));
   for (int k = 0; k < Yk; k++) {
 
-    hipLaunchKernelGGL(img_integration_kernel, blockSize, threadsPerBlock, 0, 0, 
+    img_integration_kernel <<<blockSize, threadsPerBlock>>> (
         d_pProj, nDetXMap, nDetYMap, integrateYcoord, k * 9, 0, nProj);
   }
 
@@ -557,7 +550,7 @@ void backprojectionDDb(
     blockSize.y = 1;
     blockSize.z = 1;
 
-    hipLaunchKernelGGL(rot_detector_kernel, blockSize, threadsPerBlock, 0, 0, 
+    rot_detector_kernel <<<blockSize, threadsPerBlock>>> (
         d_pRdetY, d_pRdetZ, d_pDetY, d_pDetZ, isoY, isoZ, phi, nDetYMap);
 
     threadsPerBlock.x = 16;
@@ -573,7 +566,7 @@ void backprojectionDDb(
       blockSize.y = (nDetXMap / threadsPerBlock.y) + 1;
       blockSize.z = 1;
 
-      hipLaunchKernelGGL(mapDet2Slice_kernel, blockSize, threadsPerBlock, 0, 0, 
+      mapDet2Slice_kernel <<<blockSize, threadsPerBlock>>> (
           d_pDetmX, d_pDetmY, tubeX, rtubeY, rtubeZ, d_pDetX,
           d_pRdetY, d_pRdetZ, d_pObjZ, nDetXMap, nDetYMap, nz);
 
@@ -582,7 +575,7 @@ void backprojectionDDb(
       blockSize.x = (nPixYMap / threadsPerBlock.x) + 1;
       blockSize.y = (nPixXMap / threadsPerBlock.y) + 1;
 
-      hipLaunchKernelGGL(bilinear_interpolation_kernel, blockSize, threadsPerBlock, 0, 0, 
+      bilinear_interpolation_kernel <<<blockSize, threadsPerBlock>>> (
           d_sliceI, d_pProj, d_pObjX, d_pObjY, d_pDetmX_tmp, d_pDetmY,
           nPixXMap, nPixYMap, nDetXMap, nDetYMap, nDetX, nDetY, p);
 
@@ -591,7 +584,7 @@ void backprojectionDDb(
       blockSize.x = (nPixY / threadsPerBlock.x) + 1;
       blockSize.y = (nPixX / threadsPerBlock.y) + 1;
 
-      hipLaunchKernelGGL(differentiation_kernel, blockSize, threadsPerBlock, 0, 0, 
+      differentiation_kernel <<<blockSize, threadsPerBlock>>> (
           d_pVolume, d_sliceI, tubeX, rtubeY, rtubeZ, d_pObjX, d_pObjY, d_pObjZ,
           nPixX, nPixY, nPixXMap, nPixYMap, du, dv, dx, dy, dz, nz);
 
@@ -609,7 +602,12 @@ void backprojectionDDb(
   blockSize.y = (nPixX / threadsPerBlock.y) + 1;
   blockSize.z = (nSlices / threadsPerBlock.z) + 1;
 
-  hipLaunchKernelGGL(division_kernel, blockSize, threadsPerBlock, 0, 0, d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
+  division_kernel <<<blockSize, threadsPerBlock>>> (d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution %f (s)\n", time * 1e-9f);
 
   hipMemcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double), hipMemcpyDeviceToHost);
 
@@ -677,8 +675,6 @@ int main()
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
-  auto start = std::chrono::steady_clock::now();
-
   backprojectionDDb(
     h_pVolume,
     h_pProj,
@@ -692,10 +688,6 @@ int main()
     dx, dy, dz,
     du, dv,
     DSD, DDR, DAG);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("backprojectionDDb execution time %f (s)\n", time * 1e-9f);
 
   double checkSum = 0;
   for (size_t i = 0; i < pixVol; i++)
