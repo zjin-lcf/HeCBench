@@ -137,47 +137,48 @@ long test_1D (queue &q, const int length, const int order, const bool clip,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
-  long time;
-  {
-    buffer<T, 1> d_x(x, length);
-    buffer<bool, 1> d_result(gpu_r, length);
+  T *d_x = malloc_device<T>(length, q);
+  q.memcpy(d_x, x, length * sizeof(T));
 
-    range<1> gws ((length+255)/256*256);
-    range<1> lws (256);
+  bool *d_result = malloc_device<bool>(length, q);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  range<1> gws ((length+255)/256*256);
+  range<1> lws (256);
 
-    for (int n = 0; n < repeat; n++)
-      q.submit([&] (handler &cgh) {
-        auto results = d_result.get_access<sycl_discard_write>(cgh);
-        auto inp = d_x.template get_access<sycl_read>(cgh);
-        cgh.parallel_for<class extrema1D<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          const int tid = item.get_global_id(0);
-          if (tid < length) {
-            const T data = inp[tid];
-            bool    temp = true;
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-            for ( int o = 1; o < ( order + 1 ); o++ ) {
-              int plus = tid + o;
-              int minus = tid - o;
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class extrema1D<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        const int tid = item.get_global_id(0);
+        if (tid < length) {
+          const T data = d_x[tid];
+          bool    temp = true;
 
-              clip_plus( clip, length, plus );
-              clip_minus( clip, length, minus );
+          #pragma unroll 8
+          for ( int o = 1; o < ( order + 1 ); o++ ) {
+            int plus = tid + o;
+            int minus = tid - o;
 
-              temp &= data > inp[plus];
-              temp &= data >= inp[minus];
-            }
-            results[tid] = temp;
+            clip_plus( clip, length, plus );
+            clip_minus( clip, length, minus );
+
+            temp &= data > d_x[plus];
+            temp &= data >= d_x[minus];
           }
-        });
+          d_result[tid] = temp;
+        }
       });
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average 1D kernel (type = %s, order = %d, clip = %d) execution time %f (s)\n", 
-           type, order, clip, (time * 1e-9f) / repeat);
+    });
   }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average 1D kernel (type = %s, order = %d, clip = %d) execution time %f (s)\n", 
+         type, order, clip, (time * 1e-9f) / repeat);
+
+  q.memcpy(gpu_r, d_result, length * sizeof(bool)).wait();
 
   cpu_relextrema_1D<T>(length, order, clip, x, cpu_r);
 
@@ -188,6 +189,8 @@ long test_1D (queue &q, const int length, const int order, const bool clip,
       break;
     }
 
+  free(d_x, q);
+  free(d_result, q);
   free(x);
   free(cpu_r);
   free(gpu_r);
@@ -210,65 +213,65 @@ long test_2D (queue &q, const int length_x, const int length_y,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
-  long time;
-  {
-    buffer<T, 1> d_x(x, length);
-    buffer<bool, 1> d_result(gpu_r, length);
+  T *d_x = malloc_device<T>(length, q);
+  q.memcpy(d_x, x, length * sizeof(T));
 
-    range<2> gws ((length_y+15)/16*16, (length_x+15)/16*16);
-    range<2> lws (16, 16);
+  bool *d_result = malloc_device<bool>(length, q);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  range<2> gws ((length_y+15)/16*16, (length_x+15)/16*16);
+  range<2> lws (16, 16);
 
-    for (int n = 0; n < repeat; n++)
-      q.submit([&] (handler &cgh) {
-        auto results = d_result.template get_access<sycl_discard_write>(cgh);
-        auto inp = d_x.template get_access<sycl_read>(cgh);
-        cgh.parallel_for<class extrema2D<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          const int ty = item.get_global_id(1); 
-          const int tx = item.get_global_id(0);
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-          if ( ( tx < length_y ) && ( ty < length_x ) ) {
-            int tid = tx * length_x + ty ;
-            const T data = inp[tid] ;
-            bool    temp = true ;
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (handler &cgh) {
+      cgh.parallel_for<class extrema2D<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        const int ty = item.get_global_id(1); 
+        const int tx = item.get_global_id(0);
 
-            for ( int o = 1; o < ( order + 1 ); o++ ) {
-              int plus;
-              int minus;
-              if ( axis == 0 ) {
-                plus  = tx + o;
-                minus = tx - o;
+        if ( ( tx < length_y ) && ( ty < length_x ) ) {
+          int tid = tx * length_x + ty ;
+          const T data = d_x[tid] ;
+          bool    temp = true ;
+          #pragma unroll 8
+          for ( int o = 1; o < ( order + 1 ); o++ ) {
+            int plus;
+            int minus;
+            if ( axis == 0 ) {
+              plus  = tx + o;
+              minus = tx - o;
 
-                clip_plus( clip, length_y, plus );
-                clip_minus( clip, length_y, minus );
+              clip_plus( clip, length_y, plus );
+              clip_minus( clip, length_y, minus );
 
-                plus  = plus * length_x + ty;
-                minus = minus * length_x + ty;
-              } else {
-                plus  = ty + o;
-                minus = ty - o;
+              plus  = plus * length_x + ty;
+              minus = minus * length_x + ty;
+            } else {
+              plus  = ty + o;
+              minus = ty - o;
 
-                clip_plus( clip, length_x, plus );
-                clip_minus( clip, length_x, minus );
+              clip_plus( clip, length_x, plus );
+              clip_minus( clip, length_x, minus );
 
-                plus  = tx * length_x + plus;
-                minus = tx * length_x + minus;
-              }
-              temp &= data > inp[plus] ;
-              temp &= data >= inp[minus] ;
+              plus  = tx * length_x + plus;
+              minus = tx * length_x + minus;
             }
-            results[tid] = temp;
+            temp &= data > d_x[plus] ;
+            temp &= data >= d_x[minus] ;
           }
-        });
+          d_result[tid] = temp;
+        }
       });
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average 2D kernel (type = %s, order = %d, clip = %d, axis = %d) execution time %f (s)\n", 
-         type, order, clip, axis, (time * 1e-9f) / repeat);
+    });
   }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average 2D kernel (type = %s, order = %d, clip = %d, axis = %d) execution time %f (s)\n", 
+       type, order, clip, axis, (time * 1e-9f) / repeat);
+  
+  q.memcpy(gpu_r, d_result, length * sizeof(bool)).wait();
 
   cpu_relextrema_2D(length_x, length_y, order, clip, axis, x, cpu_r);
 
@@ -279,6 +282,8 @@ long test_2D (queue &q, const int length_x, const int length_y,
       break;
     }
 
+  free(d_x, q);
+  free(d_result, q);
   free(x);
   free(cpu_r);
   free(gpu_r);
@@ -298,7 +303,7 @@ int main(int argc, char* argv[]) {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   long time = 0;
 
