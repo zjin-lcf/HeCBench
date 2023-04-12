@@ -31,8 +31,11 @@ lstm_inference(
   float g_state[5] = {0,0,0,0,0};
 
   for (t = 0; t < SAMPLE_TEST_LEN; ++t) {
+
+    float x = d_x[gid * SAMPLE_TEST_LEN + t];
+
     for (j = 0; j < 5; ++j) {
-      i_state[j] = d_inW[j] * d_x[gid * SAMPLE_TEST_LEN + t];
+      i_state[j] = d_inW[j] * x;
       for (i = 0; i < 5; ++i)
         i_state[j] += h_state[i] * d_intW[j*5+i];
       i_state[j] += d_intB[j];
@@ -40,7 +43,7 @@ lstm_inference(
     }
 
     for (j = 0; j < 5; ++j) {
-      f_state[j] = d_inW[5+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+      f_state[j] = d_inW[5+j] * x;
       for (i = 0; i < 5; ++i)
         f_state[j] += h_state[i] * d_intW[25+j*5+i];
       f_state[j] += d_intB[5+j];
@@ -48,7 +51,7 @@ lstm_inference(
     }
 
     for (j = 0; j < 5; ++j) {
-      o_state[j] = d_inW[10+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+      o_state[j] = d_inW[10+j] * x;
       for (i = 0; i < 5; ++i)
         o_state[j] += h_state[i] * d_intW[50+j*5+i];
       o_state[j] += d_intB[10+j];
@@ -56,7 +59,7 @@ lstm_inference(
     }
 
     for (j = 0; j < 5; ++j) {
-      g_state[j] = d_inW[15+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+      g_state[j] = d_inW[15+j] * x;
       for (i = 0; i < 5; ++i)
         g_state[j] += h_state[i] * d_intW[75+j*5+i];
       g_state[j] += d_intB[15+j];
@@ -68,8 +71,9 @@ lstm_inference(
       h_state[j] = tanh(c_state[j]) * o_state[j];
     }
 
-    d_y[gid * SAMPLE_TEST_LEN + t] = d_outB[0];
+    float y = d_outB[0];
     for (j = 0; j < 5; ++j)
-      d_y[gid * SAMPLE_TEST_LEN + t] += h_state[j] * d_outW[j];
+      y += h_state[j] * d_outW[j];
+    d_y[gid * SAMPLE_TEST_LEN + t] = y;
   }
 }

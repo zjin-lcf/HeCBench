@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cstring>
 #include "common.h"
+#include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+using namespace sycl::ext::oneapi::experimental::cuda;
 
 // a multiple of WGS for simplicity
 #define N 8192
@@ -58,7 +60,7 @@ void init(const char* work_path, const char* input_filename, const char* weight_
 
   // duplicate the sample using the first sample
   for (int i = 1; i < N; i++)
-	memcpy(sample_input+i*SAMPLE_TEST_LEN, sample_input, SAMPLE_TEST_LEN*sizeof(float));
+    memcpy(sample_input+i*SAMPLE_TEST_LEN, sample_input, SAMPLE_TEST_LEN*sizeof(float));
 
   // Load weights and perform inference for LSTM 1.
   sprintf(file_name, "%s/%s", work_path, weight_filename);
@@ -128,7 +130,8 @@ long lstm_n5( queue &q,
   auto start = std::chrono::steady_clock::now();
 
   q.submit([&](handler& cgh) {
-    cgh.parallel_for<class lstm>(nd_range<1>(range<1>(N), range<1>(WGS)), [=] (nd_item<1> item) {
+    cgh.parallel_for<class lstm>(
+      nd_range<1>(range<1>(N), range<1>(WGS)), [=] (nd_item<1> item) {
       int t,i,j;
       int gid = item.get_global_id(0);
       
@@ -140,35 +143,38 @@ long lstm_n5( queue &q,
       float g_state[5] = {0,0,0,0,0};
       
       for (t = 0; t < SAMPLE_TEST_LEN; ++t) {
+
+        float x = ldg(&d_x[gid * SAMPLE_TEST_LEN + t]);
+
         for (j = 0; j < 5; ++j) {
-          i_state[j] = d_inW[j] * d_x[gid * SAMPLE_TEST_LEN + t];
+          i_state[j] = ldg(&d_inW[j]) * x;
           for (i = 0; i < 5; ++i)
-            i_state[j] += h_state[i] * d_intW[j*5+i];
-          i_state[j] += d_intB[j];
+            i_state[j] += h_state[i] * ldg(&d_intW[j*5+i]);
+          i_state[j] += ldg(&d_intB[j]);
           i_state[j] = sigmoid(i_state[j]);
         }
         
         for (j = 0; j < 5; ++j) {
-          f_state[j] = d_inW[5+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+          f_state[j] = ldg(&d_inW[5+j]) * x;
           for (i = 0; i < 5; ++i)
-            f_state[j] += h_state[i] * d_intW[25+j*5+i];
-          f_state[j] += d_intB[5+j];
+            f_state[j] += h_state[i] * ldg(&d_intW[25+j*5+i]);
+          f_state[j] += ldg(&d_intB[5+j]);
           f_state[j] = sigmoid(f_state[j]);
         }
 
         for (j = 0; j < 5; ++j) {
-          o_state[j] = d_inW[10+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+          o_state[j] = ldg(&d_inW[10+j]) * x;
           for (i = 0; i < 5; ++i)
-            o_state[j] += h_state[i] * d_intW[50+j*5+i];
-          o_state[j] += d_intB[10+j];
+            o_state[j] += h_state[i] * ldg(&d_intW[50+j*5+i]);
+          o_state[j] += ldg(&d_intB[10+j]);
           o_state[j] = sigmoid(o_state[j]);
         }
 
         for (j = 0; j < 5; ++j) {
-          g_state[j] = d_inW[15+j] * d_x[gid * SAMPLE_TEST_LEN + t];
+          g_state[j] = ldg(&d_inW[15+j]) * x;
           for (i = 0; i < 5; ++i)
-            g_state[j] += h_state[i] * d_intW[75+j*5+i];
-          g_state[j] += d_intB[15+j];
+            g_state[j] += h_state[i] * ldg(&d_intW[75+j*5+i]);
+          g_state[j] += ldg(&d_intB[15+j]);
           g_state[j] = sycl::tanh(g_state[j]);
         }
 
@@ -177,9 +183,10 @@ long lstm_n5( queue &q,
           h_state[j] = sycl::tanh(c_state[j]) * o_state[j];
         }
 
-        d_y[gid * SAMPLE_TEST_LEN + t] = d_outB[0];
+        float y = ldg(&d_outB[0]);
         for (j = 0; j < 5; ++j)
-          d_y[gid * SAMPLE_TEST_LEN + t] += h_state[j] * d_outW[j];
+          y += h_state[j] * ldg(&d_outW[j]);
+        d_y[gid * SAMPLE_TEST_LEN + t] = y;
       }
     });
   }).wait();
@@ -198,7 +205,13 @@ long lstm_n5( queue &q,
   return time;
 }
 
-int main() {
+int main(int argc, char* argv[])
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   float* sample_input = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
   float* infer1_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
@@ -221,10 +234,10 @@ int main() {
 #else
   cpu_selector dev_sel;
 #endif
-  queue q(dev_sel);
+  queue q(dev_sel, property::queue::in_order());
 
   long kernel_time = 0;
-  for (int n = 0; n < 10; n++) {
+  for (int n = 0; n < repeat; n++) {
     init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
     auto start = std::chrono::steady_clock::now();
     kernel_time += lstm_n5(q, sample_input, inW, intW, intB, outW, &outB, infer1_out);
@@ -249,7 +262,7 @@ int main() {
     dump(work_path, result2_filename, infer2_out);
 #endif
   }
-  std::cout << "Average kernel time: " <<  kernel_time * 1e-6 / 20 << " ms\n";
+  std::cout << "Average kernel time: " <<  kernel_time * 1e-6 / (2 * repeat) << " ms\n";
 
   free(sample_input);
   free(infer1_out);
