@@ -129,7 +129,13 @@ long lstm_n5(const float* x,
   return time;
 }
 
-int main() {
+int main(int argc, char* argv[])
+{
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+  const int repeat = atoi(argv[1]);
 
   float* sample_input = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
   float* infer1_out = (float*) aligned_alloc(64, sizeof(float)*N*SAMPLE_TEST_LEN);
@@ -148,7 +154,7 @@ int main() {
 #endif
 
   long kernel_time = 0;
-  for (int n = 0; n < 10; n++) {
+  for (int n = 0; n < repeat; n++) {
     init(work_path, input_filename, weight1_filename, sample_input, inW, intW, intB, outW, &outB) ;
     auto start = std::chrono::steady_clock::now();
     kernel_time += lstm_n5(sample_input, inW, intW, intB, outW, &outB, infer1_out);
@@ -173,7 +179,7 @@ int main() {
     dump(work_path, result2_filename, infer2_out);
 #endif
   }
-  std::cout << "Average kernel time: " <<  kernel_time * 1e-6 / 20 << " ms\n";
+  std::cout << "Average kernel time: " <<  kernel_time * 1e-6 / (2 * repeat) << " ms\n";
 
   free(sample_input);
   free(infer1_out);
