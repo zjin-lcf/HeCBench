@@ -451,6 +451,9 @@ void backprojectionDDb(double* const h_pVolume,
                                       d_pRdetY[0:nDetYMap],\
                                       d_pRdetZ[0:nDetYMap])
   {
+
+  auto start = std::chrono::steady_clock::now();
+
   map_boudaries_kernel(d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
 
   map_boudaries_kernel(d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
@@ -578,6 +581,10 @@ void backprojectionDDb(double* const h_pVolume,
   // Normalize volume dividing by the number of projections
   division_kernel(d_pVolume, nPixX, nPixY, nSlices, nProj2Run);
 
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution %f (s)\n", time * 1e-9f);
+
   }
 
   free(d_pProj);
@@ -642,8 +649,6 @@ int main()
   for (size_t i = 0; i < detVol; i++) 
     h_pProj[i] = (double)rand() / (double)RAND_MAX;
 
-  auto start = std::chrono::steady_clock::now();
-
   backprojectionDDb(
     h_pVolume,
     h_pProj,
@@ -657,10 +662,6 @@ int main()
     dx, dy, dz,
     du, dv,
     DSD, DDR, DAG);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("backprojectionDDb execution time %f (s)\n", time * 1e-9f);
 
   double checkSum = 0;
   for (size_t i = 0; i < pixVol; i++)
