@@ -2,8 +2,13 @@
 #include <iostream>
 #include <cstring>
 #include "common.h"
-#include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
-using namespace sycl::ext::oneapi::experimental::cuda;
+
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
 
 // a multiple of WGS for simplicity
 #define N 8192

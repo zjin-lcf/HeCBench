@@ -10,9 +10,15 @@
  */
 
 #include <assert.h>
-#include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
 #include "common.h"
 #include "conv.h"
+
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
 
 #define ROWS_BLOCKDIM_X       16
 #define COLUMNS_BLOCKDIM_X    16
@@ -22,8 +28,6 @@
 #define COLUMNS_RESULT_STEPS  8
 #define ROWS_HALO_STEPS       1
 #define COLUMNS_HALO_STEPS    1
-
-using namespace sycl::ext::oneapi::experimental::cuda;
 
 void convolutionRows(
     queue &q,
