@@ -291,7 +291,7 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   free(cpu_out);
   free(gpu_out);
-  free(d_in, q)
+  free(d_in, q);
   free(d_out, q);
 }
 
