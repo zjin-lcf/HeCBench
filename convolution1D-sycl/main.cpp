@@ -15,7 +15,7 @@
   #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
   using namespace sycl::ext::oneapi::experimental::cuda;
 #else
-  #define ldg(a) (*a)
+  #define ldg(a) (*(a))
 #endif
 
 #define MAX_MASK_WIDTH 10

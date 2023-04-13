@@ -6,6 +6,13 @@
 #include "common.h"
 #include "reference.h"
 
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
+
 #define GPU_THREADS 256
 
 #define KERNEL_LOOP(index, range) \
@@ -17,8 +24,7 @@ template <typename T>
 void SwishKernel(nd_item<1> &item, const int N, const T* X, T* Y)
 {
   KERNEL_LOOP(i, N) {
-    Y[i] = X[i] / (T(1) + sycl::exp(-X[i]));
-    //Y[i] = __ldg(X + i) / (T(1) + sycl::exp(-__ldg(X + i)));
+    Y[i] = ldg(X + i) / (T(1) + sycl::exp(-ldg(X + i)));
   }
 }
 
@@ -32,9 +38,8 @@ void SwishGradientKernel(
           T* dX)
 {
   KERNEL_LOOP(i, N) {
-    //dX[i] = __ldg(dY + i) *
-            //(__ldg(Y + i) + (T(1) - __ldg(Y + i)) / (T(1) + sycl::exp(-__ldg(X + i))));
-    dX[i] = dY[i] * (Y[i] + (T(1) - Y[i]) / (T(1) + sycl::exp(-X[i])));
+    dX[i] = ldg(dY + i) *
+            (ldg(Y + i) + (T(1) - ldg(Y + i)) / (T(1) + sycl::exp(-ldg(X + i))));
   }
 }
 
