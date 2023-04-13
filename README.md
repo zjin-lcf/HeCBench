@@ -112,13 +112,13 @@ Each benchmark falls into a single category. While such classification is not ac
     It can also be used to run a single benchmark:
 
     ```
-    ./autohecbench.py mandelbrot-sycl --verbose
+    ./autohecbench.py backprop-sycl --verbose
     ```
 
     By default it will run a warmup iteration before running each benchmark,
     and it is possible to run the benchmarks multiple times with `-r`:
     ```
-    ./autohecbench.py mandelbrot-sycl -r 20 -o mandel.csv
+    ./autohecbench.py backprop-sycl -r 20 -o mandel.csv
     ```
 
     And it also has options to pick the SM version or HIP architecture and a
