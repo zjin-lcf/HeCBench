@@ -25,7 +25,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
-LDFLAGS = -L/opt/rocm/lib -lhipblas 
+LDFLAGS = -lhipblas 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

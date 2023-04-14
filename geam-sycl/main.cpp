@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <oneapi/mkl.hpp>
 
 template <typename T>
@@ -24,7 +24,7 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
 
   auto end = std::chrono::steady_clock::now();
   double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("serial transpose time = %lf (ms)\n", time * 1e-6f);
+  printf("Host: serial matrix transpose time = %f (ms)\n", time * 1e-6f);
 
   const T alpha = (T)1;
   const T beta  = (T)0;
@@ -39,11 +39,16 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
 
   time = 0.0;
 
+  // warmup to exclude program/kernel setup time
+  const int warmup = 4;
+
   sycl::event status;
-  for (int i = 0; i < repeat; i++) {
-    start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat + warmup; i++) {
+    if (i >= warmup) {
+      start = std::chrono::steady_clock::now();
+    }
     try {
-      status = oneapi::mkl::blas::omatadd_batch(
+      status = oneapi::mkl::blas::row_major::omatadd_batch(
         q,
         oneapi::mkl::transpose::trans,
         oneapi::mkl::transpose::nontrans,
@@ -68,11 +73,13 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
       break;
     }
     status.wait();
-    end = std::chrono::steady_clock::now();
-    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    if (i >= warmup) {
+      end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
   }
 
-  printf("Average device transpose time = %lf (us)\n", (time * 1e-3f) / repeat);
+  printf("Device: average matrix transpose time = %f (ms)\n", (time * 1e-6f) / repeat);
 
   q.memcpy(h_matrixT, d_matrixT, size_byte).wait();
 
@@ -108,13 +115,13 @@ int main(int argc, char* argv[]) {
 #else
   sycl::cpu_selector dev_sel;
 #endif
-  sycl::queue q(dev_sel);
+  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
-  printf("----------------\nFP32 transpose matrix (%d x %d)\n----------------\n",
+  printf("----------------FP32 transpose matrix (%d x %d)----------------\n",
          nrow, ncol);
   transpose<float>(q, nrow, ncol, repeat);
 
-  printf("----------------\nFP64 transpose matrix (%d x %d)\n----------------\n",
+  printf("----------------FP64 transpose matrix (%d x %d)----------------\n",
          nrow, ncol);
   transpose<double>(q, nrow, ncol, repeat);
 
