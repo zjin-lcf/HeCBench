@@ -23,7 +23,7 @@ void transpose_f64(int nrow, int ncol, int repeat) {
 
   auto end = std::chrono::steady_clock::now();
   double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("serial transpose time = %lf (ms)\n", time * 1e-6f);
+  printf("Host: serial matrix transpose time = %f (ms)\n", time * 1e-6f);
 
   hipblasStatus_t stat;
   hipblasHandle_t handle;
@@ -42,18 +42,22 @@ void transpose_f64(int nrow, int ncol, int repeat) {
   hipMalloc((void**)&d_matrixT, size_byte);
 
   time = 0.0;
+  const int warmup = 4;
 
-  for (int i = 0; i < repeat; i++) {
-
-    start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat + warmup; i++) {
+    if (i >= warmup) {
+      start = std::chrono::steady_clock::now();
+    }
     stat = hipblasDgeam(handle, HIPBLAS_OP_T, HIPBLAS_OP_N,
                        nrow, ncol,
                        &alpha, d_matrix, ncol,
                        &beta, d_matrix, nrow,
                        d_matrixT, nrow);
     hipDeviceSynchronize(); // required for timing correctness
-    end = std::chrono::steady_clock::now();
-    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    if (i >= warmup) {
+      end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
 
     if (stat != HIPBLAS_STATUS_SUCCESS) {
       error = 1;
@@ -62,7 +66,7 @@ void transpose_f64(int nrow, int ncol, int repeat) {
     }
   }
 
-  printf("Average device transpose time = %lf (us)\n", (time * 1e-3f) / repeat);
+  printf("Device: average matrix transpose time = %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_matrixT, d_matrixT, size_byte, hipMemcpyDeviceToHost);
 
@@ -99,7 +103,7 @@ void transpose_f32(int nrow, int ncol, int repeat) {
 
   auto end = std::chrono::steady_clock::now();
   double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("serial transpose time = %lf (ms)\n", time * 1e-6f);
+  printf("Host: serial matrix transpose time = %f (ms)\n", time * 1e-6f);
 
   hipblasStatus_t stat;
   hipblasHandle_t handle;
@@ -117,17 +121,22 @@ void transpose_f32(int nrow, int ncol, int repeat) {
   hipMalloc((void**)&d_matrixT, size_byte);
 
   time = 0.0;
+  const int warmup = 4;
 
-  for (int i = 0; i < repeat; i++) {
-    start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat + warmup; i++) {
+    if (i >= warmup) {
+      start = std::chrono::steady_clock::now();
+    }
     stat = hipblasSgeam(handle, HIPBLAS_OP_T, HIPBLAS_OP_N,
                        nrow, ncol,
                        &alpha, d_matrix, ncol,
                        &beta, d_matrix, nrow,
                        d_matrixT, nrow);
     hipDeviceSynchronize(); // required for timing correctness
-    end = std::chrono::steady_clock::now();
-    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    if (i >= warmup) {
+      end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
 
     if (stat != HIPBLAS_STATUS_SUCCESS) {
       error = 1;
@@ -136,7 +145,7 @@ void transpose_f32(int nrow, int ncol, int repeat) {
     }
   }
 
-  printf("Average device transpose time = %lf (us)\n", (time * 1e-3f) / repeat);
+  printf("Device: average matrix transpose time = %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_matrixT, d_matrixT, size_byte, hipMemcpyDeviceToHost);
 
@@ -168,11 +177,11 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  printf("----------------\nFP32 transpose matrix (%d x %d)\n----------------\n",
+  printf("----------------FP32 transpose matrix (%d x %d)----------------\n",
          nrow, ncol);
   transpose_f32<float>(nrow, ncol, repeat);
 
-  printf("----------------\nFP64 transpose matrix (%d x %d)\n----------------\n",
+  printf("----------------FP64 transpose matrix (%d x %d)----------------\n",
          nrow, ncol);
   transpose_f64<double>(nrow, ncol, repeat);
 
