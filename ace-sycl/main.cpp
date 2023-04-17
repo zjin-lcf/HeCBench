@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //define the data set size (cubic volume)
 #define DATAXSIZE 600
@@ -111,7 +111,7 @@ void calculateForce(double phi[][DATAYSIZE][DATAXSIZE],
                     double Fz[][DATAYSIZE][DATAXSIZE],
                     double dx, double dy, double dz,
                     double epsilon, double W0, double tau0,
-                    nd_item<3> &item)
+                    sycl::nd_item<3> &item)
 {
 
   unsigned iz = item.get_global_id(2);
@@ -153,7 +153,7 @@ void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE],
                double Fz[][DATAYSIZE][DATAXSIZE],
                double epsilon, double W0, double tau0, double lambda,
                double dt, double dx, double dy, double dz,
-               nd_item<3> &item)
+               sycl::nd_item<3> &item)
 {
   unsigned iz = item.get_global_id(2);
   unsigned iy = item.get_global_id(1);
@@ -176,7 +176,7 @@ void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE],
 
 
 void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE],
-                           nd_item<3> &item)
+                           sycl::nd_item<3> &item)
 {
   unsigned iz = item.get_global_id(2);
   unsigned iy = item.get_global_id(1);
@@ -208,7 +208,7 @@ void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
                      double phinew[][DATAYSIZE][DATAXSIZE],
                      double phiold[][DATAYSIZE][DATAXSIZE],
                      double D, double dt, double dx, double dy, double dz,
-                     nd_item<3> &item)
+                     sycl::nd_item<3> &item)
 {
   unsigned iz = item.get_global_id(2);
   unsigned iy = item.get_global_id(1);
@@ -225,7 +225,7 @@ void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
 
 
 void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta,
-                         nd_item<3> &item)
+                         sycl::nd_item<3> &item)
 {
   unsigned iz = item.get_global_id(2);
   unsigned iy = item.get_global_id(1);
@@ -254,7 +254,7 @@ void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta,
 
 void swapGrid(double cnew[][DATAYSIZE][DATAXSIZE],
               double cold[][DATAYSIZE][DATAXSIZE],
-              nd_item<3> &item)
+              sycl::nd_item<3> &item)
 {
   unsigned iz = item.get_global_id(2);
   unsigned iy = item.get_global_id(1);
@@ -335,152 +335,143 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_in_bytes = sizeof(double) * vol;
 
   // pointers for data set storage via malloc
   nRarray *phi_host;
   nRarray *u_host;
 
-  phi_host = (nRarray *)malloc(vol*sizeof(double));
-  u_host = (nRarray *)malloc(vol*sizeof(double));
+  phi_host = (nRarray *)malloc(vol_in_bytes);
+  u_host = (nRarray *)malloc(vol_in_bytes);
 
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
 
 #ifdef VERIFY
-  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
-  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
-  memcpy(phi_ref, phi_host, vol*sizeof(double));
-  memcpy(u_ref, u_host, vol*sizeof(double));
+  nRarray *phi_ref = (nRarray *)malloc(vol_in_bytes);
+  nRarray *u_ref = (nRarray *)malloc(vol_in_bytes);
+  memcpy(phi_ref, phi_host, vol_in_bytes);
+  memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
   auto offload_start = std::chrono::steady_clock::now();
 
-  { // sycl scope
-  #ifdef USE_GPU
-    gpu_selector dev_sel;
-  #else
-    cpu_selector dev_sel;
-  #endif
-    queue q(dev_sel);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
-    // allocate GPU device buffers
-    buffer<double, 1> d_phiold ((double*)phi_host, vol);
-    buffer<double, 1> d_uold ((double*)u_host, vol);
-    buffer<double, 1> d_phinew (vol);
-    buffer<double, 1> d_unew (vol);
-    buffer<double, 1> d_Fx (vol);
-    buffer<double, 1> d_Fy (vol);
-    buffer<double, 1> d_Fz (vol);
+  // allocate GPU device buffers
+  nRarray *d_phiold = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_uold = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_phinew = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_unew = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_Fx = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_Fy = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
+  nRarray *d_Fz = (nRarray*) sycl::malloc_device(vol_in_bytes, q);
 
-    // define the chunk sizes that each threadblock will work on
-    range<3> gws ((DATAXSIZE+3)/4*4, (DATAYSIZE+7)/8*8, (DATAZSIZE+7)/8*8);
-    range<3> lws (4, 8, 8);
+  q.memcpy(d_phiold, phi_host, vol_in_bytes);
+  q.memcpy(d_uold, u_host, vol_in_bytes);
 
-    int t = 0;
+  // define the chunk sizes that each threadblock will work on
+  sycl::range<3> gws ((DATAXSIZE+3)/4*4, (DATAYSIZE+7)/8*8, (DATAZSIZE+7)/8*8);
+  sycl::range<3> lws (4, 8, 8);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  int t = 0;
 
-    auto d_phiold_re = d_phiold.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_phinew_re = d_phinew.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_uold_re = d_uold.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_unew_re = d_unew.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_Fx_re = d_Fx.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_Fy_re = d_Fy.reinterpret<nRarray>(range<1>(DATAZSIZE));
-    auto d_Fz_re = d_Fz.reinterpret<nRarray>(range<1>(DATAZSIZE));
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-    while (t <= num_steps) {
-      
-      q.submit([&] (handler &cgh) {
-        auto d_phiold = d_phiold_re.get_access<sycl_read>(cgh);
-        auto d_Fx = d_Fx_re.get_access<sycl_discard_write>(cgh);
-        auto d_Fy = d_Fy_re.get_access<sycl_discard_write>(cgh);
-        auto d_Fz = d_Fz_re.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class calc_force>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          calculateForce(d_phiold.get_pointer(),
-                         d_Fx.get_pointer(),
-                         d_Fy.get_pointer(),
-                         d_Fz.get_pointer(),
-                         dx,dy,dz,epsilon,W0,tau0,
-                         item);
-        });
+  while (t <= num_steps) {
+    
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class calc_force>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        calculateForce(d_phiold,
+                       d_Fx,
+                       d_Fy,
+                       d_Fz,
+                       dx,dy,dz,epsilon,W0,tau0,
+                       item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_phinew = d_phinew_re.get_access<sycl_discard_write>(cgh);
-        auto d_phiold = d_phiold_re.get_access<sycl_read>(cgh);
-        auto d_uold = d_uold_re.get_access<sycl_read>(cgh);
-        auto d_Fx = d_Fx_re.get_access<sycl_read>(cgh);
-        auto d_Fy = d_Fy_re.get_access<sycl_read>(cgh);
-        auto d_Fz = d_Fz_re.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class allen_cahn>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          allenCahn(d_phinew.get_pointer(),
-                    d_phiold.get_pointer(),
-                    d_uold.get_pointer(),
-                    d_Fx.get_pointer(),
-                    d_Fy.get_pointer(),
-                    d_Fz.get_pointer(),
-                    epsilon,W0,tau0,lambda,
-                    dt,dx,dy,dz,
-                    item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class allen_cahn>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        allenCahn(d_phinew,
+                  d_phiold,
+                  d_uold,
+                  d_Fx,
+                  d_Fy,
+                  d_Fz,
+                  epsilon,W0,tau0,lambda,
+                  dt,dx,dy,dz,
+                  item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_phinew = d_phinew_re.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class bc_phi>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          boundaryConditionsPhi(d_phinew.get_pointer(), item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_phi>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        boundaryConditionsPhi(d_phinew, item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_unew = d_unew_re.get_access<sycl_discard_write>(cgh);
-        auto d_uold = d_uold_re.get_access<sycl_read>(cgh);
-        auto d_phinew = d_phinew_re.get_access<sycl_read>(cgh);
-        auto d_phiold = d_phiold_re.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class thermal_equation>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          thermalEquation(d_unew.get_pointer(),
-                          d_uold.get_pointer(),
-                          d_phinew.get_pointer(),
-                          d_phiold.get_pointer(),
-                          D,dt,dx,dy,dz,
-                          item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class thermal_equation>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        thermalEquation(d_unew,
+                        d_uold,
+                        d_phinew,
+                        d_phiold,
+                        D,dt,dx,dy,dz,
+                        item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_unew = d_unew_re.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class bc_u>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          boundaryConditionsU(d_unew.get_pointer(), delta, item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_u>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        boundaryConditionsU(d_unew, delta, item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_phinew = d_phinew_re.get_access<sycl_read_write>(cgh);
-        auto d_phiold = d_phiold_re.get_access<sycl_read_write>(cgh);
-        cgh.parallel_for<class swap_phi>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          swapGrid(d_phinew.get_pointer(), d_phiold.get_pointer(), item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swap_phi>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        swapGrid(d_phinew, d_phiold, item);
       });
+    });
 
-      q.submit([&] (handler &cgh) {
-        auto d_unew = d_unew_re.get_access<sycl_read_write>(cgh);
-        auto d_uold = d_uold_re.get_access<sycl_read_write>(cgh);
-        cgh.parallel_for<class swap_u>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-          swapGrid(d_unew.get_pointer(), d_uold.get_pointer(), item);
-        });
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swap_u>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        swapGrid(d_unew, d_uold, item);
       });
+    });
 
-      t++;
-    }
+    t++;
+  }
 
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
 
-  } // sycl scope
+  q.memcpy(phi_host, d_phiold, vol_in_bytes);
+  q.memcpy(u_host, d_uold, vol_in_bytes);
+  q.wait();
+
+  sycl::free(d_phiold, q);
+  sycl::free(d_phinew, q);
+  sycl::free(d_uold, q);
+  sycl::free(d_unew, q);
+  sycl::free(d_Fx, q);
+  sycl::free(d_Fy, q);
+  sycl::free(d_Fz, q);
 
   auto offload_end = std::chrono::steady_clock::now();
   auto offload_time = std::chrono::duration_cast<std::chrono::nanoseconds>(offload_end - offload_start).count();
