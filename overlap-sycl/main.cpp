@@ -28,9 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-void incKernel(nd_item<3> &item, int *g_out, const int *g_in,
+void incKernel(sycl::nd_item<3> &item, int *g_out, const int *g_in,
                int N, int inner_reps) {
   int idx = item.get_global_id(2);
 
@@ -49,7 +49,7 @@ int *d_data_in[STREAM_COUNT];
 int *h_data_out[STREAM_COUNT];
 int *d_data_out[STREAM_COUNT];
 
-queue q[STREAM_COUNT];
+sycl::queue q[STREAM_COUNT];
 
 int N = 1 << 22;
 int nreps = 10;  // number of times each experiment is repeated
@@ -57,8 +57,8 @@ int inner_reps = 5;  // loop iterations in the GPU kernel
 
 int memsize;
 
-range<3> lws (1, 1, 256);
-range<3> gws (1, 1, N);
+sycl::range<3> lws (1, 1, 256);
+sycl::range<3> gws (1, 1, N);
 
 
 float processWithStreams(int streams_used);
@@ -71,24 +71,24 @@ int main(int argc, char *argv[]) {
 
   memsize = N * sizeof(int);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
+
 
   // Allocate resources
   for (int i = 0; i < STREAM_COUNT; ++i) {
+#ifdef USE_GPU
+      q[i] = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+      q[i] = sycl::queue(sycl::device_selector_v, sycl::property::queue::in_order());
+#endif
 
-    q[i] = queue(dev_sel, property::queue::in_order());
 
-    h_data_in[i] = (int*) malloc_host (memsize, q[0]);
-    h_data_out[i] = (int*) malloc_host (memsize, q[0]);
+    h_data_in[i] = sycl::malloc_host<int>(N, q[0]);
+    h_data_out[i] = sycl::malloc_host<int>(N, q[0]);
 
-    d_data_in[i] = (int*) malloc_device (memsize, q[0]);
+    d_data_in[i] = sycl::malloc_device<int>(N, q[0]);
     q[0].memset(d_data_in[i], 0, memsize);
 
-    d_data_out[i] = (int*) malloc_device (memsize, q[0]);
+    d_data_out[i] = sycl::malloc_device<int>(N, q[0]);
   }
 
   // initialize host memory
@@ -101,16 +101,16 @@ int main(int argc, char *argv[]) {
   printf("\nAverage measured timings over %d repetitions:\n", nreps);
   printf(" Avg. time when execution fully serialized\t: %f ms\n",
          serial_time / nreps);
-  printf(" Avg. time when overlapped using %d streams\t: %f ms\n", STREAM_COUNT,
-         overlap_time / nreps);
-  printf(" Avg. speedup gained (serialized - overlapped)\t: %f ms\n",
-         (serial_time - overlap_time) / nreps);
+//  printf(" Avg. time when overlapped using %d streams\t: %f ms\n", STREAM_COUNT,
+//         overlap_time / nreps);
+//  printf(" Avg. speedup gained (serialized - overlapped)\t: %f ms\n",
+//         (serial_time - overlap_time) / nreps);
 
   printf("\nMeasured throughput:\n");
   printf(" Fully serialized execution\t\t: %f GB/s\n",
          (nreps * (memsize * 2e-6)) / serial_time);
-  printf(" Overlapped using %d streams\t\t: %f GB/s\n", STREAM_COUNT,
-         (nreps * (memsize * 2e-6)) / overlap_time);
+//  printf(" Overlapped using %d streams\t\t: %f GB/s\n", STREAM_COUNT,
+//         (nreps * (memsize * 2e-6)) / overlap_time);
 
   // Verify the results, we will use the results for final output
   bool bResults = check();
@@ -118,11 +118,11 @@ int main(int argc, char *argv[]) {
 
   // Free resources
   for (int i = 0; i < STREAM_COUNT; ++i) {
-    free(h_data_in[i], q[0]);
-    free(d_data_in[i], q[0]);
+    sycl::free(h_data_in[i], q[0]);
+    sycl::free(d_data_in[i], q[0]);
 
-    free(h_data_out[i], q[0]);
-    free(d_data_out[i], q[0]);
+    sycl::free(h_data_out[i], q[0]);
+    sycl::free(d_data_out[i], q[0]);
   }
 
   // Test result
@@ -145,12 +145,12 @@ float processWithStreams(int streams_used) {
     int next_stream = (current_stream + 1) % streams_used;
 
     // Process current frame
-    q[current_stream].submit([&] (handler &cgh) {
+    q[current_stream].submit([&] (sycl::handler &cgh) {
       auto din = d_data_in[current_stream];
       auto dout = d_data_out[current_stream];
       auto n = N;
       auto ireps = inner_reps;
-      cgh.parallel_for<class inc>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      cgh.parallel_for<class inc>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         incKernel(item, dout, din, n, ireps);
       });
     });
