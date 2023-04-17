@@ -58,8 +58,11 @@ int main(int argc, char * argv[])
 
   // expand the key
   unsigned int explandedKeySize = (rounds+1)*keySize;
-  uchar *expandedKey = (uchar*)malloc(explandedKeySize*sizeof(uchar));
-  uchar *roundKey    = (uchar*)malloc(explandedKeySize*sizeof(uchar));
+
+  unsigned int explandedKeySizeBytes = explandedKeySize*sizeof(uchar);
+
+  uchar *expandedKey = (uchar*)malloc(explandedKeySizeBytes);
+  uchar *roundKey    = (uchar*)malloc(explandedKeySizeBytes);
 
   keyExpansion(key, expandedKey, keySize, explandedKeySize);
   for(unsigned int i = 0; i < rounds+1; ++i)
@@ -71,15 +74,15 @@ int main(int argc, char * argv[])
   uchar* output = (uchar*)malloc(sizeBytes);
 
   uchar *inputBuffer;
-  cudaMalloc((void**)&inputBuffer, width * height);
-  cudaMemcpy(inputBuffer, input, width * height, cudaMemcpyHostToDevice);
+  cudaMalloc((void**)&inputBuffer, sizeBytes);
+  cudaMemcpy(inputBuffer, input, sizeBytes, cudaMemcpyHostToDevice);
 
   uchar *outputBuffer;
-  cudaMalloc((void**)&outputBuffer, width * height);
+  cudaMalloc((void**)&outputBuffer, sizeBytes);
 
   uchar *rKeyBuffer;
-  cudaMalloc((void**)&rKeyBuffer, explandedKeySize);
-  cudaMemcpy(rKeyBuffer, roundKey, explandedKeySize, cudaMemcpyHostToDevice);
+  cudaMalloc((void**)&rKeyBuffer, explandedKeySizeBytes);
+  cudaMemcpy(rKeyBuffer, roundKey, explandedKeySizeBytes, cudaMemcpyHostToDevice);
 
   uchar *sBoxBuffer;
   cudaMalloc((void**)&sBoxBuffer, 256);
@@ -126,13 +129,13 @@ int main(int argc, char * argv[])
   cudaMemcpy(output, outputBuffer, width * height, cudaMemcpyDeviceToHost);
 
   // Verify
-  uchar *verificationOutput = (uchar *) malloc(width*height*sizeof(uchar));
+  uchar *verificationOutput = (uchar *) malloc(sizeBytes);
 
   reference(verificationOutput, input, roundKey, explandedKeySize, 
       width, height, decrypt, rounds, keySize);
 
   /* compare the results and see if they match */
-  if(memcmp(output, verificationOutput, height*width*sizeof(uchar)) == 0)
+  if(memcmp(output, verificationOutput, sizeBytes) == 0)
     std::cout<<"Pass\n";
   else
     std::cout<<"Fail\n";
