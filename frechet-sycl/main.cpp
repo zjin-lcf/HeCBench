@@ -21,7 +21,7 @@
 #include <math.h> /* sqrt, fabs, fmin, fmax */
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define n_d 10000 /* `n_d` : Number of dimensions */
 
@@ -65,11 +65,10 @@ void discrete_frechet_distance(const int s, const int n_1, const int n_2, const 
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel);
 
   double *d_ca, *d_c1, *d_c2;
   d_ca = (double*) sycl::malloc_device(ca_size, q);
@@ -82,35 +81,35 @@ void discrete_frechet_distance(const int s, const int n_1, const int n_2, const 
   q.wait();
 
   // large n_1 and n_2 values (e.g. n_1 = n_2 = 16) may cause signalTrap
-  range<2> gws ((n_2+15)/16*16, (n_1+15)/16*16); 
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((n_2+15)/16*16, (n_1+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   auto start = std::chrono::steady_clock::now();
 
   if (s == 0)
     for (k = 0; k < repeat; k++)
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class k1>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k1>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           distance_norm1(item, n_1, n_2, d_ca, d_c1, d_c2);
         });
       });
 
   else if (s == 1)
     for (k = 0; k < repeat; k++)
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class k2>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k2>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           distance_norm2(item, n_1, n_2, d_ca, d_c1, d_c2);
         });
       });
 
   else if (s == 2)
     for (k = 0; k < repeat; k++)
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class k3>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k3>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           distance_norm3(item, n_1, n_2, d_ca, d_c1, d_c2);
         });
       });
- 
+
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -135,7 +134,7 @@ void discrete_frechet_distance(const int s, const int n_1, const int n_2, const 
 int main(int argc, char* argv[])
 {
   if (argc != 4) {
-    printf("Usage: %s <n_1> <n_2> <repeat>\n", argv[0]); 
+    printf("Usage: %s <n_1> <n_2> <repeat>\n", argv[0]);
     printf("  n_1: number of points of the 1st curve");
     printf("  n_2: number of points of the 2nd curve");
     return 1;
