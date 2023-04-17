@@ -1,8 +1,8 @@
-// 
+//
 // Copyright 2004-present Facebook. All Rights Reserved.
 //
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <algorithm>
 #include <random>
 #include <unordered_set>
@@ -90,7 +90,7 @@ bool test_sortInRegisters(sycl::queue &q, const int repeat) {
     std::sort(sorted.begin(), sorted.end(), std::greater<float>());
 
     double time = 0.0;
-    
+
     for (int i = 0; i < repeat; ++i) {
       std::shuffle(vals.begin(), vals.end(), std::random_device());
       auto out = facebook::cuda::sort(q, vals, time);
@@ -178,11 +178,10 @@ int main(int argc, char** argv) {
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   bool ok;
   ok = test_sort(q, repeat);

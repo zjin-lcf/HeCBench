@@ -1,6 +1,6 @@
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "bitmap_image.hpp"
 
 #define BLOCK_SIZE_X  16
@@ -10,10 +10,10 @@
 #define THRESHOLD     20
 #define FOUND_MIN     5000
 #define min(a, b) ((a) < (b) ? (a) : (b))
-#define syncthreads() item.barrier(access::fence_space::local_space)
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 void compute_sad_array(
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
                     int*__restrict sad_array,
     const unsigned char*__restrict image,
     const unsigned char*__restrict kernel,
@@ -59,7 +59,7 @@ void compute_sad_array(
 
 
 void find_min_in_sad_array(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int sad_array_size,
           int* __restrict cache,
     const int* __restrict sad_array,
@@ -92,16 +92,16 @@ void find_min_in_sad_array(
   // Update global min for each block
   if (lid == 0) {
     //atomicMin(min_sad, cache[0]);
-    auto ao = ext::oneapi::atomic_ref<int, 
-              ext::oneapi::memory_order::relaxed,
-              ext::oneapi::memory_scope::device,
-              access::address_space::global_space> (min_sad[0]);
+    auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
+              sycl::access::address_space::global_space> (min_sad[0]);
     ao.fetch_min(cache[0]);
   }
 }
 
 void get_num_of_occurrences(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int sad_array_size,
           int*__restrict s,
     const int*__restrict sad_array,
@@ -119,10 +119,10 @@ void get_num_of_occurrences(
 
     if (sad_array[gid] == *min_sad) {
       // atomicAdd(&cache[0], 1);
-      auto ao = ext::oneapi::atomic_ref<int, 
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (s[0]);
+      auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::work_group,
+              sycl::access::address_space::local_space> (s[0]);
       ao.fetch_add(1);
     }
 
@@ -131,10 +131,10 @@ void get_num_of_occurrences(
     // Update global occurance for each block
     if (lid == 0) {
       // atomicAdd(num_occurrences, cache[0]);
-      auto ao = ext::oneapi::atomic_ref<int, 
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::device,
-                access::address_space::global_space> (num_occurrences[0]);
+      auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
+              sycl::access::address_space::global_space> (num_occurrences[0]);
       ao.fetch_add(s[0]);
     }
   }
@@ -192,25 +192,24 @@ int main(int argc, char* argv[]) {
   int h_min_mse;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel);
 
   // Device allocation
-  buffer<unsigned char, 1> d_main_image ( h_main_image, 3 * main_size );
-  buffer<unsigned char, 1> d_template_image ( h_template_image, 3 * template_size );
-  buffer<int, 1> d_sad_array ( sad_array_size );
-  buffer<int, 1> d_min_mse (1);
-  buffer<int, 1> d_num_occurances (1);
+  sycl::buffer<unsigned char, 1> d_main_image ( h_main_image, 3 * main_size );
+  sycl::buffer<unsigned char, 1> d_template_image ( h_template_image, 3 * template_size );
+  sycl::buffer<int, 1> d_sad_array ( sad_array_size );
+  sycl::buffer<int, 1> d_min_mse (1);
+  sycl::buffer<int, 1> d_num_occurances (1);
 
-  range<2> gws ((main_height + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y * BLOCK_SIZE_Y,
+  sycl::range<2> gws ((main_height + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y * BLOCK_SIZE_Y,
                 (main_width + BLOCK_SIZE_X - 1) / BLOCK_SIZE_X * BLOCK_SIZE_X );
-  range<2> lws (BLOCK_SIZE_Y, BLOCK_SIZE_X);
+  sycl::range<2> lws (BLOCK_SIZE_Y, BLOCK_SIZE_X);
 
-  range<1> gws2 ((sad_array_size + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
-  range<1> lws2 (BLOCK_SIZE);
+  sycl::range<1> gws2 ((sad_array_size + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<1> lws2 (BLOCK_SIZE);
 
   // Measure device execution time
   double kernel_time = 0.0;
@@ -218,59 +217,59 @@ int main(int argc, char* argv[]) {
   auto begin = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    
-    q.submit([&] (handler &cgh) {
-      auto acc = d_num_occurances.get_access<sycl_discard_write>(cgh);
+
+    q.submit([&] (sycl::handler &cgh) {
+      auto acc = d_num_occurances.get_access<sycl::access::mode::discard_write>(cgh);
       cgh.fill(acc, 0);
     });
 
     h_min_mse = THRESHOLD;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_min_mse.get_access<sycl_discard_write>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      auto acc = d_min_mse.get_access<sycl::access::mode::discard_write>(cgh);
       cgh.copy(&h_min_mse, acc);
     });
 
     q.wait();
     auto kbegin = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl_discard_write>(cgh);
-      auto m_image = d_main_image.get_access<sycl_read>(cgh);
-      auto t_image = d_template_image.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class sad>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      auto sad_array = d_sad_array.get_access<sycl::access::mode::discard_write>(cgh);
+      auto m_image = d_main_image.get_access<sycl::access::mode::read>(cgh);
+      auto t_image = d_template_image.get_access<sycl::access::mode::read>(cgh);
+      cgh.parallel_for<class sad>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         compute_sad_array (
-          item, 
+          item,
           sad_array.get_pointer(),
           m_image.get_pointer(),
           t_image.get_pointer(),
-          sad_array_size, 
+          sad_array_size,
           main_width, main_height,
           template_width, template_height,
           template_size);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl_read>(cgh);
-      auto min_mse = d_min_mse.get_access<sycl_read_write>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> cache (BLOCK_SIZE, cgh);
-      cgh.parallel_for<class find_min>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      auto sad_array = d_sad_array.get_access<sycl::access::mode::read>(cgh);
+      auto min_mse = d_min_mse.get_access<sycl::access::mode::read_write>(cgh);
+      sycl::local_accessor<int> cache (BLOCK_SIZE, cgh);
+      cgh.parallel_for<class find_min>(sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         find_min_in_sad_array (
           item,
           sad_array_size,
-          cache.get_pointer(), 
+          cache.get_pointer(),
           sad_array.get_pointer(),
           min_mse.get_pointer());
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl_read>(cgh);
-      auto min_mse = d_min_mse.get_access<sycl_read>(cgh);
-      auto occurances = d_num_occurances.get_access<sycl_read_write>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> sum (1, cgh);
-      cgh.parallel_for<class count>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      auto sad_array = d_sad_array.get_access<sycl::access::mode::read>(cgh);
+      auto min_mse = d_min_mse.get_access<sycl::access::mode::read>(cgh);
+      auto occurances = d_num_occurances.get_access<sycl::access::mode::read_write>(cgh);
+      sycl::local_accessor<int> sum (1, cgh);
+      cgh.parallel_for<class count>(sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         get_num_of_occurrences (
           item,
           sad_array_size,
@@ -285,13 +284,13 @@ int main(int argc, char* argv[]) {
     auto kend = std::chrono::steady_clock::now();
     kernel_time += std::chrono::duration_cast<std::chrono::milliseconds> (kend - kbegin).count();
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_min_mse.get_access<sycl_read>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      auto acc = d_min_mse.get_access<sycl::access::mode::read>(cgh);
       cgh.copy(acc, &h_min_mse);
     });
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_num_occurances.get_access<sycl_read>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      auto acc = d_num_occurances.get_access<sycl::access::mode::read>(cgh);
       cgh.copy(acc, &h_num_occurances);
     });
   }
@@ -301,8 +300,8 @@ int main(int argc, char* argv[]) {
   float elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count();
 
   std::cout << "Parallel Computation Results: " << std::endl;
-  std::cout << "Kernel time in msec: " << kernel_time << std::endl; 
-  std::cout << "Elapsed time in msec = " << elapsed_time << std::endl; 
+  std::cout << "Kernel time in msec: " << kernel_time << std::endl;
+  std::cout << "Elapsed time in msec = " << elapsed_time << std::endl;
   std::cout << "Main Image Dimensions: " << main_width << "*" << main_height << std::endl;
   std::cout << "Template Image Dimensions: " << template_width << "*" << template_height << std::endl;
   std::cout << "Found Minimum:  " << h_min_mse << std::endl;

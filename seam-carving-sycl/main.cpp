@@ -5,10 +5,10 @@
 #include <stdint.h>
 #include <chrono>
 #include <utility>  // std::swap
-#include "common.h"
 #include "utils.h"
 #include "kernels.h"
 #include "kernels_wrapper.h"
+#include <sycl/sycl.hpp>
 
 //#define STBI_ONLY_BMP
 #define STB_IMAGE_IMPLEMENTATION
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
       mode = SEAM_CARVER_APPROX_MODE;
       printf("approximation mode selected.\n");
     }
-    else{    
+    else{
       printf("an invalid option was specified and will be ignored. Valid options are: -u, -a.\n");
     }
   }
@@ -76,36 +76,35 @@ int main(int argc, char **argv) {
 
   { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel);
 
   // remove the conditions when buffers are instantiated
-  buffer<short, 1> d_costs_left (img_size);
-  buffer<short, 1> d_costs_up (img_size);
-  buffer<short, 1> d_costs_right (img_size);
-  buffer<short, 1> d_costs_swap_left (img_size);
-  buffer<short, 1> d_costs_swap_up (img_size);
-  buffer<short, 1> d_costs_swap_right (img_size);
-  buffer<int, 1> d_index_map (img_size);
-  buffer<int, 1> d_offset_map (img_size);
+  sycl::buffer<short, 1> d_costs_left (img_size);
+  sycl::buffer<short, 1> d_costs_up (img_size);
+  sycl::buffer<short, 1> d_costs_right (img_size);
+  sycl::buffer<short, 1> d_costs_swap_left (img_size);
+  sycl:: buffer<short, 1> d_costs_swap_up (img_size);
+  sycl::buffer<short, 1> d_costs_swap_right (img_size);
+  sycl::buffer<int, 1> d_index_map (img_size);
+  sycl::buffer<int, 1> d_offset_map (img_size);
 
   //sum map in approx mode
-  buffer<int, 1> d_M (img_size);
+  sycl::buffer<int, 1> d_M (img_size);
 
   // rows to consider for reduce
-  id<1> index = (mode == SEAM_CARVER_APPROX_MODE) ? 0 : w*(h-1);
-  range<1> subRange = (mode == SEAM_CARVER_APPROX_MODE) ? img_size : img_size - w*(h-1);
-  buffer<int, 1> reduce_row (d_M, index, subRange);
+  sycl::id<1> index = (mode == SEAM_CARVER_APPROX_MODE) ? 0 : w*(h-1);
+  sycl::range<1> subRange = (mode == SEAM_CARVER_APPROX_MODE) ? img_size : img_size - w*(h-1);
+  sycl::buffer<int, 1> reduce_row (d_M, index, subRange);
 
-  buffer<int, 1> d_indices (w);
-  buffer<int, 1> d_indices_ref (indices, w);
-  buffer<int, 1> d_seam (h);
+  sycl::buffer<int, 1> d_indices (w);
+  sycl::buffer<int, 1> d_indices_ref (indices, w);
+  sycl::buffer<int, 1> d_seam (h);
 
-  buffer<uchar4, 1> d_pixels (h_pixels, img_size);
-  buffer<uchar4, 1> d_pixels_swap (img_size);
+  sycl::buffer<uchar4, 1> d_pixels (h_pixels, img_size);
+  sycl::buffer<uchar4, 1> d_pixels_swap (img_size);
 
   if(mode == SEAM_CARVER_UPDATE_MODE)
     compute_costs(q, current_w, w, h, d_pixels, d_costs_left, d_costs_up, d_costs_right);
@@ -135,7 +134,7 @@ int main(int argc, char **argv) {
     std::swap(d_pixels, d_pixels_swap);
 
     if(mode == SEAM_CARVER_UPDATE_MODE){
-      update_costs(q, current_w, w, h, d_M, d_pixels, 
+      update_costs(q, current_w, w, h, d_M, d_pixels,
                    d_costs_left, d_costs_up, d_costs_right,
                    d_costs_swap_left, d_costs_swap_up, d_costs_swap_right, d_seam );
       std::swap(d_costs_left, d_costs_swap_left);
@@ -154,7 +153,7 @@ int main(int argc, char **argv) {
 
   }  // sycl scope
 
-  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w); 
+  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w);
   printf("Image resized\n");
 
   printf("Saving in resized.bmp...\n");
@@ -162,7 +161,7 @@ int main(int argc, char **argv) {
   printf("%s\n", success ? "Success" : "Failed");
 
   free(h_pixels);
-  free(output);   
+  free(output);
   free(indices);
   return 0;
 }

@@ -1,18 +1,18 @@
 #include <vector>
 #include <iostream>
-#include "common.h"
 #include "util.h" // graph
 
 #define DIAMETER_SAMPLES 512
 
-template <typename T, access::address_space 
-          addressSpace = access::address_space::global_space>
+template <typename T, sycl::access::address_space
+          addressSpace = sycl::access::address_space::global_space>
 T atomicCAS(T *addr, T expected, T desired,
-            memory_order success = memory_order::relaxed,
-            memory_order fail = memory_order::relaxed)
+            sycl::memory_order success = sycl::memory_order::relaxed,
+            sycl::memory_order fail = sycl::memory_order::relaxed)
 {
   // add a pair of parentheses to declare a variable
-  sycl::atomic<T, addressSpace> obj((sycl::multi_ptr<T, addressSpace>(addr)));
+  sycl::atomic_ref<T, sycl::memory_order::relaxed,
+    sycl::memory_scope::device, addressSpace> obj(*addr);
   obj.compare_exchange_strong(expected, desired, success, fail);
   return expected;
 }
@@ -20,7 +20,7 @@ T atomicCAS(T *addr, T expected, T desired,
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline T atomicAdd(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
+  sycl::atomic_ref<T, sycl::memory_order::relaxed,
      MemoryScope, sycl::access::address_space::global_space> ref(val);
   return ref.fetch_add(delta);
 }
@@ -28,7 +28,7 @@ static inline T atomicAdd(T& val, const T delta)
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::work_group>
 static inline T atomicAddLocal(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
+  sycl::atomic_ref<T, sycl::memory_order::relaxed,
      MemoryScope, sycl::access::address_space::local_space> ref(val);
   return ref.fetch_add(delta);
 }
@@ -43,19 +43,19 @@ void bitonic_sort(int *values, const int N, sycl::nd_item<1> item)
   {
     for (int j = k >> 1; j > 0; j = j >> 1)
     {
-      while(idx < N) 
+      while(idx < N)
       {
         int ixj = idx^j;
-        if (ixj > idx) 
+        if (ixj > idx)
         {
-          if ((idx&k) == 0 && values[idx] > values[ixj]) 
+          if ((idx&k) == 0 && values[idx] > values[ixj])
           {
             //exchange(idx, ixj);
             int tmp = values[idx];
             values[idx] = values[ixj];
             values[ixj] = tmp;
           }
-          if ((idx&k) != 0 && values[idx] < values[ixj]) 
+          if ((idx&k) != 0 && values[idx] < values[ixj])
           {
             //exchange(idx, ixj);
             int tmp = values[idx];
@@ -65,7 +65,7 @@ void bitonic_sort(int *values, const int N, sycl::nd_item<1> item)
         }
         idx += item.get_local_range(0);
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       idx = item.get_local_id(0);
     }
   }
@@ -130,13 +130,13 @@ void bc_kernel(
     *endpoints_row = (int *)((char *)endpoints + item.get_group(0) * pitch_endpoints);
     *jia = 0;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if ((*ind == 0) && (j < DIAMETER_SAMPLES))
   {
     diameters[j] = INT_MAX;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   while (*ind < end)
   {
@@ -152,10 +152,10 @@ void bc_kernel(
       {
         d_row[k] = INT_MAX;
         sigma_row[k] = 0;
-      }  
+      }
       delta_row[k] = 0;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     //Shortest Path Calculation
 
@@ -172,7 +172,7 @@ void bc_kernel(
       *current_depth = 0;
       *sp_calc_done = false;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     //Do first iteration separately since we already know the edges to traverse
     for (int r = item.get_local_id(0) + R[(*i)]; r < R[*i + 1]; r += item.get_local_range(0))
@@ -190,7 +190,7 @@ void bc_kernel(
         atomicAdd(sigma_row[w], 1ULL);
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if (*Q2_len == 0)
     {
@@ -203,7 +203,7 @@ void bc_kernel(
         (*Q_row)[kk] = (*Q2_row)[kk];
         (*S_row)[kk + *S_len] = (*Q2_row)[kk];
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       if(j == 0)
       {
         (*endpoints_row)[(*endpoints_len)] =
@@ -215,7 +215,7 @@ void bc_kernel(
         (*current_depth)++;
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     while (!(*sp_calc_done))
     {
@@ -229,14 +229,14 @@ void bc_kernel(
             int w = C[k];
             if(atomicCAS(&d_row[w],INT_MAX,d_row[v]+1) == INT_MAX)
             {
-              int t = atomicAddLocal(*Q2_len, 1); 
+              int t = atomicAddLocal(*Q2_len, 1);
               (*Q2_row)[t] = w;
             }
             if(d_row[w] == (d_row[v]+1))
             {
               atomicAdd(sigma_row[w], sigma_row[v]);
             }
-          }  
+          }
         }
       }
       else
@@ -246,7 +246,7 @@ void bc_kernel(
         {
           *next_index = item.get_local_range(0);
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         int k = item.get_local_id(0); // Initial vertices
         while (k < *Q_len)
         {
@@ -268,7 +268,7 @@ void bc_kernel(
           k = atomicAddLocal(*next_index, 1);
         }
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if (*Q2_len == 0) // If there is no additional work found, we're
                               // done
@@ -282,7 +282,7 @@ void bc_kernel(
           (*Q_row)[kk] = (*Q2_row)[kk];
           (*S_row)[kk + *S_len] = (*Q2_row)[kk];
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if(j == 0)
         {
           (*endpoints_row)[(*endpoints_len)] =
@@ -293,7 +293,7 @@ void bc_kernel(
           *Q2_len = 0;
           (*current_depth)++;
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
       }
     }
 
@@ -307,7 +307,7 @@ void bc_kernel(
         diameters[(*ind)] = *current_depth + 1;
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     //Dependency Accumulation (Madduri/Ediger successor method)
     while (*current_depth > 0)
@@ -325,11 +325,11 @@ void bc_kernel(
             {
               float change = (sigma_row[w]/(float)sigma_row[v])*(1.0f+delta_row[v]);
               atomicAdd(delta_row[w], change);
-            }    
+            }
           }
         }
       }
-      else 
+      else
       {
         for (int kk = item.get_local_id(0) + (*endpoints_row)[(*current_depth)];
              kk < (*endpoints_row)[*current_depth + 1];
@@ -346,15 +346,15 @@ void bc_kernel(
               dsw += (sw/(float)sigma_row[v])*(1.0f+delta_row[v]);
             }
           }
-          delta_row[w] = dsw;  
+          delta_row[w] = dsw;
         }
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       if(j == 0)
       {
         (*current_depth)--;
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
 
     for (int kk = item.get_local_id(0); kk < n; kk += item.get_local_range(0))
@@ -375,7 +375,7 @@ void bc_kernel(
         *i = *ind;
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if (*ind == 2 * DIAMETER_SAMPLES)
     {
@@ -385,9 +385,9 @@ void bc_kernel(
       {
         diameter_keys[kk] = diameters[kk];
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       bitonic_sort(diameter_keys, DIAMETER_SAMPLES, item);
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       if(j == 0)
       {
         int log2n = 0;
@@ -402,7 +402,7 @@ void bc_kernel(
         }
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
@@ -415,17 +415,17 @@ std::vector<float> bc_gpu(
   const std::set<int> &source_vertices)
 {
   float *bc_gpu = new float[g.n];
-  int next_source = number_of_SMs; 
+  int next_source = number_of_SMs;
 
   size_t pitch_d, pitch_sigma, pitch_delta, pitch_Q, pitch_Q2, pitch_S, pitch_endpoints;
 
-  const size_t dimGrid_x = number_of_SMs; 
+  const size_t dimGrid_x = number_of_SMs;
   sycl::range<1> gws (dimGrid_x * max_threads_per_block);
   sycl::range<1> lws (max_threads_per_block);
 
   sycl::buffer<float, 1> bc_d (g.n);
   q.submit([&] (sycl::handler &cgh) {
-    auto acc = bc_d.get_access<sycl_write>(cgh);
+    auto acc = bc_d.get_access<sycl::access::mode::write>(cgh);
     cgh.fill(acc, 0.f);
   });
 
@@ -466,27 +466,27 @@ std::vector<float> bc_gpu(
   if(op.approx)
   {
     q.submit([&] (sycl::handler &cgh) {
-      auto acc = source_vertices_d.get_access<sycl_write>(cgh, range<1>(source_vertices.size()));
-      cgh.copy(source_vertices_h.data(), acc); 
+      auto acc = source_vertices_d.get_access<sycl::access::mode::write>(cgh, sycl::range<1>(source_vertices.size()));
+      cgh.copy(source_vertices_h.data(), acc);
     });
   }
 
   sycl::buffer<int, 1> jia_d (1);
-  q.submit([&] (handler &cgh) {
-    auto acc = jia_d.get_access<sycl_write>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    auto acc = jia_d.get_access<sycl::access::mode::write>(cgh);
     cgh.fill(acc, 0);
   });
 
   sycl::buffer<int, 1> diameters_d (DIAMETER_SAMPLES);
-  q.submit([&] (handler &cgh) {
-    auto acc = diameters_d.get_access<sycl_write>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    auto acc = diameters_d.get_access<sycl::access::mode::write>(cgh);
     cgh.fill(acc, 0);
   });
 
   int end;
   bool approx;
   if(op.approx)
-  { 
+  {
     end = op.k;
     approx = true;
   } else {
@@ -500,35 +500,35 @@ std::vector<float> bc_gpu(
   q.submit([&](sycl::handler &cgh) {
     auto g_n = g.n;
     auto g_m = g.m;
-    auto bc = bc_d.get_access<sycl_read_write>(cgh);
-    auto R = R_d.get_access<sycl_read>(cgh);
-    auto C = C_d.get_access<sycl_read>(cgh);
-    auto F = F_d.get_access<sycl_read>(cgh);
-    auto d = d_d.get_access<sycl_read>(cgh);
-    auto sigma = sigma_d.get_access<sycl_read>(cgh);
-    auto delta = delta_d.get_access<sycl_read>(cgh);
-    auto Q = Q_d.get_access<sycl_read>(cgh);
-    auto Q2 = Q2_d.get_access<sycl_read>(cgh);
-    auto S = S_d.get_access<sycl_read>(cgh);
-    auto endpoints = endpoints_d.get_access<sycl_read>(cgh);
-    auto next_source = next_source_d.get_access<sycl_read>(cgh);
-    auto jia = jia_d.get_access<sycl_read_write>(cgh);
-    auto diameters = diameters_d.get_access<sycl_read_write>(cgh);
-    auto source_vertices = source_vertices_d.get_access<sycl_read_write>(cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> ind_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> i_sm (1, cgh);
-    sycl::accessor<int*, 1, sycl_read_write, sycl_lmem> Q_row_sm (1, cgh);
-    sycl::accessor<int*, 1, sycl_read_write, sycl_lmem> Q2_row_sm (1, cgh);
-    sycl::accessor<int*, 1, sycl_read_write, sycl_lmem> S_row_sm (1, cgh);
-    sycl::accessor<int*, 1, sycl_read_write, sycl_lmem> endpoints_row_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> Q_len_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> Q2_len_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> S_len_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> current_depth_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> endpoints_len_sm (1, cgh);
-    sycl::accessor<bool, 1, sycl_read_write, sycl_lmem> sp_calc_done_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> next_index_sm (1, cgh);
-    sycl::accessor<int, 1, sycl_read_write, sycl_lmem> diameter_keys_sm (DIAMETER_SAMPLES, cgh);
+    auto bc = bc_d.get_access<sycl::access::mode::read_write>(cgh);
+    auto R = R_d.get_access<sycl::access::mode::read>(cgh);
+    auto C = C_d.get_access<sycl::access::mode::read>(cgh);
+    auto F = F_d.get_access<sycl::access::mode::read>(cgh);
+    auto d = d_d.get_access<sycl::access::mode::read>(cgh);
+    auto sigma = sigma_d.get_access<sycl::access::mode::read>(cgh);
+    auto delta = delta_d.get_access<sycl::access::mode::read>(cgh);
+    auto Q = Q_d.get_access<sycl::access::mode::read>(cgh);
+    auto Q2 = Q2_d.get_access<sycl::access::mode::read>(cgh);
+    auto S = S_d.get_access<sycl::access::mode::read>(cgh);
+    auto endpoints = endpoints_d.get_access<sycl::access::mode::read>(cgh);
+    auto next_source = next_source_d.get_access<sycl::access::mode::read>(cgh);
+    auto jia = jia_d.get_access<sycl::access::mode::read_write>(cgh);
+    auto diameters = diameters_d.get_access<sycl::access::mode::read_write>(cgh);
+    auto source_vertices = source_vertices_d.get_access<sycl::access::mode::read_write>(cgh);
+    sycl::local_accessor<int> ind_sm (1, cgh);
+    sycl::local_accessor<int> i_sm (1, cgh);
+    sycl::local_accessor<int*> Q_row_sm (1, cgh);
+    sycl::local_accessor<int*> Q2_row_sm (1, cgh);
+    sycl::local_accessor<int*> S_row_sm (1, cgh);
+    sycl::local_accessor<int*> endpoints_row_sm (1, cgh);
+    sycl::local_accessor<int> Q_len_sm (1, cgh);
+    sycl::local_accessor<int> Q2_len_sm (1, cgh);
+    sycl::local_accessor<int> S_len_sm (1, cgh);
+    sycl::local_accessor<int> current_depth_sm (1, cgh);
+    sycl::local_accessor<int> endpoints_len_sm (1, cgh);
+    sycl::local_accessor<bool> sp_calc_done_sm (1, cgh);
+    sycl::local_accessor<int> next_index_sm (1, cgh);
+    sycl::local_accessor<int> diameter_keys_sm (DIAMETER_SAMPLES, cgh);
 
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       bc_kernel(
@@ -556,7 +556,7 @@ std::vector<float> bc_gpu(
         jia.get_pointer(),
         diameters.get_pointer(),
         source_vertices.get_pointer(),
-        approx, 
+        approx,
         item,
         ind_sm.get_pointer(), i_sm.get_pointer(),
         Q_row_sm.get_pointer(), Q2_row_sm.get_pointer(),
@@ -576,7 +576,7 @@ std::vector<float> bc_gpu(
 
   // GPU result
   q.submit([&](sycl::handler &cgh) {
-    auto acc = bc_d.get_access<sycl_read>(cgh);
+    auto acc = bc_d.get_access<sycl::access::mode::read>(cgh);
     cgh.copy(acc, bc_gpu);
   }).wait();
 
@@ -596,14 +596,14 @@ std::vector<float> bc_gpu(
 void query_device(sycl::queue &q, int &max_threads_per_block, int &number_of_SMs, program_options op)
 {
   auto dev = q.get_device();
-  std::cout << "Chosen Device: " << dev.get_info<info::device::name>() << std::endl;
+  std::cout << "Chosen Device: " << dev.get_info<sycl::info::device::name>() << std::endl;
 
-  max_threads_per_block = dev.get_info<info::device::max_work_group_size>();
-  number_of_SMs = dev.get_info<info::device::max_compute_units>();
+  max_threads_per_block = dev.get_info<sycl::info::device::max_work_group_size>();
+  number_of_SMs = dev.get_info<sycl::info::device::max_compute_units>();
 
   std::cout << "Number of Multiprocessors: " << number_of_SMs << std::endl;
   std::cout << "Size of Global Memory: "
-            << dev.get_info<info::device::global_mem_size>() / (float)(1024 * 1024 * 1024) << " GB"
+            << dev.get_info<sycl::info::device::global_mem_size>() / (float)(1024 * 1024 * 1024) << " GB"
             << std::endl << std::endl;
 }
 
