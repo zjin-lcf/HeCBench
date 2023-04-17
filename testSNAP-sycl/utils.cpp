@@ -198,7 +198,7 @@ double compute_sfac(double r, double rcut, const int switch_flag)
       return 0.0;
     else {
       double rcutfac = MY_PI / (rcut - rmin0);
-      return 0.5 * (cl::sycl::cos((r - rmin0) * rcutfac) + 1.0);
+      return 0.5 * (sycl::cos((r - rmin0) * rcutfac) + 1.0);
     }
   }
   return 0.0;
@@ -217,7 +217,7 @@ double compute_dsfac(double r, double rcut, const int switch_flag)
       return 0.0;
     else {
       double rcutfac = MY_PI / (rcut - rmin0);
-      return -0.5 * cl::sycl::sin((r - rmin0) * rcutfac) * rcutfac;
+      return -0.5 * sycl::sin((r - rmin0) * rcutfac) * rcutfac;
     }
   }
   return 0.0;
@@ -255,13 +255,13 @@ void compute_duarray(const int natom,
   double uy = y * rinv;
   double uz = z * rinv;
 
-  r0inv = 1.0 / cl::sycl::sqrt(r * r + z0 * z0);
+  r0inv = 1.0 / sycl::sqrt(r * r + z0 * z0);
   a_r = z0 * r0inv;
   a_i = -z * r0inv;
   b_r = y * r0inv;
   b_i = -x * r0inv;
 
-  dr0invdr = -cl::sycl::pow(r0inv, 3.0) * (r + z0 * dz0dr);
+  dr0invdr = -sycl::pow(r0inv, 3.0) * (r + z0 * dz0dr);
 
   dr0inv[0] = dr0invdr * ux;
   dr0inv[1] = dr0invdr * uy;
