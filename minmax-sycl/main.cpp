@@ -35,9 +35,9 @@ struct compare
 template <typename T> void eval(const T bounding_box_size, const int repeat) {
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  auto dev_sel = sycl::gpu_selector_v;
 #else
-  sycl::cpu_selector dev_sel;
+  auto dev_sel = sycl::cpu_selector_v;
 #endif
   sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
