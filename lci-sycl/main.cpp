@@ -2,9 +2,9 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
 #include "../lci-cuda/tables.h"
 #include "kernels.h"
+#include <sycl/sycl.hpp>
 
 const double t_init = .1;
 const double t_final = 200;
@@ -23,7 +23,7 @@ void initial(double c[], int seed)
 void dump (FILE * out, double c[], double t)
 {
   fprintf(out,"%.5e ", t);
-  int L = (L_max > 4) ? 4 : L_max; // print a subset 
+  int L = (L_max > 4) ? 4 : L_max; // print a subset
   for(int l = 0; l < L; l++)
   {
     fprintf(out,"%.5e ", c[l]);
@@ -56,11 +56,10 @@ int main (int argc, char* argv[]) {
   double *n = (double*) malloc (size);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   int dftab_size = sizeof(double_fact_table);
   int ftab_size = sizeof(fact_table);
@@ -73,14 +72,14 @@ int main (int argc, char* argv[]) {
 
   double *d_c = sycl::malloc_device<double>(dimension+1, q);
   double *d_n = sycl::malloc_device<double>(dimension+1, q);
-  
+
   initial(c, seed);
 #ifdef DUMP
   dump(outdata, c, tmin);
 #endif
 
-  range<1> gws (96); 
-  range<1> lws (96); // work-group size >= L_max
+  sycl::range<1> gws (96);
+  sycl::range<1> lws (96); // work-group size >= L_max
 
   float total_time = 0.f;
   for (double t_next = tmin + delta_t; t_next <= tmax; t_next += delta_t)
@@ -89,8 +88,8 @@ int main (int argc, char* argv[]) {
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class rhs>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class rhs>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         RHS_f(item, dftab, ftab, t_next, d_c, d_n);
       });
     }).wait();

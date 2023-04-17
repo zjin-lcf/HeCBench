@@ -13,11 +13,10 @@ int main(int argc, char *argv[])
   int max_threads_per_block, number_of_SMs;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v);
 #else
-  sycl::cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v);
 #endif
-  sycl::queue q(dev_sel);
 
   query_device(q, max_threads_per_block,number_of_SMs,op);
 

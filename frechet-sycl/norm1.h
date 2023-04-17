@@ -1,3 +1,5 @@
+#include <sycl/sycl.hpp>
+
 double norm1(int i, int j, const double *c1, const double *c2)
 {
   double dist, diff; /* Temp variables for simpler computations */
@@ -34,7 +36,7 @@ double recursive_norm1(int i, int j, int n_2, double *ca,
   double *ca_ij = ca + (i - 1)*n_2 + (j - 1);
 
   /* This implements the algorithm from [1] */
-  if (*ca_ij > -1.0) 
+  if (*ca_ij > -1.0)
   {
     return *ca_ij;
   }
@@ -68,7 +70,7 @@ double recursive_norm1(int i, int j, int n_2, double *ca,
 }
 
 void distance_norm1 (
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int n_1, int n_2,
   double *__restrict ca,
   const double *__restrict c1,

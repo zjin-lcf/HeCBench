@@ -585,9 +585,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
     sycl::range<1> lws (n_threads);
 
     stream_l[i].submit([&](sycl::handler &cgh) {
-      sycl::accessor<short, 1,
-                     sycl::access::mode::read_write,
-                     sycl::access::target::local> sm (sycl::range<1>(n_threads), cgh);
+      sycl::local_accessor<short> sm (sycl::range<1>(n_threads), cgh);
 
       auto seed_d_l_i = seed_d_l[i];
       auto prefQ_d_i = prefQ_d[i];
@@ -610,9 +608,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
     });
 
     stream_r[i].submit([&](sycl::handler &cgh) {
-      sycl::accessor<short, 1,
-                     sycl::access::mode::read_write,
-                     sycl::access::target::local> sm (sycl::range<1>(n_threads), cgh);
+      sycl::local_accessor<short> sm (sycl::range<1>(n_threads), cgh);
 
       auto seed_d_r_i = seed_d_r[i];
       auto suffQ_d_i = suffQ_d[i];
