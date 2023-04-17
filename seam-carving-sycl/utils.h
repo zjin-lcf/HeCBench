@@ -1,3 +1,7 @@
+#include <sycl/sycl.hpp>
+
+using uchar4 = sycl::vec<unsigned char, 4>;
+
 typedef enum {
     SEAM_CARVER_STANDARD_MODE,
     SEAM_CARVER_UPDATE_MODE,
@@ -20,8 +24,8 @@ uchar4 *build_pixels(const unsigned char *imgv, int w, int h){
     for(int j = 0; j < w; j++){
       pix.x() = imgv[i*3*w + 3*j];
       pix.y() = imgv[i*3*w + 3*j + 1];
-      pix.z() = imgv[i*3*w + 3*j + 2]; 
-      pixels[i*w + j] = pix;            
+      pix.z() = imgv[i*3*w + 3*j + 2];
+      pixels[i*w + j] = pix;
     }
   }
   return pixels;
@@ -30,7 +34,7 @@ uchar4 *build_pixels(const unsigned char *imgv, int w, int h){
 unsigned char *flatten_pixels(uchar4 *pixels, int w, int h, int new_w){
   unsigned char *flattened = (unsigned char*)malloc(3*new_w*h*sizeof(unsigned char));
   for(int i = 0; i < h; i++){
-    for(int j = 0; j < new_w; j++){ 
+    for(int j = 0; j < new_w; j++){
       uchar4 pix = pixels[i*w + j];
       flattened[3*i*new_w + 3*j] = pix.x();
       flattened[3*i*new_w + 3*j + 1] = pix.y();
