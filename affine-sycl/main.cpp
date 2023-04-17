@@ -36,7 +36,7 @@
 #include <cmath>
 #include <chrono>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 int main(int argc, char** argv)
@@ -71,29 +71,29 @@ int main(int argc, char** argv)
 
   const int iterations = atoi(argv[3]);
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   size_t image_size_bytes = sizeof(unsigned short) * X_SIZE * Y_SIZE;
   
-  unsigned short *d_input_image = malloc_device<unsigned short>(X_SIZE * Y_SIZE, q);
+  unsigned short *d_input_image = sycl::malloc_device<unsigned short>(X_SIZE * Y_SIZE, q);
   q.memcpy(d_input_image, input_image, image_size_bytes); 
 
-  unsigned short *d_output_image = malloc_device<unsigned short>(X_SIZE*Y_SIZE, q);
+  unsigned short *d_output_image = sycl::malloc_device<unsigned short>(X_SIZE*Y_SIZE, q);
 
-  range<2> globalSize(Y_SIZE,X_SIZE);
-  range<2> localSize(16,16);
+  sycl::range<2> globalSize(Y_SIZE,X_SIZE);
+  sycl::range<2> localSize(16,16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++) {
-    q.submit([&](handler &h) {
-      h.parallel_for<class affine_transform> (nd_range<2>(globalSize, localSize), [=](nd_item<2> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class affine_transform> (
+        sycl::nd_range<2>(globalSize, localSize), [=](sycl::nd_item<2> item) {
         int y = item.get_global_id(0); 
         int x = item.get_global_id(1); 
 
@@ -184,8 +184,8 @@ int main(int argc, char** argv)
 
   q.memcpy(output_image, d_output_image, image_size_bytes).wait();
 
-  free(d_input_image, q);
-  free(d_output_image, q);
+  sycl::free(d_input_image, q);
+  sycl::free(d_output_image, q);
 
   // verify
   affine_reference(input_image, output_image_ref);
