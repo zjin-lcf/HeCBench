@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define p_IJWID 6
 #define p_JID   4
@@ -27,8 +27,8 @@ dfloat *drandAlloc(int N){
   return v;
 }
 
-dfloat *deviceAlloc(queue &q, const dfloat *h, int N){
-  dfloat *d = malloc_device<dfloat>(N, q);
+dfloat *deviceAlloc(sycl::queue &q, const dfloat *h, int N){
+  dfloat *d = sycl::malloc_device<dfloat>(N, q);
   q.memcpy(d, h, N * sizeof(dfloat));
   return d;
 }
@@ -64,11 +64,10 @@ int main(int argc, char **argv) {
   dfloat *h_adv            = drandAlloc(3*Np*Nelements);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   dfloat *vgeo           = deviceAlloc(q, h_vgeo, Np*Nelements*p_Nvgeo);
   dfloat *cubvgeo        = deviceAlloc(q, h_cubvgeo, cubNp*Nelements*p_Nvgeo);
@@ -77,24 +76,25 @@ int main(int argc, char **argv) {
   dfloat *u              = deviceAlloc(q, h_u, 3*Np*Nelements);
   dfloat *adv            = deviceAlloc(q, h_adv, 3*Np*Nelements);
 
-  range<2> gws (16, Nelements*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws (16, Nelements*16);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::high_resolution_clock::now();
 
   // run kernel
   for(int test=0;test<Ntests;++test) {
-    q.submit([&] (handler &cgh) {
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_cubD({16,16}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_cubInterpT({8,16}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_U({8,8}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_V({8,8}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_W({8,8}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_U1({16,16}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_V1({16,16}, cgh);
-      accessor<dfloat, 2, sycl_read_write, access::target::local> s_W1({16,16}, cgh);
-      cgh.parallel_for<class advCubatureHex3D>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<dfloat, 2> s_cubD(sycl::range<2>{16,16}, cgh);
+      sycl::local_accessor<dfloat, 2> s_cubInterpT(sycl::range<2>{8,16}, cgh);
+      sycl::local_accessor<dfloat, 2> s_U(sycl::range<2>{8,8}, cgh);
+      sycl::local_accessor<dfloat, 2> s_V(sycl::range<2>{8,8}, cgh);
+      sycl::local_accessor<dfloat, 2> s_W(sycl::range<2>{8,8}, cgh);
+      sycl::local_accessor<dfloat, 2> s_U1(sycl::range<2>{16,16}, cgh);
+      sycl::local_accessor<dfloat, 2> s_V1(sycl::range<2>{16,16}, cgh);
+      sycl::local_accessor<dfloat, 2> s_W1(sycl::range<2>{16,16}, cgh);
+      cgh.parallel_for<class advCubatureHex3D>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         dfloat r_U[16], r_V[16], r_W[16];
         dfloat r_Ud[16], r_Vd[16], r_Wd[16];
 
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
             s_W[j][i] = u[id + 2 * offset];
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if (j < 8) {
             dfloat U1 = 0, V1 = 0, W1 = 0;
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
             s_W1[j][i] = 0;
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           dfloat U2 = 0, V2 = 0, W2 = 0;
           for (int b = 0; b < 8; ++b) {
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
           s_V1[j][i] = r_Vd[k];
           s_W1[j][i] = r_Wd[k];
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           dfloat Udr = 0, Uds = 0, Udt = 0;
           dfloat Vdr = 0, Vds = 0, Vdt = 0;
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
             s_W[j][i] = rhsW;
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if (j < 8) {
             dfloat rhsU = 0, rhsV = 0, rhsW = 0;
@@ -247,7 +247,7 @@ int main(int argc, char **argv) {
             s_W1[j][i] = rhsW;
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if (i < 8 && j < 8) {
             dfloat rhsU = 0, rhsV = 0, rhsW = 0;
@@ -275,12 +275,12 @@ int main(int argc, char **argv) {
 
   q.memcpy(h_adv, adv, 3*Np*Nelements*sizeof(dfloat)).wait();
 
-  free(vgeo          , q);
-  free(cubvgeo       , q);
-  free(cubDiffInterpT, q);
-  free(cubInterpT    , q);
-  free(u             , q);
-  free(adv           , q);
+  sycl::free(vgeo          , q);
+  sycl::free(cubvgeo       , q);
+  sycl::free(cubDiffInterpT, q);
+  sycl::free(cubInterpT    , q);
+  sycl::free(u             , q);
+  sycl::free(adv           , q);
 
   double checksum = 0;
   for (int i = 0; i < 3*Np*Nelements; i++) {
