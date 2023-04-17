@@ -73,7 +73,7 @@ void AESEncrypt(      uchar4  *__restrict output  ,
                       uchar4  *__restrict block1  ,  // lmem
                 const uint     width , 
                 const uint     rounds,
-                nd_item<2>     item   )
+                sycl::nd_item<2>     item   )
                                 
 {
     unsigned int blockIdx = item.get_group(1);
@@ -101,10 +101,10 @@ void AESEncrypt(      uchar4  *__restrict output  ,
 
         block0[localIndex] = shiftRows(block0[localIndex], localIndex); 
        
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         block1[localIndex]  = mixColumns(block0, galiosCoeff, localIndex); 
         
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         block0[localIndex] = block1[localIndex]^roundKey[r*4 + localIndex];
     }  
     block0[localIndex] = sboxRead(SBox, block0[localIndex]);
@@ -138,7 +138,7 @@ void AESDecrypt(       uchar4  *__restrict output    ,
                        uchar4  *__restrict block1    ,
                 const  uint    width , 
                 const  uint    rounds,
-                nd_item<2>     item   )
+                sycl::nd_item<2>     item   )
                                 
 {
     unsigned int blockIdx = item.get_group(1);
@@ -166,10 +166,10 @@ void AESDecrypt(       uchar4  *__restrict output    ,
     
         block0[localIndex] = sboxRead(SBox, block0[localIndex]);
         
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         block1[localIndex] = block0[localIndex]^roundKey[r*4 + localIndex];
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         block0[localIndex]  = mixColumns(block1, galiosCoeff, localIndex); 
     }  
 

@@ -2,7 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using uchar4 = sycl::uchar4;
+using uchar = sycl::uchar;
 
 #include "SDKBitMap.h"
 #include "aes.h"
@@ -71,69 +74,66 @@ int main(int argc, char * argv[])
   unsigned char* output = (unsigned char*)malloc(sizeBytes);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<unsigned char,1> inputBuffer (input, width * height);
-  buffer<unsigned char,1> outputBuffer (width * height);
-  buffer<unsigned char,1> rKeyBuffer (roundKey, explandedKeySize);
-  buffer<unsigned char,1> sBoxBuffer (sbox, 256);
-  buffer<unsigned char,1> rsBoxBuffer (rsbox, 256);
+  uchar4 *inputBuffer = (uchar4*) sycl::malloc_device (sizeBytes, q);
+  q.memcpy(inputBuffer, input, sizeBytes);
+
+  uchar4 *outputBuffer = (uchar4*) sycl::malloc_device (sizeBytes, q);
+
+  uchar4 *rKeyBuffer = (uchar4*) sycl::malloc_device (explandedKeySize, q);
+  q.memcpy(rKeyBuffer, roundKey, explandedKeySize);
+
+  uchar *sBoxBuffer = sycl::malloc_device<uchar>(256, q);
+  q.memcpy(sBoxBuffer, sbox, 256);
+
+  uchar *rsBoxBuffer = sycl::malloc_device<uchar>(256, q);
+  q.memcpy(rsBoxBuffer, rsbox, 256);
 
   std::cout << "Executing kernel for " << iterations 
             << " iterations" << std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
-  range<2> gws (height, width/4);
-  range<2> lws (4, 1);
+  sycl::range<2> gws (height, width/4);
+  sycl::range<2> lws (4, 1);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  auto outputBuffer_re = outputBuffer.reinterpret<uchar4>(range<1>(width*height/4));
-  auto inputBuffer_re = inputBuffer.reinterpret<uchar4>(range<1>(width*height/4));
-  auto rKeyBuffer_re = rKeyBuffer.reinterpret<uchar4>(range<1>(explandedKeySize/4));
-
   for(int i = 0; i < iterations; i++)
   {
     if (decrypt) 
-      q.submit([&] (handler &cgh) {
-        auto out = outputBuffer_re.get_access<sycl_discard_write>(cgh);
-        auto in = inputBuffer_re.get_access<sycl_read>(cgh);
-        auto key = rKeyBuffer_re.get_access<sycl_read>(cgh);
-        auto box = rsBoxBuffer.get_access<sycl_read>(cgh);
-        accessor<uchar4, 1, sycl_read_write, access::target::local> block0(keySize/4, cgh);
-        accessor<uchar4, 1, sycl_read_write, access::target::local> block1(keySize/4, cgh);
-        cgh.parallel_for<class dec>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          AESDecrypt(out.get_pointer(),
-              in.get_pointer(),
-              key.get_pointer(),
-              box.get_pointer(),
-              block0.get_pointer(),
-              block1.get_pointer(),
-              width, rounds, item);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<uchar4, 1> block0(sycl::range<1>(keySize/4), cgh);
+        sycl::local_accessor<uchar4, 1> block1(sycl::range<1>(keySize/4), cgh);
+        cgh.parallel_for<class dec>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          AESDecrypt(outputBuffer,
+                     inputBuffer,
+                     rKeyBuffer,
+                     rsBoxBuffer,
+                     block0.get_pointer(),
+                     block1.get_pointer(),
+                     width, rounds, item);
         });
       });
 
     else
-      q.submit([&] (handler &cgh) {
-        auto out = outputBuffer_re.get_access<sycl_discard_write>(cgh);
-        auto in = inputBuffer_re.get_access<sycl_read>(cgh);
-        auto key = rKeyBuffer_re.get_access<sycl_read>(cgh);
-        auto box = sBoxBuffer.get_access<sycl_read>(cgh);
-        accessor<uchar4, 1, sycl_read_write, access::target::local> block0(keySize/4, cgh);
-        accessor<uchar4, 1, sycl_read_write, access::target::local> block1(keySize/4, cgh);
-        cgh.parallel_for<class enc>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          AESEncrypt(out.get_pointer(),
-              in.get_pointer(),
-              key.get_pointer(),
-              box.get_pointer(),
-              block0.get_pointer(),
-              block1.get_pointer(),
-              width, rounds, item);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<uchar4, 1> block0(sycl::range<1>(keySize/4), cgh);
+        sycl::local_accessor<uchar4, 1> block1(sycl::range<1>(keySize/4), cgh);
+        cgh.parallel_for<class enc>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          AESEncrypt(outputBuffer,
+                     inputBuffer,
+                     rKeyBuffer,
+                     sBoxBuffer,
+                     block0.get_pointer(),
+                     block1.get_pointer(),
+                     width, rounds, item);
         });
       });
   }
@@ -143,22 +143,25 @@ int main(int argc, char * argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto acc = outputBuffer.get_access<sycl_read>(cgh);
-    cgh.copy(acc, output);
-  }).wait();
+  q.memcpy(output, outputBuffer, sizeBytes).wait();
 
   // Verify
-  unsigned char *verificationOutput = (unsigned char *) malloc(width*height*sizeof(unsigned char));
+  unsigned char *verificationOutput = (unsigned char *) malloc(sizeBytes);
 
   reference(verificationOutput, input, roundKey, explandedKeySize, 
       width, height, decrypt, rounds, keySize);
 
   /* compare the results and see if they match */
-  if(memcmp(output, verificationOutput, height*width*sizeof(unsigned char)) == 0)
+  if(memcmp(output, verificationOutput, sizeBytes) == 0)
     std::cout<<"Pass\n";
   else
     std::cout<<"Fail\n";
+
+  sycl::free(inputBuffer, q);
+  sycl::free(outputBuffer, q);
+  sycl::free(rKeyBuffer, q);
+  sycl::free(sBoxBuffer, q);
+  sycl::free(rsBoxBuffer, q);
 
   /* release program resources (input memory etc.) */
   if(input) free(input);
@@ -175,4 +178,3 @@ int main(int argc, char * argv[])
 
   return 0;
 }
-
