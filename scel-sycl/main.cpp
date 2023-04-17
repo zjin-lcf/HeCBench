@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 #define GPU_NUM_THREADS 256
 
 void SigmoidCrossEntropyWithLogitsKernel(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int inner_size,
   const bool log_D_trick,
   const bool unjoined_lr_loss,
@@ -33,7 +33,7 @@ void SigmoidCrossEntropyWithLogitsKernel(
     }
   }
 
-  float sum = reduce_over_group(item.get_group(), value, plus<>());
+  float sum = reduce_over_group(item.get_group(), value, std::plus<>());
   if (item.get_local_id(0) == 0) {
     out_ptr[i] = -sum / inner_size;
   }
@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
 
   int input_size = (outer_size + 1) * inner_size;
   int input_size_bytes = input_size * sizeof(float);
-  
+
   int output_size = outer_size;
   int output_size_bytes = output_size * sizeof(float);
 
@@ -70,26 +70,25 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   float *d_logits, *d_targets, *d_out;
-  d_logits = malloc_device<float>(input_size, q);
-  
+  d_logits = sycl::malloc_device<float>(input_size, q);
+
   q.memcpy(d_logits, h_logits, input_size_bytes);
 
-  d_targets = malloc_device<float>(input_size, q);
+  d_targets = sycl::malloc_device<float>(input_size, q);
   q.memcpy(d_targets, h_targets, input_size_bytes);
 
-  d_out = malloc_device<float>(output_size, q);
+  d_out = sycl::malloc_device<float>(output_size, q);
 
   bool ok = true;
 
-  range<1> gws (outer_size * GPU_NUM_THREADS);
-  range<1> lws (GPU_NUM_THREADS);
+  sycl::range<1> gws (outer_size * GPU_NUM_THREADS);
+  sycl::range<1> lws (GPU_NUM_THREADS);
 
   for (int unjoined_lr_loss = 0; unjoined_lr_loss <= 1; unjoined_lr_loss++) {
 
@@ -101,8 +100,8 @@ int main(int argc, char* argv[])
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < repeat; i++) {
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             SigmoidCrossEntropyWithLogitsKernel(
               item,
               inner_size,
@@ -135,9 +134,9 @@ int main(int argc, char* argv[])
 
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_targets, q);
-  free(d_logits, q);
-  free(d_out, q);
+  sycl::free(d_targets, q);
+  sycl::free(d_logits, q);
+  sycl::free(d_out, q);
 
   free(h_targets);
   free(h_logits);
