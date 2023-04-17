@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 template <typename T, typename G>
 void adam (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
         T* __restrict p,
         T* __restrict m,
         T* __restrict v,
@@ -71,24 +71,23 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   float *d_m, *d_v, *d_g, *d_p;
 
-  d_m = malloc_device<float>(vector_size, q);
+  d_m = sycl::malloc_device<float>(vector_size, q);
   q.memcpy(d_m, m, size_bytes);
 
-  d_v = malloc_device<float>(vector_size, q);
+  d_v = sycl::malloc_device<float>(vector_size, q);
   q.memcpy(d_v, v, size_bytes);
 
-  d_g = malloc_device<float>(vector_size, q);
+  d_g = sycl::malloc_device<float>(vector_size, q);
   q.memcpy(d_g, g, size_bytes);
 
-  d_p = malloc_device<float>(vector_size, q);
+  d_p = sycl::malloc_device<float>(vector_size, q);
   q.memcpy(d_p, p, size_bytes);
 
   // Arbitrary constants
@@ -100,8 +99,8 @@ int main(int argc, char* argv[])
   const float grad_scale = 256.f;
 
   const int threadsPerBlock = 256;
-  range<1> gws ((vector_size+threadsPerBlock-1) / threadsPerBlock * threadsPerBlock);
-  range<1> lws (threadsPerBlock);
+  sycl::range<1> gws ((vector_size+threadsPerBlock-1) / threadsPerBlock * threadsPerBlock);
+  sycl::range<1> lws (threadsPerBlock);
 
   adamMode_t mode = ADAM_MODE_0;
 
@@ -109,8 +108,9 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class k>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         adam<float, float>(
           item,
           d_p, d_m, d_v, d_g,
@@ -133,10 +133,10 @@ int main(int argc, char* argv[])
 
   q.memcpy(p, d_p, size_bytes).wait();
 
-  free(d_p, q);
-  free(d_m, q);
-  free(d_v, q);
-  free(d_g, q);
+  sycl::free(d_p, q);
+  sycl::free(d_m, q);
+  sycl::free(d_v, q);
+  sycl::free(d_g, q);
 
   // verify
   reference<float, float>(
