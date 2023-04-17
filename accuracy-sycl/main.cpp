@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 #define GPU_NUM_THREADS 256
 
 void accuracy_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int N,
     const int D,
     const int top_k,
@@ -28,17 +28,17 @@ void accuracy_kernel(
         ++ngt;
       }
     }
-    ngt = reduce_over_group(item.get_group(), ngt, plus<>());
+    ngt = sycl::reduce_over_group(item.get_group(), ngt, std::plus<>());
     if (ngt <= top_k) {
       ++count;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
   if (item.get_local_id(0) == 0) { 
-    auto ao = atomic_ref<int,
-                         memory_order::relaxed,
-                         memory_scope::device,
-                         access::address_space::global_space> (accuracy[0]);
+    auto ao = sycl::atomic_ref<int,
+                                sycl::memory_order::relaxed,
+                                sycl::memory_scope::device,
+                                sycl::access::address_space::global_space> (accuracy[0]);
     ao.fetch_add(count);
   }
 }
@@ -76,34 +76,34 @@ int main(int argc, char* argv[])
   int count_ref = reference(nrows, ndims, top_k, data, label);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  int *d_label = malloc_device<int>(nrows, q);
+  int *d_label = sycl::malloc_device<int>(nrows, q);
   q.memcpy(d_label, label, label_size_bytes);
 
-  float *d_data = malloc_device<float>(data_size, q);
+  float *d_data = sycl::malloc_device<float>(data_size, q);
   q.memcpy(d_data, data, data_size_bytes);
 
-  int *d_count = malloc_device<int>(1, q);
+  int *d_count = sycl::malloc_device<int>(1, q);
 
   q.wait();
-  range<1> lws (GPU_NUM_THREADS);
+  sycl::range<1> lws (GPU_NUM_THREADS);
 
   for (int ngrid = nrows / 4; ngrid <= nrows; ngrid += nrows / 4) {
 
     printf("Grid size is %d\n", ngrid);
-    range<1> gws (ngrid * GPU_NUM_THREADS);
+    sycl::range<1> gws (ngrid * GPU_NUM_THREADS);
 
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       q.memset(d_count, 0, sizeof(int));
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class accuracy>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class accuracy>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           accuracy_kernel(item, nrows, ndims, top_k, d_data, d_label, d_count);
 	});
       });
@@ -121,9 +121,9 @@ int main(int argc, char* argv[])
     // printf("Accuracy = %f\n", (float)count / nrows);
   }
 
-  free(d_label, q);
-  free(d_data, q);
-  free(d_count, q);
+  sycl::free(d_label, q);
+  sycl::free(d_data, q);
+  sycl::free(d_count, q);
 
   free(label);
   free(data);
