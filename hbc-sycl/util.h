@@ -4,15 +4,16 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <set>
 #include <getopt.h>
 #include "parse.h"
-#include "common.h"  // sycl queue
+#include <sycl/sycl.hpp>
 
 //Command line parsing
 class program_options
 {
   public:
-    program_options() : infile(NULL), verify(false), printBCscores(false), 
+    program_options() : infile(NULL), verify(false), printBCscores(false),
                         scorefile(NULL), device(-1), approx(false), k(256) {}
 
     char *infile;
