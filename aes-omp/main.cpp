@@ -58,8 +58,11 @@ int main(int argc, char * argv[])
 
   // expand the key
   unsigned int explandedKeySize = (rounds+1)*keySize;
-  uchar *expandedKey = (uchar*)malloc(explandedKeySize*sizeof(uchar));
-  uchar *roundKey    = (uchar*)malloc(explandedKeySize*sizeof(uchar));
+
+  unsigned int explandedKeySizeBytes = explandedKeySize*sizeof(uchar);
+
+  uchar *expandedKey = (uchar*)malloc(explandedKeySizeBytes);
+  uchar *roundKey    = (uchar*)malloc(explandedKeySizeBytes);
 
   keyExpansion(key, expandedKey, keySize, explandedKeySize);
   for(unsigned int i = 0; i < rounds+1; ++i)
@@ -75,7 +78,7 @@ int main(int argc, char * argv[])
   std::cout << "-------------------------------------------" << std::endl;
 
 #pragma omp target data map (to: input[0:sizeBytes], \
-                                 roundKey[0:explandedKeySize], \
+                                 roundKey[0:explandedKeySizeBytes], \
                                  sbox[0:256], \
                                  rsbox[0:256]) \
                         map(alloc: output[0:sizeBytes])
@@ -108,13 +111,13 @@ int main(int argc, char * argv[])
 }
 
   // Verify
-  uchar *verificationOutput = (uchar *) malloc(width*height*sizeof(uchar));
+  uchar *verificationOutput = (uchar *) malloc(sizeBytes);
 
   reference(verificationOutput, input, roundKey, explandedKeySize, 
       width, height, decrypt, rounds, keySize);
 
   /* compare the results and see if they match */
-  if(memcmp(output, verificationOutput, height*width*sizeof(uchar)) == 0)
+  if(memcmp(output, verificationOutput, sizeBytes) == 0)
     std::cout<<"Pass\n";
   else
     std::cout<<"Fail\n";
@@ -134,4 +137,3 @@ int main(int argc, char * argv[])
 
   return 0;
 }
-
