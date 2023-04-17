@@ -1,13 +1,13 @@
 /*
- * A set of simple Multiple Debye-Huckel (MDH) kernels 
+ * A set of simple Multiple Debye-Huckel (MDH) kernels
  * inspired by APBS:
- *   http://www.poissonboltzmann.org/ 
+ *   http://www.poissonboltzmann.org/
  *
- * This code was all originally written by David Gohara on MacOS X, 
+ * This code was all originally written by David Gohara on MacOS X,
  * and has been subsequently been modified by John Stone, porting to Linux,
- * adding vectorization, and several other platform-specific 
+ * adding vectorization, and several other platform-specific
  * performance optimizations.
- * 
+ *
  */
 
 #include <sys/stat.h>
@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "common.h"
 #include "WKFUtils.h"
+#include <sycl/sycl.hpp>
 
 #define SEP printf("\n")
 
@@ -25,7 +25,7 @@ void gendata(float *ax,float *ay,float *az,
     float *gx,float *gy,float *gz,
     float *charge,float *size,int natom,int ngrid) {
 
-  int i;    
+  int i;
 
   printf("Generating Data..\n");
   for (i=0; i<natom; i++) {
@@ -54,77 +54,76 @@ void print_total(float * arr, int ngrid){
 }
 
 void run_gpu_kernel(
-    const int choice, 
-    const int wgsize, 
+    const int choice,
+    const int wgsize,
     const int itmax,
     const int ngrid,
     const int natom,
     const int ngadj,
-    const float *ax, 
+    const float *ax,
     const float *ay,
     const float *az,
-    const float *gx, 
-    const float *gy, 
+    const float *gx,
+    const float *gy,
     const float *gz,
-    const float *charge, 
-    const float *size, 
-    const float xkappa, 
-    const float pre1, 
+    const float *charge,
+    const float *size,
+    const float xkappa,
+    const float pre1,
           float *val)
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel);
 
   wkf_timerhandle timer = wkf_timer_create();
 
   //Allocate memory for programs and kernels
-  buffer<float, 1> ax_mem (ax, natom);
-  buffer<float, 1> ay_mem (ay, natom);
-  buffer<float, 1> az_mem (az, natom);
-  buffer<float, 1> charge_mem (charge, natom);
-  buffer<float, 1> size_mem (size, natom);
-  buffer<float, 1> gx_mem (gx, ngadj);
-  buffer<float, 1> gy_mem (gy, ngadj);
-  buffer<float, 1> gz_mem (gz, ngadj);
-  buffer<float, 1> val_mem (ngadj);
+  sycl::buffer<float, 1> ax_mem (ax, natom);
+  sycl::buffer<float, 1> ay_mem (ay, natom);
+  sycl::buffer<float, 1> az_mem (az, natom);
+  sycl::buffer<float, 1> charge_mem (charge, natom);
+  sycl::buffer<float, 1> size_mem (size, natom);
+  sycl::buffer<float, 1> gx_mem (gx, ngadj);
+  sycl::buffer<float, 1> gy_mem (gy, ngadj);
+  sycl::buffer<float, 1> gz_mem (gz, ngadj);
+  sycl::buffer<float, 1> val_mem (ngadj);
 
-  wkf_timer_start(timer); 
+  wkf_timer_start(timer);
 
-  // set work-item dimensions 
+  // set work-item dimensions
   // scale number of work units by vector size
-  range<1> gws (ngadj / 4);
-  range<1> lws (wgsize);
+  sycl::range<1> gws (ngadj / 4);
+  sycl::range<1> lws (wgsize);
 
-  auto gx_mem_re = gx_mem.reinterpret<float4>(range<1>(ngadj/4));
-  auto gy_mem_re = gy_mem.reinterpret<float4>(range<1>(ngadj/4));
-  auto gz_mem_re = gz_mem.reinterpret<float4>(range<1>(ngadj/4));
-  auto val_mem_re = val_mem.reinterpret<float4>(range<1>(ngadj/4));
+  auto gx_mem_re = gx_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
+  auto gy_mem_re = gy_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
+  auto gz_mem_re = gz_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
+  auto val_mem_re = val_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
 
   for(int n = 0; n < itmax; n++) {
     if (choice == 0)
-      q.submit([&] (handler &cgh) {
-        auto ax = ax_mem.get_access<sycl_read>(cgh);
-        auto ay = ay_mem.get_access<sycl_read>(cgh);
-        auto az = az_mem.get_access<sycl_read>(cgh);
-        auto charge = charge_mem.get_access<sycl_read>(cgh);
-        auto size = size_mem.get_access<sycl_read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl_read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl_read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl_read>(cgh);
-        auto val = val_mem_re.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> shared(5*wgsize, cgh);
-        cgh.parallel_for<class mdh_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
+        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
+        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
+        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
+        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
+        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
+        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        cgh.parallel_for<class mdh_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
-          float4 v (0.0f);
-          float4 lgx = gx[igrid];
-          float4 lgy = gy[igrid];
-          float4 lgz = gz[igrid];
+          sycl::float4 v (0.0f);
+          sycl::float4 lgx = gx[igrid];
+          sycl::float4 lgy = gy[igrid];
+          sycl::float4 lgz = gz[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
@@ -137,42 +136,42 @@ void run_gpu_kernel(
               shared[lid * 5 + 3] = charge[jatom + lid];
               shared[lid * 5 + 4] = size[jatom + lid];
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             for(int i=0; i<lsize; i++) {
-              float4 dx = lgx - shared[i * 5         ];
-              float4 dy = lgy - shared[i * 5 + 1];
-              float4 dz = lgz - shared[i * 5 + 2];
-              float4 dist = cl::sycl::sqrt(dx*dx + dy*dy + dz*dz);
+              sycl::float4 dx = lgx - shared[i * 5         ];
+              sycl::float4 dy = lgy - shared[i * 5 + 1];
+              sycl::float4 dz = lgz - shared[i * 5 + 2];
+              sycl::float4 dist = sycl::sqrt(dx*dx + dy*dy + dz*dz);
               v += pre1 * (shared[i * 5 + 3] / dist)  *
-                cl::sycl::exp( -xkappa * (dist - shared[i * 5 + 4])) /
+                sycl::exp( -xkappa * (dist - shared[i * 5 + 4])) /
                 (1.0f + xkappa * shared[i * 5 + 4]);
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
           }
           val[ igrid ] = v;
         });
       });
     else if (choice == 1)
-      q.submit([&] (handler &cgh) {
-        auto ax = ax_mem.get_access<sycl_read>(cgh);
-        auto ay = ay_mem.get_access<sycl_read>(cgh);
-        auto az = az_mem.get_access<sycl_read>(cgh);
-        auto charge = charge_mem.get_access<sycl_read>(cgh);
-        auto size = size_mem.get_access<sycl_read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl_read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl_read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl_read>(cgh);
-        auto val = val_mem_re.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> shared(5*wgsize, cgh);
-        cgh.parallel_for<class mdh2_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
+        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
+        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
+        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
+        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
+        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
+        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        cgh.parallel_for<class mdh2_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
-          float4 v (0.0f);
-          float4 lgx = gx[igrid];
-          float4 lgy = gy[igrid];
-          float4 lgz = gz[igrid];
+          sycl::float4 v (0.0f);
+          sycl::float4 lgx = gx[igrid];
+          sycl::float4 lgy = gy[igrid];
+          sycl::float4 lgz = gz[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
@@ -185,43 +184,43 @@ void run_gpu_kernel(
               shared[lid + 3*lsize] = charge[jatom + lid];
               shared[lid + 4*lsize] = size[jatom + lid];
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             for(int i=0; i<lsize; i++) {
-              float4 dx = lgx - shared[i          ];
-              float4 dy = lgy - shared[i +   lsize];
-              float4 dz = lgz - shared[i + 2*lsize];
-              float4 dist = cl::sycl::sqrt( dx * dx + dy * dy + dz * dz );
+              sycl::float4 dx = lgx - shared[i          ];
+              sycl::float4 dy = lgy - shared[i +   lsize];
+              sycl::float4 dz = lgz - shared[i + 2*lsize];
+              sycl::float4 dist = sycl::sqrt( dx * dx + dy * dy + dz * dz );
               v += pre1 * ( shared[i + 3*lsize] / dist )  *
-                cl::sycl::exp( -xkappa * (dist - shared[i + 4*lsize])) /
+                sycl::exp( -xkappa * (dist - shared[i + 4*lsize])) /
                 (1.0f + xkappa * shared[i + 4*lsize]);
 
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
           }
           val[ igrid ] = v;
         });
       });
     else
-      q.submit([&] (handler &cgh) {
-        auto ax = ax_mem.get_access<sycl_read>(cgh);
-        auto ay = ay_mem.get_access<sycl_read>(cgh);
-        auto az = az_mem.get_access<sycl_read>(cgh);
-        auto charge = charge_mem.get_access<sycl_read>(cgh);
-        auto size = size_mem.get_access<sycl_read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl_read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl_read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl_read>(cgh);
-        auto val = val_mem_re.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> shared(5*wgsize, cgh);
-        cgh.parallel_for<class mdh3_v4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
+        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
+        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
+        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
+        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
+        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
+        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
+        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        cgh.parallel_for<class mdh3_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
-          float4 v (0.0f);
-          float4 lgx = gx[igrid];
-          float4 lgy = gy[igrid];
-          float4 lgz = gz[igrid];
+          sycl::float4 v (0.0f);
+          sycl::float4 lgx = gx[igrid];
+          sycl::float4 lgy = gy[igrid];
+          sycl::float4 lgz = gz[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
@@ -234,19 +233,19 @@ void run_gpu_kernel(
               shared[lid + 3*lsize] = charge[jatom + lid];
               shared[lid + 4*lsize] = size[jatom + lid];
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             for(int i=0; i<lsize; i++) {
-              float4 dx = lgx - shared[i          ];
-              float4 dy = lgy - shared[i +   lsize];
-              float4 dz = lgz - shared[i + 2*lsize];
-              float4 dist = sycl::native::sqrt( dx * dx + dy * dy + dz * dz );
+              sycl::float4 dx = lgx - shared[i          ];
+              sycl::float4 dy = lgy - shared[i +   lsize];
+              sycl::float4 dz = lgz - shared[i + 2*lsize];
+              sycl::float4 dist = sycl::native::sqrt( dx * dx + dy * dy + dz * dz );
               v += pre1 * ( shared[i + 3*lsize] / dist )  *
                    sycl::native::exp( -xkappa * (dist - shared[i + 4*lsize])) /
                    (1.0f + xkappa * shared[i + 4*lsize]);
 
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
           }
           val[ igrid ] = v;
         });
@@ -259,8 +258,8 @@ void run_gpu_kernel(
   printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
 
   // read output image
-  q.submit([&] (handler &cgh) {
-    auto acc = val_mem.get_access<sycl_read>(cgh, range<1>(ngrid));
+  q.submit([&] (sycl::handler &cgh) {
+    auto acc = val_mem.get_access<sycl::access::mode::read>(cgh, sycl::range<1>(ngrid));
     cgh.copy(acc, val);
   }).wait();
 
@@ -286,7 +285,7 @@ void run_cpu_kernel(
     float *val)
 {
   wkf_timerhandle timer = wkf_timer_create();
-  wkf_timer_start(timer); 
+  wkf_timer_start(timer);
 
   for(int n = 0; n < itmax; n++) {
     #pragma omp parallel for
@@ -294,8 +293,8 @@ void run_cpu_kernel(
       float sum = 0.0f;
       #pragma omp parallel for simd reduction(+:sum)
       for(int iatom=0; iatom<natom; iatom++) {
-        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
+        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) +
+            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) +
             (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
 
         sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
@@ -380,7 +379,7 @@ int main(int argc, const char **argv) {
 
   for (int choice = 0; choice < 3; choice++) {
     wkf_timer_start(timer);
-    run_gpu_kernel(true, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
+    run_gpu_kernel(true, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz,
                    charge, size, xkappa, pre1, val);
     wkf_timer_stop(timer);
 
