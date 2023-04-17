@@ -332,18 +332,19 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_in_bytes = sizeof(double) * vol;
 
   // storage for result stored on host
-  nRarray *phi_host = (nRarray *)malloc(vol*sizeof(double));
-  nRarray *u_host = (nRarray *)malloc(vol*sizeof(double));
+  nRarray *phi_host = (nRarray *)malloc(vol_in_bytes);
+  nRarray *u_host = (nRarray *)malloc(vol_in_bytes);
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
 
 #ifdef VERIFY
-  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
-  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
-  memcpy(phi_ref, phi_host, vol*sizeof(double));
-  memcpy(u_ref, u_host, vol*sizeof(double));
+  nRarray *phi_ref = (nRarray *)malloc(vol_in_bytes);
+  nRarray *u_ref = (nRarray *)malloc(vol_in_bytes);
+  memcpy(phi_ref, phi_host, vol_in_bytes);
+  memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
@@ -352,11 +353,11 @@ int main(int argc, char *argv[])
   // storage for result computed on device
   double *d_phiold = (double*)phi_host;
   double *d_uold = (double*)u_host;
-  double *d_phinew = (double*) malloc (vol*sizeof(double));
-  double *d_unew = (double*) malloc (vol*sizeof(double));
-  double *d_Fx = (double*) malloc (vol*sizeof(double));
-  double *d_Fy = (double*) malloc (vol*sizeof(double));
-  double *d_Fz = (double*) malloc (vol*sizeof(double));
+  double *d_phinew = (double*) malloc (vol_in_bytes);
+  double *d_unew = (double*) malloc (vol_in_bytes);
+  double *d_Fx = (double*) malloc (vol_in_bytes);
+  double *d_Fy = (double*) malloc (vol_in_bytes);
+  double *d_Fz = (double*) malloc (vol_in_bytes);
 
   #pragma omp target data map(tofrom: d_phiold[0:vol], \
                                       d_uold[0:vol]) \

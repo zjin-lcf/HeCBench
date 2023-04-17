@@ -332,6 +332,7 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_in_bytes = sizeof(double) * vol;
 
   // pointers for data set storage via malloc
   nRarray *phi_host;
@@ -344,17 +345,17 @@ int main(int argc, char *argv[])
   nRarray *d_Fy;
   nRarray *d_Fz;
 
-  phi_host = (nRarray *)malloc(vol*sizeof(double));
-  u_host = (nRarray *)malloc(vol*sizeof(double));
+  phi_host = (nRarray *)malloc(vol_in_bytes);
+  u_host = (nRarray *)malloc(vol_in_bytes);
 
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
 
 #ifdef VERIFY
-  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
-  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
-  memcpy(phi_ref, phi_host, vol*sizeof(double));
-  memcpy(u_ref, u_host, vol*sizeof(double));
+  nRarray *phi_ref = (nRarray *)malloc(vol_in_bytes);
+  nRarray *u_ref = (nRarray *)malloc(vol_in_bytes);
+  memcpy(phi_ref, phi_host, vol_in_bytes);
+  memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
@@ -365,16 +366,16 @@ int main(int argc, char *argv[])
   dim3 block (8, 8, 4);
 
   // allocate GPU device buffers
-  hipMalloc((void **) &d_phiold, vol*sizeof(double));
-  hipMalloc((void **) &d_phinew, vol*sizeof(double));
-  hipMalloc((void **) &d_uold, vol*sizeof(double));
-  hipMalloc((void **) &d_unew, vol*sizeof(double));
-  hipMalloc((void **) &d_Fx, vol*sizeof(double));
-  hipMalloc((void **) &d_Fy, vol*sizeof(double));
-  hipMalloc((void **) &d_Fz, vol*sizeof(double));
+  hipMalloc((void **) &d_phiold, vol_in_bytes);
+  hipMalloc((void **) &d_phinew, vol_in_bytes);
+  hipMalloc((void **) &d_uold, vol_in_bytes);
+  hipMalloc((void **) &d_unew, vol_in_bytes);
+  hipMalloc((void **) &d_Fx, vol_in_bytes);
+  hipMalloc((void **) &d_Fy, vol_in_bytes);
+  hipMalloc((void **) &d_Fz, vol_in_bytes);
 
-  hipMemcpy(d_phiold, phi_host, (vol*sizeof(double)), hipMemcpyHostToDevice);
-  hipMemcpy(d_uold, u_host, (vol*sizeof(double)), hipMemcpyHostToDevice);
+  hipMemcpy(d_phiold, phi_host, vol_in_bytes, hipMemcpyHostToDevice);
+  hipMemcpy(d_uold, u_host, vol_in_bytes, hipMemcpyHostToDevice);
 
   int t = 0;
 
@@ -410,8 +411,8 @@ int main(int argc, char *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
 
-  hipMemcpy(phi_host, d_phiold, (vol*sizeof(double)), hipMemcpyDeviceToHost);
-  hipMemcpy(u_host, d_uold, (vol*sizeof(double)), hipMemcpyDeviceToHost);
+  hipMemcpy(phi_host, d_phiold, vol_in_bytes, hipMemcpyDeviceToHost);
+  hipMemcpy(u_host, d_uold, vol_in_bytes, hipMemcpyDeviceToHost);
 
   hipFree(d_phiold);
   hipFree(d_phinew);

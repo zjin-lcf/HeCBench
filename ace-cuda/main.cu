@@ -332,6 +332,7 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_in_bytes = sizeof(double) * vol;
 
   // pointers for data set storage via malloc
   nRarray *phi_host;
@@ -344,17 +345,17 @@ int main(int argc, char *argv[])
   nRarray *d_Fy;
   nRarray *d_Fz;
 
-  phi_host = (nRarray *)malloc(vol*sizeof(double));
-  u_host = (nRarray *)malloc(vol*sizeof(double));
+  phi_host = (nRarray *)malloc(vol_in_bytes);
+  u_host = (nRarray *)malloc(vol_in_bytes);
 
   initializationPhi(phi_host,r0);
   initializationU(u_host,r0,delta);
 
 #ifdef VERIFY
-  nRarray *phi_ref = (nRarray *)malloc(vol*sizeof(double));
-  nRarray *u_ref = (nRarray *)malloc(vol*sizeof(double));
-  memcpy(phi_ref, phi_host, vol*sizeof(double));
-  memcpy(u_ref, u_host, vol*sizeof(double));
+  nRarray *phi_ref = (nRarray *)malloc(vol_in_bytes);
+  nRarray *u_ref = (nRarray *)malloc(vol_in_bytes);
+  memcpy(phi_ref, phi_host, vol_in_bytes);
+  memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
@@ -365,16 +366,16 @@ int main(int argc, char *argv[])
   dim3 block (8, 8, 4);
 
   // allocate GPU device buffers
-  cudaMalloc((void **) &d_phiold, vol*sizeof(double));
-  cudaMalloc((void **) &d_phinew, vol*sizeof(double));
-  cudaMalloc((void **) &d_uold, vol*sizeof(double));
-  cudaMalloc((void **) &d_unew, vol*sizeof(double));
-  cudaMalloc((void **) &d_Fx, vol*sizeof(double));
-  cudaMalloc((void **) &d_Fy, vol*sizeof(double));
-  cudaMalloc((void **) &d_Fz, vol*sizeof(double));
+  cudaMalloc((void **) &d_phiold, vol_in_bytes);
+  cudaMalloc((void **) &d_phinew, vol_in_bytes);
+  cudaMalloc((void **) &d_uold, vol_in_bytes);
+  cudaMalloc((void **) &d_unew, vol_in_bytes);
+  cudaMalloc((void **) &d_Fx, vol_in_bytes);
+  cudaMalloc((void **) &d_Fy, vol_in_bytes);
+  cudaMalloc((void **) &d_Fz, vol_in_bytes);
 
-  cudaMemcpy(d_phiold, phi_host, (vol*sizeof(double)), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_uold, u_host, (vol*sizeof(double)), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_phiold, phi_host, vol_in_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_uold, u_host, vol_in_bytes, cudaMemcpyHostToDevice);
 
   int t = 0;
 
@@ -410,8 +411,8 @@ int main(int argc, char *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time: %.3f (ms)\n", time * 1e-6f);
 
-  cudaMemcpy(phi_host, d_phiold, (vol*sizeof(double)), cudaMemcpyDeviceToHost);
-  cudaMemcpy(u_host, d_uold, (vol*sizeof(double)), cudaMemcpyDeviceToHost);
+  cudaMemcpy(phi_host, d_phiold, vol_in_bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(u_host, d_uold, vol_in_bytes, cudaMemcpyDeviceToHost);
 
   cudaFree(d_phiold);
   cudaFree(d_phinew);
