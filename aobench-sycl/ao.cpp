@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <math.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define WIDTH        256
 #define HEIGHT       256
@@ -64,16 +64,16 @@ static void vcross(Vec *c, Vec v0, Vec v1)
 
 static void vnormalize(Vec *c)
 {
-  float length = cl::sycl::sqrt(vdot((*c), (*c)));
+  float length = sycl::sqrt(vdot((*c), (*c)));
 
-  if (cl::sycl::fabs(length) > 1.0e-17f) {
+  if (sycl::fabs(length) > 1.0e-17f) {
     c->x /= length;
     c->y /= length;
     c->z /= length;
   }
 }
 
-void ray_sphere_intersect(Isect *isect, const Ray *ray, global_ptr<Sphere> sphere)
+void ray_sphere_intersect(Isect *isect, const Ray *ray, const Sphere *sphere)
 {
   Vec rs;
 
@@ -86,7 +86,7 @@ void ray_sphere_intersect(Isect *isect, const Ray *ray, global_ptr<Sphere> spher
   float D = B * B - C;
 
   if (D > 0.0) {
-    float t = -B - cl::sycl::sqrt(D);
+    float t = -B - sycl::sqrt(D);
 
     if ((t > 0.0) && (t < isect->t)) {
       isect->t = t;
@@ -111,7 +111,7 @@ void ray_plane_intersect(Isect *isect, const Ray *ray, const Plane *plane)
   float d = -vdot(plane->p, plane->n);
   float v = vdot(ray->dir, plane->n);
 
-  if (cl::sycl::fabs(v) < 1.0e-17f) return;
+  if (sycl::fabs(v) < 1.0e-17f) return;
 
   float t = -(vdot(ray->org, plane->n) + d) / v;
 
@@ -172,7 +172,7 @@ class RNG {
 
 
 void ambient_occlusion(Vec *col, const Isect *isect, 
-		       global_ptr<Sphere> spheres, const Plane *plane, RNG &rng)
+		       Sphere *spheres, const Plane *plane, RNG &rng)
 {
   int    i, j;
   int    ntheta = NAO_SAMPLES;
@@ -193,11 +193,11 @@ void ambient_occlusion(Vec *col, const Isect *isect,
 
   for (j = 0; j < ntheta; j++) {
     for (i = 0; i < nphi; i++) {
-      float theta = cl::sycl::sqrt(rng());
+      float theta = sycl::sqrt(rng());
       float phi = 2.0f * (float)M_PI * rng();
-      float x = cl::sycl::cos(phi) * theta;
-      float y = cl::sycl::sin(phi) * theta;
-      float z = cl::sycl::sqrt(1.0f - theta * theta);
+      float x = sycl::cos(phi) * theta;
+      float y = sycl::sin(phi) * theta;
+      float z = sycl::sqrt(1.0f - theta * theta);
 
       // local -> global
       float rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;
@@ -286,25 +286,22 @@ void saveppm(const char *fname, int w, int h, unsigned char *img)
 }
 
 
-void render(queue &q, unsigned char *img, int w, int h, int nsubsamples, 
+void render(sycl::queue &q, unsigned char *img, int w, int h, int nsubsamples, 
             const Sphere* spheres, const Plane &plane)
 {
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<unsigned char, 1> d_img(img, w * h * 3, props);
-  buffer<Sphere, 1> d_spheres(spheres, 3);
+  unsigned char *d_img = sycl::malloc_device<unsigned char>(w * h * 3, q);
+  q.memcpy(d_img, img, sizeof(unsigned char) * w * h * 3);
 
-  size_t global_work_size[2]; 
-  global_work_size[1] = (w+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE;
-  global_work_size[0] = (h+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE;
+  Sphere *d_spheres = sycl::malloc_device<Sphere>(3, q);
+  q.memcpy(d_spheres, spheres, sizeof(Sphere) * 3);
 
-  size_t local_work_size[2] = { BLOCK_SIZE, BLOCK_SIZE };
+  sycl::range<2> gws ((h+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE,
+                      (w+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  sycl::range<2> lws (BLOCK_SIZE, BLOCK_SIZE);
 
-  q.submit([&](handler& cgh) {
-    auto spheres = d_spheres.get_access<sycl_read>(cgh);
-    auto fimg = d_img.get_access<sycl_discard_write>(cgh);
+  q.submit([&](sycl::handler& cgh) {
     cgh.parallel_for<class render_kernel>(
-      nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
-      range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int x = item.get_global_id(1);
         int y = item.get_global_id(0);
         if (y < h && x < w) {
@@ -332,26 +329,30 @@ void render(queue &q, unsigned char *img, int w, int h, int nsubsamples,
               isect.t = 1.0e+17f;
               isect.hit = 0;
 
-              ray_sphere_intersect( &isect, &ray, spheres.get_pointer()   );
-              ray_sphere_intersect( &isect, &ray, spheres.get_pointer() + 1  );
-              ray_sphere_intersect( &isect, &ray, spheres.get_pointer() + 2  );
+              ray_sphere_intersect( &isect, &ray, d_spheres   );
+              ray_sphere_intersect( &isect, &ray, d_spheres + 1  );
+              ray_sphere_intersect( &isect, &ray, d_spheres + 2  );
               ray_plane_intersect ( &isect, &ray, &plane );
 
               if( isect.hit ) {
                 Vec col;
-                ambient_occlusion( &col, &isect, spheres.get_pointer(), &plane, rng );
+                ambient_occlusion( &col, &isect, d_spheres, &plane, rng );
                 s0 += col.x;
                 s1 += col.y;
                 s2 += col.z;
               }
             }
           }
-          fimg[ 3 * ( y * w + x ) + 0 ] = my_clamp ( s0 / ( float )( nsubsamples * nsubsamples ) );
-          fimg[ 3 * ( y * w + x ) + 1 ] = my_clamp ( s1 / ( float )( nsubsamples * nsubsamples ) );
-          fimg[ 3 * ( y * w + x ) + 2 ] = my_clamp ( s2 / ( float )( nsubsamples * nsubsamples ) );
+          d_img[ 3 * ( y * w + x ) + 0 ] = my_clamp ( s0 / ( float )( nsubsamples * nsubsamples ) );
+          d_img[ 3 * ( y * w + x ) + 1 ] = my_clamp ( s1 / ( float )( nsubsamples * nsubsamples ) );
+          d_img[ 3 * ( y * w + x ) + 2 ] = my_clamp ( s2 / ( float )( nsubsamples * nsubsamples ) );
         }
      });
   });
+
+  q.memcpy(img, d_img, sizeof(unsigned char) * w * h * 3).wait();
+  sycl::free(d_img, q);
+  sycl::free(d_spheres, q);
 }
 
 int main(int argc, char **argv)
@@ -371,11 +372,10 @@ int main(int argc, char **argv)
   unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   clock_t start;
   start = clock();
