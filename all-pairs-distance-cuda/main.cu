@@ -257,10 +257,9 @@ int main(int argc, char **argv) {
   free(cpu_distance);
   free(gpu_distance);
   free(data);
+  free(data_char);
   cudaFree(data_char_device);
   cudaFree(distance_device);
 
   return status;
 }
-
-
