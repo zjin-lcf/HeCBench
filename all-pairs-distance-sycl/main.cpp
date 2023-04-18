@@ -9,7 +9,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
 
 #define INSTANCES 224   /* # of instances */
 #define ATTRIBUTES 4096 /* # of attributes */
@@ -29,8 +36,6 @@ void CPU(int * data, int * distance) {
     }
   }
 }
-
-
 
 int main(int argc, char **argv) {
 
@@ -60,10 +65,14 @@ int main(int argc, char **argv) {
   srand(2);
 
   /* allocate host memory */
-  data = (int *)malloc(INSTANCES * ATTRIBUTES * sizeof(int));
-  data_char = (char *)malloc(INSTANCES * ATTRIBUTES * sizeof(char));
-  cpu_distance = (int *)malloc(INSTANCES * INSTANCES * sizeof(int));
-  gpu_distance = (int *)malloc(INSTANCES * INSTANCES * sizeof(int));
+  const size_t distance_bytes = INSTANCES * INSTANCES * sizeof(int);
+  const size_t int32_data_bytes = INSTANCES * ATTRIBUTES * sizeof(int);
+  const size_t int8_data_bytes = INSTANCES * ATTRIBUTES * sizeof(char);
+
+  data = (int *)malloc(int32_data_bytes);
+  data_char = (char *)malloc(int8_data_bytes);
+  cpu_distance = (int *)malloc(distance_bytes);
+  gpu_distance = (int *)malloc(distance_bytes);
 
   /* randomly initialize host data */
 #pragma omp parallel for collapse(2)
@@ -73,19 +82,20 @@ int main(int argc, char **argv) {
     }
   }
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   /* allocate GPU memory */
-  buffer<char, 1> data_char_device(data_char, INSTANCES * ATTRIBUTES);
-  buffer<int, 1> distance_device(INSTANCES * INSTANCES);
+  char *d_data = sycl::malloc_device<char>(INSTANCES * ATTRIBUTES, q);
+  q.memcpy(d_data, data_char, int8_data_bytes);
 
-  range<2> global_size (INSTANCES, INSTANCES*THREADS);
-  range<2> local_size (1, THREADS);
+  int *d_distance = sycl::malloc_device<int>(INSTANCES * INSTANCES, q);
+
+  sycl::range<2> gws (INSTANCES, INSTANCES*THREADS);
+  sycl::range<2> lws (1, THREADS);
 
   /* CPU */
   bzero(cpu_distance,INSTANCES*INSTANCES*sizeof(int));
@@ -102,26 +112,21 @@ int main(int argc, char **argv) {
     /* register GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
 
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_write>(h);
-      h.copy(gpu_distance, distance_acc);
-    }).wait();
+    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
-    q.submit([&] (handler &h) {
-      auto data = data_char_device.get_access<sycl_read>(h);
-      auto distance = distance_device.get_access<sycl_atomic>(h);
-      h.parallel_for<class GPUregister>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
-        int idx = item.get_local_id(1); //threadIdx.x;
-        int gx = item.get_group(1); //blockIdx.x;
-        int gy = item.get_group(0); //blockIdx.y;
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class GPUregister>(
+        sycl::nd_range<2> (gws, lws), [=] (sycl::nd_item<2> item) {
+        int idx = item.get_local_id(1);
+        int gx = item.get_group(1);
+        int gy = item.get_group(0);
 
-        vec<char, 4> j, k;
         for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-          j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-          k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+          sycl::char4 j = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gx));
+          sycl::char4 k = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gy));
 
         /* use a local variable (stored in register) to hold intermediate
            values. This reduces writes to global memory */
@@ -137,7 +142,12 @@ int main(int argc, char **argv) {
             count++;
 
           /* atomic write to global memory */
-          atomic_fetch_add(distance[INSTANCES*gx + gy], count);
+          auto ao = sycl::atomic_ref<int, 
+            sycl::memory_order::relaxed,
+            sycl::memory_scope::device,
+            sycl::access::address_space::global_space> (d_distance[INSTANCES*gx + gy]);
+           
+          ao.fetch_add(count);
         }
       });
     }).wait();
@@ -146,10 +156,7 @@ int main(int argc, char **argv) {
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
 
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_read>(h);
-      h.copy(distance_acc, gpu_distance);
-    }).wait();
+    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
 
   printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
@@ -162,36 +169,31 @@ int main(int argc, char **argv) {
     /* shared memory GPU kernel */
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
 
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_write>(h);
-      h.copy(gpu_distance, distance_acc);
-    }).wait();
+    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     /*  coalesced GPU implementation of the all-pairs kernel using
         character data types, registers, and shared memory */
-    q.submit([&] (handler &h) {
-      auto data = data_char_device.get_access<sycl_read>(h);
-      auto distance = distance_device.get_access<sycl_read_write>(h);
-      accessor<int, 1, sycl_read_write, access::target::local> dist(THREADS, h); 
-      h.parallel_for<class GPUshared>(nd_range<2> (global_size, local_size), [=] (nd_item<2> item) {
-        int idx = item.get_local_id(1); //threadIdx.x;
-        int gx = item.get_group(1); //blockIdx.x;
-        int gy = item.get_group(0); //blockIdx.y;
+    q.submit([&] (sycl::handler &h) {
+      sycl::local_accessor<int, 1> dist(sycl::range<1>(THREADS), h); 
+      h.parallel_for<class GPUshared>(
+        sycl::nd_range<2> (gws, lws), [=] (sycl::nd_item<2> item) {
+        int idx = item.get_local_id(1);
+        int gx = item.get_group(1);
+        int gy = item.get_group(0);
 
         /* each thread initializes its own location of the shared array */ 
         dist[idx] = 0;
 
         /* At this point, the threads must be synchronized to ensure that
            the shared array is fully initialized. */
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
-        vec<char, 4> j, k;
-        for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-          j.load(i/4, data.get_pointer() + ATTRIBUTES*gx);
-          k.load(i/4, data.get_pointer() + ATTRIBUTES*gy);
+        for(int i = idx*4; i < ATTRIBUTES; i+=THREADS*4) {
+          sycl::char4 j = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gx));
+          sycl::char4 k = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gy));
 
         /* use a local variable (stored in register) to hold intermediate
            values. This reduces writes to global memory */
@@ -214,7 +216,7 @@ int main(int argc, char **argv) {
            by thread 0 below, this must be ensured. Above, it was not
            necessary because each thread was accessing its own memory
            */
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         /* Reduction: Thread 0 will add the value of all other threads to
            its own */ 
@@ -228,7 +230,7 @@ int main(int argc, char **argv) {
              thread per block is writing to global memory, and each block
              corresponds to a unique memory address. 
              */
-          distance[INSTANCES*gy + gx] = dist[0];
+          d_distance[INSTANCES*gy + gx] = dist[0];
         }
       });
     }).wait();
@@ -237,10 +239,7 @@ int main(int argc, char **argv) {
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
 
-    q.submit([&] (handler &h) {
-      auto distance_acc = distance_device.get_access<sycl_read>(h);
-      h.copy(distance_acc, gpu_distance);
-    }).wait();
+    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
 
   printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
@@ -252,6 +251,8 @@ int main(int argc, char **argv) {
   free(gpu_distance);
   free(data);
   free(data_char);
+  sycl::free(d_data, q);
+  sycl::free(d_distance, q);
 
   return status;
 }
