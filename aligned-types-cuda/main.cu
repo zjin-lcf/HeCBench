@@ -52,6 +52,11 @@ typedef struct
   unsigned int r, g, b, a;
 } uint4_misaligned;
 
+typedef struct
+{
+  uint4_misaligned c1, c2;
+}
+uint8_misaligned;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +102,7 @@ typedef struct __align__(16)
 {
   uint4_aligned c1, c2;
 }
-uint4_aligned_2;
+uint8_aligned;
 
 
 
@@ -303,8 +308,11 @@ int main(int argc, char **argv)
   printf("uint4_aligned...\n");
   nTotalFailures += runTest<uint4_aligned>(d_idata, d_odata, 16, MemorySize);
 
-  printf("uint4_aligned_2...\n");
-  nTotalFailures += runTest<uint4_aligned_2>(d_idata, d_odata, 32, MemorySize);
+  printf("uint8_misaligned...\n");
+  nTotalFailures += runTest<uint8_misaligned>(d_idata, d_odata, 32, MemorySize);
+
+  printf("uint8_aligned...\n");
+  nTotalFailures += runTest<uint8_aligned>(d_idata, d_odata, 32, MemorySize);
 
   printf("\n[alignedTypes] -> Test Results: %d Failures\n", nTotalFailures);
 
