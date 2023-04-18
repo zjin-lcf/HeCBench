@@ -257,6 +257,7 @@ int main(int argc, char **argv) {
   free(cpu_distance);
   free(gpu_distance);
   free(data);
+  free(data_char);
   hipFree(data_char_device);
   hipFree(distance_device);
 
