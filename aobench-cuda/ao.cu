@@ -345,7 +345,9 @@ render_kernel (unsigned char *fimg, const Sphere *spheres, const Plane plane,
   }
 }
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#ifdef DEBUG
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__) }
+
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
   if (code != cudaSuccess) 
@@ -354,6 +356,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     if (abort) exit(code);
   }
 }
+#else
+#define gpuErrchk(ans) ans
+#endif
 
 void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* spheres, const Plane &plane)
 {
@@ -367,7 +372,9 @@ void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* sph
   render_kernel <<< dim3((w+BLOCK_SIZE-1)/BLOCK_SIZE, (h+BLOCK_SIZE-1)/BLOCK_SIZE), 
                     dim3(BLOCK_SIZE, BLOCK_SIZE) >>> (d_img, d_spheres, plane, h, w, nsubsamples);
 
+#ifdef DEBUG
   gpuErrchk( cudaPeekAtLastError() );
+#endif
 
   gpuErrchk( cudaMemcpy(img, d_img, sizeof(unsigned char) * w * h * 3, cudaMemcpyDeviceToHost) );
   cudaFree(d_img);
