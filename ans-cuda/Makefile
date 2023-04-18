@@ -4,8 +4,6 @@ NVCC = nvcc
 NVCC_ARCH = -gencode arch=compute_$(ARCH),code=sm_$(ARCH)
 NVCC_FLAGS = --std=c++14 -O3 -arch=sm_$(ARCH) -Xcompiler="-pthread" 
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin

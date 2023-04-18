@@ -6,8 +6,6 @@ NVCC_FLAGS = --std=c++14 -O3 -target x86_64-pc-linux-gnu \
           -march=$(ARCH) \
           -pthread 
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin
