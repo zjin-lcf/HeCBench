@@ -11,7 +11,7 @@
 //--------------
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
   printf("// \n");
   printf("//------------ \n");
 
-  printf("\nWall time = %f seconds. \n", totalWallTime);
+  printf("\nTotal kernel time = %f seconds. \n", totalWallTime);
 
 
   // Axpy
@@ -229,12 +229,6 @@ void test_Relax()
 
   hypre_SeqVectorSetConstantValues(x,1);
 
-#ifdef _OPENMP
-  t0 = omp_get_wtime();
-#else
-  auto t0 = std::chrono::steady_clock::now();
-#endif
-
   double         *A_diag_data  = hypre_CSRMatrixData(A);
   int            *A_diag_i     = hypre_CSRMatrixI(A);
   int            *A_diag_j     = hypre_CSRMatrixJ(A);
@@ -250,36 +244,41 @@ void test_Relax()
 
   int             grid_size = nx*ny*nz;
 
-  {
-
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  const property_list props = property::buffer::use_host_ptr();
+  double *d_A_diag_data = sycl::malloc_device<double>(nonzero, q);
+  q.memcpy(d_A_diag_data, A_diag_data, sizeof(double)*nonzero);
 
-  buffer<double, 1> d_A_diag_data(A_diag_data, nonzero, props);
-  buffer<int, 1> d_A_diag_i(A_diag_i, grid_size+1, props);
-  buffer<int, 1> d_A_diag_j(A_diag_j, nonzero, props);
-  buffer<double, 1> d_u_data(u_data, grid_size, props);
-  buffer<double, 1> d_f_data(f_data, grid_size, props);
+     int *d_A_diag_i = sycl::malloc_device<int>(grid_size+1, q);
+  q.memcpy(d_A_diag_i, A_diag_i, sizeof(int)*(grid_size+1));
 
+     int *d_A_diag_j = sycl::malloc_device<int>(nonzero, q); 
+  q.memcpy(d_A_diag_j, A_diag_j, sizeof(int)*nonzero);
 
-  size_t local_work_size = BLOCK_SIZE;
-  size_t global_work_size = (n + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+  double *d_u_data = sycl::malloc_device<double>(grid_size, q); 
+  q.memcpy(d_u_data, u_data, sizeof(double)*grid_size);
 
-  for (i=0; i<testIter; ++i) {
-    q.submit([&](handler& cgh) {
-      auto A_diag_data = d_A_diag_data.get_access<sycl_read>(cgh);
-      auto A_diag_i = d_A_diag_i.get_access<sycl_read>(cgh);
-      auto A_diag_j = d_A_diag_j.get_access<sycl_read>(cgh);
-      auto u_data = d_u_data.get_access<sycl_write>(cgh);
-      auto f_data = d_f_data.get_access<sycl_read>(cgh);
+  double *d_f_data = sycl::malloc_device<double>(grid_size, q); 
+  q.memcpy(d_f_data, f_data, sizeof(double)*grid_size);
+
+  q.wait();
+  sycl::range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws ((n + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+
+#ifdef _OPENMP
+  t0 = omp_get_wtime();
+#else
+  auto t0 = std::chrono::steady_clock::now();
+#endif
+
+  for (i = 0; i < testIter; ++i) {
+    q.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class relax>(
-        nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
           if (i >= n) return;
           
@@ -287,21 +286,21 @@ void test_Relax()
           * If diagonal is nonzero, relax point i; otherwise, skip it.
           *-----------------------------------------------------------*/
           
-          if ( A_diag_data[A_diag_i[i]] != 0.0)
+          if ( d_A_diag_data[d_A_diag_i[i]] != 0.0)
           {
-            double res = f_data[i];
-            for (int jj = A_diag_i[i]+1; jj < A_diag_i[i+1]; jj++)
+            double res = d_f_data[i];
+            for (int jj = d_A_diag_i[i]+1; jj < d_A_diag_i[i+1]; jj++)
             {
-              int ii = A_diag_j[jj];
-              res -= A_diag_data[jj] * u_data[ii];
+              int ii = d_A_diag_j[jj];
+              res -= d_A_diag_data[jj] * d_u_data[ii];
             }
-            u_data[i] = res / A_diag_data[A_diag_i[i]];
+            d_u_data[i] = res / d_A_diag_data[d_A_diag_i[i]];
           }
        });
     });
   } // for
 
-  }
+  q.wait();
 
 #ifdef _OPENMP
   t1 = omp_get_wtime();
@@ -311,6 +310,14 @@ void test_Relax()
   std::chrono::duration<double> tdiff = t1 - t0;
   totalWallTime += tdiff.count();
 #endif
+
+  q.memcpy(u_data, d_u_data, sizeof(double)*grid_size).wait();
+
+  sycl::free(d_A_diag_data, q);
+  sycl::free(d_A_diag_i, q);
+  sycl::free(d_A_diag_j, q);
+  sycl::free(d_u_data, q);
+  sycl::free(d_f_data, q);
 
   error = 0;
   for (i=0; i < nx*ny*nz; i++)
@@ -391,4 +398,3 @@ void test_Axpy()
   hypre_SeqVectorDestroy(y);
 
 }
-

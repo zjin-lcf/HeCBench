@@ -20,7 +20,8 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = AMGMk
 
-source = csr_matrix.cpp  csr_matvec.cpp  hypre_error.cpp  hypre_memory.cpp  laplace.cpp  main.cpp  vector.cpp
+source = csr_matrix.cpp  csr_matvec.cpp  hypre_error.cpp  \
+         hypre_memory.cpp  laplace.cpp  main.cpp  vector.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -29,13 +30,13 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
