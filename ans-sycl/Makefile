@@ -18,8 +18,6 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin

@@ -2,8 +2,6 @@ ARCH = cc70
 NVCC = nvc++
 NVCC_FLAGS = -Wall --std=c++14 -O3 -Minfo -mp=gpu -gpu=$(ARCH) -pthread 
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin

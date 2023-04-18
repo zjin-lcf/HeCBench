@@ -4,8 +4,6 @@ NVCC = hipcc
 NVCC_ARCH =
 NVCC_FLAGS = --std=c++14 -O3 --offload-arch=$(ARCH) -pthread
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin

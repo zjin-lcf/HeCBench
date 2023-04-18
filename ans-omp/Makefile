@@ -1,8 +1,6 @@
 NVCC = icpx
 NVCC_FLAGS = --std=c++14 -O3 -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 
-BIN = -o bin
-
 INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = bin
