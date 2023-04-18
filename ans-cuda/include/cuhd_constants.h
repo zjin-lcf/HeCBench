@@ -11,6 +11,8 @@
 #ifndef CUHD_CONSTANTS_
 #define CUHD_CONSTANTS_
 
+#include <cstdint>
+
 // maximum codeword length this implementation can process
 #define MAX_CODEWORD_LENGTH 11
 
