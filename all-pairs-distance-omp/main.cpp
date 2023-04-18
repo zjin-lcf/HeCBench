@@ -83,138 +83,138 @@ int main(int argc, char **argv) {
   elapsedTime = stop_cpu - start_cpu;
   printf("CPU time: %f (us)\n",elapsedTime);
 
-#pragma omp target data map(to: data_char[0:INSTANCES * ATTRIBUTES]) \
-                        map(alloc: gpu_distance[0:INSTANCES * INSTANCES ])
-{
-  for (int n = 0; n < iterations; n++) {
-    /* register-based kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
-
-    #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
-    {
-      #pragma omp parallel
+  #pragma omp target data map(to: data_char[0:INSTANCES * ATTRIBUTES]) \
+                          map(alloc: gpu_distance[0:INSTANCES * INSTANCES ])
+  {
+    for (int n = 0; n < iterations; n++) {
+      /* register-based kernel */
+      bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
+      #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
+  
+      gettimeofday(&tp, &tzp);
+      start_gpu = tp.tv_sec*1000000+tp.tv_usec;
+  
+      #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
       {
-        int idx = omp_get_thread_num();
-        int gx = omp_get_team_num() % INSTANCES;
-        int gy = omp_get_team_num() / INSTANCES;
-    
-        for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-          char4 j = *(char4 *)(data_char + i + ATTRIBUTES*gx);
-          char4 k = *(char4 *)(data_char + i + ATTRIBUTES*gy);
-    
-          /* use a local variable (stored in register) to hold intermediate
-             values. This reduces writes to global memory */
-          char count = 0;
-    
-          if(j.x ^ k.x) 
-            count++; 
-          if(j.y ^ k.y)
-            count++;
-          if(j.z ^ k.z)
-            count++;
-          if(j.w ^ k.w)
-            count++;
-    
-          /* atomic write to global memory */
-          #pragma omp atomic update
-          gpu_distance[ INSTANCES*gx + gy ] += count;
-        }
-      }
-    }
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
-
-    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
-  }
-
-  printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
-
-  elapsedTime = 0; 
-  for (int n = 0; n < iterations; n++) {
-    /* shared memory GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
-
-    #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
-    {
-      int dist[THREADS];
-      #pragma omp parallel
-      {
-        int idx = omp_get_thread_num();
-        int gx = omp_get_team_num() % INSTANCES;
-        int gy = omp_get_team_num() / INSTANCES;
-    
-        dist[idx] = 0;
-        #pragma omp barrier
-    
-        for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
-          char4 j = *(char4 *)(data_char + i + ATTRIBUTES*gx);
-          char4 k = *(char4 *)(data_char + i + ATTRIBUTES*gy);
-    
-          /* use a local variable (stored in register) to hold intermediate
-             values. This reduces writes to global memory */
-          char count = 0;
-    
-          if(j.x ^ k.x) 
-            count++; 
-          if(j.y ^ k.y)
-            count++;
-          if(j.z ^ k.z)
-            count++;
-          if(j.w ^ k.w)
-            count++;
-    
-          dist[idx] += count;
-        }
-    
-      /* Synchronize threads to make sure all have completed their updates
-         of the shared array. Since the distances for each thread are read
-         by thread 0 below, this must be ensured. Above, it was not
-         necessary because each thread was accessing its own memory
-      */
-        #pragma omp barrier
-    
-      /* Reduction: Thread 0 will add the value of all other threads to
-      its own */ 
-        if(idx == 0) {
-          for(int i = 1; i < THREADS; i++) {
-            dist[0] += dist[i];
+        #pragma omp parallel
+        {
+          int idx = omp_get_thread_num();
+          int gx = omp_get_team_num() % INSTANCES;
+          int gy = omp_get_team_num() / INSTANCES;
+      
+          for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
+            char4 j = *(char4 *)(data_char + i + ATTRIBUTES*gx);
+            char4 k = *(char4 *)(data_char + i + ATTRIBUTES*gy);
+      
+            /* use a local variable (stored in register) to hold intermediate
+               values. This reduces writes to global memory */
+            char count = 0;
+      
+            if(j.x ^ k.x) 
+              count++; 
+            if(j.y ^ k.y)
+              count++;
+            if(j.z ^ k.z)
+              count++;
+            if(j.w ^ k.w)
+              count++;
+      
+            /* atomic write to global memory */
+            #pragma omp atomic update
+            gpu_distance[ INSTANCES*gx + gy ] += count;
           }
-    
-          /* Thread 0 will then write the output to global memory. Note that
-             this does not need to be performed atomically, because only one
-             thread per block is writing to global memory, and each block
-             corresponds to a unique memory address. 
-          */
-          gpu_distance[INSTANCES*gy + gx] = dist[0];
         }
       }
+  
+      gettimeofday(&tp, &tzp);
+      stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
+      elapsedTime += stop_gpu - start_gpu;
+  
+      #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
     }
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
-
-    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
+  
+    printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
+    status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+    if (status != 0) printf("FAIL\n");
+    else printf("PASS\n");
+  
+    elapsedTime = 0; 
+    for (int n = 0; n < iterations; n++) {
+      /* shared memory GPU kernel */
+      bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
+      #pragma omp target update to (gpu_distance[0:INSTANCES * INSTANCES])
+  
+      gettimeofday(&tp, &tzp);
+      start_gpu = tp.tv_sec*1000000+tp.tv_usec;
+  
+      #pragma omp target teams num_teams(INSTANCES*INSTANCES) thread_limit(THREADS)
+      {
+        int dist[THREADS];
+        #pragma omp parallel
+        {
+          int idx = omp_get_thread_num();
+          int gx = omp_get_team_num() % INSTANCES;
+          int gy = omp_get_team_num() / INSTANCES;
+      
+          dist[idx] = 0;
+          #pragma omp barrier
+      
+          for(int i = 4*idx; i < ATTRIBUTES; i+=THREADS*4) {
+            char4 j = *(char4 *)(data_char + i + ATTRIBUTES*gx);
+            char4 k = *(char4 *)(data_char + i + ATTRIBUTES*gy);
+      
+            /* use a local variable (stored in register) to hold intermediate
+               values. This reduces writes to global memory */
+            char count = 0;
+      
+            if(j.x ^ k.x) 
+              count++; 
+            if(j.y ^ k.y)
+              count++;
+            if(j.z ^ k.z)
+              count++;
+            if(j.w ^ k.w)
+              count++;
+      
+            dist[idx] += count;
+          }
+      
+        /* Synchronize threads to make sure all have completed their updates
+           of the shared array. Since the distances for each thread are read
+           by thread 0 below, this must be ensured. Above, it was not
+           necessary because each thread was accessing its own memory
+        */
+          #pragma omp barrier
+      
+        /* Reduction: Thread 0 will add the value of all other threads to
+        its own */ 
+          if(idx == 0) {
+            for(int i = 1; i < THREADS; i++) {
+              dist[0] += dist[i];
+            }
+      
+            /* Thread 0 will then write the output to global memory. Note that
+               this does not need to be performed atomically, because only one
+               thread per block is writing to global memory, and each block
+               corresponds to a unique memory address. 
+            */
+            gpu_distance[INSTANCES*gy + gx] = dist[0];
+          }
+        }
+      }
+  
+      gettimeofday(&tp, &tzp);
+      stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
+      elapsedTime += stop_gpu - start_gpu;
+  
+      #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
+    }
+  
+    printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
+    status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+    if (status != 0) printf("FAIL\n");
+    else printf("PASS\n");
   }
-
-  printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
-}
 
   free(cpu_distance);
   free(gpu_distance);
@@ -222,5 +222,3 @@ int main(int argc, char **argv) {
   free(data);
   return status;
 }
- 
-
