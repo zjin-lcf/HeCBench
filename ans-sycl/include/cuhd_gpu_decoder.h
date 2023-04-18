@@ -20,15 +20,15 @@
 namespace cuhd {
     class CUHDGPUDecoder {
         public:
-            static void decode(queue &q,
-                               buffer<UNIT_TYPE, 1> &d_input_buffer,
+            static void decode(sycl::queue &q,
+                               sycl::buffer<UNIT_TYPE, 1> &d_input_buffer,
                                size_t input_size,
-                               buffer<SYMBOL_TYPE, 1> &d_output_buffer,
+                               sycl::buffer<SYMBOL_TYPE, 1> &d_output_buffer,
                                size_t output_size,
-                               buffer<std::uint32_t, 1> &d_table,
-                               buffer<cl::sycl::uint4, 1> &d_sync_info,
-                               buffer<std::uint32_t, 1> &d_output_sizes,
-                               buffer<std::uint8_t, 1> &d_sequence_synced,
+                               sycl::buffer<std::uint32_t, 1> &d_table,
+                               sycl::buffer<sycl::uint4, 1> &d_sync_info,
+                               sycl::buffer<std::uint32_t, 1> &d_output_sizes,
+                               sycl::buffer<std::uint8_t, 1> &d_sequence_synced,
                                std::uint8_t* h_sequence_synced,
                                STATE_TYPE initial_state,
                                std::uint32_t initial_bit,

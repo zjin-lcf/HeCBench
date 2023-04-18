@@ -38,14 +38,13 @@ void run(long int input_size) {
   std::cout << "\u03BB | compressed size (bytes) | ";
   std::cout << std::endl << std::endl;
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
   auto start = std::chrono::steady_clock::now();
+
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v);
+#else
+  sycl::queue q(sycl::gpu_selector_v);
+#endif
 
   for(float lambda = 0.1f; lambda < 2.5f; lambda += 0.16) {
 
@@ -81,40 +80,37 @@ void run(long int input_size) {
     // allocate device buffer for compressed input
     size_t compressed_size = input_buffer->get_compressed_size();
     size_t input_buffer_size = (compressed_size + 4);
-    buffer<UNIT_TYPE, 1> d_input_buffer(input_buffer->get_compressed_data(), 
-                                        input_buffer_size);
+    sycl::buffer<UNIT_TYPE, 1> d_input_buffer(input_buffer->get_compressed_data(), 
+                                              input_buffer_size);
 
     // allocate device buffer for coding table
     size_t decoder_table_size = decoder_table->get_size();
-    // buffer<CUHDCodetableItem, 1> d_decoder_table(decoder_table->get(), decoder_table_size);
-    buffer<std::uint32_t, 1> d_decoder_table(
+    // sycl::buffer<CUHDCodetableItem, 1> d_decoder_table(decoder_table->get(), decoder_table_size);
+    sycl::buffer<std::uint32_t, 1> d_decoder_table(
         reinterpret_cast<std::uint32_t*>(decoder_table->get()), decoder_table_size);
 
     // allocate device buffer for decompressed output
     size_t output_buffer_size = output_buffer->get_uncompressed_size();
-    buffer<SYMBOL_TYPE, 1> d_output_buffer (output_buffer_size);
+    sycl::buffer<SYMBOL_TYPE, 1> d_output_buffer (output_buffer_size);
 
     size_t num_subseq = SDIV(compressed_size, SUBSEQUENCE_SIZE);
     size_t num_blocks = SDIV(num_subseq, THREADS_PER_BLOCK);
 
     // allocate device buffer for subsequence synchronization
     // the original type is cuhd::CUHDSubsequenceSyncPoint
-    buffer<cl::sycl::uint4, 1> d_sync_info{range<1>(num_subseq)};
-    //auto d_sync_info2 = d_sync_info.reinterpret<std::uint32_t> (range<1>(num_subseq * 4));
-    q.submit([&] (handler& cgh) {
-      //auto acc = d_sync_info2.get_access<sycl_discard_write>(cgh);
-      //cgh.fill(acc, (std::uint32_t)0);
-      auto acc = d_sync_info.get_access<sycl_discard_write>(cgh);
+    sycl::buffer<sycl::uint4, 1> d_sync_info{sycl::range<1>(num_subseq)};
+    q.submit([&] (sycl::handler& cgh) {
+      auto acc = d_sync_info.get_access<sycl::access::mode::discard_write>(cgh);
       cgh.fill(acc, {0, 0, 0, 0});
     });
 
     // allocate device buffer for size of output for each subsequence
-    buffer<std::uint32_t, 1> d_output_sizes(num_subseq);
+    sycl::buffer<std::uint32_t, 1> d_output_sizes(num_subseq);
 
     // allocate device buffer for indicating inter-sequence synchronisation
-    buffer<std::uint8_t, 1> d_sequence_synced(num_blocks);
-    q.submit([&] (handler& cgh) {
-      auto acc = d_sequence_synced.get_access<sycl_discard_write>(cgh);
+    sycl::buffer<std::uint8_t, 1> d_sequence_synced(num_blocks);
+    q.submit([&] (sycl::handler& cgh) {
+      auto acc = d_sequence_synced.get_access<sycl::access::mode::discard_write>(cgh);
       cgh.fill(acc, (std::uint8_t)0);
     });
     std::uint8_t* h_sequence_synced = (std::uint8_t*) malloc(num_blocks * sizeof(std::uint8_t));
@@ -138,8 +134,8 @@ void run(long int input_size) {
         THREADS_PER_BLOCK);
 
       // copy decompressed output from the GPU to the host system
-    q.submit([&] (handler& cgh) {
-      auto acc = d_output_buffer.get_access<sycl_read>(cgh);
+    q.submit([&] (sycl::handler& cgh) {
+      auto acc = d_output_buffer.get_access<sycl::access::mode::read>(cgh);
       cgh.copy(acc, output_buffer->get_decompressed_data().get());
     }).wait();
 
