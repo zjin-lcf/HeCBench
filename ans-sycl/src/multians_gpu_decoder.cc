@@ -10,9 +10,6 @@
 
 #include "cuhd_gpu_decoder.h"
 
-//#include <thrust/device_ptr.h>
-//#include <thrust/scan.h>
-
 inline void decode_subsequence(
     std::uint32_t subsequence_size,
     std::uint32_t current_subsequence,
@@ -198,12 +195,12 @@ void phase1_decode_subseq(
     std::uint32_t table_size,
     UNIT_TYPE* in_ptr,
     const uint* __restrict__ table,
-    uint4* sync_points,
+    sycl::uint4* sync_points,
     const std::uint32_t bits_in_unit,
     const std::uint32_t number_of_states,
     const STATE_TYPE initial_state,
     const std::uint32_t initial_bit,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -251,7 +248,7 @@ void phase1_decode_subseq(
 
     auto sync = [&](std::uint32_t i) {
       if(subsequences_processed >= 4) {
-        uint4 sync_point = sync_points[current_subsequence + i];
+        sycl::uint4 sync_point = sync_points[current_subsequence + i];
 
         if(sync_point.x() == last_word_unit
             && sync_point.y() == last_word_bit
@@ -261,7 +258,7 @@ void phase1_decode_subseq(
       }
     };
 
-    uint4 s0, s1, s2, s3;
+    sycl::uint4 s0, s1, s2, s3;
     bool wrt0 = false;
     bool wrt1 = false;
     bool wrt2 = false;
@@ -356,7 +353,7 @@ void phase1_decode_subseq(
       current_subsequence += 4;
       subsequences_processed += 4;
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
   }
 }
@@ -368,12 +365,12 @@ void phase2_synchronise_blocks(
     std::uint32_t num_blocks,
     UNIT_TYPE* in_ptr,
     const uint* __restrict__ table,
-    uint4* sync_points,
+    sycl::uint4* sync_points,
     SYMBOL_TYPE* block_synchronised,
     const std::uint32_t bits_in_unit,
     const std::uint32_t number_of_states,
     const STATE_TYPE initial_state,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_group(0);
   const std::uint32_t num_of_seams = num_blocks - 1;
@@ -394,7 +391,7 @@ void phase2_synchronise_blocks(
     std::uint32_t current_subsequence = (gid + 1) * item.get_local_range(0);
 
     // search for synchronised sequences at the end of previous block
-    uint4 sync_point = sync_points[current_subsequence - 1];
+    sycl::uint4 sync_point = sync_points[current_subsequence - 1];
 
     // current unit
     std::uint32_t in_pos = (current_subsequence - 1) * subsequence_size;
@@ -462,16 +459,16 @@ void phase2_synchronise_blocks(
       ++current_subsequence;
       ++subsequences_processed;
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
   }
 }
 
 void phase3_copy_num_symbols_from_sync_points_to_aux(
     std::uint32_t total_num_subsequences,
-    const uint4* __restrict__ sync_points,
+    const sycl::uint4* __restrict__ sync_points,
     std::uint32_t* subsequence_output_sizes,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -482,9 +479,9 @@ void phase3_copy_num_symbols_from_sync_points_to_aux(
 
 void phase3_copy_num_symbols_from_aux_to_sync_points(
     std::uint32_t total_num_subsequences,
-    uint4* sync_points,
+    sycl::uint4* sync_points,
     const std::uint32_t* __restrict__ subsequence_output_sizes,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -501,12 +498,12 @@ void phase4_decode_write_output(
     SYMBOL_TYPE* out_ptr,
     std::uint32_t output_size,
     const uint* __restrict__ table,
-    const uint4* __restrict__ sync_points,
+    const sycl::uint4* __restrict__ sync_points,
     const std::uint32_t bits_in_unit,
     const std::uint32_t number_of_states,
     const STATE_TYPE initial_state,
     const std::uint32_t initial_bit,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -539,8 +536,8 @@ void phase4_decode_write_output(
     std::uint32_t current_subsequence = gid;
     std::uint32_t in_pos = current_subsequence * subsequence_size;
 
-    uint4 sync_point = sync_points[current_subsequence];
-    uint4 next_sync_point = sync_points[current_subsequence + 1];
+    sycl::uint4 sync_point = sync_points[current_subsequence];
+    sycl::uint4 next_sync_point = sync_points[current_subsequence + 1];
 
     std::uint32_t out_pos = sync_point.z();
     std::uint32_t next_out_pos = gid == total_num_subsequences - 1 ?
@@ -578,15 +575,15 @@ void phase4_decode_write_output(
 }
 
 void cuhd::CUHDGPUDecoder::decode(
-    queue &q,
-    buffer<UNIT_TYPE, 1> &d_input_buffer,
+    sycl::queue &q,
+    sycl::buffer<UNIT_TYPE, 1> &d_input_buffer,
     size_t input_size,
-    buffer<SYMBOL_TYPE, 1> &d_output_buffer,
+    sycl::buffer<SYMBOL_TYPE, 1> &d_output_buffer,
     size_t output_size,
-    buffer<std::uint32_t, 1> &d_table,
-    buffer<cl::sycl::uint4, 1> &d_sync_info,
-    buffer<std::uint32_t, 1> &d_output_sizes,
-    buffer<std::uint8_t, 1> &d_sequence_synced,
+    sycl::buffer<std::uint32_t, 1> &d_table,
+    sycl::buffer<sycl::uint4, 1> &d_sync_info,
+    sycl::buffer<std::uint32_t, 1> &d_output_sizes,
+    sycl::buffer<std::uint8_t, 1> &d_sequence_synced,
     std::uint8_t* h_sequence_synced,
     STATE_TYPE initial_state,
     std::uint32_t initial_bit,
@@ -603,13 +600,13 @@ void cuhd::CUHDGPUDecoder::decode(
   const std::uint32_t bits_in_unit = sizeof(UNIT_TYPE) * 8;
 
   // launch phase 1 (intra-sequence synchronisation)
-  range<1> p1_gws(num_sequences * threads_per_block);
-  range<1> p1_lws(threads_per_block);
-  q.submit([&] (handler& cgh) {
-    auto input_buffer = d_input_buffer.get_access<sycl_read>(cgh);
-    auto table = d_table.get_access<sycl_read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class p1>(nd_range<1>(p1_gws, p1_lws), [=] (nd_item<1> item) {
+  sycl::range<1> p1_gws(num_sequences * threads_per_block);
+  sycl::range<1> p1_lws(threads_per_block);
+  q.submit([&] (sycl::handler& cgh) {
+    auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
+    auto table = d_table.get_access<sycl::access::mode::read>(cgh);
+    auto sync_info = d_sync_info.get_access<sycl::access::mode::discard_write>(cgh);
+    cgh.parallel_for<class p1>(sycl::nd_range<1>(p1_gws, p1_lws), [=] (sycl::nd_item<1> item) {
       phase1_decode_subseq(
       preferred_subsequence_size,
       num_subseq,
@@ -629,14 +626,14 @@ void cuhd::CUHDGPUDecoder::decode(
   bool blocks_synchronised = true;
 
   do {
-    range<1> p2_gws(num_sequences * threads_per_block);
-    range<1> p2_lws(threads_per_block);
-    q.submit([&] (handler& cgh) {
-      auto input_buffer = d_input_buffer.get_access<sycl_read>(cgh);
-      auto table = d_table.get_access<sycl_read>(cgh);
-      auto sync_info = d_sync_info.get_access<sycl_read_write>(cgh);
-      auto sequence_synced = d_sequence_synced.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class p2>(nd_range<1>(p2_gws, p2_lws), [=] (nd_item<1> item) {
+    sycl::range<1> p2_gws(num_sequences * threads_per_block);
+    sycl::range<1> p2_lws(threads_per_block);
+    q.submit([&] (sycl::handler& cgh) {
+      auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
+      auto table = d_table.get_access<sycl::access::mode::read>(cgh);
+      auto sync_info = d_sync_info.get_access<sycl::access::mode::read_write>(cgh);
+      auto sequence_synced = d_sequence_synced.get_access<sycl::access::mode::discard_write>(cgh);
+      cgh.parallel_for<class p2>(sycl::nd_range<1>(p2_gws, p2_lws), [=] (sycl::nd_item<1> item) {
       phase2_synchronise_blocks(
           preferred_subsequence_size,
           num_subseq,
@@ -654,8 +651,8 @@ void cuhd::CUHDGPUDecoder::decode(
     });
 
     // aux->retrieve_sync_data();
-    q.submit([&] (handler& cgh) {
-      auto acc = d_sequence_synced.get_access<sycl_read>(cgh);
+    q.submit([&] (sycl::handler& cgh) {
+      auto acc = d_sequence_synced.get_access<sycl::access::mode::read>(cgh);
       cgh.copy(acc, h_sequence_synced);
     }).wait();
 
@@ -680,12 +677,12 @@ void cuhd::CUHDGPUDecoder::decode(
 
   // launch phase 3 (parallel prefix sum)
 
-  range<1> p3_gws(num_subseq * threads_per_block);
-  range<1> p3_lws(threads_per_block);
-  q.submit([&] (handler& cgh) {
-    auto output_sizes = d_output_sizes.get_access<sycl_discard_write>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class p3>(nd_range<1>(p3_gws, p3_lws), [=] (nd_item<1> item) {
+  sycl::range<1> p3_gws(num_subseq * threads_per_block);
+  sycl::range<1> p3_lws(threads_per_block);
+  q.submit([&] (sycl::handler& cgh) {
+    auto output_sizes = d_output_sizes.get_access<sycl::access::mode::discard_write>(cgh);
+    auto sync_info = d_sync_info.get_access<sycl::access::mode::read>(cgh);
+    cgh.parallel_for<class p3>(sycl::nd_range<1>(p3_gws, p3_lws), [=] (sycl::nd_item<1> item) {
       phase3_copy_num_symbols_from_sync_points_to_aux(
         num_subseq, 
         sync_info.get_pointer(),
@@ -700,8 +697,8 @@ void cuhd::CUHDGPUDecoder::decode(
 
   std::uint32_t *h_output_sizes = (std::uint32_t*) malloc ((num_subseq + 1) * sizeof(std::uint32_t));
   h_output_sizes[0] = 0;
-  q.submit([&] (handler& cgh) {
-    auto acc = d_output_sizes.get_access<sycl_read>(cgh);
+  q.submit([&] (sycl::handler& cgh) {
+    auto acc = d_output_sizes.get_access<sycl::access::mode::read>(cgh);
     cgh.copy(acc, h_output_sizes+1);
   }).wait();
 
@@ -709,15 +706,15 @@ void cuhd::CUHDGPUDecoder::decode(
     h_output_sizes[i] += h_output_sizes[i-1];
   }
 
-  q.submit([&] (handler& cgh) {
-    auto acc = d_output_sizes.get_access<sycl_discard_write>(cgh);
+  q.submit([&] (sycl::handler& cgh) {
+    auto acc = d_output_sizes.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.copy(h_output_sizes, acc);
   });
 
-  q.submit([&] (handler& cgh) {
-    auto output_sizes = d_output_sizes.get_access<sycl_read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class p3_2>(nd_range<1>(p3_gws, p3_lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler& cgh) {
+    auto output_sizes = d_output_sizes.get_access<sycl::access::mode::read>(cgh);
+    auto sync_info = d_sync_info.get_access<sycl::access::mode::write>(cgh);
+    cgh.parallel_for<class p3_2>(sycl::nd_range<1>(p3_gws, p3_lws), [=] (sycl::nd_item<1> item) {
       phase3_copy_num_symbols_from_aux_to_sync_points(
         num_subseq, 
         sync_info.get_pointer(),
@@ -728,14 +725,14 @@ void cuhd::CUHDGPUDecoder::decode(
 
   // launch phase4 (final decoding)
 
-  range<1> p4_gws(num_sequences * threads_per_block);
-  range<1> p4_lws(threads_per_block);
-  q.submit([&] (handler& cgh) {
-    auto input_buffer = d_input_buffer.get_access<sycl_read>(cgh);
-    auto output_buffer = d_output_buffer.get_access<sycl_write>(cgh);
-    auto table = d_table.get_access<sycl_read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class p4>(nd_range<1>(p4_gws, p4_lws), [=] (nd_item<1> item) {
+  sycl::range<1> p4_gws(num_sequences * threads_per_block);
+  sycl::range<1> p4_lws(threads_per_block);
+  q.submit([&] (sycl::handler& cgh) {
+    auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
+    auto output_buffer = d_output_buffer.get_access<sycl::access::mode::write>(cgh);
+    auto table = d_table.get_access<sycl::access::mode::read>(cgh);
+    auto sync_info = d_sync_info.get_access<sycl::access::mode::read>(cgh);
+    cgh.parallel_for<class p4>(sycl::nd_range<1>(p4_gws, p4_lws), [=] (sycl::nd_item<1> item) {
       phase4_decode_write_output(
       preferred_subsequence_size,
       num_subseq,
@@ -755,4 +752,3 @@ void cuhd::CUHDGPUDecoder::decode(
 
   free(h_output_sizes);
 }
-

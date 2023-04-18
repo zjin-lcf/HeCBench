@@ -11,9 +11,7 @@
 #ifndef ANS_SYCL_DEFINITIONS_
 #define ANS_SYCL_DEFINITIONS_
 
-#include "common.h"
-
 #include <iostream>
-
+#include <sycl/sycl.hpp>
 
 #endif /* ANS_SYCL_DEFINITIONS */
