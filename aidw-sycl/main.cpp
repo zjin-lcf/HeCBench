@@ -24,7 +24,7 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 // Calculate the power parameter, and then weighted interpolating
@@ -40,7 +40,7 @@ void AIDW_Kernel(
     const int inum,
     const float area,
     const float *__restrict avg_dist,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 
 {
   int tid = item.get_global_id(0);
@@ -91,7 +91,7 @@ void AIDW_Kernel_Tiled(
           float *__restrict sdx,
           float *__restrict sdy,
           float *__restrict sdz,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int tid = item.get_global_id(0);
   if (tid >= inum) return;
@@ -133,7 +133,7 @@ void AIDW_Kernel_Tiled(
       sdy[lid] = dy[lid + BLOCK_SIZE * m];
       sdz[lid] = dz[lid + BLOCK_SIZE * m];
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     for(e = 0; e < BLOCK_SIZE; e++) {
       six_s = six_t - sdx[e];
@@ -202,51 +202,57 @@ int main(int argc, char *argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-  buffer<float, 1> d_dx (dx.data(), dnum);
-  buffer<float, 1> d_dy (dy.data(), dnum);
-  buffer<float, 1> d_dz (dz.data(), dnum);
-  buffer<float, 1> d_avg_dist (avg_dist.data(), dnum);
-  buffer<float, 1> d_ix (ix.data(), inum);
-  buffer<float, 1> d_iy (iy.data(), inum);
-  buffer<float, 1> d_iz (iz.data(), inum);
+  size_t dnum_bytes = dnum * sizeof(float);
+  size_t inum_bytes = inum * sizeof(float);
 
-  range<1> gws ((inum + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  float *d_dx = sycl::malloc_device<float>(dnum, q);
+  q.memcpy(d_dx, dx.data(), dnum_bytes);
+
+  float *d_dy = sycl::malloc_device<float>(dnum, q);
+  q.memcpy(d_dy, dy.data(), dnum_bytes);
+
+  float *d_dz = sycl::malloc_device<float>(dnum, q);
+  q.memcpy(d_dz, dz.data(), dnum_bytes);
+
+  float *d_avg_dist = sycl::malloc_device<float>(dnum, q);
+  q.memcpy(d_avg_dist, avg_dist.data(), dnum_bytes);
+
+  float *d_ix = sycl::malloc_device<float>(inum, q);
+  q.memcpy(d_ix, ix.data(), inum_bytes);
+
+  float *d_iy = sycl::malloc_device<float>(inum, q);
+  q.memcpy(d_iy, iy.data(), inum_bytes);
+
+  float *d_iz = sycl::malloc_device<float>(inum, q);
+  q.memcpy(d_iz, iz.data(), inum_bytes);
+
+  sycl::range<1> gws ((inum + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
   // Weighted Interpolate using AIDW
-  q.submit([&] (handler &cgh) {
-    auto dx = d_dx.get_access<sycl_read>(cgh);
-    auto dy = d_dy.get_access<sycl_read>(cgh);
-    auto dz = d_dz.get_access<sycl_read>(cgh);
-    auto ix = d_ix.get_access<sycl_read>(cgh);
-    auto iy = d_iy.get_access<sycl_read>(cgh);
-    auto iz = d_iz.get_access<sycl_discard_write>(cgh);
-    auto avg_dist = d_avg_dist.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class aidw>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      AIDW_Kernel(dx.get_pointer(), 
-                  dy.get_pointer(),
-                  dz.get_pointer(),
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class aidw>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      AIDW_Kernel(d_dx, 
+                  d_dy,
+                  d_dz,
                   dnum,
-                  ix.get_pointer(),
-                  iy.get_pointer(),
-                  iz.get_pointer(),
+                  d_ix,
+                  d_iy,
+                  d_iz,
                   inum,
                   area,
-                  avg_dist.get_pointer(),
+                  d_avg_dist,
                   item);
     });
   });
   
-  q.submit([&] (handler &cgh) {
-    auto acc = d_iz.get_access<sycl_read>(cgh);
-    cgh.copy(acc, iz.data());
-  }).wait();
+  q.memcpy(iz.data(), d_iz, inum_bytes).wait();
 
   if (check) {
     bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
@@ -256,28 +262,22 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++) {
-    q.submit([&] (handler &cgh) {
-      auto dx = d_dx.get_access<sycl_read>(cgh);
-      auto dy = d_dy.get_access<sycl_read>(cgh);
-      auto dz = d_dz.get_access<sycl_read>(cgh);
-      auto ix = d_ix.get_access<sycl_read>(cgh);
-      auto iy = d_iy.get_access<sycl_read>(cgh);
-      auto iz = d_iz.get_access<sycl_discard_write>(cgh);
-      auto avg_dist = d_avg_dist.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sdx(BLOCK_SIZE, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sdy(BLOCK_SIZE, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sdz(BLOCK_SIZE, cgh);
-      cgh.parallel_for<class aidw_tiled>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        AIDW_Kernel_Tiled(dx.get_pointer(), 
-                          dy.get_pointer(),
-                          dz.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> sdx(sycl::range<1>(BLOCK_SIZE), cgh);
+      sycl::local_accessor<float, 1> sdy(sycl::range<1>(BLOCK_SIZE), cgh);
+      sycl::local_accessor<float, 1> sdz(sycl::range<1>(BLOCK_SIZE), cgh);
+      cgh.parallel_for<class aidw_tiled>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        AIDW_Kernel_Tiled(d_dx, 
+                          d_dy,
+                          d_dz,
                           dnum,
-                          ix.get_pointer(),
-                          iy.get_pointer(),
-                          iz.get_pointer(),
+                          d_ix,
+                          d_iy,
+                          d_iz,
                           inum,
                           area,
-                          avg_dist.get_pointer(),
+                          d_avg_dist,
                           sdx.get_pointer(),
                           sdy.get_pointer(),
                           sdz.get_pointer(),
@@ -290,6 +290,14 @@ int main(int argc, char *argv[])
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
+
+  sycl::free(d_dx, q);
+  sycl::free(d_dy, q);
+  sycl::free(d_dz, q);
+  sycl::free(d_ix, q);
+  sycl::free(d_iy, q);
+  sycl::free(d_iz, q);
+  sycl::free(d_avg_dist, q);
 
   return 0;
 }
