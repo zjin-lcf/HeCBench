@@ -345,7 +345,8 @@ render_kernel (unsigned char *fimg, const Sphere *spheres, const Plane plane,
   }
 }
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#ifdef DEBUG
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__) }
 inline void gpuAssert(hipError_t code, const char *file, int line, bool abort=true)
 {
   if (code != hipSuccess) 
@@ -354,6 +355,9 @@ inline void gpuAssert(hipError_t code, const char *file, int line, bool abort=tr
     if (abort) exit(code);
   }
 }
+#else
+#define gpuErrchk(ans) ans
+#endif
 
 void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* spheres, const Plane &plane)
 {
@@ -367,16 +371,13 @@ void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* sph
   hipLaunchKernelGGL(render_kernel, dim3((w+BLOCK_SIZE-1)/BLOCK_SIZE, (h+BLOCK_SIZE-1)/BLOCK_SIZE), 
                                     dim3(BLOCK_SIZE, BLOCK_SIZE), 0, 0, d_img, d_spheres, plane, h, w, nsubsamples);
 
+#ifdef DEBUG
   gpuErrchk( hipPeekAtLastError() );
+#endif
 
   gpuErrchk( hipMemcpy(img, d_img, sizeof(unsigned char) * w * h * 3, hipMemcpyDeviceToHost) );
   hipFree(d_img);
   hipFree(d_spheres);
-}
-
-
-void callRender( const Sphere *spheres, const Plane &plane )
-{
 }
 
 int main(int argc, char **argv)
