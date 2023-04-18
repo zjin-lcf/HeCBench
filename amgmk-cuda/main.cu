@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
   printf("// \n");
   printf("//------------ \n");
 
-  printf("\nWall time = %f seconds. \n", totalWallTime);
+  printf("\nTotal kernel time = %f seconds. \n", totalWallTime);
 
 
   // Axpy
@@ -252,12 +252,6 @@ void test_Relax()
 
   hypre_SeqVectorSetConstantValues(x,1);
 
-#ifdef _OPENMP
-  t0 = omp_get_wtime();
-#else
-  auto t0 = std::chrono::steady_clock::now();
-#endif
-
   double         *A_diag_data  = hypre_CSRMatrixData(A);
   int            *A_diag_i     = hypre_CSRMatrixI(A);
   int            *A_diag_j     = hypre_CSRMatrixJ(A);
@@ -290,20 +284,23 @@ void test_Relax()
   cudaMemcpy(d_u_data, u_data, sizeof(double)*grid_size, cudaMemcpyHostToDevice);
   cudaMemcpy(d_f_data, f_data, sizeof(double)*grid_size, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+
+#ifdef _OPENMP
+  t0 = omp_get_wtime();
+#else
+  auto t0 = std::chrono::steady_clock::now();
+#endif
+
   dim3 block1D(BLOCK_SIZE);
   dim3 grid1D((n + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
-  for (i=0; i<testIter; ++i) {
-      relax<<< dim3(grid1D), dim3(block1D) >>> (d_A_diag_data, d_A_diag_i, d_A_diag_j, d_u_data, d_f_data, n);
+  for (i = 0; i < testIter; ++i) {
+    relax<<< dim3(grid1D), dim3(block1D) >>> (
+      d_A_diag_data, d_A_diag_i, d_A_diag_j, d_u_data, d_f_data, n);
   }
 
-  cudaMemcpy(u_data, d_u_data, sizeof(double)*grid_size, cudaMemcpyDeviceToHost);
-
-  cudaFree(d_A_diag_data);
-  cudaFree(d_A_diag_i);
-  cudaFree(d_A_diag_j);
-  cudaFree(d_u_data);
-  cudaFree(d_f_data);
+  cudaDeviceSynchronize();
 
 #ifdef _OPENMP
   t1 = omp_get_wtime();
@@ -313,6 +310,14 @@ void test_Relax()
   std::chrono::duration<double> tdiff = t1 - t0;
   totalWallTime += tdiff.count();
 #endif
+
+  cudaMemcpy(u_data, d_u_data, sizeof(double)*grid_size, cudaMemcpyDeviceToHost);
+
+  cudaFree(d_A_diag_data);
+  cudaFree(d_A_diag_i);
+  cudaFree(d_A_diag_j);
+  cudaFree(d_u_data);
+  cudaFree(d_f_data);
 
   error = 0;
   for (i=0; i < nx*ny*nz; i++)

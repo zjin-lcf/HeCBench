@@ -228,12 +228,6 @@ void test_Relax()
 
   hypre_SeqVectorSetConstantValues(x,1);
 
-#ifdef _OPENMP
-  t0 = omp_get_wtime();
-#else
-  auto t0 = std::chrono::steady_clock::now();
-#endif
-
   double         *A_diag_data  = hypre_CSRMatrixData(A);
   int            *A_diag_i     = hypre_CSRMatrixI(A);
   int            *A_diag_j     = hypre_CSRMatrixJ(A);
@@ -249,33 +243,37 @@ void test_Relax()
 
   int             grid_size = nx*ny*nz;
 
-#pragma omp target data map(to: A_diag_data[0:nonzero], \
-                                A_diag_i[0:grid_size+1], A_diag_j[0:nonzero], \
-                                f_data[0:grid_size]) map(from: u_data[0:grid_size])
+  #pragma omp target data map(to: A_diag_data[0:nonzero], \
+                                  A_diag_i[0:grid_size+1], A_diag_j[0:nonzero], \
+                                  f_data[0:grid_size]) map(from: u_data[0:grid_size])
   {
 
-  for (int ti=0; ti<testIter; ++ti) {
-        #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE) 
-        for (int i = 0; i < n; i++)
-	{
-          /*-----------------------------------------------------------
-          * If diagonal is nonzero, relax point i; otherwise, skip it.
-          *-----------------------------------------------------------*/
-          
-          if ( A_diag_data[A_diag_i[i]] != 0.0)
-          {
-            double res = f_data[i];
-            for (int jj = A_diag_i[i]+1; jj < A_diag_i[i+1]; jj++)
-            {
-              int ii = A_diag_j[jj];
-              res -= A_diag_data[jj] * u_data[ii];
-            }
-            u_data[i] = res / A_diag_data[A_diag_i[i]];
-          }
-       }
+#ifdef _OPENMP
+  t0 = omp_get_wtime();
+#else
+  auto t0 = std::chrono::steady_clock::now();
+#endif
+
+  for (int ti = 0; ti < testIter; ++ti) {
+    #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE) 
+    for (int i = 0; i < n; i++)
+    {
+      /*-----------------------------------------------------------
+      * If diagonal is nonzero, relax point i; otherwise, skip it.
+      *-----------------------------------------------------------*/
+      
+      if ( A_diag_data[A_diag_i[i]] != 0.0)
+      {
+        double res = f_data[i];
+        for (int jj = A_diag_i[i]+1; jj < A_diag_i[i+1]; jj++)
+        {
+          int ii = A_diag_j[jj];
+          res -= A_diag_data[jj] * u_data[ii];
+        }
+        u_data[i] = res / A_diag_data[A_diag_i[i]];
+      }
     } 
   }
-
 #ifdef _OPENMP
   t1 = omp_get_wtime();
   totalWallTime += t1 - t0;
@@ -284,6 +282,8 @@ void test_Relax()
   std::chrono::duration<double> tdiff = t1 - t0;
   totalWallTime += tdiff.count();
 #endif
+
+  }
 
   error = 0;
   for (int i=0; i < nx*ny*nz; i++)
