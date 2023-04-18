@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 // Forward declaration
@@ -57,6 +57,10 @@ struct uint4_misaligned
   unsigned int r, g, b, a;
 };
 
+struct uint8_misaligned
+{
+  uint4_misaligned c1, c2;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Aligned types
@@ -93,7 +97,7 @@ struct alignas(16) uint4_aligned
 // "Structure of arrays" storage strategy offers best performance
 // in general case. See section 5.1.2 of the Programming Guide.
 ////////////////////////////////////////////////////////////////////////////////
-struct alignas(16) uint4_aligned_2
+struct alignas(16) uint8_aligned
 {
   uint4_aligned c1, c2;
 };
@@ -134,10 +138,10 @@ int iAlignDown(int a, int b)
 // so it's not per-byte in case of padded structures.
 ////////////////////////////////////////////////////////////////////////////////
 template <typename TData> 
-void testKernel(TData *__restrict d_odata,
+void testKernel(      TData *__restrict d_odata,
                 const TData *__restrict d_idata,
                 int numElements,
-                nd_item<1> &item)
+                sycl::nd_item<1> &item)
 {
   const int pos = item.get_global_id(0);
   if (pos < numElements)
@@ -193,9 +197,9 @@ unsigned char *h_idataCPU, *h_odataGPU;
 
 template <typename TData> 
 int runTest(
-  queue &q,
-  buffer<unsigned char, 1> &d_idata,
-  buffer<unsigned char, 1> &d_odata,
+  sycl::queue &q,
+  unsigned char *d_idata,
+  unsigned char *d_odata,
   int packedElementSize,
   int memory_size)
 {
@@ -203,28 +207,20 @@ int runTest(
   const int         numElements = iDivDown(memory_size, sizeof(TData));
 
   //Clean output buffer before current test
-  q.submit([&] (handler &cgh) {
-    auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-    cgh.fill(odata, (unsigned char)0);
-  });
+  q.memset(d_odata, 0, memory_size).wait();
 
   //Run test
-  q.wait();
+  sycl::range<1> gws ((numElements + 255)/256*256);
+  sycl::range<1> lws (256);
 
   auto start = std::chrono::high_resolution_clock::now();
-  range<1> gws ((numElements + 255)/256*256);
-  range<1> lws (256);
-
-  auto d_odata_re = d_odata.reinterpret<TData>(range<1>(memory_size/sizeof(TData)));
-  auto d_idata_re = d_idata.reinterpret<TData>(range<1>(memory_size/sizeof(TData)));
 
   for (int i = 0; i < NUM_ITERATIONS; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto odata = d_odata_re.template get_access<sycl_discard_write>(cgh);
-      auto idata = d_idata_re.template get_access<sycl_read>(cgh);
-      cgh.parallel_for<class copy_kernel<TData>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        testKernel<TData>(odata.get_pointer(), idata.get_pointer(), numElements, item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class copy_kernel<TData>>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        testKernel<TData>((TData*)d_odata, (TData*)d_idata, numElements, item);
       });
     });
   }
@@ -236,20 +232,16 @@ int runTest(
   double gpuTime = (double)elapsed_seconds.count() / NUM_ITERATIONS;
 
   printf("Avg. time: %f ms / Copy throughput: %f GB/s.\n", gpuTime * 1000,
-      (double)totalMemSizeAligned / (gpuTime * 1073741824.0));
+         (double)totalMemSizeAligned / (gpuTime * 1073741824.0));
 
   //Read back GPU results and run validation
-  q.submit([&] (handler &cgh) {
-    auto odata = d_odata.get_access<sycl_read>(cgh);
-    cgh.copy(odata, h_odataGPU);
-  }).wait();
+  q.memcpy(h_odataGPU, d_odata, memory_size).wait();
 
   int flag = testCPU(
       (TData *)h_odataGPU,
       (TData *)h_idataCPU,
       numElements,
-      packedElementSize
-      );
+      packedElementSize);
 
   printf(flag ? "\tTEST OK\n" : "\tTEST FAILURE\n");
 
@@ -275,15 +267,16 @@ int main(int argc, char **argv)
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("Uploading input data to GPU memory...\n");
-  buffer<unsigned char, 1> d_idata (h_idataCPU, MemorySize);
-  buffer<unsigned char, 1> d_odata (MemorySize);
+  unsigned char *d_idata = sycl::malloc_device<unsigned char>(MemorySize, q);
+  q.memcpy(d_idata, h_idataCPU, MemorySize);
+
+  unsigned char *d_odata = sycl::malloc_device<unsigned char>(MemorySize, q);
 
   printf("Testing misaligned types...\n");
   printf("uchar_misaligned...\n");
@@ -319,12 +312,17 @@ int main(int argc, char **argv)
   printf("uint4_aligned...\n");
   nTotalFailures += runTest<uint4_aligned>(q, d_idata, d_odata, 16, MemorySize);
 
-  printf("uint4_aligned_2...\n");
-  nTotalFailures += runTest<uint4_aligned_2>(q, d_idata, d_odata, 32, MemorySize);
+  printf("uint8_misaligned...\n");
+  nTotalFailures += runTest<uint8_misaligned>(q, d_idata, d_odata, 32, MemorySize);
+
+  printf("uint8_aligned...\n");
+  nTotalFailures += runTest<uint8_aligned>(q, d_idata, d_odata, 32, MemorySize);
 
   printf("\n[alignedTypes] -> Test Results: %d Failures\n", nTotalFailures);
 
   printf("Shutting down...\n");
+  sycl::free(d_odata, q);
+  sycl::free(d_idata, q);
   free(h_odataGPU);
   free(h_idataCPU);
 
