@@ -19,10 +19,11 @@
 
 template <typename T>
 void testMin (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMinDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
 
@@ -37,10 +38,11 @@ void testMin (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
 
 template <typename T>
 void testMax (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicMaxDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
 
@@ -55,10 +57,11 @@ void testMax (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
 
 template <typename T>
 void testAdd (T *h_ptr, T *d_ptr, const int repeat, const char* name) {
+  hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
+
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipMemcpy(d_ptr, h_ptr, sizeof(T), hipMemcpyHostToDevice);
     hipLaunchKernelGGL(HIP_KERNEL_NAME(atomicAddDerived<T>), NUM_BLOCKS, BLOCK_SIZE, 0, 0, d_ptr);
   }
 
