@@ -2,10 +2,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 inline
-float warpReduceSum(float val, nd_item<1> &item)
+float warpReduceSum(float val, sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
   for(int mask = 16; mask > 0; mask >>= 1)
@@ -15,7 +15,7 @@ float warpReduceSum(float val, nd_item<1> &item)
 
 // Calculate the sum of all elements in a block
 inline
-float blockReduceSum(float val, nd_item<1> &item, float *shared)
+float blockReduceSum(float val, sycl::nd_item<1> &item, float *shared)
 {
   int lid = item.get_local_id(0);
   int lane = lid & 0x1f;
@@ -26,7 +26,7 @@ float blockReduceSum(float val, nd_item<1> &item, float *shared)
   if(lane == 0)
     shared[wid] = val;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   val = (lid < (item.get_local_range(0) >> 5)) ? shared[lane] : 0;
   val = warpReduceSum(val, item);
@@ -35,17 +35,17 @@ float blockReduceSum(float val, nd_item<1> &item, float *shared)
 }
 
 inline
-float warpReduceMax(float val, nd_item<1> &item)
+float warpReduceMax(float val, sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
   for(int mask = 16; mask > 0; mask >>= 1)
-    val = max(val, sg.shuffle_xor(val, mask));
+    val = sycl::max(val, sg.shuffle_xor(val, mask));
   return val;
 }
 
 // Calculate the maximum of all elements in a block
 inline
-float blockReduceMax(float val, nd_item<1> &item, float *shared)
+float blockReduceMax(float val, sycl::nd_item<1> &item, float *shared)
 {
   int lid = item.get_local_id(0);
   int lane = lid & 0x1f; // in-warp idx
@@ -56,7 +56,7 @@ float blockReduceMax(float val, nd_item<1> &item, float *shared)
   if(lane == 0) // record in-warp max by warp Idx
     shared[wid] = val;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   val = (lid < (item.get_local_range(0) >> 5)) ? shared[lane] : 0;
   val = warpReduceMax(val, item);
@@ -76,7 +76,7 @@ void mha (
    const float scale,
    const int THRESHOLD,
    float *__restrict dst,
-   nd_item<1> &item,
+   sycl::nd_item<1> &item,
    float *shared,
    float &s_max_val,
    float &s_sum)
@@ -111,7 +111,7 @@ void mha (
   // pos is the start position of the corresponding query matrix prococessed by this block.
   int pos = candidate_id * qk_col + head_id * dim_per_head + lid;
   if (lid < dim_per_head) sq[lid] = q[pos];
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // calculate the correlation between the query and key QK^T/sqrt(d_k)
 
@@ -133,22 +133,21 @@ void mha (
 
   if (lid == 0)
     s_max_val = max_val;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   local_i -= s_max_val;
 
   if(local_i < -THRESHOLD) local_i = -THRESHOLD;
 
-  local_o = exp(local_i);
+  local_o = sycl::exp(local_i);
 
   float val = (lid < n_steps) ? local_o : 0.f;
   val = blockReduceSum(val, item, shared);
   if (lid == 0) s_sum = val;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
-  if (lid < n_steps) logits[lid] =
-      local_o / s_sum;
-  item.barrier(access::fence_space::local_space);
+  if (lid < n_steps) logits[lid] = local_o / s_sum;
+  item.barrier(sycl::access::fence_space::local_space);
 
   // calculate the weighted sum on value matrix V softmax(QK^T/sqrt(d_k))V 
   summ = 0.f;
@@ -213,18 +212,16 @@ int main(int argc, char* argv[])
   const int v_size = beamsize * dim_feature * n_steps;
   const int v_size_bytes = sizeof(float) * v_size;
 
-
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  float *dq = (float *)malloc_device(q_size_bytes, q);
-  float *dk = (float *)malloc_device(k_size_bytes, q);
-  float *dv = (float *)malloc_device(v_size_bytes, q);
-  float *dst = (float *)malloc_device(q_size_bytes, q);
+  float *dq = (float *)sycl::malloc_device(q_size_bytes, q);
+  float *dk = (float *)sycl::malloc_device(k_size_bytes, q);
+  float *dv = (float *)sycl::malloc_device(v_size_bytes, q);
+  float *dst = (float *)sycl::malloc_device(q_size_bytes, q);
 
   float *hq = (float*)malloc(q_size_bytes);
   float *hk = (float*)malloc(k_size_bytes);
@@ -245,8 +242,8 @@ int main(int argc, char* argv[])
   q.memcpy(dk, hk, k_size_bytes);
   q.memcpy(dv, hv, v_size_bytes);
 
-  range<1> lws (qk_col / nhead);
-  range<1> gws (nhead * beamsize * qk_col / nhead);
+  sycl::range<1> lws (qk_col / nhead);
+  sycl::range<1> gws (nhead * beamsize * qk_col / nhead);
 
   const int shared_size = ((qk_col / nhead) + n_steps);
 
@@ -254,11 +251,11 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler &cgh) {
-      accessor<float, 1, sycl_read_write, sycl_lmem> shared(shared_size, cgh);
-      accessor<float, 0, sycl_read_write, sycl_lmem> s_max_val(cgh);
-      accessor<float, 0, sycl_read_write, sycl_lmem> s_sum(cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item)
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> shared(sycl::range<1>(shared_size), cgh);
+      sycl::local_accessor<float, 0> s_max_val(cgh);
+      sycl::local_accessor<float, 0> s_sum(cgh);
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
         [[sycl::reqd_sub_group_size(32)]] {
         mha(dq, dk, dv, beamsize, n_steps, qk_col, v_col, nhead, scaler,
             THRESHOLD, dst, item, shared.get_pointer(), s_max_val, s_sum);
@@ -273,10 +270,10 @@ int main(int argc, char* argv[])
 
   q.memcpy(h_dst, dst, q_size_bytes).wait();
 
-  free(dq, q);
-  free(dk, q);
-  free(dv, q);
-  free(dst, q);
+  sycl::free(dq, q);
+  sycl::free(dk, q);
+  sycl::free(dv, q);
+  sycl::free(dst, q);
 
   // compute distances as simple checksums
   for (int i = 0; i < beamsize - 1; i++) {
