@@ -3,12 +3,12 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 256
 
 void findMovingPixels(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -27,7 +27,7 @@ void findMovingPixels(
 
 // alpha = 0.92 
 void updateBackground(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
@@ -40,7 +40,7 @@ void updateBackground(
 
 // alpha = 0.92, c = 3
 void updateThreshold(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
@@ -59,7 +59,7 @@ void updateThreshold(
 // merge three kernels into a single kernel
 //
 void merge(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -105,11 +105,10 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   unsigned char *d_Img, *d_Img1, *d_Img2;
   unsigned char *d_Bn, *d_Mp, *d_Tn;
@@ -123,8 +122,8 @@ int main(int argc, char* argv[]) {
   q.memcpy(d_Bn, Bn, imgSize_bytes);
   q.memcpy(d_Tn, Tn, imgSize_bytes);
 
-  range<1> gws ((imgSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws ((imgSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
   long time = 0;
 
@@ -147,8 +146,9 @@ int main(int argc, char* argv[]) {
     if (i >= 2) {
       if (merged) {
         auto start = std::chrono::steady_clock::now();
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for<class merged_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class merged_kernel>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             merge ( item, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Bn );
           });
         }).wait();
@@ -157,18 +157,21 @@ int main(int argc, char* argv[]) {
       }
       else {
         auto start = std::chrono::steady_clock::now();
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class k1>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             findMovingPixels ( item, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Mp );
           });
         });
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class k2>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             updateBackground  ( item, imgSize, d_Img, d_Mp, d_Bn );
           });
         });
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for<class k3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class k3>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             updateThreshold  ( item, imgSize, d_Img, d_Mp, d_Bn, d_Tn );
           });
         });
