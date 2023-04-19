@@ -104,11 +104,10 @@ template <typename T>
 void atomicPerf (int n, int t, int repeat)
 {
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
   
   size_t data_size = sizeof(T) * t;
 
