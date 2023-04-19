@@ -30,14 +30,19 @@ void wiAtomicOnGlobalMem(T* result, int size, int n, sycl::nd_item<1> &item)
 }
 
 template <typename T>
+class noAtomicKernel;
+
+template <typename T>
+class atomicKernel;
+
+template <typename T>
 void atomicCost (int t, int repeat)
 {
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
   
   for (int size = 1; size <= 16; size++) {
 
@@ -64,7 +69,8 @@ void atomicCost (int t, int repeat)
     {
       q.memset(d_result, 0, result_size);
       q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(gws_wi, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class noAtomicKernel<T>>(
+          sycl::nd_range<1>(gws_wi, lws), [=](sycl::nd_item<1> item) {
           wiAtomicOnGlobalMem<T>(d_result, size, t, item);
         });
       });
@@ -81,7 +87,8 @@ void atomicCost (int t, int repeat)
     {
       q.memset(d_result, 0, result_size);
       q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(gws_wo, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class atomicKernel<T>>(
+          sycl::nd_range<1>(gws_wo, lws), [=](sycl::nd_item<1> item) {
           woAtomicOnGlobalMem<T>(d_result, size, t, item);
         });
       });
