@@ -28,7 +28,7 @@ end;
 #include <cmath>
 #include <limits>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // float
 
@@ -265,7 +265,7 @@ void compute_f (const int n,
                 const float *x,
                 const float *y,
                       float *r,
-                      nd_item<1> &item)
+                      sycl::nd_item<1> &item)
 {
   const int i = item.get_global_id(0);
   if (i >= n) return;
@@ -285,7 +285,7 @@ void compute_s (const int n,
                 const float *x,
                 const float *y,
                       short *r,
-                      nd_item<1> &item)
+                      sycl::nd_item<1> &item)
 {
   const int i = item.get_global_id(0);
   if (i >= n) return;
@@ -302,7 +302,7 @@ void compute_i (const int n,
                 const float *x,
                 const float *y,
                       int *r,
-                      nd_item<1> &item)
+                      sycl::nd_item<1> &item)
 {
   const int i = item.get_global_id(0);
   if (i >= n) return;
@@ -400,36 +400,37 @@ int main(int argc, char* argv[])
   }
   
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  float *dx = (float *) malloc_device (input_bytes, q);
+  float *dx = (float *) sycl::malloc_device (input_bytes, q);
   q.memcpy(dx, x, input_bytes).wait();
 
-  float *dy = (float *) malloc_device (input_bytes, q);
+  float *dy = (float *) sycl::malloc_device (input_bytes, q);
   q.memcpy(dy, y, input_bytes).wait();
 
-  float *df = (float *) malloc_device (output_float_bytes, q);
+  float *df = (float *) sycl::malloc_device (output_float_bytes, q);
 
-    int *di = (int *) malloc_device (output_int_bytes, q);
+    int *di = (int *) sycl::malloc_device (output_int_bytes, q);
 
-  short *ds = (short *) malloc_device (output_short_bytes, q);
+  short *ds = (short *) sycl::malloc_device (output_short_bytes, q);
 
-  range<1> gws ((n / 256 + 1) * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((n / 256 + 1) * 256);
+  sycl::range<1> lws (256);
 
   printf("\n======== output type is f32 ========\n");
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class atan2f>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class atan2f>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_f(n, dy, dx, df, item);
       });
     });
+  }
 
   q.wait();
 
@@ -452,12 +453,14 @@ int main(int argc, char* argv[])
 
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class atan2i>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class atan2i>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_i(n, dy, dx, di, item);
       });
     });
+  }
 
   q.wait();
 
@@ -480,12 +483,14 @@ int main(int argc, char* argv[])
 
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class atan2s>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class atan2s>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_s(n, dy, dx, ds, item);
       });
     });
+  }
 
   q.wait();
 
@@ -504,11 +509,11 @@ int main(int argc, char* argv[])
   }
   printf("RMSE: %f\n", sqrtf(error / n));
 
-  free(df, q);
-  free(di, q);
-  free(ds, q);
-  free(dx, q);
-  free(dy, q);
+  sycl::free(df, q);
+  sycl::free(di, q);
+  sycl::free(ds, q);
+  sycl::free(dx, q);
+  sycl::free(dy, q);
   free(x);
   free(y);
   free(hf);
