@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3 -munsafe-fp-atomics
@@ -54,4 +53,3 @@ clean:
 
 run: $(program)
 	./$(program) 8192 2000 9 100
-

@@ -21,18 +21,21 @@ int main(int argc, char* argv[]) {
   const int MaxRad = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
 
+  const size_t size_bytes = size * sizeof(float);
+  const size_t box_bytes = size * sizeof(int);
+
   // input image
-  float *img = (float*) malloc (sizeof(float) * size);
+  float *img = (float*) malloc (size_bytes);
 
   // host and device results
-  float *norm = (float*) malloc (sizeof(float) * size);
-  float *h_norm = (float*) malloc (sizeof(float) * size);
+  float *norm = (float*) malloc (size_bytes);
+  float *h_norm = (float*) malloc (size_bytes);
 
-  int *box = (int*) malloc (sizeof(int) * size);
-  int *h_box = (int*) malloc (sizeof(int) * size);
+  int *box = (int*) malloc (box_bytes);
+  int *h_box = (int*) malloc (box_bytes);
 
-  float *out = (float*) malloc (sizeof(float) * size);
-  float *h_out = (float*) malloc (sizeof(float) * size);
+  float *out = (float*) malloc (size_bytes);
+  float *h_out = (float*) malloc (size_bytes);
 
   srand(123);
   for (int i = 0; i < size; i++) {
