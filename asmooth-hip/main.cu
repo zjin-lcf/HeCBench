@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
@@ -69,7 +69,7 @@ __global__ void smoothingFilter(
 }
 
 __global__ void normalizeFilter(
-    int Lx, int Ly,
+    int Lx, int Ly, 
           float*__restrict__ Img,
     const float*__restrict__ Norm)
 {
@@ -138,18 +138,21 @@ int main(int argc, char* argv[]) {
   const int MaxRad = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
  
+  const size_t size_bytes = size * sizeof(float);
+  const size_t box_bytes = size * sizeof(int);
+
   // input image
-  float *img = (float*) malloc (sizeof(float) * size);
+  float *img = (float*) malloc (size_bytes);
 
   // host and device results
-  float *norm = (float*) malloc (sizeof(float) * size);
-  float *h_norm = (float*) malloc (sizeof(float) * size);
+  float *norm = (float*) malloc (size_bytes);
+  float *h_norm = (float*) malloc (size_bytes);
 
-  int *box = (int*) malloc (sizeof(int) * size);
-  int *h_box = (int*) malloc (sizeof(int) * size);
+  int *box = (int*) malloc (box_bytes);
+  int *h_box = (int*) malloc (box_bytes);
 
-  float *out = (float*) malloc (sizeof(float) * size);
-  float *h_out = (float*) malloc (sizeof(float) * size);
+  float *out = (float*) malloc (size_bytes);
+  float *h_out = (float*) malloc (size_bytes);
 
   srand(123);
   for (int i = 0; i < size; i++) {
@@ -158,38 +161,38 @@ int main(int argc, char* argv[]) {
   }
 
   float *d_img;
-  hipMalloc((void**)&d_img, sizeof(float) * size);
+  hipMalloc((void**)&d_img, size_bytes);
 
   float *d_norm;
-  hipMalloc((void**)&d_norm, sizeof(float) * size);
+  hipMalloc((void**)&d_norm, size_bytes);
 
   int *d_box;
-  hipMalloc((void**)&d_box, sizeof(int) * size);
+  hipMalloc((void**)&d_box, box_bytes);
 
   float *d_out;
-  hipMalloc((void**)&d_out, sizeof(float) * size);
+  hipMalloc((void**)&d_out, size_bytes);
 
   dim3 grids ((Lx+15)/16, (Ly+15)/16);
   dim3 blocks (16, 16);
 
   // reset output
-  hipMemcpy(d_out, out, sizeof(float) * size, hipMemcpyHostToDevice);
+  hipMemcpy(d_out, out, size_bytes, hipMemcpyHostToDevice);
 
   double time = 0;
 
   for (int i = 0; i < repeat; i++) {
     // restore input image
-    hipMemcpy(d_img, img, sizeof(float) * size, hipMemcpyHostToDevice);
+    hipMemcpy(d_img, img, size_bytes, hipMemcpyHostToDevice);
     // reset norm
-    hipMemcpy(d_norm, norm, sizeof(float) * size, hipMemcpyHostToDevice);
+    hipMemcpy(d_norm, norm, size_bytes, hipMemcpyHostToDevice);
 
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
     // launch three kernels
-    hipLaunchKernelGGL(smoothingFilter, grids, blocks, 0, 0, Lx, Ly, Threshold, MaxRad, d_img, d_box, d_norm);
-    hipLaunchKernelGGL(normalizeFilter, grids, blocks, 0, 0, Lx, Ly, d_img, d_norm);
-    hipLaunchKernelGGL(outFilter, grids, blocks, 0, 0, Lx, Ly, d_img, d_box, d_out);
+    smoothingFilter<<<grids, blocks>>>(Lx, Ly, Threshold, MaxRad, d_img, d_box, d_norm);
+    normalizeFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_norm);
+    outFilter<<<grids, blocks>>>(Lx, Ly, d_img, d_box, d_out);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -198,9 +201,9 @@ int main(int argc, char* argv[]) {
 
   printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
-  hipMemcpy(out, d_out, sizeof(float) * size, hipMemcpyDeviceToHost);
-  hipMemcpy(box, d_box, sizeof(int) * size, hipMemcpyDeviceToHost);
-  hipMemcpy(norm, d_norm, sizeof(float) * size, hipMemcpyDeviceToHost);
+  hipMemcpy(out, d_out, size_bytes, hipMemcpyDeviceToHost);
+  hipMemcpy(box, d_box, box_bytes, hipMemcpyDeviceToHost);
+  hipMemcpy(norm, d_norm, size_bytes, hipMemcpyDeviceToHost);
 
   // verify
   reference (Lx, Ly, Threshold, MaxRad, img, h_box, h_norm, h_out);

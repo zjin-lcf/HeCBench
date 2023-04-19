@@ -138,18 +138,21 @@ int main(int argc, char* argv[]) {
   const int MaxRad = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
  
+  const size_t size_bytes = size * sizeof(float);
+  const size_t box_bytes = size * sizeof(int);
+
   // input image
-  float *img = (float*) malloc (sizeof(float) * size);
+  float *img = (float*) malloc (size_bytes);
 
   // host and device results
-  float *norm = (float*) malloc (sizeof(float) * size);
-  float *h_norm = (float*) malloc (sizeof(float) * size);
+  float *norm = (float*) malloc (size_bytes);
+  float *h_norm = (float*) malloc (size_bytes);
 
-  int *box = (int*) malloc (sizeof(int) * size);
-  int *h_box = (int*) malloc (sizeof(int) * size);
+  int *box = (int*) malloc (box_bytes);
+  int *h_box = (int*) malloc (box_bytes);
 
-  float *out = (float*) malloc (sizeof(float) * size);
-  float *h_out = (float*) malloc (sizeof(float) * size);
+  float *out = (float*) malloc (size_bytes);
+  float *h_out = (float*) malloc (size_bytes);
 
   srand(123);
   for (int i = 0; i < size; i++) {
@@ -158,30 +161,30 @@ int main(int argc, char* argv[]) {
   }
 
   float *d_img;
-  cudaMalloc((void**)&d_img, sizeof(float) * size);
+  cudaMalloc((void**)&d_img, size_bytes);
 
   float *d_norm;
-  cudaMalloc((void**)&d_norm, sizeof(float) * size);
+  cudaMalloc((void**)&d_norm, size_bytes);
 
   int *d_box;
-  cudaMalloc((void**)&d_box, sizeof(int) * size);
+  cudaMalloc((void**)&d_box, box_bytes);
 
   float *d_out;
-  cudaMalloc((void**)&d_out, sizeof(float) * size);
+  cudaMalloc((void**)&d_out, size_bytes);
 
   dim3 grids ((Lx+15)/16, (Ly+15)/16);
   dim3 blocks (16, 16);
 
   // reset output
-  cudaMemcpy(d_out, out, sizeof(float) * size, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_out, out, size_bytes, cudaMemcpyHostToDevice);
 
   double time = 0;
 
   for (int i = 0; i < repeat; i++) {
     // restore input image
-    cudaMemcpy(d_img, img, sizeof(float) * size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_img, img, size_bytes, cudaMemcpyHostToDevice);
     // reset norm
-    cudaMemcpy(d_norm, norm, sizeof(float) * size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_norm, norm, size_bytes, cudaMemcpyHostToDevice);
 
     cudaDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
@@ -198,9 +201,9 @@ int main(int argc, char* argv[]) {
 
   printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
-  cudaMemcpy(out, d_out, sizeof(float) * size, cudaMemcpyDeviceToHost);
-  cudaMemcpy(box, d_box, sizeof(int) * size, cudaMemcpyDeviceToHost);
-  cudaMemcpy(norm, d_norm, sizeof(float) * size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(out, d_out, size_bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(box, d_box, box_bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(norm, d_norm, size_bytes, cudaMemcpyDeviceToHost);
 
   // verify
   reference (Lx, Ly, Threshold, MaxRad, img, h_box, h_norm, h_out);
