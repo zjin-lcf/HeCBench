@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "reference.cpp"
 
@@ -20,19 +20,22 @@ int main(int argc, char* argv[]) {
   const int Threshold = atoi(argv[2]);
   const int MaxRad = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
+
+  const size_t size_bytes = size * sizeof(float);
+  const size_t box_bytes = size * sizeof(int);
  
   // input image
-  float *img = (float*) malloc (sizeof(float) * size);
+  float *img = (float*) malloc (size_bytes);
 
   // host and device results
-  float *norm = (float*) malloc (sizeof(float) * size);
-  float *h_norm = (float*) malloc (sizeof(float) * size);
+  float *norm = (float*) malloc (size_bytes);
+  float *h_norm = (float*) malloc (size_bytes);
 
-  int *box = (int*) malloc (sizeof(int) * size);
-  int *h_box = (int*) malloc (sizeof(int) * size);
+  int *box = (int*) malloc (box_bytes);
+  int *h_box = (int*) malloc (box_bytes);
 
-  float *out = (float*) malloc (sizeof(float) * size);
-  float *h_out = (float*) malloc (sizeof(float) * size);
+  float *out = (float*) malloc (size_bytes);
+  float *h_out = (float*) malloc (size_bytes);
 
   srand(123);
   for (int i = 0; i < size; i++) {
@@ -41,46 +44,36 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float,1> d_img (size);
-  buffer<float,1> d_norm (size);
-  buffer<  int,1> d_box (size);
-  buffer<float,1> d_out (out, size);
-  d_out.set_final_data(nullptr);
+  float *d_img = sycl::malloc_device<float>(size, q);
+  float *d_norm = sycl::malloc_device<float>(size, q);
+    int *d_box = sycl::malloc_device<int>(size, q);
+  float *d_out = sycl::malloc_device<float>(size, q);
 
-  range<2> gws ((Ly+15)/16*16, (Lx+15)/16*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((Ly+15)/16*16, (Lx+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   double time = 0;
 
   for (int i = 0; i < repeat; i++) {
     // restore input image
-    q.submit([&] (handler &cgh) {
-      auto acc = d_img.get_access<sycl_discard_write>(cgh);
-      cgh.copy(img, acc); 
-    });
+    q.memcpy(d_img, img, size_bytes);
 
     // reset norm
-    q.submit([&] (handler &cgh) {
-      auto acc = d_norm.get_access<sycl_discard_write>(cgh);
-      cgh.copy(norm, acc); 
-    });
+    q.memcpy(d_norm, norm, size_bytes);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     // launch three kernels
-    q.submit([&] (handler &cgh) {
-      auto Img = d_img.get_access<sycl_read>(cgh);
-      auto Box = d_box.get_access<sycl_discard_write>(cgh);
-      auto Norm = d_norm.get_access<sycl_read_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> s_Img(1024, cgh);
-      cgh.parallel_for<class smoothing>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> s_Img(sycl::range<1>(1024), cgh);
+      cgh.parallel_for<class smoothing>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int tid = item.get_local_id(1);
         int tjd = item.get_local_id(0);
         int i = item.get_global_id(1);
@@ -93,9 +86,9 @@ int main(int argc, char* argv[]) {
         // part of shared memory may be unused
 
         if ( i < Lx && j < Ly )
-          s_Img[stid] = Img[gtid];
+          s_Img[stid] = d_img[gtid];
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         if ( i < Lx && j < Ly )
         {
@@ -123,46 +116,42 @@ int main(int argc, char* argv[]) {
                     sum += s_Img[stid + ii*blockDim_x + jj];
                   // Compute block borders with global memory
                   else
-                    sum += Img[gtid + ii*Lx + jj];
+                    sum += d_img[gtid + ii*Lx + jj];
                 }
             q++;
           }
-          Box[gtid] = s;
+          d_box[gtid] = s;
 
           // Normalization for each box
           for (int ii = -s; ii < s+1; ii++)
             for (int jj = -s; jj < s+1; jj++)
               if (ksum != 0) {
-                auto atomic_obj_ref = sycl::atomic_ref<float, 
+                auto ao = sycl::atomic_ref<float, 
                   sycl::memory_order::relaxed,
                   sycl::memory_scope::device,
-                  access::address_space::global_space> (Norm[gtid + ii*Lx + jj]);
-                atomic_obj_ref.fetch_add(sycl::native::divide(1.f, (float)ksum));
+                  sycl::access::address_space::global_space> (d_norm[gtid + ii*Lx + jj]);
+                ao.fetch_add(sycl::native::divide(1.f, (float)ksum));
               }
         }
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto Norm = d_norm.get_access<sycl_read>(cgh);
-      auto Img = d_img.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class normalize>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class normalize>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int i = item.get_global_id(1);
         int j = item.get_global_id(0); 
         if ( i < Lx && j < Ly ) {
           int gtid = j * Lx + i;  
-          const float norm = Norm[gtid];
-          if (norm != 0) Img[gtid] = sycl::native::divide(Img[gtid], norm);
+          const float norm = d_norm[gtid];
+          if (norm != 0) d_img[gtid] = sycl::native::divide(d_img[gtid], norm);
         }
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto Img = d_img.get_access<sycl_read>(cgh);
-      auto Box = d_box.get_access<sycl_read>(cgh);
-      auto Out = d_out.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> s_Img(1024, cgh);
-      cgh.parallel_for<class output>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> s_Img(1024, cgh);
+      cgh.parallel_for<class output>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int tid = item.get_local_id(1);
         int tjd = item.get_local_id(0);
         int i = item.get_global_id(1);
@@ -173,13 +162,13 @@ int main(int argc, char* argv[]) {
         int gtid = j * Lx + i;  
 
         if ( i < Lx && j < Ly )
-          s_Img[stid] = Img[gtid];
+          s_Img[stid] = d_img[gtid];
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         if ( i < Lx && j < Ly )
         {
-          const int s = Box[gtid];
+          const int s = d_box[gtid];
           float sum = 0.f;
           int ksum  = 0;
 
@@ -191,9 +180,9 @@ int main(int argc, char* argv[]) {
                 if( tid-s >= 0 && tid+s < blockDim_x && tjd-s >= 0 && tjd+s < blockDim_y )
                   sum += s_Img[stid + ii*blockDim_y + jj];
                 else
-                  sum += Img[gtid + ii*Ly + jj];
+                  sum += d_img[gtid + ii*Ly + jj];
               }
-          if ( ksum != 0 ) Out[gtid] = sycl::native::divide(sum, (float)ksum);
+          if ( ksum != 0 ) d_out[gtid] = sycl::native::divide(sum, (float)ksum);
         }
       });
     });
@@ -205,20 +194,9 @@ int main(int argc, char* argv[]) {
 
   printf("Average filtering time %lf (s)\n", (time * 1e-9) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(acc, out);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_box.get_access<sycl_read>(cgh);
-    cgh.copy(acc, box);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_norm.get_access<sycl_read>(cgh);
-    cgh.copy(acc, norm); 
-  });
+  q.memcpy(out, d_out, size_bytes);
+  q.memcpy(box, d_box, box_bytes);
+  q.memcpy(norm, d_norm, size_bytes);
 
   q.wait();
 
@@ -226,6 +204,10 @@ int main(int argc, char* argv[]) {
   reference (Lx, Ly, Threshold, MaxRad, img, h_box, h_norm, h_out);
   verify(size, MaxRad, norm, h_norm, out, h_out, box, h_box);
 
+  sycl::free(d_img, q);
+  sycl::free(d_norm, q);
+  sycl::free(d_box, q);
+  sycl::free(d_out, q);
   free(img);
   free(norm);
   free(h_norm);
