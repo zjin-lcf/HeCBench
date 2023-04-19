@@ -39,7 +39,7 @@
 #include <vector>
 #include <algorithm>  // for_each
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "support/common.h"
 #include "support/verify.h"
@@ -117,7 +117,21 @@ void read_input(T *x_vector, const Params &p) {
   }
 }
 
-// Main ------------------------------------------------------------------------------------------
+inline int atomicAdd(int& val, const int delta)
+{
+  sycl::atomic_ref<int, sycl::memory_order::relaxed, 
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
+  return ref.fetch_add(delta);
+}
+
+inline int atomicExch(int& addr, const int val) {
+  sycl::atomic_ref<int, sycl::memory_order::relaxed,
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(addr);
+  return ref.exchange(val);
+}
+
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
@@ -131,34 +145,31 @@ int main(int argc, char **argv) {
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
-  T *h_in_out = (T *)malloc(in_size * sizeof(T));
-  int *h_finished =
-    (int *)malloc(sizeof(int) * finished_size);
+  
+  size_t in_size_bytes = in_size * sizeof(T);
+  size_t finished_size_bytes = finished_size * sizeof(int);
+
+  T *h_in_out = (T *)malloc(in_size_bytes);
+  int *h_finished = (int *)malloc(finished_size_bytes);
   int *h_head = (int *)malloc(sizeof(int));
 
-
-  range<1> gws (blocks*threads);
-  range<1> lws (threads);
-
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<T, 1> d_in_out(in_size);
-  buffer<int, 1> d_finished(finished_size);
-  buffer<int, 1> d_head(1);
+    T *d_in_out = sycl::malloc_device<T>(in_size, q);
+  int *d_finished = sycl::malloc_device<int>(finished_size, q);
+  int *d_head = sycl::malloc_device<int>(1, q);
 
-  T *h_in_backup = (T *)malloc(in_size * sizeof(T));
+  T *h_in_backup = (T *)malloc(in_size_bytes);
 
   // Initialize
   read_input(h_in_out, p);
   memset((void *)h_finished, 0, sizeof(int) * finished_size);
   h_head[0] = 0;
-  memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
-
+  memcpy(h_in_backup, h_in_out, in_size_bytes); // Backup for reuse across iterations
 
   const int A = p.m;
   const int B = tiled_n;
@@ -166,103 +177,91 @@ int main(int argc, char **argv) {
 
   double time = 0; 
 
+  sycl::range<1> gws (blocks*threads);
+  sycl::range<1> lws (threads);
+
   // Loop over the kernel on a device
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
-
-    q.submit([&] (handler &cgh) {
-      auto d_acc = d_in_out.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_in_backup, d_acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto d_acc = d_finished.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_finished, d_acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto d_acc = d_head.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_head, d_acc);
-    });
+    q.memcpy(d_in_out, h_in_backup, in_size_bytes);
+    q.memcpy(d_finished, h_finished, finished_size_bytes);
+    q.memcpy(d_head, h_head, sizeof(int));
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto input = d_in_out.template get_access<sycl_read_write>(cgh);
-      auto finished = d_finished.template get_access<sycl_atomic>(cgh);
-      auto head = d_head.template get_access<sycl_atomic>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> lmem(2, cgh);
-
-      cgh.parallel_for<class asta>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> lmem(sycl::range<1>(2), cgh);
+      cgh.parallel_for<class asta>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 
         const int tid = item.get_local_id(0);
         int       m   = A * B - 1;
 
         if(tid == 0) // Dynamic fetch
-          lmem[1] = atomic_fetch_add(head[0], 1);
-        item.barrier(access::fence_space::local_space);
+          lmem[1] = atomicAdd(d_head[0], 1);
+        item.barrier(sycl::access::fence_space::local_space);
 
         while(lmem[1] < m) {
           int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
           if(next_in_cycle == lmem[1]) {
             if(tid == 0) // Dynamic fetch
-              lmem[1] = atomic_fetch_add(head[0], 1);
-            item.barrier(access::fence_space::local_space);
+              lmem[1] = atomicAdd(d_head[0], 1);
+            item.barrier(sycl::access::fence_space::local_space);
             continue;
           }
           T   data1, data2, data3, data4;
           int i = tid;
           if(i < b)
-            data1 = input[lmem[1] * b + i];
+            data1 = d_in_out[lmem[1] * b + i];
           i += item.get_local_range(0);
           if(i < b)
-            data2 = input[lmem[1] * b + i];
+            data2 = d_in_out[lmem[1] * b + i];
           i += item.get_local_range(0);
           if(i < b)
-            data3 = input[lmem[1] * b + i];
+            data3 = d_in_out[lmem[1] * b + i];
           i += item.get_local_range(0);
           if(i < b)
-            data4 = input[lmem[1] * b + i];
+            data4 = d_in_out[lmem[1] * b + i];
 
           if(tid == 0) {
             //make sure the read is not cached
-            lmem[0] = atomic_fetch_add(finished[lmem[1]], 0);
+            lmem[0] = atomicAdd(d_finished[lmem[1]], 0);
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           for(; lmem[0] == 0; next_in_cycle = (next_in_cycle * A) - m * (next_in_cycle / B)) {
             T backup1, backup2, backup3, backup4;
             i = tid;
             if(i < b)
-              backup1 = input[next_in_cycle * b + i];
+              backup1 = d_in_out[next_in_cycle * b + i];
             i += item.get_local_range(0);
             if(i < b)
-              backup2 = input[next_in_cycle * b + i];
+              backup2 = d_in_out[next_in_cycle * b + i];
             i += item.get_local_range(0);
             if(i < b)
-              backup3 = input[next_in_cycle * b + i];
+              backup3 = d_in_out[next_in_cycle * b + i];
             i += item.get_local_range(0);
             if(i < b)
-              backup4 = input[next_in_cycle * b + i];
+              backup4 = d_in_out[next_in_cycle * b + i];
 
             if(tid == 0) {
-              lmem[0] = atomic_exchange(finished[next_in_cycle], (int)1);
+              lmem[0] = atomicExch(d_finished[next_in_cycle], (int)1);
             }
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             if(!lmem[0]) {
               i = tid;
               if(i < b)
-                input[next_in_cycle * b + i] = data1;
+                d_in_out[next_in_cycle * b + i] = data1;
               i += item.get_local_range(0);
               if(i < b)
-                input[next_in_cycle * b + i] = data2;
+                d_in_out[next_in_cycle * b + i] = data2;
               i += item.get_local_range(0);
               if(i < b)
-                input[next_in_cycle * b + i] = data3;
+                d_in_out[next_in_cycle * b + i] = data3;
               i += item.get_local_range(0);
               if(i < b)
-                input[next_in_cycle * b + i] = data4;
+                d_in_out[next_in_cycle * b + i] = data4;
             }
             i = tid;
             if(i < b)
@@ -279,23 +278,20 @@ int main(int argc, char **argv) {
           }
 
           if(tid == 0) // Dynamic fetch
-            lmem[1] = atomic_fetch_add(head[0], 1);
-          item.barrier(access::fence_space::local_space);
+            lmem[1] = atomicAdd(d_head[0], 1);
+          item.barrier(sycl::access::fence_space::local_space);
         }
       });
     });
 
     q.wait();
     auto end = std::chrono::steady_clock::now();
+
     if (rep >= p.n_warmup) 
       time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    q.submit([&] (handler &cgh) {
-      auto d_acc = d_in_out.template get_access<sycl_read>(cgh);
-      cgh.copy(d_acc, h_in_out);
-    });
+    q.memcpy(h_in_out, d_in_out, in_size_bytes).wait();
   }
-  q.wait();
 
   printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 
@@ -309,5 +305,8 @@ int main(int argc, char **argv) {
   free(h_head);
   free(h_in_backup);
 
+  sycl::free(d_in_out, q);
+  sycl::free(d_finished, q);
+  sycl::free(d_head, q);
   return 0;
 }
