@@ -17,15 +17,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 #define ATOMIC_REF(v) \
-  atomic_ref<T, memory_order::relaxed, memory_scope::device,\
-             access::address_space::generic_space>(v)
+  sycl::atomic_ref<T, sycl::memory_order::relaxed, \
+                   sycl::memory_scope::device,\
+                   sycl::access::address_space::generic_space>(v)
 
 template <class T>
-void testKernel(nd_item<1> &item, T *g_odata)
+void testKernel(sycl::nd_item<1> &item, T *g_odata)
 {
   const int i = item.get_global_id(0);
 
@@ -54,7 +55,7 @@ void testKernel(nd_item<1> &item, T *g_odata)
 }
 
 template <typename T>
-void testcase(queue &q, const int repeat)
+void testcase(sycl::queue &q, const int repeat)
 {
   unsigned int len = 1 << 27;
   unsigned int localWorkSize = 256;
@@ -65,16 +66,16 @@ void testcase(queue &q, const int repeat)
   unsigned int memSize = sizeof(gpuData);
 
   // allocate device memory for result
-  T *dOData = malloc_shared<T>(numData, q);
+  T *dOData = sycl::malloc_shared<T>(numData, q);
 
-  range<1> gws (globalWorkSize);
-  range<1> lws (localWorkSize);
+  sycl::range<1> gws (globalWorkSize);
+  sycl::range<1> lws (localWorkSize);
 
   for (int i = 0; i < repeat; i++) {
     q.memcpy(dOData, gpuData, memSize);
 
-    q.submit([&](handler &h) {
-      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         testKernel(item, dOData);
       });
     });
@@ -86,8 +87,8 @@ void testcase(queue &q, const int repeat)
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler &h) {
-      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         testKernel(item, dOData);
       });
     });
@@ -98,7 +99,7 @@ void testcase(queue &q, const int repeat)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  free(dOData, q);
+  sycl::free(dOData, q);
 }
 
 int main(int argc, char **argv)
@@ -108,12 +109,11 @@ int main(int argc, char **argv)
     return 1;
   }
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   const int repeat = atoi(argv[1]);
   testcase<int>(q, repeat);
