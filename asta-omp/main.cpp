@@ -132,14 +132,18 @@ int main(int argc, char **argv) {
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
-  FP *h_in_out = (FP *)malloc(in_size * sizeof(FP));
-  int *h_finished = (int *)malloc(sizeof(int) * finished_size);
+
+  size_t in_size_bytes = in_size * sizeof(FP);
+  size_t finished_size_bytes = finished_size * sizeof(int);
+
+  FP *h_in_out = (FP *)malloc(in_size_bytes);
+  int *h_finished = (int *)malloc(finished_size_bytes);
   int *h_head = (int *)malloc(sizeof(int));
-  FP *h_in_backup = (FP *)malloc(in_size * sizeof(FP));
+  FP *h_in_backup = (FP *)malloc(in_size_bytes);
 
   // Initialize
   read_input(h_in_out, p);
-  memcpy(h_in_backup, h_in_out, in_size * sizeof(FP)); // Backup for reuse across iterations
+  memcpy(h_in_backup, h_in_out, in_size_bytes); // Backup for reuse across iterations
 
   const int A = p.m;
   const int B = tiled_n;
@@ -153,8 +157,8 @@ int main(int argc, char **argv) {
 
     for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-      memcpy(h_in_out, h_in_backup, in_size * sizeof(FP));
-      memset((void *)h_finished, 0, sizeof(int) * finished_size);
+      memcpy(h_in_out, h_in_backup, in_size_bytes);
+      memset((void *)h_finished, 0, finished_size_bytes);
       h_head[0] = 0;
 
 #pragma omp target update to(h_in_out[0:in_size]) // nowait
