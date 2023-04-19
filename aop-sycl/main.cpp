@@ -32,7 +32,7 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef WITH_FULL_W_MATRIX
 #define R_W_MATRICES_SMEM_SLOTS 15
@@ -40,25 +40,23 @@
 #define R_W_MATRICES_SMEM_SLOTS 12
 #endif
 
-#define HOST_DEVICE        
-#define HOST_DEVICE_INLINE inline
-#define syncthreads() item.barrier(access::fence_space::local_space)
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 
 struct PayoffCall
 {
   double m_K;
-  HOST_DEVICE_INLINE PayoffCall(double K) : m_K(K) {}
-  HOST_DEVICE_INLINE double operator()(double S) const { return sycl::fmax(S - m_K, 0.0); }
-  HOST_DEVICE_INLINE int is_in_the_money(double S) const { return S > m_K; }
+  inline PayoffCall(double K) : m_K(K) {}
+  inline double operator()(double S) const { return sycl::fmax(S - m_K, 0.0); }
+  inline int is_in_the_money(double S) const { return S > m_K; }
 };
 
 struct PayoffPut
 {
   double m_K;
-  HOST_DEVICE_INLINE PayoffPut(double K) : m_K(K) {}
-  HOST_DEVICE_INLINE double operator()(double S) const { return sycl::fmax(m_K - S, 0.0); }
-  HOST_DEVICE_INLINE int is_in_the_money(double S) const { return S < m_K; }
+  inline PayoffPut(double K) : m_K(K) {}
+  inline double operator()(double S) const { return sycl::fmax(m_K - S, 0.0); }
+  inline int is_in_the_money(double S) const { return S < m_K; }
 };
 
 
@@ -66,7 +64,7 @@ template< typename Payoff >
 class generate_paths;
 
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
-void generate_paths_kernel(nd_item<1> &item,
+void generate_paths_kernel(sycl::nd_item<1> &item,
                            int num_timesteps, 
                            int num_paths, 
                            Payoff payoff,
@@ -86,7 +84,7 @@ void generate_paths_kernel(nd_item<1> &item,
   // Compute (r - sigma^2 / 2).
   const double r_min_half_sigma_sq_dt = (r - 0.5*sigma*sigma)*dt;
   // Compute sigma*sqrt(dt).
-  const double sigma_sqrt_dt = sigma*sycl::sqrt(dt);
+  const double sigma_sqrt_dt = sigma * sycl::sqrt(dt);
 
   // Keep the previous price.
   double S = S0;
@@ -108,7 +106,7 @@ void generate_paths_kernel(nd_item<1> &item,
   paths[offset] = payoff(S);
 }
 
-static inline void assemble_R(int m, double4 &sums, double *smem_svds)
+static inline void assemble_R(int m, sycl::double4 &sums, double *smem_svds)
 {
   // Assemble R.
 
@@ -222,7 +220,7 @@ static inline void swap(double &x, double &y)
   double t = x; x = y; y = t;
 }
 
-static inline void svd_3x3(int m, double4 &sums, double *smem_svds)
+static inline void svd_3x3(int m, sycl::double4 &sums, double *smem_svds)
 {
   // Assemble the R matrix.
   assemble_R(m, sums, smem_svds);
@@ -465,14 +463,14 @@ template< typename Payoff >
 class prepare_svd;
 
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
-void prepare_svd_kernel(nd_item<1> &item,
+void prepare_svd_kernel(sycl::nd_item<1> &item,
                         int num_paths, 
                         int min_in_the_money, 
                         Payoff payoff, 
                         int *__restrict scan_input,
                         int *__restrict scan_output,
-                        double4 *__restrict lsums,
-                        int *__restrict lsum,
+                        sycl::double4& lsums,
+                        int& lsum,
                         double *__restrict smem_svds,
                         const double *__restrict paths, 
                                  int *__restrict all_out_of_the_money, 
@@ -490,7 +488,7 @@ void prepare_svd_kernel(nd_item<1> &item,
 
   // Sums.
   int m = 0; 
-  double4 sums = double4(0.0);
+  sycl::double4 sums = sycl::double4(0.0);
 
   // Initialize the shared memory. DBL_MAX is a marker to specify that the value is invalid.
   if( lid < R_W_MATRICES_SMEM_SLOTS )
@@ -531,17 +529,17 @@ void prepare_svd_kernel(nd_item<1> &item,
     }
 
     // Early continue if no item pays off.
-    if (lid == 0) lsum[0] = 0;
+    if (lid == 0) lsum = 0;
     syncthreads();
     // atomicOr(&lsum, in_the_money);
-    auto any_obj = ext::oneapi::atomic_ref<int, 
-                   ext::oneapi::memory_order::relaxed,
-                   ext::oneapi::memory_scope::work_group,
-                   access::address_space::local_space> (lsum[0]);
+    auto any_obj = sycl::atomic_ref<int, 
+                   sycl::memory_order::relaxed,
+                   sycl::memory_scope::work_group,
+                   sycl::access::address_space::local_space> (lsum);
 
     any_obj.fetch_or(in_the_money);
     syncthreads();
-    if (lsum[0] == 0) continue;
+    if (lsum == 0) continue;
     
     // Update the number of payoff items.
     m += in_the_money;
@@ -562,13 +560,13 @@ void prepare_svd_kernel(nd_item<1> &item,
   }
 
   // Compute the final reductions.
-  if (lid == 0) lsum[0] = 0;
+  if (lid == 0) lsum = 0;
   syncthreads();
 
-  auto sum_obj = ext::oneapi::atomic_ref<int, 
-                 ext::oneapi::memory_order::relaxed,
-                 ext::oneapi::memory_scope::work_group,
-                 access::address_space::local_space> (lsum[0]);
+  auto sum_obj = sycl::atomic_ref<int, 
+                 sycl::memory_order::relaxed,
+                 sycl::memory_scope::work_group,
+                 sycl::access::address_space::local_space> (lsum);
 
   sum_obj.fetch_add(m);
 
@@ -576,7 +574,7 @@ void prepare_svd_kernel(nd_item<1> &item,
 
   int not_enough_paths = 0;
   // Do we all exit?
-  if (lid == 0 && lsum[0] < min_in_the_money)
+  if (lid == 0 && lsum < min_in_the_money)
     not_enough_paths = 1;
   
   // Early exit if no path is in the money.
@@ -590,38 +588,38 @@ void prepare_svd_kernel(nd_item<1> &item,
     // Compute the final reductions.
 
     if (lid == 0)
-      lsums[0] = double4(0.0);
+      lsums = sycl::double4(0.0);
     syncthreads();
 
-    auto sumx_obj = ext::oneapi::atomic_ref<double, 
-                    ext::oneapi::memory_order::relaxed,
-                    ext::oneapi::memory_scope::work_group,
-                    access::address_space::local_space> (lsums[0].x());
+    auto sumx_obj = sycl::atomic_ref<double, 
+                    sycl::memory_order::relaxed,
+                    sycl::memory_scope::work_group,
+                    sycl::access::address_space::local_space> (lsums.x());
     sumx_obj.fetch_add(sums.x());
     
-    auto sumy_obj = ext::oneapi::atomic_ref<double, 
-                    ext::oneapi::memory_order::relaxed,
-                    ext::oneapi::memory_scope::work_group,
-                    access::address_space::local_space> (lsums[0].y());
+    auto sumy_obj = sycl::atomic_ref<double, 
+                    sycl::memory_order::relaxed,
+                    sycl::memory_scope::work_group,
+                    sycl::access::address_space::local_space> (lsums.y());
     sumy_obj.fetch_add(sums.y());
 
-    auto sumz_obj = ext::oneapi::atomic_ref<double, 
-                    ext::oneapi::memory_order::relaxed,
-                    ext::oneapi::memory_scope::work_group,
-                    access::address_space::local_space> (lsums[0].z());
+    auto sumz_obj = sycl::atomic_ref<double, 
+                    sycl::memory_order::relaxed,
+                    sycl::memory_scope::work_group,
+                    sycl::access::address_space::local_space> (lsums.z());
     sumz_obj.fetch_add(sums.z());
 
-    auto sumw_obj = ext::oneapi::atomic_ref<double, 
-                    ext::oneapi::memory_order::relaxed,
-                    ext::oneapi::memory_scope::work_group,
-                    access::address_space::local_space> (lsums[0].w());
+    auto sumw_obj = sycl::atomic_ref<double, 
+                    sycl::memory_order::relaxed,
+                    sycl::memory_scope::work_group,
+                    sycl::access::address_space::local_space> (lsums.w());
     sumw_obj.fetch_add(sums.w());
 
     syncthreads();
     
     // The 1st thread has everything he needs to build R from the QR decomposition.
     if( lid == 0 )
-      svd_3x3(lsum[0], lsums[0], smem_svds);
+      svd_3x3(lsum, lsums, smem_svds);
 
     syncthreads();
 
@@ -635,10 +633,10 @@ template< typename Payoff >
 class partial_beta;
 
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
-void compute_partial_beta_kernel(nd_item<1> &item,
+void compute_partial_beta_kernel(sycl::nd_item<1> &item,
                                  int num_paths,
                                  Payoff payoff,
-                                       double3 *__restrict lsums,
+                                       sycl::double3 &lsums,
                                        double *__restrict shared_svd,
                                  const double *__restrict svd,
                                  const double *__restrict paths,
@@ -746,25 +744,25 @@ void compute_partial_beta_kernel(nd_item<1> &item,
 
   // Compute the sum of the elements in the block. 
   if( lid == 0 )
-    lsums[0] = double3(0);
+    lsums = sycl::double3(0);
   syncthreads();
 
-  auto sumx_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].x());
+  auto sumx_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.x());
   sumx_obj.fetch_add(beta0);
   
-  auto sumy_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].y());
+  auto sumy_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.y());
   sumy_obj.fetch_add(beta1);
 
-  auto sumz_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].z());
+  auto sumz_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.z());
   sumz_obj.fetch_add(beta2);
 
   syncthreads();
@@ -772,9 +770,9 @@ void compute_partial_beta_kernel(nd_item<1> &item,
   // The 1st thread stores the result to GMEM.
   if( lid == 0 )
   {
-    partial_sums[0*NUM_THREADS_PER_BLOCK + bid] = lsums[0].x();
-    partial_sums[1*NUM_THREADS_PER_BLOCK + bid] = lsums[0].y();
-    partial_sums[2*NUM_THREADS_PER_BLOCK + bid] = lsums[0].z();
+    partial_sums[0*NUM_THREADS_PER_BLOCK + bid] = lsums.x();
+    partial_sums[1*NUM_THREADS_PER_BLOCK + bid] = lsums.y();
+    partial_sums[2*NUM_THREADS_PER_BLOCK + bid] = lsums.z();
   }
 }
 
@@ -783,8 +781,8 @@ class final_beta;
 
 template< int NUM_THREADS_PER_BLOCK >
 void compute_final_beta_kernel(
-  nd_item<1> &item,
-  double3 *__restrict lsums,
+  sycl::nd_item<1> &item,
+  sycl::double3& lsums,
   const int *__restrict all_out_of_the_money,
   double *__restrict beta)
 {
@@ -799,7 +797,7 @@ void compute_final_beta_kernel(
   }
 
   // The final sums.
-  double3 sums;
+  sycl::double3 sums;
   
   // We load the elements.
   sums.x() = beta[0*NUM_THREADS_PER_BLOCK + lid];
@@ -808,25 +806,25 @@ void compute_final_beta_kernel(
   
   // Compute the sums.
   if( lid == 0 )
-    lsums[0] = double3(0);
+    lsums = sycl::double3(0);
   syncthreads();
 
-  auto sumx_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].x());
+  auto sumx_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.x());
   sumx_obj.fetch_add(sums.x());
   
-  auto sumy_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].y());
+  auto sumy_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.y());
   sumy_obj.fetch_add(sums.y());
 
-  auto sumz_obj = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (lsums[0].z());
+  auto sumz_obj = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (lsums.z());
   sumz_obj.fetch_add(sums.z());
  
   syncthreads();
@@ -834,9 +832,9 @@ void compute_final_beta_kernel(
   // Store beta.
   if( lid == 0 )
   {
-    beta[0] = lsums[0].x(); 
-    beta[1] = lsums[0].y();
-    beta[2] = lsums[0].z();
+    beta[0] = lsums.x(); 
+    beta[1] = lsums.y();
+    beta[2] = lsums.z();
   }
 }
 
@@ -846,7 +844,7 @@ template< typename Payoff >
 class update_cashflow;
 
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
-void update_cashflow_kernel(nd_item<1> &item,
+void update_cashflow_kernel(sycl::nd_item<1> &item,
                             int num_paths,
                             Payoff payoff_object,
                             double exp_min_r_dt,
@@ -903,9 +901,9 @@ template< typename Payoff >
 class partial_sums;
 
 template< int NUM_THREADS_PER_BLOCK >
-void compute_partial_sums_kernel(nd_item<1> &item,
+void compute_partial_sums_kernel(sycl::nd_item<1> &item,
                                  int num_paths, 
-                                 double *__restrict lsum,
+                                 double& lsum,
                                  const double *__restrict cashflows,
                                  double *__restrict sums)
 {
@@ -921,21 +919,21 @@ void compute_partial_sums_kernel(nd_item<1> &item,
     sum = cashflows[path];
 
   // Compute the sum over the block.
-  if (lid == 0) lsum[0] = 0;
+  if (lid == 0) lsum = 0;
   syncthreads();
   
   // atomicAdd(&lsum, sum);
-  auto sum_obj = ext::oneapi::atomic_ref<double, 
-                 ext::oneapi::memory_order::relaxed,
-                 ext::oneapi::memory_scope::work_group,
-                 access::address_space::local_space> (lsum[0]);
+  auto sum_obj = sycl::atomic_ref<double, 
+                 sycl::memory_order::relaxed,
+                 sycl::memory_scope::work_group,
+                 sycl::access::address_space::local_space> (lsum);
   sum_obj.fetch_add(sum);
  
   syncthreads();
 
   // The block leader writes the sum to GMEM.
   if( lid == 0 )
-    sums[bid] = lsum[0];
+    sums[bid] = lsum;
 }
 
 template< typename Payoff >
@@ -943,11 +941,11 @@ class final_sums;
 
 template< int NUM_THREADS_PER_BLOCK >
 void compute_final_sum_kernel(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int num_paths, 
   int num_blocks,
   double exp_min_r_dt,
-  double *__restrict lsum,
+  double& lsum,
   double *__restrict sums)
 {
   int lid = item.get_local_id(0);
@@ -958,14 +956,14 @@ void compute_final_sum_kernel(
     sum += sums[item];
 
   // Compute the sum over the block.
-  if (lid == 0) lsum[0] = 0;
+  if (lid == 0) lsum = 0;
   syncthreads();
   
   // atomicAdd(&lsum, sum);
-  auto sum_obj = ext::oneapi::atomic_ref<double, 
-                 ext::oneapi::memory_order::relaxed,
-                 ext::oneapi::memory_scope::work_group,
-                 access::address_space::local_space> (lsum[0]);
+  auto sum_obj = sycl::atomic_ref<double, 
+                 sycl::memory_order::relaxed,
+                 sycl::memory_scope::work_group,
+                 sycl::access::address_space::local_space> (lsum);
   sum_obj.fetch_add(sum);
 
   syncthreads();
@@ -973,13 +971,13 @@ void compute_final_sum_kernel(
   // The block leader writes the sum to GMEM.
   if( lid == 0 )
   {
-    sums[0] = exp_min_r_dt * lsum[0] / (double) num_paths;
+    sums[0] = exp_min_r_dt * lsum / (double) num_paths;
   }
 }
 
 template< typename Payoff >
 static inline 
-void do_run(queue &q,
+void do_run(sycl::queue &q,
             double *h_samples,
             int num_timesteps, 
             int num_paths, 
@@ -988,65 +986,54 @@ void do_run(queue &q,
             double S0,
             double r,
             double sigma,
-            buffer<double, 1> &d_samples,
-            buffer<double, 1> &d_paths,
-            buffer<double, 1> &d_cashflows,
-            buffer<double, 1> &d_svds,
-            buffer<int   , 1> &d_all_out_of_the_money,
-            buffer<double, 1> &d_temp_storage,
+            double *d_samples,
+            double *d_paths,
+            double *d_cashflows,
+            double *d_svds,
+            int    *d_all_out_of_the_money,
+            double *d_temp_storage,
             double *h_price)
 {
-  q.submit([&] (handler &cgh) {
-    auto acc = d_samples.get_access<sycl_discard_write>(cgh);
-    cgh.copy(h_samples, acc);
-  });
+  q.memcpy(d_samples, h_samples, sizeof(double) * num_timesteps * num_paths);
 
   // Generate asset prices.
   const int NUM_THREADS_PER_BLOCK0 = 256;
   int grid_dim = (num_paths + NUM_THREADS_PER_BLOCK0-1) / NUM_THREADS_PER_BLOCK0;
-  range<1> gws_gen_paths (grid_dim * NUM_THREADS_PER_BLOCK0);
-  range<1> lws_gen_paths (NUM_THREADS_PER_BLOCK0);
+  sycl::range<1> gws_gen_paths (grid_dim * NUM_THREADS_PER_BLOCK0);
+  sycl::range<1> lws_gen_paths (NUM_THREADS_PER_BLOCK0);
 
-  q.submit([&] (handler &cgh) {
-    auto paths = d_paths.get_access<sycl_discard_write>(cgh);
-    auto samples = d_samples.get_access<sycl_read>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for<class generate_paths<Payoff>>(
-      nd_range<1>(gws_gen_paths, lws_gen_paths), [=] (nd_item<1> item) {
+      sycl::nd_range<1>(gws_gen_paths, lws_gen_paths), [=] (sycl::nd_item<1> item) {
       generate_paths_kernel<NUM_THREADS_PER_BLOCK0>(
         item,
         num_timesteps,
         num_paths,
-        payoff, 
-        dt, 
-        S0, 
-        r, 
-        sigma, 
-        samples.get_pointer(),
-        paths.get_pointer());
+        payoff,
+        dt,
+        S0,
+        r,
+        sigma,
+        d_samples,
+        d_paths);
     });
   });
 
   // Reset the all_out_of_the_money array.
-  q.submit([&] (handler &cgh) {
-    auto acc = d_all_out_of_the_money.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, 0);
-  });
+  q.memset(d_all_out_of_the_money, 0, num_timesteps*sizeof(int));
 
   // Prepare the SVDs.
   const int NUM_THREADS_PER_BLOCK1 = 256;
-  range<1> gws_prepare_svd ((num_timesteps-1) * NUM_THREADS_PER_BLOCK1);
-  range<1> lws_prepare_svd (NUM_THREADS_PER_BLOCK1);
+  sycl::range<1> gws_prepare_svd ((num_timesteps-1) * NUM_THREADS_PER_BLOCK1);
+  sycl::range<1> lws_prepare_svd (NUM_THREADS_PER_BLOCK1);
 
-  q.submit([&] (handler &cgh) {
-    auto paths = d_paths.get_access<sycl_read>(cgh);
-    auto all_out_of_the_money = d_all_out_of_the_money.get_access<sycl_write>(cgh);
-    auto svds = d_svds.get_access<sycl_write>(cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> scan_input(NUM_THREADS_PER_BLOCK1, cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> scan_output(1+NUM_THREADS_PER_BLOCK1, cgh);
-    accessor<double4, 1, sycl_read_write, access::target::local> lsums (1, cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> lsum (1, cgh);
-    accessor<double, 1, sycl_read_write, access::target::local> smem_svds (R_W_MATRICES_SMEM_SLOTS, cgh);
-    cgh.parallel_for<class prepare_svd<Payoff>>(nd_range<1>(gws_prepare_svd, lws_prepare_svd), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<int, 1> scan_input(sycl::range<1>(NUM_THREADS_PER_BLOCK1), cgh);
+    sycl::local_accessor<int, 1> scan_output(sycl::range<1>(1+NUM_THREADS_PER_BLOCK1), cgh);
+    sycl::local_accessor<sycl::double4, 0> lsums (cgh);
+    sycl::local_accessor<int, 0> lsum (cgh);
+    sycl::local_accessor<double, 1> smem_svds (sycl::range<1>(R_W_MATRICES_SMEM_SLOTS), cgh);
+    cgh.parallel_for<class prepare_svd<Payoff>>(sycl::nd_range<1>(gws_prepare_svd, lws_prepare_svd), [=] (sycl::nd_item<1> item) {
       prepare_svd_kernel<NUM_THREADS_PER_BLOCK1>(
           item,
           num_paths,
@@ -1054,15 +1041,14 @@ void do_run(queue &q,
           payoff, 
           scan_input.get_pointer(),
           scan_output.get_pointer(),
-          lsums.get_pointer(),
-          lsum.get_pointer(),
+          lsums,
+          lsum,
           smem_svds.get_pointer(),
-          paths.get_pointer(), 
-          all_out_of_the_money.get_pointer(),
-          svds.get_pointer());
+          d_paths,
+          d_all_out_of_the_money,
+          d_svds);
     });
   });
-
 
   // The constant to discount the payoffs.
   const double exp_min_r_dt = std::exp(-r*dt);
@@ -1085,64 +1071,56 @@ void do_run(queue &q,
   for( int timestep = num_timesteps-2 ; timestep >= 0 ; --timestep )
   {
     // Compute beta (two kernels) for that timestep.
-    range<1> gws_partial_beta (NUM_THREADS_PER_BLOCK2 * NUM_THREADS_PER_BLOCK2);
-    range<1> lws_partial_beta (NUM_THREADS_PER_BLOCK2);
-    q.submit([&] (handler &cgh) {
-      auto svds = d_svds.get_access<sycl_read>(cgh);
-      auto paths = d_paths.get_access<sycl_read>(cgh);
-      auto cashflows = d_cashflows.get_access<sycl_read>(cgh);
-      auto all_out_of_the_money = d_all_out_of_the_money.get_access<sycl_read>(cgh);
-      auto partial_sums = d_temp_storage.get_access<sycl_write>(cgh);
-      accessor<double3, 1, sycl_read_write, access::target::local> lsums (1, cgh);
-      accessor<double, 1, sycl_read_write, access::target::local> shared_svds (R_W_MATRICES_SMEM_SLOTS, cgh);
-      cgh.parallel_for<class partial_beta<Payoff>>(nd_range<1>(gws_partial_beta, lws_partial_beta), [=] (nd_item<1> item) {
+    sycl::range<1> gws_partial_beta (NUM_THREADS_PER_BLOCK2 * NUM_THREADS_PER_BLOCK2);
+    sycl::range<1> lws_partial_beta (NUM_THREADS_PER_BLOCK2);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<sycl::double3, 0> lsums (cgh);
+      sycl::local_accessor<double, 1> shared_svds (sycl::range<1>(R_W_MATRICES_SMEM_SLOTS), cgh);
+      cgh.parallel_for<class partial_beta<Payoff>>(
+        sycl::nd_range<1>(gws_partial_beta, lws_partial_beta), [=] (sycl::nd_item<1> item) {
         compute_partial_beta_kernel<NUM_THREADS_PER_BLOCK2>(
           item,
           num_paths,
           payoff,
-          lsums.get_pointer(),
+          lsums,
           shared_svds.get_pointer(),
-          svds.get_pointer() + 16*timestep,
-          paths.get_pointer() + timestep*num_paths,
-          cashflows.get_pointer(),
-          all_out_of_the_money.get_pointer() + timestep,
-          partial_sums.get_pointer());
+          d_svds + 16*timestep,
+          d_paths + timestep*num_paths,
+          d_cashflows,
+          d_all_out_of_the_money + timestep,
+          d_temp_storage);
       });
     });
 
     // Compute beta (two kernels) for that timestep.
-    range<1> gws_final_beta (NUM_THREADS_PER_BLOCK2);
-    range<1> lws_final_beta (NUM_THREADS_PER_BLOCK2);
-    q.submit([&] (handler &cgh) {
-      auto out_of_the_money = d_all_out_of_the_money.get_access<sycl_read>(cgh);
-      auto beta = d_temp_storage.get_access<sycl_read_write>(cgh);
-      accessor<double3, 1, sycl_read_write, access::target::local> lsums (1, cgh);
-      cgh.parallel_for<class final_beta<Payoff>>(nd_range<1>(gws_final_beta, lws_final_beta), [=] (nd_item<1> item) {
+    sycl::range<1> gws_final_beta (NUM_THREADS_PER_BLOCK2);
+    sycl::range<1> lws_final_beta (NUM_THREADS_PER_BLOCK2);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<sycl::double3, 0> lsums (cgh);
+      cgh.parallel_for<class final_beta<Payoff>>(
+        sycl::nd_range<1>(gws_final_beta, lws_final_beta), [=] (sycl::nd_item<1> item) {
         compute_final_beta_kernel<NUM_THREADS_PER_BLOCK2>(
           item,
-          lsums.get_pointer(),
-          out_of_the_money.get_pointer() + timestep,
-          beta.get_pointer());
+          lsums,
+          d_all_out_of_the_money + timestep,
+          d_temp_storage);
       });
     });
 
-    range<1> gws_cashflow (update_cashflow_grid * NUM_THREADS_PER_BLOCK2);
-    range<1> lws_cashflow (NUM_THREADS_PER_BLOCK2);
-    q.submit([&] (handler &cgh) {
-      auto all_out_of_the_money = d_all_out_of_the_money.get_access<sycl_read>(cgh);
-      auto beta = d_temp_storage.get_access<sycl_read>(cgh);
-      auto paths = d_paths.get_access<sycl_read>(cgh);
-      auto cashflows = d_cashflows.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class update_cashflow<Payoff>>(nd_range<1>(gws_cashflow, lws_cashflow), [=] (nd_item<1> item) {
+    sycl::range<1> gws_cashflow (update_cashflow_grid * NUM_THREADS_PER_BLOCK2);
+    sycl::range<1> lws_cashflow (NUM_THREADS_PER_BLOCK2);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class update_cashflow<Payoff>>(
+        sycl::nd_range<1>(gws_cashflow, lws_cashflow), [=] (sycl::nd_item<1> item) {
         update_cashflow_kernel<NUM_THREADS_PER_BLOCK2>(
           item,
           num_paths,
           payoff,
           exp_min_r_dt,
-          beta.get_pointer(),
-          paths.get_pointer() + timestep*num_paths,
-          all_out_of_the_money.get_pointer() + timestep,
-          cashflows.get_pointer());
+          d_temp_storage,
+          d_paths + timestep*num_paths,
+          d_all_out_of_the_money + timestep,
+          d_cashflows);
       });
     });
   }
@@ -1151,43 +1129,39 @@ void do_run(queue &q,
   const int NUM_THREADS_PER_BLOCK4 = 128;
   grid_dim = (num_paths + NUM_THREADS_PER_BLOCK4-1) / NUM_THREADS_PER_BLOCK4;
 
-  range<1> gws_partial_sum (grid_dim * NUM_THREADS_PER_BLOCK4);
-  range<1> lws_partial_sum (NUM_THREADS_PER_BLOCK4);
-  q.submit([&] (handler &cgh) {
-    auto cashflows = d_cashflows.get_access<sycl_read>(cgh);
-    auto sums = d_temp_storage.get_access<sycl_write>(cgh);
-    accessor<double, 1, sycl_read_write, access::target::local> lsum (1, cgh);
-    cgh.parallel_for<class partial_sums<Payoff>>(nd_range<1>(gws_partial_sum, lws_partial_sum), [=] (nd_item<1> item) {
+  sycl::range<1> gws_partial_sum (grid_dim * NUM_THREADS_PER_BLOCK4);
+  sycl::range<1> lws_partial_sum (NUM_THREADS_PER_BLOCK4);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<double, 0> lsum (cgh);
+    cgh.parallel_for<class partial_sums<Payoff>>(
+      sycl::nd_range<1>(gws_partial_sum, lws_partial_sum), [=] (sycl::nd_item<1> item) {
       compute_partial_sums_kernel<NUM_THREADS_PER_BLOCK4>(
         item,
         num_paths,
-        lsum.get_pointer(),
-        cashflows.get_pointer(),
-        sums.get_pointer());
+        lsum,
+        d_cashflows,
+        d_temp_storage);
     });
   });
 
-  range<1> gws_final_sum (NUM_THREADS_PER_BLOCK4);
-  range<1> lws_final_sum (NUM_THREADS_PER_BLOCK4);
-  q.submit([&] (handler &cgh) {
-    auto sums = d_temp_storage.get_access<sycl_read_write>(cgh);
-    accessor<double, 1, sycl_read_write, access::target::local> lsum (1, cgh);
-    cgh.parallel_for<class final_sums<Payoff>>(nd_range<1>(gws_final_sum, lws_final_sum), [=] (nd_item<1> item) {
+  sycl::range<1> gws_final_sum (NUM_THREADS_PER_BLOCK4);
+  sycl::range<1> lws_final_sum (NUM_THREADS_PER_BLOCK4);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<double, 0> lsum (cgh);
+    cgh.parallel_for<class final_sums<Payoff>>(
+      sycl::nd_range<1>(gws_final_sum, lws_final_sum), [=] (sycl::nd_item<1> item) {
       compute_final_sum_kernel<NUM_THREADS_PER_BLOCK4>(
         item,
         num_paths,
         grid_dim,
         exp_min_r_dt,
-        lsum.get_pointer(),
-        sums.get_pointer());
+        lsum,
+        d_temp_storage);
     });
   });
 
   // Copy the result to the host.
-  q.submit([&] (handler &cgh) {
-    auto acc = d_temp_storage.get_access<sycl_read>(cgh, range<1>(1));
-    cgh.copy(acc, h_price);
-  }).wait();
+  q.memcpy(h_price, d_temp_storage, sizeof(double)).wait();
 }
 
 template< typename Payoff >
@@ -1318,31 +1292,29 @@ int main(int argc, char **argv)
   double *h_samples = (double*) malloc (num_timesteps*num_paths*sizeof(double));
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Memory on the GPU to store normally distributed random numbers.
-  buffer<double, 1> d_samples (num_timesteps*num_paths);
+  double *d_samples = sycl::malloc_device<double>(num_timesteps*num_paths, q);
 
   // Memory on the GPU to store the asset price along the paths. The last column contains the discounted payoffs.
-  buffer<double, 1> d_paths (num_timesteps*num_paths);
+  double *d_paths = sycl::malloc_device<double>(num_timesteps*num_paths, q);
 
   // The discounted payoffs are the last column.
-  // double *d_cashflows = d_paths + (num_timesteps-1)*num_paths;
-  buffer<double, 1> d_cashflows (d_paths, (num_timesteps-1)*num_paths, num_paths);
+  double *d_cashflows = d_paths + (num_timesteps-1)*num_paths;
 
   // Storage to keep intermediate SVD matrices.
-  buffer<double, 1> d_svds (16*num_timesteps);
+  double *d_svds = sycl::malloc_device<double>(16*num_timesteps, q);
 
   // Memory on the GPU to flag timesteps where no path is in the money.
-  buffer<int, 1> d_all_out_of_the_money (num_timesteps);
+  int *d_all_out_of_the_money = sycl::malloc_device<int>(num_timesteps, q);
 
-  // Memory on the GPU to compute the reductions (beta and the option price).
+  // Memory on the GPU to compute the reductions (beta and the option price, q).
   int max_temp_storage = 4*MAX_GRID_SIZE;
-  buffer<double, 1> d_temp_storage (max_temp_storage);
+  double *d_temp_storage = sycl::malloc_device<double>(max_temp_storage, q);
 
   // The price on the host.
   double h_price;
@@ -1423,6 +1395,11 @@ int main(int argc, char **argv)
 
   // Release memory
   free(h_samples);
+  sycl::free(d_temp_storage, q);
+  sycl::free(d_all_out_of_the_money, q);
+  sycl::free(d_svds, q);
+  sycl::free(d_paths, q);
+  sycl::free(d_samples, q);
 
   return 0;
 }
