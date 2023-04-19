@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 #define min(a,b) (a) < (b) ? (a) : (b)
 #define max(a,b) (a) > (b) ? (a) : (b)
@@ -315,11 +315,10 @@ int main(int argc, char **argv)
   const int loop_num = atoi(argv[1]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   auto info = q.get_device().get_info<sycl::info::device::atomic_memory_scope_capabilities>();
   bool atomicMemoryScopeSystem = false;
