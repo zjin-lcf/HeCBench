@@ -42,7 +42,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <cstring>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 // Thread block size
@@ -87,44 +87,37 @@ class dot_kernel;
 
 // Initialize buffers da, db, dc with initA, initB, and initC, respectively 
 template <typename T>
-void init_arrays(queue &q, 
-                 buffer<T, 1> &da,
-                 buffer<T, 1> &db, 
-                 buffer<T, 1> &dc, 
+void init_arrays(sycl::queue &q, 
+                 T *da, T *db, T *dc, 
                  T initA, T initB, T initC)
 {
   const int array_size = ARRAY_SIZE; 
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto a = da.template get_access<sycl_discard_write>(cgh);
-    auto b = db.template get_access<sycl_discard_write>(cgh);
-    auto c = dc.template get_access<sycl_discard_write>(cgh);
-    
-    cgh.parallel_for<class init_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class init_kernel<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const int i = item.get_global_id(0);
-      a[i] = initA;
-      b[i] = initB;
-      c[i] = initC;
+      da[i] = initA;
+      db[i] = initB;
+      dc[i] = initC;
     });
   }).wait();
-  q.wait();
 }
 
 
 // dc[i] = da[i] for each i
 template <typename T>
-void copy(queue &q, buffer<T, 1> &da, buffer<T, 1> &dc)
+void copy(sycl::queue &q, T *da, T *dc)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto a = da.template get_access<sycl_read>(cgh);
-    auto c = dc.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class copy_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class copy_kernel<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const int i = item.get_global_id(0);
-      c[i] = a[i];
+      dc[i] = da[i];
     });
   });
   q.wait();
@@ -132,18 +125,17 @@ void copy(queue &q, buffer<T, 1> &da, buffer<T, 1> &dc)
 
 // db[i] = scalar * dc[i] for each i
 template <typename T>
-void mul(queue &q, buffer<T, 1> &db, buffer<T, 1> &dc)
+void mul(sycl::queue &q, T *db, T *dc)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto c = dc.template get_access<sycl_read>(cgh);
-    auto b = db.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class mul_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class mul_kernel<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
-      b[i] = scalar * c[i];
+      db[i] = scalar * dc[i];
     });
   });
   q.wait();
@@ -151,79 +143,65 @@ void mul(queue &q, buffer<T, 1> &db, buffer<T, 1> &dc)
 
 // dc[i] = da[i] + db[i] for each i
 template <typename T>
-void add(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
+void add(sycl::queue &q, T *da, T *db, T *dc)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto a = da.template get_access<sycl_read>(cgh);
-    auto b = db.template get_access<sycl_read>(cgh);
-    auto c = dc.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class add_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class add_kernel<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const int i = item.get_global_id(0);
-      c[i] = a[i] + b[i];
+      dc[i] = da[i] + db[i];
     });
-  });
-  q.wait();
+  }).wait();
 }
 
 
 // da[i] = db[i] + scalar * dc[i] for each i
 template <typename T>
-void triad(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
+void triad(sycl::queue &q, T *da, T *db, T *dc)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto b = db.template get_access<sycl_read>(cgh);
-    auto c = dc.template get_access<sycl_read>(cgh);
-    auto a = da.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class triad_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class triad_kernel<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
-      a[i] = b[i] + scalar * c[i];
+      da[i] = db[i] + scalar * dc[i];
     });
-  });
-  q.wait();
+  }).wait();
 }
 
 
 // da[i] += db[i] + scalar * dc[i] for each i
 template <typename T>
-void nstream(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dc)
+void nstream(sycl::queue &q, T *da, T *db, T *dc)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (array_size);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto b = db.template get_access<sycl_read>(cgh);
-    auto c = dc.template get_access<sycl_read>(cgh);
-    auto a = da.template get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class nstream_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (array_size);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class nstream_kernel<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const T scalar = SCALAR;
       const int i = item.get_global_id(0);
-      a[i] += b[i] + scalar * c[i];
+      da[i] += db[i] + scalar * dc[i];
     });
-  });
-  q.wait();
+  }).wait();
 }
 
 // sum += da[i] * db[i] for each i
 template <typename T>
-T dot(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dsum, T *sums)
+T dot(sycl::queue &q, T *da, T *db, T *dsum, T *sums)
 {
   const int array_size = ARRAY_SIZE;
-  range<1> gws (DOT_NUM_BLOCKS * TBSIZE);
-  range<1> lws (TBSIZE);
-  q.submit([&] (handler &cgh) {
-    auto b = db.template get_access<sycl_read>(cgh);
-    auto a = da.template get_access<sycl_read_write>(cgh);
-    auto sum = dsum.template get_access<sycl_discard_write>(cgh);
-    accessor<T, 1, sycl_read_write, access::target::local> tb_sum(TBSIZE, cgh);
-    cgh.parallel_for<class dot_kernel<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-
+  sycl::range<1> gws (DOT_NUM_BLOCKS * TBSIZE);
+  sycl::range<1> lws (TBSIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<T, 1> tb_sum(sycl::range<1>(TBSIZE), cgh);
+    cgh.parallel_for<class dot_kernel<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       const size_t lid = item.get_local_id(0);
       const int blockIdx = item.get_group(0);
       const int blockDim = item.get_local_range(0);
@@ -232,11 +210,11 @@ T dot(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dsum, T *sums)
       tb_sum[lid] = 0.0;
       for (int i = item.get_global_id(0);
            i < array_size; i += blockDim * gridDim)
-        tb_sum[lid] += a[i] * b[i];
+        tb_sum[lid] += da[i] * db[i];
 
       for (int offset = blockDim / 2; offset > 0; offset /= 2)
       {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if (lid < offset)
         {
           tb_sum[lid] += tb_sum[lid+offset];
@@ -244,15 +222,12 @@ T dot(queue &q, buffer<T, 1> &da, buffer<T, 1> &db, buffer<T, 1> &dsum, T *sums)
       }
 
       if (lid == 0)
-        sum[blockIdx] = tb_sum[lid];
+        dsum[blockIdx] = tb_sum[lid];
     });
   });
 
   // sum up partial sums on a host
-  q.submit([&] (handler &cgh) {
-    auto acc = dsum.template get_access<sycl_read>(cgh);
-    cgh.copy(acc, sums);
-  }).wait();
+  q.memcpy(sums, dsum, DOT_NUM_BLOCKS * sizeof(T)).wait();  
 
   T sum = 0.0;
   for (int i = 0; i < DOT_NUM_BLOCKS; i++)
@@ -278,16 +253,15 @@ void run()
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<T, 1> da (ARRAY_SIZE);
-  buffer<T, 1> db (ARRAY_SIZE);
-  buffer<T, 1> dc (ARRAY_SIZE);
-  buffer<T, 1> dsum (DOT_NUM_BLOCKS);
+  T *da = sycl::malloc_device<T>(ARRAY_SIZE, q);
+  T *db = sycl::malloc_device<T>(ARRAY_SIZE, q);
+  T *dc = sycl::malloc_device<T>(ARRAY_SIZE, q);
+  T *dsum = sycl::malloc_device<T>(DOT_NUM_BLOCKS, q);
 
   // Allocate the host array for partial sums for the dot kernel
   T *sums = (T*)malloc(sizeof(T) * DOT_NUM_BLOCKS);
@@ -322,7 +296,6 @@ void run()
     copy(q, da, dc);
     t2 = std::chrono::high_resolution_clock::now();
     timings[0].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
 
     // Execute Mul
     t1 = std::chrono::high_resolution_clock::now();
@@ -398,6 +371,10 @@ void run()
   // Add a blank line
   std::cout << std::endl;
 
+  free(da, q);
+  free(db, q);
+  free(dc, q);
+  free(dsum, q);
   free(sums);
 }
 
