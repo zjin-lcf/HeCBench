@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "backprop.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,28 +63,28 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   double offload_start = get_time();
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_input = malloc_device<float>(in+1, q);
+  float *d_input = sycl::malloc_device<float>(in+1, q);
   q.memcpy(d_input, net->input_units, sizeof(float)*(in+1));
 
-  float *d_input_weights = malloc_device<float>((in+1)*(hid+1), q);
+  float *d_input_weights = sycl::malloc_device<float>((in+1)*(hid+1), q);
   q.memcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-  float *d_hidden_partial_sum = malloc_device<float>(num_blocks*WIDTH, q);
+  float *d_hidden_partial_sum = sycl::malloc_device<float>(num_blocks*WIDTH, q);
 
   // set global and local workitems
-  range<2> global_work(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
-  range<2> local_work(BLOCK_SIZE, BLOCK_SIZE);
+  sycl::range<2> gws(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
+  sycl::range<2> lws(BLOCK_SIZE, BLOCK_SIZE);
 
-  q.submit([&](handler& cgh) {
-    accessor <float, 1, sycl_read_write, access::target::local> input_node (HEIGHT, cgh);
-    accessor <float, 1, sycl_read_write, access::target::local> weight_matrix (HEIGHT * WIDTH, cgh);
-    cgh.parallel_for<class forward>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+  q.submit([&](sycl::handler& cgh) {
+    sycl::local_accessor <float, 1> input_node (sycl::range<1>(HEIGHT), cgh);
+    sycl::local_accessor <float, 1> weight_matrix (sycl::range<1>(HEIGHT * WIDTH), cgh);
+    cgh.parallel_for<class forward>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       #include "bpnn_layerforward.sycl"
     });
   });
@@ -111,25 +111,26 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   // input_weights_sycl has been written in the first kernel, so it needs to be restored.
   q.memcpy(d_input_weights, input_weights_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-  float *d_hidden_delta = malloc_device<float>(hid+1, q);
+  float *d_hidden_delta = sycl::malloc_device<float>(hid+1, q);
   q.memcpy(d_hidden_delta, net->hidden_delta, sizeof(float)*(hid+1));
 
-  float *d_input_prev_weights = malloc_device<float>((in+1)*(hid+1), q);
+  float *d_input_prev_weights = sycl::malloc_device<float>((in+1)*(hid+1), q);
   q.memcpy(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-  q.submit([&](handler& cgh) {
-    cgh.parallel_for<class adjust_weights>(nd_range<2>(global_work, local_work), [=] (nd_item<2> item) {
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class adjust_weights>(
+    sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       #include "bpnn_adjust_weights.sycl"
     });
   });
 
   q.memcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1)).wait();
 
-  free(d_input, q);
-  free(d_input_weights, q);
-  free(d_hidden_partial_sum, q);
-  free(d_hidden_delta, q);
-  free(d_input_prev_weights, q);
+  sycl::free(d_input, q);
+  sycl::free(d_input_weights, q);
+  sycl::free(d_hidden_partial_sum, q);
+  sycl::free(d_hidden_delta, q);
+  sycl::free(d_input_prev_weights, q);
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
