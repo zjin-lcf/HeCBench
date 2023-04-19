@@ -5,7 +5,7 @@
 #include <string>
 #include <cstring>
 #include <cstdio>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "util.h"
 
 #define MAX_THREADS_PER_BLOCK 256
@@ -64,36 +64,35 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     char *h_graph_visited, int *h_cost) noexcept(false) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  Node *d_graph_nodes = malloc_device<Node>(no_of_nodes, q);
+  Node *d_graph_nodes = sycl::malloc_device<Node>(no_of_nodes, q);
   q.memcpy(d_graph_nodes, h_graph_nodes, no_of_nodes * sizeof(Node));
 
-  int *d_graph_edges = malloc_device<int>(edge_list_size, q); 
+  int *d_graph_edges = sycl::malloc_device<int>(edge_list_size, q); 
   q.memcpy(d_graph_edges, h_graph_edges, edge_list_size * sizeof(int));
 
-  char *d_graph_mask = malloc_device<char>(no_of_nodes, q);
+  char *d_graph_mask = sycl::malloc_device<char>(no_of_nodes, q);
   q.memcpy(d_graph_mask, h_graph_mask, no_of_nodes * sizeof(char));
 
-  char *d_updating_graph_mask = malloc_device<char>(no_of_nodes, q);
+  char *d_updating_graph_mask = sycl::malloc_device<char>(no_of_nodes, q);
   q.memcpy(d_updating_graph_mask, h_updating_graph_mask, no_of_nodes * sizeof(char));
 
-  char *d_graph_visited = malloc_device<char>(no_of_nodes, q);
+  char *d_graph_visited = sycl::malloc_device<char>(no_of_nodes, q);
   q.memcpy(d_graph_visited, h_graph_visited, no_of_nodes * sizeof(char));
 
-  int *d_cost= malloc_device<int>(no_of_nodes, q);
+  int *d_cost= sycl::malloc_device<int>(no_of_nodes, q);
   q.memcpy(d_cost, h_cost, no_of_nodes * sizeof(int));
 
   char h_over;
-  char *d_over = malloc_device<char>(1, q);
+  char *d_over = sycl::malloc_device<char>(1, q);
 
   int global_work_size = (no_of_nodes + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK * MAX_THREADS_PER_BLOCK;
-  range<1> gws (global_work_size);
-  range<1> lws (MAX_THREADS_PER_BLOCK);
+  sycl::range<1> gws (global_work_size);
+  sycl::range<1> lws (MAX_THREADS_PER_BLOCK);
 
   long time = 0;
   do {
@@ -102,8 +101,9 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
     
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class kernel1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class kernel1>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int tid = item.get_global_id(0);
         if (tid<no_of_nodes && d_graph_mask[tid]) {
           d_graph_mask[tid]=0;
@@ -121,8 +121,9 @@ void run_bfs_gpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size,
       });
     });
 
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class kernel2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class kernel2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int tid = item.get_global_id(0);
         if (tid<no_of_nodes && d_updating_graph_mask[tid]) {
           d_graph_mask[tid]=1;
