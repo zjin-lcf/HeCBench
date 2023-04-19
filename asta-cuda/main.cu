@@ -230,8 +230,12 @@ int main(int argc, char **argv) {
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
-  T *h_in_out = (T *)malloc(in_size * sizeof(T));
-  int *h_finished = (int *)malloc(sizeof(int) * finished_size);
+
+  size_t in_size_bytes = in_size * sizeof(T);
+  size_t finished_size_bytes = finished_size * sizeof(int);
+
+  T *h_in_out = (T *)malloc(in_size_bytes);
+  int *h_finished = (int *)malloc(finished_size_bytes);
   int *h_head = (int *)malloc(sizeof(int));
 
 
@@ -241,24 +245,24 @@ int main(int argc, char **argv) {
   T * d_in_out;
   int * d_finished;
   int * d_head;
-  cudaMalloc((void**)&d_in_out, in_size * sizeof(T));
-  cudaMalloc((void**)&d_finished, sizeof(int) * finished_size);
+  cudaMalloc((void**)&d_in_out, in_size_bytes);
+  cudaMalloc((void**)&d_finished, finished_size_bytes);
   cudaMalloc((void**)&d_head, sizeof(int));
-  T *h_in_backup = (T *)malloc(in_size * sizeof(T));
+  T *h_in_backup = (T *)malloc(in_size_bytes);
 
   // Initialize
   read_input(h_in_out, p);
-  memset((void *)h_finished, 0, sizeof(int) * finished_size);
+  memset((void *)h_finished, 0, finished_size_bytes);
   h_head[0] = 0;
-  memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
+  memcpy(h_in_backup, h_in_out, in_size_bytes); // Backup for reuse across iterations
 
   double time = 0;
 
   // Loop over the kernel on a device
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-    cudaMemcpyAsync(d_in_out, h_in_backup, in_size * sizeof(T), cudaMemcpyHostToDevice, 0);
-    cudaMemcpyAsync(d_finished, h_finished, sizeof(int) * finished_size, cudaMemcpyHostToDevice, 0);
+    cudaMemcpyAsync(d_in_out, h_in_backup, in_size_bytes, cudaMemcpyHostToDevice, 0);
+    cudaMemcpyAsync(d_finished, h_finished, finished_size_bytes, cudaMemcpyHostToDevice, 0);
     cudaMemcpyAsync(d_head, h_head, sizeof(int), cudaMemcpyHostToDevice, 0);
 
     cudaDeviceSynchronize();
@@ -271,9 +275,8 @@ int main(int argc, char **argv) {
     if (rep >= p.n_warmup) 
       time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    cudaMemcpyAsync(h_in_out, d_in_out, in_size * sizeof(T), cudaMemcpyDeviceToHost, 0);
+    cudaMemcpy(h_in_out, d_in_out, in_size_bytes, cudaMemcpyDeviceToHost);
   }
-  cudaDeviceSynchronize();
 
   printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 

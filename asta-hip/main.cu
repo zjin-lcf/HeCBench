@@ -230,8 +230,12 @@ int main(int argc, char **argv) {
   int tiled_n       = divceil(p.n, p.s);
   int in_size       = p.m * tiled_n * p.s;
   int finished_size = p.m * tiled_n;
-  T *h_in_out = (T *)malloc(in_size * sizeof(T));
-  int *h_finished = (int *)malloc(sizeof(int) * finished_size);
+
+  size_t in_size_bytes = in_size * sizeof(T);
+  size_t finished_size_bytes = finished_size * sizeof(int);
+
+  T *h_in_out = (T *)malloc(in_size_bytes);
+  int *h_finished = (int *)malloc(finished_size_bytes);
   int *h_head = (int *)malloc(sizeof(int));
 
 
@@ -241,39 +245,38 @@ int main(int argc, char **argv) {
   T * d_in_out;
   int * d_finished;
   int * d_head;
-  hipMalloc((void**)&d_in_out, in_size * sizeof(T));
-  hipMalloc((void**)&d_finished, sizeof(int) * finished_size);
+  hipMalloc((void**)&d_in_out, in_size_bytes);
+  hipMalloc((void**)&d_finished, finished_size_bytes);
   hipMalloc((void**)&d_head, sizeof(int));
-  T *h_in_backup = (T *)malloc(in_size * sizeof(T));
+  T *h_in_backup = (T *)malloc(in_size_bytes);
 
   // Initialize
   read_input(h_in_out, p);
-  memset((void *)h_finished, 0, sizeof(int) * finished_size);
+  memset((void *)h_finished, 0, finished_size_bytes);
   h_head[0] = 0;
-  memcpy(h_in_backup, h_in_out, in_size * sizeof(T)); // Backup for reuse across iterations
+  memcpy(h_in_backup, h_in_out, in_size_bytes); // Backup for reuse across iterations
 
   double time = 0;
 
   // Loop over the kernel on a device
   for(int rep = 0; rep < p.n_warmup + p.n_reps; rep++) {
 
-    hipMemcpyAsync(d_in_out, h_in_backup, in_size * sizeof(T), hipMemcpyHostToDevice, 0);
-    hipMemcpyAsync(d_finished, h_finished, sizeof(int) * finished_size, hipMemcpyHostToDevice, 0);
+    hipMemcpyAsync(d_in_out, h_in_backup, in_size_bytes, hipMemcpyHostToDevice, 0);
+    hipMemcpyAsync(d_finished, h_finished, finished_size_bytes, hipMemcpyHostToDevice, 0);
     hipMemcpyAsync(d_head, h_head, sizeof(int), hipMemcpyHostToDevice, 0);
 
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    hipLaunchKernelGGL(PTTWAC_soa_asta, dimGrid, dimBlock, 0, 0, p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
+    PTTWAC_soa_asta<<<dimGrid, dimBlock>>>(p.m, tiled_n, p.s, d_in_out, d_finished, d_head);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
     if (rep >= p.n_warmup) 
       time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    hipMemcpyAsync(h_in_out, d_in_out, in_size * sizeof(T), hipMemcpyDeviceToHost, 0);
+    hipMemcpy(h_in_out, d_in_out, in_size_bytes, hipMemcpyDeviceToHost);
   }
-  hipDeviceSynchronize();
 
   printf("Average kernel execution time %lf (s)\n", (time * 1e-9) / p.n_reps);
 

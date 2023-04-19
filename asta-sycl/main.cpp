@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
 
   // Initialize
   read_input(h_in_out, p);
-  memset((void *)h_finished, 0, sizeof(int) * finished_size);
+  memset((void *)h_finished, 0, finished_size_bytes);
   h_head[0] = 0;
   memcpy(h_in_backup, h_in_out, in_size_bytes); // Backup for reuse across iterations
 
