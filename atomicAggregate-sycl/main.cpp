@@ -1,6 +1,6 @@
 #include <chrono>
 #include <stdio.h>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // reference
 // https://stackoverflow.com/questions/59879285/whats-the-alternative-for-match-any-sync-on-compute-capability-6
@@ -8,7 +8,7 @@
 #define warpSize 32
 
 inline int ffs(int x) {
-  return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
+  return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
 // increment the value at ptr by 1 and return the old value
@@ -17,9 +17,9 @@ int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
   auto sg = item.get_sub_group();
   for (int i = 0; i < warpSize; i++) {
     unsigned long long tptr = sycl::select_from_group(sg, (unsigned long long)ptr, i);
-    unsigned my_mask = sycl::reduce_over_group(
-        sg, (tptr == (unsigned long long)ptr) ? (0x1 << sg.get_local_linear_id()) : 0,
-        sycl::ext::oneapi::plus<>());
+    auto gb = sycl::ext::oneapi::group_ballot(sg, (tptr == (unsigned long long)ptr));
+    unsigned my_mask;
+    gb.extract_bits(my_mask, 0);
     if (i == (item.get_local_id(0) & (warpSize - 1))) mask = my_mask;
   }
 
@@ -27,8 +27,11 @@ int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
   int res = 0;
   unsigned lane_id = item.get_local_id(0) % warpSize;
   if (lane_id == leader) {                 // leader does the update
-    res = sycl::atomic<int>(sycl::global_ptr<int>(ptr))
-              .fetch_add(sycl::popcount(mask));
+    sycl::atomic_ref<int, 
+       sycl::memory_order::relaxed,
+       sycl::memory_scope::device,
+       sycl::access::address_space::global_space> ao (*ptr);
+    res = ao.fetch_add(sycl::popcount(mask));
   }
   res = sycl::select_from_group(sg, res, leader); // get leader’s old value
   return res + sycl::popcount(mask & ((1 << lane_id) - 1)); // compute old value
@@ -52,28 +55,30 @@ int main(int argc, char *argv[]) {
   h_d = new int[ds];
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-
-  sycl::queue q(dev_sel);
 
   d_d = (int *)sycl::malloc_device(ds * sizeof(d_d[0]), q);
   q.memset(d_d, 0, ds * sizeof(d_d[0]));
 
   q.wait();
 
-  auto start = std::chrono::steady_clock::now();
   sycl::range<1> gws (256 * 32 * 256);
   sycl::range<1> lws (256);
-  for (int i = 0; i < repeat; i++)
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
     q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
+      cgh.parallel_for<class kernel>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
                        [[sycl::reqd_sub_group_size(warpSize)]] {
         k(d_d, item);
       });
     });
+  }
 
   q.wait();
 
