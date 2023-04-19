@@ -39,7 +39,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 #if DOUBLE_PRECISION
@@ -186,9 +186,9 @@ inline FLOAT BezierBlend(int k, FLOAT mu, int n) {
     }
   }
   if(k > 0)
-    blend *= cl::sycl::pow(mu, (FLOAT)k);
+    blend *= sycl::pow(mu, (FLOAT)k);
   if(n - k > 0)
-    blend *= cl::sycl::pow(1 - mu, (FLOAT)(n - k));
+    blend *= sycl::pow(1 - mu, (FLOAT)(n - k));
   return (blend);
 }
 
@@ -229,19 +229,18 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   // Device run
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   int in_size   = (in_size_i + 1) * (in_size_j + 1);
   int out_size  = out_size_i * out_size_j;
 
-  XYZ *d_in = malloc_device<XYZ>(in_size, q);
+  XYZ *d_in = sycl::malloc_device<XYZ>(in_size, q);
   q.memcpy(d_in, in, sizeof(XYZ) * in_size);
 
-  XYZ *d_out = malloc_device<XYZ>(out_size, q);
+  XYZ *d_out = sycl::malloc_device<XYZ>(out_size, q);
 
   size_t lws = p.work_group_size;
   size_t gws = (out_size_i + p.work_group_size - 1) / p.work_group_size * p.work_group_size;
@@ -249,8 +248,9 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
-  q.submit([&](handler& cgh) {
-    cgh.parallel_for<class bs>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class bs>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       int i, j, ki, kj;
       FLOAT   mui, muj, bi, bj;
 
@@ -291,8 +291,8 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   free(cpu_out);
   free(gpu_out);
-  free(d_in, q);
-  free(d_out, q);
+  sycl::free(d_in, q);
+  sycl::free(d_out, q);
 }
 
 int main(int argc, char **argv) {
