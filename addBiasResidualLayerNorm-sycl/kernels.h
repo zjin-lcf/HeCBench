@@ -179,7 +179,7 @@ void addBiasResidualPostLayerNormV2(
   for (int i = 0; i < ite; i++) {
     int col_id = i * dim + lid;
     int id      = bid * n / 2 + col_id;
-    out_ptr[id] = fma(local_out_half2[i] - s_mean_2, s_var_2,
+    out_ptr[id] = fma(local_out_half2[i], s_var_2,
                       ldg(&gamma_ptr[col_id]), ldg(&beta_ptr[col_id]));
   }
 }
