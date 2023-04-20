@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "binomialOptions.h"
 #include "realtype.h"
@@ -91,34 +91,34 @@ extern "C" void binomialOptionsGPU(
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<__TOptionData, 1> d_OptionData (h_OptionData, MAX_OPTIONS);
-  buffer<real, 1> d_CallValue (callValue, MAX_OPTIONS);
+  __TOptionData *d_optionData = sycl::malloc_device<__TOptionData>(MAX_OPTIONS, q);
+  q.memcpy(d_optionData, h_OptionData, sizeof(__TOptionData) * MAX_OPTIONS);
 
-  range<1> gws (optN * THREADBLOCK_SIZE);
-  range<1> lws (THREADBLOCK_SIZE);
+  real *d_callValue = sycl::malloc_device<real>(MAX_OPTIONS, q);
+
+  sycl::range<1> gws (optN * THREADBLOCK_SIZE);
+  sycl::range<1> lws (THREADBLOCK_SIZE);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < numIterations; i++) {
-    q.submit([&] (handler &cgh) {
-      auto callValue = d_CallValue.get_access<sycl_discard_write>(cgh);
-      auto optionData = d_OptionData.get_access<sycl_read>(cgh);
-      accessor<real, 1, sycl_read_write, access::target::local> call_exchange(THREADBLOCK_SIZE + 1, cgh);
-      cgh.parallel_for<class bo>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real, 1> call_exchange(sycl::range<1>(THREADBLOCK_SIZE + 1), cgh);
+      cgh.parallel_for<class kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int     tid = item.get_local_id(0);
         const int     bid = item.get_group(0);
-        const real      S = optionData[bid].S;
-        const real      X = optionData[bid].X;
-        const real    vDt = optionData[bid].vDt;
-        const real puByDf = optionData[bid].puByDf;
-        const real pdByDf = optionData[bid].pdByDf;
+        const real      S = d_optionData[bid].S;
+        const real      X = d_optionData[bid].X;
+        const real    vDt = d_optionData[bid].vDt;
+        const real puByDf = d_optionData[bid].puByDf;
+        const real pdByDf = d_optionData[bid].pdByDf;
 
         real call[ELEMS_PER_THREAD + 1];
         #pragma unroll
@@ -134,9 +134,9 @@ extern "C" void binomialOptionsGPU(
         for(int i = NUM_STEPS; i > 0; --i)
         {
           call_exchange[tid] = call[0];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           call[ELEMS_PER_THREAD] = call_exchange[tid + 1];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if (i > final_it)
           {
@@ -148,7 +148,7 @@ extern "C" void binomialOptionsGPU(
 
         if (tid == 0)
         {
-          callValue[bid] = call[0];
+          d_callValue[bid] = call[0];
         }
       });
     });
@@ -158,4 +158,8 @@ extern "C" void binomialOptionsGPU(
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time : %f (us)\n", time * 1e-3f / numIterations);
+
+  q.memcpy(callValue, d_callValue, optN *sizeof(real)).wait();
+  sycl::free(d_optionData, q);
+  sycl::free(d_callValue, q);
 }
