@@ -3,17 +3,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define threadsPerBlock  256
 
-template<memory_scope MemoryScope = memory_scope::device>
+template<sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline
-void gpuAtomicAddNoReturn(int32_t &address, int32_t val) {
-  auto ao = atomic_ref<int32_t,
-                       memory_order::relaxed,
-                       MemoryScope,
-    access::address_space::generic_space> (address);
+void gpuAtomicAddNoReturn(int &address, int val) {
+  auto ao = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed, MemoryScope,
+    sycl::access::address_space::generic_space> (address);
   ao.fetch_add(val);
 }
 
@@ -39,7 +38,7 @@ template <typename output_t,
           typename IndexType,
           DeviceMemoryType MemoryType>
 void bincount (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
        output_t *smem,
        output_t *output,
   const input_t *input,
@@ -69,7 +68,7 @@ void bincount (
       if (v >= minvalue && v <= maxvalue) {
         const IndexType bin = getBin<input_t, IndexType>(
                               v, minvalue, maxvalue, nbins);
-        gpuAtomicAddNoReturn<memory_scope::work_group>(smem[bin], 1);
+        gpuAtomicAddNoReturn<sycl::memory_scope::work_group>(smem[bin], 1);
       }
     }
     item.barrier(sycl::access::fence_space::local_space);
@@ -97,11 +96,12 @@ void bincount (
 
 #define HANDLE_CASE(MEMORY_TYPE, SHARED_MEM)                         \
   auto start = std::chrono::steady_clock::now();                     \
-  for (int i = 0; i < repeat; i++)                                   \
-    q.submit([&](handler& cgh) {                                     \
-      accessor<output_t, 1, sycl_read_write, access::target::local>  \
-        sm (SHARED_MEM, cgh);                                        \
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {\
+  for (int i = 0; i < repeat; i++) {                                 \
+    q.submit([&](sycl::handler& cgh) {                               \
+      sycl::local_accessor<output_t, 1>                              \
+        sm (sycl::range<1>(SHARED_MEM), cgh);                        \
+      cgh.parallel_for(                                              \
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {     \
       bincount<output_t, input_t, IndexType, MEMORY_TYPE>(           \
         item,                                                        \
         sm.get_pointer(),                                            \
@@ -114,6 +114,7 @@ void bincount (
         output_size);                                                \
       });                                                            \
     });                                                              \
+  }                                                                  \
   q.wait();                                                          \
   auto end = std::chrono::steady_clock::now();                       \
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count(); \
@@ -161,16 +162,15 @@ void eval(IndexType input_size, int repeat)
   printf("Input min, max values: (%f %f)\n", (float)input_minvalue, (float)input_maxvalue);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  input_t *d_input = malloc_device<input_t>(input_size, q);
+  input_t *d_input = sycl::malloc_device<input_t>(input_size, q);
   q.memcpy(d_input, input, input_size_bytes).wait();
 
-  int maxSharedMemory = q.get_device().get_info<info::device::local_mem_size>();
+  int maxSharedMemory = q.get_device().get_info<sycl::info::device::local_mem_size>();
 
   printf("Maximum shared local memory size per block in bytes: %d\n", maxSharedMemory);
 
@@ -183,10 +183,10 @@ void eval(IndexType input_size, int repeat)
     size_t output_size_bytes = sizeof(output_t) * output_size;
     output_t *output = (output_t*) malloc (output_size_bytes); 
 
-    output_t *d_output = malloc_device<output_t>(output_size, q);
+    output_t *d_output = sycl::malloc_device<output_t>(output_size, q);
 
-    range<1> gws ((input_size + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
-    range<1> lws (threadsPerBlock);
+    sycl::range<1> gws ((input_size + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
+    sycl::range<1> lws (threadsPerBlock);
 
     // determine memory type to use in the kernel
     printf("bincount using global atomics\n");
@@ -223,11 +223,11 @@ void eval(IndexType input_size, int repeat)
              (int64_t)maxvalue / repeat);
     }
 
-    free(d_output, q);
+    sycl::free(d_output, q);
     free(output);
   }
 
-  free(d_input, q);
+  sycl::free(d_input, q);
   free(input);
 }
 
@@ -240,7 +240,7 @@ int main(int argc, char* argv[])
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
 
-  eval<int32_t, float, int32_t>(n, repeat);
+  eval<int, float, int>(n, repeat);
 
   return 0; 
 }
