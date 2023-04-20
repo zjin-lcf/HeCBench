@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
     #pragma omp target update from (h_dst[0:img_size])
 
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
     #pragma omp target update from (h_dst[0:img_size])
 
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
     #pragma omp target update from (h_dst[0:img_size])
 
@@ -172,4 +172,4 @@ int main(int argc, char *argv[]) {
   free(r_dst);
   free(h_src);
   return 0;
-};
+}

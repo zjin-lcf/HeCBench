@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
@@ -188,4 +188,4 @@ int main(int argc, char *argv[]) {
   cudaFree(d_dst);
   cudaFree(d_src);
   return 0;
-};
+}

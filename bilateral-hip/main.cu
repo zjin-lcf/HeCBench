@@ -117,13 +117,13 @@ int main(int argc, char *argv[]) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(bilateralFilter<3>), blocks, threads, 0, 0, 
+    bilateralFilter<3><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
 
@@ -141,13 +141,13 @@ int main(int argc, char *argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(bilateralFilter<6>), blocks, threads, 0, 0, 
+    bilateralFilter<6><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
 
@@ -163,13 +163,13 @@ int main(int argc, char *argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(bilateralFilter<9>), blocks, threads, 0, 0, 
+    bilateralFilter<9><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
 
@@ -188,4 +188,4 @@ int main(int argc, char *argv[]) {
   hipFree(d_dst);
   hipFree(d_src);
   return 0;
-};
+}
