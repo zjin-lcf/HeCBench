@@ -14,7 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 constexpr int const BLOCK_SIZE = 256;
 
@@ -213,7 +213,7 @@ inline nvcompType_t TypeOf()
   }
 }
 
-__inline__ size_t sizeOfnvcompType(nvcompType_t type)
+inline size_t sizeOfnvcompType(nvcompType_t type)
 {
   switch (type) {
   case NVCOMP_TYPE_BITS:
@@ -240,7 +240,7 @@ __inline__ size_t sizeOfnvcompType(nvcompType_t type)
 }
 
 void compress(
-    queue &q, 
+    sycl::queue &q, 
     void* const workspace,
     const size_t workspaceSize,
     const nvcompType_t inType,

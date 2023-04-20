@@ -18,7 +18,7 @@ void readMinAndMax(
     T* const maxBuffer,
     int const blockOffset,
     int const blockEnd,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 {
   static_assert(
       BLOCK_SIZE <= BLOCK_WIDTH,
@@ -43,7 +43,7 @@ void readMinAndMax(
 template <typename T>
 void
 reduceMinAndMax(T* const minBuffer, T* const maxBuffer, int const blockEnd,
-                nd_item<1> &item)
+                sycl::nd_item<1> &item)
 {
   int lid = item.get_local_id(0);
 
@@ -60,7 +60,7 @@ reduceMinAndMax(T* const minBuffer, T* const maxBuffer, int const blockEnd,
         maxBuffer[idx] = sycl::max(maxBuffer[idx], maxBuffer[d + idx]);
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
@@ -73,7 +73,7 @@ void bitPackConfigScanKernel(
     LIMIT* const maxValue,
     INPUT const* const in,
     const size_t* const numDevice,
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     LIMIT *minBuffer,
     LIMIT *maxBuffer)
 {
@@ -123,7 +123,7 @@ void bitPackConfigScanKernel(
     minBuffer[lid] = localMin;
     maxBuffer[lid] = localMax;
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // cooperatively compute min and max
     reduceMinAndMax(minBuffer, maxBuffer, lastThread, item);
@@ -142,7 +142,7 @@ void bitPackConfigFinalizeKernel(
     unsigned char* const numBitsPtr,
     INPUT* const outMinValPtr,
     const size_t* const numDevice,
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     LIMIT *minBuffer,
     LIMIT *maxBuffer)
 {
@@ -170,7 +170,7 @@ void bitPackConfigFinalizeKernel(
   // load data
   readMinAndMax(inMin, inMax, minBuffer, maxBuffer, 0, num, item);
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // cooperatively compute min and max
   reduceMinAndMax(minBuffer, maxBuffer, sycl::min(BLOCK_SIZE, (int)num), item);
@@ -197,7 +197,7 @@ void bitPackKernel(
     OUTPUT* const outPtr,
     INPUT const* const in,
     const size_t* const numDevice,
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     typename std::make_unsigned<INPUT>::type *inBuffer)
 {
   const size_t num = *numDevice;
@@ -242,7 +242,7 @@ void bitPackKernel(
     OUTPUT val = 0;
     for (int bufferStart = blockStartIdx; bufferStart < blockEndIdx;
          bufferStart += BLOCK_SIZE) {
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       // fill input buffer
       int const inputIdx = bufferStart + lid;
@@ -250,7 +250,7 @@ void bitPackKernel(
         inBuffer[lid] = in[inputIdx] - valueOffset;
       }
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       int const currentStartIdx = sycl::max(startIdx, bufferStart);
       int const currentEndIdx =
@@ -303,7 +303,7 @@ void bitPackKernel(
  */
 template <typename LIMIT, typename INPUT>
 void bitPackConfigLaunch(
-    queue &q,
+    sycl::queue &q,
     LIMIT* const minValueScratch,
     LIMIT* const maxValueScratch,
     INPUT* const minValOutPtr,
@@ -312,14 +312,14 @@ void bitPackConfigLaunch(
     const size_t* const numDevice,
     size_t const maxNum)
 {
-  const range<1> grid(std::min(BLOCK_WIDTH, static_cast<int>(roundUpDiv(maxNum, BLOCK_SIZE))));
-  const range<1> block(BLOCK_SIZE);
+  const sycl::range<1> grid(std::min(BLOCK_WIDTH, static_cast<int>(roundUpDiv(maxNum, BLOCK_SIZE))));
+  const sycl::range<1> block(BLOCK_SIZE);
 
   // make sure the result will fit in a single block for the finalize kernel
-  q.submit([&](handler &cgh) {
-    accessor<LIMIT, 1, access_mode::read_write, access::target::local> minBuffer(BLOCK_SIZE, cgh);
-    accessor<LIMIT, 1, access_mode::read_write, access::target::local> maxBuffer(BLOCK_SIZE, cgh);
-    cgh.parallel_for(nd_range<1>(grid * block, block), [=](nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<LIMIT, 1> minBuffer(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<LIMIT, 1> maxBuffer(sycl::range<1>(BLOCK_SIZE), cgh);
+    cgh.parallel_for(sycl::nd_range<1>(grid * block, block), [=](sycl::nd_item<1> item) {
       bitPackConfigScanKernel(minValueScratch, maxValueScratch, in, numDevice, item,
                               (LIMIT *)minBuffer.get_pointer(),
                               (LIMIT *)maxBuffer.get_pointer());
@@ -327,10 +327,10 @@ void bitPackConfigLaunch(
   });
 
   // determine numBits and convert min value
-  q.submit([&](handler &cgh) {
-    accessor<LIMIT, 1, access_mode::read_write, access::target::local> minBuffer(BLOCK_SIZE, cgh);
-    accessor<LIMIT, 1, access_mode::read_write, access::target::local> maxBuffer(BLOCK_SIZE, cgh);
-    cgh.parallel_for(nd_range<1>(block, block), [=](nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<LIMIT, 1> minBuffer(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<LIMIT, 1> maxBuffer(sycl::range<1>(BLOCK_SIZE), cgh);
+    cgh.parallel_for(sycl::nd_range<1>(block, block), [=](sycl::nd_item<1> item) {
       bitPackConfigFinalizeKernel(
          minValueScratch, maxValueScratch, numBitsPtr, minValOutPtr,
          numDevice, item, (LIMIT *)minBuffer.get_pointer(),
@@ -341,7 +341,7 @@ void bitPackConfigLaunch(
 
 template <typename INPUT, typename OUTPUT>
 void bitPackLaunch(
-    queue &q,
+    sycl::queue &q,
     const INPUT * const minValueDevicePtr,
     unsigned char const* const numBitsDevicePtr,
     OUTPUT* const outPtr,
@@ -352,13 +352,13 @@ void bitPackLaunch(
   static_assert(BLOCK_SIZE % (sizeof(OUTPUT) * 8U) == 0,
       "Block size must be a multiple of output word size.");
 
-  range<1> const gws (std::min(4096, static_cast<int>(roundUpDiv(maxNum, BLOCK_SIZE))) * BLOCK_SIZE);
-  range<1> const lws (BLOCK_SIZE);
+  sycl::range<1> const gws (std::min(4096, static_cast<int>(roundUpDiv(maxNum, BLOCK_SIZE))) * BLOCK_SIZE);
+  sycl::range<1> const lws (BLOCK_SIZE);
 
   using UINPUT = typename std::make_unsigned<INPUT>::type;
-  q.submit([&](handler &cgh) {
-    accessor<UINPUT, 1, access_mode::read_write, access::target::local> inBuffer(256, cgh);
-    cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<UINPUT, 1> inBuffer(sycl::range<1>(256), cgh);
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       bitPackKernel(numBitsDevicePtr, minValueDevicePtr, outPtr, in,
                     numDevice, item, inBuffer.get_pointer());
     });
@@ -367,7 +367,7 @@ void bitPackLaunch(
 
 template <typename IN, typename OUT, typename LIMIT>
 void bitPackFixedBitAndMinInternal(
-    queue &q,
+    sycl::queue &q,
     void const* const minValueDevicePtr,
     unsigned char const* const numBitsDevicePtr,
     void* const /* workspace */,
@@ -392,7 +392,7 @@ void bitPackFixedBitAndMinInternal(
 
 template <typename IN, typename OUT, typename LIMIT>
 void bitPackInternal(
-    queue &q,
+    sycl::queue &q,
     void* const workspace,
     void* const outPtr,
     void const* const in,
@@ -430,7 +430,7 @@ void bitPackInternal(
 
 
 void compress(
-    queue &q,
+    sycl::queue &q,
     void* const workspace,
     const size_t workspaceSize,
     const nvcompType_t inType,
