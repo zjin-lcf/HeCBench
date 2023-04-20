@@ -39,7 +39,7 @@
 #include <chrono>
 #include <iostream>
 #include <limits>
-#include <common.h>
+#include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 256
 
@@ -47,17 +47,16 @@ void ParallelBitonicSort(int input[], int n) {
 
   // Create queue on implementation-chosen default device.
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, property::queue::in_order());
 
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
   size_t size_bytes = sizeof(int) * size;
 
-  int *d_input = malloc_device<int>(size, q);
+  int *d_input = sycl::malloc_device<int>(size, q);
   q.memcpy(d_input, input, size_bytes).wait();
 
   auto start = std::chrono::steady_clock::now();
@@ -75,8 +74,9 @@ void ParallelBitonicSort(int input[], int n) {
       int two_power = 1 << (step - stage);
 
       // Offload the work to kernel.
-      q.submit([&](handler &h) {
-        h.parallel_for(nd_range<1>(range<1>(size), range<1>(BLOCK_SIZE)), [=](nd_item<1> item) {
+      q.submit([&](sycl::handler &h) {
+        h.parallel_for(sycl::nd_range<1>(
+          sycl::range<1>(size), sycl::range<1>(BLOCK_SIZE)), [=](sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
  
           // Assign the bitonic sequence number.
@@ -120,7 +120,7 @@ void ParallelBitonicSort(int input[], int n) {
   printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);
 
   q.memcpy(input, d_input, size_bytes).wait();
-  free(d_input, q);
+  sycl::free(d_input, q);
 }
 
 // Loop over the bitonic sequences at each stage in serial.
