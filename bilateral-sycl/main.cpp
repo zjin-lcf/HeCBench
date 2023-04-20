@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 template<int R>
 void bilateralFilter(
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const float *__restrict in,
     float *__restrict out,
     int w, 
@@ -96,50 +96,50 @@ int main(int argc, char *argv[]) {
   // square of the height of the curve peak
   float a_square = 0.5f / (variance_I * (float)M_PI);
 
-  float *h_src = (float*) malloc (img_size * sizeof(float));
+  const size_t img_size_bytes = img_size * sizeof(float);
+
+  float *h_src = (float*) malloc (img_size_bytes);
   // host and device results
-  float *h_dst = (float*) malloc (img_size * sizeof(float));
-  float *r_dst = (float*) malloc (img_size * sizeof(float));
+  float *h_dst = (float*) malloc (img_size_bytes);
+  float *r_dst = (float*) malloc (img_size_bytes);
 
   srand(123);
   for (int i = 0; i < img_size; i++)
     h_src[i] = rand() % 256;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_src (h_src, img_size);
-  buffer<float, 1> d_dst (img_size);
+  float *d_src = sycl::malloc_device<float>(img_size, q);
+  q.memcpy(d_src, h_src, img_size_bytes);
 
-  range<2> lws (16, 16);
-  range<2> gws ((h+15)/16*16, (w+15)/16*16);
+  float *d_dst = sycl::malloc_device<float>(img_size, q);
+
+  sycl::range<2> lws (16, 16);
+  sycl::range<2> gws ((h+15)/16*16, (w+15)/16*16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      auto src = d_src.get_access<sycl_read>(cgh);
-      auto dst = d_dst.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class radius3x3>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        bilateralFilter<3>(item, src.get_pointer(), dst.get_pointer(), 
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class radius3x3>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+        bilateralFilter<3>(item, d_src, d_dst,
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (3x3) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_dst.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_dst);
-  }).wait();
+  q.memcpy(h_dst, d_dst, img_size_bytes).wait();
 
   // verify
   bool ok = true;
@@ -154,25 +154,22 @@ int main(int argc, char *argv[]) {
   q.wait();
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      auto src = d_src.get_access<sycl_read>(cgh);
-      auto dst = d_dst.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class radius6x6>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        bilateralFilter<6>(item, src.get_pointer(), dst.get_pointer(), 
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class radius6x6>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+        bilateralFilter<6>(item, d_src, d_dst,
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (6x6) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_dst.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_dst);
-  }).wait();
+  q.memcpy(h_dst, d_dst, img_size_bytes).wait();
 
   reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
   for (int i = 0; i < w*h; i++) {
@@ -185,26 +182,22 @@ int main(int argc, char *argv[]) {
   q.wait();
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      auto src = d_src.get_access<sycl_read>(cgh);
-      auto dst = d_dst.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class radius9x9>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        bilateralFilter<9>(item, src.get_pointer(), dst.get_pointer(), 
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class radius9x9>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+        bilateralFilter<9>(item, d_src, d_dst,
                            w, h, a_square, variance_I, variance_spatial);
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (9x9) %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_dst.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_dst);
-  }).wait();
-
+  q.memcpy(h_dst, d_dst, img_size_bytes).wait();
 
   reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
   for (int i = 0; i < w*h; i++) {
@@ -218,5 +211,7 @@ int main(int argc, char *argv[]) {
   free(h_dst);
   free(r_dst);
   free(h_src);
+  sycl::free(d_dst, q);
+  sycl::free(d_src, q);
   return 0;
-};
+}
