@@ -8,7 +8,7 @@
 #define threadsPerBlock  256
 
 static inline __device__
-void gpuAtomicAddNoReturn(int32_t *address, int32_t val) {
+void gpuAtomicAddNoReturn(int *address, int val) {
   atomicAdd(address, val);
 }
 
@@ -229,7 +229,7 @@ int main(int argc, char* argv[])
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
 
-  eval<int32_t, float, int32_t>(n, repeat);
+  eval<int, float, int>(n, repeat);
 
   return 0; 
 }
