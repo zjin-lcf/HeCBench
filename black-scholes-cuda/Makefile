@@ -47,7 +47,10 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu blackScholesAnalyticEngineStructs.cuh \
+          blackScholesAnalyticEngineKernels.cu \
+          blackScholesAnalyticEngineKernelsCpu.cu \
+          Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

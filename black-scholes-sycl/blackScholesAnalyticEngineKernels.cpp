@@ -13,13 +13,15 @@
 
 
 //device kernel to retrieve the compound factor in interestRate
+inline
 float interestRateCompoundFactor(float t, yieldTermStruct currYieldTermStruct)
 {
-  return (cl::sycl::exp((currYieldTermStruct.forward)*t));
+  return (sycl::exp((currYieldTermStruct.forward)*t));
 }
 
 
 //device kernel to retrieve the discount factor in interestRate
+inline
 float interestRateDiscountFactor(float t, yieldTermStruct currYieldTermStruct)
 {
   return 1.0f / interestRateCompoundFactor(t, currYieldTermStruct);
@@ -27,6 +29,7 @@ float interestRateDiscountFactor(float t, yieldTermStruct currYieldTermStruct)
 
 
 //device function to get the variance of the black volatility function
+inline
 float getBlackVolBlackVar(blackVolStruct volTS)
 {
   float vol = volTS.volatility;
@@ -35,6 +38,7 @@ float getBlackVolBlackVar(blackVolStruct volTS)
 
 
 //device function to get the discount on a dividend yield
+inline
 float getDiscountOnDividendYield(float yearFraction, yieldTermStruct dividendYieldTermStruct)
 {
   float intDiscountFactor = interestRateDiscountFactor(yearFraction, dividendYieldTermStruct);
@@ -43,6 +47,7 @@ float getDiscountOnDividendYield(float yearFraction, yieldTermStruct dividendYie
 
 
 //device function to get the discount on the risk free rate
+inline
 float getDiscountOnRiskFreeRate(float yearFraction, yieldTermStruct riskFreeRateYieldTermStruct)
 {
   return interestRateDiscountFactor(yearFraction, riskFreeRateYieldTermStruct);
@@ -50,6 +55,7 @@ float getDiscountOnRiskFreeRate(float yearFraction, yieldTermStruct riskFreeRate
 
 
 //device kernel to run the error function
+inline
 float errorFunct(normalDistStruct normDist, float x)
 {
   float R,S,P,Q,s,y,z,r, ax;
@@ -96,16 +102,15 @@ float errorFunct(normalDistStruct normDist, float x)
     S=ERROR_FUNCT_one+s*(ERROR_FUNCT_sb1+s*(ERROR_FUNCT_sb2+s*(ERROR_FUNCT_sb3+s*(ERROR_FUNCT_sb4+s*(ERROR_FUNCT_sb5+s*(ERROR_FUNCT_sb6+s*ERROR_FUNCT_sb7))))));
   }
 
-  r = cl::sycl::exp( -ax*ax-0.5625f +R/S);
+  r = sycl::exp( -ax*ax-0.5625f +R/S);
   if(x>=0.0f) 
     return ERROR_FUNCT_one-r/ax; 
   else 
     return r/ax-ERROR_FUNCT_one;
 }
 
-
-
 //device kernel to run the operator function in cumulative normal distribution
+inline
 float cumNormDistOp(normalDistStruct normDist, float z)
 {
   z = (z - normDist.average) / normDist.sigma;
@@ -115,6 +120,7 @@ float cumNormDistOp(normalDistStruct normDist, float z)
 
 
 //device kernel to run the gaussian function in the normal distribution
+inline
 float gaussianFunctNormDist(normalDistStruct normDist, float x)
 {
   float deltax = x - normDist.average;
@@ -122,11 +128,12 @@ float gaussianFunctNormDist(normalDistStruct normDist, float x)
 
   // debian alpha had some strange problem in the very-low range
   return exponent <= -690.0f ? 0.0f :  // exp(x) < 1.0e-300 anyway
-    normDist.normalizationFactor * cl::sycl::exp(exponent);
+    normDist.normalizationFactor * sycl::exp(exponent);
 }
 
 
 //device kernel to retrieve the derivative in a cumulative normal distribution
+inline
 float cumNormDistDeriv(normalDistStruct normDist, float x)
 {
   float xn = (x - normDist.average) / normDist.sigma;
@@ -135,6 +142,7 @@ float cumNormDistDeriv(normalDistStruct normDist, float x)
 
 
 //device function to initialize the cumulative normal distribution structure
+inline
 void initCumNormDist(normalDistStruct& currCumNormDist)
 {
   currCumNormDist.average = 0.0f;
@@ -146,9 +154,10 @@ void initCumNormDist(normalDistStruct& currCumNormDist)
 
 
 //device function to initialize variable in the black calculator
+inline
 void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct payoff)
 {
-  blackCalculator.d1 = cl::sycl::log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 
+  blackCalculator.d1 = sycl::log(blackCalculator.forward / blackCalculator.strike)/blackCalculator.stdDev + 
                        0.5f*blackCalculator.stdDev;
   blackCalculator.d2 = blackCalculator.d1 - blackCalculator.stdDev;
 
@@ -190,6 +199,7 @@ void initBlackCalcVars(blackCalcStruct& blackCalculator, payoffStruct payoff)
 
 
 //device function to initialize the black calculator
+inline
 void initBlackCalculator(blackCalcStruct& blackCalc, payoffStruct payoff, float forwardPrice, float stdDev, float riskFreeDiscount)
 {
   blackCalc.strike = payoff.strike;
@@ -203,6 +213,7 @@ void initBlackCalculator(blackCalcStruct& blackCalc, payoffStruct payoff, float 
 
 
 //device function to retrieve the output resulting value
+inline
 float getResultVal(blackCalcStruct blackCalculator)
 {
   float result = blackCalculator.discount * (blackCalculator.forward * 
