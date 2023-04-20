@@ -201,7 +201,7 @@ __global__ void addBiasResidualPostLayerNormV2(
   for (int i = 0; i < ite; i++) {
     int col_id  = i * blockDim.x + tid;
     int id      = bid * n / 2 + col_id;
-    out_ptr[id] = fma(local_out_half2[i] - s_mean_2, s_var_2,
+    out_ptr[id] = fma(local_out_half2[i], s_var_2,
                       __ldg(&gamma_ptr[col_id]), __ldg(&beta_ptr[col_id]));
   }
 }
