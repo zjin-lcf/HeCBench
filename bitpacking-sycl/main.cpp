@@ -1,19 +1,19 @@
 #include "utils.h"
 
 template <typename T>
-void toGPU(queue &q, T* const output, T const* const input, size_t const num)
+void toGPU(sycl::queue &q, T* const output, T const* const input, size_t const num)
 {
   q.memcpy(output, input, num * sizeof(T)).wait();
 }
 
 template <typename T>
-void fromGPU(queue &q, T* const output, T const* const input, size_t const num)
+void fromGPU(sycl::queue &q, T* const output, T const* const input, size_t const num)
 {
   q.memcpy(output, input, num * sizeof(T)).wait();
 }
 
 template <>
-void fromGPU<void>(queue &q, void* const output, void const* const input, size_t const num)
+void fromGPU<void>(sycl::queue &q, void* const output, void const* const input, size_t const num)
 {
   q.memcpy(output, input, num).wait();
 }
@@ -29,11 +29,10 @@ void runBitPackingOnGPU(
 {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   T* input;
 
