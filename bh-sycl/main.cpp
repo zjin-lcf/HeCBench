@@ -43,7 +43,7 @@ Emerald Edition, pp. 75-92. January 2011.
 #include <stdio.h>
 #include <math.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // threads per block
 #define THREADS1 256  // must be a power of 2
@@ -73,6 +73,46 @@ static double drnd()
   const int lastrand = randx;
   randx = (1103515245L * randx + 12345) & 0x7FFFFFFF;
   return (double)lastrand / 2147483648.0;
+}
+
+// Reference
+inline unsigned int atomicInc(unsigned int *addr,
+                              unsigned int operand) 
+{
+  auto atm = sycl::atomic_ref<unsigned int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(addr[0]);
+  unsigned int old;
+  while (true) {
+    old = atm.load();
+    if (old >= operand) {
+      if (atm.compare_exchange_strong(old, 0))
+        break;
+    } else if (atm.compare_exchange_strong(old, old + 1))
+      break;
+  }
+  return old;
+}
+
+inline int atomicCAS(int &val, int expected, int desired) 
+{
+  int expected_value = expected;
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  atm.compare_exchange_strong(expected_value, desired);
+  return expected_value;
+}
+
+inline int atomicSub(int &val, int operand) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  return atm.fetch_sub(operand);
 }
 
 
@@ -111,9 +151,9 @@ int main(int argc, char* argv[])
   double runtime;
   float dtime, dthf, epssq, itolsq;
 
-  float4 *accVel;
-  float2 *vel;
-  float4 *posMass;
+  sycl::float4 *accVel;
+  sycl::float2 *vel;
+  sycl::float4 *posMass;
   double rsc, vsc, r, v, x, y, z, sq, scale;
 
   // the number of thread blocks may be adjusted for higher performance
@@ -133,13 +173,13 @@ int main(int argc, char* argv[])
 
   // allocate host memory
 
-  accVel = (float4*)malloc(sizeof(float4) * nbodies);
+  accVel = (sycl::float4*)malloc(sizeof(sycl::float4) * nbodies);
   if (accVel == NULL) fprintf(stderr, "cannot allocate accVel\n");
 
-  vel = (float2*)malloc(sizeof(float2) * nbodies);
+  vel = (sycl::float2*)malloc(sizeof(sycl::float2) * nbodies);
   if (vel == NULL) fprintf(stderr, "cannot allocate vel\n");
 
-  posMass = (float4*)malloc(sizeof(float4) * nbodies);
+  posMass = (sycl::float4*)malloc(sizeof(sycl::float4) * nbodies);
   if (posMass == NULL) fprintf(stderr, "cannot allocate posMass\n");
 
   // initialize host memory (https://github.com/staceyson/splash2/blob/master/codes/apps/barnes/code.C)
@@ -147,7 +187,7 @@ int main(int argc, char* argv[])
   rsc = (3 * 3.1415926535897932384626433832795) / 16;
   vsc = sqrt(1.0 / rsc);
   for (i = 0; i < nbodies; i++) {
-    float4 p;
+    sycl::float4 p;
     p.w() = 1.f / nbodies;
     r = 1.0 / sqrt(pow(drnd()*0.999, -2.0/3.0) - 1.0);
     do {
@@ -174,7 +214,7 @@ int main(int argc, char* argv[])
       sq = x*x + y*y + z*z;
     } while (sq > 1.0);
     scale = vsc * v / sqrt(sq);
-    float2 v;
+    sycl::float2 v;
     v.x() = x * scale;
     v.y() = y * scale;
     accVel[i].w() = z * scale;
@@ -182,42 +222,31 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // allocate device memory
 
-  buffer<int, 1> d_child ((nnodes+1) * 8);
-  buffer<int, 1> d_count (nnodes+1);
-  buffer<int, 1> d_start (nnodes+1);
-  buffer<int, 1> d_sort (nnodes+1);
-  buffer<float2, 1> d_vel (nnodes+1);
-  buffer<float4, 1> d_accVel (nnodes+1);
-  buffer<float4, 1> d_posMass (nnodes+1);
-  buffer<float3, 1> d_max (blocks * FACTOR1);
-  buffer<float3, 1> d_min (blocks * FACTOR1);
-  buffer<int, 1> d_step (1);
-  buffer<int, 1> d_bottom (1);
-  buffer<unsigned int, 1> d_blkcnt (1);
-  buffer<float, 1> d_radius (1);
+  int *childd = sycl::malloc_device<int>((nnodes+1) * 8, q);
+  int *countd = sycl::malloc_device<int>(nnodes+1, q);
+  int *startd = sycl::malloc_device<int>(nnodes+1, q);
+  int *sortd = sycl::malloc_device<int>(nnodes+1, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_accVel.get_access<sycl_write>(cgh, range<1>(nbodies)); 
-    cgh.copy(accVel, acc);
-  });
+  sycl::float2 *veld = sycl::malloc_device<sycl::float2>(nnodes+1, q);
+  sycl::float4 *accVeld = sycl::malloc_device<sycl::float4>(nnodes+1, q);
+  sycl::float4 *posMassd = sycl::malloc_device<sycl::float4>(nnodes+1, q);
+  sycl::float3 *maxd = sycl::malloc_device<sycl::float3>(blocks * FACTOR1, q);
+  sycl::float3 *mind = sycl::malloc_device<sycl::float3>(blocks * FACTOR1, q);
+  int *stepd = sycl::malloc_device<int>(1, q);
+  int *bottomd = sycl::malloc_device<int>(1, q);
+  unsigned int *blkcntd = sycl::malloc_device<unsigned int>(1, q);
+  float *radiusd = sycl::malloc_device<float>(1, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_vel.get_access<sycl_write>(cgh, range<1>(nbodies));
-    cgh.copy(vel, acc);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_posMass.get_access<sycl_write>(cgh, range<1>(nbodies)); 
-    cgh.copy(posMass, acc);
-  });
+  q.memcpy(accVeld, accVel, nbodies * sizeof(sycl::float4));
+  q.memcpy(veld, vel, nbodies * sizeof(sycl::float2));
+  q.memcpy(posMassd, posMass, nbodies * sizeof(sycl::float4));
 
   q.wait();
 
@@ -225,42 +254,32 @@ int main(int argc, char* argv[])
   gettimeofday(&starttime, NULL);
 
   // run timesteps (launch kernels on a device)
-  q.submit([&] (handler &cgh) {
-    auto step = d_step.get_access<sycl_write>(cgh);
-    auto blkcnt = d_blkcnt.get_access<sycl_write>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
     cgh.single_task<class init>([=] () {
-      step[0] = -1;
-      blkcnt[0] = 0;
+      stepd[0] = -1;
+      blkcntd[0] = 0;
     });
   });
 
   for (step = 0; step < timesteps; step++) {
 
-    range<1> k2_gws (blocks * FACTOR1 * THREADS1);
-    range<1> k2_lws (THREADS1);
+    sycl::range<1> k2_gws (blocks * FACTOR1 * THREADS1);
+    sycl::range<1> k2_lws (THREADS1);
 
-    q.submit([&](handler &cgh) {
-      auto startd = d_start.get_access<sycl_write>(cgh);
-      auto childd = d_child.get_access<sycl_write>(cgh);
-      auto posMassd = d_posMass.get_access<sycl_read_write>(cgh);
-      auto maxd = d_max.get_access<sycl_read_write>(cgh);
-      auto mind = d_min.get_access<sycl_read_write>(cgh);
-      auto radiusd = d_radius.get_access<sycl_write>(cgh);
-      auto bottomd = d_bottom.get_access<sycl_write>(cgh);
-      auto stepd = d_step.get_access<sycl_read_write>(cgh);
-      auto blkcntd = d_blkcnt.get_access<sycl_atomic>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> smaxx(THREADS1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> smaxy(THREADS1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> smaxz(THREADS1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sminx(THREADS1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sminy(THREADS1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sminz(THREADS1, cgh);
-      cgh.parallel_for<class bounding_box>(nd_range<1>(k2_gws, k2_lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> smaxx(sycl::range<1>(THREADS1), cgh);
+      sycl::local_accessor<float, 1> smaxy(sycl::range<1>(THREADS1), cgh);
+      sycl::local_accessor<float, 1> smaxz(sycl::range<1>(THREADS1), cgh);
+      sycl::local_accessor<float, 1> sminx(sycl::range<1>(THREADS1), cgh);
+      sycl::local_accessor<float, 1> sminy(sycl::range<1>(THREADS1), cgh);
+      sycl::local_accessor<float, 1> sminz(sycl::range<1>(THREADS1), cgh);
+      cgh.parallel_for<class bounding_box>(
+        sycl::nd_range<1>(k2_gws, k2_lws), [=] (sycl::nd_item<1> item) {
         int i, j, k;
         float val;
-        float3 min, max;
+        sycl::float3 min, max;
         // initialize with valid data (in case #bodies < #threads)
-        const float4 p0 = posMassd[0];
+        const sycl::float4 p0 = posMassd[0];
         min.x() = max.x() = p0.x();
         min.y() = max.y() = p0.y();
         min.z() = max.z() = p0.z();
@@ -269,7 +288,7 @@ int main(int argc, char* argv[])
         i = item.get_local_id(0);
         int inc = THREADS1 * item.get_group_range(0);
         for (j = item.get_global_id(0); j < nbodies; j += inc) {
-          const float4 p = posMassd[j];
+          const sycl::float4 p = posMassd[j];
           val = p.x();
           min.x() = sycl::fmin(min.x(), val);
           max.x() = sycl::fmax(max.x(), val);
@@ -290,7 +309,7 @@ int main(int argc, char* argv[])
         smaxz[i] = max.z();
 
         for (j = THREADS1 / 2; j > 0; j /= 2) {
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           if (i < j) {
             k = i + j;
             sminx[i] = min.x() = sycl::fmin(min.x(), sminx[k]);
@@ -307,24 +326,16 @@ int main(int argc, char* argv[])
           k = item.get_group(0);
           mind[k] = min;
           maxd[k] = max;
-          item.barrier(access::fence_space::local_space);
+
+          sycl::atomic_fence(sycl::memory_order::seq_cst, sycl::memory_scope::device);
 
           inc = item.get_group_range(0) - 1;
           
-          unsigned int old;
-          while(true) {
-            old = atomic_load(blkcntd[0]);
-            if (old >= inc) {
-              if (atomic_compare_exchange_strong(blkcntd[0], old, (unsigned int)0)) break;
-            } else if (atomic_compare_exchange_strong(blkcntd[0], old, old + 1))
-              break;
-          }
-            
-          if (inc == old) {
+          if (inc == atomicInc(blkcntd, inc)) {
             // I'm the last block, so combine all block results
             for (j = 0; j <= inc; j++) {
-              float3 minp = mind[j];
-              float3 maxp = maxd[j];
+              sycl::float3 minp = mind[j];
+              sycl::float3 maxp = maxd[j];
               min.x() = sycl::fmin(min.x(), minp.x());
               max.x() = sycl::fmax(max.x(), maxp.x());
               min.y() = sycl::fmin(min.y(), minp.y());
@@ -342,7 +353,7 @@ int main(int argc, char* argv[])
             bottomd[0] = k;
 
             startd[k] = 0;
-            float4 p;
+            sycl::float4 p;
             p.x() = (min.x() + max.x()) * 0.5f;
             p.y() = (min.y() + max.y()) * 0.5f;
             p.z() = (min.z() + max.z()) * 0.5f;
@@ -356,11 +367,11 @@ int main(int argc, char* argv[])
       });
     });
 
-    range<1> k3_gws (blocks * 256);
-    range<1> k3_lws (256);
-    q.submit([&](handler &cgh) {
-      auto childd = d_child.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class clear_kernel1>(nd_range<1>(k3_gws, k3_lws), [=] (nd_item<1> item) {
+    sycl::range<1> k3_gws (blocks * 256);
+    sycl::range<1> k3_lws (256);
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class clear_kernel1>(
+        sycl::nd_range<1>(k3_gws, k3_lws), [=] (sycl::nd_item<1> item) {
         int top = 8 * nnodes;
         int bottom = 8 * nbodies;
         int inc = item.get_local_range(0) * item.get_group_range(0);
@@ -375,14 +386,10 @@ int main(int argc, char* argv[])
       });
     });
 
-    range<1> k4_gws (blocks * FACTOR2 * THREADS2);
-    range<1> k4_lws (THREADS2);
-    q.submit([&](handler &cgh) {
-      auto childd = d_child.get_access<sycl_atomic>(cgh);
-      auto posMassd = d_posMass.get_access<sycl_read>(cgh);
-      auto radiusd = d_radius.get_access<sycl_read>(cgh);
-      auto bottomd = d_bottom.get_access<sycl_atomic>(cgh);
-      cgh.parallel_for<class tree_building>(nd_range<1>(k4_gws, k4_lws), [=] (nd_item<1> item) {
+    sycl::range<1> k4_gws (blocks * FACTOR2 * THREADS2);
+    sycl::range<1> k4_lws (THREADS2);
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class tree_building>(sycl::nd_range<1>(k4_gws, k4_lws), [=] (sycl::nd_item<1> item) {
         int i, j, depth, skip, inc;
         float x, y, z, r;
         float dx, dy, dz;
@@ -391,7 +398,7 @@ int main(int argc, char* argv[])
 
         // cache root data
         radius = radiusd[0] * 0.5f;
-        const float4 root = posMassd[nnodes];
+        const sycl::float4 root = posMassd[nnodes];
 
         skip = 1;
         inc = item.get_local_range(0) * item.get_group_range(0);
@@ -399,7 +406,7 @@ int main(int argc, char* argv[])
 
         // iterate over all bodies assigned to thread
         while (i < nbodies) {
-          const float4 p = posMassd[i];
+          const sycl::float4 p = posMassd[i];
           if (skip != 0) {
             // new body, so start traversing at root
             skip = 0;
@@ -418,8 +425,7 @@ int main(int argc, char* argv[])
           }
 
           // follow path to leaf cell
-          //ch = childd[n*8+j];
-          ch = atomic_load(childd[n*8+j]);
+          ch = childd[n*8+j];
           while (ch >= nbodies) {
             n = ch;
             depth++;
@@ -433,38 +439,35 @@ int main(int argc, char* argv[])
             x += dx;
             y += dy;
             z += dz;
-            //ch = childd[n*8+j];
-            ch = atomic_load(childd[n*8+j]);
+            ch = childd[n*8+j];
           }
 
           if (ch != -2) {  // skip if child pointer is locked and try again later
             locked = n*8+j;
             if (ch == -1) {
-              if (atomic_compare_exchange_strong(childd[locked], ch, i)) {  // if null, just insert the new body
+              if (ch == atomicCAS(childd[locked], ch, i)) {  // if null, just insert the new body
                 i += inc;  // move on to next body
                 skip = 1;
               }
             } else {  // there already is a body at this position
-              if (atomic_compare_exchange_strong(childd[locked], ch, -2)) {  // try to lock
+              if (ch == atomicCAS(childd[locked], ch, -2)) {  // try to lock
                 patch = -1;
-                const float4 chp = posMassd[ch];
+                const sycl::float4 chp = posMassd[ch];
                 // create new cell(s) and insert the old and new bodies
                 do {
                   depth++;
-                  cell = atomic_fetch_sub(bottomd[0], 1) - 1;
+                  cell = atomicSub(bottomd[0], 1) - 1;
 
                   if (patch != -1) {
-                    //childd[n*8+j] = cell;
-                    atomic_store(childd[n*8+j], cell);
+                    childd[n*8+j] = cell;
                   }
-                  patch = max(patch, cell);
+                  patch = sycl::max(patch, cell);
 
                   j = 0;
                   if (x < chp.x()) j = 1;
                   if (y < chp.y()) j |= 2;
                   if (z < chp.z()) j |= 4;
-                  //childd[cell*8+j] = ch;
-                  atomic_store(childd[cell*8+j], ch);
+                  childd[cell*8+j] = ch;
 
                   n = cell;
                   r *= 0.5f;
@@ -477,36 +480,30 @@ int main(int argc, char* argv[])
                   y += dy;
                   z += dz;
 
-                  //ch = childd[n*8+j];
-                  ch = atomic_load(childd[n*8+j]);
+                  ch = childd[n*8+j];
                   // repeat until the two bodies are different children
                 } while (ch >= 0);
-                //childd[n*8+j] = i;
-                atomic_store(childd[n*8+j], i);
+                childd[n*8+j] = i;
 
                 i += inc;  // move on to next body
                 skip = 2;
               }
             }
           }
-          item.barrier(access::fence_space::local_space);  // optional barrier for performance
+          item.barrier(sycl::access::fence_space::local_space);  // optional barrier for performance
 
           if (skip == 2) {
-            //childd[locked] = patch;
-            atomic_store(childd[locked], patch);
+            childd[locked] = patch;
           }
         }
       });
     });
 
-    range<1> k5_gws (blocks * 256);
-    range<1> k5_lws (256);
-    q.submit([&](handler &cgh) {
-      auto startd = d_start.get_access<sycl_write>(cgh);
-      auto posMassd = d_posMass.get_access<sycl_write>(cgh);
-      auto bottomd = d_bottom.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class clear_kernel2>(nd_range<1>(k5_gws, k5_lws), [=] (nd_item<1> item) {
-
+    sycl::range<1> k5_gws (blocks * 256);
+    sycl::range<1> k5_lws (256);
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class clear_kernel2>(
+        sycl::nd_range<1>(k5_gws, k5_lws), [=] (sycl::nd_item<1> item) {
         int bottom = bottomd[0];
         int inc = item.get_local_range(0) * item.get_group_range(0);
         int k = (bottom & (-WARPSIZE)) + item.get_global_id(0);  // align to warp size
@@ -521,16 +518,13 @@ int main(int argc, char* argv[])
       });
     });
 
-    range<1> k6_gws (blocks * FACTOR3 * THREADS3);
-    range<1> k6_lws (THREADS3);
-    q.submit([&](handler &cgh) {
-      auto countd = d_count.get_access<sycl_read_write>(cgh);
-      auto childd = d_child.get_access<sycl_read_write>(cgh);
-      auto posMassd = d_posMass.get_access<sycl_read_write>(cgh);
-      auto bottomd = d_bottom.get_access<sycl_read>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> child(THREADS3*8, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> mass(THREADS3*8, cgh);
-      cgh.parallel_for<class sum>(nd_range<1>(k6_gws, k6_lws), [=] (nd_item<1> item) {
+    sycl::range<1> k6_gws (blocks * FACTOR3 * THREADS3);
+    sycl::range<1> k6_lws (THREADS3);
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> child(sycl::range<1>(THREADS3*8), cgh);
+      sycl::local_accessor<float, 1> mass(sycl::range<1>(THREADS3*8), cgh);
+      cgh.parallel_for<class sum>(
+        sycl::nd_range<1>(k6_gws, k6_lws), [=] (sycl::nd_item<1> item) {
         int i, j, ch, cnt;
         float cm, px, py, pz, m;
         int bottom = bottomd[0];
@@ -658,15 +652,11 @@ int main(int argc, char* argv[])
       });
     });
 
-    range<1> k7_gws (blocks * FACTOR4 * THREADS4);
-    range<1> k7_lws (THREADS4);
-    q.submit([&](handler &cgh) {
-      auto sortd = d_sort.get_access<sycl_write>(cgh);
-      auto countd = d_count.get_access<sycl_read>(cgh);
-      auto startd = d_start.get_access<sycl_read_write>(cgh);
-      auto childd = d_child.get_access<sycl_read_write>(cgh);
-      auto bottomd = d_bottom.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class sort>(nd_range<1>(k7_gws, k7_lws), [=] (nd_item<1> item) {
+    sycl::range<1> k7_gws (blocks * FACTOR4 * THREADS4);
+    sycl::range<1> k7_lws (THREADS4);
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class sort>(
+        sycl::nd_range<1>(k7_gws, k7_lws), [=] (sycl::nd_item<1> item) {
         int i, j;
         int bottom = bottomd[0];
         int dec = item.get_local_range(0) * item.get_group_range(0);
@@ -699,26 +689,20 @@ int main(int argc, char* argv[])
             }
             k -= dec;  // move on to next cell
           }
-          item.barrier(access::fence_space::local_space);  // optional barrier for performance
+          item.barrier(sycl::access::fence_space::local_space);  // optional barrier for performance
         }
       });
     });
 
-    range<1> k8_gws (blocks * FACTOR5 * THREADS5);
-    range<1> k8_lws (THREADS5);
+    sycl::range<1> k8_gws (blocks * FACTOR5 * THREADS5);
+    sycl::range<1> k8_lws (THREADS5);
 
-    q.submit([&](handler &cgh) {
-      auto sortd = d_sort.get_access<sycl_read>(cgh);
-      auto childd = d_child.get_access<sycl_read>(cgh);
-      auto posMassd = d_posMass.get_access<sycl_read>(cgh);
-      auto veld = d_vel.get_access<sycl_write>(cgh);
-      auto accVeld = d_accVel.get_access<sycl_write>(cgh);
-      auto radiusd = d_radius.get_access<sycl_read>(cgh);
-      auto stepd = d_step.get_access<sycl_read>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> pos(THREADS5, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> node(THREADS5, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> dq(THREADS5, cgh);
-      cgh.parallel_for<class calc_force>(nd_range<1>(k8_gws, k8_lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> pos(sycl::range<1>(THREADS5), cgh);
+      sycl::local_accessor<int, 1> node(sycl::range<1>(THREADS5), cgh);
+      sycl::local_accessor<float, 1> dq(sycl::range<1>(THREADS5), cgh);
+      cgh.parallel_for<class calc_force>(
+        sycl::nd_range<1>(k8_gws, k8_lws), [=] (sycl::nd_item<1> item) {
         int i, j, k, n, depth, base, sbase, diff, pd, nd;
         float ax, ay, az, dx, dy, dz, tmp;
         int lid = item.get_local_id(0);
@@ -732,7 +716,7 @@ int main(int argc, char* argv[])
           }
           dq[i - 1] += epssq;
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
       
         // figure out first thread in each warp (lane 0)
         base = lid / WARPSIZE;
@@ -744,13 +728,13 @@ int main(int argc, char* argv[])
         if (diff < MAXDEPTH) {
           dq[diff+j] = dq[diff];
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
       
         // iterate over all bodies assigned to thread
         for (k = item.get_global_id(0); k < nbodies; k += item.get_local_range(0) * item.get_group_range(0)) {
           i = sortd[k];  // get permuted/sorted index
           // cache position info
-          const float4 pi = posMassd[i];
+          const sycl::float4 pi = posMassd[i];
       
           ax = 0.0f;
           ay = 0.0f;
@@ -773,12 +757,12 @@ int main(int argc, char* argv[])
               pd++;
       
               if (n >= 0) {
-                const float4 pn = posMassd[n];
+                const sycl::float4 pn = posMassd[n];
                 dx = pn.x() - pi.x();
                 dy = pn.y() - pi.y();
                 dz = pn.z() - pi.z();
                 tmp = dx*dx + (dy*dy + (dz*dz + epssq));  // compute distance squared (plus softening)
-                if ((n < nbodies) || ext::oneapi::all_of(item.get_group(), tmp >= dq[depth])) {  
+                if ((n < nbodies) || sycl::all_of_group(item.get_group(), tmp >= dq[depth])) {  
                 // check if all threads agree that cell is far enough away (or is a body)
                   tmp = sycl::rsqrt(tmp);  // compute distance
                   tmp = pn.w() * tmp * tmp * tmp;
@@ -802,10 +786,10 @@ int main(int argc, char* argv[])
             depth--;  // done with this level
           } while (depth >= j);
       
-          float4 acc = accVeld[i];
+          sycl::float4 acc = accVeld[i];
           if (stepd[0] > 0) {
             // update velocity
-            float2 v = veld[i];
+            sycl::float2 v = veld[i];
             v.x() += (ax - acc.x()) * dthf;
             v.y() += (ay - acc.y()) * dthf;
             acc.w() += (az - acc.z()) * dthf;
@@ -821,28 +805,26 @@ int main(int argc, char* argv[])
       });
     });
 
-    range<1> k9_gws (blocks * FACTOR6 * THREADS6);
-    range<1> k9_lws (THREADS6);
-    q.submit([&](handler &cgh) {
-      auto posMassd = d_posMass.get_access<sycl_read_write>(cgh);
-      auto veld = d_vel.get_access<sycl_read_write>(cgh);
-      auto accVeld = d_accVel.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class integration>(nd_range<1>(k9_gws, k9_lws), [=] (nd_item<1> item) {
+    sycl::range<1> k9_gws (blocks * FACTOR6 * THREADS6);
+    sycl::range<1> k9_lws (THREADS6);
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class integration>(
+        sycl::nd_range<1>(k9_gws, k9_lws), [=] (sycl::nd_item<1> item) {
         // iterate over all bodies assigned to thread
         int inc = item.get_local_range(0) * item.get_group_range(0);
         for (int i = item.get_global_id(0); i < nbodies; i += inc) {
           // integrate
-          float4 acc = accVeld[i];
+          sycl::float4 acc = accVeld[i];
           float dvelx = acc.x() * dthf;
           float dvely = acc.y() * dthf;
           float dvelz = acc.z() * dthf;
 
-          float2 v = veld[i];
+          sycl::float2 v = veld[i];
           float velhx = v.x() + dvelx;
           float velhy = v.y() + dvely;
           float velhz = acc.w() + dvelz;
 
-          float4 p = posMassd[i];
+          sycl::float4 p = posMassd[i];
           p.x() += velhx * dtime;
           p.y() += velhy * dtime;
           p.z() += velhz * dtime;
@@ -866,20 +848,9 @@ int main(int argc, char* argv[])
   printf("Total kernel execution time: %.4lf s\n", runtime);
 
   // transfer final results back to a host
-  q.submit([&] (handler &cgh) {
-    auto acc = d_accVel.get_access<sycl_read>(cgh, range<1>(nbodies)); 
-    cgh.copy(acc, accVel);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_vel.get_access<sycl_read>(cgh, range<1>(nbodies));
-    cgh.copy(acc, vel);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_posMass.get_access<sycl_read>(cgh, range<1>(nbodies)); 
-    cgh.copy(acc, posMass);
-  });
+  q.memcpy(accVel, accVeld, nbodies * sizeof(sycl::float4));
+  q.memcpy(vel, veld, nbodies * sizeof(sycl::float2));
+  q.memcpy(posMass, posMassd, nbodies * sizeof(sycl::float4));
 
   q.wait();
 
@@ -895,6 +866,20 @@ int main(int argc, char* argv[])
   free(vel);
   free(accVel);
   free(posMass);
+
+  sycl::free(childd, q);
+  sycl::free(veld, q);
+  sycl::free(accVeld, q);
+  sycl::free(countd, q);
+  sycl::free(startd, q);
+  sycl::free(sortd, q);
+  sycl::free(posMassd, q);
+  sycl::free(maxd, q);
+  sycl::free(mind, q);
+  sycl::free(stepd, q);
+  sycl::free(blkcntd, q);
+  sycl::free(bottomd, q);
+  sycl::free(radiusd, q);
 
   return 0;
 }
