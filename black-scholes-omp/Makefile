@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -53,7 +52,9 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp blackScholesAnalyticEngineStructs.h \
+           blackScholesAnalyticEngineKernels.cpp \
+           blackScholesAnalyticEngineKernelsCpu.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

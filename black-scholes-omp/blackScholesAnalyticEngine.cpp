@@ -236,7 +236,7 @@ void runBlackScholesAnalyticEngine(const int repeat)
       for (int i = 0; i < repeat; i++) {
         #pragma omp target teams distribute parallel for simd thread_limit(THREAD_BLOCK_SIZE)
         for (int optionNum = 0; optionNum < numVals; optionNum++) {
-          optionInputStruct threadOption = values[optionNum];
+          const optionInputStruct threadOption = values[optionNum];
 
           payoffStruct currPayoff;
           currPayoff.type = threadOption.type;

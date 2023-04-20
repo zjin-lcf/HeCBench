@@ -5,7 +5,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUM_DIFF_SETTINGS 37
 
@@ -229,37 +229,36 @@ void runBlackScholesAnalyticEngine(const int repeat)
     gettimeofday(&start, NULL);
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel, property::queue::in_order());
 
     //allocate space for data on GPU
-    optionInputStruct* optionsGpu = malloc_device<optionInputStruct>(numVals, q);
-    float* outputValsGpu = malloc_device<float>(numVals, q);
+    optionInputStruct* optionsGpu = sycl::malloc_device<optionInputStruct>(numVals, q);
+    float* outputValsGpu = sycl::malloc_device<float>(numVals, q);
 
     //copy the data from the CPU to the GPU
     q.memcpy(optionsGpu, values, numVals * sizeof(optionInputStruct)).wait();
 
     // setup execution parameters
-    size_t global_work_size = (numVals + THREAD_BLOCK_SIZE - 1) / THREAD_BLOCK_SIZE * THREAD_BLOCK_SIZE;
-    size_t local_work_size = THREAD_BLOCK_SIZE;
-    range<1> gws (global_work_size);
-    range<1> lws (local_work_size);
+    sycl::range<1> gws ((numVals + THREAD_BLOCK_SIZE - 1) / 
+                        THREAD_BLOCK_SIZE * THREAD_BLOCK_SIZE);
+    sycl::range<1> lws (THREAD_BLOCK_SIZE);
 
     struct timeval kstart;
     gettimeofday(&kstart, NULL);
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&](handler& cgh) {
-        cgh.parallel_for<class blackScholesKernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&](sycl::handler& cgh) {
+        cgh.parallel_for<class blackScholesKernel>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int optionNum = item.get_global_id(0);
 
           //check if within current options
           if (optionNum < numVals)
           {
-            optionInputStruct threadOption = optionsGpu[optionNum];
+            const optionInputStruct threadOption = optionsGpu[optionNum];
 
             payoffStruct currPayoff;
             currPayoff.type = threadOption.type;
@@ -320,8 +319,8 @@ void runBlackScholesAnalyticEngine(const int repeat)
 
     q.memcpy(outputVals, outputValsGpu, numVals * sizeof(float)).wait();
 
-    free(optionsGpu, q);
-    free(outputValsGpu, q);
+    sycl::free(optionsGpu, q);
+    sycl::free(outputValsGpu, q);
 
     struct timeval end;
     gettimeofday(&end, NULL);

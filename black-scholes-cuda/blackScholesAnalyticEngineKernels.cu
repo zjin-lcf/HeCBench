@@ -211,14 +211,14 @@ __device__ float getResultVal(blackCalcStruct blackCalculator)
 
 
 //global function to retrieve the output value for an option
-__global__ void getOutValOption(optionInputStruct* options, float* outputVals, int numVals)
+__global__ void getOutValOption(const optionInputStruct* options, float* outputVals, int numVals)
 {
   int optionNum = blockIdx.x * blockDim.x + threadIdx.x;
 
   //check if within current options
   if (optionNum < numVals)
   {
-    optionInputStruct threadOption = options[optionNum];
+    const optionInputStruct threadOption = options[optionNum];
 
     payoffStruct currPayoff;
     currPayoff.type = threadOption.type;
@@ -258,7 +258,7 @@ __global__ void getOutValOption(optionInputStruct* options, float* outputVals, i
     blackCalcStruct blackCalc;
 
     //initialize the calculator
-    initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrt(variance), riskFreeDiscount);
+    initBlackCalculator(blackCalc, currOption.payoff, forwardPrice, sqrtf(variance), riskFreeDiscount);
 
     //retrieve the results values
     float resultVal = getResultVal(blackCalc);
