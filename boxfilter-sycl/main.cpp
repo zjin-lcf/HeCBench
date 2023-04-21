@@ -12,7 +12,7 @@
 #include <chrono>
 #include <memory>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "shrUtils.h"
 
 extern
@@ -49,13 +49,15 @@ unsigned int rgbaFloat4ToUint(const sycl::float4 rgba, const float fScale)
     return uiPackedPix;
 }
 
-void BoxFilterGPU ( queue &q, 
-                    buffer<sycl::uchar4, 1> &cmBufIn,
-                    buffer<unsigned int, 1> &cmBufTmp,
-                    buffer<unsigned int, 1> &cmBufOut,
+void BoxFilterGPU ( sycl::queue &q, 
+                    sycl::uchar4 *cmBufIn,
+                    unsigned int *cmBufTmp,
+                    unsigned int *cmBufOut,
                     const unsigned int uiWidth, 
                     const unsigned int uiHeight, 
-                    const int iRadius, const float fScale )
+                    const int iRadius,
+                    const float fScale,
+                    const int iCycles)
 {
     const int szMaxWorkgroupSize = 256;
     const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
@@ -64,104 +66,112 @@ void BoxFilterGPU ( queue &q,
       uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
     // Set global and local work sizes for row kernel // Workgroup padded left and right
-    range<2> row_gws(uiHeight, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius) * 
+    sycl::range<2> row_gws(uiHeight, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius) * 
                                       DivUp((size_t)uiWidth, (size_t)uiNumOutputPix));
-    range<2> row_lws(1, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius));
-
-    // Launch row kernel
-    q.submit([&] (handler &cgh) {
-    auto ucSource = cmBufIn.get_access<sycl_read>(cgh);
-    auto uiDest = cmBufTmp.get_access<sycl_discard_write>(cgh);
-    accessor<sycl::uchar4, 1, sycl_read_write, access::target::local> 
-      uc4LocalData(iRadiusAligned + uiNumOutputPix + iRadius, cgh);
-    cgh.parallel_for<class row_kernel>(nd_range<2>(row_gws, row_lws), [=] (nd_item<2> item) {
-        int lid = item.get_local_id(1);
-        int gidx = item.get_group(1);
-        int gidy = item.get_group(0);
-
-        int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
-        int globalPosY = gidy;
-        int iGlobalOffset = globalPosY * uiWidth + globalPosX;
-
-        // Read global data into LMEM
-        if (globalPosX >= 0 && globalPosX < uiWidth)
-        {
-            uc4LocalData[lid] = ucSource[iGlobalOffset];
-        }
-        else
-            uc4LocalData[lid] = {0, 0, 0, 0}; 
-
-        item.barrier(access::fence_space::local_space);
-
-        if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
-           (lid < (iRadiusAligned + (int)uiNumOutputPix)))
-        {
-            // Init summation registers to zero
-            sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
-
-            // Do summation, using inline function to break up uint value from LMEM into independent RGBA values
-            int iOffsetX = lid - iRadius;
-            int iLimit = iOffsetX + (2 * iRadius) + 1;
-            for(; iOffsetX < iLimit; iOffsetX++)
-            {
-                f4Sum.x() += uc4LocalData[iOffsetX].x();
-                f4Sum.y() += uc4LocalData[iOffsetX].y();
-                f4Sum.z() += uc4LocalData[iOffsetX].z();
-                f4Sum.w() += uc4LocalData[iOffsetX].w(); 
-            }
-
-            // Use inline function to scale and convert registers to packed RGBA values in a sycl::uchar4, 
-            // and write back out to GMEM
-            uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
-        }
-      });
-    });
+    sycl::range<2> row_lws(1, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius));
 
     // Set global and local work sizes for column kernel
-    range<1> col_gws(64 * DivUp((size_t)uiWidth, 64));
-    range<1> col_lws(64);
+    sycl::range<1> col_gws(64 * DivUp((size_t)uiWidth, 64));
+    sycl::range<1> col_lws(64);
 
-    // Launch column kernel
-    q.submit([&] (handler &cgh) {
-    auto uiSource = cmBufTmp.get_access<sycl_read>(cgh);
-    auto uiDest = cmBufOut.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class col_kernel>(nd_range<1>(col_gws, col_lws), [=] (nd_item<1> item) {
-      size_t globalPosX = item.get_global_id(0);
-      auto uiInputImage = uiSource.get_pointer() + globalPosX;
-      auto uiOutputImage = uiDest.get_pointer() + globalPosX;
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
-      sycl::float4 top_color = rgbaUintToFloat4(uiInputImage[0]);
-      sycl::float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
+    for (int i = 0; i < iCycles; i++) {
+      // Launch row kernel
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<sycl::uchar4, 1> uc4LocalData(
+           sycl::range<1>(iRadiusAligned + uiNumOutputPix + iRadius), cgh);
+        cgh.parallel_for<class row_kernel>(
+          sycl::nd_range<2>(row_gws, row_lws), [=] (sycl::nd_item<2> item) {
+          int lid = item.get_local_id(1);
+          int gidx = item.get_group(1);
+          int gidy = item.get_group(0);
 
-      sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
-      sycl::float4 f4Sum = top_color * radius ;
-      for (int y = 0; y < iRadius + 1; y++) 
-      {
-          f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
-      }
-      uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
-      for(int y = 1; y < iRadius + 1; y++) 
-      {
-          f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-          f4Sum -= top_color;
-          uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
-      }
-      
-      for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
-      {
-          f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-          f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-          uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
-      }
+          int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
+          int globalPosY = gidy;
+          int iGlobalOffset = globalPosY * uiWidth + globalPosX;
 
-      for (int y = uiHeight - iRadius; y < uiHeight; y++) 
-      {
-          f4Sum += bot_color;
-          f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-          uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
-      }
-    });
-   });
+          // Read global data into LMEM
+          if (globalPosX >= 0 && globalPosX < uiWidth)
+          {
+              uc4LocalData[lid] = cmBufIn[iGlobalOffset];
+          }
+          else
+              uc4LocalData[lid] = {0, 0, 0, 0}; 
+
+          item.barrier(sycl::access::fence_space::local_space);
+
+          if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
+             (lid < (iRadiusAligned + (int)uiNumOutputPix)))
+          {
+              // Init summation registers to zero
+              sycl::float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
+
+              // Do summation, using inline function to break up uint value from LMEM into independent RGBA values
+              int iOffsetX = lid - iRadius;
+              int iLimit = iOffsetX + (2 * iRadius) + 1;
+              for(; iOffsetX < iLimit; iOffsetX++)
+              {
+                  f4Sum.x() += uc4LocalData[iOffsetX].x();
+                  f4Sum.y() += uc4LocalData[iOffsetX].y();
+                  f4Sum.z() += uc4LocalData[iOffsetX].z();
+                  f4Sum.w() += uc4LocalData[iOffsetX].w(); 
+              }
+
+              // Use inline function to scale and convert registers to packed RGBA values in a sycl::uchar4, 
+              // and write back out to GMEM
+              cmBufTmp[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
+          }
+        });
+      });
+
+      // Launch column kernel
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class col_kernel>(
+          sycl::nd_range<1>(col_gws, col_lws), [=] (sycl::nd_item<1> item) {
+          size_t globalPosX = item.get_global_id(0);
+          auto uiInputImage = cmBufTmp + globalPosX;
+          auto uiOutputImage = cmBufOut + globalPosX;
+
+          sycl::float4 top_color = rgbaUintToFloat4(uiInputImage[0]);
+          sycl::float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
+
+          sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
+          sycl::float4 f4Sum = top_color * radius ;
+          for (int y = 0; y < iRadius + 1; y++) 
+          {
+              f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
+          }
+          uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
+          for(int y = 1; y < iRadius + 1; y++) 
+          {
+              f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+              f4Sum -= top_color;
+              uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+          }
+          
+          for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
+          {
+              f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+              f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+              uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+          }
+
+          for (int y = uiHeight - iRadius; y < uiHeight; y++) 
+          {
+              f4Sum += bot_color;
+              f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+              uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+          }
+        });
+     });
+   }
+
+   q.wait();
+   auto end = std::chrono::steady_clock::now();
+   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+   printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
 }
 
 int main(int argc, char** argv)
@@ -177,7 +187,7 @@ int main(int argc, char** argv)
   unsigned int* uiDevOutput = NULL;      
   unsigned int* uiHostOutput = NULL;      
 
-  shrLoadPPM4ub(argv[1], (uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
+  shrLoadPPM4ub(argv[1], (sycl::uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
   printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n", 
          uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
   printf("Using Local Memory for Row Processing\n\n");
@@ -191,50 +201,38 @@ int main(int argc, char** argv)
   uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<sycl::uchar4, 1> cmDevBufIn(szBuff);
-  buffer<unsigned int, 1> cmDevBufTmp(szBuff);
-  buffer<unsigned int, 1> cmDevBufOut(szBuff);
+  sycl::uchar4 *cmDevBufIn = sycl::malloc_device<sycl::uchar4>(szBuff, q);
+  unsigned int *cmDevBufTmp = sycl::malloc_device<unsigned int>(szBuff, q);
+  unsigned int *cmDevBufOut = sycl::malloc_device<unsigned int>(szBuff, q);
 
   // Copy input data from host to device 
-  q.submit([&] (handler &cgh) {
-    auto input = cmDevBufIn.get_access<sycl_write>(cgh);
-    cgh.copy((sycl::uchar4*)uiInput, input);
-  });
-
-  // Warmup
-  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut,
-                uiImageWidth, uiImageHeight, RADIUS, SCALE);
-  q.wait();
+  q.memcpy(cmDevBufIn, (sycl::uchar4*)uiInput, sizeof(sycl::uchar4) * szBuff);
 
   const int iCycles = atoi(argv[2]);
+
+  printf("Warmup..\n");
+  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut,
+                uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
+
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
 
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < iCycles; i++)
-  {
-    BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-        uiImageWidth, uiImageHeight, RADIUS, SCALE);
-  }
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
+  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+                uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
   // Copy output from device to host
-  q.submit([&] (handler &cgh) {
-    auto output = cmDevBufOut.get_access<sycl_read>(cgh);
-    cgh.copy(output, uiDevOutput);
-  }).wait();
+  q.memcpy(uiDevOutput, cmDevBufOut, szBuffBytes).wait();
 
   // Do filtering on the host
   BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
+
+  sycl::free(cmDevBufIn, q);
+  sycl::free(cmDevBufTmp, q);
+  sycl::free(cmDevBufOut, q);
 
   // Verification 
   // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
