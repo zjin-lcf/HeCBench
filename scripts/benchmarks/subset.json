@@ -52,12 +52,6 @@
       "1000"
     ]
   ],
-  "alp-sycl": [
-    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
-    [
-      "1"
-    ]
-  ],
   "aobench-sycl": [
     "(?:Average render time: )([0-9.+-e]+)(?: sec)",
     [
@@ -478,12 +472,6 @@
       "1000"
     ]
   ],
-  "alp-cuda": [
-    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
-    [
-      "1"
-    ]
-  ],
   "asmooth-cuda": [
     "(?:Average filtering time )([0-9.+-e]+)(?: \\(s\\))",
     [
@@ -886,12 +874,6 @@
     "(?:Average kernel execution time \\(w/o shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
-    ]
-  ],
-  "alp-hip": [
-    "(?:kernels )([0-9.+-e]+)(?: \\(us\\))",
-    [
-      "1"
     ]
   ],
   "aobench-hip": [
