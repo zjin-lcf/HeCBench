@@ -211,7 +211,7 @@
       "5"
     ]
   ],
-  "epistatis-sycl": [
+  "epistasis-sycl": [
     "(?:Total offloading time: )([0-9.+-e]+)(?: sec)",
     [
       "100",
@@ -640,7 +640,7 @@
       "5"
     ]
   ],
-  "epistatis-cuda": [
+  "epistasis-cuda": [
     "(?:Total offloading time: )([0-9.+-e]+)(?: sec)",
     [
       "100",
@@ -1073,7 +1073,7 @@
       "5"
     ]
   ],
-  "epistatis-hip": [
+  "epistasis-hip": [
     "(?:Total offloading time: )([0-9.+-e]+)(?: sec)",
     [
       "100",
