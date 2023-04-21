@@ -7,31 +7,35 @@
 #define Real_t float
 #endif
 
-//#define DEBUG // verify the results of kernel execution
-
 template <typename T>
 void bs ( const size_t aSize,
     const size_t zSize,
     const T *acc_a,  // N+1
     const T *acc_z,  // T
     size_t *acc_r,  // T
-    const size_t n )
+    const size_t n,
+    const int repeat )
 {
-#pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
-#pragma omp target teams distribute parallel for thread_limit(256)
-  for (int i = 0; i < zSize; i++) { 
-    T z = acc_z[i];
-    size_t low = 0;
-    size_t high = n;
-    while (high - low > 1) {
-      size_t mid = low + (high - low)/2;
-      if (z < acc_a[mid])
-        high = mid;
-      else
-        low = mid;
+  auto start = std::chrono::steady_clock::now();
+  for (int i= 0; i < repeat; i++) {
+    #pragma omp target teams distribute parallel for thread_limit(256)
+    for (int i = 0; i < zSize; i++) { 
+      T z = acc_z[i];
+      size_t low = 0;
+      size_t high = n;
+      while (high - low > 1) {
+        size_t mid = low + (high - low)/2;
+        if (z < acc_a[mid])
+          high = mid;
+        else
+          low = mid;
+      }
+      acc_r[i] = low;
     }
-    acc_r[i] = low;
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
@@ -40,24 +44,30 @@ void bs2 ( const size_t aSize,
     const T *acc_a,  // N+1
     const T *acc_z,  // T
     size_t *acc_r,  // T
-    const size_t n )
+    const size_t n,
+    const int repeat )
 {
-#pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
-#pragma omp target teams distribute parallel for thread_limit(256)
-  for (int i = 0; i < zSize; i++) { 
-    unsigned  nbits = 0;
-    while (n >> nbits) nbits++;
-    size_t k = 1ULL << (nbits - 1);
-    T z = acc_z[i];
-    size_t idx = (acc_a[k] <= z) ? k : 0;
-    while (k >>= 1) {
-      size_t r = idx | k;
-      if (r < n && z >= acc_a[r]) { 
-        idx = r;
+  auto start = std::chrono::steady_clock::now();
+  for (int i= 0; i < repeat; i++) {
+    #pragma omp target teams distribute parallel for thread_limit(256)
+    for (int i = 0; i < zSize; i++) { 
+      unsigned  nbits = 0;
+      while (n >> nbits) nbits++;
+      size_t k = 1ULL << (nbits - 1);
+      T z = acc_z[i];
+      size_t idx = (acc_a[k] <= z) ? k : 0;
+      while (k >>= 1) {
+        size_t r = idx | k;
+        if (r < n && z >= acc_a[r]) { 
+          idx = r;
+        }
       }
+      acc_r[i] = idx;
     }
-    acc_r[i] = idx;
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
@@ -66,25 +76,31 @@ void bs3 ( const size_t aSize,
     const T *acc_a,  // N+1
     const T *acc_z,  // T
     size_t *acc_r,  // T
-    const size_t n )
+    const size_t n,
+    const int repeat )
 {
-#pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
-#pragma omp target teams distribute parallel for thread_limit(256)
-  for (int i = 0; i < zSize; i++) { 
-    unsigned nbits = 0;
-    while (n >> nbits) nbits++;
-    size_t k = 1ULL << (nbits - 1);
-    T z = acc_z[i];
-    size_t idx = (acc_a[k] <= z) ? k : 0;
-    while (k >>= 1) {
-      size_t r = idx | k;
-      size_t w = r < n ? r : n; 
-      if (z >= acc_a[w]) { 
-        idx = r;
+  auto start = std::chrono::steady_clock::now();
+  for (int i= 0; i < repeat; i++) {
+    #pragma omp target teams distribute parallel for thread_limit(256)
+    for (int i = 0; i < zSize; i++) { 
+      unsigned nbits = 0;
+      while (n >> nbits) nbits++;
+      size_t k = 1ULL << (nbits - 1);
+      T z = acc_z[i];
+      size_t idx = (acc_a[k] <= z) ? k : 0;
+      while (k >>= 1) {
+        size_t r = idx | k;
+        size_t w = r < n ? r : n; 
+        if (z >= acc_a[w]) { 
+          idx = r;
+        }
       }
+      acc_r[i] = idx;
     }
-    acc_r[i] = idx;
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
@@ -93,10 +109,11 @@ void bs4 ( const size_t aSize,
     const T *acc_a,  // N+1
     const T *acc_z,  // T
     size_t *acc_r,  // T
-    const size_t n )
+    const size_t n,
+    const int repeat )
 {
-  #pragma omp target data map(to: acc_a[0:aSize], acc_z[0:zSize]) map(from: acc_r[0:zSize])
-  {
+  auto start = std::chrono::steady_clock::now();
+  for (int i= 0; i < repeat; i++) {
     #pragma omp target teams num_teams(zSize/256)  thread_limit(256)
     {
       size_t k;
@@ -125,6 +142,9 @@ void bs4 ( const size_t aSize,
       }
     }
   }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 #ifdef DEBUG
@@ -176,53 +196,37 @@ int main(int argc, char* argv[])
     z[i] = rand() % N;
   }
 
-  auto start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs(aSize, zSize, a, z, r, N);  
+  #pragma omp target data map(to: a[0:aSize], z[0:zSize]) \
+                          map(from: r[0:zSize])
+  {
+    bs(aSize, zSize, a, z, r, N, repeat);
+  
+  #ifdef DEBUG
+    #pragma omp target update from (r[0:zSize])
+    verify(a, z, r, aSize, zSize, "bs1");
+  #endif
+  
+    bs2(aSize, zSize, a, z, r, N, repeat);
+  
+  #ifdef DEBUG
+    #pragma omp target update from (r[0:zSize])
+    verify(a, z, r, aSize, zSize, "bs2");
+  #endif
+  
+    bs3(aSize, zSize, a, z, r, N, repeat);
+  
+  #ifdef DEBUG
+    #pragma omp target update from (r[0:zSize])
+    verify(a, z, r, aSize, zSize, "bs3");
+  #endif
+  
+    bs4(aSize, zSize, a, z, r, N, repeat);
+  
+  #ifdef DEBUG
+    #pragma omp target update from (r[0:zSize])
+    verify(a, z, r, aSize, zSize, "bs4");
+  #endif
   }
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
-
-#ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs1");
-#endif
-
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs2(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
-
-#ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs2");
-#endif
-
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs3(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
-
-#ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs3");
-#endif
-
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs4(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
-
-#ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs4");
-#endif
 
   free(a);
   free(z);

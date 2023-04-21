@@ -1,189 +1,15 @@
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
+#include "bs.h"
+#include "bs2.h"
+#include "bs3.h"
+#include "bs4.h"
 
 #ifndef Real_t 
 #define Real_t float
 #endif
-
-//#define DEBUG // verify the results of kernel execution
-
-template <typename T>
-class BS;
-
-template <typename T>
-void bs ( queue &q,
-          const size_t aSize,
-          const size_t zSize,
-          const T *a,  // N+1
-          const T *z,  // T
-               size_t *r,  // T
-          const size_t n )
-{
-  buffer<T, 1> buf_x(a, aSize);
-  buffer<T, 1> buf_z(z, zSize);
-  buffer<size_t, 1> buf_r(r, zSize);
-  nd_range<1> ndr{range<1>(zSize), range<1>(256)};
-
-  q.submit([&](handler& cgh) {
-    auto acc_a = buf_x.template get_access<sycl_read>(cgh);
-    auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
-
-    cgh.parallel_for<class BS<T>>(ndr, [=](nd_item<1> item) {
-      size_t i = item.get_global_id(0);
-       T z = acc_z[i];
-       size_t low = 0;
-       size_t high = n;
-        while (high - low > 1) {
-          size_t mid = low + (high - low)/2;
-          if (z < acc_a[mid])
-            high = mid;
-          else
-            low = mid;
-        }
-        acc_r[i] = low;
-    });
-  });
-  q.wait();
-}
-
-template <typename T>
-class BS2;
-
-template <typename T>
-void bs2 (queue &q,
-          const size_t aSize,
-          const size_t zSize,
-          const T *a,  // N+1
-          const T *z,  // T
-          size_t *r,  // T
-          const size_t n )
-{
-  buffer<T, 1> buf_x(a, aSize);
-  buffer<T, 1> buf_z(z, zSize);
-  buffer<size_t, 1> buf_r(r, zSize);
-  nd_range<1> ndr{range<1>(zSize), range<1>(256)};
-
-  q.submit([&](handler& cgh) {
-    auto acc_a = buf_x.template get_access<sycl_read>(cgh);
-    auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
-
-    cgh.parallel_for<class BS2<T>>(ndr, [=](nd_item<1> item) {
-      size_t i = item.get_global_id(0);
-      unsigned  nbits = 0;
-      while (n >> nbits) nbits++;
-      size_t k = 1ULL << (nbits - 1);
-      T z = acc_z[i];
-      size_t idx = (acc_a[k] <= z) ? k : 0;
-      while (k >>= 1) {
-        size_t r = idx | k;
-        if (r < n && z >= acc_a[r]) { 
-          idx = r;
-        }
-      }
-      acc_r[i] = idx;
-    });
-  });
-  q.wait();
-}
-
-template <typename T>
-class BS3;
-
-template <typename T>
-void bs3 ( queue &q,
-          const size_t aSize,
-          const size_t zSize,
-          const T *a,  // N+1
-          const T *z,  // T
-          size_t *r,  // T
-          const size_t n )
-{
-  buffer<T, 1> buf_x(a, aSize);
-  buffer<T, 1> buf_z(z, zSize);
-  buffer<size_t, 1> buf_r(r, zSize);
-  nd_range<1> ndr{range<1>(zSize), range<1>(256)};
-
-  q.submit([&](handler& cgh) {
-    auto acc_a = buf_x.template get_access<sycl_read>(cgh);
-    auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
-
-    cgh.parallel_for<class BS3<T>>(ndr, [=] (nd_item<1> item) {
-      size_t i = item.get_global_id(0);
-       unsigned nbits = 0;
-       while (n >> nbits) nbits++;
-       size_t k = 1ULL << (nbits - 1);
-       T z = acc_z[i];
-       size_t idx = (acc_a[k] <= z) ? k : 0;
-       while (k >>= 1) {
-         size_t r = idx | k;
-         size_t w = r < n ? r : n; 
-         if (z >= acc_a[w]) { 
-           idx = r;
-         }
-       }
-       acc_r[i] = idx;
-    });
-  });
-  q.wait();
-}
-
-template <typename T>
-class BS4;
-
-template <typename T>
-void bs4 (queue &q,
-          const size_t aSize,
-          const size_t zSize,
-          const T *a,  // N+1
-          const T *z,  // T
-          size_t *r,  // T
-          const size_t n
-    )
-{
-
-  buffer<T, 1> buf_x(a, aSize);
-  buffer<T, 1> buf_z(z, zSize);
-  buffer<size_t, 1> buf_r(r, zSize);
-  nd_range<1> ndr{range<1>(zSize), range<1>(256)};
-
-  q.submit([&](handler& cgh) {
-    auto acc_a = buf_x.template get_access<sycl_read>(cgh);
-    auto acc_z = buf_z.template get_access<sycl_read>(cgh);
-    auto acc_r = buf_r.template get_access<sycl_discard_write>(cgh);
-
-    accessor<size_t, 1, sycl_read_write, access::target::local> k(range<1>(1), cgh);
-
-    cgh.parallel_for<class BS4<T>>(ndr, [=](nd_item<1> item) {
-       size_t gid = item.get_global_id(0);
-       size_t lid = item.get_local_id(0);
-
-       if (lid == 0) {
-         unsigned nbits = 0;
-         while (n >> nbits) nbits++;
-         k[0] = 1ULL << (nbits - 1);
-       }
-       item.barrier(access::fence_space::local_space);
-
-       size_t p = k[0];
-       T z = acc_z[gid];
-       size_t idx = (acc_a[p] <= z) ? p : 0;
-       while (p >>= 1) {
-         size_t r = idx | p;
-         size_t w = r < n ? r : n;
-         if (z >= acc_a[w]) { 
-           idx = r;
-         }
-       }
-       acc_r[gid] = idx;
-    });
-  });
-  q.wait();
-}
 
 #ifdef DEBUG
 void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
@@ -230,66 +56,53 @@ int main(int argc, char* argv[])
   for (size_t i = 0; i < aSize; i++) a[i] = i;
 
   // lower = 0, upper = n-1
-  for (size_t i = 0; i < zSize; i++) { 
-    z[i] = rand() % N;
-  }
+  for (size_t i = 0; i < zSize; i++) z[i] = rand() % N;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
+  Real_t *d_a = sycl::malloc_device<Real_t>(aSize, q);
+  q.memcpy(d_a, a, aSize * sizeof(Real_t));
 
-  auto start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs(q, aSize, zSize, a, z, r, N);  
-  }
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
+  Real_t *d_z = sycl::malloc_device<Real_t>(zSize, q);
+  q.memcpy(d_z, z, zSize * sizeof(Real_t));
+
+  size_t *d_r = sycl::malloc_device<size_t>(zSize, q);
+
+  bs(q, aSize, zSize, d_a, d_z, d_r, N, repeat);  
 
 #ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs1");
+  q.memcpy(r, d_r, zSize * sizeof(size_t)).wait();
+  verify(a, z, r, aSize, zSize, "bs");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs2(q, aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs2(q, aSize, zSize, d_a, d_z, d_r, N, repeat);  
 
 #ifdef DEBUG
+  q.memcpy(r, d_r, zSize * sizeof(size_t)).wait();
   verify(a, z, r, aSize, zSize, "bs2");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs3(q, aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs3(q, aSize, zSize, d_a, d_z, d_r, N, repeat);  
 
 #ifdef DEBUG
+  q.memcpy(r, d_r, zSize * sizeof(size_t)).wait();
   verify(a, z, r, aSize, zSize, "bs3");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs4(q, aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs4(q, aSize, zSize, d_a, d_z, d_r, N, repeat);  
 
 #ifdef DEBUG
+  q.memcpy(r, d_r, zSize * sizeof(size_t)).wait();
   verify(a, z, r, aSize, zSize, "bs4");
 #endif
 
+  sycl::free(d_a, q);
+  sycl::free(d_z, q);
+  sycl::free(d_r, q);
   free(a);
   free(z);
   free(r);
