@@ -6,11 +6,12 @@
 // In GPU Computing Gems Jade Edition (pp. 29-38). Morgan Kaufmann.
 //-----------------------------------------------------------------------
 
+#include <cassert>
 #include <cstdio>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-inline int warp_scan(nd_item<1> &item, int val, volatile int *s_data)
+inline int warp_scan(sycl::nd_item<1> &item, int val, volatile int *s_data)
 {
   // initialize shared memory accessed by each warp with zeros
   auto sg = item.get_sub_group();
@@ -27,20 +28,20 @@ inline int warp_scan(nd_item<1> &item, int val, volatile int *s_data)
   return s_data[idx-1];
 }
 
-inline size_t lanemask_lt(sub_group &sg)
+inline size_t lanemask_lt(sycl::sub_group &sg)
 {
   const unsigned int lane = sg.get_local_linear_id();
   return (1UL << (lane)) - 1UL;
 }
 
 // warp scan optimized for binary
-inline unsigned int binary_warp_scan(sub_group &sg, bool p)
+inline unsigned int binary_warp_scan(sycl::sub_group &sg, bool p)
 {
   const size_t mask = lanemask_lt(sg);
   size_t b = sycl::reduce_over_group(sg,
-                   p ? (1UL << sg.get_local_linear_id()) : 0,
-                   sycl::ext::oneapi::plus<>());
-  return popcount(b & mask);
+                    p ? (1UL << sg.get_local_linear_id()) : 0,
+                    sycl::ext::oneapi::plus<>());
+  return sycl::popcount(b & mask);
 }
 
 // positive numbers
@@ -48,7 +49,7 @@ inline bool valid(int x) {
   return x > 0;
 }
 
-inline int block_binary_prefix_sums(nd_item<1> &item, int *sdata, int x)
+inline int block_binary_prefix_sums(sycl::nd_item<1> &item, int *sdata, int x)
 {
   bool predicate = valid(x);
 
@@ -72,7 +73,7 @@ inline int block_binary_prefix_sums(nd_item<1> &item, int *sdata, int x)
     printf("B %d %d\n", warpIdx, sdata[warpIdx]);
 #endif
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // C. One warp scans the warp partial sums
   if (idx < warpSize) {
@@ -81,7 +82,7 @@ inline int block_binary_prefix_sums(nd_item<1> &item, int *sdata, int x)
     printf("C: %d %d\n", idx, sdata[idx]);
 #endif
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // D. Each thread adds prefix sums of warp partial
   // sums to its own intra−warp prefix sums
@@ -89,7 +90,7 @@ inline int block_binary_prefix_sums(nd_item<1> &item, int *sdata, int x)
 }
 
 void binary_scan(
-        nd_item<1> &item,
+        sycl::nd_item<1> &item,
         int *__restrict__ s_data,
         int *__restrict__ g_odata,
   const int *__restrict__ g_idata)
@@ -101,13 +102,11 @@ void binary_scan(
 template <int N>
 void bscan (const int repeat) 
 {
-    
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   int h_in[N];
   int h_out[N];
@@ -121,8 +120,8 @@ void bscan (const int repeat)
   srand(123);
 
   size_t grid_size = 12*7*8*9*10;
-  range<1> gws (grid_size * N);
-  range<1> lws (N);
+  sycl::range<1> gws (grid_size * N);
+  sycl::range<1> lws (N);
 
   int valid_count = 0;
 
@@ -131,14 +130,13 @@ void bscan (const int repeat)
       h_in[n] = rand() % N - N/2;
       if (valid(h_in[n])) valid_count++;  // total number of valid elements
     }
-    q.memcpy(d_in, h_in, N*sizeof(int));
+    q.memcpy(d_in, h_in, N*sizeof(int)).wait();
 
-    q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      accessor<int, 1, sycl_read_write, access::target::local> sm (80, cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> sm (sycl::range<1>(80), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
         [[sycl::reqd_sub_group_size(64)]] {
         binary_scan(item, sm.get_pointer(), d_out, d_in);
       });
@@ -181,7 +179,7 @@ int main(int argc, char* argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  // scan over N elements (N = [64, 1024])
+  // scan over N elements (N = [32, 1024])
   bscan<64>(repeat);
   bscan<128>(repeat);
   bscan<256>(repeat);
