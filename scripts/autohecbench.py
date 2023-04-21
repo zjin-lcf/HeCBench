@@ -153,6 +153,7 @@ def main():
             p.map(comp, benches)
     except Exception as e:
         print("Compilation failed, exiting")
+        print(e)
         sys.exit(1)
 
     t_compiled = time.time()
