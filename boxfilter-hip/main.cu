@@ -156,7 +156,8 @@ void BoxFilterGPU (uchar4* cmBufIn,
     const unsigned int uiWidth, 
     const unsigned int uiHeight, 
     const int iRadius, 
-    const float fScale )
+    const float fScale,
+    const int iCycles )
 {
   const int szMaxWorkgroupSize = 256;
   const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
@@ -168,16 +169,27 @@ void BoxFilterGPU (uchar4* cmBufIn,
   dim3 row_grid(DivUp((size_t)uiWidth, (size_t)uiNumOutputPix), uiHeight); 
   dim3 row_block((size_t)(iRadiusAligned + uiNumOutputPix + iRadius), 1);
 
-  // Launch row kernel
-  row_kernel<<<row_grid, row_block, sizeof(uchar4)*(iRadiusAligned+uiNumOutputPix+iRadius)>>> (
-      cmBufIn, cmBufTmp, uiWidth, uiHeight, iRadius, iRadiusAligned, fScale, uiNumOutputPix);
-
   // Set global and local work sizes for column kernel
   dim3 col_grid(DivUp((size_t)uiWidth, 64));
   dim3 col_block(64);
 
-  // Launch column kernel
-  col_kernel<<<col_grid, col_block>>>(cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iCycles; i++) {
+    // Launch row kernel
+    row_kernel<<<row_grid, row_block, sizeof(uchar4)*(iRadiusAligned+uiNumOutputPix+iRadius)>>> (
+        cmBufIn, cmBufTmp, uiWidth, uiHeight, iRadius, iRadiusAligned, fScale, uiNumOutputPix);
+
+
+    // Launch column kernel
+    col_kernel<<<col_grid, col_block>>>(cmBufTmp, cmBufOut, uiWidth, uiHeight, iRadius, fScale);
+  }
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
 }
 
 int main(int argc, char** argv)
@@ -217,27 +229,15 @@ int main(int argc, char** argv)
   // Copy input data from host to device 
   hipMemcpy(cmDevBufIn, uiInput, szBuffBytes, hipMemcpyHostToDevice);
 
-  // Warmup
-  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-      uiImageWidth, uiImageHeight, RADIUS, SCALE);
-
-  hipDeviceSynchronize();
-
   const int iCycles = atoi(argv[2]);
+
+  printf("Warmup..\n");
+  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+                uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
+
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
-
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < iCycles; i++)
-  {
-    BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
-        uiImageWidth, uiImageHeight, RADIUS, SCALE);
-  }
-
-  hipDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
+  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+                uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
   // Copy output from device to host
   hipMemcpy(uiDevOutput, cmDevBufOut, szBuffBytes, hipMemcpyDeviceToHost);
