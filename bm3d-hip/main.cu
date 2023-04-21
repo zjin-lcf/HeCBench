@@ -219,6 +219,8 @@ int main(int argc, char** argv)
   hip_error_check( hipMemcpy(d_kaiser_window, &kaiserWindow[0],
     k*k*sizeof(float), hipMemcpyHostToDevice));
 
+  hipDeviceSynchronize();
+
   // start measuring the total time
   auto start = std::chrono::high_resolution_clock::now();
 

@@ -219,6 +219,8 @@ int main(int argc, char** argv)
   cuda_error_check( cudaMemcpy(d_kaiser_window, &kaiserWindow[0],
     k*k*sizeof(float), cudaMemcpyHostToDevice));
 
+  cudaDeviceSynchronize();
+
   // start measuring the total time
   auto start = std::chrono::high_resolution_clock::now();
 

@@ -1,4 +1,4 @@
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "params.hpp"
 #include "indices.hpp"
 
@@ -23,7 +23,7 @@ Note: Stack is just an array, not FIFO
  */
 void add_to_matched_image(
     uint *stack,         //IN/OUT: Stack of N patches matched to current reference patch
-    uchar *num_patches_in_stack,//IN/OUT: Number of patches in stack
+    sycl::uchar *num_patches_in_stack,//IN/OUT: Number of patches in stack
     const uint value,       //IN: [..DIFF(ushort)..|..LOC_Y(sbyte)..|..LOC_X(sbyte)..]
     const Params & params    //IN: Denoising parameters
     )
@@ -31,7 +31,7 @@ void add_to_matched_image(
   //stack[*num_patches_in_stack-1] is most similar (lowest number)
   int k;
 
-  uchar num = (*num_patches_in_stack);
+  sycl::uchar num = (*num_patches_in_stack);
   if (num < params.N) //add new value
   {
     k = num++;
@@ -67,15 +67,15 @@ Division: Kernel handles gridDim.y lines starting with the line passed in argume
 Each thread process one reference patch. All the warps of a block process the same reference patches.
  */
 void block_matching(
-    nd_item<2> item,
+    sycl::nd_item<2> item,
     uint* __restrict s_data,
-    const  uchar* __restrict image, //IN: Original image
+    const  sycl::uchar* __restrict image, //IN: Original image
     ushort* __restrict g_stacks,         //OUT: For each reference patch contains addresses of similar patches (patch is adressed by top left corner) [..LOC_Y(sbyte)..|..LOC_X(sbyte)..]
     uint* __restrict g_num_patches_in_stack,  //OUT: For each reference patch contains number of similar patches
-    const uint2 image_dim,      //IN: Image dimensions
-    const uint2 stacks_dim,      //IN: Size of area, where reference patches could be located
+    const sycl::uint2 image_dim,      //IN: Image dimensions
+    const sycl::uint2 stacks_dim,      //IN: Size of area, where reference patches could be located
     const Params params,      //IN: Denoising parameters
-    const uint2 start_point)    //IN: Address of the top-left reference patch of a batch
+    const sycl::uint2 start_point)    //IN: Address of the top-left reference patch of a batch
 {
   const int lidx = item.get_local_id(1);
   const int bidx = item.get_group(1);
@@ -95,16 +95,16 @@ void block_matching(
   //Shared arrays
   uint *s_diff = s_data; //SIZE: p_rectangle_width*num_warps
   uint *s_stacks = &s_data[p_rectangle_width*num_warps]; //SIZE: params.N*num_warps*warpSize
-  uchar *s_patches_in_stack = (uchar*)&s_data[num_warps*(p_rectangle_width + params.N*warpSize)]; //SIZE: num_warps*warpSize
-  uchar *s_image_p = (uchar*)&s_patches_in_stack[num_warps*warpSize]; //SIZE: p_rectangle_width*params.k
+  sycl::uchar *s_patches_in_stack = (sycl::uchar*)&s_data[num_warps*(p_rectangle_width + params.N*warpSize)]; //SIZE: num_warps*warpSize
+  sycl::uchar *s_image_p = (sycl::uchar*)&s_patches_in_stack[num_warps*warpSize]; //SIZE: p_rectangle_width*params.k
 
   s_diff += idx2(0, wid, p_rectangle_width);
 
   //Initialize s_patches_in_stack to zero
   s_patches_in_stack[ idx2(tid, wid, warpSize) ] = 0;
 
-  int2 p; //Address of reference patch
-  int2 q; //Address of patch against which the difference is computed
+  sycl::int2 p; //Address of reference patch
+  sycl::int2 q; //Address of patch against which the difference is computed
 
   p.x() = p_rectangle_start + (tid*params.p);
   p.y() = start_point.y() + (bidy*params.p);
@@ -131,14 +131,14 @@ void block_matching(
     s_image_p[i] = image[idx2(p_rectangle_start+sx,p.y()+sy,image_dim.x())];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   //scale difference so that it can fit ushort
   uint shift = (sycl::clz(params.Tn) < 16u) ? 16u - (uint)sycl::clz(params.Tn) : 0;
 
 
   //Ensure that displaced patch coordinates (q) will be positive
-  int2 from;
+  sycl::int2 from;
   from.y() = (p.y() - (int)params.n < 0) ? -p.y() : -(int)params.n;
   from.x() = (((int)p_rectangle_start) - (int)params.n < 0) ? -((int)p_rectangle_start) : -(int)params.n;
   from.x() += wid;
@@ -202,7 +202,7 @@ void block_matching(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   uint batch_size = gridx*warpSize;
   uint block_address_x = bidx*warpSize+tid;
@@ -247,33 +247,29 @@ void block_matching(
   g_num_patches_in_stack[ idx2(block_address_x ,bidy, batch_size) ] = flp2((uint)j+1)-1;
 }
 
-
-extern "C" void run_block_matching(
-    queue &q,
-    buffer<uchar, 1> &image, //Original image
-    buffer<ushort, 1> &stacks, //For each reference patch contains addresses of similar patches (patch is adressed by top left corner)
-    buffer<uint, 1> &num_patches_in_stack, //For each reference patch contains number of similar patches
-    const uint2 image_dim,  //Image dimensions
-    const uint2 stacks_dim, //size of area where reference patches could be located
+void run_block_matching(
+    sycl::queue &q,
+    sycl::uchar *image, //Original image
+    ushort *stacks, //For each reference patch contains addresses of similar patches (patch is adressed by top left corner)
+    uint *num_patches_in_stack, //For each reference patch contains number of similar patches
+    const sycl::uint2 image_dim,  //Image dimensions
+    const sycl::uint2 stacks_dim, //size of area where reference patches could be located
     const Params params,    //Denoising parameters
-    const uint2 start_point,//Address of the top-left reference patch of a batch
-    const range<2> lws,  
-    const range<2> gws,
+    const sycl::uint2 start_point,//Address of the top-left reference patch of a batch
+    const sycl::range<2> lws,  
+    const sycl::range<2> gws,
     const uint shared_memory_size
     )
 {
-  q.submit([&] (handler &cgh) {
-    auto image_acc = image.get_access<sycl_read>(cgh);
-    auto stacks_acc = stacks.get_access<sycl_discard_write>(cgh);
-    auto num_patches_in_stack_acc = num_patches_in_stack.get_access<sycl_discard_write>(cgh);
-    accessor<uint, 1, sycl_read_write, access::target::local> 
-      lmem(shared_memory_size/sizeof(uint), cgh);
-    cgh.parallel_for<class bm>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<uint, 1> lmem (sycl::range<1>(shared_memory_size/sizeof(uint)), cgh);
+    cgh.parallel_for<class bm>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       block_matching(item,
                      lmem.get_pointer(),
-                     image_acc.get_pointer(),
-                     stacks_acc.get_pointer(),
-                     num_patches_in_stack_acc.get_pointer(),
+                     image,
+                     stacks,
+                     num_patches_in_stack,
                      image_dim,
                      stacks_dim,
                      params,
