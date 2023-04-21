@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h> 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "bondsStructs.h"
 #include "bondsKernelsGpu.cpp"
 #include "bondsKernelsCpu.cpp"
@@ -310,11 +310,10 @@ void runBoundsEngine(const int repeat)
     struct timeval end;
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
     gettimeofday(&start, NULL);
 
