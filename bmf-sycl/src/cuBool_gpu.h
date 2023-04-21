@@ -1,6 +1,7 @@
 #ifndef cuBool_GPU_CUH
 #define cuBool_GPU_CUH
 
+#include <algorithm>
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -51,9 +52,9 @@ class cuBool
       std::cout << "~~~ GPU cuBool ~~~" << std::endl; 
 
       std::cout << "Using device : " << 
-         q.get_device().get_info<info::device::name>() << std::endl;
+         q.get_device().get_info<sycl::info::device::name>() << std::endl;
 
-      const int SMs = q.get_device().get_info<info::device::max_compute_units>();
+      const int SMs = q.get_device().get_info<sycl::info::device::max_compute_units>();
       max_parallel_lines_ = SMs * WARPSPERBLOCK;
 
       height_ = height;
@@ -151,16 +152,18 @@ class cuBool
     void calculateDistance(const factor_handler &handler, const error_t weight = 1) {
       q.memset(handler.d_distance_, 0, sizeof(error_t));
       q.submit([&](sycl::handler &cgh) {
-        accessor<factor_t, 1, sycl_read_write, sycl_lmem> B_block_sm(32 * WARPSPERBLOCK, cgh);
-        accessor<bit_vector_t, 1, sycl_read_write, sycl_lmem> C_block_sm(32 * WARPSPERBLOCK, cgh);
-        accessor<error_t, 1, sycl_read_write, sycl_lmem> reductionArray_sm(WARPSPERBLOCK, cgh);
+        sycl::local_accessor<factor_t, 1> B_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+        sycl::local_accessor<bit_vector_t, 1> C_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+        sycl::local_accessor<error_t, 1> reductionArray_sm(sycl::range<1>(WARPSPERBLOCK), cgh);
         auto d_C_t = d_C;
         auto height_t = height_;
         auto width_t = width_;
         auto width_C_padded_t = width_C_padded_;
-        range<1> gws (SDIV(height_, WARPSPERBLOCK) * WARPSPERBLOCK * 32);
-        range<1> lws (WARPSPERBLOCK * 32);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+        sycl::range<1> gws (SDIV(height_, WARPSPERBLOCK) * WARPSPERBLOCK * 32);
+        sycl::range<1> lws (WARPSPERBLOCK * 32);
+        cgh.parallel_for(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
+          [[sycl::reqd_sub_group_size(32)]] {
           computeDistanceRowsShared(
             handler.d_A, handler.d_B, d_C_t, height_t,
             width_t, width_C_padded_t, handler.factorDim_,
@@ -227,11 +230,11 @@ class cuBool
       return initializeFactors(activeId, factorDim, [&,this](factor_handler& handler) {
         float threshold = getInitChance(density_, handler.factorDim_);
 
-        range<1> gws (SDIV(height_, WARPSPERBLOCK * 32 / lineSize_padded_) * WARPSPERBLOCK * 32);
-        range<1> lws (WARPSPERBLOCK * 32);
+        sycl::range<1> gws (SDIV(height_, WARPSPERBLOCK * 32 / lineSize_padded_) * WARPSPERBLOCK * 32);
+        sycl::range<1> lws (WARPSPERBLOCK * 32);
         q.submit([&](sycl::handler &cgh) {
           auto height_t = height_;
-          cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+          cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
             initFactor(handler.d_A, height_t, handler.factorDim_,
                        seed, threshold, item);
           });
@@ -239,11 +242,11 @@ class cuBool
 
         seed += height_;
 
-        range<1> gws2 (SDIV(width_, WARPSPERBLOCK * 32 / lineSize_padded_) * WARPSPERBLOCK * 32);
+        sycl::range<1> gws2 (SDIV(width_, WARPSPERBLOCK * 32 / lineSize_padded_) * WARPSPERBLOCK * 32);
         q.submit([&](sycl::handler &cgh) {
-          auto width__ct1 = width_;
-          cgh.parallel_for(nd_range<1>(gws2, lws), [=](nd_item<1> item) {
-            initFactor(handler.d_B, width__ct1, handler.factorDim_,
+          auto width_t = width_;
+          cgh.parallel_for(sycl::nd_range<1>(gws2, lws), [=](sycl::nd_item<1> item) {
+            initFactor(handler.d_B, width_t, handler.factorDim_,
                        seed, threshold, item);
           });
         });
@@ -274,18 +277,18 @@ class cuBool
        */
 
       q.submit([&](sycl::handler &cgh) {
-        accessor<factor_t, 1, sycl_read_write, sycl_lmem> B_block_sm(32 * WARPSPERBLOCK, cgh);
-        accessor<bit_matrix_t, 1, sycl_read_write, sycl_lmem> C_block_sm(32 * WARPSPERBLOCK, cgh);
-        accessor<error_t, 1, sycl_read_write, sycl_lmem> reductionArray_sm(WARPSPERBLOCK, cgh);
+        sycl::local_accessor<factor_t, 1> B_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+        sycl::local_accessor<bit_matrix_t, 1> C_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+        sycl::local_accessor<error_t, 1> reductionArray_sm(sycl::range<1>(WARPSPERBLOCK), cgh);
 
         auto d_C_t = d_C;
         auto height_t = height_;
         auto width_t = width_;
         auto width_C_padded_t = width_C_padded_;
 
-        range<1> gws (SDIV(height_, WARPSPERBLOCK) * WARPSPERBLOCK * 32);
-        range<1> lws (WARPSPERBLOCK * 32);
-        cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+        sycl::range<1> gws (SDIV(height_, WARPSPERBLOCK) * WARPSPERBLOCK * 32);
+        sycl::range<1> lws (WARPSPERBLOCK * 32);
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           computeDistanceRowsShared(
             handler.d_A, handler.d_B, d_C_t, height_t,
             width_t, width_C_padded_t, handler.factorDim_,
@@ -456,19 +459,19 @@ class cuBool
         index_t lineToBeChanged = (fast_kiss32(state) % height_) / WARPSPERBLOCK * WARPSPERBLOCK;
         uint32_t gpuSeed = fast_kiss32(state) + iteration;
 
-        range<1> gws (SDIV(min(linesAtOnce, height_), WARPSPERBLOCK) * WARPSPERBLOCK * 32);
-        range<1> lws (WARPSPERBLOCK * 32);
+        sycl::range<1> gws (SDIV(std::min(linesAtOnce, height_), WARPSPERBLOCK) * WARPSPERBLOCK * 32);
+        sycl::range<1> lws (WARPSPERBLOCK * 32);
 
         q.submit([&](sycl::handler &cgh) {
-          accessor<factor_t, 1, sycl_read_write, sycl_lmem> B_block_sm(32 * WARPSPERBLOCK, cgh);
-          accessor<bit_vector_t, 1, sycl_read_write, sycl_lmem> C_block_sm(32 * WARPSPERBLOCK, cgh);
+          sycl::local_accessor<factor_t, 1> B_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+          sycl::local_accessor<bit_vector_t, 1> C_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
 
           auto d_C_t = d_C;
           auto height_t = height_;
           auto width_t = width_;
           auto width_C_padded_t = width_C_padded_;
 
-          cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+          cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
             vectorMatrixMultCompareRowWarpShared
              (handler.d_A, handler.d_B, 
               d_C_t, height_t, width_t, width_C_padded_t, 
@@ -490,18 +493,18 @@ class cuBool
            //lineToBeChanged, handler.d_distance_, gpuSeed, temperature/10,
            //config.flipManyChance, config.flipManyDepth, weight);
 
-        range<1> gws2 (SDIV(min(linesAtOnce, width_), WARPSPERBLOCK) * WARPSPERBLOCK * 32);
+        sycl::range<1> gws2 (SDIV(std::min(linesAtOnce, width_), WARPSPERBLOCK) * WARPSPERBLOCK * 32);
         q.submit([&](sycl::handler &cgh) {
 
-          accessor<factor_t, 1, sycl_read_write, sycl_lmem> A_block_sm(32 * WARPSPERBLOCK, cgh);
-          accessor<bit_vector_t, 1, sycl_read_write, sycl_lmem> C_block_sm(32 * WARPSPERBLOCK, cgh);
+          sycl::local_accessor<factor_t, 1> A_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
+          sycl::local_accessor<bit_vector_t, 1> C_block_sm(sycl::range<1>(32 * WARPSPERBLOCK), cgh);
 
           auto d_C_t = d_C;
           auto height_t = height_;
           auto width_t = width_;
           auto width_C_padded_t = width_C_padded_;
 
-          cgh.parallel_for(nd_range<1>(gws2, lws), [=](nd_item<1> item) {
+          cgh.parallel_for(sycl::nd_range<1>(gws2, lws), [=](sycl::nd_item<1> item) {
             vectorMatrixMultCompareColWarpShared
             (handler.d_A, handler.d_B, 
              d_C_t, height_t, width_t, width_C_padded_t, 
@@ -616,10 +619,11 @@ class cuBool
     vector<factor_handler> activeExperiments;
     vector<float> finalDistances;
 #ifdef USE_GPU
-    sycl::queue q{sycl::gpu_selector{}, property::queue::in_order()};
+    sycl::queue q{sycl::gpu_selector_v, sycl::property::queue::in_order()};
 #else
-    sycl::queue q{sycl::cpu_selector{}};
+    sycl::queue q{sycl::cpu_selector_v, sycl::property::queue::in_order()};
 #endif
+
 };
 
 #endif

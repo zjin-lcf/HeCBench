@@ -6,21 +6,21 @@
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline void atomicAdd(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
+  sycl::atomic_ref<T, sycl::memory_order::relaxed, 
      MemoryScope, sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
 
 template <typename T>
-inline T warpReduceSum(T val, nd_item<1> &item, int width = 32) {
+inline T warpReduceSum(T val, sycl::nd_item<1> &item, int width = 32) {
   auto sg = item.get_sub_group(); 
   for (int offset = width / 2; offset > 0; offset /= 2)
-    val += shift_group_left(sg, val, offset);
+    val += sycl::shift_group_left(sg, val, offset);
   return val;
 }
 
 template<typename T>
-inline T blockReduceSum(T val, local_ptr<T> reductionArray, nd_item<1> &item) {
+inline T blockReduceSum(T val, sycl::local_ptr<T> reductionArray, sycl::nd_item<1> &item) {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const int lane = item.get_local_id(0) % sub_group_size; 
   const int wid = item.get_local_id(0) / sub_group_size;
@@ -42,7 +42,7 @@ void initFactor(
   const uint8_t factorDim,
   const uint32_t seed, 
   const float threshold,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   const index_t tid = item.get_global_id(0);
 
@@ -75,10 +75,10 @@ void computeDistanceRowsShared(
   const uint8_t factorDim,
   const error_t weight,
   error_t *global_error,
-  nd_item<1> item,
-  local_ptr<bit_factor_t> B_block,
-  local_ptr<bit_matrix_t> C_block,
-  local_ptr<error_t> reductionArray)
+  sycl::nd_item<1> item,
+  sycl::local_ptr<bit_factor_t> B_block,
+  sycl::local_ptr<bit_matrix_t> C_block,
+  sycl::local_ptr<error_t> reductionArray)
 {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const index_t warpIdIntern = item.get_local_id(0) / sub_group_size;
@@ -146,9 +146,9 @@ void vectorMatrixMultCompareRowWarpShared(
   const float flipManyChance,
   const uint32_t flipManyDepth,
   const error_t weight,
-  nd_item<1> &item,
-  local_ptr<bit_factor_t> B_block,
-  local_ptr<bit_matrix_t> C_block)
+  sycl::nd_item<1> &item,
+  sycl::local_ptr<bit_factor_t> B_block,
+  sycl::local_ptr<bit_matrix_t> C_block)
 {
 
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
@@ -230,9 +230,9 @@ void vectorMatrixMultCompareColWarpShared(
   const float flipManyChance,
   const uint32_t flipManyDepth,
   const error_t weight,
-  nd_item<1> item,
-  local_ptr<bit_factor_t> A_block,
-  local_ptr<bit_matrix_t> C_block)
+  sycl::nd_item<1> item,
+  sycl::local_ptr<bit_factor_t> A_block,
+  sycl::local_ptr<bit_matrix_t> C_block)
 {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const index_t warpIdIntern = item.get_local_id(0) / sub_group_size;
