@@ -7,8 +7,6 @@
 #define Real_t float
 #endif
 
-//#define DEBUG // verify the results of kernel execution
-
 template <typename T>
 __global__ void
 kernel_BS (const T* __restrict__ acc_a,
@@ -110,93 +108,81 @@ kernel_BS4 (const T* __restrict__ acc_a,
 template <typename T>
 void bs ( const size_t aSize,
     const size_t zSize,
-    const T *a,  // N+1
-    const T *z,  // T
-    size_t *r,   // T
-    const size_t n )
+    const T *d_a,  // N+1
+    const T *d_z,  // T
+    size_t *d_r,   // T
+    const size_t n,
+    const int repeat )
 {
-  T* buf_x;
-  T* buf_z;
-  size_t *buf_r;
-  hipMalloc((void**)&buf_x, sizeof(T)*aSize);
-  hipMalloc((void**)&buf_z, sizeof(T)*zSize);
-  hipMalloc((void**)&buf_r, sizeof(size_t)*zSize);
-  hipMemcpy(buf_x, a,  sizeof(T)*aSize, hipMemcpyHostToDevice);
-  hipMemcpy(buf_z, z,  sizeof(T)*zSize, hipMemcpyHostToDevice);
-  hipLaunchKernelGGL(kernel_BS, zSize/256, 256, 0, 0, buf_x, buf_z, buf_r, n);
-  hipMemcpy(r, buf_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
-  hipFree(buf_x);
-  hipFree(buf_z);
-  hipFree(buf_r);
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    kernel_BS<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
 void bs2 ( const size_t aSize,
     const size_t zSize,
-    const T *a,  // N+1
-    const T *z,  // T
-    size_t *r,   // T
-    const size_t n )
+    const T *d_a,  // N+1
+    const T *d_z,  // T
+    size_t *d_r,   // T
+    const size_t n,
+    const int repeat )
 {
-  T* buf_x;
-  T* buf_z;
-  size_t *buf_r;
-  hipMalloc((void**)&buf_x, sizeof(T)*aSize);
-  hipMalloc((void**)&buf_z, sizeof(T)*zSize);
-  hipMalloc((void**)&buf_r, sizeof(size_t)*zSize);
-  hipMemcpy(buf_x, a,  sizeof(T)*aSize, hipMemcpyHostToDevice);
-  hipMemcpy(buf_z, z,  sizeof(T)*zSize, hipMemcpyHostToDevice);
-  hipLaunchKernelGGL(kernel_BS2, zSize/256, 256, 0, 0, buf_x, buf_z, buf_r, n);
-  hipMemcpy(r, buf_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
-  hipFree(buf_x);
-  hipFree(buf_z);
-  hipFree(buf_r);
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    kernel_BS2<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
 void bs3 ( const size_t aSize,
     const size_t zSize,
-    const T *a,  // N+1
-    const T *z,  // T
-    size_t *r,   // T
-    const size_t n )
+    const T *d_a,  // N+1
+    const T *d_z,  // T
+    size_t *d_r,   // T
+    const size_t n,
+    const int repeat )
 {
-  T* buf_x;
-  T* buf_z;
-  size_t *buf_r;
-  hipMalloc((void**)&buf_x, sizeof(T)*aSize);
-  hipMalloc((void**)&buf_z, sizeof(T)*zSize);
-  hipMalloc((void**)&buf_r, sizeof(size_t)*zSize);
-  hipMemcpy(buf_x, a,  sizeof(T)*aSize, hipMemcpyHostToDevice);
-  hipMemcpy(buf_z, z,  sizeof(T)*zSize, hipMemcpyHostToDevice);
-  hipLaunchKernelGGL(kernel_BS3, zSize/256, 256, 0, 0, buf_x, buf_z, buf_r, n);
-  hipMemcpy(r, buf_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
-  hipFree(buf_x);
-  hipFree(buf_z);
-  hipFree(buf_r);
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    kernel_BS3<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 template <typename T>
 void bs4 ( const size_t aSize,
     const size_t zSize,
-    const T *a,  // N+1
-    const T *z,  // T
-    size_t *r,   // T
-    const size_t n )
+    const T *d_a,  // N+1
+    const T *d_z,  // T
+    size_t *d_r,   // T
+    const size_t n,
+    const int repeat )
 {
-  T* buf_x;
-  T* buf_z;
-  size_t *buf_r;
-  hipMalloc((void**)&buf_x, sizeof(T)*aSize);
-  hipMalloc((void**)&buf_z, sizeof(T)*zSize);
-  hipMalloc((void**)&buf_r, sizeof(size_t)*zSize);
-  hipMemcpy(buf_x, a,  sizeof(T)*aSize, hipMemcpyHostToDevice);
-  hipMemcpy(buf_z, z,  sizeof(T)*zSize, hipMemcpyHostToDevice);
-  hipLaunchKernelGGL(kernel_BS4, zSize/256, 256, 0, 0, buf_x, buf_z, buf_r, n);
-  hipMemcpy(r, buf_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
-  hipFree(buf_x);
-  hipFree(buf_z);
-  hipFree(buf_r);
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    kernel_BS4<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
 #ifdef DEBUG
@@ -244,58 +230,48 @@ int main(int argc, char* argv[])
   for (size_t i = 0; i < aSize; i++) a[i] = i;
 
   // lower = 0, upper = n-1
-  for (size_t i = 0; i < zSize; i++) { 
-    z[i] = rand() % N;
-  }
+  for (size_t i = 0; i < zSize; i++) z[i] = rand() % N;
 
-  auto start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs(aSize, zSize, a, z, r, N);  
-  }
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
+  Real_t* d_a;
+  Real_t* d_z;
+  size_t *d_r;
+  hipMalloc((void**)&d_a, sizeof(Real_t)*aSize);
+  hipMalloc((void**)&d_z, sizeof(Real_t)*zSize);
+  hipMalloc((void**)&d_r, sizeof(size_t)*zSize);
+  hipMemcpy(d_a, a, sizeof(Real_t)*aSize, hipMemcpyHostToDevice);
+  hipMemcpy(d_z, z, sizeof(Real_t)*zSize, hipMemcpyHostToDevice);
+
+  bs(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
 #ifdef DEBUG
-  verify(a, z, r, aSize, zSize, "bs1");
+  hipMemcpy(r, d_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
+  verify(a, z, r, aSize, zSize, "bs");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs2(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs2(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
 #ifdef DEBUG
+  hipMemcpy(r, d_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
   verify(a, z, r, aSize, zSize, "bs2");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs3(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs3(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
 #ifdef DEBUG
+  hipMemcpy(r, d_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
   verify(a, z, r, aSize, zSize, "bs3");
 #endif
 
-  start = std::chrono::steady_clock::now();
-  for(uint k = 0; k < repeat; k++) {
-    bs4(aSize, zSize, a, z, r, N);  
-  }
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average device execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
+  bs4(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
 #ifdef DEBUG
+  hipMemcpy(r, d_r, sizeof(size_t)*zSize, hipMemcpyDeviceToHost);
   verify(a, z, r, aSize, zSize, "bs4");
 #endif
 
+  hipFree(d_a);
+  hipFree(d_z);
+  hipFree(d_r);
   free(a);
   free(z);
   free(r);
