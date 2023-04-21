@@ -4,7 +4,9 @@
 
 #include "bondsKernelsGpu.h"
 
+#define INLINE
 
+INLINE
 int monthLengthKernelGpu(int month, bool leapYear) 
 {
   int MonthLength[12];
@@ -39,6 +41,7 @@ int monthLengthKernelGpu(int month, bool leapYear)
 }
 
 
+INLINE
 int monthOffsetKernelGpu(int m, bool leapYear) 
 {
   int MonthOffset[13];
@@ -75,6 +78,7 @@ int monthOffsetKernelGpu(int m, bool leapYear)
 }
 
 
+INLINE
 int yearOffsetKernelGpu(int y)
 {
 
@@ -214,6 +218,7 @@ int yearOffsetKernelGpu(int y)
 }
 
 
+INLINE
 bool isLeapKernelGpu(int y) 
 {
   bool YearIsLeap[121];
@@ -344,6 +349,7 @@ bool isLeapKernelGpu(int y)
 }
 
 
+INLINE
 bondsDateStruct intializeDateKernelGpu(int d, int m, int y) 
 {
   bondsDateStruct currDate;
@@ -361,6 +367,7 @@ bondsDateStruct intializeDateKernelGpu(int d, int m, int y)
 }
 
 
+INLINE
 dataType yearFractionGpu(bondsDateStruct d1,
     bondsDateStruct d2, int dayCounter)
 {
@@ -368,6 +375,7 @@ dataType yearFractionGpu(bondsDateStruct d1,
 }
 
 
+INLINE
 int dayCountGpu(bondsDateStruct d1, bondsDateStruct d2, int dayCounter) 
 {
   if (dayCounter == USE_EXACT_DAY)
@@ -390,34 +398,43 @@ int dayCountGpu(bondsDateStruct d1, bondsDateStruct d2, int dayCounter)
 }
 
 
+INLINE
 dataType couponNotionalGpu()
 {
   return (dataType)100.0;
 }
 
+
+INLINE
 dataType bondNotionalGpu()
 {
   return (dataType)100.0;
 }
 
 
+
+INLINE
 dataType fixedRateCouponNominalGpu()
 {
   return (dataType)100.0;
 }
 
+
+INLINE
 bool eventHasOccurredGpu(bondsDateStruct currDate, bondsDateStruct eventDate)
 {
   return eventDate.dateSerialNum > currDate.dateSerialNum;
 }
 
 
+INLINE
 bool cashFlowHasOccurredGpu(bondsDateStruct refDate, bondsDateStruct eventDate)
 {
   return eventHasOccurredGpu(refDate, eventDate);
 }
 
 
+INLINE
 bondsDateStruct advanceDateGpu(bondsDateStruct date, int numMonthsAdvance) 
 {
   int d = date.day;
@@ -446,6 +463,7 @@ bondsDateStruct advanceDateGpu(bondsDateStruct date, int numMonthsAdvance)
 }
 
 
+INLINE
 dataType getDirtyPriceGpu(bondStruct *bond, 
     bondsYieldTermStruct *discountCurve, 
     bondsDateStruct *currDate, 
@@ -464,6 +482,7 @@ dataType getDirtyPriceGpu(bondStruct *bond,
 }
 
 
+INLINE
 dataType getAccruedAmountGpu(bondsDateStruct *maturityDate, bondsDateStruct date, int bondNum, cashFlowsStruct cashFlows, int numLegs)
 {
   dataType currentNotional = bondNotionalGpu();
@@ -475,6 +494,7 @@ dataType getAccruedAmountGpu(bondsDateStruct *maturityDate, bondsDateStruct date
 }
 
 
+INLINE
 dataType bondFunctionsAccruedAmountGpu(bondsDateStruct *maturityDate, bondsDateStruct date, int bondNum, cashFlowsStruct cashFlows, int numLegs) 
 {
   return cashFlowsAccruedAmountGpu(cashFlows, false, date, numLegs, maturityDate, bondNum) * 
@@ -482,6 +502,7 @@ dataType bondFunctionsAccruedAmountGpu(bondsDateStruct *maturityDate, bondsDateS
 }
 
 
+INLINE
 dataType cashFlowsAccruedAmountGpu(cashFlowsStruct cashFlows,
     bool includecurrDateFlows,
     bondsDateStruct currDate,
@@ -500,6 +521,7 @@ dataType cashFlowsAccruedAmountGpu(cashFlowsStruct cashFlows,
 }
 
 
+INLINE
 dataType fixedRateCouponAccruedAmountGpu(cashFlowsStruct cashFlows, int numLeg, 
     bondsDateStruct d, bondsDateStruct* maturityDate, int bondNum) 
 {
@@ -522,6 +544,7 @@ dataType fixedRateCouponAccruedAmountGpu(cashFlowsStruct cashFlows, int numLeg,
 }
 
 
+INLINE
 dataType cashFlowsNpvGpu(cashFlowsStruct cashFlows,
     bondsYieldTermStruct discountCurve,
     bool includecurrDateFlows,
@@ -545,6 +568,8 @@ dataType cashFlowsNpvGpu(cashFlowsStruct cashFlows,
 }
 
 
+
+INLINE
 dataType bondsYieldTermStructureDiscountGpu(bondsYieldTermStruct ytStruct, bondsDateStruct t)
 {
   ytStruct.intRate.rate = ytStruct.forward;
@@ -554,18 +579,22 @@ dataType bondsYieldTermStructureDiscountGpu(bondsYieldTermStruct ytStruct, bonds
 }
 
 
+
+INLINE
 dataType flatForwardDiscountImplGpu(intRateStruct intRate, dataType t) 
 {
   return interestRateDiscountFactorGpu(intRate, t);
 }
 
 
+INLINE
 dataType interestRateDiscountFactorGpu(intRateStruct intRate, dataType t) 
 {
   return (dataType)1.0/interestRateCompoundFactorGpuTwoArgs(intRate, t);
 }
 
 
+INLINE
 dataType interestRateCompoundFactorGpuTwoArgs(intRateStruct intRate, dataType t) 
 {
   if (intRate.comp == SIMPLE_INTEREST)
@@ -578,6 +607,7 @@ dataType interestRateCompoundFactorGpuTwoArgs(intRateStruct intRate, dataType t)
 }
 
 
+INLINE
 dataType fixedRateCouponAmountGpu(cashFlowsStruct cashFlows, int numLeg) 
 {
   if (cashFlows.legs[numLeg].amount == COMPUTE_AMOUNT)
@@ -591,6 +621,7 @@ dataType fixedRateCouponAmountGpu(cashFlowsStruct cashFlows, int numLeg)
   }
 }
 
+INLINE
 dataType interestRateCompoundFactorGpu(intRateStruct intRate, bondsDateStruct d1,
     bondsDateStruct d2, int dayCounter)
 {
@@ -599,6 +630,8 @@ dataType interestRateCompoundFactorGpu(intRateStruct intRate, bondsDateStruct d1
 }
 
 
+
+INLINE
 dataType interestRateImpliedRateGpu(dataType compound, int comp, dataType freq, dataType t) 
 {
   dataType r = 0.0f;
@@ -623,6 +656,8 @@ dataType interestRateImpliedRateGpu(dataType compound, int comp, dataType freq, 
 }
 
 
+
+INLINE
 int cashFlowsNextCashFlowNumGpu(cashFlowsStruct cashFlows,
     bondsDateStruct currDate,
     int numLegs) 
@@ -638,6 +673,7 @@ int cashFlowsNextCashFlowNumGpu(cashFlowsStruct cashFlows,
 }
 
 
+INLINE
 dataType getBondYieldGpu(dataType cleanPrice,
     int dc,
     int comp,
@@ -665,6 +701,7 @@ dataType getBondYieldGpu(dataType cleanPrice,
 }
 
 
+INLINE
 dataType getBondFunctionsYieldGpu(dataType cleanPrice,
     int dc,
     int comp,
@@ -685,6 +722,8 @@ dataType getBondFunctionsYieldGpu(dataType cleanPrice,
 }
 
 
+
+INLINE
 dataType getCashFlowsYieldGpu(cashFlowsStruct leg,
     dataType npv,
     int dayCounter,
@@ -715,6 +754,7 @@ dataType getCashFlowsYieldGpu(cashFlowsStruct leg,
 }
 
 
+INLINE
 dataType solverSolveGpu(solverStruct solver,
     irrFinderStruct f,
     dataType accuracy,
@@ -793,6 +833,7 @@ dataType solverSolveGpu(solverStruct solver,
 }
 
 
+INLINE
 dataType cashFlowsNpvYieldGpu(cashFlowsStruct cashFlows,
     intRateStruct y,
     bool includecurrDateFlows,
@@ -836,6 +877,8 @@ dataType cashFlowsNpvYieldGpu(cashFlowsStruct cashFlows,
   return npv;
 }
 
+
+INLINE
 dataType fOpGpu(irrFinderStruct f, dataType y, cashFlowsStruct cashFlows, int numLegs)
 {
   intRateStruct yield;
@@ -856,6 +899,7 @@ dataType fOpGpu(irrFinderStruct f, dataType y, cashFlowsStruct cashFlows, int nu
 
 
 
+INLINE
 dataType fDerivativeGpu(irrFinderStruct f, dataType y, cashFlowsStruct cashFlows, int numLegs)
 {
   intRateStruct yield;
@@ -870,12 +914,14 @@ dataType fDerivativeGpu(irrFinderStruct f, dataType y, cashFlowsStruct cashFlows
 }
 
 
+INLINE
 bool closeGpu(dataType x, dataType y)
 {
   return closeGpuThreeArgs(x,y,42);
 }
 
 
+INLINE
 bool closeGpuThreeArgs(dataType x, dataType y, int n)
 {
   dataType diff = sycl::fabs(x-y);
@@ -885,6 +931,8 @@ bool closeGpuThreeArgs(dataType x, dataType y, int n)
     diff <= tolerance*sycl::fabs(y);
 }
 
+
+INLINE
 dataType solveImplGpu(solverStruct solver, irrFinderStruct f,
     dataType xAccuracy, cashFlowsStruct cashFlows, int numLegs)
 {
@@ -950,6 +998,7 @@ dataType solveImplGpu(solverStruct solver, irrFinderStruct f,
 }
 
 
+INLINE
 dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
     intRateStruct y,
     bool includecurrDateFlows,
@@ -998,8 +1047,9 @@ dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
 }
 
 
+__attribute__ ((always_inline))
 void bonds (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     bondsYieldTermStruct* __restrict discountCurve,
     bondsYieldTermStruct* __restrict repoCurve,
     bondsDateStruct* __restrict currDate,
@@ -1083,36 +1133,36 @@ void bonds (
   }
 }
 
-void getBondsResultsGpu(queue &q, inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+void getBondsResultsGpu(sycl::queue &q, inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
 {
-  buffer<bondsYieldTermStruct, 1> discountCurveGpu (inArgsHost.discountCurve, numBonds);
-  buffer<bondsYieldTermStruct, 1> repoCurveGpu (inArgsHost.repoCurve, numBonds);
-  buffer<bondsDateStruct, 1> currDateGpu (inArgsHost.currDate, numBonds);
-  buffer<bondsDateStruct, 1> maturityDateGpu (inArgsHost.maturityDate, numBonds);
-  buffer<dataType, 1> bondCleanPriceGpu (inArgsHost.bondCleanPrice, numBonds);
-  buffer<bondStruct, 1> bondGpu (inArgsHost.bond, numBonds);
-  buffer<dataType, 1> dummyStrikeGpu (inArgsHost.dummyStrike, numBonds);
-  buffer<dataType, 1> dirtyPriceGpu (resultsFromGpu.dirtyPrice, numBonds);
-  buffer<dataType, 1> accruedAmountCurrDateGpu (resultsFromGpu.accruedAmountCurrDate, numBonds);
-  buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
-  buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
+  sycl::buffer<bondsYieldTermStruct, 1> discountCurveGpu (inArgsHost.discountCurve, numBonds);
+  sycl::buffer<bondsYieldTermStruct, 1> repoCurveGpu (inArgsHost.repoCurve, numBonds);
+  sycl::buffer<bondsDateStruct, 1> currDateGpu (inArgsHost.currDate, numBonds);
+  sycl::buffer<bondsDateStruct, 1> maturityDateGpu (inArgsHost.maturityDate, numBonds);
+  sycl::buffer<dataType, 1> bondCleanPriceGpu (inArgsHost.bondCleanPrice, numBonds);
+  sycl::buffer<bondStruct, 1> bondGpu (inArgsHost.bond, numBonds);
+  sycl::buffer<dataType, 1> dummyStrikeGpu (inArgsHost.dummyStrike, numBonds);
+  sycl::buffer<dataType, 1> dirtyPriceGpu (resultsFromGpu.dirtyPrice, numBonds);
+  sycl::buffer<dataType, 1> accruedAmountCurrDateGpu (resultsFromGpu.accruedAmountCurrDate, numBonds);
+  sycl::buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
+  sycl::buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
 
-  range<1> gws ((numBonds + 255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((numBonds + 255)/256*256);
+  sycl::range<1> lws (256);
 
-  q.submit([&] (handler &cgh) {
-    auto discountCurve = discountCurveGpu.get_access<sycl_read>(cgh);
-    auto repoCurve = repoCurveGpu.get_access<sycl_read>(cgh);
-    auto currDate = currDateGpu.get_access<sycl_read>(cgh);
-    auto maturityDate = maturityDateGpu.get_access<sycl_read>(cgh);
-    auto bondCleanPrice = bondCleanPriceGpu.get_access<sycl_read>(cgh);
-    auto bond = bondGpu.get_access<sycl_read>(cgh);
-    auto dummyStrike = dummyStrikeGpu.get_access<sycl_read>(cgh);
-    auto dirtyPrice = dirtyPriceGpu.get_access<sycl_discard_write>(cgh);
-    auto accruedAmountCurrDate = accruedAmountCurrDateGpu.get_access<sycl_discard_write>(cgh);
-    auto cleanPrice = cleanPriceGpu.get_access<sycl_discard_write>(cgh);
-    auto bondForwardVal = bondForwardValGpu.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto discountCurve = discountCurveGpu.get_access<sycl::access::mode::read>(cgh);
+    auto repoCurve = repoCurveGpu.get_access<sycl::access::mode::read>(cgh);
+    auto currDate = currDateGpu.get_access<sycl::access::mode::read>(cgh);
+    auto maturityDate = maturityDateGpu.get_access<sycl::access::mode::read>(cgh);
+    auto bondCleanPrice = bondCleanPriceGpu.get_access<sycl::access::mode::read>(cgh);
+    auto bond = bondGpu.get_access<sycl::access::mode::read>(cgh);
+    auto dummyStrike = dummyStrikeGpu.get_access<sycl::access::mode::read>(cgh);
+    auto dirtyPrice = dirtyPriceGpu.get_access<sycl::access::mode::discard_write>(cgh);
+    auto accruedAmountCurrDate = accruedAmountCurrDateGpu.get_access<sycl::access::mode::discard_write>(cgh);
+    auto cleanPrice = cleanPriceGpu.get_access<sycl::access::mode::discard_write>(cgh);
+    auto bondForwardVal = bondForwardValGpu.get_access<sycl::access::mode::discard_write>(cgh);
+    cgh.parallel_for<class kernel>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       bonds(item,
         discountCurve.get_pointer(),
         repoCurve.get_pointer(),
