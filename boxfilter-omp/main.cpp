@@ -104,20 +104,25 @@ void BoxFilterGPU ( unsigned int *uiInput,
                     unsigned int *uiDevOutput,
                     const unsigned int uiWidth, 
                     const unsigned int uiHeight, 
-                    const int iRadius, const float fScale )
+                    const int iRadius,
+                    const float fScale,
+                    const float iCycles )
 {
-    const int szMaxWorkgroupSize = 256;
-    const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
-    unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
+  const int szMaxWorkgroupSize = 256;
+  const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
+  unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
 
-    if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
-      uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
+  if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
+    uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
-    // Set team and thread sizes for row kernel // Workgroup padded left and right
-    const int uiBlockWidth = DivUp((size_t)uiWidth, (size_t)uiNumOutputPix);
-    const int numTeams = uiHeight * uiBlockWidth;
-    const int blockSize = iRadiusAligned + uiNumOutputPix + iRadius;
+  // Set team and thread sizes for row kernel // Workgroup padded left and right
+  const int uiBlockWidth = DivUp((size_t)uiWidth, (size_t)uiNumOutputPix);
+  const int numTeams = uiHeight * uiBlockWidth;
+  const int blockSize = iRadiusAligned + uiNumOutputPix + iRadius;
 
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iCycles; i++) {
     // Launch row kernel
     #pragma omp target teams num_teams(numTeams) thread_limit(blockSize)
     {
@@ -203,6 +208,10 @@ void BoxFilterGPU ( unsigned int *uiInput,
           uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
       }
     }
+  }
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
 }
 
 int main(int argc, char** argv)
@@ -235,24 +244,16 @@ int main(int argc, char** argv)
                           map(alloc: uiTmp[0:szBuff]) \
                           map(from: uiDevOutput[0:szBuff])
   {
-    // Warmup
-    BoxFilterGPU (uiInput, uiTmp, uiDevOutput, 
-                  uiImageWidth, uiImageHeight, RADIUS, SCALE);
-
     const int iCycles = atoi(argv[2]);
+
+    printf("Warmup..\n");
+    BoxFilterGPU (uiInput, uiTmp, uiDevOutput, 
+                  uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
+
+
     printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
-
-    auto start = std::chrono::steady_clock::now();
-
-    for (int i = 0; i < iCycles; i++)
-    {
-      BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
-                    uiImageWidth, uiImageHeight, RADIUS, SCALE);
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
+    BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
+                  uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
   }
 
   // Do filtering on the host
