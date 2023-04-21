@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cstdint>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "../config.h"
 
