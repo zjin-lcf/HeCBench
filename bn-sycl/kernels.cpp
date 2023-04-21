@@ -15,7 +15,7 @@ void genScoreKernel(const int sizepernode,
                     float *D_localscore, 
                     const int *D_data,
                     const float *D_LG,
-                    nd_item<1> &item)
+                    sycl::nd_item<1> &item)
 {
   int id = item.get_global_id(0);
   int node,index;
@@ -96,7 +96,7 @@ void computeKernel(const int taskperthr,
                    float *D_Score,
                    int *D_resP,
                    float* lsinblock,
-                   nd_item<1> &item)
+                   sycl::nd_item<1> &item)
 {
   const unsigned int tid = item.get_local_id(0);
   const unsigned int bid = item.get_group(0);
@@ -141,7 +141,7 @@ void computeKernel(const int taskperthr,
 
   lsinblock[tid]=bestls;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for(i=128;i>=1;i/=2){
 
@@ -162,7 +162,7 @@ void computeKernel(const int taskperthr,
       }
 
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if(tid==0){
@@ -174,7 +174,7 @@ void computeKernel(const int taskperthr,
     lsinblock[0]=(float)t;
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(tid==(int)lsinblock[0]){
     for(i=0;i<4;i++){
@@ -182,8 +182,6 @@ void computeKernel(const int taskperthr,
     }
   }
 }
-
-
 
 void Dincr(int *bit,int n){
 
@@ -229,7 +227,6 @@ bool D_getState(int parN,int *sta,int time){
   return true;
 
 }
-
 
 void D_findComb(int* comb, int l, int n)
 {
