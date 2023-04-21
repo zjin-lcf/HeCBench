@@ -1,4 +1,4 @@
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "indices.hpp"
 /*
  * Based on dct8x8_kernel2.cu provided in CUDA samples form NVIDIA Corporation.
@@ -147,7 +147,7 @@ void InplaceIDCTvector(float *Vect0, int Step)
 * \return None
 */
 
-void DCT2D8x8(nd_item<2> &item, 
+void DCT2D8x8(sycl::nd_item<2> &item, 
               float *__restrict block, 
               float *__restrict dst,
               const float *__restrict src,
@@ -203,7 +203,7 @@ void DCT2D8x8(nd_item<2> &item,
 * \return None
 */
 
-void IDCT2D8x8(nd_item<2> &item,
+void IDCT2D8x8(sycl::nd_item<2> &item,
                float *__restrict block, 
                float *__restrict dst,
                const float *__restrict src,
@@ -240,41 +240,38 @@ void IDCT2D8x8(nd_item<2> &item,
     dst[i * BLOCK_SIZE] = bl_ptr[i * BLOCK_SIZE];
 }
 
-extern "C" void run_DCT2D8x8(  
-  queue &q,
-  buffer<float, 1> &transformed_stacks,
-  buffer<float, 1> &gathered_stacks,
+void run_DCT2D8x8(  
+  sycl::queue &q,
+  float *transformed_stacks,
+  float *gathered_stacks,
   const uint size,
-  const range<2> lws,  
-  const range<2> gws)
+  const sycl::range<2> lws,  
+  const sycl::range<2> gws)
 {
-  q.submit([&] (handler &cgh) {
-    auto dst = transformed_stacks.get_access<sycl_discard_write>(cgh);
-    auto src = gathered_stacks.get_access<sycl_read>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> 
-      lmem(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE, cgh);
-    cgh.parallel_for<class dct>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      DCT2D8x8(item, lmem.get_pointer(), dst.get_pointer(), src.get_pointer(), size);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1>
+      lmem(sycl::range<1>(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE), cgh);
+    cgh.parallel_for<class dct>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      DCT2D8x8(item, lmem.get_pointer(), transformed_stacks, gathered_stacks, size);
     });
   });
 }
 
-extern "C" void run_IDCT2D8x8(
-  queue &q,
-  buffer<float, 1> &gathered_stacks,
-  buffer<float, 1> &transformed_stacks,
+void run_IDCT2D8x8(
+  sycl::queue &q,
+  float *gathered_stacks,
+  float *transformed_stacks,
   const uint size,
-  const range<2> lws,  
-  const range<2> gws)
+  const sycl::range<2> lws,  
+  const sycl::range<2> gws)
 {
-  q.submit([&] (handler &cgh) {
-    auto dst = gathered_stacks.get_access<sycl_discard_write>(cgh);
-    auto src = transformed_stacks.get_access<sycl_read>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> 
-      lmem(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE, cgh);
-    cgh.parallel_for<class idct>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      IDCT2D8x8 (item, lmem.get_pointer(), dst.get_pointer(), src.get_pointer(), size);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1>
+      lmem(sycl::range<1>(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE), cgh);
+    cgh.parallel_for<class idct>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      IDCT2D8x8 (item, lmem.get_pointer(), gathered_stacks, transformed_stacks, size);
     });
   });
-    
 }
