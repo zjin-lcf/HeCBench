@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.cpp"
 
 const int HIGHEST = 3;
@@ -33,7 +33,7 @@ void incrS(int *bit, int n); // STATE_N code increases 1 each time
 // get every possible combination of state for a parent set
 bool getState( int parN, int *state, int time); 
 float logGamma(int N); // log and gamma
-float findBestGraph(queue &q, float* D_localscore, int* D_resP,
+float findBestGraph(sycl::queue &q, float* D_localscore, int* D_resP,
                     float* D_Score, bool *D_parent);
 void genScore();
 void sortGraph();
@@ -62,11 +62,10 @@ int main(int argc, char** argv) {
   float tmpd;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   printf("NODE_N=%d\nInitialization...\n", NODE_N);
 
@@ -77,22 +76,22 @@ int main(int argc, char** argv) {
 
   Pre_logGamma();
 
-  int *D_data = malloc_device<int>(NODE_N * DATA_N, q);
+  int *D_data = sycl::malloc_device<int>(NODE_N * DATA_N, q);
   q.memcpy(D_data, data, NODE_N * DATA_N * sizeof(int));
 
-  float *D_LG = malloc_device<float>(DATA_N + 2, q);
+  float *D_LG = sycl::malloc_device<float>(DATA_N + 2, q);
   q.memcpy(D_LG, LG, (DATA_N + 2) * sizeof(float));
 
-  float *D_localscore = malloc_device<float>(NODE_N * sizepernode, q);
+  float *D_localscore = sycl::malloc_device<float>(NODE_N * sizepernode, q);
 
-  float *D_Score = malloc_device<float>(sizepernode / (256 * WORKLOAD) + 1, q);
+  float *D_Score = sycl::malloc_device<float>(sizepernode / (256 * WORKLOAD) + 1, q);
 
-  bool *D_parent = malloc_device<bool>(NODE_N, q);
+  bool *D_parent = sycl::malloc_device<bool>(NODE_N, q);
 
-  int *D_resP = malloc_device<int>((sizepernode / (256 * WORKLOAD) + 1) * 4, q);
+  int *D_resP = sycl::malloc_device<int>((sizepernode / (256 * WORKLOAD) + 1) * 4, q);
 
-  range<1> gws((sizepernode+255)/256*256);
-  range<1> lws(256);
+  sycl::range<1> gws((sizepernode+255)/256*256);
+  sycl::range<1> lws(256);
 
   const int sizePerNode = sizepernode;  // global variable not allowed by lambda
 
@@ -102,8 +101,8 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class genScore>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class genScore>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         genScoreKernel(sizePerNode, D_localscore, D_data, D_LG, item);
       });
     });
@@ -200,12 +199,12 @@ int main(int argc, char** argv) {
   free(localscore);
   free(scores);
   free(parents);
-  free(D_LG, q);
-  free(D_data, q);
-  free(D_localscore, q);
-  free(D_parent, q);
-  free(D_Score, q);
-  free(D_resP, q);
+  sycl::free(D_LG, q);
+  sycl::free(D_data, q);
+  sycl::free(D_localscore, q);
+  sycl::free(D_parent, q);
+  sycl::free(D_Score, q);
+  sycl::free(D_resP, q);
 
   for(j=0;j<HIGHEST;j++){
     fprintf(fpout,"score:%f\n",maxScore[j]);
@@ -222,7 +221,7 @@ int main(int argc, char** argv) {
 }
 
 
-float findBestGraph(queue &q, float *D_localscore, int *D_resP,
+float findBestGraph(sycl::queue &q, float *D_localscore, int *D_resP,
                     float *D_Score, bool *D_parent) {
   float bestls = -99999999.f;
   int bestparent[5];
@@ -258,12 +257,13 @@ float findBestGraph(queue &q, float *D_localscore, int *D_resP,
       q.memcpy(D_parent, orders[node], NODE_N * sizeof(bool));
 
       const int sizePerNode = sizepernode;
-      range<1> gws(blocknum * 256);
-      range<1> lws(256);
+      sycl::range<1> gws(blocknum * 256);
+      sycl::range<1> lws(256);
 
-      q.submit([&] (handler &cgh) {
-        accessor<float, 1, sycl_read_write, access::target::local> sinblock(256, cgh);
-        cgh.parallel_for<class compute>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> sinblock(sycl::range<1>(256), cgh);
+        cgh.parallel_for<class compute>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           computeKernel(WORKLOAD, sizePerNode, D_localscore,
             D_parent, node, total, D_Score, D_resP,
             sinblock.get_pointer(), item);
