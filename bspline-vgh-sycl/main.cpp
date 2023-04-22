@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define max(a,b) ((a<b)?b:a)
 #define min(a,b) ((a<b)?a:b)
@@ -156,34 +156,33 @@ int main(int argc, char ** argv) {
   int spline_y_grid_delta_inv=45;
   int spline_z_grid_delta_inv=45;
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_walkers_vals = malloc_device<float>(WSIZE*NSIZE, q);
+  float *d_walkers_vals = sycl::malloc_device<float>(WSIZE*NSIZE, q);
   q.memcpy(d_walkers_vals, walkers_vals, WSIZE*NSIZE*sizeof(float));
 
-  float *d_walkers_grads = malloc_device<float>(WSIZE*MSIZE, q);
+  float *d_walkers_grads = sycl::malloc_device<float>(WSIZE*MSIZE, q);
   q.memcpy(d_walkers_grads, walkers_grads, WSIZE*MSIZE*sizeof(float));
 
-  float *d_walkers_hess = malloc_device<float>(WSIZE*OSIZE, q);
+  float *d_walkers_hess = sycl::malloc_device<float>(WSIZE*OSIZE, q);
   q.memcpy(d_walkers_hess, walkers_hess, WSIZE*OSIZE*sizeof(float));
 
-  float *d_spline_coefs = malloc_device<float>(SSIZE, q);
+  float *d_spline_coefs = sycl::malloc_device<float>(SSIZE, q);
   q.memcpy(d_spline_coefs, spline_coefs, SSIZE*sizeof(float));
 
-  float *d_a = malloc_device<float>(4, q);
-  float *d_b = malloc_device<float>(4, q);
-  float *d_c = malloc_device<float>(4, q);
-  float *d_da = malloc_device<float>(4, q);
-  float *d_db = malloc_device<float>(4, q);
-  float *d_dc = malloc_device<float>(4, q);
-  float *d_d2a = malloc_device<float>(4, q);
-  float *d_d2b = malloc_device<float>(4, q);
-  float *d_d2c = malloc_device<float>(4, q);
+  float *d_a = sycl::malloc_device<float>(4, q);
+  float *d_b = sycl::malloc_device<float>(4, q);
+  float *d_c = sycl::malloc_device<float>(4, q);
+  float *d_da = sycl::malloc_device<float>(4, q);
+  float *d_db = sycl::malloc_device<float>(4, q);
+  float *d_dc = sycl::malloc_device<float>(4, q);
+  float *d_d2a = sycl::malloc_device<float>(4, q);
+  float *d_d2b = sycl::malloc_device<float>(4, q);
+  float *d_d2c = sycl::malloc_device<float>(4, q);
 
   double total_time = 0.0;
 
@@ -233,14 +232,15 @@ int main(int argc, char ** argv) {
     eval_abc(d2Af,tz,&d2c[0]);              
     q.memcpy(d_d2c, d2c, sizeof(float)*4);
 
-    range<1> gws ((spline_num_splines+255)/256*256);
-    range<1> lws (256);
+    sycl::range<1> gws ((spline_num_splines+255)/256*256);
+    sycl::range<1> lws (256);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &h) {
-      h.parallel_for<class vgh_spline>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class vgh_spline>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int n = item.get_global_id(0);
         if (n < spline_num_splines)
           eval_UBspline_3d_s_vgh ( 
@@ -297,18 +297,18 @@ int main(int argc, char ** argv) {
   free(walkers_z);
   free(spline_coefs);
 
-  free(d_walkers_vals, q);
-  free(d_walkers_grads, q);
-  free(d_walkers_hess, q);
-  free(d_spline_coefs, q);
-  free(d_a, q);
-  free(d_b, q);
-  free(d_c, q);
-  free(d_da, q);
-  free(d_db, q);
-  free(d_dc, q);
-  free(d_d2a, q);
-  free(d_d2b, q);
-  free(d_d2c, q);
+  sycl::free(d_walkers_vals, q);
+  sycl::free(d_walkers_grads, q);
+  sycl::free(d_walkers_hess, q);
+  sycl::free(d_spline_coefs, q);
+  sycl::free(d_a, q);
+  sycl::free(d_b, q);
+  sycl::free(d_c, q);
+  sycl::free(d_da, q);
+  sycl::free(d_db, q);
+  sycl::free(d_dc, q);
+  sycl::free(d_d2a, q);
+  sycl::free(d_d2b, q);
+  sycl::free(d_d2c, q);
   return 0;
 }
