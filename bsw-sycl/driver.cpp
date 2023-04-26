@@ -1,5 +1,5 @@
+#include <sycl.hpp>
 #include "utils.hpp"
-#include "common.h"
 #include "kernel.cpp"
 
 void kernel_driver_aa(std::string filename,
@@ -37,40 +37,32 @@ void kernel_driver_aa(std::string filename,
     13,7,8,9,0,11,10,12,2,0,14,5,
     1,15,16,0,19,17,22,18,21};
 
-  float total_packing;
-
-  auto start = NOW;
-  float total_time_cpu = 0;
-
-  // total number of iterations
   int its = (totalAlignments>20000)?(ceil((float)totalAlignments/20000)):1;
   unsigned NBLOCKS    = totalAlignments;
   unsigned leftOvers    = NBLOCKS % its;
   unsigned stringsPerIt = NBLOCKS / its;
   unsigned maxAlignments = stringsPerIt + leftOvers;
 
-  { // SYCL scope
-
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<short, 1> d_ref_start(maxAlignments);
-  buffer<short, 1> d_ref_end(maxAlignments);
-  buffer<short, 1> d_query_start(maxAlignments);
-  buffer<short, 1> d_query_end(maxAlignments);
-  buffer<short, 1> d_scores(maxAlignments);
-  buffer<int, 1> d_offset_ref(maxAlignments);
-  buffer<int, 1> d_offset_query(maxAlignments);
-  buffer<char, 1> d_strA (maxContigSize * maxAlignments);
-  buffer<char, 1> d_strB (maxReadSize * maxAlignments);
-  buffer<short, 1> d_encoding_matrix (h_encoding_matrix, ENCOD_MAT_SIZE);
-  buffer<short, 1> d_scoring_matrix (h_scoring_matrix, SCORE_MAT_SIZE);
+  short *d_ref_start = sycl::malloc_device<short>(maxAlignments, q);
+  short *d_ref_end = sycl::malloc_device<short>(maxAlignments, q);
+  short *d_query_start = sycl::malloc_device<short>(maxAlignments, q);
+  short *d_query_end = sycl::malloc_device<short>(maxAlignments, q);
+  short *d_scores = sycl::malloc_device<short>(maxAlignments, q);
+  int *d_offset_ref = sycl::malloc_device<int>(maxAlignments, q);
+  int *d_offset_query = sycl::malloc_device<int>(maxAlignments, q);
+  char *d_strA = sycl::malloc_device<char>(maxContigSize * maxAlignments, q);
+  char *d_strB = sycl::malloc_device<char>(maxReadSize * maxAlignments, q);
+  short *d_encoding_matrix = sycl::malloc_device<short>(ENCOD_MAT_SIZE, q);
+  q.memcpy(d_encoding_matrix, h_encoding_matrix, sizeof(short) * ENCOD_MAT_SIZE);
 
-  total_packing = 0;
+  short *d_scoring_matrix = sycl::malloc_device<short>(SCORE_MAT_SIZE, q);
+  q.memcpy(d_scoring_matrix , h_scoring_matrix, sizeof(short) * SCORE_MAT_SIZE);
 
   short* ref_begin    = h_ref_begin;
   short* ref_end      = h_ref_end;  
@@ -80,9 +72,11 @@ void kernel_driver_aa(std::string filename,
 
   std::cout<<"Number of loop iterations: " << its << std::endl;
 
+  q.wait();
+  auto start = NOW;
+
   for(int perGPUIts = 0; perGPUIts < its; perGPUIts++)
   {
-    auto packing_start = NOW;
     int  blocksLaunched;
     std::vector<std::string>::const_iterator beginAVec;
     std::vector<std::string>::const_iterator endAVec;
@@ -110,8 +104,6 @@ void kernel_driver_aa(std::string filename,
     unsigned running_sum = 0;
     int sequences_per_stream = blocksLaunched;
 
-    auto start_cpu = NOW;
-
     for(unsigned int i = 0; i < sequencesA.size(); i++)
     {
       running_sum +=sequencesA[i].size();
@@ -131,10 +123,6 @@ void kernel_driver_aa(std::string filename,
     unsigned totalLengthB = h_offsetB[sequencesB.size() - 1];
     // std::cout << "totalLengthB: " << totalLengthB << std::endl;
 
-    auto end_cpu = NOW;
-    std::chrono::duration<double> cpu_dur = end_cpu - start_cpu;
-
-    total_time_cpu += cpu_dur.count();
     unsigned offsetSumA = 0;
     unsigned offsetSumB = 0;
 
@@ -148,30 +136,10 @@ void kernel_driver_aa(std::string filename,
       offsetSumB += sequencesB[i].size();
     }
 
-    auto packing_end = NOW;
-    std::chrono::duration<double> packing_dur = packing_end - packing_start;
-
-    total_packing += packing_dur.count();
-
-    q.submit([&] (handler &cgh) {
-      auto offset_ref = d_offset_ref.get_access<sycl_discard_write>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(h_offsetA, offset_ref);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto offset_query = d_offset_query.get_access<sycl_discard_write>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(h_offsetB, offset_query);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto str = d_strA.get_access<sycl_discard_write>(cgh, range<1>(totalLengthA));
-      cgh.copy(h_strA, str);  
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto str = d_strB.get_access<sycl_discard_write>(cgh, range<1>(totalLengthB));
-      cgh.copy(h_strB, str);  
-    });
+    q.memcpy(d_offset_ref, h_offsetA, sequences_per_stream * sizeof(int));
+    q.memcpy(d_offset_query, h_offsetB, sequences_per_stream * sizeof(int));
+    q.memcpy(d_strA, h_strA, totalLengthA * sizeof(char));
+    q.memcpy(d_strB, h_strB, totalLengthB * sizeof(char));
 
     unsigned minSize = (maxReadSize < maxContigSize) ? maxReadSize : maxContigSize;
     unsigned totShmem = 3 * (minSize + 1) * sizeof(short);
@@ -181,131 +149,98 @@ void kernel_driver_aa(std::string filename,
     printf("sequences per stream (SYCL grid size): %d\n", sequences_per_stream);
     printf("minSize (SYCL work-group size): %d\n", minSize);
 
-    range<1> gws_aa(sequences_per_stream*minSize);
-    range<1> lws_aa(minSize);
+    sycl::range<1> gws_aa(sequences_per_stream*minSize);
+    sycl::range<1> lws_aa(minSize);
 
-    q.submit([&] (handler &cgh) {
-      auto strA = d_strA.get_access<sycl_read>(cgh);
-      auto strB = d_strB.get_access<sycl_read>(cgh);
-      auto offset_ref = d_offset_ref.get_access<sycl_read>(cgh);
-      auto offset_query = d_offset_query.get_access<sycl_read>(cgh);
-      auto ref_start = d_ref_start.get_access<sycl_read>(cgh);
-      auto ref_end = d_ref_end.get_access<sycl_discard_write>(cgh);
-      auto query_start = d_query_start.get_access<sycl_read>(cgh);
-      auto query_end = d_query_end.get_access<sycl_discard_write>(cgh);
-      auto scores = d_scores.get_access<sycl_discard_write>(cgh);
-      auto scoring_matrix = d_scoring_matrix.get_access<sycl_read>(cgh);
-      auto encoding_matrix = d_encoding_matrix.get_access<sycl_read>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor< char, 1> is_valid_array(sycl::range<1>(ShmemBytes), cgh);
+      sycl::local_accessor<short, 1> sh_prev_E(sycl::range<1>(32), cgh);
+      sycl::local_accessor<short, 1> sh_prev_H(sycl::range<1>(32), cgh);
+      sycl::local_accessor<short, 1> sh_prev_prev_H(sycl::range<1>(32), cgh);
+      sycl::local_accessor<short, 1> sh_spill_prev_E(sycl::range<1>(1024), cgh);
+      sycl::local_accessor<short, 1> sh_spill_prev_H(sycl::range<1>(1024), cgh);
+      sycl::local_accessor<short, 1> sh_spill_prev_prev_H(sycl::range<1>(1024), cgh);
+      sycl::local_accessor<short, 1> sh_aa_encoding(sycl::range<1>(ENCOD_MAT_SIZE), cgh);
+      sycl::local_accessor<short, 1> sh_aa_scoring(sycl::range<1>(SCORE_MAT_SIZE), cgh);
+      sycl::local_accessor<short, 1> sh_locTots(sycl::range<1>(32), cgh);
+      sycl::local_accessor<short, 1> sh_locInds(sycl::range<1>(32), cgh);
+      sycl::local_accessor<short, 1> sh_locInds2(sycl::range<1>(32), cgh);
 
-      accessor<char, 1, sycl_read_write, access::target::local> is_valid_array(ShmemBytes, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_E(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_H(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_prev_H(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_E(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_H(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_prev_H(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_aa_encoding(ENCOD_MAT_SIZE, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_aa_scoring(SCORE_MAT_SIZE, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locTots(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locInds(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locInds2(32, cgh);
-
-      cgh.parallel_for<class aa>(nd_range<1>(gws_aa, lws_aa), [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+      cgh.parallel_for<class aa>(
+        sycl::nd_range<1>(gws_aa, lws_aa), [=] (sycl::nd_item<1> item)
+        [[intel::reqd_sub_group_size(32)]] {
         sequence_aa_kernel(
-           strA.get_pointer(),
-           strB.get_pointer(),
-           offset_ref.get_pointer(),
-           offset_query.get_pointer(),
-           ref_start.get_pointer(),
-           ref_end.get_pointer(),
-           query_start.get_pointer(),
-           query_end.get_pointer(),
-           scores.get_pointer(),
+           d_strA,
+           d_strB,
+           d_offset_ref,
+           d_offset_query,
+           d_ref_start,
+           d_ref_end,
+           d_query_start,
+           d_query_end,
+           d_scores,
            openGap,
            extendGap,
-           scoring_matrix.get_pointer(),
-           encoding_matrix.get_pointer(),
+           d_scoring_matrix,
+           d_encoding_matrix,
            is_valid_array.get_pointer(),
            sh_prev_E.get_pointer(),
            sh_prev_H.get_pointer(),
            sh_prev_prev_H.get_pointer(),
-           local_spill_prev_E.get_pointer(),
-           local_spill_prev_H.get_pointer(),
-           local_spill_prev_prev_H.get_pointer(),
+           sh_spill_prev_E.get_pointer(),
+           sh_spill_prev_H.get_pointer(),
+           sh_spill_prev_prev_H.get_pointer(),
            sh_aa_encoding.get_pointer(),
            sh_aa_scoring.get_pointer(),
-	   locTots.get_pointer(),
-	   locInds.get_pointer(),
-	   locInds2.get_pointer(),
+	   sh_locTots.get_pointer(),
+	   sh_locInds.get_pointer(),
+	   sh_locInds2.get_pointer(),
            false,
            item
         );
       });
     });
 
-    // copyin back end index so that we can find new min
-    q.submit([&] (handler &cgh) {
-      auto acc = d_ref_end.get_access<sycl_read>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(acc, ref_end);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_query_end.get_access<sycl_read>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(acc, query_end);
-    });
-
-    q.wait();
-
-    auto sec_cpu_start = NOW;
-
+    // copy back end index so that we can find new min
+    q.memcpy(ref_end, d_ref_end, sizeof(short) * sequences_per_stream);
+    q.memcpy(query_end, d_query_end, sizeof(short) * sequences_per_stream);
+    
     // find the new largest of smaller lengths
     int newMin = get_new_min_length(ref_end, query_end, blocksLaunched);
-    auto sec_cpu_end = NOW;
-    std::chrono::duration<double> dur_sec_cpu = sec_cpu_end - sec_cpu_start;
-    total_time_cpu += dur_sec_cpu.count();
 
-    range<1> gws_aa_r(sequences_per_stream*newMin);
-    range<1> lws_aa_r(newMin);
+    sycl::range<1> gws_aa_r(sequences_per_stream*newMin);
+    sycl::range<1> lws_aa_r(newMin);
 
-    q.submit([&] (handler &cgh) {
-      auto strA = d_strA.get_access<sycl_read>(cgh);
-      auto strB = d_strB.get_access<sycl_read>(cgh);
-      auto offset_ref = d_offset_ref.get_access<sycl_read>(cgh);
-      auto offset_query = d_offset_query.get_access<sycl_read>(cgh);
-      auto ref_start = d_ref_start.get_access<sycl_discard_write>(cgh);
-      auto ref_end = d_ref_end.get_access<sycl_read>(cgh);
-      auto query_start = d_query_start.get_access<sycl_discard_write>(cgh);
-      auto query_end = d_query_end.get_access<sycl_read>(cgh);
-      auto scores = d_scores.get_access<sycl_read>(cgh);
-      auto scoring_matrix = d_scoring_matrix.get_access<sycl_read>(cgh);
-      auto encoding_matrix = d_encoding_matrix.get_access<sycl_read>(cgh);
-      accessor<char, 1, sycl_read_write, access::target::local> is_valid_array(ShmemBytes, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_E(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_H(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_prev_prev_H(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_E(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_H(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> local_spill_prev_prev_H(1024, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_aa_encoding(ENCOD_MAT_SIZE, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> sh_aa_scoring(SCORE_MAT_SIZE, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locTots(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locInds(32, cgh);
-      accessor<short, 1, sycl_read_write, access::target::local> locInds2(32, cgh);
-      cgh.parallel_for<class aa_r>(nd_range<1>(gws_aa_r, lws_aa_r), [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<char, 1> is_valid_array(ShmemBytes, cgh);
+      sycl::local_accessor<short, 1> sh_prev_E(32, cgh);
+      sycl::local_accessor<short, 1> sh_prev_H(32, cgh);
+      sycl::local_accessor<short, 1> sh_prev_prev_H(32, cgh);
+      sycl::local_accessor<short, 1> local_spill_prev_E(1024, cgh);
+      sycl::local_accessor<short, 1> local_spill_prev_H(1024, cgh);
+      sycl::local_accessor<short, 1> local_spill_prev_prev_H(1024, cgh);
+      sycl::local_accessor<short, 1> sh_aa_encoding(ENCOD_MAT_SIZE, cgh);
+      sycl::local_accessor<short, 1> sh_aa_scoring(SCORE_MAT_SIZE, cgh);
+      sycl::local_accessor<short, 1> locTots(32, cgh);
+      sycl::local_accessor<short, 1> locInds(32, cgh);
+      sycl::local_accessor<short, 1> locInds2(32, cgh);
+      cgh.parallel_for<class aa_r>(
+        sycl::nd_range<1>(gws_aa_r, lws_aa_r), [=] (sycl::nd_item<1> item)
+        [[intel::reqd_sub_group_size(32)]] {
         sequence_aa_kernel(
-           strA.get_pointer(),
-           strB.get_pointer(),
-           offset_ref.get_pointer(),
-           offset_query.get_pointer(),
-           ref_start.get_pointer(),
-           ref_end.get_pointer(),
-           query_start.get_pointer(),
-           query_end.get_pointer(),
-           scores.get_pointer(),
+           d_strA,
+           d_strB,
+           d_offset_ref,
+           d_offset_query,
+           d_ref_start,
+           d_ref_end,
+           d_query_start,
+           d_query_end,
+           d_scores,
            openGap,
            extendGap,
-           scoring_matrix.get_pointer(),
-           encoding_matrix.get_pointer(),
+           d_scoring_matrix,
+           d_encoding_matrix,
            is_valid_array.get_pointer(),
            sh_prev_E.get_pointer(),
            sh_prev_H.get_pointer(),
@@ -324,20 +259,10 @@ void kernel_driver_aa(std::string filename,
     });
 
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_ref_start.get_access<sycl_read>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(acc, ref_begin);
-    });
+    q.memcpy(ref_begin, d_ref_start, sizeof(short) * sequences_per_stream);
+    q.memcpy(query_begin, d_query_start, sizeof(short) * sequences_per_stream);
+    q.memcpy(top_scores, d_scores, sizeof(short) * sequences_per_stream);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_query_start.get_access<sycl_read>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(acc, query_begin);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto scores = d_scores.get_access<sycl_read>(cgh, range<1>(sequences_per_stream));
-      cgh.copy(scores, top_scores);
-    });
 
     ref_begin += stringsPerIt;
     query_begin += stringsPerIt;
@@ -348,19 +273,25 @@ void kernel_driver_aa(std::string filename,
   }  // iterations end here
 
   q.wait();
+  auto end = NOW;
 
- } // SYCL scope 
-
-  auto end  = NOW;
-
-  std::cout <<"cpu time:"<<total_time_cpu<<std::endl;
-  std::cout <<"packing time:"<<total_packing<<std::endl;
+  sycl::free(d_ref_start, q);
+  sycl::free(d_ref_end, q);
+  sycl::free(d_query_start, q);
+  sycl::free(d_query_end, q);
+  sycl::free(d_scores, q);
+  sycl::free(d_offset_ref, q);
+  sycl::free(d_offset_query, q);
+  sycl::free(d_strA, q);
+  sycl::free(d_strB, q);
+  sycl::free(d_encoding_matrix, q);
+  sycl::free(d_scoring_matrix, q);
 
   std::chrono::duration<double> diff = end - start;
   std::cout << "Total Alignments:" << totalAlignments << "\n" 
             << "Max Reference Size:" << maxContigSize << "\n"
             << "Max Query Size:"<< maxReadSize << "\n" 
-            << "Total Execution Time (seconds):"<< diff.count() << "\n";
+            << "Total loop iteration time (seconds):"<< diff.count() << "\n";
 
   std::ofstream results_file(filename);
 

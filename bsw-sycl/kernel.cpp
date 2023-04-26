@@ -2,7 +2,7 @@
 
 inline short
 warpReduceMax_with_index(short val, short& myIndex, short& myIndex2,
-                         int lengthSeqB, bool inverse, nd_item<1> &item)
+                         int lengthSeqB, bool inverse, sycl::nd_item<1> &item)
 {
   short myMax    = val;
   short newInd   = 0;
@@ -70,7 +70,7 @@ warpReduceMax_with_index(short val, short& myIndex, short& myIndex2,
 }
 
 short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2, int lengthSeqB, 
-    short* locTots, short* locInds, short* locInds2, bool inverse, nd_item<1> &item)
+    short* locTots, short* locInds, short* locInds2, bool inverse, sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
   auto gp = item.get_group();
@@ -157,7 +157,7 @@ void sequence_aa_kernel(
     short*__restrict locInds,
     short*__restrict locInds2,
     bool   inverse,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 
 {
   auto sg = item.get_sub_group();
