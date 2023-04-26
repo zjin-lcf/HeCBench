@@ -37,11 +37,6 @@ void kernel_driver_aa(std::string filename,
     13,7,8,9,0,11,10,12,2,0,14,5,
     1,15,16,0,19,17,22,18,21};
 
-  float total_packing;
-
-  auto start = NOW;
-  float total_time_cpu = 0;
-
   // total number of iterations
   int its = (totalAlignments>20000)?(ceil((float)totalAlignments/20000)):1;
   unsigned NBLOCKS    = totalAlignments;
@@ -86,8 +81,6 @@ void kernel_driver_aa(std::string filename,
   hipMemcpy(d_scoring_matrix, h_scoring_matrix, 
       SCORE_MAT_SIZE * sizeof(short), hipMemcpyHostToDevice);
 
-  total_packing = 0;
-
   short* ref_begin    = h_ref_begin;
   short* ref_end      = h_ref_end;  
   short* query_begin  = h_query_begin;
@@ -96,9 +89,11 @@ void kernel_driver_aa(std::string filename,
 
   std::cout<<"Number of loop iterations: " << its << std::endl;
 
+  hipDeviceSynchronize();
+  auto start = NOW;
+
   for (int perGPUIts = 0; perGPUIts < its; perGPUIts++)
   {
-    auto packing_start = NOW;
     int  blocksLaunched;
     std::vector<std::string>::const_iterator beginAVec;
     std::vector<std::string>::const_iterator endAVec;
@@ -126,8 +121,6 @@ void kernel_driver_aa(std::string filename,
     unsigned running_sum = 0;
     int sequences_per_stream = blocksLaunched;
 
-    auto start_cpu = NOW;
-
     for (unsigned int i = 0; i < sequencesA.size(); i++)
     {
       running_sum += sequencesA[i].size();
@@ -147,9 +140,6 @@ void kernel_driver_aa(std::string filename,
     unsigned totalLengthB = h_offsetB[sequencesB.size() - 1];
     // std::cout << "totalLengthB: " << totalLengthB << std::endl;
 
-    auto end_cpu = NOW;
-    std::chrono::duration<double> cpu_dur = end_cpu - start_cpu;
-    total_time_cpu += cpu_dur.count();
     unsigned offsetSumA = 0;
     unsigned offsetSumB = 0;
 
@@ -162,11 +152,6 @@ void kernel_driver_aa(std::string filename,
       offsetSumA += sequencesA[i].size();
       offsetSumB += sequencesB[i].size();
     }
-
-    auto packing_end = NOW;
-    std::chrono::duration<double> packing_dur = packing_end - packing_start;
-
-    total_packing += packing_dur.count();
 
     hipMemcpyAsync(d_offset_ref, h_offsetA, sizeof(unsigned) * sequences_per_stream,
         hipMemcpyHostToDevice, 0);
@@ -218,13 +203,8 @@ void kernel_driver_aa(std::string filename,
 
     hipDeviceSynchronize();
 
-    auto sec_cpu_start = NOW;
-
     // find the new largest of smaller lengths
     int newMin = get_new_min_length(ref_end, query_end, blocksLaunched);
-    auto sec_cpu_end = NOW;
-    std::chrono::duration<double> dur_sec_cpu = sec_cpu_end - sec_cpu_start;
-    total_time_cpu += dur_sec_cpu.count();
 
     dim3 gws_aa_r(sequences_per_stream);
     dim3 lws_aa_r(newMin);
@@ -264,6 +244,7 @@ void kernel_driver_aa(std::string filename,
   }  // iterations end here
 
   hipDeviceSynchronize();
+  auto end  = NOW;
 
   hipFree(d_ref_start);
   hipFree(d_ref_end);
@@ -277,16 +258,11 @@ void kernel_driver_aa(std::string filename,
   hipFree(d_encoding_matrix);
   hipFree(d_scoring_matrix);
 
-  auto end  = NOW;
-
-  std::cout <<"cpu time:"<<total_time_cpu<<std::endl;
-  std::cout <<"packing time:"<<total_packing<<std::endl;
-
   std::chrono::duration<double> diff = end - start;
   std::cout << "Total Alignments:" << totalAlignments << "\n" 
     << "Max Reference Size:" << maxContigSize << "\n"
     << "Max Query Size:"<< maxReadSize << "\n" 
-    << "Total Execution Time (seconds):"<< diff.count() << "\n";
+    << "Total loop iteration time (seconds):"<< diff.count() << "\n";
 
   std::ofstream results_file(filename);
 
