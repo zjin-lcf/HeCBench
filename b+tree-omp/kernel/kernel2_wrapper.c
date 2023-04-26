@@ -33,10 +33,6 @@ kernel2_wrapper(
   //  CPU VARIABLES
   //======================================================================================================================================================150
 
-  // timer
-
-  long long offload_start = get_time();
-
   // findRangeK kernel
 
   size_t threads;
@@ -52,11 +48,11 @@ kernel2_wrapper(
                         map(tofrom: recstart[0: count])\
                         map(from: reclength[0: count])
   {
+    long long kernel_start = get_time();
 
-#pragma omp target teams num_teams(count) thread_limit(threads)
+    #pragma omp target teams num_teams(count) thread_limit(threads)
     {
-
-#pragma omp parallel
+      #pragma omp parallel
       {
         // private thread IDs
         int thid = omp_get_thread_num();
@@ -81,20 +77,20 @@ kernel2_wrapper(
               offset_2[bid] = knodes[lastKnode[bid]].indices[thid];
             }
           }
-#pragma omp barrier
+          #pragma omp barrier
           // set for next tree level
           if(thid==0){
             currKnode[bid] = offset[bid];
             lastKnode[bid] = offset_2[bid];
           }
-#pragma omp barrier
+          #pragma omp barrier
         }
 
         // Find the index of the starting record
         if(knodes[currKnode[bid]].keys[thid] == start[bid]){
           recstart[bid] = knodes[currKnode[bid]].indices[thid];
         }
-#pragma omp barrier
+        #pragma omp barrier
 
         // Find the index of the ending record
         if(knodes[lastKnode[bid]].keys[thid] == end[bid]){
@@ -102,9 +98,9 @@ kernel2_wrapper(
         }
       }
     }
+    long long kernel_end = get_time();
+    printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
   }
-
-  long long offload_end = get_time();
 
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
@@ -113,9 +109,5 @@ kernel2_wrapper(
 	  printf("reclength[%d] = %d\n", i, reclength[i]);
 #endif
 
-  //  DISPLAY TIMING
-
-  printf("Device offloading time:\n");
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000);
 }
 

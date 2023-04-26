@@ -22,8 +22,6 @@ kernel_wrapper(record *records,
     record *ans)
 {
 
-  long long offload_start = get_time();
-
   int numBlocks;
   numBlocks = count;                  // max # of blocks can be 65,535
   int threadsPerBlock;
@@ -109,9 +107,8 @@ kernel_wrapper(record *records,
 
   cudaMemcpyAsync(ansD, ans, count*sizeof(record), cudaMemcpyHostToDevice, 0);
 
-  //======================================================================================================================================================150
-  // findK kernel
-  //======================================================================================================================================================150
+  cudaDeviceSynchronize();
+  long long kernel_start = get_time();
 
   findK<<<numBlocks, threadsPerBlock>>>(  maxheight,
       knodesD,
@@ -122,9 +119,9 @@ kernel_wrapper(record *records,
       keysD,
       ansD);
 
-  //==================================================50
-  //  ansD
-  //==================================================50
+  cudaDeviceSynchronize();
+  long long kernel_end = get_time();
+  printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
 
   cudaMemcpy(ans, ansD, count*sizeof(record), cudaMemcpyDeviceToHost);
 
@@ -135,14 +132,9 @@ kernel_wrapper(record *records,
   cudaFree(keysD);
   cudaFree(ansD);
 
-  long long offload_end = get_time();
-
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("ans[%d] = %d\n", i, ans[i].value);
   printf("\n");
 #endif
-
-  printf("Total time:\n");
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000); 
 }

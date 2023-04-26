@@ -7,7 +7,7 @@
 
 void 
 kernel_wrapper(	
-    queue &q,
+    sycl::queue &q,
     record *records,
     long records_mem, // not length in byte
     knode *knodes,
@@ -23,62 +23,67 @@ kernel_wrapper(
     int *keys,
     record *ans)
 {
+  record *recordsD_acc = sycl::malloc_device<record>(records_mem, q);
+  q.memcpy(recordsD_acc, records, sizeof(record) * records_mem);
 
-  long long offload_start = get_time();
+  knode *knodesD_acc = sycl::malloc_device<knode>(knodes_mem, q);
+  q.memcpy(knodesD_acc, knodes, sizeof(knode) * knodes_mem);
 
-  { // SYCL scope
+  long *currKnodeD_acc = sycl::malloc_device<long>(count, q);
+  q.memcpy(currKnodeD_acc, currKnode, sizeof(long) * count);
+ 
+  long *offsetD_acc = sycl::malloc_device<long>(count, q);
+  q.memcpy(offsetD_acc, offset, sizeof(long) * count);
 
-    const property_list props = property::buffer::use_host_ptr();
+  int *keysD_acc = sycl::malloc_device<int>(count, q);
+  q.memcpy(keysD_acc, keys, sizeof(int) * count);
 
-    buffer<record,1> recordsD (records, records_mem, props);
-    buffer<knode,1> knodesD (knodes, knodes_mem, props);
-    buffer<long,1> currKnodeD (currKnode, count, props);
-    buffer<long,1> offsetD (offset, count, props);
-    buffer<int,1> keysD (keys, count, props);
-    buffer<record,1> ansD (ans, count, props);
-    currKnodeD.set_final_data(nullptr);
-    offsetD.set_final_data(nullptr);
+  record *ansD_acc = sycl::malloc_device<record>(count, q);
 
+  // findK kernel
 
-    // findK kernel
-
-    size_t local_work_size[1];
+  size_t local_work_size[1];
 #ifdef USE_GPU
-    local_work_size[0] = order < 256 ? order : 256;
+  local_work_size[0] = order < 256 ? order : 256;
 #else
-    local_work_size[0] = order < 1024 ? order : 1024;
+  local_work_size[0] = order < 1024 ? order : 1024;
 #endif
-    size_t global_work_size[1];
-    global_work_size[0] = count * local_work_size[0];
+  size_t global_work_size[1];
+  global_work_size[0] = count * local_work_size[0];
 
-    printf("# of blocks = %d, # of threads/block = %d (ensure that device can handle)\n", (int)(global_work_size[0]/local_work_size[0]), (int)local_work_size[0]);
+#ifdef DEBUG
+  printf("# of blocks = %d, # of threads/block = %d (ensure that device can handle)\n",
+         (int)(global_work_size[0]/local_work_size[0]), (int)local_work_size[0]);
+#endif
 
-    q.submit([&](handler& cgh) {
+  q.wait();
+  long long kernel_start = get_time();
 
-        auto knodesD_acc = knodesD.get_access<sycl_read>(cgh);
-        auto currKnodeD_acc = currKnodeD.get_access<sycl_read_write>(cgh);
-        auto recordsD_acc = recordsD.get_access<sycl_read>(cgh);
-        auto offsetD_acc = offsetD.get_access<sycl_read_write>(cgh);
-        auto keysD_acc = keysD.get_access<sycl_read>(cgh);
-        auto ansD_acc = ansD.get_access<sycl_write>(cgh);
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class findK>(sycl::nd_range<1>(
+      sycl::range<1>(global_work_size[0]),
+      sycl::range<1>(local_work_size[0])), [=] (sycl::nd_item<1> item) {
+      #include "findK.sycl"
+    });
+  }).wait();
 
-        cgh.parallel_for<class findK>(
-            nd_range<1>(range<1>(global_work_size[0]),
-              range<1>(local_work_size[0])), [=] (nd_item<1> item) {
-#include "findK.sycl"
-            });
-        });
+  long long kernel_end = get_time();
 
-    q.wait();
-  } // SYCL scope
-  long long offload_end = get_time();
+  q.memcpy(ans, ansD_acc, count*sizeof(record)).wait();
+
+  sycl::free(recordsD_acc, q);
+  sycl::free(knodesD_acc, q);
+  sycl::free(currKnodeD_acc, q);
+  sycl::free(offsetD_acc, q);
+  sycl::free(keysD_acc, q);
+  sycl::free(ansD_acc, q);
 
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("ans[%d] = %d\n", i, ans[i].value);
   printf("\n");
 #endif
-  printf("Device offloading time:\n");
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000);
+
+  printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
 }
 

@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <hip/hip_runtime.h>
+#include <stdio.h>
 #include "../common.h"
 #include "../util/timer/timer.h"
 #include "./kernel.cu"
@@ -21,8 +21,6 @@ kernel_wrapper(record *records,
     int *keys,
     record *ans)
 {
-
-  long long offload_start = get_time();
 
   int numBlocks;
   numBlocks = count;                  // max # of blocks can be 65,535
@@ -109,11 +107,10 @@ kernel_wrapper(record *records,
 
   hipMemcpyAsync(ansD, ans, count*sizeof(record), hipMemcpyHostToDevice, 0);
 
-  //======================================================================================================================================================150
-  // findK kernel
-  //======================================================================================================================================================150
+  hipDeviceSynchronize();
+  long long kernel_start = get_time();
 
-  hipLaunchKernelGGL(findK, dim3(numBlocks), dim3(threadsPerBlock), 0, 0,   maxheight,
+  findK<<<numBlocks, threadsPerBlock>>>(  maxheight,
       knodesD,
       knodes_elem,
       recordsD,
@@ -122,9 +119,9 @@ kernel_wrapper(record *records,
       keysD,
       ansD);
 
-  //==================================================50
-  //  ansD
-  //==================================================50
+  hipDeviceSynchronize();
+  long long kernel_end = get_time();
+  printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
 
   hipMemcpy(ans, ansD, count*sizeof(record), hipMemcpyDeviceToHost);
 
@@ -135,14 +132,9 @@ kernel_wrapper(record *records,
   hipFree(keysD);
   hipFree(ansD);
 
-  long long offload_end = get_time();
-
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("ans[%d] = %d\n", i, ans[i].value);
   printf("\n");
 #endif
-
-  printf("Total time:\n");
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000); 
 }

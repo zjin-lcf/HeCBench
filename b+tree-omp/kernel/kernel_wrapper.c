@@ -27,23 +27,22 @@ kernel_wrapper(  record *records,
   //  CPU VARIABLES
   //======================================================================================================================================================150
 
-  // timer
-  long long offload_start = get_time();
-
   // findK kernel
 
   int threads = order < 256 ? order : 256;
 
-#pragma omp target data map(to: knodes[0: knodes_mem],\
-                                records[0: records_mem],\
-                                keys[0: count], \
-                                currKnode[0: count],\
-                                offset[0: count])\
-                        map(from: ans[0: count])
- {
-#pragma omp target teams num_teams(count) thread_limit(threads)
+  #pragma omp target data map(to: knodes[0: knodes_mem],\
+                                  records[0: records_mem],\
+                                  keys[0: count], \
+                                  currKnode[0: count],\
+                                  offset[0: count])\
+                          map(from: ans[0: count])
+  {
+    long long kernel_start = get_time();
+
+    #pragma omp target teams num_teams(count) thread_limit(threads)
     {
-#pragma omp parallel
+      #pragma omp parallel
       {
         // private thread IDs
         int thid = omp_get_thread_num();
@@ -61,13 +60,12 @@ kernel_wrapper(  record *records,
               offset[bid] = knodes[offset[bid]].indices[thid];
             }
           }
-#pragma omp barrier
+          #pragma omp barrier
           // set for next tree level
           if(thid==0){
             currKnode[bid] = offset[bid];
           }
-#pragma omp barrier
-
+          #pragma omp barrier
         }
 
         //At this point, we have a candidate leaf node which may contain
@@ -77,17 +75,15 @@ kernel_wrapper(  record *records,
         }
       }
     }
+    long long kernel_end = get_time();
+    printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
   } 
-  long long offload_end = get_time();
 
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("ans[%d] = %d\n", i, ans[i].value);
   printf("\n");
 #endif
-
-  printf("Device offloading time:\n");
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000);
 
 }
 

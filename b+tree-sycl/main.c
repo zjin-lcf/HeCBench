@@ -25,7 +25,7 @@
 #include <limits.h> // INT_MIN, INT_MAX
 #include <math.h>   // log, pow
 #include <string.h> // memset
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "b+tree.h"
 #include "timer.h"
 #include "num.h"
@@ -1778,11 +1778,10 @@ int main(int argc, char** argv )
   // Create SYCL queue only once
   // ------------------------------------------------------------60
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // ------------------------------------------------------------60
   // process commands
@@ -2124,7 +2123,6 @@ int main(int argc, char** argv )
               end,
               recstart,
               reclength);
-
 
           pFile = fopen (output,"aw+");
           if (pFile==NULL)

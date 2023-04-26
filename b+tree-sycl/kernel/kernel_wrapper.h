@@ -1,9 +1,9 @@
 #ifndef KERNEL_WRAPPER_H
 #define KERNEL_WRAPPER_H
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 void 
-kernel_wrapper(	queue &q,
+kernel_wrapper(	sycl::queue &q,
 		record *records,
 		long records_mem,
 		knode *knodes,
