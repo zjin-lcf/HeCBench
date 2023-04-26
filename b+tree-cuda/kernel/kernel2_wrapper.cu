@@ -119,6 +119,9 @@ kernel2_wrapper(  knode *knodes,
 
   cudaMemcpyAsync(ansDLength, reclength, count*sizeof(int), cudaMemcpyHostToDevice, 0);
 
+  cudaDeviceSynchronize();
+  long long kernel_start = get_time();
+   
   // [GPU] findRangeK kernel
   findRangeK<<<numBlocks, threadsPerBlock>>>(  maxheight,
       knodesD,
@@ -132,11 +135,13 @@ kernel2_wrapper(  knode *knodes,
       ansDStart,
       ansDLength);
 
+  cudaDeviceSynchronize();
+  long long kernel_end = get_time();
+  printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
+
   cudaMemcpyAsync(recstart, ansDStart, count*sizeof(int), cudaMemcpyDeviceToHost, 0);
 
   cudaMemcpyAsync(reclength, ansDLength, count*sizeof(int), cudaMemcpyDeviceToHost, 0);
-
-  cudaDeviceSynchronize();
 
   cudaFree(knodesD);
   cudaFree(currKnodeD);
@@ -148,17 +153,11 @@ kernel2_wrapper(  knode *knodes,
   cudaFree(ansDStart);
   cudaFree(ansDLength);
 
-  long long offload_end = get_time();
-
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("recstart[%d] = %d\n", i, recstart[i]);
   for (int i = 0; i < count; i++)
     printf("reclength[%d] = %d\n", i, reclength[i]);
 #endif
-
-
-  printf("Total time:\n"); 
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000); 
 }
 

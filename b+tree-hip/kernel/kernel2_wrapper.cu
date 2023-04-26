@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <hip/hip_runtime.h>
+#include <stdio.h>
 #include "../common.h"
 #include "../util/timer/timer.h"
 #include "./kernel2.cu"
@@ -119,8 +119,11 @@ kernel2_wrapper(  knode *knodes,
 
   hipMemcpyAsync(ansDLength, reclength, count*sizeof(int), hipMemcpyHostToDevice, 0);
 
+  hipDeviceSynchronize();
+  long long kernel_start = get_time();
+   
   // [GPU] findRangeK kernel
-  hipLaunchKernelGGL(findRangeK, dim3(numBlocks), dim3(threadsPerBlock), 0, 0,   maxheight,
+  findRangeK<<<numBlocks, threadsPerBlock>>>(  maxheight,
       knodesD,
       knodes_elem,
       currKnodeD,
@@ -132,11 +135,13 @@ kernel2_wrapper(  knode *knodes,
       ansDStart,
       ansDLength);
 
+  hipDeviceSynchronize();
+  long long kernel_end = get_time();
+  printf("Kernel execution time: %f (us)\n", (float)(kernel_end-kernel_start));
+
   hipMemcpyAsync(recstart, ansDStart, count*sizeof(int), hipMemcpyDeviceToHost, 0);
 
   hipMemcpyAsync(reclength, ansDLength, count*sizeof(int), hipMemcpyDeviceToHost, 0);
-
-  hipDeviceSynchronize();
 
   hipFree(knodesD);
   hipFree(currKnodeD);
@@ -148,17 +153,11 @@ kernel2_wrapper(  knode *knodes,
   hipFree(ansDStart);
   hipFree(ansDLength);
 
-  long long offload_end = get_time();
-
 #ifdef DEBUG
   for (int i = 0; i < count; i++)
     printf("recstart[%d] = %d\n", i, recstart[i]);
   for (int i = 0; i < count; i++)
     printf("reclength[%d] = %d\n", i, reclength[i]);
 #endif
-
-
-  printf("Total time:\n"); 
-  printf("%.12f s\n", (float) (offload_end-offload_start) / 1000000); 
 }
 
