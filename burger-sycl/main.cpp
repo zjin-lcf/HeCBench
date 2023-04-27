@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define idx(i,j)   (i)*y_points+(j)
 
@@ -64,112 +64,108 @@ int main(int argc, char* argv[])
     }
   }
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<double, 1> d_u_new (u_new, grid_elems); 
-  buffer<double, 1> d_v_new (v_new, grid_elems);
-  buffer<double, 1> d_u (u, grid_elems);
-  buffer<double, 1> d_v (v, grid_elems);
-  d_u_new.set_final_data(nullptr);
-  d_v_new.set_final_data(nullptr);
-  d_u.set_final_data(du);
-  d_v.set_final_data(dv);
+  double *d_u_new = sycl::malloc_device<double>(grid_elems, q);
+  q.memcpy(d_u_new, u_new, grid_size); 
+
+  double *d_v_new = sycl::malloc_device<double>(grid_elems, q);
+  q.memcpy(d_v_new, v_new, grid_size); 
+
+  double *d_u = sycl::malloc_device<double>(grid_elems, q);
+  q.memcpy(d_u, u, grid_size); 
+
+  double *d_v = sycl::malloc_device<double>(grid_elems, q);
+  q.memcpy(d_v, v, grid_size); 
 
   // ranges of the four kernels
-  range<2> gws ((y_points-2+15)/16*16, (x_points-2+15)/16*16);
-  range<2> lws (16, 16);
-  range<1> gws2 ((x_points+255)/256*256);
-  range<1> lws2 (256);
-  range<1> gws3 ((y_points+255)/256*256);
-  range<1> lws3 (256);
-  range<1> gws4 ((grid_elems+255)/256*256);
-  range<1> lws4 (256);
+  sycl::range<2> gws ((y_points-2+15)/16*16, (x_points-2+15)/16*16);
+  sycl::range<2> lws (16, 16);
+  sycl::range<1> gws2 ((x_points+255)/256*256);
+  sycl::range<1> lws2 (256);
+  sycl::range<1> gws3 ((y_points+255)/256*256);
+  sycl::range<1> lws3 (256);
+  sycl::range<1> gws4 ((grid_elems+255)/256*256);
+  sycl::range<1> lws4 (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int itr = 0; itr < num_itrs; itr++) {
 
-    q.submit([&] (handler &cgh) {
-      auto u_new = d_u_new.get_access<sycl_write>(cgh);
-      auto v_new = d_v_new.get_access<sycl_write>(cgh);
-      auto     u = d_u.get_access<sycl_read>(cgh);
-      auto     v = d_v.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class core>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class core>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int i = item.get_global_id(0) + 1;
         int j = item.get_global_id(1) + 1;
         if (j < x_points - 1 && i < y_points - 1) {
-          u_new[idx(i,j)] = u[idx(i,j)] + 
-            (nu*del_t/(del_x*del_x)) * (u[idx(i,j+1)] + u[idx(i,j-1)] - 2 * u[idx(i,j)]) + 
-            (nu*del_t/(del_y*del_y)) * (u[idx(i+1,j)] + u[idx(i-1,j)] - 2 * u[idx(i,j)]) - 
-            (del_t/del_x)*u[idx(i,j)] * (u[idx(i,j)] - u[idx(i,j-1)]) - 
-            (del_t/del_y)*v[idx(i,j)] * (u[idx(i,j)] - u[idx(i-1,j)]);
+          d_u_new[idx(i,j)] = d_u[idx(i,j)] + 
+            (nu*del_t/(del_x*del_x)) * (d_u[idx(i,j+1)] + d_u[idx(i,j-1)] - 2 * d_u[idx(i,j)]) + 
+            (nu*del_t/(del_y*del_y)) * (d_u[idx(i+1,j)] + d_u[idx(i-1,j)] - 2 * d_u[idx(i,j)]) - 
+            (del_t/del_x)*d_u[idx(i,j)] * (d_u[idx(i,j)] - d_u[idx(i,j-1)]) - 
+            (del_t/del_y)*d_v[idx(i,j)] * (d_u[idx(i,j)] - d_u[idx(i-1,j)]);
 
-          v_new[idx(i,j)] = v[idx(i,j)] +
-            (nu*del_t/(del_x*del_x)) * (v[idx(i,j+1)] + v[idx(i,j-1)] - 2 * v[idx(i,j)]) + 
-            (nu*del_t/(del_y*del_y)) * (v[idx(i+1,j)] + v[idx(i-1,j)] - 2 * v[idx(i,j)]) -
-            (del_t/del_x)*u[idx(i,j)] * (v[idx(i,j)] - v[idx(i,j-1)]) - 
-            (del_t/del_y)*v[idx(i,j)] * (v[idx(i,j)] - v[idx(i-1,j)]);
+          d_v_new[idx(i,j)] = d_v[idx(i,j)] +
+            (nu*del_t/(del_x*del_x)) * (d_v[idx(i,j+1)] + d_v[idx(i,j-1)] - 2 * d_v[idx(i,j)]) + 
+            (nu*del_t/(del_y*del_y)) * (d_v[idx(i+1,j)] + d_v[idx(i-1,j)] - 2 * d_v[idx(i,j)]) -
+            (del_t/del_x)*d_u[idx(i,j)] * (d_v[idx(i,j)] - d_v[idx(i,j-1)]) - 
+            (del_t/del_y)*d_v[idx(i,j)] * (d_v[idx(i,j)] - d_v[idx(i-1,j)]);
         }
       });
     });
 
     // Boundary conditions
-    q.submit([&] (handler &cgh) {
-      auto u_new = d_u_new.get_access<sycl_write>(cgh);
-      auto v_new = d_v_new.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class bound_h>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bound_h>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < x_points) {
-          u_new[idx(0,i)] = 1.0;
-          v_new[idx(0,i)] = 1.0;
-          u_new[idx(y_points-1,i)] = 1.0;
-          v_new[idx(y_points-1,i)] = 1.0;
+          d_u_new[idx(0,i)] = 1.0;
+          d_v_new[idx(0,i)] = 1.0;
+          d_u_new[idx(y_points-1,i)] = 1.0;
+          d_v_new[idx(y_points-1,i)] = 1.0;
         }
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto u_new = d_u_new.get_access<sycl_write>(cgh);
-      auto v_new = d_v_new.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class bound_v>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bound_v>(
+        sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
         int j = item.get_global_id(0);
         if (j < y_points) {
-          u_new[idx(j,0)] = 1.0;
-          v_new[idx(j,0)] = 1.0;
-          u_new[idx(j,x_points-1)] = 1.0;
-          v_new[idx(j,x_points-1)] = 1.0;
+          d_u_new[idx(j,0)] = 1.0;
+          d_v_new[idx(j,0)] = 1.0;
+          d_u_new[idx(j,x_points-1)] = 1.0;
+          d_v_new[idx(j,x_points-1)] = 1.0;
         }
       });
     });
 
     // Updating older values to newer ones
-    q.submit([&] (handler &cgh) {
-      auto u_new = d_u_new.get_access<sycl_read>(cgh);
-      auto v_new = d_v_new.get_access<sycl_read>(cgh);
-      auto u = d_u.get_access<sycl_discard_write>(cgh);
-      auto v = d_v.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class update>(nd_range<1>(gws4, lws4), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class update>(
+        sycl::nd_range<1>(gws4, lws4), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < grid_elems) {
-          u[i] = u_new[i];
-          v[i] = v_new[i];
+          d_u[i] = d_u_new[i];
+          d_v[i] = d_v_new[i];
         }
       });
     });
   }
 
+  q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
-  }
+  q.memcpy(du, d_u, grid_size);
+  q.memcpy(dv, d_v, grid_size);
+  q.wait();
 
   printf("Serial computing for verification...\n");
 
@@ -247,6 +243,10 @@ int main(int argc, char* argv[])
   free(dv);
   free(u_new);
   free(v_new);
+  sycl::free(d_u, q);
+  sycl::free(d_v, q);
+  sycl::free(d_u_new, q);
+  sycl::free(d_v_new, q);
 
   return 0;
 }
