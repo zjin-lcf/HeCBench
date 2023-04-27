@@ -444,14 +444,6 @@ int main(int argc, char *argv[])
     hipMemcpy(bicluster[i].data, d_bc_data_tmp+n*i, sizeof(char)*n, hipMemcpyDeviceToHost);
   }
 
-  for(i=0; i<maxbcn; i++) {
-    bicluster[i].score=bicluster_temp_score[i];
-    bicluster[i].datacount=bicluster_temp_datacount[i];
-    bicluster[i].samplecount=bicluster_temp_samplecount[i];
-  }
-
-  printbicluster(out,gene,Hd,n,D,maxbcn,thr,bicluster,print_type,overlap);
-
   hipFree(d_gene);
   hipFree(d_bc_score);
   hipFree(d_bc_datacount);
@@ -460,6 +452,14 @@ int main(int argc, char *argv[])
   hipFree(d_bc_sample_tmp);
   hipFree(d_bc_data);
   hipFree(d_bc_data_tmp);
+
+  for(i=0; i<maxbcn; i++) {
+    bicluster[i].score=bicluster_temp_score[i];
+    bicluster[i].datacount=bicluster_temp_datacount[i];
+    bicluster[i].samplecount=bicluster_temp_samplecount[i];
+  }
+
+  printbicluster(out,gene,Hd,n,D,maxbcn,thr,bicluster,print_type,overlap);
 
   for (i = 0; i < n; i++) {
     free(gene[i].x);
