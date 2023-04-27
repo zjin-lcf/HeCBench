@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 #include "reference.h"
 
 void car (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const float *__restrict img,
   const float *__restrict kernels,
   const float *__restrict offsets_h,
@@ -109,40 +109,42 @@ int main(int argc, char* argv[]) {
     offsets_v[i] = LCG_random_double(&seed);
   }
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_img (img, image_size);
-  buffer<float, 1> d_offsets_h (offsets_h, offset_size);
-  buffer<float, 1> d_offsets_v (offsets_v, offset_size);
-  buffer<float, 1> d_kernel (kernel, kernel_size);
-  buffer<float, 1> d_output (output, output_size);
+  float *d_img = sycl::malloc_device<float>(image_size, q);
+  q.memcpy(d_img, img, image_size_byte);
 
-  range<1> gws ((output_size + 255) / 256 * 256);
-  range<1> lws (256);
+  float *d_offsets_h = sycl::malloc_device<float>(offset_size, q);
+  q.memcpy(d_offsets_h, offsets_h, offset_size_byte);
+
+  float *d_offsets_v = sycl::malloc_device<float>(offset_size, q);
+  q.memcpy(d_offsets_v, offsets_v, offset_size_byte);
+
+  float *d_kernel = sycl::malloc_device<float>(kernel_size, q);
+  q.memcpy(d_kernel, kernel, kernel_size_byte);
+
+  float *d_output = sycl::malloc_device<float>(output_size, q);
+
+  sycl::range<1> gws ((output_size + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto img = d_img.get_access<sycl_read>(cgh);
-      auto kernel = d_kernel.get_access<sycl_read>(cgh);
-      auto offsets_h = d_offsets_h.get_access<sycl_read>(cgh);
-      auto offsets_v = d_offsets_v.get_access<sycl_read>(cgh);
-      auto output = d_output.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class downsampling>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class downsampling>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         car(item,
-            img.get_pointer(),
-            kernel.get_pointer(),
-            offsets_h.get_pointer(),
-            offsets_v.get_pointer(),
-            output.get_pointer(),
+            d_img,
+            d_kernel,
+            d_offsets_h,
+            d_offsets_v,
+            d_output,
             p,
             1, // offset_unit,
             padding,
@@ -156,14 +158,19 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
 
+  q.memcpy(output, d_output, output_size_byte).wait();
   reference (img, kernel, offsets_h, offsets_v, output_ref, p, 1, padding);
-
-  } // sycl scope
 
   float rmse = 0;
   for (size_t i = 0; i < output_size; i++)
     rmse += (output_ref[i] - output[i]) * (output_ref[i] - output[i]);
   printf("RMSE: %f\n", sqrtf(rmse/output_size));
+
+  sycl::free(d_img, q);
+  sycl::free(d_offsets_h, q);
+  sycl::free(d_offsets_v, q);
+  sycl::free(d_kernel, q);
+  sycl::free(d_output, q);
 
   free(img);
   free(offsets_h);
