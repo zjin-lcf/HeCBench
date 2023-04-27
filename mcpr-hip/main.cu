@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
   // kernel 1
   int threads_per_block = 192;
   dim3 threads (threads_per_block);
-  dim3 blocks (ceil(n/threads_per_block));
+  dim3 blocks(ceil(1.0 * n / threads_per_block));
 
   hipMemset(d_probs, 0.0, alphas_size_byte);
 

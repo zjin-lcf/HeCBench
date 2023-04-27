@@ -199,10 +199,9 @@ int main(int argc, char* argv[])
     if (level < min_d) min_d = level;
     if (level > max_d) max_d = level;
 
-
 #ifdef VERIFY
-    verify_generateSpanningTree<<<blocks, ThreadsPerBlock>>>(
-      g.nodes, g.edges, d_g.nindex, d_g.nlist, iter, d_parent, level, d_tail, border[level + 1]);
+    verify_generateSpanningTree<<<blocks, ThreadsPerBlock>>>(g.nodes, g.edges, d_g.nindex, d_g.nlist, iter, d_parent,
+                                                             level, d_tail, border[level + 1]);
 #endif
     //root count
     //#1
@@ -212,13 +211,12 @@ int main(int argc, char* argv[])
     }
 
 #ifdef VERIFY
-    if (cudaSuccess != cudaMemcpy((void*)&label[root[iter % g.nodes]], 
-                                  (void*)&d_label[root[iter % g.nodes]],
+    if (cudaSuccess != cudaMemcpy((void *)&label[root[iter % g.nodes]], (void *)&d_label[root[iter % g.nodes]],
                                   sizeof(int), cudaMemcpyDeviceToHost))
-      fprintf(stderr, "ERROR: copying to host failed\n");
+    fprintf(stderr, "ERROR: copying to host failed\n");
 
     if (label[root[iter % g.nodes]] != g.nodes)
-      printf("ERROR: root count mismatch\n");
+    printf("ERROR: root count mismatch\n");
 #endif
 
     // tree label
@@ -271,14 +269,16 @@ int main(int argc, char* argv[])
   printf("Total graphB+ runtime:    %.6f s\n", runtime);
 
   if (cudaSuccess != cudaMemcpy(inCC, d_inCC, sizeof(int) * g.nodes, cudaMemcpyDeviceToHost))
-    fprintf(stderr, "ERROR: copying incc from device failed\n");
+  fprintf(stderr, "ERROR: copying incc from device failed\n");
 
   // print results
-  avg_d = sum_d/iterations;
+  avg_d = sum_d / iterations;
   printf("number of trees %d\n", iterations);
-  printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n",min_d, max_d, avg_d);
-  for (int i = 0; i < g.nodes; i++) {
-    if (i >= 10) break;  // to limit output
+  printf("Min depth of the trees %d\n Max depth of the trees %d\n Avg depth of the trees %.4f\n", min_d, max_d, avg_d);
+  for (int i = 0; i < g.nodes; i++)
+  {
+    if (i >= 10)
+    break; // to limit output
     printf("%6d: %6d   (%5.1f%%)  %d\n", i, inCC[i], 100.0 * inCC[i] / iterations, g.origID[i]);
   }
 
@@ -327,7 +327,7 @@ int main(int argc, char* argv[])
   cudaFree(d_ws2);
   cudaFree(d_wSize);
   cudaFree(d_minus);
-  cudaFree(d_ws1);
+  // cudaFree(d_ws1);
 
   return 0;
 }
