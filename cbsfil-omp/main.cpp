@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
     *(uint*)(&image[i]) = (w << 24) | (z << 16) | (y << 8) | x;
   }
 
-  double total_time = 0.0;
+  long total_time = 0;
   #pragma omp target data map(from: image[0:numPix])
   {
     int numThreadsX = std::min(PowTwoDivider(height), 64);
