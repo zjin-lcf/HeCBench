@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
   dim3 dimBlockY (blocks);
   dim3 dimGridY ((width  + blocks - 1) / blocks);
 
-  double total_time = 0.0;
+  long total_time = 0;
   for (int i = 0; i < repeat; i++) {
     hipMemcpy(d_image, image, image_size, hipMemcpyHostToDevice);
     auto start = std::chrono::steady_clock::now();
