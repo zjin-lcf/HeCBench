@@ -193,7 +193,7 @@ int main(int argc, char* argv[]) {
 
   dim3 blocks(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1);
 
-  dim3 grids_2((unsigned int)ceil((float)sad_array_size) / BLOCK_SIZE, 1, 1);
+  dim3 grids_2((unsigned int)ceil((float)sad_array_size / BLOCK_SIZE), 1, 1);
   dim3 blocks_2(BLOCK_SIZE, 1, 1);
 
   check(cudaMemcpy(d_main_image, h_main_image,

@@ -290,7 +290,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
   hipMemcpy(d_maskTable, mask_table_device, size, hipMemcpyHostToDevice);
 
   double* d_probMat;
-  hipMalloc((void**)&d_probMat, size*size);
+  hipMalloc((void **)&d_probMat, sizeof(double) * size * size);
   hipMemcpy(d_probMat, probMat_device, sizeof(double)*size*size, hipMemcpyHostToDevice);
 
   dim3 grids ((seqs_len+128)/128);
