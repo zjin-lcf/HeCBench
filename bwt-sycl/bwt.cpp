@@ -1,11 +1,11 @@
 #include <iostream>
 #include <list>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "bwt.hpp"
 
 const int blockSize = 256;
 
-void generate_table(nd_item<1> &item, int* table, int table_size, int n) {
+void generate_table(sycl::nd_item<1> &item, int* table, int table_size, int n) {
   int index = item.get_global_id(0);
   int stride = item.get_local_range(0) * item.get_group_range(0);
   for(int i = index; i < table_size; i+=stride)
@@ -23,7 +23,7 @@ bool compare_rotations(const int& a, const int& b, const char* genome, int n) {
   return false;
 }
 
-void bitonic_sort_step(nd_item<1> &item, int*__restrict table, int table_size, 
+void bitonic_sort_step(sycl::nd_item<1> &item, int*__restrict table, int table_size, 
                        int j, int k, const char*__restrict genome, int n) {
   int i = item.get_global_id(0);
   int ixj = i ^ j;
@@ -38,7 +38,7 @@ void bitonic_sort_step(nd_item<1> &item, int*__restrict table, int table_size,
   }
 }
 
-void reconstruct_sequence(nd_item<1> &item,
+void reconstruct_sequence(sycl::nd_item<1> &item,
                           const int*__restrict table,
                           const char*__restrict sequence, 
                           char*__restrict transformed_sequence, int n) {
@@ -71,67 +71,63 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   table_size++;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> d_table (table_size);
-  int* table = (int*) malloc(table_size * sizeof(int));
+  const int table_size_bytes = table_size * sizeof(int);
+  const int seq_size_bytes = n * sizeof(char);
+
+  int *d_table = sycl::malloc_device<int>(table_size, q);
+  int* table = (int*) malloc(table_size_bytes);
 
   int numBlocks = (table_size + blockSize - 1) / blockSize;
-  range<1> gws (numBlocks * blockSize);
-  range<1> lws (blockSize);
+  sycl::range<1> gws (numBlocks * blockSize);
+  sycl::range<1> lws (blockSize);
 
-  q.submit([&] (handler &cgh) {
-    auto table = d_table.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class gen>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      generate_table(item, table.get_pointer(), table_size, n);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class gen>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      generate_table(item, d_table, table_size, n);
     });
   });
 
-  buffer<char, 1> d_sequence (sequence.c_str(), n);
+  char *d_sequence = sycl::malloc_device<char>(n, q);
+  q.memcpy(d_sequence, sequence.c_str(), seq_size_bytes);
 
   for (int k = 2; k <= table_size; k <<= 1) {
     for (int j = k >> 1; j > 0; j = j >> 1) {
-      q.submit([&] (handler &cgh) {
-        auto table = d_table.get_access<sycl_read_write>(cgh);
-        auto seq = d_sequence.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class bsort>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          bitonic_sort_step(item, table.get_pointer(), table_size, j, k, seq.get_pointer(), n);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class bsort>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          bitonic_sort_step(item, d_table, table_size, j, k, d_sequence, n);
         });
       });
     }
   }
 
-  buffer<char, 1> d_transformed_sequence (n);
+  char *d_transformed_sequence = sycl::malloc_device<char>(n, q);
   numBlocks = (n + blockSize - 1) / blockSize;
-  range<1> gws2 (numBlocks * blockSize);
+  sycl::range<1> gws2 (numBlocks * blockSize);
 
-  q.submit([&] (handler &cgh) {
-    auto table = d_table.get_access<sycl_read>(cgh);
-    auto seq = d_sequence.get_access<sycl_read>(cgh);
-    auto xseq = d_transformed_sequence.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class restruct>(nd_range<1>(gws2, lws), [=] (nd_item<1> item) {
-      reconstruct_sequence(item, table.get_pointer(), seq.get_pointer(), xseq.get_pointer(), n);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class restruct>(
+      sycl::nd_range<1>(gws2, lws), [=] (sycl::nd_item<1> item) {
+      reconstruct_sequence(item, d_table, d_sequence, d_transformed_sequence, n);
     });
   });
-  char* transformed_sequence_cstr = (char*) malloc(n * sizeof(char));
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_transformed_sequence.get_access<sycl_read>(cgh);
-    cgh.copy(acc, transformed_sequence_cstr);
-  });
+  char* transformed_sequence_cstr = (char*) malloc(seq_size_bytes);
+
+  q.memcpy(transformed_sequence_cstr, d_transformed_sequence, seq_size_bytes).wait(); 
 
   std::string transformed_sequence(transformed_sequence_cstr, n);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_table.get_access<sycl_read>(cgh);
-    cgh.copy(acc, table);
-  });
+  q.memcpy(table, d_table, table_size_bytes).wait(); 
+  sycl::free(d_table, q);
+  sycl::free(d_sequence, q);
 
-  q.wait();
   free(transformed_sequence_cstr);
 
   return std::make_pair(transformed_sequence, table);

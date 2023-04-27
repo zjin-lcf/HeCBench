@@ -1,6 +1,5 @@
 #include <iostream>
 #include <list>
-#include "hip/hip_runtime.h"
 #include "bwt.hpp"
 
 const int blockSize = 256;
@@ -68,33 +67,36 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   table_size |= table_size >> 16;
   table_size++;
 
+  const int table_size_bytes = table_size * sizeof(int);
+  const int seq_size_bytes = n * sizeof(char);
+
   int* d_table;
-  hipMalloc(&d_table, table_size * sizeof(int));
-  int* table = (int*) malloc(table_size * sizeof(int));
+  hipMalloc(&d_table, table_size_bytes);
+  int* table = (int*) malloc(table_size_bytes);
 
   int numBlocks = (table_size + blockSize - 1) / blockSize;
-  hipLaunchKernelGGL(generate_table, dim3(numBlocks), dim3(blockSize), 0, 0, d_table, table_size, n);
+  generate_table<<<numBlocks,blockSize>>>(d_table, table_size, n);
 
   char* d_sequence;
   hipMalloc(&d_sequence, n * sizeof(char));
   hipMemcpy(d_sequence, sequence.c_str(), n * sizeof(char), hipMemcpyHostToDevice);
   for (int k = 2; k <= table_size; k <<= 1) {
     for (int j = k >> 1; j > 0; j = j >> 1) {
-      hipLaunchKernelGGL(bitonic_sort_step, dim3(numBlocks), dim3(blockSize), 0, 0, d_table, table_size, j, k, d_sequence, n);
+      bitonic_sort_step<<<numBlocks,blockSize>>>(d_table, table_size, j, k, d_sequence, n);
     }
   }
 
   char* d_transformed_sequence;
-  hipMalloc(&d_transformed_sequence, n * sizeof(char));
+  hipMalloc(&d_transformed_sequence, seq_size_bytes);
   numBlocks = (n + blockSize - 1) / blockSize;
-  hipLaunchKernelGGL(reconstruct_sequence, dim3(numBlocks), dim3(blockSize), 0, 0, d_table, d_sequence, d_transformed_sequence, n);
-  char* transformed_sequence_cstr = (char*) malloc(n * sizeof(char));
+  reconstruct_sequence<<<numBlocks,blockSize>>>(d_table, d_sequence, d_transformed_sequence, n);
+  char* transformed_sequence_cstr = (char*) malloc(seq_size_bytes);
 
-  hipMemcpy(transformed_sequence_cstr, d_transformed_sequence, n * sizeof(char), hipMemcpyDeviceToHost);
+  hipMemcpy(transformed_sequence_cstr, d_transformed_sequence, seq_size_bytes, hipMemcpyDeviceToHost);
 
   std::string transformed_sequence(transformed_sequence_cstr, n);
 
-  hipMemcpy(table, d_table, table_size * sizeof(int), hipMemcpyDeviceToHost);
+  hipMemcpy(table, d_table, table_size_bytes, hipMemcpyDeviceToHost);
   hipFree(d_table);
   hipFree(d_sequence);
   free(transformed_sequence_cstr);

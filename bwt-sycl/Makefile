@@ -27,13 +27,13 @@ obj = main.o bwt.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../bwt-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../bwt-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
@@ -67,7 +67,7 @@ $(program): $(obj)
 main.o: ../bwt-cuda/main.cpp ../bwt-cuda/bwt.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-bwt.o: bwt.cpp ../bwt-cuda/bwt.hpp
+bwt.o: bwt.buffer.cpp ../bwt-cuda/bwt.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 clean:
 	rm -rf $(program) $(obj)
