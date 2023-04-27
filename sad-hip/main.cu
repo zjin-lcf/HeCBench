@@ -188,13 +188,12 @@ int main(int argc, char* argv[]) {
   check(hipMalloc((void **)&d_min_mse, sizeof(int)));
   check(hipMalloc((void **)&d_num_occurances, sizeof(int)));
 
-  dim3 grids((unsigned int)ceil((float)(main_width) / BLOCK_SIZE_X), 
-             (unsigned int)ceil((float)(main_height) / BLOCK_SIZE_Y), 1);
-
+  dim3 grids((unsigned int)ceilf((float)main_width / BLOCK_SIZE_X),
+             (unsigned int)ceilf((float)main_height / BLOCK_SIZE_Y));
   dim3 blocks(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1);
 
-  dim3 grids_2((unsigned int)ceil((float)sad_array_size / BLOCK_SIZE), 1, 1);
-  dim3 blocks_2(BLOCK_SIZE, 1, 1);
+  dim3 grids_2((unsigned int)ceilf((float)sad_array_size / BLOCK_SIZE));
+  dim3 blocks_2(BLOCK_SIZE);
 
   check(hipMemcpy(d_main_image, h_main_image,
                    3 * main_size * sizeof(unsigned char), hipMemcpyHostToDevice));

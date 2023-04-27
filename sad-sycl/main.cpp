@@ -204,11 +204,11 @@ int main(int argc, char* argv[]) {
   sycl::buffer<int, 1> d_min_mse (1);
   sycl::buffer<int, 1> d_num_occurances (1);
 
-  sycl::range<2> gws ((main_height + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y * BLOCK_SIZE_Y,
-                (main_width + BLOCK_SIZE_X - 1) / BLOCK_SIZE_X * BLOCK_SIZE_X );
+  sycl::range<2> gws ((unsigned int)ceilf((float)main_height / BLOCK_SIZE_Y) * BLOCK_SIZE_Y,
+                      (unsigned int)ceilf((float)main_width / BLOCK_SIZE_X) * BLOCK_SIZE_X );
   sycl::range<2> lws (BLOCK_SIZE_Y, BLOCK_SIZE_X);
 
-  sycl::range<1> gws2 ((sad_array_size + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<1> gws2 ((unsigned int)ceilf((float)sad_array_size / BLOCK_SIZE) * BLOCK_SIZE);
   sycl::range<1> lws2 (BLOCK_SIZE);
 
   // Measure device execution time
