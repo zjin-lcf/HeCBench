@@ -90,10 +90,10 @@ int main(int argc, char* argv[]) {
   size_t kernel_size = dim_b * kernels_size * dim_w * dim_h;
   size_t output_size = dim_b * dim_c * dim_w * dim_h;
 
-  size_t image_size_byte = sizeof(float) * dim_b * dim_c * (img_w + padding) * (img_h + padding);
-  size_t offset_size_byte = sizeof(float) * dim_b * kernels_size * dim_w * dim_h;
-  size_t kernel_size_byte = sizeof(float) * dim_b * kernels_size * dim_w * dim_h;
-  size_t output_size_byte = sizeof(float) * dim_b * dim_c * dim_w * dim_h;
+  size_t image_size_byte = sizeof(float) * image_size;
+  size_t offset_size_byte = sizeof(float) * offset_size;
+  size_t kernel_size_byte = sizeof(float) * kernel_size;
+  size_t output_size_byte = sizeof(float) * output_size;
 
   float *img = (float*) malloc (image_size_byte);
   float *offsets_h = (float*) malloc (offset_size_byte);
