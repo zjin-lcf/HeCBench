@@ -18,7 +18,7 @@ void car (
   const int padding,
   const size_t n)
 {
-  int global_idx = item.get_global_id(0);
+  size_t global_idx = item.get_global_id(0);
   if(global_idx >= n) return;
 
   const int dim_b = p.output_dim_b;
@@ -29,8 +29,11 @@ void car (
   const int img_w = p.image_w;
   const int img_h = p.image_h;
 
-  const int idb = (global_idx / (dim_c * dim_h * dim_w)) % dim_b;
-  const int idc = (global_idx / (dim_h * dim_w)) % dim_c;
+  const size_t vol_size = (size_t)dim_c * dim_h * dim_w;
+  const size_t img_size = (size_t)dim_h * dim_w;
+
+  const int idb = (global_idx / vol_size) % dim_b;
+  const int idc = (global_idx / img_size) % dim_c;
   const int idy = (global_idx / dim_w) % dim_h;
   const int idx = global_idx % dim_w;
 
@@ -84,15 +87,15 @@ int main(int argc, char* argv[]) {
 
   const int padding = 1;
 
-  size_t image_size = dim_b * dim_c * (img_w + padding) * (img_h + padding);
-  size_t offset_size = dim_b * kernels_size * dim_w * dim_h;
-  size_t kernel_size = dim_b * kernels_size * dim_w * dim_h;
-  size_t output_size = dim_b * dim_c * dim_w * dim_h;
+  size_t image_size = (size_t)dim_b * dim_c * (img_w + padding) * (img_h + padding);
+  size_t offset_size = (size_t)dim_b * kernels_size * dim_w * dim_h;
+  size_t kernel_size = (size_t)dim_b * kernels_size * dim_w * dim_h;
+  size_t output_size = (size_t)dim_b * dim_c * dim_w * dim_h;
 
-  size_t image_size_byte = sizeof(float) * dim_b * dim_c * (img_w + padding) * (img_h + padding);
-  size_t offset_size_byte = sizeof(float) * dim_b * kernels_size * dim_w * dim_h;
-  size_t kernel_size_byte = sizeof(float) * dim_b * kernels_size * dim_w * dim_h;
-  size_t output_size_byte = sizeof(float) * dim_b * dim_c * dim_w * dim_h;
+  size_t image_size_byte = sizeof(float) * image_size;
+  size_t offset_size_byte = sizeof(float) * offset_size;
+  size_t kernel_size_byte = sizeof(float) * kernel_size;
+  size_t output_size_byte = sizeof(float) * output_size;
 
   float *img = (float*) malloc (image_size_byte);
   float *offsets_h = (float*) malloc (offset_size_byte);
