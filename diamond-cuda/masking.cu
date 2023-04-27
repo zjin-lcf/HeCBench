@@ -290,7 +290,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
   cudaMemcpy(d_maskTable, mask_table_device, size, cudaMemcpyHostToDevice);
 
   double* d_probMat;
-  cudaMalloc((void**)&d_probMat, size*size);
+  cudaMalloc((void **)&d_probMat, sizeof(double) * size * size);
   cudaMemcpy(d_probMat, probMat_device, sizeof(double)*size*size, cudaMemcpyHostToDevice);
 
   dim3 grids ((seqs_len+128)/128);
