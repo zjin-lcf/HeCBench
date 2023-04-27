@@ -67,9 +67,12 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   table_size |= table_size >> 16;
   table_size++;
 
+  const int table_size_bytes = table_size * sizeof(int);
+  const int seq_size_bytes = n * sizeof(char);
+
   int* d_table;
-  cudaMalloc(&d_table, table_size * sizeof(int));
-  int* table = (int*) malloc(table_size * sizeof(int));
+  cudaMalloc(&d_table, table_size_bytes);
+  int* table = (int*) malloc(table_size_bytes);
 
   int numBlocks = (table_size + blockSize - 1) / blockSize;
   generate_table<<<numBlocks,blockSize>>>(d_table, table_size, n);
@@ -84,16 +87,16 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   }
 
   char* d_transformed_sequence;
-  cudaMalloc(&d_transformed_sequence, n * sizeof(char));
+  cudaMalloc(&d_transformed_sequence, seq_size_bytes);
   numBlocks = (n + blockSize - 1) / blockSize;
   reconstruct_sequence<<<numBlocks,blockSize>>>(d_table, d_sequence, d_transformed_sequence, n);
-  char* transformed_sequence_cstr = (char*) malloc(n * sizeof(char));
+  char* transformed_sequence_cstr = (char*) malloc(seq_size_bytes);
 
-  cudaMemcpy(transformed_sequence_cstr, d_transformed_sequence, n * sizeof(char), cudaMemcpyDeviceToHost);
+  cudaMemcpy(transformed_sequence_cstr, d_transformed_sequence, seq_size_bytes, cudaMemcpyDeviceToHost);
 
   std::string transformed_sequence(transformed_sequence_cstr, n);
 
-  cudaMemcpy(table, d_table, table_size * sizeof(int), cudaMemcpyDeviceToHost);
+  cudaMemcpy(table, d_table, table_size_bytes, cudaMemcpyDeviceToHost);
   cudaFree(d_table);
   cudaFree(d_sequence);
   free(transformed_sequence_cstr);
