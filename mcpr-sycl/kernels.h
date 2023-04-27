@@ -3,7 +3,7 @@ void compute_probs(
   const double* __restrict rands,
         double* __restrict probs,
   int n, int K, int M,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   // assign overall id/index of the thread = id of row
   int i = item.get_global_id(0);
@@ -49,7 +49,7 @@ void compute_probs_unitStrides(
   const double* __restrict rands,
         double* __restrict probs,
   int n, int K, int M,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   // assign overall id/index of the thread = id of row
   int i = item.get_global_id(0);
@@ -98,7 +98,7 @@ void compute_probs_unitStrides_sharedMem(
         double* __restrict probs,
   int n, int K, int M,
   double* __restrict shared,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   // assign overall id/index of the thread = id of row
   int i = item.get_global_id(0);

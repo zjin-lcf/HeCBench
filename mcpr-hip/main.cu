@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
   // kernel 3
   threads_per_block = 96;
   dim3 threads2 (threads_per_block);
-  dim3 blocks2 (ceil(n/threads_per_block));
+  dim3 blocks2(ceil(1.0 * n / threads_per_block));
 
   const int sm_size = sizeof(double) * K * threads_per_block * 2;
   hipMemset(d_probs, 0.0, alphas_size_byte);

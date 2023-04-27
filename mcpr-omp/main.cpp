@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
   {
     // kernel 1
     int threads_per_block = 192;
-    int num_blocks = ceil(n/threads_per_block);
+    int num_blocks = ceil(1.0 * n / threads_per_block);
 
     memset(probs, 0, alphas_size_byte);
     #pragma omp target update to (probs[0:alphas_size])
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
 
     // kernel 3
     threads_per_block = 96;
-    num_blocks = ceil(n/threads_per_block);
+    num_blocks = ceil(1.0 * n / threads_per_block);
 
     memset(probs, 0, alphas_size_byte);
     #pragma omp target update to (probs[0:alphas_size])
