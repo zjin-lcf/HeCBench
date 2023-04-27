@@ -1,18 +1,18 @@
 #include <stdio.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 16
 
 inline void atomicAdd(double *val, const double operand)
 {
-  sycl::ext::oneapi::atomic_ref<double, 
-     sycl::memory_order::relaxed, 
-     sycl::memory_scope::device,
-     sycl::access::address_space::global_space> ref (*val);
+  sycl::atomic_ref<double,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space> ref (*val);
   ref.fetch_add(operand);
 }
 
-void ccsd_tengy_gpu(queue &q,
+void ccsd_tengy_gpu(sycl::queue &q,
     const double * __restrict f1n,    const double * __restrict f1t,
     const double * __restrict f2n,    const double * __restrict f2t,
     const double * __restrict f3n,    const double * __restrict f3t,
@@ -27,52 +27,53 @@ void ccsd_tengy_gpu(queue &q,
   double emp5i = 0.0, emp4i = 0.0, emp5k = 0.0, emp4k = 0.0;
 
   {
-    buffer<double, 1> d_f1n (f1n, nvir*nvir);
-    buffer<double, 1> d_f2n (f2n, nvir*nvir);
-    buffer<double, 1> d_f3n (f3n, nvir*nvir);
-    buffer<double, 1> d_f4n (f4n, nvir*nvir);
-    buffer<double, 1> d_f1t (f1t, nvir*nvir);
-    buffer<double, 1> d_f2t (f2t, nvir*nvir);
-    buffer<double, 1> d_f3t (f3t, nvir*nvir);
-    buffer<double, 1> d_f4t (f4t, nvir*nvir);
-    buffer<double, 1> d_dintc1 (dintc1, nvir);
-    buffer<double, 1> d_dintc2 (dintc2, nvir);
-    buffer<double, 1> d_dintx1 (dintx1, nvir);
-    buffer<double, 1> d_dintx2 (dintx2, nvir);
-    buffer<double, 1> d_t1v1 (t1v1, nvir);
-    buffer<double, 1> d_t1v2 (t1v2, nvir);
-    buffer<double, 1> d_eorb (eorb, (ncor+nocc+nvir));
-    buffer<double, 1> d_emp5i (&emp5i, 1);
-    buffer<double, 1> d_emp4i (&emp4i, 1);
-    buffer<double, 1> d_emp5k (&emp5k, 1);
-    buffer<double, 1> d_emp4k (&emp4k, 1);
+    sycl::buffer<double, 1> d_f1n (f1n, nvir*nvir);
+    sycl::buffer<double, 1> d_f2n (f2n, nvir*nvir);
+    sycl::buffer<double, 1> d_f3n (f3n, nvir*nvir);
+    sycl::buffer<double, 1> d_f4n (f4n, nvir*nvir);
+    sycl::buffer<double, 1> d_f1t (f1t, nvir*nvir);
+    sycl::buffer<double, 1> d_f2t (f2t, nvir*nvir);
+    sycl::buffer<double, 1> d_f3t (f3t, nvir*nvir);
+    sycl::buffer<double, 1> d_f4t (f4t, nvir*nvir);
+    sycl::buffer<double, 1> d_dintc1 (dintc1, nvir);
+    sycl::buffer<double, 1> d_dintc2 (dintc2, nvir);
+    sycl::buffer<double, 1> d_dintx1 (dintx1, nvir);
+    sycl::buffer<double, 1> d_dintx2 (dintx2, nvir);
+    sycl::buffer<double, 1> d_t1v1 (t1v1, nvir);
+    sycl::buffer<double, 1> d_t1v2 (t1v2, nvir);
+    sycl::buffer<double, 1> d_eorb (eorb, (ncor+nocc+nvir));
+    sycl::buffer<double, 1> d_emp5i (&emp5i, 1);
+    sycl::buffer<double, 1> d_emp4i (&emp4i, 1);
+    sycl::buffer<double, 1> d_emp5k (&emp5k, 1);
+    sycl::buffer<double, 1> d_emp4k (&emp4k, 1);
 
-    range<2> gws((nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE, 
-                 (nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-    range<2> lws(BLOCK_SIZE, BLOCK_SIZE);
+    sycl::range<2> gws((nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE,
+                       (nvir+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+    sycl::range<2> lws(BLOCK_SIZE, BLOCK_SIZE);
 
-    q.submit([&] (handler &cgh) {
-      auto f1n = d_f1n.get_access<sycl_read>(cgh);
-      auto f1t = d_f1t.get_access<sycl_read>(cgh);
-      auto f2n = d_f2n.get_access<sycl_read>(cgh);
-      auto f2t = d_f2t.get_access<sycl_read>(cgh);
-      auto f3n = d_f3n.get_access<sycl_read>(cgh);
-      auto f3t = d_f3t.get_access<sycl_read>(cgh);
-      auto f4n = d_f4n.get_access<sycl_read>(cgh);
-      auto f4t = d_f4t.get_access<sycl_read>(cgh);
-      auto dintc1 = d_dintc1.get_access<sycl_read>(cgh);
-      auto dintx1 = d_dintx1.get_access<sycl_read>(cgh);
-      auto t1v1 = d_t1v1.get_access<sycl_read>(cgh);
-      auto dintc2 = d_dintc2.get_access<sycl_read>(cgh);
-      auto dintx2 = d_dintx2.get_access<sycl_read>(cgh);
-      auto t1v2 = d_t1v2.get_access<sycl_read>(cgh);
-      auto eorb = d_eorb.get_access<sycl_read>(cgh);
-      auto emp4i = d_emp4i.get_access<sycl_read_write>(cgh);
-      auto emp5i = d_emp5i.get_access<sycl_read_write>(cgh);
-      auto emp4k = d_emp4k.get_access<sycl_read_write>(cgh);
-      auto emp5k = d_emp5k.get_access<sycl_read_write>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      auto f1n = d_f1n.get_access<sycl::access::mode::read>(cgh);
+      auto f1t = d_f1t.get_access<sycl::access::mode::read>(cgh);
+      auto f2n = d_f2n.get_access<sycl::access::mode::read>(cgh);
+      auto f2t = d_f2t.get_access<sycl::access::mode::read>(cgh);
+      auto f3n = d_f3n.get_access<sycl::access::mode::read>(cgh);
+      auto f3t = d_f3t.get_access<sycl::access::mode::read>(cgh);
+      auto f4n = d_f4n.get_access<sycl::access::mode::read>(cgh);
+      auto f4t = d_f4t.get_access<sycl::access::mode::read>(cgh);
+      auto dintc1 = d_dintc1.get_access<sycl::access::mode::read>(cgh);
+      auto dintx1 = d_dintx1.get_access<sycl::access::mode::read>(cgh);
+      auto t1v1 = d_t1v1.get_access<sycl::access::mode::read>(cgh);
+      auto dintc2 = d_dintc2.get_access<sycl::access::mode::read>(cgh);
+      auto dintx2 = d_dintx2.get_access<sycl::access::mode::read>(cgh);
+      auto t1v2 = d_t1v2.get_access<sycl::access::mode::read>(cgh);
+      auto eorb = d_eorb.get_access<sycl::access::mode::read>(cgh);
+      auto emp4i = d_emp4i.get_access<sycl::access::mode::read_write>(cgh);
+      auto emp5i = d_emp5i.get_access<sycl::access::mode::read_write>(cgh);
+      auto emp4k = d_emp4k.get_access<sycl::access::mode::read_write>(cgh);
+      auto emp5k = d_emp5k.get_access<sycl::access::mode::read_write>(cgh);
 
-      cgh.parallel_for<class tengy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class tengy>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int b = item.get_global_id(1);
         const int c = item.get_global_id(0); 
 
@@ -133,4 +134,3 @@ void ccsd_tengy_gpu(queue &q,
   *emp5i_ = emp5i;
   *emp5k_ = emp5k;
 }
-

@@ -1,18 +1,18 @@
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-void ccsd_tengy_gpu(queue &q,
+void ccsd_tengy_gpu(sycl::queue &q,
     const double * __restrict f1n,    const double * __restrict f1t,
     const double * __restrict f2n,    const double * __restrict f2t,
     const double * __restrict f3n,    const double * __restrict f3t,
     const double * __restrict f4n,    const double * __restrict f4t,
-    const double * __restrict dintc1, const double * __restrict dintx1, const double * __restrict t1v1,
+    const double * __restrict dintc1, const double * __restrict dintx1,const double * __restrict t1v1,
     const double * __restrict dintc2, const double * __restrict dintx2, const double * __restrict t1v2,
     const double * __restrict eorb,   const double eaijk,
     double * __restrict emp4i, double * __restrict emp5i,
     double * __restrict emp4k, double * __restrict emp5k,
     const int ncor, const int nocc, const int nvir);
 
-void ccsd_trpdrv(queue &q,
+void ccsd_trpdrv(sycl::queue &q,
     double * __restrict f1n, double * __restrict f1t,
     double * __restrict f2n, double * __restrict f2t,
     double * __restrict f3n, double * __restrict f3t,

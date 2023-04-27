@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 /* Do not allow the test to allocate more than MAX_MEM gigabytes. */
@@ -14,7 +14,7 @@
 #define MAX(x,y) (x>y ? x : y)
 
 
-void ccsd_trpdrv(queue &q,
+void ccsd_trpdrv(sycl::queue &q,
     double * __restrict f1n, double * __restrict f1t,
     double * __restrict f2n, double * __restrict f2t,
     double * __restrict f3n, double * __restrict f3t,
@@ -133,11 +133,10 @@ int main(int argc, char* argv[])
   int iter = 0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   for (int klo=1; klo<=nocc; klo+=kchunk) {
     const int khi = MIN(nocc, klo+kchunk-1);
