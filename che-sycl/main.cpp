@@ -4,7 +4,7 @@
 #include <iostream>
 #include <random>
 #include <fstream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //define the data set size for a cubic volume
 #define DATAXSIZE 256
@@ -88,7 +88,7 @@ double GradientZ(const double phi[][DATAYSIZE][DATAXSIZE],
 }
 
 void chemicalPotential(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     const double c[][DATAYSIZE][DATAXSIZE], 
     double mu[][DATAYSIZE][DATAXSIZE], 
     double dx,
@@ -119,7 +119,7 @@ double freeEnergy(double c, double e_AA, double e_BB, double e_AB)
 }
 
 void localFreeEnergyFunctional(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     const double c[][DATAYSIZE][DATAXSIZE],
     double f[][DATAYSIZE][DATAXSIZE], 
     double dx,
@@ -144,7 +144,7 @@ void localFreeEnergyFunctional(
 }
 
 void cahnHilliard(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     double cnew[][DATAYSIZE][DATAXSIZE], 
     const double cold[][DATAYSIZE][DATAXSIZE], 
     const double mu[][DATAYSIZE][DATAXSIZE],
@@ -163,7 +163,7 @@ void cahnHilliard(
   }
 }
 
-void Swap(nd_item<3> &item, double cnew[][DATAYSIZE][DATAXSIZE], double cold[][DATAYSIZE][DATAXSIZE])
+void Swap(sycl::nd_item<3> &item, double cnew[][DATAYSIZE][DATAXSIZE], double cold[][DATAYSIZE][DATAXSIZE])
 {
   unsigned idx = item.get_global_id(2);
   unsigned idy = item.get_global_id(1);
@@ -236,21 +236,22 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_bytes = vol * sizeof(double);
 
   // pointers for data set storage via malloc
   nRarray *c_host; // storage for result stored on host
   nRarray *mu_host;
   nRarray *f_host;
 
-  if ((c_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((c_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"c_host malloc failed\n"); 
     return 1;
   }
-  if ((mu_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((mu_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"mu_host malloc failed\n"); 
     return 1;
   }
-  if ((f_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((f_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"f_host malloc failed\n"); 
     return 1;
   }
@@ -262,82 +263,61 @@ int main(int argc, char *argv[])
   double integral_f = 0.0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<double, 1> d_cold (vol);
-  buffer<double, 1> d_cnew (vol);
-  buffer<double, 1> d_muold (vol);
-  buffer<double, 1> d_fold (vol);
+  nRarray *d_cold = (nRarray*) sycl::malloc_device(vol_bytes, q);
+  nRarray *d_cnew = (nRarray*) sycl::malloc_device(vol_bytes, q);
+  nRarray *d_muold = (nRarray*) sycl::malloc_device(vol_bytes, q);
+  nRarray *d_fold = (nRarray*) sycl::malloc_device(vol_bytes, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_cold.get_access<sycl_discard_write>(cgh);
-    cgh.copy((double*)c_host, acc);
-  });
+  q.memcpy(d_cold, c_host, vol_bytes);
 
-  range<3> lws (BLKZSIZE, BLKYSIZE, BLKXSIZE);
-  range<3> gws ((DATAZSIZE+BLKZSIZE-1)/BLKZSIZE * BLKZSIZE, 
-                (DATAYSIZE+BLKYSIZE-1)/BLKYSIZE * BLKYSIZE,
-                (DATAXSIZE+BLKXSIZE-1)/BLKXSIZE * BLKXSIZE);
+  sycl::range<3> lws (BLKZSIZE, BLKYSIZE, BLKXSIZE);
+  sycl::range<3> gws ((DATAZSIZE+BLKZSIZE-1)/BLKZSIZE * BLKZSIZE,
+                      (DATAYSIZE+BLKYSIZE-1)/BLKYSIZE * BLKYSIZE,
+                      (DATAXSIZE+BLKXSIZE-1)/BLKXSIZE * BLKXSIZE);
 
   q.wait(); 
   auto start = std::chrono::steady_clock::now();
 
-  auto d_cnew_re = d_cnew.reinterpret<nRarray>(range<1>(DATAZSIZE));
-  auto d_cold_re = d_cold.reinterpret<nRarray>(range<1>(DATAZSIZE));
-  auto d_muold_re = d_muold.reinterpret<nRarray>(range<1>(DATAZSIZE));
-  auto d_fold_re = d_fold.reinterpret<nRarray>(range<1>(DATAZSIZE));
-
   for (int t = 0; t < t_f; t++) {
 
-    q.submit([&] (handler &cgh) {
-      auto cold = d_cold_re.get_access<sycl_read>(cgh);
-      auto muold = d_muold_re.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class chemical_potential>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        chemicalPotential(item, cold.get_pointer(), muold.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class chemical_potential>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        chemicalPotential(item, d_cold, d_muold,
                           dx,dy,dz,gamma,e_AA,e_BB,e_AB);
       });
     });
         
-    q.submit([&] (handler &cgh) {
-      auto cold = d_cold_re.get_access<sycl_read>(cgh);
-      auto fold = d_fold_re.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class energy>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        localFreeEnergyFunctional(item, cold.get_pointer(), fold.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class energy>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        localFreeEnergyFunctional(item, d_cold, d_fold,
                                   dx,dy,dz,gamma,e_AA,e_BB,e_AB);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto cold = d_cold_re.get_access<sycl_read>(cgh);
-      auto muold = d_muold_re.get_access<sycl_read>(cgh);
-      auto cnew = d_cnew_re.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class cahn_hilliard>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        cahnHilliard(item, cnew.get_pointer(), cold.get_pointer(), muold.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class cahn_hilliard>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        cahnHilliard(item, d_cnew, d_cold, d_muold,
                      D,dt,dx,dy,dz);
       });
     });
 
     if (t > 0 && t % (t_freq - 1) == 0) {
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_cnew.get_access<sycl_read>(cgh);
-        cgh.copy(acc, (double*)c_host);
-      }).wait();
+      q.memcpy(c_host, d_cnew, vol_bytes);
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_muold.get_access<sycl_read>(cgh);
-        cgh.copy(acc, (double*)mu_host);
-      }).wait();
+      q.memcpy(mu_host, d_muold, vol_bytes);
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_fold.get_access<sycl_read>(cgh);
-        cgh.copy(acc, (double*)f_host);
-      }).wait();
+      q.memcpy(f_host, d_fold, vol_bytes);
 
+      q.wait();
       integral_c = integral(c_host,nx,ny,nz);
 
       ofile_c << t << "," << integral_c << std::endl;
@@ -351,11 +331,10 @@ int main(int argc, char *argv[])
       ofile_f << t << "," << integral_f << std::endl;
     }
 
-    q.submit([&] (handler &cgh) {
-      auto cold = d_cold_re.get_access<sycl_read_write>(cgh);
-      auto cnew = d_cnew_re.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class swap_grid>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        Swap(item, cnew.get_pointer(), cold.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swap_grid>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        Swap(item, d_cnew, d_cold);
       });
     });
   }
@@ -368,5 +347,9 @@ int main(int argc, char *argv[])
   free(c_host);
   free(mu_host);
   free(f_host);
+  sycl::free(d_cold, q);
+  sycl::free(d_cnew, q);
+  sycl::free(d_muold, q);
+  sycl::free(d_fold, q);
   return 0;
 }
