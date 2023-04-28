@@ -1,5 +1,6 @@
 void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
-             float alpha_im, float alpha_re, float beta_im, float beta_re, nd_item<1> &item)
+             float alpha_im, float alpha_re, float beta_im, float beta_re,
+             sycl::nd_item<1> &item)
 {
     int b0 = item.get_group(0);
     int t0 = item.get_local_id(0);
@@ -45,12 +46,12 @@ void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloa
           Y[32 * b0 + t0].Re = private_var99_Re;
           Y[32 * b0 + t0].Im = private_var99_Im;
         }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
 }
 
 void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
-             float alpha_im, float alpha_re, nd_item<1> &item)
+             float alpha_im, float alpha_re, sycl::nd_item<1> &item)
 {
     int b0 = item.get_group(0);
     int t0 = item.get_local_id(0);
@@ -74,6 +75,6 @@ void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloa
         Y[32 * b0 + t0].Re = private_var96_Re;
         Y[32 * b0 + t0].Im = private_var96_Im;
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
 }
