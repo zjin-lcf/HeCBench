@@ -471,7 +471,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred");
+      fprintf (stderr, "Failed to open the file %s. Exit\n.", FileName);
       exit(EXIT_FAILURE);
     }
 
@@ -519,8 +519,6 @@ int main(int argc, char **argv) {
   unsigned char *h_interm_cpu_proxy = (unsigned char *)malloc(in_size);
   unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
 
-  auto t1 = std::chrono::high_resolution_clock::now();
-
   unsigned char* d_in_out;
   cudaMalloc((void**)&d_in_out, sizeof(unsigned char)*in_size);
   
@@ -532,6 +530,8 @@ int main(int argc, char **argv) {
 
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
+
+  auto t1 = std::chrono::high_resolution_clock::now();
 
   proxy_threads.push_back(std::thread([&]() {
 
