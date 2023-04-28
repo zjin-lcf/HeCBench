@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <hip/hip_runtime.h>
 #include <chrono>
 #include <iostream>
 #include <random>
 #include <fstream>
+#include <hip/hip_runtime.h>
 #include "kernels.h"
 
 using namespace std;
@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_bytes = vol * sizeof(double);
 
   // pointers for data set storage via malloc
   nRarray *c_host; // storage for result stored on host
@@ -78,23 +79,23 @@ int main(int argc, char *argv[])
   nRarray *d_muold;
   nRarray *d_fold;
 
-  if ((c_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((c_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"c_host malloc failed\n"); 
     return 1;
   }
-  if ((mu_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((mu_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"mu_host malloc failed\n"); 
     return 1;
   }
-  if ((f_host = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((f_host = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"f_host malloc failed\n"); 
     return 1;
   }
 
-  hipMalloc((void **) &d_cold, vol*sizeof(double));
-  hipMalloc((void **) &d_cnew, vol*sizeof(double));
-  hipMalloc((void **) &d_muold, vol*sizeof(double));
-  hipMalloc((void **) &d_fold, vol*sizeof(double));
+  hipMalloc((void **) &d_cold, vol_bytes);
+  hipMalloc((void **) &d_cnew, vol_bytes);
+  hipMalloc((void **) &d_muold, vol_bytes);
+  hipMalloc((void **) &d_fold, vol_bytes);
 
   initialization(c_host);
 
@@ -102,7 +103,7 @@ int main(int argc, char *argv[])
   double integral_mu = 0.0;
   double integral_f = 0.0;
 
-  hipMemcpy(d_cold, c_host, (vol*sizeof(double)), hipMemcpyHostToDevice);
+  hipMemcpy(d_cold, c_host, vol_bytes, hipMemcpyHostToDevice);
 
   const dim3 blockSize(BLKXSIZE, BLKYSIZE, BLKZSIZE);
   const dim3 gridSize((DATAXSIZE+BLKXSIZE-1)/BLKXSIZE, 
@@ -114,16 +115,16 @@ int main(int argc, char *argv[])
 
   for (int t = 0; t < t_f; t++) {
 
-    hipLaunchKernelGGL(chemicalPotential, gridSize, blockSize, 0, 0, d_cold,d_muold,dx,dy,dz,gamma,e_AA,e_BB,e_AB);
-    hipLaunchKernelGGL(localFreeEnergyFunctional, gridSize, blockSize, 0, 0, d_cold,d_fold,dx,dy,dz,gamma,e_AA,e_BB,e_AB);
-    hipLaunchKernelGGL(cahnHilliard, gridSize, blockSize, 0, 0, d_cnew,d_cold,d_muold,D,dt,dx,dy,dz);
+    chemicalPotential<<<gridSize, blockSize>>>(d_cold,d_muold,dx,dy,dz,gamma,e_AA,e_BB,e_AB);
+    localFreeEnergyFunctional<<<gridSize, blockSize>>>(d_cold,d_fold,dx,dy,dz,gamma,e_AA,e_BB,e_AB);
+    cahnHilliard<<<gridSize, blockSize>>>(d_cnew,d_cold,d_muold,D,dt,dx,dy,dz);
 
     if (t > 0 && t % (t_freq - 1) == 0) {
-      hipMemcpy(c_host, d_cnew, (vol*sizeof(double)), hipMemcpyDeviceToHost);
+      hipMemcpy(c_host, d_cnew, vol_bytes, hipMemcpyDeviceToHost);
 
-      hipMemcpy(mu_host, d_muold, (vol*sizeof(double)), hipMemcpyDeviceToHost);
+      hipMemcpy(mu_host, d_muold, vol_bytes, hipMemcpyDeviceToHost);
 
-      hipMemcpy(f_host, d_fold, (vol*sizeof(double)), hipMemcpyDeviceToHost);
+      hipMemcpy(f_host, d_fold, vol_bytes, hipMemcpyDeviceToHost);
 
       integral_c = integral(c_host,nx,ny,nz);
 
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
       ofile_f << t << "," << integral_f << endl;
     }
 
-    hipLaunchKernelGGL(Swap, gridSize, blockSize, 0, 0, d_cnew, d_cold);
+    Swap<<<gridSize, blockSize>>>(d_cnew, d_cold);
   }
 
   hipDeviceSynchronize();
