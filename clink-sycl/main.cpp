@@ -1,7 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <cstring>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef __NVPTX__
   #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
@@ -102,7 +102,7 @@ void init(const char* work_path, const char* input_filename, const char* weight_
   fclose(fp);
 }
 
-long lstm_n5( queue &q,
+long lstm_n5( sycl::queue &q,
               const float* x, 
               const float* inW, 
               const float* intW, 
@@ -111,32 +111,33 @@ long lstm_n5( queue &q,
               const float* outB,
                     float* y) 
 {
-  float *d_x = malloc_device<float>(N*SAMPLE_TEST_LEN, q);
+  float *d_x = sycl::malloc_device<float>(N*SAMPLE_TEST_LEN, q);
   q.memcpy(d_x, x, sizeof(float) * N * SAMPLE_TEST_LEN);
 
-  float *d_inW = malloc_device<float>(20, q);
+  float *d_inW = sycl::malloc_device<float>(20, q);
   q.memcpy(d_inW, inW, sizeof(float) * 20);
 
-  float *d_intW = malloc_device<float>(100, q);
+  float *d_intW = sycl::malloc_device<float>(100, q);
   q.memcpy(d_intW, intW, sizeof(float) * 100);
 
-  float *d_intB = malloc_device<float>(20, q);
+  float *d_intB = sycl::malloc_device<float>(20, q);
   q.memcpy(d_intB, intB, sizeof(float) * 20);
 
-  float *d_outW = malloc_device<float>(5, q);
+  float *d_outW = sycl::malloc_device<float>(5, q);
   q.memcpy(d_outW, outW, sizeof(float) * 5);
 
-  float *d_outB = malloc_device<float>(1, q);
+  float *d_outB = sycl::malloc_device<float>(1, q);
   q.memcpy(d_outB, outB, sizeof(float));
 
-  float *d_y = malloc_device<float>(N*SAMPLE_TEST_LEN, q);
+  float *d_y = sycl::malloc_device<float>(N*SAMPLE_TEST_LEN, q);
   
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
     cgh.parallel_for<class lstm>(
-      nd_range<1>(range<1>(N), range<1>(WGS)), [=] (nd_item<1> item) {
+      sycl::nd_range<1>(sycl::range<1>(N), sycl::range<1>(WGS)),
+      [=] (sycl::nd_item<1> item) {
       int t,i,j;
       int gid = item.get_global_id(0);
       
@@ -200,13 +201,13 @@ long lstm_n5( queue &q,
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   q.memcpy(d_y, y, sizeof(float) * N * SAMPLE_TEST_LEN).wait();
-  free(d_x ,q);
-  free(d_inW ,q);
-  free(d_intW ,q);
-  free(d_intB ,q);
-  free(d_outW ,q);
-  free(d_outB ,q);
-  free(d_y ,q);
+  sycl::free(d_x ,q);
+  sycl::free(d_inW ,q);
+  sycl::free(d_intW ,q);
+  sycl::free(d_intB ,q);
+  sycl::free(d_outW ,q);
+  sycl::free(d_outB ,q);
+  sycl::free(d_y ,q);
   return time;
 }
 
@@ -235,11 +236,10 @@ int main(int argc, char* argv[])
 #endif
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   long kernel_time = 0;
   for (int n = 0; n < repeat; n++) {
