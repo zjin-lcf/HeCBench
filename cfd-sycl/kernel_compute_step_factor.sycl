@@ -14,5 +14,5 @@
 
 	float pressure       = compute_pressure(density, density_energy, speed_sqd);
 	float speed_of_sound = compute_speed_of_sound(density, pressure);
-	step_factors_acc[i] = (float)(0.5f) / (cl::sycl::sqrt(areas_acc[i]) * (cl::sycl::sqrt(speed_sqd) + speed_of_sound));
+	step_factors_acc[i] = (float)(0.5f) / (sycl::sqrt(areas_acc[i]) * (sycl::sqrt(speed_sqd) + speed_of_sound));
 

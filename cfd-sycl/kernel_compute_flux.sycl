@@ -20,7 +20,7 @@
 	float speed_sqd_i                          = compute_speed_sqd(velocity_i);
 	//float speed_sqd_i;
 	//compute_speed_sqd(velocity_i, speed_sqd_i);
-	float speed_i                              = cl::sycl::sqrt(speed_sqd_i);
+	float speed_i                              = sycl::sqrt(speed_sqd_i);
 	float pressure_i                           = compute_pressure(density_i, density_energy_i, speed_sqd_i);
 	float speed_of_sound_i                     = compute_speed_of_sound(density_i, pressure_i);
 	Float3 flux_contribution_i_momentum_x, flux_contribution_i_momentum_y, flux_contribution_i_momentum_z;
@@ -50,7 +50,7 @@
 		normal.x = normals_acc[i + (j + 0*NNB)*nelr];
 		normal.y = normals_acc[i + (j + 1*NNB)*nelr];
 		normal.z = normals_acc[i + (j + 2*NNB)*nelr];
-		normal_len = cl::sycl::sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
+		normal_len = sycl::sqrt(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
 		
 		if(nb >= 0) 	// a legitimate neighbor
 		{
@@ -68,7 +68,7 @@ compute_flux_contribution(density_nb, momentum_nb, density_energy_nb, pressure_n
 &flux_contribution_nb_density_energy);
 			
 			// artificial viscosity
-			factor = -normal_len*smoothing_coefficient*(float)(0.5f)*(speed_i + cl::sycl::sqrt(speed_sqd_nb) + speed_of_sound_i + speed_of_sound_nb);
+			factor = -normal_len*smoothing_coefficient*(float)(0.5f)*(speed_i + sycl::sqrt(speed_sqd_nb) + speed_of_sound_i + speed_of_sound_nb);
 			flux_i_density += factor*(density_i-density_nb);
 			flux_i_density_energy += factor*(density_energy_i-density_energy_nb);
 			flux_i_momentum.x += factor*(momentum_i.x-momentum_nb.x);
