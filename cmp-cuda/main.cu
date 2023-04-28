@@ -207,7 +207,6 @@ int main(int argc, const char** argv) {
   const int  ntrs = gather.ntrs();       // Max number of traces by cdp
   const real inc = (c1-c0) * (1.0f / (real)nc);
 
-
   dt = dt / 1000000.0f;
   real idt = 1.0f / dt;
   int tau = ((int)( itau * idt) > 0) ? ((int)( itau * idt)) : 0;
@@ -217,25 +216,23 @@ int main(int argc, const char** argv) {
 
   LOG(INFO, "Starting CMP execution");
 
-  // Chronometer
-  auto beg = std::chrono::high_resolution_clock::now();
-
   // Alloc memory
   real *d_h, *d_gx,  *d_gy, *d_sx, *d_sy, *d_scalco, *d_cdpsmpl;
   real *d_c, *d_num, *d_stt, *d_str, *d_stk; // nc stts per sample
   int  *d_ctr; // ns Cs per cdp
-  cudaMalloc((void**)&d_gx, sizeof(real)*ttraces);
-  cudaMalloc((void**)&d_gy, sizeof(real)*ttraces);
-  cudaMalloc((void**)&d_sx, sizeof(real)*ttraces);
-  cudaMalloc((void**)&d_sy, sizeof(real)*ttraces);
-  cudaMalloc((void**)&d_scalco, sizeof(real)*ttraces);
+  const size_t traces_bytes = ttraces * sizeof(real);
+  cudaMalloc((void**)&d_gx, traces_bytes);
+  cudaMalloc((void**)&d_gy, traces_bytes);
+  cudaMalloc((void**)&d_sx, traces_bytes);
+  cudaMalloc((void**)&d_sy, traces_bytes);
+  cudaMalloc((void**)&d_scalco, traces_bytes);
   cudaMalloc((void**)&d_cdpsmpl, sizeof(real)*ntrs*ns);
 
-  cudaMemcpy(d_gx    , h_gx    , sizeof(real)*ttraces, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_gy    , h_gy    , sizeof(real)*ttraces, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_sx    , h_sx    , sizeof(real)*ttraces, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_sy    , h_sy    , sizeof(real)*ttraces, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_scalco, h_scalco, sizeof(real)*ttraces, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_gx    , h_gx    , traces_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_gy    , h_gy    , traces_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_sx    , h_sx    , traces_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_sy    , h_sy    , traces_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_scalco, h_scalco, traces_bytes, cudaMemcpyHostToDevice);
 
   cudaMalloc((void** ) &d_c  , sizeof(real)*nc      );
   cudaMalloc((void** ) &d_h  , sizeof(real)*ttraces );
@@ -252,8 +249,8 @@ int main(int argc, const char** argv) {
   //
   // DEVICE REGION
   //
-
-  auto kbeg = std::chrono::high_resolution_clock::now();
+  cudaDeviceSynchronize();
+  auto beg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
   init_c<<<nc, 1>>>(d_c, inc, c0);
@@ -284,14 +281,12 @@ int main(int argc, const char** argv) {
   }
   // Gets time at end of computation
   cudaDeviceSynchronize();
-  auto kend = std::chrono::high_resolution_clock::now();
+  auto end = std::chrono::high_resolution_clock::now();
 
   // Copy results back to host
   cudaMemcpy(h_ctr, d_ctr, sizeof(int ) * ncdps * ns, cudaMemcpyDeviceToHost);
   cudaMemcpy(h_str, d_str, sizeof(real) * ncdps * ns, cudaMemcpyDeviceToHost);
   cudaMemcpy(h_stk, d_stk, sizeof(real) * ncdps * ns, cudaMemcpyDeviceToHost);
-
-  auto end = std::chrono::high_resolution_clock::now();
 
   //
   // END DEVICE REGION
@@ -339,13 +334,10 @@ int main(int argc, const char** argv) {
   printf("Error rate: ctr=%e str=%e stk=%e\n",
          err_ctr_rate, err_str_rate, err_stk_rate);
 
-  // Logs stats (exec time and semblance-traces per second)
-  double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / ktime);
-  std::string stats = "Giga-Semblances-Trace/s: " + std::to_string(stps);
-
-  double offload_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
-  stats += "\nDevice offload time: " + std::to_string(offload_time) + " (s) ";
+  // Logs stats (semblance-traces per second)
+  double time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / time);
+  std::string stats = "Giga semblances traces per second: " + std::to_string(stps);
   LOG(INFO, stats);
 
 #ifdef SAVE
