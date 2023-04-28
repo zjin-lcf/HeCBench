@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "WKFUtils.h"
 
 #define MAXATOMS 4000
@@ -23,7 +23,7 @@
 #define BLOCKSIZE    BLOCKSIZEX * BLOCKSIZEY
 
 
-int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<sycl::float4,1> &atominfo) {
+int copyatoms(sycl::queue &q, float *atoms, int count, float zplane, sycl::float4 *atominfo) {
 
   if (count > MAXATOMS) {
     printf("Atom count exceeds constant buffer storage capacity\n");
@@ -40,11 +40,7 @@ int copyatoms(queue &q, float *atoms, int count, float zplane, buffer<sycl::floa
     atompre[i].w() = atoms[i*4 + 3];
   }
 
-  //cudaMemcpyToSymbol(atominfo, atompre, count * 4 * sizeof(float), 0);
-  q.submit([&](auto &h) {
-    auto d = atominfo.get_access<sycl_write>(h, range<1>(count), id<1>(0));
-    h.copy(atompre, d);
-  }).wait();
+  q.memcpy(atominfo, atompre, count * 4 * sizeof(float));
   return 0;
 }
 
@@ -69,7 +65,7 @@ int initatoms(float **atombuf, int count, sycl::int3 volsize, float gridspacing)
     atoms[addr + 1] = (rand() / (float) RAND_MAX) * size.y(); 
     atoms[addr + 2] = (rand() / (float) RAND_MAX) * size.z(); 
     atoms[addr + 3] = ((rand() / (float) RAND_MAX) * 2.0) - 1.0;  // charge
-  }  
+  }
 
   return 0;
 }
@@ -108,8 +104,8 @@ int main(int argc, char** argv) {
   //     each thread will do several consecutive grid cells in this version,
   //     we're using up some of our available parallelism to reduce overhead.
 
-  auto gws = range<3>(volsize.z(), volsize.y()/UNROLLY, volsize.x()/UNROLLX);
-  auto lws = range<3>(1, BLOCKSIZEY, BLOCKSIZEX);
+  sycl::range<3> gws (volsize.z(), volsize.y()/UNROLLY, volsize.x()/UNROLLX);
+  sycl::range<3> lws (1, BLOCKSIZEY, BLOCKSIZEX);
 
   // initialize the wall clock timers
   runtimer = wkf_timer_create();
@@ -132,22 +128,15 @@ int main(int argc, char** argv) {
   printf("Allocating %.2fMB of memory for output buffer...\n", volmemsz / (1024.0 * 1024.0));
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
+  float *doutput = (float*) sycl::malloc_device(volmemsz, q);
+  sycl::float4 *datominfo = (sycl::float4*) sycl::malloc_device<sycl::float4>(MAXATOMS, q);
 
-  //cudaMalloc((void**)&doutput, volmemsz);
-  //cudaMalloc((void**)&datominfo, sizeof(sycl::float4) * MAXATOMS);
-  buffer<float,1> doutput (volmemsz/sizeof(float));
-  buffer<sycl::float4,1> datominfo (MAXATOMS);
-
-  q.submit([&](auto &h) {
-    auto d = doutput.get_access<sycl_discard_write>(h);
-    h.fill(d, 0.f);
-  }).wait();
+  q.memset(doutput, 0, volmemsz);
 
   printf("starting run...\n");
   wkf_timer_start(mastertimer);
@@ -177,9 +166,7 @@ int main(int argc, char** argv) {
     // RUN the kernel...
     wkf_timer_start(runtimer);
     q.submit([&](auto &h) {
-      auto atominfo = datominfo.get_access<sycl_read>(h);
-      auto energygrid = doutput.get_access<sycl_write>(h);
-      h.parallel_for(nd_range<3>(gws, lws), [=](nd_item<3> item) {
+      h.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
         unsigned int xindex = sycl::mul24(unsigned(item.get_group(2)),
                               unsigned(item.get_local_range(2))) * UNROLLX + item.get_local_id(2); 
         unsigned int yindex = sycl::mul24(unsigned(item.get_group(1)),
@@ -206,10 +193,10 @@ int main(int argc, char** argv) {
         //
         int atomid;
         for (atomid=0; atomid<runatoms; atomid++) {
-          float dy = coory - atominfo[atomid].y();
-          float dyz2 = (dy * dy) + atominfo[atomid].z();
+          float dy = coory - datominfo[atomid].y();
+          float dyz2 = (dy * dy) + datominfo[atomid].z();
 
-          float dx1 = coorx - atominfo[atomid].x();
+          float dx1 = coorx - datominfo[atomid].x();
           float dx2 = dx1 + gridspacing_u;
           float dx3 = dx2 + gridspacing_u;
           float dx4 = dx3 + gridspacing_u;
@@ -218,24 +205,24 @@ int main(int argc, char** argv) {
           float dx7 = dx6 + gridspacing_u;
           float dx8 = dx7 + gridspacing_u;
 
-          energyvalx1 += atominfo[atomid].w() * sycl::rsqrt(dx1*dx1 + dyz2);
-          energyvalx2 += atominfo[atomid].w() * sycl::rsqrt(dx2*dx2 + dyz2);
-          energyvalx3 += atominfo[atomid].w() * sycl::rsqrt(dx3*dx3 + dyz2);
-          energyvalx4 += atominfo[atomid].w() * sycl::rsqrt(dx4*dx4 + dyz2);
-          energyvalx5 += atominfo[atomid].w() * sycl::rsqrt(dx5*dx5 + dyz2);
-          energyvalx6 += atominfo[atomid].w() * sycl::rsqrt(dx6*dx6 + dyz2);
-          energyvalx7 += atominfo[atomid].w() * sycl::rsqrt(dx7*dx7 + dyz2);
-          energyvalx8 += atominfo[atomid].w() * sycl::rsqrt(dx8*dx8 + dyz2);
+          energyvalx1 += datominfo[atomid].w() * sycl::rsqrt(dx1*dx1 + dyz2);
+          energyvalx2 += datominfo[atomid].w() * sycl::rsqrt(dx2*dx2 + dyz2);
+          energyvalx3 += datominfo[atomid].w() * sycl::rsqrt(dx3*dx3 + dyz2);
+          energyvalx4 += datominfo[atomid].w() * sycl::rsqrt(dx4*dx4 + dyz2);
+          energyvalx5 += datominfo[atomid].w() * sycl::rsqrt(dx5*dx5 + dyz2);
+          energyvalx6 += datominfo[atomid].w() * sycl::rsqrt(dx6*dx6 + dyz2);
+          energyvalx7 += datominfo[atomid].w() * sycl::rsqrt(dx7*dx7 + dyz2);
+          energyvalx8 += datominfo[atomid].w() * sycl::rsqrt(dx8*dx8 + dyz2);
         }
 
-        energygrid[outaddr             ] += energyvalx1;
-        energygrid[outaddr+1*BLOCKSIZEX] += energyvalx2;
-        energygrid[outaddr+2*BLOCKSIZEX] += energyvalx3;
-        energygrid[outaddr+3*BLOCKSIZEX] += energyvalx4;
-        energygrid[outaddr+4*BLOCKSIZEX] += energyvalx5;
-        energygrid[outaddr+5*BLOCKSIZEX] += energyvalx6;
-        energygrid[outaddr+6*BLOCKSIZEX] += energyvalx7;
-        energygrid[outaddr+7*BLOCKSIZEX] += energyvalx8;
+        doutput[outaddr             ] += energyvalx1;
+        doutput[outaddr+1*BLOCKSIZEX] += energyvalx2;
+        doutput[outaddr+2*BLOCKSIZEX] += energyvalx3;
+        doutput[outaddr+3*BLOCKSIZEX] += energyvalx4;
+        doutput[outaddr+4*BLOCKSIZEX] += energyvalx5;
+        doutput[outaddr+5*BLOCKSIZEX] += energyvalx6;
+        doutput[outaddr+6*BLOCKSIZEX] += energyvalx7;
+        doutput[outaddr+7*BLOCKSIZEX] += energyvalx8;
       });
     }).wait();
     wkf_timer_stop(runtimer);
@@ -249,10 +236,7 @@ int main(int argc, char** argv) {
   // Copy the GPU output data back to the host and use/store it..
   energy = (float *) malloc(volmemsz);
   wkf_timer_start(hostcopytimer);
-  q.submit([&](auto &h) {
-    auto d = doutput.get_access<sycl_read>(h);
-    h.copy(d, energy);
-  }).wait();
+  q.memcpy(energy, doutput, volmemsz).wait();
   wkf_timer_stop(hostcopytimer);
   hostcopytotal=wkf_timer_time(hostcopytimer);
 
@@ -281,5 +265,7 @@ int main(int argc, char** argv) {
   
   free(atoms);
   free(energy);
+  sycl::free(doutput, q);
+  sycl::free(datominfo, q);
   return 0;
 }
