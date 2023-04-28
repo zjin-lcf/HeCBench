@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "chacha20.h"
 
-void hex_to_raw(nd_item<1> &item, const char* src, const int n /*src size*/,
+void hex_to_raw(sycl::nd_item<1> &item, const char* src, const int n /*src size*/,
                 uint8_t* dst, const uint8_t* char_to_uint)
 {
   for (int i = item.get_local_id(0); i < n/2; i = i + item.get_local_range(0)) {
@@ -16,7 +16,7 @@ void hex_to_raw(nd_item<1> &item, const char* src, const int n /*src size*/,
 }
 
 void test_keystreams (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const char *__restrict text_key,
     const char *__restrict text_nonce,
     const char *__restrict text_keystream,
@@ -68,56 +68,51 @@ int main(int argc, char* argv[])
   uint8_t *raw_keystream = (uint8_t*) malloc (result_len);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<uint8_t, 1> d_char_to_uint (char_to_uint, 256);
+  uint8_t *d_char_to_uint = sycl::malloc_device<uint8_t>(256, q);
+  q.memcpy(d_char_to_uint, char_to_uint, 256);
 
-  buffer<char, 1> d_key (h_key, key_len);
-  buffer<uint8_t, 1> d_raw_key (key_len/2); 
+  char *d_key = sycl::malloc_device<char>(key_len, q);
+  q.memcpy(d_key, h_key, key_len);
 
-  buffer<char, 1> d_nonce (h_nonce, nonce_len); 
-  buffer<uint8_t, 1> d_raw_nonce (nonce_len/2); 
+  uint8_t *d_raw_key = sycl::malloc_device<uint8_t>(key_len/2, q); 
 
-  buffer<char, 1> d_keystream (h_keystream, keystream_len);
+  char *d_nonce = sycl::malloc_device<char>(nonce_len, q);
+  q.memcpy(d_nonce, h_nonce, nonce_len);
 
-  buffer<uint8_t, 1> d_raw_keystream (result_len); 
-  buffer<uint8_t, 1> d_result (result_len); 
+  uint8_t *d_raw_nonce = sycl::malloc_device<uint8_t>(nonce_len/2, q);
 
-  range<1> gws (256);
-  range<1> lws (256);
+  char *d_keystream = sycl::malloc_device<char>(keystream_len, q);
+  q.memcpy(d_keystream, h_keystream, keystream_len);
+
+  uint8_t *d_raw_keystream = sycl::malloc_device<uint8_t>(result_len, q);
+  uint8_t *d_result = sycl::malloc_device<uint8_t>(result_len, q);
+
+  sycl::range<1> gws (256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_result.get_access<sycl_write>(cgh);
-      cgh.fill(acc, (uint8_t)0);
-    });
+    q.memset(d_result, 0, result_len); 
 
-    q.submit([&] (handler &cgh) {
-      auto key = d_key.get_access<sycl_read>(cgh);
-      auto nonce = d_nonce.get_access<sycl_read>(cgh);
-      auto keystream = d_keystream.get_access<sycl_read>(cgh);
-      auto char2uint = d_char_to_uint.get_access<sycl_read>(cgh);
-      auto raw_key = d_raw_key.get_access<sycl_read_write>(cgh);
-      auto raw_nonce = d_raw_nonce.get_access<sycl_read_write>(cgh);
-      auto raw_keystream = d_raw_keystream.get_access<sycl_read_write>(cgh);
-      auto result = d_result.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class keystreams>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class keystreams>(
+       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
        test_keystreams(
           item,
-          key.get_pointer(),
-          nonce.get_pointer(),
-          keystream.get_pointer(),
-          char2uint.get_pointer(), 
-          raw_key.get_pointer(),
-          raw_nonce.get_pointer(),
-          raw_keystream.get_pointer(),
-          result.get_pointer(),
+          d_key,
+          d_nonce,
+          d_keystream,
+          d_char_to_uint, 
+          d_raw_key,
+          d_raw_nonce,
+          d_raw_keystream,
+          d_result,
           key_len, nonce_len, keystream_len);
       });
     });
@@ -128,16 +123,8 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of kernels: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_raw_keystream.get_access<sycl_read>(cgh);
-    cgh.copy(acc, raw_keystream);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_result.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  });
-
+  q.memcpy(raw_keystream, d_raw_keystream, result_len);
+  q.memcpy(result, d_result, result_len);
   q.wait();
 
   int error = memcmp(result, raw_keystream, result_len);
@@ -145,6 +132,14 @@ int main(int argc, char* argv[])
 
   free(result);
   free(raw_keystream);
+  sycl::free(d_key, q);
+  sycl::free(d_raw_key, q);
+  sycl::free(d_nonce, q);
+  sycl::free(d_raw_nonce, q);
+  sycl::free(d_keystream, q);
+  sycl::free(d_raw_keystream, q);
+  sycl::free(d_result, q);
+  sycl::free(d_char_to_uint, q);
 
   return 0;
 }
