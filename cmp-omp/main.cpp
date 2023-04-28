@@ -226,51 +226,49 @@ int main(int argc, const char** argv) {
                                   d_str[0:ncdps*ns], \
                                   d_stk[0:ncdps*ns])
   {
+    // Chronometer
+    beg = std::chrono::high_resolution_clock::now();
 
-  // Chronometer
-  beg = std::chrono::high_resolution_clock::now();
+    // Evaluate Cs - linspace
+    #pragma omp target teams distribute parallel for thread_limit(1)
+    for (int i = 0; i < nc; i++) 
+      d_c[i] = c0 + inc*i;
 
-  // Evaluate Cs - linspace
-  #pragma omp target teams distribute parallel for thread_limit(1)
-  for (int i = 0; i < nc; i++) 
-    d_c[i] = c0 + inc*i;
+    // Evaluate halfoffset points in x and y coordinates
+    #pragma omp target teams distribute parallel for thread_limit(1)
+    for (int i = 0; i < ttraces; i++) {
+      real _s = d_scalco[i];
 
-  // Evaluate halfoffset points in x and y coordinates
-  #pragma omp target teams distribute parallel for thread_limit(1)
-  for (int i = 0; i < ttraces; i++) {
-    real _s = d_scalco[i];
+      if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
+      else if(_s < 0) _s = 1.0f / _s;
 
-    if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
-    else if(_s < 0) _s = 1.0f / _s;
+      real hx = (d_gx[i] - d_sx[i]) * _s;
+      real hy = (d_gy[i] - d_sy[i]) * _s;
 
-    real hx = (d_gx[i] - d_sx[i]) * _s;
-    real hy = (d_gy[i] - d_sy[i]) * _s;
+      d_h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
+    }
 
-    d_h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
-  }
+    for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
+      int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
+      int t_idf = ntraces_by_cdp_id[cdp_id];
+      int stride = t_idf - t_id0;
 
-  for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
-    int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
-    int t_idf = ntraces_by_cdp_id[cdp_id];
-    int stride = t_idf - t_id0;
+      // Compute semblances for each c for each sample
+      compute_semblances(d_h, d_c, d_samples + t_id0*ns, d_num, d_stt,
+                         t_id0, t_idf, idt, dt, tau, w, nc, ns);
 
-    // Compute semblances for each c for each sample
-    compute_semblances(d_h, d_c, d_samples + t_id0*ns, d_num, d_stt,
-                       t_id0, t_idf, idt, dt, tau, w, nc, ns);
+      // Get max C for max semblance for each sample on this cdp
+      redux_semblances(d_num, d_stt, d_ctr, d_str, d_stk, nc, cdp_id, ns);
 
-    // Get max C for max semblance for each sample on this cdp
-    redux_semblances(d_num, d_stt, d_ctr, d_str, d_stk, nc, cdp_id, ns);
+      number_of_semblances += stride;
 
-    number_of_semblances += stride;
+      #ifdef DEBUG
+      std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
+      #endif
+    }
 
-#ifdef DEBUG
-    std::cout << "Progress: " + std::to_string(cdp_id) + "/" + std::to_string(ncdps) << std::endl;
-#endif
-  }
-
-  // Gets time at end of computation
-  end = std::chrono::high_resolution_clock::now();
-
+    // Gets time at end of computation
+    end = std::chrono::high_resolution_clock::now();
   }
 
   //
@@ -309,9 +307,9 @@ int main(int argc, const char** argv) {
 
   int err_ctr = 0, err_str = 0, err_stk = 0;
   for (int i = 0; i < ncdps*ns; i++) {
-   if (r_ctr[i] != h_ctr[i]) err_ctr++;
-   if (r_str[i] - h_str[i] > 1e-3) err_str++;
-   if (r_stk[i] - h_stk[i] > 1e-3) err_stk++;
+   if (r_ctr[i] != d_ctr[i]) err_ctr++;
+   if (r_str[i] - d_str[i] > 1e-3) err_str++;
+   if (r_stk[i] - d_stk[i] > 1e-3) err_stk++;
   }
   float err_ctr_rate = (float)err_ctr / (ncdps * ns);
   float err_str_rate = (float)err_str / (ncdps * ns); 
@@ -320,10 +318,9 @@ int main(int argc, const char** argv) {
          err_ctr_rate, err_str_rate, err_stk_rate);
 
   // Logs stats (exec time and semblance-traces per second)
-  double total_exec_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / total_exec_time);
-  std::string stats = "Total Execution Time: " + std::to_string(total_exec_time);
-  stats += ": Giga-Semblances-Trace/s: " + std::to_string(stps);
+  double time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / time);
+  std::string stats = "Giga semblances traces per second: " + std::to_string(stps);
   LOG(INFO, stats);
 
 #ifdef SAVE

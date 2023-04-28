@@ -207,7 +207,6 @@ int main(int argc, const char** argv) {
   const int  ntrs = gather.ntrs();       // Max number of traces by cdp
   const real inc = (c1-c0) * (1.0f / (real)nc);
 
-
   dt = dt / 1000000.0f;
   real idt = 1.0f / dt;
   int tau = ((int)( itau * idt) > 0) ? ((int)( itau * idt)) : 0;
@@ -217,25 +216,23 @@ int main(int argc, const char** argv) {
 
   LOG(INFO, "Starting CMP execution");
 
-  // Chronometer
-  auto beg = std::chrono::high_resolution_clock::now();
-
   // Alloc memory
   real *d_h, *d_gx,  *d_gy, *d_sx, *d_sy, *d_scalco, *d_cdpsmpl;
   real *d_c, *d_num, *d_stt, *d_str, *d_stk; // nc stts per sample
   int  *d_ctr; // ns Cs per cdp
-  hipMalloc((void**)&d_gx, sizeof(real)*ttraces);
-  hipMalloc((void**)&d_gy, sizeof(real)*ttraces);
-  hipMalloc((void**)&d_sx, sizeof(real)*ttraces);
-  hipMalloc((void**)&d_sy, sizeof(real)*ttraces);
-  hipMalloc((void**)&d_scalco, sizeof(real)*ttraces);
+  const size_t traces_bytes = ttraces * sizeof(real);
+  hipMalloc((void**)&d_gx, traces_bytes);
+  hipMalloc((void**)&d_gy, traces_bytes);
+  hipMalloc((void**)&d_sx, traces_bytes);
+  hipMalloc((void**)&d_sy, traces_bytes);
+  hipMalloc((void**)&d_scalco, traces_bytes);
   hipMalloc((void**)&d_cdpsmpl, sizeof(real)*ntrs*ns);
 
-  hipMemcpy(d_gx    , h_gx    , sizeof(real)*ttraces, hipMemcpyHostToDevice);
-  hipMemcpy(d_gy    , h_gy    , sizeof(real)*ttraces, hipMemcpyHostToDevice);
-  hipMemcpy(d_sx    , h_sx    , sizeof(real)*ttraces, hipMemcpyHostToDevice);
-  hipMemcpy(d_sy    , h_sy    , sizeof(real)*ttraces, hipMemcpyHostToDevice);
-  hipMemcpy(d_scalco, h_scalco, sizeof(real)*ttraces, hipMemcpyHostToDevice);
+  hipMemcpy(d_gx    , h_gx    , traces_bytes, hipMemcpyHostToDevice);
+  hipMemcpy(d_gy    , h_gy    , traces_bytes, hipMemcpyHostToDevice);
+  hipMemcpy(d_sx    , h_sx    , traces_bytes, hipMemcpyHostToDevice);
+  hipMemcpy(d_sy    , h_sy    , traces_bytes, hipMemcpyHostToDevice);
+  hipMemcpy(d_scalco, h_scalco, traces_bytes, hipMemcpyHostToDevice);
 
   hipMalloc((void** ) &d_c  , sizeof(real)*nc      );
   hipMalloc((void** ) &d_h  , sizeof(real)*ttraces );
@@ -252,14 +249,14 @@ int main(int argc, const char** argv) {
   //
   // DEVICE REGION
   //
-
-  auto kbeg = std::chrono::high_resolution_clock::now();
+  hipDeviceSynchronize();
+  auto beg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
-  hipLaunchKernelGGL(init_c, nc, 1, 0, 0, d_c, inc, c0);
+  init_c<<<nc, 1>>>(d_c, inc, c0);
 
   // Evaluate halfoffset points in x and y coordinates
-  hipLaunchKernelGGL(init_half, ttraces, 1, 0, 0, d_scalco, d_gx, d_gy, d_sx, d_sy, d_h);
+  init_half<<<ttraces, 1>>>(d_scalco, d_gx, d_gy, d_sx, d_sy, d_h);
 
   for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
     int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
@@ -284,14 +281,12 @@ int main(int argc, const char** argv) {
   }
   // Gets time at end of computation
   hipDeviceSynchronize();
-  auto kend = std::chrono::high_resolution_clock::now();
+  auto end = std::chrono::high_resolution_clock::now();
 
   // Copy results back to host
   hipMemcpy(h_ctr, d_ctr, sizeof(int ) * ncdps * ns, hipMemcpyDeviceToHost);
   hipMemcpy(h_str, d_str, sizeof(real) * ncdps * ns, hipMemcpyDeviceToHost);
   hipMemcpy(h_stk, d_stk, sizeof(real) * ncdps * ns, hipMemcpyDeviceToHost);
-
-  auto end = std::chrono::high_resolution_clock::now();
 
   //
   // END DEVICE REGION
@@ -339,13 +334,10 @@ int main(int argc, const char** argv) {
   printf("Error rate: ctr=%e str=%e stk=%e\n",
          err_ctr_rate, err_str_rate, err_stk_rate);
 
-  // Logs stats (exec time and semblance-traces per second)
-  double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / ktime);
-  std::string stats = "Giga-Semblances-Trace/s: " + std::to_string(stps);
-
-  double offload_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
-  stats += "\nDevice offload time: " + std::to_string(offload_time) + " (s) ";
+  // Logs stats (semblance-traces per second)
+  double time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / time);
+  std::string stats = "Giga semblances traces per second: " + std::to_string(stps);
   LOG(INFO, stats);
 
 #ifdef SAVE

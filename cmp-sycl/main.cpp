@@ -263,7 +263,7 @@ int main(int argc, const char** argv) {
   //
 
   q.wait();
-  auto kbeg = std::chrono::high_resolution_clock::now();
+  auto beg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
   q.submit([&] (sycl::handler &cgh) {
@@ -319,7 +319,7 @@ int main(int argc, const char** argv) {
   }
   // Gets time at end of computation
   q.wait();
-  auto kend = std::chrono::high_resolution_clock::now();
+  auto end = std::chrono::high_resolution_clock::now();
 
   // Copy results back to host
   q.memcpy(h_ctr, d_ctr, sizeof(int ) * ncdps * ns);
@@ -373,9 +373,9 @@ int main(int argc, const char** argv) {
   printf("Error rate: ctr=%e str=%e stk=%e\n",
          err_ctr_rate, err_str_rate, err_stk_rate);
 
-  // Logs stats (exec time and semblance-traces per second)
-  double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / ktime);
+  // Logs stats (semblance-traces per second)
+  double time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / time);
   std::string stats = "Giga semblances traces per second: " + std::to_string(stps);
   LOG(INFO, stats);
 
