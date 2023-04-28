@@ -37,7 +37,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3 -fmad=false
+  CFLAGS += -O3 -fmad=true
 endif
 
 #===============================================================================
