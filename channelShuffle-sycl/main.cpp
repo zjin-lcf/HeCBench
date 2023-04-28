@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUM_THREADS 256
 #define GridDimMaxY 65536
 
 template <typename T, bool kNFirst>
 void ChannelShuffleNCHWKernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     const int G,
     const int K,
     const int HxW,
@@ -34,7 +34,7 @@ void ChannelShuffleNCHWKernel(
 
 template <typename T, int kSharedSize>
 void ChannelShuffleNHWCKernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int G,
     const int K,
     const T* X,
@@ -45,8 +45,8 @@ void ChannelShuffleNHWCKernel(
   int threadIdx_x = item.get_local_id(0);
 
   auto g = item.get_group();
-  multi_ptr<T[kSharedSize], access::address_space::local_space> localPtr =
-    ext::oneapi::group_local_memory_for_overwrite<T[kSharedSize]>(g);
+  sycl::multi_ptr<T[kSharedSize], sycl::access::address_space::local_space> localPtr =
+    sycl::ext::oneapi::group_local_memory_for_overwrite<T[kSharedSize]>(g);
 
   T* sdata = *localPtr;
 
@@ -56,7 +56,7 @@ void ChannelShuffleNHWCKernel(
     sdata[i] = X[offset + i];
   }
 
-  group_barrier(g, memory_scope::work_group);
+  sycl::group_barrier(g, sycl::memory_scope::work_group);
 
   for (int i = threadIdx_x; i < C; i += blockDim_x) {
     const int g = i % G;
@@ -66,7 +66,7 @@ void ChannelShuffleNHWCKernel(
 }
 
 template <typename T>
-bool ChannelShuffleNCHW (queue &q, T *X, int N, int C, int G, int numel, T *Y,
+bool ChannelShuffleNCHW (sycl::queue &q, T *X, int N, int C, int G, int numel, T *Y,
                          long &time, int repeat)
 {
   if (C % G != 0 || numel < N * C) return false;
@@ -78,25 +78,25 @@ bool ChannelShuffleNCHW (queue &q, T *X, int N, int C, int G, int numel, T *Y,
   auto start = std::chrono::steady_clock::now();
 
   if (N <= GridDimMaxY) {
-    range<3> gws (C, N, S * NUM_THREADS);
-    range<3> lws (1, 1, NUM_THREADS);
+    sycl::range<3> gws (C, N, S * NUM_THREADS);
+    sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
+      q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class shuffle_nchw>(
-          nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+          sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
           ChannelShuffleNCHWKernel<float, false>(item, G, K, HxW, X, Y);
         });
       });
     }
   } else {
-    range<3> gws (C, S, N * NUM_THREADS);
-    range<3> lws (1, 1, NUM_THREADS);
+    sycl::range<3> gws (C, S, N * NUM_THREADS);
+    sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
+      q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class shuffle2_nchw>(
-          nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+          sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
           ChannelShuffleNCHWKernel<float, true>(item, G, K, HxW, X, Y);
         });
       });
@@ -111,7 +111,7 @@ bool ChannelShuffleNCHW (queue &q, T *X, int N, int C, int G, int numel, T *Y,
 }
 
 template <typename T>
-bool ChannelShuffleNHWC (queue &q, T *X, int N, int C, int G, int numel, T *Y,
+bool ChannelShuffleNHWC (sycl::queue &q, T *X, int N, int C, int G, int numel, T *Y,
                          long &time, int repeat)
 {
   if (C % G != 0 || numel < N * C) return false;
@@ -120,34 +120,34 @@ bool ChannelShuffleNHWC (queue &q, T *X, int N, int C, int G, int numel, T *Y,
   const int HxW = numel / (N * C);
   const int outer_size = N * HxW;
 
-  range<1> gws (outer_size * NUM_THREADS);
-  range<1> lws (NUM_THREADS);
+  sycl::range<1> gws (outer_size * NUM_THREADS);
+  sycl::range<1> lws (NUM_THREADS);
 
   auto start = std::chrono::steady_clock::now();
 
   if (C <= 32) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
+      q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class shuffle_nhwc_sm32>(
-          nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           ChannelShuffleNHWCKernel<float, 32>(item, G, K, X, Y);
         });
       });
     }
   } else if (C <= 128) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
+      q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class shuffle_nhwc_sm128>(
-          nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           ChannelShuffleNHWCKernel<float, 128>(item, G, K, X, Y);
         });
       });
     }
   } else if (C <= 512) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
+      q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class shuffle_nhwc_sm512>(
-          nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           ChannelShuffleNHWCKernel<float, 512>(item, G, K, X, Y);
         });
       });
@@ -175,11 +175,10 @@ int main(int argc, char* argv[])
   long time;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // limited by the global device memory
   for (int N = 1; N <= 64; N = N * 4) {
@@ -189,11 +188,11 @@ int main(int argc, char* argv[])
 
       const int numel = N * C * W * H; // assume no integer overflow
 
-      float *d_X = malloc_device<float>(numel, q);
-      float *d_Y = malloc_device<float>(numel, q);
+      float *d_X = sycl::malloc_device<float>(numel, q);
+      float *d_Y = sycl::malloc_device<float>(numel, q);
       if (d_X == nullptr || d_Y == nullptr) {
-        if (d_X != nullptr) free(d_X, q);
-        if (d_Y != nullptr) free(d_Y, q);
+        if (d_X != nullptr) sycl::free(d_X, q);
+        if (d_Y != nullptr) sycl::free(d_Y, q);
         printf("Device memory allocation failed. Exit\n");
         goto end;
       }
@@ -210,8 +209,8 @@ int main(int argc, char* argv[])
       else
         printf("Failed to execute channel shuffle (nchw)\n");
 
-      free(d_X, q);
-      free(d_Y, q);
+      sycl::free(d_X, q);
+      sycl::free(d_Y, q);
     }
   }
   
