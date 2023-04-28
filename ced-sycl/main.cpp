@@ -36,11 +36,11 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <sycl/sycl.hpp>
 
 #include "kernel.h"
 #include "support/partitioner.h"
 #include "support/verify.h"
-#include "common.h"
 
 const float c_gaus[9] = {0.0625f, 0.125f, 0.0625f, 
                          0.1250f, 0.250f, 0.1250f, 
@@ -141,7 +141,7 @@ void read_input(unsigned char** all_gray_frames,
 
     FILE *fp = fopen(FileName, "r");
     if(fp == NULL) {
-      perror ("The following error occurred");
+      fprintf (stderr, "Failed to open the file %s. Exit\n", FileName);
       exit(EXIT_FAILURE);
     }
 
@@ -192,46 +192,46 @@ int main(int argc, char **argv) {
   unsigned char *h_theta_cpu_proxy  = (unsigned char *)malloc(in_size);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
-  auto t1 = std::chrono::high_resolution_clock::now();
-
-  buffer<unsigned char, 1> d_in_out(in_size);
-  buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
-  buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
-  buffer<float, 1> d_gaus (c_gaus, 9);
-  buffer<int, 1> d_sobx (c_sobx, 9);
-  buffer<int, 1> d_soby (c_soby, 9);
+  sycl::buffer<unsigned char, 1> d_in_out(in_size);
+  sycl::buffer<unsigned char, 1> d_interm_gpu_proxy(in_size);
+  sycl::buffer<unsigned char, 1> d_theta_gpu_proxy(in_size);
 
   CoarseGrainPartitioner partitioner = partitioner_create(n_frames, p.alpha, worklist);
   std::vector<std::thread> proxy_threads;
+
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  sycl::buffer<float, 1> d_gaus (c_gaus, 9);
+  sycl::buffer<int, 1> d_sobx (c_sobx, 9);
+  sycl::buffer<int, 1> d_soby (c_soby, 9);
 
   proxy_threads.push_back(std::thread([&]() {
 
       for(int task_id = gpu_first(&partitioner); gpu_more(&partitioner); task_id = gpu_next(&partitioner)) {
 
         // Copy next frame to device
-        q.submit([&] (handler &cgh) {
-          auto in_acc = d_in_out.get_access<sycl_discard_write>(cgh);
+        q.submit([&] (sycl::handler &cgh) {
+          auto in_acc = d_in_out.get_access<sycl::access::mode::discard_write>(cgh);
           cgh.copy(all_gray_frames[task_id], in_acc); 
         });
 
         int threads = p.n_gpu_threads;
-        range<2> gws (rows-2, cols-2);
-        range<2> lws (threads, threads);
+        sycl::range<2> gws (rows-2, cols-2);
+        sycl::range<2> lws (threads, threads);
 
         // call GAUSSIAN KERNEL
-        q.submit([&] (handler &cgh) {
-          auto data = d_in_out.get_access<sycl_read>(cgh);
-          auto out = d_interm_gpu_proxy.get_access<sycl_discard_write>(cgh);
-          auto gaus = d_gaus.get_access<sycl_read, access::target::constant_buffer>(cgh);
-          accessor<int, 1, sycl_read_write, access::target::local> 
-          l_data((threads+2)*(threads+2), cgh);
-          cgh.parallel_for<class gaussian>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          auto data = d_in_out.get_access<sycl::access::mode::read>(cgh);
+          auto out = d_interm_gpu_proxy.get_access<sycl::access::mode::discard_write>(cgh);
+          auto gaus = d_gaus.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
+          sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
+          cgh.parallel_for<class gaussian>(
+            sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
             const int L_SIZE = item.get_local_range(0);
             int sum         = 0;
             const int g_row = item.get_global_id(0) + 1;
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
             else if(l_col == L_SIZE)
               l_data[l_row * (L_SIZE + 2) + L_SIZE + 1] = data[pos + 1];
 
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             for(int i = 0; i < 3; i++) {
               for(int j = 0; j < 3; j++) {
@@ -285,15 +285,15 @@ int main(int argc, char **argv) {
         });
 
         // call SOBEL KERNEL
-        q.submit([&] (handler &cgh) {
-          auto data = d_interm_gpu_proxy.get_access<sycl_read>(cgh);
-          auto out = d_in_out.get_access<sycl_discard_write>(cgh);
-          auto theta = d_theta_gpu_proxy.get_access<sycl_discard_write>(cgh);
-          auto sobx = d_sobx.get_access<sycl_read, access::target::constant_buffer>(cgh);
-          auto soby = d_soby.get_access<sycl_read, access::target::constant_buffer>(cgh);
-          accessor<int, 1, sycl_read_write, access::target::local> 
-          l_data((threads+2)*(threads+2), cgh);
-          cgh.parallel_for<class sobel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          auto data = d_interm_gpu_proxy.get_access<sycl::access::mode::read>(cgh);
+          auto out = d_in_out.get_access<sycl::access::mode::discard_write>(cgh);
+          auto theta = d_theta_gpu_proxy.get_access<sycl::access::mode::discard_write>(cgh);
+          auto sobx = d_sobx.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
+          auto soby = d_soby.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
+          sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
+          cgh.parallel_for<class sobel>(
+            sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
             const int L_SIZE = item.get_local_range(0);
             const float PI    = 3.14159265f;
             const int   g_row = item.get_global_id(0) + 1;
@@ -336,7 +336,7 @@ int main(int argc, char **argv) {
             else if(l_col == L_SIZE)
               l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             float sumx = 0, sumy = 0, angle = 0;
             // find x and y derivatives
@@ -388,13 +388,13 @@ int main(int argc, char **argv) {
         });
 
         // call NON-MAXIMUM SUPPRESSION KERNEL
-        q.submit([&] (handler &cgh) {
-          auto data = d_in_out.get_access<sycl_read>(cgh);
-          auto theta = d_theta_gpu_proxy.get_access<sycl_read>(cgh);
-          auto out = d_interm_gpu_proxy.get_access<sycl_discard_write>(cgh);
-          accessor<int, 1, sycl_read_write, access::target::local> 
-          l_data((threads+2)*(threads+2), cgh);
-          cgh.parallel_for<class non_max_supress>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          auto data = d_in_out.get_access<sycl::access::mode::read>(cgh);
+          auto theta = d_theta_gpu_proxy.get_access<sycl::access::mode::read>(cgh);
+          auto out = d_interm_gpu_proxy.get_access<sycl::access::mode::discard_write>(cgh);
+          sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
+          cgh.parallel_for<class non_max_supress>(
+            sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
             // These variables are offset by one to avoid seg. fault errors
             // As such, this kernel ignores the outside ring of pixels
             const int L_SIZE = item.get_local_range(0);
@@ -436,7 +436,7 @@ int main(int argc, char **argv) {
             else if(l_col == L_SIZE)
               l_data[l_row * (L_SIZE + 2) + (L_SIZE + 1)] = data[pos + 1];
 
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
 
             unsigned char my_magnitude = l_data[l_row * (L_SIZE + 2) + l_col];
 
@@ -508,12 +508,12 @@ int main(int argc, char **argv) {
         });
 
         // call HYSTERESIS KERNEL
-        q.submit([&] (handler &cgh) {
-          auto data = d_interm_gpu_proxy.get_access<sycl_read>(cgh);
-          auto out = d_in_out.get_access<sycl_discard_write>(cgh);
-          accessor<int, 1, sycl_read_write, access::target::local> 
-          l_data((threads+2)*(threads+2), cgh);
-          cgh.parallel_for<class hyst>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          auto data = d_interm_gpu_proxy.get_access<sycl::access::mode::read>(cgh);
+          auto out = d_in_out.get_access<sycl::access::mode::discard_write>(cgh);
+          sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
+          cgh.parallel_for<class hyst>(
+            sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
             // These variables are offset by one to avoid seg. fault errors
             // As such, this kernel ignores the outside ring of pixels
             // Establish our high and low thresholds as floats
@@ -546,8 +546,8 @@ int main(int argc, char **argv) {
         });
 
         // Copy from Device
-        q.submit([&] (handler &cgh) {
-          auto in_acc = d_in_out.get_access<sycl_read>(cgh);
+        q.submit([&] (sycl::handler &cgh) {
+          auto in_acc = d_in_out.get_access<sycl::access::mode::read>(cgh);
           cgh.copy(in_acc, all_out_frames[task_id]);
         }).wait();
       }
