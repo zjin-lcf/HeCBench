@@ -7,7 +7,7 @@
 #include <iterator>
 #include <vector>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 using namespace std;
 
@@ -79,9 +79,9 @@ template <typename K, typename V>
 inline Pair<K, V> shfl_xor(const Pair<K, V> &p, int laneMask,
                            sycl::nd_item<1> &item,
                            int width = WARP_SIZE) {
-  return Pair<K, V>(
-      sycl::permute_group_by_xor(item.get_sub_group(), p.k, laneMask),
-      sycl::permute_group_by_xor(item.get_sub_group(), p.v, laneMask));
+  auto sg = item.get_sub_group();
+  return Pair<K, V>(sycl::permute_group_by_xor(sg, p.k, laneMask),
+                    sycl::permute_group_by_xor(sg, p.v, laneMask));
 }
 
 template <typename T, typename Comparator>
@@ -138,12 +138,13 @@ inline bool warpHasCollision(T val, sycl::nd_item<1> &item) {
   // -if any lane as a difference of 0, there is a duplicate
   //  (excepting the first lane)
   val = warpBitonicSort<T, LessThan<T>>(val, item);
-  const T lower = sycl::shift_group_right(item.get_sub_group(), val, 1);
+  auto sg = item.get_sub_group();
+  const T lower = sycl::shift_group_right(sg, val, 1);
 
   // Shuffle for lane 0 will present its same value, so only
   // subsequent lanes will detect duplicates
   const bool dup = (lower == val) && (getLaneId(item) != 0);
-  return (sycl::any_of_group(item.get_sub_group(), dup) != 0);
+  return (sycl::any_of_group(sg, dup) != 0);
 }
 
 /// Determine if two warp threads have the same value (a collision),
@@ -170,16 +171,18 @@ inline unsigned int warpCollisionMask(T val, sycl::nd_item<1> &item) {
   // duplicated. All except for lane 0, since shfl will present its
   // own value (and if lane 0's value is duplicated, lane 1 will pick
   // that up)
-  const T lower = sycl::shift_group_right(item.get_sub_group(), pVal.k, 1);
+  auto sg = item.get_sub_group();
+  const T lower = sycl::shift_group_right(sg, pVal.k, 1);
   Pair<int, bool> dup(pVal.v, (lower == pVal.k) && (getLaneId(item) != 0));
 
   // Sort back based on lane ID so each thread originally knows
   // whether or not it duplicated
   dup = warpBitonicSort<Pair<int, bool>, LessThan<Pair<int, bool>>>(dup, item);
 
-  auto sg = item.get_sub_group();
-  return sycl::reduce_over_group(sg, dup.v ? (0x1 << sg.get_local_linear_id()) : 0,
-                                 sycl::plus<>());
+  auto mask = sycl::ext::oneapi::group_ballot(sg, dup.v);
+  unsigned int matchmask;
+  mask.extract_bits(matchmask, 0);
+  return matchmask;
 }
 
 void checkDuplicates(sycl::nd_item<1> &item,
@@ -201,50 +204,50 @@ void checkDuplicateMask(sycl::nd_item<1> &item,
 
 vector<int> checkDuplicates(sycl::queue &q, const vector<int> &v) {
   unsigned int v_size = v.size();
-  sycl::buffer<int, 1> d_set (v.data(), v_size);
-  sycl::buffer<int, 1> d_hasDuplicate (32);
+
+  int *d_set = sycl::malloc_device<int>(v_size, q);
+  q.memcpy(d_set, v.data(), v_size * sizeof(int));
+
+  int *d_hasDuplicate = sycl::malloc_device<int>(32, q);
 
   sycl::range<1> gws (32);
   sycl::range<1> lws (32);
   q.submit([&](sycl::handler &cgh) {
-    auto s = d_set.get_access<sycl_read>(cgh);
-    auto d = d_hasDuplicate.get_access<sycl_write>(cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws),
         [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-      checkDuplicates(item, v_size, s.get_pointer(), d.get_pointer());
+      checkDuplicates(item, v_size, d_set, d_hasDuplicate);
     });
   });
 
   vector<int> hasDuplicates(32, false);
-  q.submit([&](sycl::handler &cgh) {
-    auto acc = d_hasDuplicate.get_access<sycl_read>(cgh);
-    cgh.copy(acc, hasDuplicates.data());
-  }).wait();
+  q.memcpy(hasDuplicates.data(), d_hasDuplicate, sizeof(int) * 32).wait();
+  sycl::free(d_set, q);
+  sycl::free(d_hasDuplicate, q);
 
   return hasDuplicates;
 }
 
 unsigned int checkDuplicateMask(sycl::queue &q, const vector<int> &v) {
   unsigned int v_size = v.size();
-  sycl::buffer<int, 1> d_set (v.data(), v_size);
-  sycl::buffer<unsigned int, 1> d_duplicateMask (1);
+
+  int *d_set = sycl::malloc_device<int>(v_size, q);
+  q.memcpy(d_set, v.data(), v_size * sizeof(int));
+
+  unsigned int *d_duplicateMask = sycl::malloc_device<unsigned int>(1, q);
 
   sycl::range<1> gws (32);
   sycl::range<1> lws (32);
   q.submit([&](sycl::handler &cgh) {
-    auto s = d_set.get_access<sycl_read>(cgh);
-    auto d = d_duplicateMask.get_access<sycl_write>(cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws),
         [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-      checkDuplicateMask(item, v_size, s.get_pointer(), d.get_pointer());
+      checkDuplicateMask(item, v_size, d_set, d_duplicateMask);
     });
   });
 
   unsigned int mask;
-  q.submit([&](sycl::handler &cgh) {
-    auto acc = d_duplicateMask.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &mask);
-  }).wait();
+  q.memcpy(&mask, d_duplicateMask, sizeof(unsigned int)).wait();
+  sycl::free(d_set, q);
+  sycl::free(d_duplicateMask, q);
 
   return mask;
 }
@@ -340,11 +343,10 @@ int main(int argc, char* argv[]) {
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
   
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) 
@@ -363,4 +365,3 @@ int main(int argc, char* argv[]) {
 
   return 0;
 }
-
