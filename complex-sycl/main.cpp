@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "complex.h"
 #include "kernels.h"
 
@@ -28,26 +28,27 @@ int main(int argc, char* argv[]) {
   char* cs = (char*) malloc (n);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   char* d_cs = sycl::malloc_device<char>(n, q);
 
-  range<1> gws ((n + 255)/256*256); 
-  range<1> lws (256);
+  sycl::range<1> gws ((n + 255)/256*256);
+  sycl::range<1> lws (256);
 
   // warmup
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       complex_float(item, d_cs, n);
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       complex_double(item, d_cs, n);
     });
   });
@@ -58,8 +59,9 @@ int main(int argc, char* argv[]) {
 
   // complex numbers in single precision
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         complex_float(item, d_cs, n);
       });
     });
@@ -77,8 +79,9 @@ int main(int argc, char* argv[]) {
 
   // complex numbers in double precision
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         complex_double(item, d_cs, n);
       });
     });

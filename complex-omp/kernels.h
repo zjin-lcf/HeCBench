@@ -89,7 +89,7 @@ void complex_double (char* checkSum, int n)
               Creal(Cmul(Cadd(z1, z2) , Cadd(Conj(z1), Conj(z2))))) < 1e-3; 
 
     s += fabs(Cabs(Csub(z1, z2)) * Cabs(Csub(z1 , z2)) -
-              Creal(Cmul(Csub(z1, z2) , Csub(Conj(z1), Conj(z2))))) < 1e-3f;
+              Creal(Cmul(Csub(z1, z2) , Csub(Conj(z1), Conj(z2))))) < 1e-3;
 
     s += fabs(Creal(Cadd(Cmul(z1, Conj(z2)) , Cmul(z2, Conj(z1)))) -
               2.0 * (Creal(z1) * Creal(z2) + Cimag(z1) * Cimag(z2))) < 1e-3;

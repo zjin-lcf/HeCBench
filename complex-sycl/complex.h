@@ -7,7 +7,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-typedef float2 FloatComplex;
+typedef sycl::float2 FloatComplex;
 
 static inline float Crealf (FloatComplex x) 
 { 
@@ -112,7 +112,7 @@ static inline float Cabsf (FloatComplex x)
 }
 
 /* Double precision */
-typedef double2 DoubleComplex;
+typedef sycl::double2 DoubleComplex;
 
 static inline double Creal (DoubleComplex x) 
 { 

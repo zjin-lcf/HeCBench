@@ -34,7 +34,7 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
   return (a_new * seed + c_new) % m;
 }
 
-void complex_float (nd_item<1> &item, char* checkSum, int n)
+void complex_float (sycl::nd_item<1> &item, char* checkSum, int n)
 {
   int i = item.get_global_id(0);
   if (i >= n) return; 
@@ -48,24 +48,24 @@ void complex_float (nd_item<1> &item, char* checkSum, int n)
   FloatComplex z1 = make_FloatComplex(r1, r2);
   FloatComplex z2 = make_FloatComplex(r3, r4);
 
-  char s = fabsf(Cabsf(Cmulf(z1, z2)) - Cabsf(z1) * Cabsf(z2)) < 1e-3f;
+  char s = sycl::fabs(Cabsf(Cmulf(z1, z2)) - Cabsf(z1) * Cabsf(z2)) < 1e-3f;
 
-  s += fabsf(Cabsf(Caddf(z1, z2)) * Cabsf(Caddf(z1 , z2)) -
+  s += sycl::fabs(Cabsf(Caddf(z1, z2)) * Cabsf(Caddf(z1 , z2)) -
              Crealf(Cmulf(Caddf(z1, z2) , Caddf(Conjf(z1), Conjf(z2))))) < 1e-3f; 
 
-  s += fabsf(Cabsf(Csubf(z1, z2)) * Cabsf(Csubf(z1 , z2)) -
+  s += sycl::fabs(Cabsf(Csubf(z1, z2)) * Cabsf(Csubf(z1 , z2)) -
              Crealf(Cmulf(Csubf(z1, z2) , Csubf(Conjf(z1), Conjf(z2))))) < 1e-3f;
 
-  s += fabsf(Crealf(Caddf(Cmulf(z1, Conjf(z2)) , Cmulf(z2, Conjf(z1)))) -
+  s += sycl::fabs(Crealf(Caddf(Cmulf(z1, Conjf(z2)) , Cmulf(z2, Conjf(z1)))) -
              2.0f * (Crealf(z1) * Crealf(z2) + Cimagf(z1) * Cimagf(z2))) < 1e-3f;
 
-  s += fabsf(Cabsf(Cdivf(Conjf(z1), z2)) -
+  s += sycl::fabs(Cabsf(Cdivf(Conjf(z1), z2)) -
              Cabsf(Cdivf(Conjf(z1), Conjf(z2)))) < 1e-3f;
 
   checkSum[i] = s;
 }
 
-void complex_double (nd_item<1> &item, char* checkSum, int n)
+void complex_double (sycl::nd_item<1> &item, char* checkSum, int n)
 {
   int i = item.get_global_id(0);
   if (i >= n) return; 
@@ -79,18 +79,18 @@ void complex_double (nd_item<1> &item, char* checkSum, int n)
   DoubleComplex z1 = make_DoubleComplex(r1, r2);
   DoubleComplex z2 = make_DoubleComplex(r3, r4);
 
-  char s = fabs(Cabs(Cmul(z1, z2)) - Cabs(z1) * Cabs(z2)) < 1e-3;
+  char s = sycl::fabs(Cabs(Cmul(z1, z2)) - Cabs(z1) * Cabs(z2)) < 1e-3;
 
-  s += fabs(Cabs(Cadd(z1, z2)) * Cabs(Cadd(z1 , z2)) -
+  s += sycl::fabs(Cabs(Cadd(z1, z2)) * Cabs(Cadd(z1 , z2)) -
             Creal(Cmul(Cadd(z1, z2) , Cadd(Conj(z1), Conj(z2))))) < 1e-3; 
 
-  s += fabs(Cabs(Csub(z1, z2)) * Cabs(Csub(z1 , z2)) -
-            Creal(Cmul(Csub(z1, z2) , Csub(Conj(z1), Conj(z2))))) < 1e-3f;
+  s += sycl::fabs(Cabs(Csub(z1, z2)) * Cabs(Csub(z1 , z2)) -
+            Creal(Cmul(Csub(z1, z2) , Csub(Conj(z1), Conj(z2))))) < 1e-3;
 
-  s += fabs(Creal(Cadd(Cmul(z1, Conj(z2)) , Cmul(z2, Conj(z1)))) -
+  s += sycl::fabs(Creal(Cadd(Cmul(z1, Conj(z2)) , Cmul(z2, Conj(z1)))) -
             2.0 * (Creal(z1) * Creal(z2) + Cimag(z1) * Cimag(z2))) < 1e-3;
 
-  s += fabs(Cabs(Cdiv(Conj(z1), z2)) -
+  s += sycl::fabs(Cabs(Cdiv(Conj(z1), z2)) -
             Cabs(Cdiv(Conj(z1), Conj(z2)))) < 1e-3;
 
   checkSum[i] = s;
