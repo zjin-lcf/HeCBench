@@ -15,9 +15,7 @@ int index_n   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_
 int index_w   = base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x + ( max_cols );
 int index_nw =  base + max_cols * BLOCK_SIZE * b_index_y + BLOCK_SIZE * b_index_x;
 
-if (tx == 0){
-  SCORE(tx, 0) = d_input_itemsets_acc[index_nw + tx];
-}
+if (tx == 0) SCORE(tx, 0) = d_input_itemsets_acc[index_nw + tx];
 
 for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
   REF(ty, tx) =  d_reference_acc[index + max_cols * ty];
@@ -26,10 +24,12 @@ SCORE((tx + 1), 0) = d_input_itemsets_acc[index_w + max_cols * tx];
 
 SCORE(0, (tx + 1)) = d_input_itemsets_acc[index_n];
 
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 for( int m = 0 ; m < BLOCK_SIZE ; m++){
+
   if ( tx <= m ){
+
     int t_index_x =  tx + 1;
     int t_index_y =  m - tx + 1;
 
@@ -37,21 +37,23 @@ for( int m = 0 ; m < BLOCK_SIZE ; m++){
         SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
         SCORE((t_index_y-1), (t_index_x))   - (penalty));
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 }
 
 for( int m = BLOCK_SIZE - 2 ; m >=0 ; m--){
+
   if ( tx <= m){
+
     int t_index_x =  tx + BLOCK_SIZE - m ;
     int t_index_y =  BLOCK_SIZE - tx;
 
     SCORE(t_index_y, t_index_x) = max3(  SCORE((t_index_y-1), (t_index_x-1)) + REF((t_index_y-1), (t_index_x-1)),
         SCORE((t_index_y),   (t_index_x-1)) - (penalty), 
         SCORE((t_index_y-1), (t_index_x))   - (penalty));
-  }
-  item.barrier(access::fence_space::local_space);
-}
 
+  }
+  item.barrier(sycl::access::fence_space::local_space);
+}
 
 for ( int ty = 0 ; ty < BLOCK_SIZE ; ty++)
   d_input_itemsets_acc[index + max_cols * ty] = SCORE((ty+1), (tx+1));

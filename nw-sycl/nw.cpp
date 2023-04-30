@@ -16,7 +16,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.cpp"
 
 // kernel 
@@ -105,11 +105,13 @@ int main(int argc, char **argv){
   int *reference;
   int *input_itemsets;
   int *output_itemsets;
-  
-  size_t matrix_size = max_rows * max_cols * sizeof(int);
-  reference = (int *)malloc(matrix_size); 
-  input_itemsets = (int *)malloc(matrix_size);
-  output_itemsets = (int *)malloc(matrix_size);
+
+  const int matrix_size = max_rows * max_cols;
+  const size_t matrix_size_bytes = matrix_size * sizeof(int);
+
+  reference = (int *)malloc( matrix_size_bytes );
+  input_itemsets = (int *)malloc( matrix_size_bytes );
+  output_itemsets = (int *)malloc( matrix_size_bytes );
 
   srand(7);
 
@@ -139,12 +141,12 @@ int main(int argc, char **argv){
   for( int j = 1; j< max_cols ; j++)
     input_itemsets[j] = -j * penalty;
 
+
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   int workgroupsize = BLOCK_SIZE;
 #ifdef DEBUG
@@ -166,32 +168,21 @@ int main(int argc, char **argv){
   const int offset_c = 0;
   const int block_width = worksize/BLOCK_SIZE ;
 
-  int *d_input_itemsets_acc = malloc_device<int>(max_cols * max_rows, q);
-  q.memcpy(d_input_itemsets_acc, input_itemsets, matrix_size);
+  int *d_input_itemsets_acc = sycl::malloc_device<int>(matrix_size, q);
+  q.memcpy(d_input_itemsets_acc, input_itemsets, matrix_size_bytes);
 
-  int *d_reference_acc = malloc_device<int>(max_cols * max_rows, q);
-  q.memcpy(d_reference_acc, reference, matrix_size);
-  
-  // warmup
+  int *d_reference_acc = sycl::malloc_device<int>(matrix_size, q);
+  q.memcpy(d_reference_acc, reference,  matrix_size_bytes);
+
+  // warmup is required to exclude data copy from host to device 
   for(int blk = 1 ; blk <= block_width ; blk++){
     global_work = BLOCK_SIZE * blk; // kernel arg set every iteration
-    q.submit([&](handler& cgh) {
-      accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <int, 1> input_itemsets_l (sycl::range<1>((BLOCK_SIZE + 1) *(BLOCK_SIZE+1)), cgh);
+      sycl::local_accessor <int, 1> reference_l (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
       cgh.parallel_for<class kernel1_warmup>(
-        nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(global_work), sycl::range<1>(local_work)), [=] (sycl::nd_item<1> item) {
           #include "kernel1.sycl"
-      });
-    });
-  }
-  for(int blk = block_width - 1 ; blk >= 1 ; blk--){	   
-    global_work = BLOCK_SIZE * blk;
-    q.submit([&](handler& cgh) {
-      accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      cgh.parallel_for<class kernel2_warmup>(
-        nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
-          #include "kernel2.sycl"
       });
     });
   }
@@ -208,11 +199,11 @@ int main(int argc, char **argv){
 #ifdef DEBUG
     printf("global size: %d local size: %d\n", global_work, local_work);
 #endif
-    q.submit([&](handler& cgh) {
-      accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <int, 1> input_itemsets_l (sycl::range<1>((BLOCK_SIZE + 1) *(BLOCK_SIZE+1)), cgh);
+      sycl::local_accessor <int, 1> reference_l (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
       cgh.parallel_for<class kernel1>(
-        nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(global_work), sycl::range<1>(local_work)), [=] (sycl::nd_item<1> item) {
           #include "kernel1.sycl"
       });
     });
@@ -224,11 +215,11 @@ int main(int argc, char **argv){
 
   for(int blk = block_width - 1 ; blk >= 1 ; blk--){	   
     global_work = BLOCK_SIZE * blk;
-    q.submit([&](handler& cgh) {
-      accessor <int, 1, sycl_read_write, access::target::local> input_itemsets_l ((BLOCK_SIZE + 1) *(BLOCK_SIZE+1), cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> reference_l (BLOCK_SIZE * BLOCK_SIZE, cgh);
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <int, 1> input_itemsets_l (sycl::range<1>((BLOCK_SIZE + 1) *(BLOCK_SIZE+1)), cgh);
+      sycl::local_accessor <int, 1> reference_l (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
       cgh.parallel_for<class kernel2>(
-        nd_range<1>(range<1>(global_work), range<1>(local_work)), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(global_work), sycl::range<1>(local_work)), [=] (sycl::nd_item<1> item) {
           #include "kernel2.sycl"
       });
     });
@@ -239,7 +230,7 @@ int main(int argc, char **argv){
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
 
-  q.memcpy(output_itemsets, d_input_itemsets_acc, matrix_size).wait();
+  q.memcpy(output_itemsets, d_input_itemsets_acc, matrix_size_bytes).wait();
 
   // verify
   nw_host(input_itemsets, reference, max_cols, penalty);
@@ -315,7 +306,7 @@ int main(int argc, char **argv){
   free(reference);
   free(input_itemsets);
   free(output_itemsets);
-  free(d_input_itemsets_acc, q);
-  free(d_reference_acc, q);
-
+  sycl::free(d_input_itemsets_acc, q);
+  sycl::free(d_reference_acc, q);
+  return 0;
 }
