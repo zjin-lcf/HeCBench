@@ -9,7 +9,7 @@ entitled "GNU Free Documentation License".
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define B ((int)32)
 #define T ((int)32)
@@ -90,44 +90,44 @@ int main(int argc, char* argv[]) {
 
   int* decrypted = new int[ENCRYPTEDLEN*THREADS];
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_scores (scores, totalBigrams);
-  buffer<int, 1> d_encrypted(encryptedMap, ENCRYPTEDLEN);
-  buffer<int, 1> d_decrypted(decrypted, ENCRYPTEDLEN * THREADS);
-  buffer<unsigned int, 1> d_states (THREADS);
+  float *d_scores = sycl::malloc_device<float>(totalBigrams, q);
+  q.memcpy(d_scores, scores, totalBigrams * sizeof(float));
 
-  range<1> gws(THREADS);
-  range<1> lws(T);
+  int *d_encrypted = sycl::malloc_device<int>(ENCRYPTEDLEN, q); 
+  q.memcpy(d_encrypted, encryptedMap, ENCRYPTEDLEN * sizeof(int));
+
+  int *d_decrypted = sycl::malloc_device<int>(ENCRYPTEDLEN * THREADS, q);
+
+  unsigned int *d_states = sycl::malloc_device<unsigned int>(THREADS, q);
+
+  sycl::range<1> gws(THREADS);
+  sycl::range<1> lws(T);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto states = d_states.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class setup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      setupKernel(item, states.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class setup>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      setupKernel(item, d_states);
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    auto scores = d_scores.get_access<sycl_read>(cgh);
-    auto encrypted = d_encrypted.get_access<sycl_read>(cgh);
-    auto states = d_states.get_access<sycl_read>(cgh);
-    auto decrypted = d_decrypted.get_access<sycl_discard_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> lscores (ALPHABET*ALPHABET, cgh);
-    cgh.parallel_for<class decode>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> lscores (sycl::range<1>(ALPHABET*ALPHABET), cgh);
+    cgh.parallel_for<class decode>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       decodeKernel(item, 
-                   scores.get_pointer(), 
-                   encrypted.get_pointer(),
-                   states.get_pointer(),
-                   decrypted.get_pointer(),
+                   d_scores,
+                   d_encrypted,
+                   d_states,
+                   d_decrypted,
                    lscores.get_pointer());
     });
   });
@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Kernel execution time %f (s)\n", time * 1e-9f);
 
-  } // sycl scope
+  q.memcpy(decrypted, d_decrypted, ENCRYPTEDLEN * THREADS * sizeof(int)).wait();
 
   int bestCandidate = 0;
   float bestScore = CAP;
@@ -157,6 +157,10 @@ int main(int argc, char* argv[]) {
   bool pass = verify(&decrypted[ENCRYPTEDLEN*bestCandidate]);
   printf("%s\n", pass ? "PASS" : "FAIL");
 
+  sycl::free(d_scores, q);
+  sycl::free(d_encrypted, q);
+  sycl::free(d_decrypted, q);
+  sycl::free(d_states, q);
   delete[] decrypted;
   delete[] scoreHistory;
   return 0;
