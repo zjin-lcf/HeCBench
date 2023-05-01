@@ -372,7 +372,7 @@ static void computeCC(const int repeat,
     q.submit([&](sycl::handler &cgh) {
       cgh.parallel_for<class compute_med>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
-          [[intel::reqd_sub_group_size(WARPSIZE)]] {
+          [[sycl::reqd_sub_group_size(WARPSIZE)]] {
         compute2(item, nodes, nidx_d, nlist_d,
                  nstat_d, wl_d, topL_d, posL_d);
       });
@@ -381,8 +381,7 @@ static void computeCC(const int repeat,
     q.submit([&](sycl::handler &cgh) {
       sycl::local_accessor<int, 0> vB (cgh);
       cgh.parallel_for<class compute_high>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
-          [[intel::reqd_sub_group_size(WARPSIZE)]] {
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute3(item, nodes, nidx_d, nlist_d,
                  nstat_d, wl_d, topH_d, posH_d, vB);
       });
@@ -411,6 +410,10 @@ static void computeCC(const int repeat,
   sycl::free(nstat_d, q);
   sycl::free(nlist_d, q);
   sycl::free(nidx_d, q);
+  sycl::free(topL_d, q);
+  sycl::free(posL_d, q);
+  sycl::free(topH_d, q);
+  sycl::free(posH_d, q);
 }
 
 static void verify(const int v, const int id, const int* const __restrict nidx, 
