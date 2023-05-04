@@ -57,7 +57,7 @@
  * computes the bit-reversed CRC.
  */
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 /*
  * Calculate the CRC64 of the provided buffer using the slow reference
  * implementation (in serial).
@@ -72,7 +72,7 @@ uint64_t crc64(const void *input, size_t nbytes);
 /*
  * Calculate the CRC64 of the provided buffer, in parallel if possible.
  */
-uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes);
+uint64_t crc64_parallel(sycl::queue &q, const void *input, size_t nbytes);
 
 /*
  * Calculate the 'check bytes' for the provided CRC64. If these bytes are

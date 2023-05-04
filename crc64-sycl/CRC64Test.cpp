@@ -43,7 +43,7 @@
 #include <vector>
 #include <iostream>
 #include "CRC64.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //using namespace std;
 int main(int argc, char *argv[]) {
@@ -61,11 +61,10 @@ int main(int argc, char *argv[]) {
   srand48(seed);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
 #ifdef __bgp__
 #define THE_CLOCK CLOCK_REALTIME
@@ -97,8 +96,10 @@ int main(int argc, char *argv[]) {
     double b_time = (b_end.tv_sec - b_start.tv_sec);
     b_time += 1e-9*(b_end.tv_nsec - b_start.tv_nsec);
 
-    tot_time += b_time;
-    tot_bytes += test_length;
+    if (ntest > 1) {
+      tot_time += b_time;
+      tot_bytes += test_length;
+    }
 
     // Copy the input_buffer and append the check bytes.
     size_t tlend = 8;
