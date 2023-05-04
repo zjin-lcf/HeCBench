@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 long get_time() {
@@ -81,11 +81,10 @@ int main(int argc, char **argv) {
   float kernel_time = 20;               // time the kernel should run
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   printf("[%s] - Starting...\n", argv[0]);
 
@@ -101,7 +100,6 @@ int main(int argc, char **argv) {
   long *d_a = (long *)sycl::malloc_device(nbytes, q);
 
   // time execution with nkernels streams
-  long total_clocks = 0;
   unsigned clock_rate = 1e3 * q.get_device().get_info<sycl::info::device::max_clock_frequency>();
   long time_clocks = (long)(kernel_time * clock_rate);
 
@@ -116,14 +114,13 @@ int main(int argc, char **argv) {
         clock_block(d_a+i, time_clocks);
       });
     });
-    total_clocks += time_clocks;
   }
 
   // queue a sum kernel and a copy back to host 
   sycl::range<1> gws2 (32);
   sycl::range<1> lws2 (32);
   auto e2 = q.submit([&](sycl::handler &cgh) {
-    sycl::accessor<long, 1, sycl_read_write, sycl_lmem> s (32, cgh);
+    sycl::local_accessor<long, 1> s (sycl::range<1>(32), cgh);
     cgh.depends_on(e);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       sum(d_a, nkernels, item, s.get_pointer());
