@@ -24,9 +24,9 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <sycl/sycl.hpp>
 #include "options.h"
 #include "scoped_ptrs.h"
-#include "common.h"
 using namespace aocl_utils;
 
 #define MANUAL_VECTOR      8 
@@ -283,114 +283,112 @@ int main(int argc, char** argv)
   printf("Allocating and setting up data\n");
   setupData();
 
-  { // SYCL scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  size_t gws_compute = total_doc_size / 2 / MANUAL_VECTOR;
-  size_t lws_compute = (block_size / MANUAL_VECTOR); 
+  sycl::range<1> gws_compute (total_doc_size / 2 / MANUAL_VECTOR);
+  sycl::range<1> lws_compute ((block_size / MANUAL_VECTOR));
   size_t gws_reduce = total_num_docs;
   size_t lws_reduce = block_size;
 
-  buffer<uint, 1> d_docWordFrequencies_dimm1 (h_docWordFrequencies_dimm1, total_doc_size/2);
-  buffer<uint, 1> d_docWordFrequencies_dimm2 (h_docWordFrequencies_dimm2, total_doc_size/2);
-  buffer<uint, 1> d_partialSums_dimm1 (total_doc_size/(2*block_size));
-  buffer<uint, 1> d_partialSums_dimm2 (total_doc_size/(2*block_size));
-  buffer<ulong, 1> d_profileWeights_dimm1 (h_profileWeights, 1L << 24);
-  buffer<ulong, 1> d_profileWeights_dimm2 (h_profileWeights, 1L << 24);
-  buffer<uint, 1> d_isWordInProfileHash(h_isWordInProfileHash, 1L << BLOOM_SIZE);
-  buffer<ulong, 1> d_docInfo(h_docInfo, total_num_docs);
-  buffer<ulong, 1> d_profileScore(h_profileScore, total_num_docs);
+  uint *d_docWordFrequencies_dimm1 = sycl::malloc_device<uint>(total_doc_size/2, q);
+  uint *d_docWordFrequencies_dimm2 = sycl::malloc_device<uint>(total_doc_size/2, q);
+  uint *d_partialSums_dimm1 = sycl::malloc_device<uint>(total_doc_size/(2*block_size), q);
+  uint *d_partialSums_dimm2 = sycl::malloc_device<uint>(total_doc_size/(2*block_size), q);
+  ulong *d_profileWeights_dimm1 = sycl::malloc_device<ulong>((1L << 24), q);
+  ulong *d_profileWeights_dimm2 = sycl::malloc_device<ulong>((1L << 24), q);
+  uint *d_isWordInProfileHash = sycl::malloc_device<uint>(1L << BLOOM_SIZE, q);
+  ulong *d_docInfo = sycl::malloc_device<ulong>(total_num_docs, q);
+  ulong *d_profileScore = sycl::malloc_device<ulong>(total_num_docs, q);
+
+  q.memcpy(d_docWordFrequencies_dimm1, h_docWordFrequencies_dimm1, sizeof(uint) * total_doc_size/2);
+  q.memcpy(d_docWordFrequencies_dimm2, h_docWordFrequencies_dimm2, sizeof(uint) * total_doc_size/2);
+  q.memcpy(d_profileWeights_dimm1, h_profileWeights, sizeof(ulong) * (1L << 24));
+  q.memcpy(d_profileWeights_dimm2, h_profileWeights, sizeof(ulong) * (1L << 24));
+  q.memcpy(d_isWordInProfileHash, h_isWordInProfileHash, sizeof(uint) * (1L << BLOOM_SIZE));
+  q.memcpy(d_docInfo, h_docInfo, sizeof(ulong) * total_num_docs);
+
+  q.wait();
 
   const double start_time = getCurrentTimestamp();
   for (uint i=0; i<repeat; i++) {
-    q.submit([&] (handler &h) {
-      accessor<ulong, 1, sycl_read_write, access::target::local> partial (NUM_THREADS_PER_WG/MANUAL_VECTOR, h);
-      auto docWordFrequencies_dimm1 = d_docWordFrequencies_dimm1.get_access<sycl_read>(h);
-      auto docWordFrequencies_dimm2 = d_docWordFrequencies_dimm2.get_access<sycl_read>(h);
-      auto profileWeights_dimm1 = d_profileWeights_dimm1.get_access<sycl_read>(h);
-      auto profileWeights_dimm2 = d_profileWeights_dimm2.get_access<sycl_read>(h);
-      auto isWordInProfileHash = d_isWordInProfileHash.get_access<sycl_read>(h);
-      auto profileScorePerGroup_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_write>(h);
-      auto profileScorePerGroup_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_write>(h);
-      h.parallel_for<class compute>(nd_range<1>(gws_compute, lws_compute), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &h) {
+      sycl::local_accessor<ulong, 1> partial (sycl::range<1>(NUM_THREADS_PER_WG/MANUAL_VECTOR), h);
+      h.parallel_for<class compute>(
+      sycl::nd_range<1>(gws_compute, lws_compute), [=] (sycl::nd_item<1> item) {
         uint curr_entry[MANUAL_VECTOR];
         uint word_id[MANUAL_VECTOR];
         uint freq[MANUAL_VECTOR];
         uint hash1[MANUAL_VECTOR];
         uint hash2[MANUAL_VECTOR];
-        bool     is_end[MANUAL_VECTOR];
-        bool     make_access[MANUAL_VECTOR];
+        bool is_end[MANUAL_VECTOR];
+        bool make_access[MANUAL_VECTOR];
 
         ulong sum = 0;
         //#pragma unroll
         for (uint i=0; i<MANUAL_VECTOR; i++) {
-           curr_entry[i] = docWordFrequencies_dimm1[item.get_global_id(0)*MANUAL_VECTOR + i]; 
+           curr_entry[i] = d_docWordFrequencies_dimm1[item.get_global_id(0)*MANUAL_VECTOR + i]; 
            freq[i] = curr_entry[i] & 0xff;
            word_id[i] = curr_entry[i] >> 8;
            is_end[i] = curr_entry[i] == docEndingTag;
            hash1[i] = word_id[i] >> BLOOM_1;
            hash2[i] = word_id[i] & BLOOM_2;
-           make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-                                       && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           make_access[i] = !is_end[i] && ((d_isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+                                       && ((d_isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
            if (make_access[i]) {
-              sum += mulfp(profileWeights_dimm1[word_id[i]],freq[i]);
+              sum += mulfp(d_profileWeights_dimm1[word_id[i]],freq[i]);
            }
         }
 
         //#pragma unroll
         for (uint i=0; i<MANUAL_VECTOR; i++) {
-           curr_entry[i] = docWordFrequencies_dimm2[item.get_global_id(0)*MANUAL_VECTOR + i]; 
+           curr_entry[i] = d_docWordFrequencies_dimm2[item.get_global_id(0)*MANUAL_VECTOR + i]; 
            freq[i] = curr_entry[i] & 0xff;
            word_id[i] = curr_entry[i] >> 8;
            is_end[i] = curr_entry[i] == docEndingTag;
            hash1[i] = word_id[i] >> BLOOM_1;
            hash2[i] = word_id[i] & BLOOM_2;
-           make_access[i] = !is_end[i] && ((isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
-                                       && ((isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
+           make_access[i] = !is_end[i] && ((d_isWordInProfileHash[ hash1[i] >> 5 ] >> (hash1[i] & 0x1f)) & 0x1) 
+                                       && ((d_isWordInProfileHash[ hash2[i] >> 5 ] >> (hash2[i] & 0x1f)) & 0x1); 
            if (make_access[i]) {
-              sum += mulfp(profileWeights_dimm2[word_id[i]],freq[i]);
+              sum += mulfp(d_profileWeights_dimm2[word_id[i]],freq[i]);
            }
         }
 
         partial[item.get_local_id(0)] = sum;
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         if (item.get_local_id(0) == 0) {
-           vec<ulong, 8> res;
+           sycl::vec<ulong, 8> res;
            res.load(0, partial.get_pointer());
            ulong final_result = res.s0() + res.s1() + res.s2() + res.s3() +
                                 res.s4() + res.s5() + res.s6() + res.s7();
-           profileScorePerGroup_highbits_dimm1[item.get_group(0)] = (uint) (final_result >> 32); 
-           profileScorePerGroup_lowbits_dimm2[item.get_group(0)] = (uint) (final_result & 0xFFFFFFFF); 
+           d_partialSums_dimm1[item.get_group(0)] = (uint) (final_result >> 32); 
+           d_partialSums_dimm2[item.get_group(0)] = (uint) (final_result & 0xFFFFFFFF); 
         }
       });
     });
 
-    q.submit([&] (handler &h) {
-      auto docInfo = d_docInfo.get_access<sycl_read>(h);
-      auto partial_highbits_dimm1 = d_partialSums_dimm1.get_access<sycl_read>(h);
-      auto partial_lowbits_dimm2 = d_partialSums_dimm2.get_access<sycl_read>(h);
-      auto result = d_profileScore.get_access<sycl_discard_write>(h);
-      h.parallel_for<class reduction>(nd_range<1>(gws_reduce, lws_reduce), [=] (nd_item<1> item) {
-        ulong info = docInfo[item.get_global_id(0)];
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class reduction>(
+        sycl::nd_range<1>(gws_reduce, lws_reduce), [=] (sycl::nd_item<1> item) {
+        ulong info = d_docInfo[item.get_global_id(0)];
         uint start = info >> 32;
         uint end = info & 0xFFFFFFFF;
 
         ulong total = 0;
         #pragma unroll 2
         for (uint i=start; i<=end; i++) {
-           ulong upper = partial_highbits_dimm1[i];
-           ulong lower = partial_lowbits_dimm2[i];
+           ulong upper = d_partialSums_dimm1[i];
+           ulong lower = d_partialSums_dimm2[i];
            ulong sum = (upper << 32) | lower;
            total += sum;
         }
 
-        result[item.get_global_id(0)] = total;
+        d_profileScore[item.get_global_id(0)] = total;
       });
     });
   }
@@ -402,7 +400,17 @@ int main(int argc, char** argv)
   printf("Kernel Time = %f ms (averaged over %d times)\n", kernelExecutionTime * 1000.0f, repeat );
   printf("Throughput = %f\n", total_doc_size_no_padding / kernelExecutionTime / 1.0e+6f );
 
-  }
+  q.memcpy(h_profileScore, d_profileScore, sizeof(ulong) * total_num_docs).wait();
+
+  sycl::free(d_docWordFrequencies_dimm1, q);
+  sycl::free(d_docWordFrequencies_dimm2, q);
+  sycl::free(d_partialSums_dimm1, q);
+  sycl::free(d_partialSums_dimm2, q);
+  sycl::free(d_profileWeights_dimm1, q);
+  sycl::free(d_profileWeights_dimm2, q);
+  sycl::free(d_isWordInProfileHash, q);
+  sycl::free(d_docInfo, q);
+  sycl::free(d_profileScore, q);
   printf("Done\n");
 
   runOnCPU();
