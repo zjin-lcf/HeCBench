@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 const int max_seq_len = 1024;
 const int max_batch_tokens = 9216;
@@ -12,7 +12,7 @@ inline int flat_3dim(int id1, int id2, int id3, int dim2, int dim3) {
 }
 
 template <typename T>
-void concat (nd_item<1> &item,
+void concat (sycl::nd_item<1> &item,
              const T *__restrict inp1,
              const T *__restrict inp2,
                    T *output,
@@ -48,6 +48,12 @@ int main(int argc, char* argv[])
     return 1;
   }
   const int repeat = atoi(argv[1]);
+
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
   for (int nhead = 4; nhead <= 16; nhead += 4) { // a multiple of 4
     srand(nhead);
@@ -93,29 +99,23 @@ int main(int argc, char* argv[])
       inp2[i] = 1.f;
     }
 
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
-
     float *d_inp1, *d_inp2, *d_outp;
 
-    d_inp1 = (float *)malloc_device(inp1_size_bytes, q);
-    d_inp2 = (float *)malloc_device(inp2_size_bytes, q);
-    d_outp = (float *)malloc_device(outp_size_bytes, q);
+    d_inp1 = (float *)sycl::malloc_device(inp1_size_bytes, q);
+    d_inp2 = (float *)sycl::malloc_device(inp2_size_bytes, q);
+    d_outp = (float *)sycl::malloc_device(outp_size_bytes, q);
     q.memcpy(d_inp1, inp1, inp1_size_bytes);
     q.memcpy(d_inp2, inp2, inp2_size_bytes);
 
     const size_t n = batch_size * beam_size * nhead * head_dim * (sl1 + sl2);
     const size_t nblock = (n + 255) / 256;
-    range<1> gws (nblock * 256);
-    range<1> lws (256);
+    sycl::range<1> gws (nblock * 256);
+    sycl::range<1> lws (256);
 
     // warmup
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class warmup>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         concat(item, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
       });
     });
@@ -124,8 +124,9 @@ int main(int argc, char* argv[])
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class eval>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class eval>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           concat(item, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
         });
       });
@@ -144,9 +145,9 @@ int main(int argc, char* argv[])
     }
     printf("Checksum = %lf\n\n", checksum);
 
-    free(d_inp1, q);
-    free(d_inp2, q);
-    free(d_outp, q);
+    sycl::free(d_inp1, q);
+    sycl::free(d_inp2, q);
+    sycl::free(d_outp, q);
     free(inp1);
     free(inp2);
     free(outp);
