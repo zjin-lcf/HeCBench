@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "conv.h"
 
 int main(int argc, char **argv)
@@ -25,11 +25,15 @@ int main(int argc, char **argv)
   const unsigned int imageH = atoi(argv[2]);
   const int numIterations = atoi(argv[3]);
 
-  float* h_Kernel    = (float*)malloc(KERNEL_LENGTH * sizeof(float));
-  float* h_Input     = (float*)malloc(imageW * imageH * sizeof(float));
-  float* h_Buffer    = (float*)malloc(imageW * imageH * sizeof(float));
-  float* h_OutputCPU = (float*)malloc(imageW * imageH * sizeof(float));
-  float* h_OutputGPU = (float*)malloc(imageW * imageH * sizeof(float));
+  const size_t kernelSize_bytes = KERNEL_LENGTH * sizeof(float);
+  const size_t imageSize = (size_t)imageW * imageH;
+  const size_t imageSize_bytes = imageSize * sizeof(float);
+
+  float* h_Kernel    = (float*)malloc(kernelSize_bytes);
+  float* h_Input     = (float*)malloc(imageSize_bytes);
+  float* h_Buffer    = (float*)malloc(imageSize_bytes);
+  float* h_OutputCPU = (float*)malloc(imageSize_bytes);
+  float* h_OutputGPU = (float*)malloc(imageSize_bytes);
 
   srand(2009);
   for(unsigned int i = 0; i < KERNEL_LENGTH; i++)
@@ -38,20 +42,44 @@ int main(int argc, char **argv)
   for(unsigned int i = 0; i < imageW * imageH; i++)
     h_Input[i] = (float)(rand() % 16);
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    buffer<float,1> d_Kernel(h_Kernel, KERNEL_LENGTH);
-    buffer<float,1> d_Input(h_Input, imageW * imageH);
-    buffer<float,1> d_Buffer(imageW * imageH);
-    buffer<float,1> d_Output(h_OutputGPU, imageW * imageH);
+  float *d_Kernel = sycl::malloc_device<float>(KERNEL_LENGTH, q);
+  q.memcpy(d_Kernel, h_Kernel, kernelSize_bytes);
 
-    //Just a single run or a warmup iteration
+  float *d_Input = sycl::malloc_device<float>(imageSize, q);
+  q.memcpy(d_Input, h_Input, imageSize_bytes);
+
+  float *d_Buffer = sycl::malloc_device<float>(imageSize, q);
+  float *d_Output = sycl::malloc_device<float>(imageSize, q);
+
+  //Just a single run or a warmup iteration
+  convolutionRows(
+      q,
+      d_Buffer,
+      d_Input,
+      d_Kernel,
+      imageW,
+      imageH,
+      imageW);
+
+  convolutionColumns(
+      q,
+      d_Output,
+      d_Buffer,
+      d_Kernel,
+      imageW,
+      imageH,
+      imageW);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for(int iter = 0; iter < numIterations; iter++){
     convolutionRows(
         q,
         d_Buffer,
@@ -69,36 +97,14 @@ int main(int argc, char **argv)
         imageW,
         imageH,
         imageW);
-
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
-
-    for(int iter = 0; iter < numIterations; iter++){
-      convolutionRows(
-          q,
-          d_Buffer,
-          d_Input,
-          d_Kernel,
-          imageW,
-          imageH,
-          imageW);
-
-      convolutionColumns(
-          q,
-          d_Output,
-          d_Buffer,
-          d_Kernel,
-          imageW,
-          imageH,
-          imageW);
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
   }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
+
+  q.memcpy(h_OutputGPU, d_Output, imageSize_bytes).wait();
 
   printf("Comparing against Host/C++ computation...\n"); 
   convolutionRowHost(h_Buffer, h_Input, h_Kernel, imageW, imageH, KERNEL_RADIUS);
@@ -117,6 +123,10 @@ int main(int argc, char **argv)
   free(h_Buffer);
   free(h_Input);
   free(h_Kernel);
+  sycl::free(d_Buffer, q);
+  sycl::free(d_Output, q);
+  sycl::free(d_Input, q);
+  sycl::free(d_Kernel, q);
 
   printf("%s\n", L2norm < 1e-6 ? "PASS" : "FAIL");
   return 0;

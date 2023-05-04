@@ -10,7 +10,7 @@
  */
 
 #include <assert.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "conv.h"
 
 #ifdef __NVPTX__
@@ -30,10 +30,10 @@
 #define COLUMNS_HALO_STEPS    1
 
 void convolutionRows(
-    queue &q,
-    buffer<float,1> &d_Dst,
-    buffer<float,1> &d_Src,
-    buffer<float,1> &d_Kernel,
+    sycl::queue &q,
+    float *dst,
+    float *src,
+    float *kernel,
     const int imageW,
     const int imageH,
     const int pitch
@@ -43,17 +43,14 @@ void convolutionRows(
     assert ( imageW % (ROWS_RESULT_STEPS * ROWS_BLOCKDIM_X) == 0 );
     assert ( imageH % ROWS_BLOCKDIM_Y == 0 );
 
-    range<2> lws (ROWS_BLOCKDIM_Y, ROWS_BLOCKDIM_X);
-    range<2> gws (imageH, imageW / ROWS_RESULT_STEPS);
+    sycl::range<2> lws (ROWS_BLOCKDIM_Y, ROWS_BLOCKDIM_X);
+    sycl::range<2> gws (imageH, imageW / ROWS_RESULT_STEPS);
 
-    q.submit([&] (handler &cgh) {
-      auto dst = d_Dst.get_access<sycl_discard_write>(cgh);
-      auto src = d_Src.get_access<sycl_read>(cgh);
-      auto kernel = d_Kernel.get_access<sycl_read>(cgh);
-      accessor<float, 2, sycl_read_write, access::target::local> 
-        l_Data({ROWS_BLOCKDIM_Y, (ROWS_RESULT_STEPS + 2 * ROWS_HALO_STEPS) * ROWS_BLOCKDIM_X}, cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 2>
+        l_Data(sycl::range<2>{ROWS_BLOCKDIM_Y, (ROWS_RESULT_STEPS + 2 * ROWS_HALO_STEPS) * ROWS_BLOCKDIM_X}, cgh);
 
-      cgh.parallel_for<class conv_rows>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class conv_rows>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int gidX = item.get_group(1); 
         int gidY = item.get_group(0); 
         int lidX = item.get_local_id(1); 
@@ -62,8 +59,8 @@ void convolutionRows(
         const int baseX = (gidX * ROWS_RESULT_STEPS - ROWS_HALO_STEPS) * ROWS_BLOCKDIM_X + lidX;
         const int baseY = gidY * ROWS_BLOCKDIM_Y + lidY;
 
-        const float* src_new = src.get_pointer() + baseY * pitch + baseX;
-        float* dst_new = dst.get_pointer() + baseY * pitch + baseX;
+        const float* src_new = src + baseY * pitch + baseX;
+        float* dst_new = dst + baseY * pitch + baseX;
 
         //Load main data
         #pragma unroll
@@ -81,7 +78,7 @@ void convolutionRows(
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? ldg(&src_new[i * ROWS_BLOCKDIM_X]) : 0;
 
         //Compute and store results
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         #pragma unroll
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++) {
@@ -98,10 +95,10 @@ void convolutionRows(
 }
 
 void convolutionColumns(
-    queue &q,
-    buffer<float,1> &d_Dst,
-    buffer<float,1> &d_Src,
-    buffer<float,1> &d_Kernel,
+    sycl::queue &q,
+    float *dst,
+    float *src,
+    float *kernel,
     const int imageW,
     const int imageH,
     const int pitch
@@ -111,17 +108,14 @@ void convolutionColumns(
     assert ( imageW % COLUMNS_BLOCKDIM_X == 0 );
     assert ( imageH % (COLUMNS_RESULT_STEPS * COLUMNS_BLOCKDIM_Y) == 0 );
 
-    range<2> lws (COLUMNS_BLOCKDIM_Y, COLUMNS_BLOCKDIM_X);
-    range<2> gws (imageH / COLUMNS_RESULT_STEPS, imageW);
+    sycl::range<2> lws (COLUMNS_BLOCKDIM_Y, COLUMNS_BLOCKDIM_X);
+    sycl::range<2> gws (imageH / COLUMNS_RESULT_STEPS, imageW);
 
-    q.submit([&] (handler &cgh) {
-      auto dst = d_Dst.get_access<sycl_discard_write>(cgh);
-      auto src = d_Src.get_access<sycl_read>(cgh);
-      auto kernel = d_Kernel.get_access<sycl_read>(cgh);
-      accessor<float, 2, sycl_read_write, access::target::local> 
-        l_Data({COLUMNS_BLOCKDIM_X, (COLUMNS_RESULT_STEPS + 2 * COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + 1}, cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 2>
+        l_Data(sycl::range<2>{COLUMNS_BLOCKDIM_X, (COLUMNS_RESULT_STEPS + 2 * COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + 1}, cgh);
 
-      cgh.parallel_for<class conv_cols>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      cgh.parallel_for<class conv_cols>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
 
         int gidX = item.get_group(1); 
         int gidY = item.get_group(0); 
@@ -132,8 +126,8 @@ void convolutionColumns(
         const int baseX = gidX * COLUMNS_BLOCKDIM_X + lidX;
         const int baseY = (gidY * COLUMNS_RESULT_STEPS - COLUMNS_HALO_STEPS) * COLUMNS_BLOCKDIM_Y + lidY;
 
-        const float* src_new = src.get_pointer() + baseY * pitch + baseX;
-        float* dst_new = dst.get_pointer() + baseY * pitch + baseX;
+        const float* src_new = src + baseY * pitch + baseX;
+        float* dst_new = dst + baseY * pitch + baseX;
 
         //Load main data
         #pragma unroll
@@ -151,7 +145,7 @@ void convolutionColumns(
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? ldg(&src_new[i * COLUMNS_BLOCKDIM_Y * pitch]) : 0;
 
         //Compute and store results
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         #pragma unroll
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++) {

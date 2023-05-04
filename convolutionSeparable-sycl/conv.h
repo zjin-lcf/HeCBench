@@ -39,20 +39,20 @@ void convolutionColumnHost(
 
 
 void convolutionRows(
-    queue &q,
-    buffer<float,1> &d_Dst,
-    buffer<float,1> &d_Src,
-    buffer<float,1> &c_Kernel,
+    sycl::queue &q,
+    float *d_Dst,
+    float *d_Src,
+    float *c_Kernel,
     const int imageW,
     const int imageH,
     const int pitch
 );
 
 void convolutionColumns(
-    queue &q,
-    buffer<float,1> &d_Dst,
-    buffer<float,1> &d_Src,
-    buffer<float,1> &c_Kernel,
+    sycl::queue &q,
+    float *d_Dst,
+    float *d_Src,
+    float *c_Kernel,
     const int imageW,
     const int imageH,
     const int pitch
