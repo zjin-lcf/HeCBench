@@ -1,6 +1,6 @@
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
