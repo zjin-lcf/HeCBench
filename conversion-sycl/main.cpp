@@ -58,9 +58,9 @@ int main(int argc, char* argv[]) {
   const int nelems = 1024 * 1024 * 256;
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   std::printf("bfloat16 -> half\n");
