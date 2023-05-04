@@ -85,8 +85,10 @@ int main(int argc, char *argv[]) {
     double b_time = (b_end.tv_sec - b_start.tv_sec);
     b_time += 1e-9*(b_end.tv_nsec - b_start.tv_nsec);
 
-    tot_time += b_time;
-    tot_bytes += test_length;
+    if (ntest > 1) {
+      tot_time += b_time;
+      tot_bytes += test_length;
+    }
 
     // Copy the input_buffer and append the check bytes.
     size_t tlend = 8;
