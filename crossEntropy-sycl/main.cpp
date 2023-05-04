@@ -19,7 +19,7 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 using namespace std;
 
@@ -268,11 +268,10 @@ int main(int argc, char** argv) {
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   printf("Tensor size (BatchSize * Width * Height) = %d * %d * %d \n", bs, W, H);
 
