@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef __NVPTX__
   #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
@@ -21,7 +21,6 @@
 #define MAX_MASK_WIDTH 10
 #define BLOCK_SIZE 256
 #define TILE_SIZE BLOCK_SIZE
-#define __syncthreads() item.barrier(access::fence_space::local_space)
 
 template<typename T>
 class k1;
@@ -33,7 +32,7 @@ template<typename T>
 class k3;
 
 template<typename T>
-void conv1d(nd_item<1> &item,
+void conv1d(sycl::nd_item<1> &item,
             const T * __restrict__ mask,
             const T * __restrict__ in,
                   T * __restrict__ out,
@@ -52,8 +51,8 @@ void conv1d(nd_item<1> &item,
 }
 
 template<typename T>
-void conv1d_tiled(nd_item<1> &item,
-                  local_ptr<T> tile,
+void conv1d_tiled(sycl::nd_item<1> &item,
+                  sycl::local_ptr<T> tile,
                   const T * __restrict__ mask,
                   const T *__restrict__ in,
                         T *__restrict__ out,
@@ -80,7 +79,7 @@ void conv1d_tiled(nd_item<1> &item,
   if (lid < n)
      tile[lid + dim + n] = halo_right >= input_width ? 0 : in[halo_right];
 
-  __syncthreads();
+  item.barrier(sycl::access::fence_space::local_space);
 
   T s = 0;
   for (int j = 0; j < mask_width; j++)
@@ -90,8 +89,8 @@ void conv1d_tiled(nd_item<1> &item,
 }
 
 template<typename T>
-void conv1d_tiled_caching(nd_item<1> &item,
-                          local_ptr<T> tile,
+void conv1d_tiled_caching(sycl::nd_item<1> &item,
+                          sycl::local_ptr<T> tile,
                           const T *__restrict__ mask,
                           const T *__restrict__ in,
                                 T *__restrict__ out,
@@ -103,7 +102,8 @@ void conv1d_tiled_caching(nd_item<1> &item,
   int dim = item.get_local_range(0);
   int i = bid * dim + lid;
   tile[lid] = in[i];
-  __syncthreads();
+
+  item.barrier(sycl::access::fence_space::local_space);
 
   int this_tile_start = bid * dim;
   int next_tile_start = (bid + 1) * dim;
@@ -149,7 +149,7 @@ void reference(const T *h_in,
 }
 
 template <typename T>
-void conv1D(queue &q, const int input_width, const int mask_width, const int repeat)
+void conv1D(sycl::queue &q, const int input_width, const int mask_width, const int repeat)
 {
   size_t size_bytes = input_width * sizeof(T);
 
@@ -167,23 +167,24 @@ void conv1D(queue &q, const int input_width, const int mask_width, const int rep
   }
 
   T *mask, *d_a, *d_b;
-  mask = malloc_device<T>(MAX_MASK_WIDTH, q);
-  d_a = malloc_device<T>(input_width, q);
-  d_b = malloc_device<T>(input_width, q);
+  mask = sycl::malloc_device<T>(MAX_MASK_WIDTH, q);
+  d_a = sycl::malloc_device<T>(input_width, q);
+  d_b = sycl::malloc_device<T>(input_width, q);
 
   q.memcpy(d_a, a, size_bytes);
   q.memcpy(mask, h_mask, mask_width * sizeof(T));
 
-  range<1> gws (input_width);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (input_width);
+  sycl::range<1> lws (BLOCK_SIZE);
 
   q.wait();
 
   // conv1D basic
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class k1<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k1<T>>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         conv1d(item, mask, d_a, d_b, input_width, mask_width);
       });
     });
@@ -199,10 +200,9 @@ void conv1D(queue &q, const int input_width, const int mask_width, const int rep
   // conv1D tiling
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<T, 1, sycl_read_write, access::target::local>
-        tile (TILE_SIZE + MAX_MASK_WIDTH - 1, cgh);
-      cgh.parallel_for<class k2<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE + MAX_MASK_WIDTH - 1), cgh);
+      cgh.parallel_for<class k2<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         conv1d_tiled(item, tile.get_pointer(), mask, d_a, d_b, input_width, mask_width);
       });
     });
@@ -218,9 +218,9 @@ void conv1D(queue &q, const int input_width, const int mask_width, const int rep
   // conv1D tiling and caching
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<T, 1, sycl_read_write, access::target::local> tile (TILE_SIZE, cgh);
-      cgh.parallel_for<class k3<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE), cgh);
+      cgh.parallel_for<class k3<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         conv1d_tiled_caching(item, tile.get_pointer(), mask, d_a, d_b, input_width, mask_width);
       });
     });
@@ -235,9 +235,9 @@ void conv1D(queue &q, const int input_width, const int mask_width, const int rep
 
   free(a);
   free(b);
-  free(mask, q);
-  free(d_a, q);
-  free(d_b, q);
+  sycl::free(mask, q);
+  sycl::free(d_a, q);
+  sycl::free(d_b, q);
 }
 
 int main(int argc, char* argv[]) {
@@ -253,11 +253,10 @@ int main(int argc, char* argv[]) {
   const int repeat = atoi(argv[2]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   for (int mask_width = 3; mask_width < MAX_MASK_WIDTH; mask_width += 2) {
     printf("\n---------------------\n");
