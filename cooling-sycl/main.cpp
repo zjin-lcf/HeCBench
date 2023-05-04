@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 typedef double Real;
 
@@ -126,7 +126,7 @@ void cool_kernel (
   const Real *__restrict T,
         Real *__restrict r,
   const int  heat_flag,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   int i = item.get_global_id(0);
   if (i < num)
@@ -166,11 +166,10 @@ int main(int argc, char* argv[])
   Real *h_r = (Real*) malloc (size_bytes);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Real *d_T, *d_r;
   d_T = (Real *)sycl::malloc_device(size_bytes, q);
@@ -178,13 +177,14 @@ int main(int argc, char* argv[])
 
   d_r = (Real *)sycl::malloc_device(size_bytes, q);
 
-  range<1> gws ((num + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((num + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class noheat>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class noheat>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         cool_kernel(num, n, d_T, d_r, 0, item);
       });
     });
@@ -194,8 +194,9 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class heat>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class heat>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         cool_kernel(num, n, d_T, d_r, 1, item);
       });
     });
@@ -220,8 +221,8 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", error ? "FAIL" : "PASS");
 
-  free(d_T, q);
-  free(d_r, q);
+  sycl::free(d_T, q);
+  sycl::free(d_r, q);
   free(T);
   free(r);
   free(h_r);
