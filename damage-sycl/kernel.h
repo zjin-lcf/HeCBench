@@ -8,7 +8,7 @@
  * local_cache - local (local_size) array to store the bond breakages.
  */
 void damage_of_node(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int n,
   const int *__restrict nlist,
   const int *__restrict family,
@@ -26,14 +26,14 @@ void damage_of_node(
   local_cache[local_id] = nlist[global_id] != -1 ? 1 : 0; 
 
   //Wait for all threads
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for (int i = local_size/2; i > 0; i /= 2) {
     if(local_id < i){
       local_cache[local_id] += local_cache[local_id + i];
     } 
     //Wait for all threads
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (local_id == 0) {
