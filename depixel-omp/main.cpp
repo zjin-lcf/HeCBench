@@ -44,14 +44,17 @@ int main(int argc, char** argv) {
         img[i].z = dis(gen);
       }
 
+      #pragma omp target update to (img[0:size])
+
       auto start = std::chrono::steady_clock::now();
 
-      #pragma omp target update to (img[0:size])
       check_connect(img, tmp, width, height);
       eliminate_crosses(tmp, out, width, height);
-      #pragma omp target update from (out[0:size])
 
       auto end = std::chrono::steady_clock::now();
+
+      #pragma omp target update from (out[0:size])
+
       std::chrono::duration<float> time = end - start;
       total_time += time.count();
 
@@ -68,7 +71,7 @@ int main(int argc, char** argv) {
 
   printf("Image size: %d (width) x %d (height)\ncheckSum: %f\n",
          width, height, sum);
-  printf("Average device time over %d iterations: %f (s)\n",
+  printf("Average kernel time over %d iterations: %f (s)\n",
          repeat, total_time / repeat);
 
   free(out);
