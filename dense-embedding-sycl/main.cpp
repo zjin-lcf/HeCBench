@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 template <typename T>
 void reference(
@@ -28,7 +28,7 @@ void reference(
 
 template <typename T>
 void dense_esuhm(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const T* input,
     const T* dense,
           T* output,
@@ -50,7 +50,7 @@ void dense_esuhm(
 
 template <typename T>
 void dense_esuhm2(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const T* input,
     const T* dense,
           T* output,
@@ -84,11 +84,10 @@ int main(int argc, char* argv[])
   printf("Batch size: %d\n", batch_size);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   for (int ncols = 64; ncols <= 2048; ncols = ncols * 2) {
 
@@ -132,28 +131,29 @@ int main(int argc, char* argv[])
     reference(input, dense, output_ref, ncols, batch_size, input_offset);
 
     float *d_input, *d_dense, *d_output;
-    d_input = malloc_device<float>(input_size, q);
+    d_input = sycl::malloc_device<float>(input_size, q);
     q.memcpy(d_input, input, input_size_bytes);
     
-    d_dense = malloc_device<float>(dense_size, q);
+    d_dense = sycl::malloc_device<float>(dense_size, q);
     q.memcpy(d_dense, dense, dense_size_bytes);
 
-    d_output = malloc_device<float>(input_size, q);
+    d_output = sycl::malloc_device<float>(input_size, q);
     q.memset(d_output, 0, input_size_bytes);
 
     int* d_input_offset;
-    d_input_offset = malloc_device<int>(batch_size+1, q);
+    d_input_offset = sycl::malloc_device<int>(batch_size+1, q);
     q.memcpy(d_input_offset, input_offset, batch_size_bytes);
     
-    range<1> gws (batch_size * 256);
-    range<1> lws (256);
+    sycl::range<1> gws (batch_size * 256);
+    sycl::range<1> lws (256);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class de1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class de1>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           dense_esuhm(item, d_input, d_dense, d_output, ncols, d_input_offset);
         });
       });
@@ -168,8 +168,9 @@ int main(int argc, char* argv[])
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class de2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class de2>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           dense_esuhm2(item, d_input, d_dense, d_output, ncols, d_input_offset);
         });
       });
@@ -191,10 +192,10 @@ int main(int argc, char* argv[])
     }
     printf("%s\n", ok ? "PASS" : "FAIL");
 
-    free(d_input, q);
-    free(d_dense, q);
-    free(d_output, q);
-    free(d_input_offset, q);
+    sycl::free(d_input, q);
+    sycl::free(d_dense, q);
+    sycl::free(d_output, q);
+    sycl::free(d_input_offset, q);
 
     free(input);
     free(dense);
