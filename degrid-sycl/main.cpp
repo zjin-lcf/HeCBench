@@ -1,9 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <stdlib.h>
-#include "common.h"
 #include "degrid.h"
-
 #include "kernels.cpp"
 
 void init_gcf(PRECISION2 *gcf, size_t size) {

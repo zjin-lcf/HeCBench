@@ -6,13 +6,13 @@ class degrid;
 
 template <typename CmplxType>
 void
-degrid_kernel(global_ptr<CmplxType> out, 
-              global_ptr<const CmplxType> in, 
+degrid_kernel(CmplxType *out, 
+              const CmplxType *in, 
               const size_t npts,
-              global_ptr<const CmplxType> img, 
+              const CmplxType *img, 
               const size_t img_dim,
-              global_ptr<const CmplxType> gcf,
-              nd_item<2> &item)
+              const CmplxType *gcf,
+              sycl::nd_item<2> &item)
 {
   const int blockIdx_x = item.get_group(1);
   const int blockDim_x = item.get_local_range(1);
@@ -67,38 +67,41 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   img -= IMG_SIZE*GCF_DIM+GCF_DIM;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<const CmplxType, 1> d_img (img, IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM);
-  buffer<const CmplxType, 1> d_gcf (gcf, 64*GCF_DIM*GCF_DIM);
-  buffer<      CmplxType, 1> d_out (NPOINTS);
-  buffer<const CmplxType, 1> d_in  (in, NPOINTS);
+  const size_t image_size = IMG_SIZE*IMG_SIZE+2*IMG_SIZE*GCF_DIM+2*GCF_DIM;
+  const size_t image_size_bytes = image_size * sizeof(CmplxType);
+ 
+  CmplxType *d_img = sycl::malloc_device<CmplxType> (image_size, q); 
+  CmplxType *d_gcf = sycl::malloc_device<CmplxType> (64*GCF_DIM*GCF_DIM, q);
+  CmplxType *d_out = sycl::malloc_device<CmplxType> (NPOINTS, q);
+  CmplxType *d_in  = sycl::malloc_device<CmplxType> (NPOINTS, q);
+
+  q.memcpy(d_img, img, image_size_bytes);
+  q.memcpy(d_in, in, sizeof(CmplxType) * NPOINTS);
+  q.memcpy(d_gcf, gcf, sizeof(CmplxType) * 64*GCF_DIM*GCF_DIM);
 
   // NPOINTS is a multiple of 32
-  range<2> gws(8, NPOINTS);
-  range<2> lws(8, 32);
+  sycl::range<2> gws(8, NPOINTS);
+  sycl::range<2> lws(8, 32);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < REPEAT; n++) {
-    q.submit([&] (handler &cgh) {
-      auto out = d_out.template get_access<sycl_discard_write>(cgh);
-      auto in = d_in.template get_access<sycl_read>(cgh);
-      auto img = d_img.template get_access<sycl_read>(cgh);
-      auto gcf = d_gcf.template get_access<sycl_read>(cgh);
-      cgh.parallel_for<class degrid<CmplxType>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class degrid<CmplxType>>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         // GCF_DIM is at least 32
-        degrid_kernel(out.get_pointer(),
-                      in.get_pointer(),
+        degrid_kernel(d_out,
+                      d_in,
                       NPOINTS,
-                      img.get_pointer() + IMG_SIZE*GCF_DIM+GCF_DIM,
+                      d_img + IMG_SIZE*GCF_DIM+GCF_DIM,
                       IMG_SIZE,
-                      gcf.get_pointer() + GCF_DIM*(GCF_DIM+1)/2,
+                      d_gcf + GCF_DIM*(GCF_DIM+1)/2,
                       item); 
       });
     });
@@ -109,8 +112,9 @@ void degridGPU(CmplxType* out, CmplxType* in, CmplxType *img, CmplxType *gcf) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time " << (time * 1e-9f) / REPEAT << " (s)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_out.template get_access<sycl_read>(cgh);
-    cgh.copy(acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(CmplxType) * NPOINTS).wait();
+  sycl::free(d_img, q);
+  sycl::free(d_gcf, q);
+  sycl::free(d_out, q);
+  sycl::free(d_in, q);
 }
