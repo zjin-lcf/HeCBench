@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 // Copies the flow velocity from GPU to CPU memory, for data output.
@@ -243,11 +243,10 @@ int main(int argc, char* argv[]) {
   lbm_vars h_vars, d_vars;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
   
   init_and_allocate_data(q, domain, &h_vars, &d_vars);
 
