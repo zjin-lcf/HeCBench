@@ -76,11 +76,11 @@ __global__ void DCT8x8_kernel(
     const unsigned int imageH,
     const unsigned int imageW
 ){
-    const unsigned int    localX = threadIdx.x; //get_local_id(0);
-    const unsigned int    localY = BLOCK_SIZE * threadIdx.y; //get_local_id(1);
+    const unsigned int    localX = threadIdx.x;
+    const unsigned int    localY = BLOCK_SIZE * threadIdx.y;
     const unsigned int modLocalX = localX & (BLOCK_SIZE - 1);
-    const unsigned int   globalX = blockIdx.x * BLOCK_X + localX;//get_group_id(0) * BLOCK_X + localX;
-    const unsigned int   globalY = blockIdx.y * BLOCK_Y + localY;//get_group_id(1) * BLOCK_Y + localY;
+    const unsigned int   globalX = blockIdx.x * BLOCK_X + localX;
+    const unsigned int   globalY = blockIdx.y * BLOCK_Y + localY;
 
     __shared__ float l_Transpose[BLOCK_Y * (BLOCK_X+1)];
 
@@ -118,11 +118,11 @@ __global__ void IDCT8x8_kernel(
     const unsigned int imageH,
     const unsigned int imageW
 ){
-    const unsigned int    localX = threadIdx.x; //get_local_id(0);
-    const unsigned int    localY = BLOCK_SIZE * threadIdx.y; //get_local_id(1);
+    const unsigned int    localX = threadIdx.x;
+    const unsigned int    localY = BLOCK_SIZE * threadIdx.y;
     const unsigned int modLocalX = localX & (BLOCK_SIZE - 1);
-    const unsigned int   globalX = blockIdx.x * BLOCK_X + localX;//get_group_id(0) * BLOCK_X + localX;
-    const unsigned int   globalY = blockIdx.y * BLOCK_Y + localY;//get_group_id(1) * BLOCK_Y + localY;
+    const unsigned int   globalX = blockIdx.x * BLOCK_X + localX;
+    const unsigned int   globalY = blockIdx.y * BLOCK_Y + localY;
 
     __shared__ float l_Transpose[BLOCK_Y * (BLOCK_X+1)];
 
