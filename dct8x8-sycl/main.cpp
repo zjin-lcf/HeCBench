@@ -13,13 +13,13 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "DCT8x8.h"
 
 void DCT8x8(
-    queue &q,
-    buffer<float, 1> &d_Dst,
-    buffer<float, 1> &d_Src,
+    sycl::queue &q,
+    float *d_Dst,
+    float *d_Src,
     unsigned int stride,
     unsigned int imageH,
     unsigned int imageW,
@@ -77,14 +77,15 @@ int main(int argc, char **argv)
       h_Input[i * stride + j] = (float)rand() / (float)RAND_MAX;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_Input (h_Input, imageH * stride);
-  buffer<float, 1> d_Output (imageH * stride);
+  float *d_Input = sycl::malloc_device<float>(imageH * stride, q);
+  q.memcpy(d_Input, h_Input, sizeof(float) * imageH * stride);
+
+  float *d_Output = sycl::malloc_device<float>(imageH * stride, q);
 
   printf("Performing Forward DCT8x8 of %u x %u image on the device\n\n", imageH, imageW);
 
@@ -108,10 +109,7 @@ int main(int argc, char **argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average DCT8x8 kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_OutputGPU); 
-  }).wait();
+  q.memcpy(h_OutputGPU, d_Output, sizeof(float) * imageH * stride).wait();
 
   Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir);
 
@@ -136,16 +134,15 @@ int main(int argc, char **argv)
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average IDCT8x8 kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_OutputGPU); 
-  }).wait();
+  q.memcpy(h_OutputGPU, d_Output, sizeof(float) * imageH * stride).wait();
 
   Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir);
 
   free(h_OutputGPU);
   free(h_OutputCPU);
   free(h_Input);
+  sycl::free(d_Output, q);
+  sycl::free(d_Input, q);
 
   return 0;
 }

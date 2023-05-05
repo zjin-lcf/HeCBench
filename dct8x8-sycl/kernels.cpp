@@ -9,7 +9,7 @@
  *
  */
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "DCT8x8.h"
 
 inline void DCT8(float *D){
@@ -68,10 +68,10 @@ inline void IDCT8(float *D){
 }
 
 void DCT8x8_kernel(
-    nd_item<2> &item,
-    global_ptr<float> d_Dst,
-    global_ptr<float> d_Src,
-    local_ptr<float> l_Transpose,
+    sycl::nd_item<2> &item,
+    float *d_Dst,
+    float *d_Src,
+    float *l_Transpose,
     const unsigned int stride,
     const unsigned int imageH,
     const unsigned int imageW
@@ -110,10 +110,10 @@ void DCT8x8_kernel(
 }
 
 void IDCT8x8_kernel(
-    nd_item<2> &item,
-    global_ptr<float> d_Dst,
-    global_ptr<float> d_Src,
-    local_ptr<float> l_Transpose,
+    sycl::nd_item<2> &item,
+    float *d_Dst,
+    float *d_Src,
+    float *l_Transpose,
     const unsigned int stride,
     const unsigned int imageH,
     const unsigned int imageW
@@ -155,9 +155,9 @@ inline unsigned int iDivUp(unsigned int dividend, unsigned int divisor){
 }
 
 void DCT8x8(
-    queue &q,
-    buffer<float, 1> &d_Dst,
-    buffer<float, 1> &d_Src,
+    sycl::queue &q,
+    float *d_Dst,
+    float *d_Src,
     unsigned int stride,
     unsigned int imageH,
     unsigned int imageW,
@@ -170,26 +170,24 @@ void DCT8x8(
     globalWorkSize[0] = iDivUp(imageW, BLOCK_X) * localWorkSize[0];
     globalWorkSize[1] = iDivUp(imageH, BLOCK_Y) * localWorkSize[1];
 
-    range<2> gws (globalWorkSize[1], globalWorkSize[0]);
-    range<2> lws (localWorkSize[1], localWorkSize[0]);
+    sycl::range<2> gws (globalWorkSize[1], globalWorkSize[0]);
+    sycl::range<2> lws (localWorkSize[1], localWorkSize[0]);
 
     if (dir == DCT_FORWARD)  {
-      q.submit([&] (handler &cgh) {
-        auto in = d_Src.get_access<sycl_read>(cgh);
-        auto out = d_Dst.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_Transpose(BLOCK_Y * (BLOCK_X+1), cgh);
-        cgh.parallel_for<class dct8x8>(nd_range<2>(range<2>(gws), range<2>(lws)), [=] (nd_item<2> item) {
-          DCT8x8_kernel(item, out.get_pointer(), in.get_pointer(), l_Transpose.get_pointer(), stride, imageH, imageW);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> l_Transpose(sycl::range<1>(BLOCK_Y * (BLOCK_X+1)), cgh);
+        cgh.parallel_for<class dct8x8>(
+          sycl::nd_range<2>(sycl::range<2>(gws), sycl::range<2>(lws)), [=] (sycl::nd_item<2> item) {
+          DCT8x8_kernel(item, d_Dst, d_Src, l_Transpose.get_pointer(), stride, imageH, imageW);
         });
       });
     }
     else {
-      q.submit([&] (handler &cgh) {
-        auto in = d_Src.get_access<sycl_read>(cgh);
-        auto out = d_Dst.get_access<sycl_discard_write>(cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_Transpose(BLOCK_Y * (BLOCK_X+1), cgh);
-        cgh.parallel_for<class idct8x8>(nd_range<2>(range<2>(gws), range<2>(lws)), [=] (nd_item<2> item) {
-          IDCT8x8_kernel(item, out.get_pointer(), in.get_pointer(), l_Transpose.get_pointer(), stride, imageH, imageW);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> l_Transpose(sycl::range<1>(BLOCK_Y * (BLOCK_X+1)), cgh);
+        cgh.parallel_for<class idct8x8>(
+          sycl::nd_range<2>(sycl::range<2>(gws), sycl::range<2>(lws)), [=] (sycl::nd_item<2> item) {
+          IDCT8x8_kernel(item, d_Dst, d_Src, l_Transpose.get_pointer(), stride, imageH, imageW);
         });
       });
     }
