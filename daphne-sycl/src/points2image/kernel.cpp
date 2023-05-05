@@ -7,7 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "benchmark.h"
 #include "datatypes.h"
 
@@ -16,33 +16,34 @@
 // number of GPU threads
 #define THREADS 256
 
-template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
+template<typename T>
 static inline void atomicMin(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
-     MemoryScope, sycl::access::address_space::global_space> ref(val);
+  sycl::atomic_ref<T, sycl::memory_order::relaxed, 
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
   ref.fetch_min(delta);
 }
 
-template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
+template<typename T>
 static inline void atomicMax(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
-     MemoryScope, sycl::access::address_space::global_space> ref(val);
+  sycl::atomic_ref<T, sycl::memory_order::relaxed, 
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
   ref.fetch_max(delta);
 }
 
-template <typename T, access::address_space 
-          addressSpace = access::address_space::global_space>
-T atomicCAS(
-    T *addr, T expected, T desired,
-    memory_order success = memory_order::relaxed,
-    memory_order fail = memory_order::relaxed)
+template <typename T>
+inline T atomicCAS(T *val, T expected, T desired) 
 {
-  // add a pair of parentheses to declare a variable
-  atomic<T, addressSpace> obj((multi_ptr<T, addressSpace>(addr)));
-  obj.compare_exchange_strong(expected, desired, success, fail);
-  return expected;
+  T expected_value = expected;
+  auto atm = sycl::atomic_ref<T,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*val);
+  atm.compare_exchange_strong(expected_value, desired);
+  return expected_value;
 }
 
 class points2image : public benchmark {
@@ -64,7 +65,7 @@ class points2image : public benchmark {
      * Performs the kernel operations on all input and output data.
      * p: number of testcases to process in one step
      */
-    virtual void run(queue &q, int p = 1);
+    virtual void run(sycl::queue &q, int p = 1);
     /**
      * Finally checks whether all input data has been processed successfully.
      */
@@ -87,7 +88,7 @@ class points2image : public benchmark {
      * count: the number of testcases to read
      * returns: the number of testcases actually read
      */
-    virtual int read_next_testcases(queue &q, int count);
+    virtual int read_next_testcases(sycl::queue &q, int count);
     /**
      * Compares the results from the algorithm with the reference data.
      * count: the number of testcases processed 
@@ -117,7 +118,7 @@ int points2image::read_number_testcases(std::ifstream& input_file)
 /**
  * Reads the next point cloud
  */
-void  parsePointCloud(queue &q, std::ifstream& input_file, PointCloud2* pointcloud2) {
+void  parsePointCloud(sycl::queue &q, std::ifstream& input_file, PointCloud2* pointcloud2) {
   input_file.read((char*)&(pointcloud2->height), sizeof(int));
   input_file.read((char*)&(pointcloud2->width), sizeof(int));
   input_file.read((char*)&(pointcloud2->point_step), sizeof(uint));
@@ -211,7 +212,7 @@ void parsePointsImage(std::ifstream& output_file, PointsImage* goldenResult) {
 }
 
 // return how many could be read
-int points2image::read_next_testcases(queue &q, int count)
+int points2image::read_next_testcases(sycl::queue &q, int count)
 {
   int i;
   // free the memory that has been allocated in the previous iteration
@@ -315,7 +316,7 @@ void compute_point_from_pointcloud(
     Mat33 cameraMat,
     int* __restrict min_y,
     int* __restrict max_y,
-    nd_item<3> &item) 
+    sycl::nd_item<3> &item) 
 {
 
   // determine index in cloud memory
@@ -383,8 +384,6 @@ void compute_point_from_pointcloud(
     if ( newvalue>= cm_point)
     {
       msg_intensity[pid] = intensity;
-      //sycl::atomic<int>(sycl::global_ptr<int>(max_y)).fetch_max(py);
-      //sycl::atomic<int>(sycl::global_ptr<int>(min_y)).fetch_min(py);
       atomicMax(*max_y, py);
       atomicMin(*min_y, py);
     }
@@ -404,7 +403,7 @@ void compute_point_from_pointcloud(
  * returns: the two dimensional image of transformed points
  */
 PointsImage pointcloud2_to_image(
-    queue &q,
+    sycl::queue &q,
     const PointCloud2& pointcloud2,
     const Mat44& cameraExtrinsicMat,
     const Mat33& cameraMat, const Vec5& distCoeff,
@@ -448,11 +447,11 @@ PointsImage pointcloud2_to_image(
   q.memcpy(msg_max_y, &msg.max_y, sizeof(int)).wait();
 
   // call the kernel with enough threads to process the cloud in a single call
-  range<3> lws (1, 1, THREADS);
-  range<3> gws(1, (pointcloud2.width + THREADS - 1) / THREADS,
-                  THREADS * pointcloud2.height);
+  sycl::range<3> lws (1, 1, THREADS);
+  sycl::range<3> gws(1, (pointcloud2.width + THREADS - 1) / THREADS,
+                     THREADS * pointcloud2.height);
 
-  q.parallel_for(nd_range<3>(gws, lws), [=](nd_item<3> item) {
+  q.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
     compute_point_from_pointcloud(
       pointcloud2.data, msg.distance, msg.intensity, msg.min_height,
       pointcloud2.width, pointcloud2.height, pointcloud2.point_step, w, h,
@@ -469,7 +468,7 @@ PointsImage pointcloud2_to_image(
   return msg;
 }
 
-void points2image::run(queue &q, int p) {
+void points2image::run(sycl::queue &q, int p) {
   // pause while reading and comparing data
   // only run the timer when the algorithm is active
   pause_func();
