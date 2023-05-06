@@ -7,7 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUM_GROUPS 1
 #define GROUP_SIZE 1
@@ -44,17 +44,17 @@ void print_timing(std::string test, const std::array<float, TOTAL_RUN_COUNT> &re
 }
 
 int main() {
+
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   std::array<float, TOTAL_RUN_COUNT> results;
 
-  range<1> gws (NUM_GROUPS * GROUP_SIZE);
-  range<1> lws (GROUP_SIZE);
+  sycl::range<1> gws (NUM_GROUPS * GROUP_SIZE);
+  sycl::range<1> lws (GROUP_SIZE);
 
   //------------------------------------------------------------------------------------
   // HIP kernel launch enqueue rate:
@@ -62,8 +62,8 @@ int main() {
   //------------------------------------------------------------------------------------
   for (auto i = 0; i < TOTAL_RUN_COUNT; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       });
     });
     auto stop = std::chrono::high_resolution_clock::now();
@@ -76,8 +76,8 @@ int main() {
   //------------------------------------------------------------------------------------
   for (auto i = 0; i < TOTAL_RUN_COUNT; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       });
     }).wait();
     auto stop = std::chrono::high_resolution_clock::now();
@@ -91,8 +91,8 @@ int main() {
   for (auto i = 0; i < TOTAL_RUN_COUNT; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
     for (int j = 0; j < BATCH_SIZE; j++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         });
       });
     }
