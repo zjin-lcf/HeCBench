@@ -4,7 +4,7 @@
 #include <vector>  // vector
 #include <cstring>  // memcpy
 #include <algorithm>  // sort
-#include "common.h"
+#include <sycl/sycl.hpp>
 //--------------------data--------------------//
 struct Option {
   std::string inputFile;

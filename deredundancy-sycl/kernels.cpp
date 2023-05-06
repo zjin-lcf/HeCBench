@@ -1,5 +1,5 @@
 // kernel_baseToNumber
-void kernel_baseToNumber(char *reads, const long length, nd_item<1> &item) 
+void kernel_baseToNumber(char *reads, const long length, sycl::nd_item<1> &item) 
 {
   long index = item.get_global_id(0); 
   while (index < length) {
@@ -51,7 +51,7 @@ void kernel_compressData(
     unsigned int *compressed, 
     int *gaps, 
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
@@ -89,7 +89,7 @@ void kernel_createIndex4(
     long *words, 
     int *magicBase,
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
@@ -124,7 +124,7 @@ void kernel_createIndex4(
     int flag = 0;  // if has gap
     for (int j=0; j<4; j++) {
       indexValue += (bases[j]&3)<<(3-j)*2;
-      flag += cl::sycl::max((int)(bases[j] - 3), 0);
+      flag += sycl::max((int)(bases[j] - 3), 0);
     }
     indexs[i] = flag?65535:indexValue;  // gap value is 65535
     wordCount += flag?0:1;
@@ -145,7 +145,7 @@ void kernel_createIndex5(
     long *words, 
     int *magicBase,
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;
@@ -180,7 +180,7 @@ void kernel_createIndex5(
     int flag = 0;
     for (int j=0; j<5; j++) {
       indexValue += (bases[j]&3)<<(4-j)*2;
-      flag += cl::sycl::max((int)(bases[j] - 3), 0);
+      flag += sycl::max((int)(bases[j] - 3), 0);
     }
     indexs[i] = flag?65535:indexValue;
     wordCount += flag?0:1;
@@ -201,7 +201,7 @@ void kernel_createIndex6(
     long *words, 
     int *magicBase,
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;
@@ -236,7 +236,7 @@ void kernel_createIndex6(
     int flag = 0;
     for (int j=0; j<6; j++) {
       indexValue += (bases[j]&3)<<(5-j)*2;
-      flag += cl::sycl::max((int)(bases[j] - 3), 0);
+      flag += sycl::max((int)(bases[j] - 3), 0);
     }
     indexs[i] = flag?65535:indexValue;
     wordCount += flag?0:1;
@@ -257,7 +257,7 @@ void kernel_createIndex7(
     long *words, 
     int *magicBase,
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;
@@ -292,7 +292,7 @@ void kernel_createIndex7(
     int flag = 0;
     for (int j=0; j<7; j++) {
       indexValue += (bases[j]&3)<<(6-j)*2;
-      flag += cl::sycl::max((int)(bases[j] - 3), 0);
+      flag += sycl::max((int)(bases[j] - 3), 0);
     }
     indexs[i] = flag?65535:indexValue;
     wordCount += flag?0:1;
@@ -311,13 +311,13 @@ void kernel_createCutoff(
     long *words, 
     int *wordCutoff, 
     const int readsCount,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
   int length = lengths[index];
   int required = length - wordLength + 1;
-  int cutoff = cl::sycl::ceil((float)length * (1.f - threshold) * (float)wordLength);
+  int cutoff = sycl::ceil((float)length * (1.f - threshold) * (float)wordLength);
   required -= cutoff;
   wordCutoff[index] = required;
 }
@@ -328,7 +328,7 @@ void kernel_mergeIndex(
     unsigned short *orders, 
     const long *words, 
     const int readsCount, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
@@ -353,26 +353,29 @@ void kernel_mergeIndex(
 
 // updateRepresentative
 void updateRepresentative(
-    queue &q,
-    buffer<int, 1> &d_cluster, 
+    sycl::queue &q,
+    int *d_cluster, 
     int *representative, 
     const int readsCount) 
 {
-  buffer<int, 1> d_r(representative, 1);
-  q.submit([&](handler &cgh) {
-    auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
-    auto r = d_r.get_access<sycl_read_write>(cgh);
+  int *d_r = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_r, representative, sizeof(int));
+
+  q.submit([&](sycl::handler &cgh) {
     cgh.single_task<class update>([=]() {
-      r[0]++;
-      while (r[0] < readsCount) {
-        if (cluster[r[0]] < 0) {  // is representative
-          cluster[r[0]] = r[0];
+      d_r[0]++;
+      while (d_r[0] < readsCount) {
+        if (d_cluster[d_r[0]] < 0) {  // is representative
+          d_cluster[d_r[0]] = d_r[0];
           break;
         }
-        r[0]++;
+        d_r[0]++;
       }
     });
   });
+
+  q.memcpy(representative, d_r, sizeof(int)).wait();
+  sycl::free(d_r, q);
 }
 
 // kernel_makeTable
@@ -383,7 +386,7 @@ void kernel_makeTable(
     const long *words,
     unsigned short *table,
     const int representative, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   int start = offsets[representative];
@@ -403,7 +406,7 @@ void kernel_cleanTable(
     const long *words,
     unsigned short *table, 
     const int representative, 
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   int start = offsets[representative];
@@ -420,19 +423,19 @@ void kernel_magic(float threshold,
     int *cluster, 
     const int representative, 
     const int readsCount,
-    cl::sycl::nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   int index = item.get_global_id(0);
   if (index >= readsCount) return;  // out of range
   if (cluster[index] >= 0) return;  // is clustered
   int offsetOne = representative*4;  // representative magic offset
   int offsetTwo = index*4;  // query magic offset
-  int magic = cl::sycl::min(magicBase[offsetOne + 0], magicBase[offsetTwo + 0]) +
-    cl::sycl::min(magicBase[offsetOne + 1], magicBase[offsetTwo + 1]) +
-    cl::sycl::min(magicBase[offsetOne + 2], magicBase[offsetTwo + 2]) +
-    cl::sycl::min(magicBase[offsetOne + 3], magicBase[offsetTwo + 3]);
+  int magic = sycl::min(magicBase[offsetOne + 0], magicBase[offsetTwo + 0]) +
+    sycl::min(magicBase[offsetOne + 1], magicBase[offsetTwo + 1]) +
+    sycl::min(magicBase[offsetOne + 2], magicBase[offsetTwo + 2]) +
+    sycl::min(magicBase[offsetOne + 3], magicBase[offsetTwo + 3]);
   int length = lengths[index];
-  int minLength = cl::sycl::ceil((float)length*threshold);
+  int minLength = sycl::ceil((float)length*threshold);
   if (magic > minLength) {  // pass filter
     cluster[index] = -2;
   }
@@ -451,7 +454,7 @@ void kernel_filter(
     int *cluster, 
     const unsigned short *table, 
     const int readsCount,
-    nd_item<1> &item, 
+    sycl::nd_item<1> &item, 
     int *result)
 {
   int gid = item.get_group(0);
@@ -463,9 +466,9 @@ void kernel_filter(
   int start = offsets[gid];
   int end = start + words[gid];
   for (int i = lid + start; i < end; i += 128) {
-    result[lid] += cl::sycl::min(table[indexs[i]], orders[i]);
+    result[lid] += sycl::min(table[indexs[i]], orders[i]);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if (lid == 0) {
     for (int i=1; i<128; i++) {
@@ -489,7 +492,7 @@ void kernel_align(
     const int representative,
     int *cluster,
     const int readsCount,
-    nd_item<1> &item) 
+    sycl::nd_item<1> &item) 
 {
   // variables
   int index = item.get_global_id(0);
@@ -497,7 +500,7 @@ void kernel_align(
   if (cluster[index] != -3) return;  // not pass filter
   int target = representative;  // representative read
   int query = index;  // query read
-  int minLength = cl::sycl::ceil((float)lengths[index] * threshold);
+  int minLength = sycl::ceil((float)lengths[index] * threshold);
   int targetLength = lengths[target] - gaps[target];  // representative base count
   int queryLength = lengths[query] - gaps[query];  // query base count
   int target32Length = targetLength/16+1;  // compressed target length
@@ -508,8 +511,8 @@ void kernel_align(
   short rowPrevious[3000] = {0};  // dynamic matrix row
   int columnPrevious[17] = {0};  // dynamic matrix column
   int columnNow[17] = {0};  // dynamic matrix column
-  int shift = cl::sycl::ceil((float)targetLength - (float)queryLength*threshold);
-  shift = cl::sycl::ceil((float)shift / 16.f); // shift form diagonal
+  int shift = sycl::ceil((float)targetLength - (float)queryLength*threshold);
+  shift = sycl::ceil((float)shift / 16.f); // shift form diagonal
   // compute
   for (int i = 0; i < query32Length; i++) {  // query is column
     // first big loop
@@ -520,9 +523,9 @@ void kernel_align(
     int targetIndex = 0;  // target position
     unsigned int queryPack = compressed[queryOffset+i];  // get 16 query bases
     int jstart = i-shift;
-    jstart = cl::sycl::max(jstart, 0);
+    jstart = sycl::max(jstart, 0);
     int jend = i+shift;
-    jend = cl::sycl::min(jend, target32Length);
+    jend = sycl::min(jend, target32Length);
     for (int j=0; j<target32Length; j++) {  // target is row
       columnPrevious[0] = rowPrevious[targetIndex];
       unsigned int targetPack = compressed[targetOffset+j];  // get 16 target bases
@@ -537,8 +540,8 @@ void kernel_align(
           int queryBase = (queryPack>>l)&3;  // get base from query
           int diffScore = queryBase == targetBase;
           columnNow[m] = columnPrevious[m-1] + diffScore;
-          columnNow[m] = cl::sycl::max(columnNow[m], columnNow[m - 1]);
-          columnNow[m] = cl::sycl::max(columnNow[m], columnPrevious[m]);
+          columnNow[m] = sycl::max(columnNow[m], columnNow[m - 1]);
+          columnNow[m] = sycl::max(columnNow[m], columnPrevious[m]);
         }
         targetIndex++;
         rowNow[targetIndex] = columnNow[16];
@@ -565,9 +568,9 @@ void kernel_align(
           int diffScore = queryBase == targetBase;
           columnPrevious[m] = columnNow[m-1] + diffScore;
           columnPrevious[m] =
-            cl::sycl::max(columnPrevious[m], columnPrevious[m - 1]);
+            sycl::max(columnPrevious[m], columnPrevious[m - 1]);
           columnPrevious[m] =
-            cl::sycl::max(columnPrevious[m], columnNow[m]);
+            sycl::max(columnPrevious[m], columnNow[m]);
         }
         targetIndex++;
         rowNow[targetIndex] = columnPrevious[16];
@@ -594,9 +597,9 @@ void kernel_align(
     targetIndex = 0;
     queryPack = compressed[queryOffset+i];
     jstart = i-shift;
-    jstart = cl::sycl::max(jstart, 0);
+    jstart = sycl::max(jstart, 0);
     jend = i+shift;
-    jend = cl::sycl::min(jend, target32Length);
+    jend = sycl::min(jend, target32Length);
     for (int j=0; j<target32Length; j++) {
       unsigned int targetPack = compressed[targetOffset+j];
       //---16*16 core----//
@@ -610,8 +613,8 @@ void kernel_align(
           int queryBase = (queryPack>>l)&3;
           int diffScore = queryBase == targetBase;
           columnNow[m] = columnPrevious[m-1] + diffScore;
-          columnNow[m] = cl::sycl::max(columnNow[m], columnNow[m - 1]);
-          columnNow[m] = cl::sycl::max(columnNow[m], columnPrevious[m]);
+          columnNow[m] = sycl::max(columnNow[m], columnNow[m - 1]);
+          columnNow[m] = sycl::max(columnNow[m], columnPrevious[m]);
         }
         targetIndex++;
         rowPrevious[targetIndex] = columnNow[16];
@@ -638,9 +641,9 @@ void kernel_align(
           int diffScore = queryBase == targetBase;
           columnPrevious[m] = columnNow[m-1] + diffScore;
           columnPrevious[m] =
-            cl::sycl::max(columnPrevious[m], columnPrevious[m - 1]);
+            sycl::max(columnPrevious[m], columnPrevious[m - 1]);
           columnPrevious[m] =
-            cl::sycl::max(columnPrevious[m], columnNow[m]);
+            sycl::max(columnPrevious[m], columnNow[m]);
         }
         targetIndex++;
         rowPrevious[targetIndex] = columnPrevious[16];
@@ -660,4 +663,3 @@ void kernel_align(
     }
   }
 }
-
