@@ -13,18 +13,17 @@
 
 // Use power method to find the first eigenvector.
 // http://www.miislita.com/information-retrieval-tutorial/matrix-tutorial-3-eigenvalues-eig// envectors.html
-
-float4 firstEigenVector( local_ptr<float> matrix )
+sycl::float4 firstEigenVector( sycl::local_ptr<float> matrix )
 {
     // 8 iterations seems to be more than enough.
 
-    float4 v = {1.0f, 1.0f, 1.0f, 0.0f};
+    sycl::float4 v = {1.0f, 1.0f, 1.0f, 0.0f};
     #pragma unroll
     for(int i = 0; i < 8; i++) {
       float x = v.x() * matrix[0] + v.y() * matrix[1] + v.z() * matrix[2];
       float y = v.x() * matrix[1] + v.y() * matrix[3] + v.z() * matrix[4];
       float z = v.x() * matrix[2] + v.y() * matrix[4] + v.z() * matrix[5];
-      float m = cl::sycl::fmax(cl::sycl::fmax(x, y), z);        
+      float m = sycl::fmax(sycl::fmax(x, y), z);        
       float iv = 1.0f / m;
       
       v.x() = x * iv;
@@ -35,7 +34,7 @@ float4 firstEigenVector( local_ptr<float> matrix )
     return v;
 }
 
-void colorSums(nd_item<1> &item, local_ptr<const float4> colors, local_ptr<float4> sums)
+void colorSums(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors, sycl::local_ptr<sycl::float4> sums)
 {
     const int idx = item.get_local_id(0);
 
@@ -46,12 +45,12 @@ void colorSums(nd_item<1> &item, local_ptr<const float4> colors, local_ptr<float
     sums[idx] += sums[idx^1];
 }
 
-float4 bestFitLine(nd_item<1> &item, local_ptr<const float4> colors, float4 color_sum, local_ptr<float> covariance)
+sycl::float4 bestFitLine(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors, sycl::float4 color_sum, sycl::local_ptr<float> covariance)
 {
     // Compute covariance matrix of the given colors.
     const int idx = item.get_local_id(0);
 
-    float4 diff = colors[idx] - color_sum * (float4)(0.0625f); // * 1.0f / 16.0f
+    sycl::float4 diff = colors[idx] - color_sum * (sycl::float4)(0.0625f); // * 1.0f / 16.0f
 
     covariance[6 * idx + 0] = diff.x() * diff.x();    // 0, 6, 12, 2, 8, 14, 4, 10, 0
     covariance[6 * idx + 1] = diff.x() * diff.y();
@@ -81,7 +80,7 @@ float4 bestFitLine(nd_item<1> &item, local_ptr<const float4> colors, float4 colo
 // ////////////////////////////////////////////////////////////////////////////////
 // // Sort colors
 // ////////////////////////////////////////////////////////////////////////////////
-void sortColors(nd_item<1> &item, local_ptr<const float> values, local_ptr<int> ranks)
+void sortColors(sycl::nd_item<1> &item, sycl::local_ptr<const float> values, sycl::local_ptr<int> ranks)
 {
     const int tid = item.get_local_id(0);
 
@@ -106,13 +105,13 @@ void sortColors(nd_item<1> &item, local_ptr<const float> values, local_ptr<int> 
 ////////////////////////////////////////////////////////////////////////////////
 // Load color block to shared mem
 ////////////////////////////////////////////////////////////////////////////////
-void loadColorBlock(nd_item<1> &item, global_ptr<const unsigned int> image, local_ptr<float4> colors, 
-                    local_ptr<float4> sums, local_ptr<int> xrefs, local_ptr<float> temp, int groupOffset)
+void loadColorBlock(sycl::nd_item<1> &item, sycl::global_ptr<const unsigned int> image, sycl::local_ptr<sycl::float4> colors, 
+                    sycl::local_ptr<sycl::float4> sums, sycl::local_ptr<int> xrefs, sycl::local_ptr<float> temp, int groupOffset)
 {
     const int bid = item.get_group(0) + groupOffset;
     const int idx = item.get_local_id(0);
 
-    float4 tmp;
+    sycl::float4 tmp;
 
     if (idx < 16)
     {
@@ -127,7 +126,7 @@ void loadColorBlock(nd_item<1> &item, global_ptr<const unsigned int> image, loca
 
         // Sort colors along the best fit line.
         colorSums(item, colors, sums);
-        float4 axis = bestFitLine(item, colors, sums[idx], temp);
+        sycl::float4 axis = bestFitLine(item, colors, sums[idx], temp);
             
         temp[idx] = colors[idx].x() * axis.x() + colors[idx].y() * axis.y() + colors[idx].z() * axis.z();
         
@@ -142,11 +141,11 @@ void loadColorBlock(nd_item<1> &item, global_ptr<const unsigned int> image, loca
 // ////////////////////////////////////////////////////////////////////////////////
 // // Round color to RGB565 and expand
 // ////////////////////////////////////////////////////////////////////////////////
-float4 roundAndExpand(float4 v, unsigned short * w)
+sycl::float4 roundAndExpand(sycl::float4 v, unsigned short * w)
 {
-    unsigned short x = cl::sycl::rint(cl::sycl::clamp(v.x(), 0.0f, 1.0f) * 31.0f);
-    unsigned short y = cl::sycl::rint(cl::sycl::clamp(v.y(), 0.0f, 1.0f) * 63.0f);
-    unsigned short z = cl::sycl::rint(cl::sycl::clamp(v.z(), 0.0f, 1.0f) * 31.0f);
+    unsigned short x = sycl::rint(sycl::clamp(v.x(), 0.0f, 1.0f) * 31.0f);
+    unsigned short y = sycl::rint(sycl::clamp(v.y(), 0.0f, 1.0f) * 63.0f);
+    unsigned short z = sycl::rint(sycl::clamp(v.z(), 0.0f, 1.0f) * 31.0f);
 
     *w = ((x << 11) | (y << 5) | z);
     v.x() = x * 0.03227752766457f; // approximate integer bit expansion.
@@ -158,11 +157,11 @@ float4 roundAndExpand(float4 v, unsigned short * w)
 ////////////////////////////////////////////////////////////////////////////////
 // Evaluate permutations
 ////////////////////////////////////////////////////////////////////////////////
-float evalPermutation(local_ptr<const float4> colors, unsigned int permutation, 
-                      unsigned short* start, unsigned short* end, float4 color_sum,
-                      global_ptr<float> alphaTable4, global_ptr<int> prods4, float weight)
+float evalPermutation(sycl::local_ptr<const sycl::float4> colors, unsigned int permutation, 
+                      unsigned short* start, unsigned short* end, sycl::float4 color_sum,
+                      sycl::global_ptr<float> alphaTable4, sycl::global_ptr<int> prods4, float weight)
 {
-    float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
+    sycl::float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
@@ -178,32 +177,32 @@ float evalPermutation(local_ptr<const float4> colors, unsigned int permutation,
     float alpha2_sum = (akku >> 16);
     float beta2_sum = ((akku >> 8) & 0xff);
     float alphabeta_sum = ((akku >> 0) & 0xff);
-    float4 betax_sum = weight * color_sum - alphax_sum;
+    sycl::float4 betax_sum = weight * color_sum - alphax_sum;
 
     //// Compute endpoints using least squares.
  
     // alpha2, beta2, alphabeta and factor could be precomputed for each permutation, but it's faster to recompute them.
     const float factor = 1.0f / (alpha2_sum * beta2_sum - alphabeta_sum * alphabeta_sum);
 
-    float4 a = (alphax_sum * beta2_sum - betax_sum * alphabeta_sum) * factor;
-    float4 b = (betax_sum * alpha2_sum - alphax_sum * alphabeta_sum) * factor;
+    sycl::float4 a = (alphax_sum * beta2_sum - betax_sum * alphabeta_sum) * factor;
+    sycl::float4 b = (betax_sum * alpha2_sum - alphax_sum * alphabeta_sum) * factor;
     
     // Round a, b to the closest 5-6-5 color and expand...
     a = roundAndExpand(a, start);
     b = roundAndExpand(b, end);
 
     // compute the error
-    float4 e = a * a * alpha2_sum + b * b * beta2_sum + 2.0f * (a * b * alphabeta_sum - a * alphax_sum - b * betax_sum);
+    sycl::float4 e = a * a * alpha2_sum + b * b * beta2_sum + 2.0f * (a * b * alphabeta_sum - a * alphax_sum - b * betax_sum);
 
     return (1.0f/weight) * (e.x() + e.y() + e.z());
 }
 
 // unused function
-float evalPermutation3(local_ptr<const float4> colors, unsigned int permutation, 
-                       unsigned short * start, unsigned short * end, float4 color_sum,
-                       global_ptr<float> alphaTable3, global_ptr<int> prods3)
+float evalPermutation3(sycl::local_ptr<const sycl::float4> colors, unsigned int permutation, 
+                       unsigned short * start, unsigned short * end, sycl::float4 color_sum,
+                       sycl::global_ptr<float> alphaTable3, sycl::global_ptr<int> prods3)
 {
-    float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
+    sycl::float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
@@ -219,29 +218,29 @@ float evalPermutation3(local_ptr<const float4> colors, unsigned int permutation,
     float alpha2_sum = (akku >> 16);
     float beta2_sum = ((akku >> 8) & 0xff);
     float alphabeta_sum = ((akku >> 0) & 0xff);
-    float4 betax_sum = 4.0f * color_sum - alphax_sum;
+    sycl::float4 betax_sum = 4.0f * color_sum - alphax_sum;
 
     const float factor = 1.0f / (alpha2_sum * beta2_sum - alphabeta_sum * alphabeta_sum);
 
-    float4 a = (alphax_sum * beta2_sum - betax_sum * alphabeta_sum) * factor;
-    float4 b = (betax_sum * alpha2_sum - alphax_sum * alphabeta_sum) * factor;
+    sycl::float4 a = (alphax_sum * beta2_sum - betax_sum * alphabeta_sum) * factor;
+    sycl::float4 b = (betax_sum * alpha2_sum - alphax_sum * alphabeta_sum) * factor;
     
     // Round a, b to the closest 5-6-5 color and expand...
     a = roundAndExpand(a, start);
     b = roundAndExpand(b, end);
 
     // compute the error
-    float4 e = a * a * alpha2_sum + b * b * beta2_sum + 2.0f * (a * b * alphabeta_sum - a * alphax_sum - b * betax_sum);
+    sycl::float4 e = a * a * alpha2_sum + b * b * beta2_sum + 2.0f * (a * b * alphabeta_sum - a * alphax_sum - b * betax_sum);
 
     return (0.25f) * (e.x() + e.y() + e.z());
 }
 
-uint4 evalAllPermutations(nd_item<1> &item, local_ptr<const float4> colors, 
-                          global_ptr<const unsigned int> permutations,			 
-                          local_ptr<float> errors, float4 color_sum, 
-                          local_ptr<unsigned int> s_permutations, 
-                          global_ptr<float> alphaTable4, global_ptr<int> prods4,
-                          global_ptr<float> alphaTable3, global_ptr<int> prods3)
+sycl::uint4 evalAllPermutations(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors, 
+                                sycl::global_ptr<const unsigned int> permutations,			 
+                                sycl::local_ptr<float> errors, sycl::float4 color_sum, 
+                                sycl::local_ptr<unsigned int> s_permutations, 
+                                sycl::global_ptr<float> alphaTable4, sycl::global_ptr<int> prods4,
+                                sycl::global_ptr<float> alphaTable3, sycl::global_ptr<int> prods3)
 {
     const int idx = item.get_local_id(0);
 
@@ -311,14 +310,14 @@ uint4 evalAllPermutations(nd_item<1> &item, local_ptr<const float4> colors,
 
     errors[idx] = bestError;
     
-    uint4 result = {bestStart, bestEnd, bestPermutation, 0};
+    sycl::uint4 result = {bestStart, bestEnd, bestPermutation, 0};
     return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Find index with minimum error
 ////////////////////////////////////////////////////////////////////////////////
-int findMinError(nd_item<1> &item, local_ptr<float> errors, local_ptr<int> indices)
+int findMinError(sycl::nd_item<1> &item, sycl::local_ptr<float> errors, sycl::local_ptr<int> indices)
 {
     const int idx = item.get_local_id(0);
 
@@ -327,7 +326,7 @@ int findMinError(nd_item<1> &item, local_ptr<float> errors, local_ptr<int> indic
     #pragma unroll
     for(int d = NUM_THREADS/2; d > 32; d >>= 1)
     {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         
         if (idx < d)
         {
@@ -341,7 +340,7 @@ int findMinError(nd_item<1> &item, local_ptr<float> errors, local_ptr<int> indic
         }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // unroll last 6 iterations
     if (idx < 32)
@@ -372,15 +371,15 @@ int findMinError(nd_item<1> &item, local_ptr<float> errors, local_ptr<int> indic
         }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     return indices[0];
 }
 
 
 //Save DXT block
-void saveBlockDXT1(nd_item<1> &item, unsigned int start, unsigned int end, 
-                   unsigned int permutation, local_ptr<int> xrefs, global_ptr<uint2> result, int groupOffset)
+void saveBlockDXT1(sycl::nd_item<1> &item, unsigned int start, unsigned int end, 
+                   unsigned int permutation, sycl::local_ptr<int> xrefs, sycl::global_ptr<sycl::uint2> result, int groupOffset)
 {
     const int bid = item.get_group(0) + groupOffset;
 
