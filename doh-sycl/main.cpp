@@ -198,11 +198,10 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order()); 
 
   float *d_input_img = sycl::malloc_device<float>(img_size, q);
 
@@ -220,7 +219,8 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         hessian_matrix_det(d_input_img, h, w, sigma, d_output_img, item);
       });
     });
