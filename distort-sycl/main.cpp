@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -37,65 +38,67 @@ int main(int argc, char **argv)
   prop.yscale = (prop.height - prop.yshift - yshift_2) / prop.height;
 
   const int imageSize = height * width;
-  const int imageSize_bytes = imageSize * sizeof(uchar3);
+  const int imageSize_bytes = imageSize * sizeof(sycl::uchar3);
 
-  uchar3* h_src = (uchar3*) malloc (imageSize_bytes);
-  uchar3* h_dst = (uchar3*) malloc (imageSize_bytes);
-  uchar3* r_dst = (uchar3*) malloc (imageSize_bytes);
+  sycl::uchar3* h_src = (sycl::uchar3*) malloc (imageSize_bytes);
+  sycl::uchar3* h_dst = (sycl::uchar3*) malloc (imageSize_bytes);
+  sycl::uchar3* r_dst = (sycl::uchar3*) malloc (imageSize_bytes);
 
   srand(123);
   for (int i = 0; i < imageSize; i++) {
     h_src[i] = {rand() % 256, rand() % 256, rand() % 256};
   }
 
-  {
-  #ifdef USE_GPU
-    gpu_selector dev_sel;
-  #else
-    cpu_selector dev_sel;
-  #endif
-    queue q(dev_sel);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
   
-    buffer<uchar3, 1> d_src(h_src, imageSize);
-    buffer<uchar3, 1> d_dst(h_dst, imageSize);
-    buffer<Properties, 1> d_prop (&prop, 1);
+  sycl::uchar3 *d_src = sycl::malloc_device<sycl::uchar3>(imageSize, q);
+  q.memcpy(d_src, h_src, imageSize_bytes);
+
+  sycl::uchar3 *d_dst = sycl::malloc_device<sycl::uchar3>(imageSize, q);
+
+  Properties *d_prop = sycl::malloc_device<Properties>(1, q);
+  q.memcpy(d_prop, &prop, sizeof(Properties));
   
-    range<2> lws (16, 16);
-    range<2> gws ((height / 16 + 1) * 16, (width / 16 + 1) * 16);
+  sycl::range<2> lws (16, 16);
+  sycl::range<2> gws ((height / 16 + 1) * 16, (width / 16 + 1) * 16);
   
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
   
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        auto src = d_src.get_access<sycl_read>(cgh);
-        auto dst = d_dst.get_access<sycl_discard_write>(cgh);
-        auto prop = d_prop.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class scan_block>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          barrel_distort(item,
-                         src.get_pointer(),
-                         dst.get_pointer(),
-                         prop.get_pointer());
-        });
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class image_process>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+        barrel_distort(item, d_src, d_dst, d_prop);
       });
-    }
-  
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+    });
   }
+  
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+
+  q.memcpy(h_dst, d_dst, imageSize_bytes).wait();
 
   // verify
   int ex = 0, ey = 0, ez = 0;
   reference(h_src, r_dst, &prop);
   for (int i = 0; i < imageSize; i++) {
-    ex = max(abs(h_dst[i].x() - r_dst[i].x()), ex);
-    ey = max(abs(h_dst[i].y() - r_dst[i].y()), ey);
-    ez = max(abs(h_dst[i].z() - r_dst[i].z()), ez);
+    ex = std::max(abs(h_dst[i].x() - r_dst[i].x()), ex);
+    ey = std::max(abs(h_dst[i].y() - r_dst[i].y()), ey);
+    ez = std::max(abs(h_dst[i].z() - r_dst[i].z()), ez);
   }
 
   std::cout << "Max error of each channel: " << ex << " " << ey << " " << ez << std::endl;
+
+  sycl::free(d_src, q);
+  sycl::free(d_dst, q);
+  sycl::free(d_prop, q);
 
   free(h_src);
   free(h_dst);

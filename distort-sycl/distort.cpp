@@ -37,8 +37,8 @@ inline float getRadialY(float x, float y, const struct Properties* prop)
   return result;
 }
 
-inline void sampleImageTest(const uchar3* src, float idx0, float idx1,
-                            uchar3& result, const struct Properties* prop)
+inline void sampleImageTest(const sycl::uchar3* src, float idx0, float idx1,
+                            sycl::uchar3& result, const struct Properties* prop)
 {
   // if one of index is out-of-bound
   if((idx0 < 0) || (idx1 < 0) || (idx0 > prop->height - 1) || (idx1 > prop->width - 1))
@@ -54,10 +54,10 @@ inline void sampleImageTest(const uchar3* src, float idx0, float idx1,
   int idx1_floor = (int)sycl::floor(idx1);
   int idx1_ceil = (int)sycl::ceil(idx1);
 
-  uchar3 s1 = src[(idx0_floor * prop->width) + idx1_floor];
-  uchar3 s2 = src[(idx0_floor * prop->width) + idx1_ceil];
-  uchar3 s3 = src[(idx0_ceil * prop->width) + idx1_ceil];
-  uchar3 s4 = src[(idx0_ceil * prop->width) + idx1_floor];
+  sycl::uchar3 s1 = src[(idx0_floor * prop->width) + idx1_floor];
+  sycl::uchar3 s2 = src[(idx0_floor * prop->width) + idx1_ceil];
+  sycl::uchar3 s3 = src[(idx0_ceil * prop->width) + idx1_ceil];
+  sycl::uchar3 s4 = src[(idx0_ceil * prop->width) + idx1_floor];
 
   float x = idx0 - idx0_floor;
   float y = idx1 - idx1_floor;
@@ -72,9 +72,9 @@ inline void sampleImageTest(const uchar3* src, float idx0, float idx1,
 
 SYCL_EXTERNAL
 void barrel_distort (
-  nd_item<2> &item,
-  const uchar3 *__restrict src,
-        uchar3 *__restrict dst,
+  sycl::nd_item<2> &item,
+  const sycl::uchar3 *__restrict src,
+        sycl::uchar3 *__restrict dst,
   const struct Properties *__restrict prop)
 {
   int h = item.get_global_id(0);
@@ -82,22 +82,22 @@ void barrel_distort (
   if (w < prop->width && h < prop->height) {
     float x = getRadialX((float)w, (float)h, prop);
     float y = getRadialY((float)w, (float)h, prop);
-    uchar3 temp;
+    sycl::uchar3 temp;
     sampleImageTest(src, y, x, temp, prop);
     dst[(h * prop->width) + w] = temp;
   }
 }
 
 void reference (
-  const uchar3 *src,
-        uchar3 *dst,
+  const sycl::uchar3 *src,
+        sycl::uchar3 *dst,
   const struct Properties *prop)
 {
   for (int h = 0; h < prop->height; h++) {
     for (int w = 0; w < prop->width; w++) {
       float x = getRadialX((float)w, (float)h, prop);
       float y = getRadialY((float)w, (float)h, prop);
-      uchar3 temp;
+      sycl::uchar3 temp;
       sampleImageTest(src, y, x, temp, prop);
       dst[(h * prop->width) + w] = temp;
     }
