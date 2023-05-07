@@ -24,7 +24,7 @@
   __attribute__((aligned(boundary))) vardec
 #endif
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #define BLOCK_SIZE 16
 
 constexpr const int dim = 2;
@@ -46,7 +46,7 @@ using real = double;
 
 template <int np, typename real>
 __attribute__((noinline)) void divergence_sphere_gpu(
-    queue &q,
+    sycl::queue &q,
     const  real *v,
     const derivative<np, real> &deriv,
     const element<np, real> &elem,
@@ -65,23 +65,25 @@ __attribute__((noinline)) void divergence_sphere_gpu(
     }
   }
 
-  buffer<real,1> d_gv(gv, np*np*dim); 
-  buffer<real,1> d_Dvv(deriv.Dvv, np*np);
-  buffer<real,1> d_div(div, np*np);
-  buffer<real,1> d_vvtemp(np*np);
-  buffer<real,1> d_rmetdet(elem.rmetdet, np*np);
+  real *d_gv = sycl::malloc_device<real>(np*np*dim, q); 
+  q.memcpy(d_gv, gv, sizeof(real)*np*np*dim);
 
-  range<2> global_work_size((np+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE, 
-      (np+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-  range<2> local_work_size(BLOCK_SIZE, BLOCK_SIZE);
+  real *d_Dvv = sycl::malloc_device<real>(np*np, q);
+  q.memcpy(d_Dvv, deriv.Dvv, sizeof(real)*np*np);
 
-  q.submit([&] (handler &cgh) {
-    auto gv = d_gv.template get_access<sycl_read>(cgh);
-    auto Dvv = d_Dvv.template get_access<sycl_read>(cgh);
-    auto div = d_div.template get_access<sycl_discard_read_write>(cgh);
-    auto vvtemp = d_vvtemp.template get_access<sycl_discard_read_write>(cgh);
-    auto rmetdet = d_rmetdet.template get_access<sycl_read>(cgh);
-    cgh.parallel_for<class divergence_test>(nd_range<2>(global_work_size, local_work_size), [=] (nd_item<2> item) {
+  real *d_rmetdet = sycl::malloc_device<real>(np*np, q);
+  q.memcpy(d_rmetdet, elem.rmetdet, sizeof(real)*np*np);
+
+  real *d_div = sycl::malloc_device<real>(np*np, q);
+  real *d_vvtemp = sycl::malloc_device<real>(np*np, q);
+
+  sycl::range<2> gws ((np+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE, 
+                      (np+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  sycl::range<2> lws (BLOCK_SIZE, BLOCK_SIZE);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class divergence_test>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       constexpr const real rrearth = 1.5683814303638645E-7;
       const int l = item.get_global_id(1);
       const int j = item.get_global_id(0); 
@@ -89,19 +91,27 @@ __attribute__((noinline)) void divergence_sphere_gpu(
         real dudx00 = 0.0;
         real dvdy00 = 0.0;
         for(int i = 0; i < np; i++) {
-          dudx00 += Dvv[l*np+i] * gv[j*np*dim+i*dim];
-          dvdy00 += Dvv[l*np+i] * gv[i*np*dim+j*dim+1];
+          dudx00 += d_Dvv[l*np+i] * d_gv[j*np*dim+i*dim];
+          dvdy00 += d_Dvv[l*np+i] * d_gv[i*np*dim+j*dim+1];
         }
-        div[j*np+l] = dudx00;
-        vvtemp[l*np+j] = dvdy00;
+        d_div[j*np+l] = dudx00;
+        d_vvtemp[l*np+j] = dvdy00;
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if (l < np && j < np) 
-        div[l*np+j] = (div[l*np+j] + vvtemp[l*np+j]) * 
-                      (rmetdet[l*np+j] * rrearth);
+        d_div[l*np+j] = (d_div[l*np+j] + d_vvtemp[l*np+j]) * 
+                        (d_rmetdet[l*np+j] * rrearth);
     });
   });
+
+  q.memcpy(div, d_div, sizeof(real)*np*np).wait();
+
+  sycl::free(d_gv, q);
+  sycl::free(d_Dvv, q);
+  sycl::free(d_div, q);
+  sycl::free(d_vvtemp, q);
+  sycl::free(d_rmetdet, q);
 }
 
 template <int np, typename real>
