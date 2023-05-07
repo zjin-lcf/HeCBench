@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "tensorAccessor.h"
 
 template <typename T, size_t N, template <typename U> class PtrTraits = DefaultPtrTraits>
@@ -9,7 +9,7 @@ using PackedTensorAccessor32 = GenericPackedTensorAccessor<T, N, PtrTraits, int>
 
 template <int kSize, typename scalar_t, typename acc_t, typename index_t>
 void conv_depthwise2d_forward_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> input,
           PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> output,
     const PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> weight,
@@ -77,7 +77,7 @@ void conv_depthwise2d_forward_kernel(
 }
 
 template <typename scalar_t>
-void dwconv2d_forward (queue &q,
+void dwconv2d_forward (sycl::queue &q,
                        const int m,
                        const int n,
                        const int input_channels,
@@ -149,8 +149,8 @@ void dwconv2d_forward (queue &q,
 
   size_t output_size_bytes = output_size * sizeof(scalar_t);
 
-  range<1> gws ((output_size + 255) / 256 * 256);
-  range<1> lws (256); 
+  sycl::range<1> gws ((output_size + 255) / 256 * 256);
+  sycl::range<1> lws (256); 
   
   scalar_t *h_input = (scalar_t*) malloc (input_size_bytes);
   scalar_t *h_weight = (scalar_t*) malloc (weight_size_bytes);
@@ -168,19 +168,19 @@ void dwconv2d_forward (queue &q,
     h_bias[i] = rand() / (float)RAND_MAX;
   }
 
-  scalar_t *d_input = malloc_device<scalar_t>(input_size, q);
+  scalar_t *d_input = sycl::malloc_device<scalar_t>(input_size, q);
   q.memcpy(d_input, h_input, input_size_bytes);
   PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> input_a (d_input, input_sizes, input_stride_sizes);
 
-  scalar_t *d_weight = malloc_device<scalar_t>(weight_size, q);
+  scalar_t *d_weight = sycl::malloc_device<scalar_t>(weight_size, q);
   q.memcpy(d_weight, h_weight, weight_size_bytes);
   PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> weight_a (d_weight, weight_sizes, weight_stride_sizes);
 
-  scalar_t *d_output = malloc_device<scalar_t>(output_size, q);
+  scalar_t *d_output = sycl::malloc_device<scalar_t>(output_size, q);
   PackedTensorAccessor32<scalar_t, 4, RestrictPtrTraits> output_a (d_output, output_sizes, output_stride_sizes);
 
   bool has_bias = true;
-  scalar_t *d_bias = malloc_device<scalar_t>(bias_size, q);
+  scalar_t *d_bias = sycl::malloc_device<scalar_t>(bias_size, q);
   q.memcpy(d_bias, h_bias, bias_size_bytes);
   PackedTensorAccessor32<scalar_t, 1, RestrictPtrTraits> bias_a (d_bias, &bias_size, bias_stride_sizes);
 
@@ -189,8 +189,9 @@ void dwconv2d_forward (queue &q,
 
   for (int i = 0; i < repeat; i++) {
     if (kW == 3 && kH == 3) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class kSize3x3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class kSize3x3>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           conv_depthwise2d_forward_kernel<3, scalar_t, scalar_t, int>(
             item,
             input_a, output_a, weight_a, bias_a, has_bias, output_size,
@@ -200,8 +201,9 @@ void dwconv2d_forward (queue &q,
         });
       });
     } else if (kW == 1 && kH == 1) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class kSize1x1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class kSize1x1>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           conv_depthwise2d_forward_kernel<1, scalar_t, scalar_t, int> (
             item,
             input_a, output_a, weight_a, bias_a, has_bias, output_size,
@@ -211,8 +213,9 @@ void dwconv2d_forward (queue &q,
         });
       });
     } else {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class kSize0x0>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class kSize0x0>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           conv_depthwise2d_forward_kernel<0, scalar_t, scalar_t, int> (
             item,
             input_a, output_a, weight_a, bias_a, has_bias, output_size,
@@ -238,10 +241,10 @@ void dwconv2d_forward (queue &q,
   }
   printf("Checksum = %f\n", sum / output_size);
 
-  free(d_input, q);
-  free(d_output, q);
-  free(d_weight, q);
-  free(d_bias, q);
+  sycl::free(d_input, q);
+  sycl::free(d_output, q);
+  sycl::free(d_weight, q);
+  sycl::free(d_bias, q);
 
   free(h_input);
   free(h_output);
@@ -264,11 +267,10 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[5]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   // sweep over depth multipliers and kernel sizes
   for (int m = 1; m <= 4; m = m + 1) {
