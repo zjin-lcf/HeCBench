@@ -84,11 +84,10 @@ void compareDivergences(const real *v,
 
   std::cout << "Divergence on the GPU\n";
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Timer::Timer time_f;
   real divergence_f[np*np];
