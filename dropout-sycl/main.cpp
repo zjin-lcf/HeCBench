@@ -3,7 +3,7 @@
 #include <utility> // std::pair
 #include <oneapi/mkl.hpp>
 #include <oneapi/mkl/rng/device.hpp>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // philox generates 128 bits of randomness at a time. 
 // Kernel uses this explicitly by putting suitably transformed result into float4
@@ -95,11 +95,10 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   float *d_self_info = (float *)sycl::malloc_device(self_size, q);
   q.memcpy(d_self_info, self_info, self_size);
@@ -119,7 +118,7 @@ int main(int argc, char *argv[]) {
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
+    q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         fused_dropout_kernel<float, float, unsigned int>(
           d_self_info, d_ret_info, d_mask_info, nelem, pa, rng_engine_inputs, item);
