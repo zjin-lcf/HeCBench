@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "shrUtils.h"
 
 // Forward Declarations
@@ -56,31 +56,31 @@ int main(int argc, char **argv)
   shrFillArray(srcB, 4 * iNumElements);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_srcA = malloc_device<float>(src_size, q);
+  float *d_srcA = sycl::malloc_device<float>(src_size, q);
   q.memcpy(d_srcA, srcA, src_size_bytes);
 
-  float *d_srcB = malloc_device<float>(src_size, q);
+  float *d_srcB = sycl::malloc_device<float>(src_size, q);
   q.memcpy(d_srcB, srcB, src_size_bytes);
 
-  float *d_dst = malloc_device<float>(dst_size, q);
+  float *d_dst = sycl::malloc_device<float>(dst_size, q);
 
   printf("Global Work Size \t\t= %d\nLocal Work Size \t\t= %d\n# of Work Groups \t\t= %d\n\n", 
            szGlobalWorkSize, szLocalWorkSize, (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize)); 
-  range<1> gws (szGlobalWorkSize);
-  range<1> lws (szLocalWorkSize);
+  sycl::range<1> gws (szGlobalWorkSize);
+  sycl::range<1> lws (szLocalWorkSize);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iNumIterations; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class dot_product>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class dot_product>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int iGID = item.get_global_id(0);
         if (iGID < iNumElements) {
           int iInOffset = iGID << 2;
@@ -99,6 +99,9 @@ int main(int argc, char **argv)
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   q.memcpy(dst, d_dst, dst_size_bytes).wait();
+  sycl::free(d_dst, q);
+  sycl::free(d_srcA, q);
+  sycl::free(d_srcB, q);
 
   // Compute and compare results for golden-host and report errors and pass/fail
   printf("Comparing against Host/C++ computation...\n\n"); 
