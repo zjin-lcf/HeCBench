@@ -2,7 +2,7 @@
 #include <float.h>
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 using namespace std::chrono;
@@ -25,8 +25,7 @@ float gammafunction(unsigned int n)
 {   
   if(n == 0)
     return 0.0f;
-  float x = ((float)n + 0.5f) * sycl::log((float) n) - 
-            ((float)n - 1.0f) * sycl::log(sycl::exp((float) 1.0f));
+  float x = ((float)n + 0.5f) * sycl::log((float) n) - ((float)n - 1.0f);
   return x;
 }
 
@@ -145,28 +144,27 @@ int main(int argc, char **argv)
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  unsigned int* d_data_zeros = malloc_device<unsigned int>(num_snp*PP_zeros*2, q);
+  unsigned int* d_data_zeros = sycl::malloc_device<unsigned int>(num_snp*PP_zeros*2, q);
   q.memcpy(d_data_zeros, bin_data_zeros_trans,
            num_snp*PP_zeros*2*sizeof(unsigned int));
 
-  unsigned int* d_data_ones = malloc_device<unsigned int>(num_snp*PP_ones*2, q);
+  unsigned int* d_data_ones = sycl::malloc_device<unsigned int>(num_snp*PP_ones*2, q);
   q.memcpy(d_data_ones, bin_data_ones_trans,
            num_snp*PP_ones*2*sizeof(unsigned int));
 
-  float *d_scores= malloc_device<float>(num_snp * num_snp, q);
+  float *d_scores= sycl::malloc_device<float>(num_snp * num_snp, q);
   q.memcpy(d_scores, scores, sizeof(float) * num_snp * num_snp);
 
   // setup kernel ND-range
   int num_snp_m = num_snp;
   while(num_snp_m % block_snp != 0) num_snp_m++;
-  range<2> global_epi(num_snp_m, num_snp_m);
-  range<2> local_epi(1, block_snp);
+  sycl::range<2> global_epi(num_snp_m, num_snp_m);
+  sycl::range<2> local_epi(1, block_snp);
 
   // epistasis detection kernel
 
@@ -174,8 +172,9 @@ int main(int argc, char **argv)
 
   for (int i = 0; i < iteration; i++) {
 
-    q.submit([&](handler& h) {
-      h.parallel_for<class kernel_epi>(nd_range<2>(global_epi, local_epi), [=](nd_item<2> id) {
+    q.submit([&](sycl::handler& h) {
+      h.parallel_for<class kernel_epi>(
+      sycl::nd_range<2>(global_epi, local_epi), [=](sycl::nd_item<2> id) {
         int i, j, tid, p, k;
 
         i = id.get_global_id(0);
@@ -183,6 +182,7 @@ int main(int argc, char **argv)
         tid = i * num_snp + j;
 
         if (j > i && i < num_snp && j < num_snp) {
+
           unsigned int ft[2 * 9];
           for(k = 0; k < 2 * 9; k++) ft[k] = 0;
 
@@ -190,22 +190,27 @@ int main(int argc, char **argv)
           unsigned int di2, dj2;
           unsigned int* SNPi;
           unsigned int* SNPj;
-
+          unsigned int SNPi_p, SNPi_p1, SNPj_p, SNPj_p1;
           // Phenotype 0
           SNPi = (unsigned int*) &d_data_zeros[i * 2];
           SNPj = (unsigned int*) &d_data_zeros[j * 2];
           for (p = 0; p < 2 * PP_zeros * num_snp - 2 * num_snp; p += 2 * num_snp) {
-            di2 = ~(SNPi[p] | SNPi[p + 1]);
-            dj2 = ~(SNPj[p] | SNPj[p + 1]);
+            SNPi_p = SNPi[p];
+            SNPi_p1 = SNPi[p+1];
+            SNPj_p = SNPj[p];
+            SNPj_p1 = SNPj[p+1];
 
-            t00 = SNPi[p] & SNPj[p];
-            t01 = SNPi[p] & SNPj[p + 1];
-            t02 = SNPi[p] & dj2;
-            t10 = SNPi[p + 1] & SNPj[p];
-            t11 = SNPi[p + 1] & SNPj[p + 1];
-            t12 = SNPi[p + 1] & dj2;
-            t20 = di2 & SNPj[p];
-            t21 = di2 & SNPj[p + 1];
+            di2 = ~(SNPi_p | SNPi_p1);
+            dj2 = ~(SNPj_p | SNPj_p1);
+
+            t00 = SNPi_p & SNPj_p;
+            t01 = SNPi_p & SNPj_p1;
+            t02 = SNPi_p & dj2;
+            t10 = SNPi_p1 & SNPj_p;
+            t11 = SNPi_p1 & SNPj_p1;
+            t12 = SNPi_p1 & dj2;
+            t20 = di2 & SNPj_p;
+            t21 = di2 & SNPj_p1;
             t22 = di2 & dj2;
 
             ft[0] += sycl::popcount(t00);
@@ -221,19 +226,23 @@ int main(int argc, char **argv)
 
           // remainder
           p = 2 * PP_zeros * num_snp - 2 * num_snp;
-          di2 = ~(SNPi[p] | SNPi[p + 1]);
-          dj2 = ~(SNPj[p] | SNPj[p + 1]);
+          SNPi_p = SNPi[p];
+          SNPi_p1 = SNPi[p+1];
+          SNPj_p = SNPj[p];
+          SNPj_p1 = SNPj[p+1];
+          di2 = ~(SNPi_p | SNPi_p1);
+          dj2 = ~(SNPj_p | SNPj_p1);
           di2 = di2 & mask_zeros;
           dj2 = dj2 & mask_zeros;
 
-          t00 = SNPi[p] & SNPj[p];
-          t01 = SNPi[p] & SNPj[p + 1];
-          t02 = SNPi[p] & dj2;
-          t10 = SNPi[p + 1] & SNPj[p];
-          t11 = SNPi[p + 1] & SNPj[p + 1];
-          t12 = SNPi[p + 1] & dj2;
-          t20 = di2 & SNPj[p];
-          t21 = di2 & SNPj[p + 1];
+          t00 = SNPi_p & SNPj_p;
+          t01 = SNPi_p & SNPj_p1;
+          t02 = SNPi_p & dj2;
+          t10 = SNPi_p1 & SNPj_p;
+          t11 = SNPi_p1 & SNPj_p1;
+          t12 = SNPi_p1 & dj2;
+          t20 = di2 & SNPj_p;
+          t21 = di2 & SNPj_p1;
           t22 = di2 & dj2;
 
           ft[0] += sycl::popcount(t00);
@@ -251,17 +260,22 @@ int main(int argc, char **argv)
           SNPj = (unsigned int*) &d_data_ones[j * 2];
           for(p = 0; p < 2 * PP_ones * num_snp - 2 * num_snp; p += 2 * num_snp)
           {
-            di2 = ~(SNPi[p] | SNPi[p + 1]);
-            dj2 = ~(SNPj[p] | SNPj[p + 1]);
+            SNPi_p = SNPi[p];
+            SNPi_p1 = SNPi[p+1];
+            SNPj_p = SNPj[p];
+            SNPj_p1 = SNPj[p+1];
 
-            t00 = SNPi[p] & SNPj[p];
-            t01 = SNPi[p] & SNPj[p + 1];
-            t02 = SNPi[p] & dj2;
-            t10 = SNPi[p + 1] & SNPj[p];
-            t11 = SNPi[p + 1] & SNPj[p + 1];
-            t12 = SNPi[p + 1] & dj2;
-            t20 = di2 & SNPj[p];
-            t21 = di2 & SNPj[p + 1];
+            di2 = ~(SNPi_p | SNPi_p1);
+            dj2 = ~(SNPj_p | SNPj_p1);
+
+            t00 = SNPi_p & SNPj_p;
+            t01 = SNPi_p & SNPj_p1;
+            t02 = SNPi_p & dj2;
+            t10 = SNPi_p1 & SNPj_p;
+            t11 = SNPi_p1 & SNPj_p1;
+            t12 = SNPi_p1 & dj2;
+            t20 = di2 & SNPj_p;
+            t21 = di2 & SNPj_p1;
             t22 = di2 & dj2;
 
             ft[9]  += sycl::popcount(t00);
@@ -275,19 +289,24 @@ int main(int argc, char **argv)
             ft[17] += sycl::popcount(t22);
           }
           p = 2 * PP_ones * num_snp - 2 * num_snp;
-          di2 = ~(SNPi[p] | SNPi[p + 1]);
-          dj2 = ~(SNPj[p] | SNPj[p + 1]);
+          SNPi_p = SNPi[p];
+          SNPi_p1 = SNPi[p+1];
+          SNPj_p = SNPj[p];
+          SNPj_p1 = SNPj[p+1];
+
+          di2 = ~(SNPi_p | SNPi_p1);
+          dj2 = ~(SNPj_p | SNPj_p1);
           di2 = di2 & mask_ones;
           dj2 = dj2 & mask_ones;
 
-          t00 = SNPi[p] & SNPj[p];
-          t01 = SNPi[p] & SNPj[p + 1];
-          t02 = SNPi[p] & dj2;
-          t10 = SNPi[p + 1] & SNPj[p];
-          t11 = SNPi[p + 1] & SNPj[p + 1];
-          t12 = SNPi[p + 1] & dj2;
-          t20 = di2 & SNPj[p];
-          t21 = di2 & SNPj[p + 1];
+          t00 = SNPi_p & SNPj_p;
+          t01 = SNPi_p & SNPj_p1;
+          t02 = SNPi_p & dj2;
+          t10 = SNPi_p1 & SNPj_p;
+          t11 = SNPi_p1 & SNPj_p1;
+          t12 = SNPi_p1 & dj2;
+          t20 = di2 & SNPj_p;
+          t21 = di2 & SNPj_p1;
           t22 = di2 & dj2;
 
           ft[9]  += sycl::popcount(t00);
@@ -302,6 +321,7 @@ int main(int argc, char **argv)
 
           // compute score
           float score = 0.0f;
+          #pragma unroll
           for(k = 0; k < 9; k++)
             score += gammafunction(ft[k] + ft[9 + k] + 1) -
                      gammafunction(ft[k]) - gammafunction(ft[9 + k]);
@@ -333,9 +353,9 @@ int main(int argc, char **argv)
   bool ok = (p1 == p2) && (fabsf(scores[p1] - scores_ref[p2]) < 1e-3f);
   std::cout << (ok ? "PASS" : "FAIL") << std::endl;
 
-  free(d_data_zeros, q);
-  free(d_data_ones, q);
-  free(d_scores, q);
+  sycl::free(d_data_zeros, q);
+  sycl::free(d_data_ones, q);
+  sycl::free(d_scores, q);
 
   mem_free(bin_data_zeros);
   mem_free(bin_data_ones);

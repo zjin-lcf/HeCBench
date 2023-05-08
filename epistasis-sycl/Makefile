@@ -30,14 +30,15 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
-          -I../include -I../epistasis-cuda -fsycl
+          -I../epistasis-cuda -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
+            -Xcuda-ptxas --maxrregcount=40 \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
