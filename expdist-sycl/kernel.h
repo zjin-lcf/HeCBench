@@ -16,7 +16,7 @@
 #define reduce_block_size 256
 #endif
 
-#define syncthreads() item.barrier(access::fence_space::local_space)
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 template <typename T>
 class computeCost;
@@ -50,7 +50,7 @@ inline void fill_shared_mem_tiled_1D(
 
 template<typename T>
 void distance_tiled(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   const T *__restrict A, 
   const T *__restrict B,
   int m, int n, 
@@ -104,11 +104,10 @@ void distance_tiled(
     }
   }
 
-  // atomicAdd(&sum, s_cross_term);
-  auto sum_ref = ext::oneapi::atomic_ref<T, 
-                 ext::oneapi::memory_order::relaxed,
-                 ext::oneapi::memory_scope::work_group,
-                 access::address_space::local_space> (sum[0]);
+  auto sum_ref = sycl::atomic_ref<T, 
+                 sycl::memory_order::relaxed,
+                 sycl::memory_scope::work_group,
+                 sycl::access::address_space::local_space> (sum[0]);
   sum_ref.fetch_add(s_cross_term);
   syncthreads();
 
@@ -128,7 +127,7 @@ void distance_tiled(
  */
 template<typename T>
 void reduce_cross_term(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
         T *__restrict output,
   const T *__restrict cross_term,
         T *__restrict sum,
@@ -143,10 +142,10 @@ void reduce_cross_term(
   for (int i=tx; i<nblocks; i+=reduce_block_size)
     s_cross_term += cross_term[i];
 
-  auto sum_ref = ext::oneapi::atomic_ref<T, 
-                 ext::oneapi::memory_order::relaxed,
-                 ext::oneapi::memory_scope::work_group,
-                 access::address_space::local_space> (sum[0]);
+  auto sum_ref = sycl::atomic_ref<T, 
+                 sycl::memory_order::relaxed,
+                 sycl::memory_scope::work_group,
+                 sycl::access::address_space::local_space> (sum[0]);
   sum_ref.fetch_add(s_cross_term);
 
   syncthreads();
