@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utilits.h"
 #include "easywave.h"
 #include "cOgrd.h"
@@ -290,8 +290,11 @@ int main( int argc, char **argv )
   Dx = Re * g2r( DLon );     // in m along the equator
   Dy = Re * g2r( DLat );
 
+  const size_t grid_size = (size_t)NLat*NLon*MAX_VARS_PER_NODE;
+  const size_t grid_size_bytes = grid_size * sizeof(float);
+
   // allocate memory for GRIDNODE structure and for caching arrays
-  float* node = (float*) malloc(sizeof(float)*NLon*NLat*MAX_VARS_PER_NODE);
+  float* node = (float*) malloc(grid_size_bytes);
   if (node == NULL) return Err.post( Err.msgAllocateMem() );
   float* R6 = (float*) malloc( sizeof(float) * (NLat+1) );
   if (R6 == NULL) return Err.post( Err.msgAllocateMem() );
@@ -831,24 +834,34 @@ int main( int argc, char **argv )
   timespec start, inter, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_node (node, NLat*NLon*MAX_VARS_PER_NODE);
-  d_node.set_final_data(nullptr);
-  buffer<float, 1> d_R6 (R6, NLat+1);
-  buffer<float, 1> d_C2 (C2, NLat+1);
-  buffer<float, 1> d_C4 (C4, NLat+1);
-  buffer<float, 1> d_C1 (C1, NLon+1);
-  buffer<float, 1> d_C3 (C3, NLon+1);
-  buffer<int, 1> d_Imin (1);
-  buffer<int, 1> d_Imax (1);
-  buffer<int, 1> d_Jmin (1);
-  buffer<int, 1> d_Jmax (1);
+  float *d_node = sycl::malloc_device<float>(grid_size, q);
+  q.memcpy(d_node, node, grid_size_bytes);
+
+  float *d_R6 = sycl::malloc_device<float>(NLat+1, q);
+  q.memcpy(d_R6, R6, sizeof(float) * (NLat+1));
+
+  float *d_C2 = sycl::malloc_device<float>(NLat+1, q);
+  q.memcpy(d_C2, C2, sizeof(float) * (NLat+1));
+
+  float *d_C4 = sycl::malloc_device<float>(NLat+1, q);
+  q.memcpy(d_C4, C4, sizeof(float) * (NLat+1));
+
+  float *d_C1 = sycl::malloc_device<float>(NLon+1, q);
+  q.memcpy(d_C1, C1, sizeof(float) * (NLon+1));
+
+  float *d_C3 = sycl::malloc_device<float>(NLon+1, q);
+  q.memcpy(d_C3, C3, sizeof(float) * (NLon+1));
+
+  int *d_Imin = sycl::malloc_device<int>(1, q);
+  int *d_Imax = sycl::malloc_device<int>(1, q);
+  int *d_Jmin = sycl::malloc_device<int>(1, q);
+  int *d_Jmax = sycl::malloc_device<int>(1, q);
 
   for( Par.time=0,loop=1,lastProgress=Par.outProgress,lastPropagation=Par.outPropagation,lastDump=0;
       Par.time<=Par.timeMax; loop++,Par.time+=Par.dt,lastProgress+=Par.dt,lastPropagation+=Par.dt ) {
@@ -856,11 +869,8 @@ int main( int argc, char **argv )
     /* FIXME: check if Par.poiDt can be used for those purposes */
     if( Par.filePOIs && Par.poiDt && ((Par.time/Par.poiDt)*Par.poiDt == Par.time) ) {
       // SavePOIs 
-      q.submit([&](handler &h) {
-          auto node_acc = d_node.get_access<sycl_read>(h);
-          h.copy(node_acc, node); 
-      });
-      q.wait();
+      q.memcpy(node, d_node, grid_size_bytes).wait();
+
       it = Par.time / Par.poiDt;
       timePOI[it] = Par.time;
       for( n=0; n<NPOIs; n++ ) {
@@ -872,213 +882,178 @@ int main( int argc, char **argv )
     }
 
     // sea floor topography (mass conservation)
-    q.submit([&](handler &h) {
-        auto node = d_node.get_access<sycl_read_write>(h);
-        auto R6 = d_R6.get_access<sycl_read>(h);
-        h.parallel_for<class mass_conservation>(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
-              range<2>(16,16), cl::sycl::id<2>(Imin, Jmin)), [=](nd_item<2> item) {
-            int i = item.get_global_id(0);
-            int j = item.get_global_id(1);
-            if (i <= Imax && j <= Jmax) {
-              int m = idx(j,i);
-              if( Node(m, iD) == 0 ) return;
-              Node(m, iH) = Node(m, iH) - Node(m, iR1)*( Node(m, iM) - Node(m-NLat, iM) + Node(m, iN)*R6[j] - Node(m-1, iN)*R6[j-1] );
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class mass_conservation>(
+        sycl::nd_range<2>(sycl::range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
+                          sycl::range<2>(16,16), sycl::id<2>(Imin, Jmin)), [=](sycl::nd_item<2> item) {
+          int i = item.get_global_id(0);
+          int j = item.get_global_id(1);
+          if (i <= Imax && j <= Jmax) {
+            int m = idx(j,i);
+            if( NodeD(m, iD) == 0 ) return;
+            NodeD(m, iH) = NodeD(m, iH) - NodeD(m, iR1)*( NodeD(m, iM) - NodeD(m-NLat, iM) + NodeD(m, iN)*d_R6[j] - NodeD(m-1, iN)*d_R6[j-1] );
 
-              float absH = cl::sycl::fabs(Node(m, iH));
+            float absH = sycl::fabs(NodeD(m, iH));
 
-              if( absH < Par.sshZeroThreshold ) Node(m, iH) = 0.;
+            if( absH < Par.sshZeroThreshold ) NodeD(m, iH) = 0.;
 
-              if( Node(m, iH) > Node(m, iHmax) ) Node(m, iHmax) = Node(m, iH);
+            if( NodeD(m, iH) > NodeD(m, iHmax) ) NodeD(m, iHmax) = NodeD(m, iH);
 
-              if( Par.sshArrivalThreshold && Node(m, iTime) < 0 && absH > Par.sshArrivalThreshold ) Node(m, iTime) = (float)Par.time;
-            }
-        });
+            if( Par.sshArrivalThreshold && NodeD(m, iTime) < 0 && absH > Par.sshArrivalThreshold ) NodeD(m, iTime) = (float)Par.time;
+          }
+      });
     });
 
-    q.submit([&](handler &h) {
-        auto node = d_node.get_access<sycl_read_write>(h);
-        auto C1 = d_C1.get_access<sycl_read>(h);
-        auto C2 = d_C2.get_access<sycl_read>(h);
-        auto C3 = d_C3.get_access<sycl_read>(h);
-        auto C4 = d_C4.get_access<sycl_read>(h);
-        h.single_task<class update_bound>([=] () {
-            int i, j, m;
-            // open bondary conditions
-            if( Jmin <= 2 ) {
-              for( i=2; i<=(NLon-1); i++ ) {
-                m = idx(1,i);
-                Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m, iN), 2.0f) + 
-                    0.25f*cl::sycl::pow((Node(m, iM)+Node(m-NLat, iM)),2.0f) )*C1[i];
-                if( Node(m, iN) > 0 ) Node(m, iH) = - Node(m, iH);
-              }
-            }
-            if( Imin <= 2 ) {
-              for( j=2; j<=(NLat-1); j++ ) {
-                m = idx(j,1);
-                Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m, iM),2.0f) + 
-                    0.25f*cl::sycl::pow((Node(m, iN)+Node(m-1, iN)),2.0f) )*C2[j];
-                if( Node(m, iM) > 0 ) Node(m, iH) = - Node(m, iH);
-              }
-            }
-            if( Jmax >= (NLat-1) ) {
-              for( i=2; i<=(NLon-1); i++ ) {
-                m = idx(NLat,i);
-                Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m-1, iN),2.0f) + 0.25f*cl::sycl::pow((Node(m, iM)+Node(m-1, iM)),2.0f) )*C3[i];
-                if( Node(m-1, iN) < 0 ) Node(m, iH) = - Node(m, iH);
-              }
-            }
-            if( Imax >= (NLon-1) ) {
-              for( j=2; j<=(NLat-1); j++ ) {
-                m = idx(j,NLon);
-                Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m-NLat, iM),2.0f) + 0.25f*cl::sycl::pow((Node(m, iN)+Node(m-1, iN)),2.0f) )*C4[j];
-                if( Node(m-NLat, iM) < 0 ) Node(m, iH) = - Node(m, iH);
-              }
-            }
-            if( Jmin <= 2 ) {
-              m = idx(1,1);
-              Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m, iM),2.0f) + cl::sycl::pow(Node(m, iN),2.0f) )*C1[1];
-              if( Node(m, iN) > 0 ) Node(m, iH) = - Node(m, iH);
-              m = idx(1,NLon);
-              Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m-NLat, iM),2.0f) + cl::sycl::pow(Node(m, iN),2.0f) )*C1[NLon];
-              if( Node(m, iN) > 0 ) Node(m, iH) = - Node(m, iH);
-            }
-            if( Jmin >= (NLat-1) ) {
-              m = idx(NLat,1);
-              Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m, iM),2.0f) + cl::sycl::pow(Node(m-1, iN),2.0f) )*C3[1];
-              if( Node(m-1, iN) < 0 ) Node(m, iH) = - Node(m, iH);
-              m = idx(NLat,NLon);
-              Node(m, iH) = cl::sycl::sqrt( cl::sycl::pow(Node(m-NLat, iM),2.0f) + cl::sycl::pow(Node(m-1, iN),2.0f) )*C3[NLon];
-              if( Node(m-1, iN) < 0 ) Node(m, iH) = - Node(m, iH);
-            }
-        });
+    q.submit([&](sycl::handler &h) {
+      h.single_task<class update_bound>([=] () {
+        int i, j, m;
+        // open bondary conditions
+        if( Jmin <= 2 ) {
+          for( i=2; i<=(NLon-1); i++ ) {
+            m = idx(1,i);
+            NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m, iN), 2.0f) + 
+                0.25f*sycl::pow((NodeD(m, iM)+NodeD(m-NLat, iM)),2.0f) )*d_C1[i];
+            if( NodeD(m, iN) > 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          }
+        }
+        if( Imin <= 2 ) {
+          for( j=2; j<=(NLat-1); j++ ) {
+            m = idx(j,1);
+            NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m, iM),2.0f) + 
+                0.25f*sycl::pow((NodeD(m, iN)+NodeD(m-1, iN)),2.0f) )*d_C2[j];
+            if( NodeD(m, iM) > 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          }
+        }
+        if( Jmax >= (NLat-1) ) {
+          for( i=2; i<=(NLon-1); i++ ) {
+            m = idx(NLat,i);
+            NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m-1, iN),2.0f) + 0.25f*sycl::pow((NodeD(m, iM)+NodeD(m-1, iM)),2.0f) )*d_C3[i];
+            if( NodeD(m-1, iN) < 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          }
+        }
+        if( Imax >= (NLon-1) ) {
+          for( j=2; j<=(NLat-1); j++ ) {
+            m = idx(j,NLon);
+            NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m-NLat, iM),2.0f) + 0.25f*sycl::pow((NodeD(m, iN)+NodeD(m-1, iN)),2.0f) )*d_C4[j];
+            if( NodeD(m-NLat, iM) < 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          }
+        }
+        if( Jmin <= 2 ) {
+          m = idx(1,1);
+          NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m, iM),2.0f) + sycl::pow(NodeD(m, iN),2.0f) )*d_C1[1];
+          if( NodeD(m, iN) > 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          m = idx(1,NLon);
+          NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m-NLat, iM),2.0f) + sycl::pow(NodeD(m, iN),2.0f) )*d_C1[NLon];
+          if( NodeD(m, iN) > 0 ) NodeD(m, iH) = - NodeD(m, iH);
+        }
+        if( Jmin >= (NLat-1) ) {
+          m = idx(NLat,1);
+          NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m, iM),2.0f) + sycl::pow(NodeD(m-1, iN),2.0f) )*d_C3[1];
+          if( NodeD(m-1, iN) < 0 ) NodeD(m, iH) = - NodeD(m, iH);
+          m = idx(NLat,NLon);
+          NodeD(m, iH) = sycl::sqrt( sycl::pow(NodeD(m-NLat, iM),2.0f) + sycl::pow(NodeD(m-1, iN),2.0f) )*d_C3[NLon];
+          if( NodeD(m-1, iN) < 0 ) NodeD(m, iH) = - NodeD(m, iH);
+        }
+      });
     });
 
     // moment conservation
-    q.submit([&](handler &h) {
-        auto node = d_node.get_access<sycl_read_write>(h);
-        h.parallel_for<class moment_conservation>(nd_range<2>(range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
-              range<2>(16,16), cl::sycl::id<2>(Imin, Jmin)), [=](nd_item<2> item) {
-            int i = item.get_global_id(0);
-            int j = item.get_global_id(1);
-            if (i <= Imax && j <= Jmax) {
-              int m = idx(j,i);
-              if( (Node(m, iD)*Node(m+NLat, iD)) != 0 )
-                Node(m, iM) = Node(m, iM) - Node(m, iR2)*(Node(m+NLat, iH)-Node(m, iH));
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class moment_conservation>(
+      sycl::nd_range<2>(sycl::range<2>((Imax-Imin+16)/16*16, (Jmax-Jmin+16)/16*16), 
+                        sycl::range<2>(16,16), sycl::id<2>(Imin, Jmin)), [=](sycl::nd_item<2> item) {
+        int i = item.get_global_id(0);
+        int j = item.get_global_id(1);
+        if (i <= Imax && j <= Jmax) {
+          int m = idx(j,i);
+          if( (NodeD(m, iD)*NodeD(m+NLat, iD)) != 0 )
+            NodeD(m, iM) = NodeD(m, iM) - NodeD(m, iR2)*(NodeD(m+NLat, iH)-NodeD(m, iH));
 
-              if( (Node(m, iD)*Node(m+1, iD)) != 0 )
-                Node(m, iN) = Node(m, iN) - Node(m, iR4)*(Node(m+1, iH)-Node(m, iH));
-            }
-        });
-    });
-
-    q.submit([&](handler &h) {
-        auto Imin_acc = d_Imin.get_access<sycl_write>(h);
-        h.copy(&Imin, Imin_acc);
-    });
-    q.submit([&](handler &h) {
-        auto Jmin_acc = d_Jmin.get_access<sycl_write>(h);
-        h.copy(&Jmin, Jmin_acc);
-    });
-    q.submit([&](handler &h) {
-        auto Imax_acc = d_Imax.get_access<sycl_write>(h);
-        h.copy(&Imax, Imax_acc);
-    });
-    q.submit([&](handler &h) {
-        auto Jmax_acc = d_Jmax.get_access<sycl_write>(h);
-        h.copy(&Jmax, Jmax_acc);
+          if( (NodeD(m, iD)*NodeD(m+1, iD)) != 0 )
+            NodeD(m, iN) = NodeD(m, iN) - NodeD(m, iR4)*(NodeD(m+1, iH)-NodeD(m, iH));
+        }
+      });
     });
 
-    q.submit([&](handler &h) {
-        auto node = d_node.get_access<sycl_read_write>(h);
-        auto Imin = d_Imin.get_access<sycl_read_write>(h);
-        auto Imax = d_Imax.get_access<sycl_read_write>(h);
-        auto Jmin = d_Jmin.get_access<sycl_read_write>(h);
-        auto Jmax = d_Jmax.get_access<sycl_read_write>(h);
-        h.single_task<class update_bound2>([=] () {
-            // open boundaries
-            int i, j, m;
-            int enlarge;
-            if( Jmin[0] <= 2 ) {
-              for( i=1; i<=(NLon-1); i++ ) {
-                m = idx(1,i);
-                Node(m, iM) = Node(m, iM) - Node(m, iR2)*(Node(m+NLat, iH) - Node(m, iH));
-              }
-            }
-            if( Imin[0] <= 2 ) {
-              for( j=1; j<=NLat; j++ ) {
-                m = idx(j,1);
-                Node(m, iM) = Node(m, iM) - Node(m, iR2)*(Node(m+NLat, iH) - Node(m, iH));
-              }
-            }
-            if( Jmax[0] >= (NLat-1) ) {
-              for( i=1; i<=(NLon-1); i++ ) {
-                m = idx(NLat,i);
-                Node(m, iM) = Node(m, iM) - Node(m, iR2)*(Node(m+NLat, iH) - Node(m, iH));
-              }
-            }
-            if( Imin[0] <= 2 ) {
-              for( j=1; j<=(NLat-1); j++ ) {
-                m = idx(j,1);
-                Node(m, iN) = Node(m, iN) - Node(m, iR4)*(Node(m+1, iH) - Node(m, iH));
-              }
-            }
-            if( Jmin[0] <= 2 ) {
-              for( i=1; i<=NLon; i++ ) {
-                m = idx(1,i);
-                Node(m, iN) = Node(m, iN) - Node(m, iR4)*(Node(m+1, iH) - Node(m, iH));
-              }
-            }
-            if( Imax[0] >= (NLon-1) ) {
-              for( j=1; j<=(NLat-1); j++ ) {
-                m = idx(j,NLon);
-                Node(m, iN) = Node(m, iN) - Node(m, iR4)*(Node(m+1, iH) - Node(m, iH));
-              }
-            }
+    q.memcpy(d_Imin, &Imin, sizeof(int));
+    q.memcpy(d_Jmin, &Jmin, sizeof(int));
+    q.memcpy(d_Imax, &Imax, sizeof(int));
+    q.memcpy(d_Jmax, &Jmax, sizeof(int));
 
-            // calculation area for the next step
-            if( Imin[0] > 2 ) {
-              for( enlarge=0, j=Jmin[0]; j<=Jmax[0]; j++ ) {
-                if( cl::sycl::fabs(Node(idx(j,Imin[0]+2), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
-              }
-              if( enlarge ) { Imin[0]--; if( Imin[0] < 2 ) Imin[0] = 2; }
-            }
-            if( Imax[0] < (NLon-1) ) {
-              for( enlarge=0, j=Jmin[0]; j<=Jmax[0]; j++ ) {
-                if( cl::sycl::fabs(Node(idx(j,Imax[0]-2), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
-              }
-              if( enlarge ) { Imax[0]++; if( Imax[0] > (NLon-1) ) Imax[0] = NLon-1; }
-            }
-            if( Jmin[0] > 2 ) {
-              for( enlarge=0, i=Imin[0]; i<=Imax[0]; i++ ) {
-                if( cl::sycl::fabs(Node(idx(Jmin[0]+2,i), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
-              }
-              if( enlarge ) { Jmin[0]--; if( Jmin[0] < 2 ) Jmin[0] = 2; }
-            }
-            if( Jmax[0] < (NLat-1) ) {
-              for( enlarge=0, i=Imin[0]; i<=Imax[0]; i++ ) {
-                if( cl::sycl::fabs(Node(idx(Jmax[0]-2,i), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
-              }
-              if( enlarge ) { Jmax[0]++; if( Jmax[0] > (NLat-1) ) Jmax[0] = NLat-1; }
-            }
-        });
+    q.submit([&](sycl::handler &h) {
+      h.single_task<class update_bound2>([=] () {
+        // open boundaries
+        int i, j, m;
+        int enlarge;
+        if( d_Jmin[0] <= 2 ) {
+          for( i=1; i<=(NLon-1); i++ ) {
+            m = idx(1,i);
+            NodeD(m, iM) = NodeD(m, iM) - NodeD(m, iR2)*(NodeD(m+NLat, iH) - NodeD(m, iH));
+          }
+        }
+        if( d_Imin[0] <= 2 ) {
+          for( j=1; j<=NLat; j++ ) {
+            m = idx(j,1);
+            NodeD(m, iM) = NodeD(m, iM) - NodeD(m, iR2)*(NodeD(m+NLat, iH) - NodeD(m, iH));
+          }
+        }
+        if( d_Jmax[0] >= (NLat-1) ) {
+          for( i=1; i<=(NLon-1); i++ ) {
+            m = idx(NLat,i);
+            NodeD(m, iM) = NodeD(m, iM) - NodeD(m, iR2)*(NodeD(m+NLat, iH) - NodeD(m, iH));
+          }
+        }
+        if( d_Imin[0] <= 2 ) {
+          for( j=1; j<=(NLat-1); j++ ) {
+            m = idx(j,1);
+            NodeD(m, iN) = NodeD(m, iN) - NodeD(m, iR4)*(NodeD(m+1, iH) - NodeD(m, iH));
+          }
+        }
+        if( d_Jmin[0] <= 2 ) {
+          for( i=1; i<=NLon; i++ ) {
+            m = idx(1,i);
+            NodeD(m, iN) = NodeD(m, iN) - NodeD(m, iR4)*(NodeD(m+1, iH) - NodeD(m, iH));
+          }
+        }
+        if( d_Imax[0] >= (NLon-1) ) {
+          for( j=1; j<=(NLat-1); j++ ) {
+            m = idx(j,NLon);
+            NodeD(m, iN) = NodeD(m, iN) - NodeD(m, iR4)*(NodeD(m+1, iH) - NodeD(m, iH));
+          }
+        }
+
+        // calculation area for the next step
+        if( d_Imin[0] > 2 ) {
+          for( enlarge=0, j=d_Jmin[0]; j<=d_Jmax[0]; j++ ) {
+            if( sycl::fabs(NodeD(idx(j,d_Imin[0]+2), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
+          }
+          if( enlarge ) { d_Imin[0]--; if( d_Imin[0] < 2 ) d_Imin[0] = 2; }
+        }
+        if( d_Imax[0] < (NLon-1) ) {
+          for( enlarge=0, j=d_Jmin[0]; j<=d_Jmax[0]; j++ ) {
+            if( sycl::fabs(NodeD(idx(j,d_Imax[0]-2), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
+          }
+          if( enlarge ) { d_Imax[0]++; if( d_Imax[0] > (NLon-1) ) d_Imax[0] = NLon-1; }
+        }
+        if( d_Jmin[0] > 2 ) {
+          for( enlarge=0, i=d_Imin[0]; i<=d_Imax[0]; i++ ) {
+            if( sycl::fabs(NodeD(idx(d_Jmin[0]+2,i), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
+          }
+          if( enlarge ) { d_Jmin[0]--; if( d_Jmin[0] < 2 ) d_Jmin[0] = 2; }
+        }
+        if( d_Jmax[0] < (NLat-1) ) {
+          for( enlarge=0, i=d_Imin[0]; i<=d_Imax[0]; i++ ) {
+            if( sycl::fabs(NodeD(idx(d_Jmax[0]-2,i), iH)) > Par.sshClipThreshold ) { enlarge = 1; break; }
+          }
+          if( enlarge ) { d_Jmax[0]++; if( d_Jmax[0] > (NLat-1) ) d_Jmax[0] = NLat-1; }
+        }
+      });
     });
 
-    q.submit([&](handler &h) {
-        auto Imin_acc = d_Imin.get_access<sycl_read>(h);
-        h.copy(Imin_acc, &Imin);
-    });
-    q.submit([&](handler &h) {
-        auto Jmin_acc = d_Jmin.get_access<sycl_read>(h);
-        h.copy(Jmin_acc, &Jmin);
-    });
-    q.submit([&](handler &h) {
-        auto Imax_acc = d_Imax.get_access<sycl_read>(h);
-        h.copy(Imax_acc, &Imax);
-    });
-    q.submit([&](handler &h) {
-        auto Jmax_acc = d_Jmax.get_access<sycl_read>(h);
-        h.copy(Jmax_acc, &Jmax);
-    });
+    q.memcpy(&Imin, d_Imin, sizeof(int));
+    q.memcpy(&Jmin, d_Jmin, sizeof(int));
+    q.memcpy(&Imax, d_Imax, sizeof(int));
+    q.memcpy(&Jmax, d_Jmax, sizeof(int));
     q.wait();
 
     clock_gettime(CLOCK_MONOTONIC, &inter);
@@ -1105,11 +1080,18 @@ int main( int argc, char **argv )
     }
   } // main loop
 
-  q.submit([&](handler &h) {
-      auto node_acc = d_node.get_access<sycl_read>(h);
-      h.copy(node_acc, node);
-      });
-  q.wait();
+  q.memcpy(node, d_node, grid_size_bytes).wait();
+  sycl::free(d_node, q);
+  sycl::free(d_C1, q);
+  sycl::free(d_C2, q);
+  sycl::free(d_C3, q);
+  sycl::free(d_C4, q);
+  sycl::free(d_R6, q);
+  sycl::free(d_Imin, q);
+  sycl::free(d_Imax, q);
+  sycl::free(d_Jmin, q);
+  sycl::free(d_Jmax, q);
+
   clock_gettime(CLOCK_MONOTONIC, &end);
   Log.print("Finishing main loop");
 
