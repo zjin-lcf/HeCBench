@@ -16,7 +16,7 @@
 #define SOL(i,j,k) _sol[i][j][k]
 #define SPD(i,j,k) _spd[i][j][k]
 
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 DOUBLE get_time_eikonal(DOUBLE a, DOUBLE b, DOUBLE c, DOUBLE s);
 //
@@ -25,7 +25,7 @@ DOUBLE get_time_eikonal(DOUBLE a, DOUBLE b, DOUBLE c, DOUBLE s);
 //
 SYCL_EXTERNAL
 void run_solver(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const double*__restrict__ spd,
   const bool*__restrict__ mask,
   const DOUBLE *__restrict__ sol_in,
@@ -42,7 +42,7 @@ void run_solver(
 //
 SYCL_EXTERNAL
 void run_reduction(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const bool *__restrict__ con,
   bool *__restrict__ listVol,
   const uint *__restrict__ list,
@@ -53,7 +53,7 @@ void run_reduction(
 //
 SYCL_EXTERNAL
 void run_check_neighbor(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const double*__restrict__ spd,
   const bool*__restrict__ mask,
   const DOUBLE *__restrict__ sol_in,

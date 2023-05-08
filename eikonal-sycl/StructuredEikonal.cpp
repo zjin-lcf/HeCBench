@@ -1,9 +1,9 @@
 #include "StructuredEikonal.h"
 
-StructuredEikonal::StructuredEikonal(queue &q, bool verbose) 
-:verbose_(verbose), isGpuMemCreated_(false),
-width_(256), height_(256), depth_(256),
-itersPerBlock_(10), solverType_(0), q(q) {}
+StructuredEikonal::StructuredEikonal(sycl::queue &q, bool verbose) 
+  :verbose_(verbose), isGpuMemCreated_(false),
+  width_(256), height_(256), depth_(256),
+  itersPerBlock_(10), solverType_(0), q(q) {}
 
 StructuredEikonal::~StructuredEikonal() {}
 
