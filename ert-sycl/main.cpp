@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define ERT_ALIGN           256
 #define ERT_NUM_EXPERIMENTS 1
@@ -34,25 +34,22 @@ T *alloc(uint64_t psize)
 }
 
 template <typename T>
-inline void launchKernel(queue &q, uint64_t n, uint64_t t, T *buf, buffer<T,1> &d_buf,
+inline void launchKernel(sycl::queue &q, uint64_t n, uint64_t t, T *buf, T *d_buf,
                          int *bytes_per_elem_ptr, int *mem_accesses_per_elem_ptr)
 {
   gpuKernel<T>(q, n, t, d_buf, bytes_per_elem_ptr, mem_accesses_per_elem_ptr);
 }
 
 template <typename T>
-void run(queue &q, uint64_t PSIZE, T *buf)
+void run(sycl::queue &q, uint64_t PSIZE, T *buf)
 {
   uint64_t nsize = PSIZE;
-  nsize          = nsize & (~(ERT_ALIGN - 1));
-  nsize          = nsize / sizeof(T);
+  uint64_t nsize_bytes = nsize & (~(ERT_ALIGN - 1));
+  nsize = nsize_bytes / sizeof(T);
 
-  buffer<T, 1> d_buf (nsize);
+  T *d_buf = sycl::malloc_device<T>(nsize, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_buf.template get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, (T)0);
-  });
+  q.memset(d_buf, 0, nsize_bytes);
 
   uint64_t n, nNew;
   uint64_t t;
@@ -70,19 +67,13 @@ void run(queue &q, uint64_t PSIZE, T *buf)
     float value = -1.f;
     initialize<T>(nsize, buf, value);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_buf.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(buf, acc);
-    });
+    q.memcpy(d_buf, buf, nsize_bytes); 
 
     for (t = 1; t <= ntrials; t = t * 2) { // working set - ntrials
       launchKernel<T>(q, n, t, buf, d_buf, &bytes_per_elem, &mem_accesses_per_elem);
     } // working set - ntrials
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_buf.template get_access<sycl_read>(cgh);
-      cgh.copy(acc, buf);
-    }).wait();
+    q.memcpy(buf, d_buf, nsize_bytes).wait();
 
     nNew = ERT_WSS_MULT * n;
     if (nNew == n) {
@@ -91,6 +82,8 @@ void run(queue &q, uint64_t PSIZE, T *buf)
 
     n = nNew;
   } // working set - nsize
+
+  sycl::free(d_buf, q);
 }
 
 int main(int argc, char *argv[])
@@ -111,19 +104,18 @@ int main(int argc, char *argv[])
   double start, checksum;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // FP16
-  half2 *hlfbuf = alloc<half2>(PSIZE);
+  sycl::half2 *hlfbuf = alloc<sycl::half2>(PSIZE);
   start = getTime();
-  run<half2>(q, PSIZE, hlfbuf);
+  run<sycl::half2>(q, PSIZE, hlfbuf);
   printf("runtime (half2): %lf (s)\n", getTime() - start);
   checksum = 0; 
-  for (uint64_t i = 0; i < PSIZE / sizeof(half2); i++) {
+  for (uint64_t i = 0; i < PSIZE / sizeof(sycl::half2); i++) {
     checksum += (float)hlfbuf[i].x() + (float)hlfbuf[i].y();
   }
   printf("checksum: %lf\n", checksum);

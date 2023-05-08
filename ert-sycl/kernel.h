@@ -16,18 +16,18 @@ int gpu_threads;
 template <typename T>
 class blockStride;
 
-// If data type is "half2"
-template <typename T, typename std::enable_if<std::is_same<T, half2>::value, int>::type = 0>
+// If data type is "sycl::half2"
+template <typename T, typename std::enable_if<std::is_same<T, sycl::half2>::value, int>::type = 0>
 void initialize(uint64_t nsize, T *__restrict A, float value)
 {
   uint64_t i;
   for (i = 0; i < nsize; ++i) {
-    A[i] = half2(value);
+    A[i] = sycl::half2(value);
   }
 }
 
 // If data type is float or double
-template <typename T, typename std::enable_if<!std::is_same<T, half2>::value, int>::type = 0>
+template <typename T, typename std::enable_if<!std::is_same<T, sycl::half2>::value, int>::type = 0>
 void initialize(uint64_t nsize, T *__restrict A, float value)
 {
   uint64_t i;
@@ -36,9 +36,9 @@ void initialize(uint64_t nsize, T *__restrict A, float value)
   }
 }
 
-// If data type is "half2"
-template <typename T, typename std::enable_if<std::is_same<T, half2>::value, int>::type = 0>
-void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> &item)
+// If data type is "sycl::half2"
+template <typename T, typename std::enable_if<std::is_same<T, sycl::half2>::value, int>::type = 0>
+void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, sycl::nd_item<1> &item)
 {
   uint32_t blockIdx_x   = item.get_group(0);
   uint32_t gridDim_x    = item.get_group_range(0);
@@ -62,8 +62,8 @@ void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> 
 
   // A needs to be initilized to -1 coming in
   // And with alpha=2 and beta=1, A=-1 is preserved upon return
-  T alpha      = half2(2.0f);
-  T const_beta = half2(1.0f);
+  T alpha      = sycl::half2(2.0f);
+  T const_beta = sycl::half2(1.0f);
 
   uint32_t i, j;
   for (j = 0; j < ntrials; ++j) {
@@ -87,8 +87,8 @@ void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> 
 }
 
 // If data type is float or double
-template <typename T, typename std::enable_if<!std::is_same<T, half2>::value, int>::type = 0>
-void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> &item)
+template <typename T, typename std::enable_if<!std::is_same<T, sycl::half2>::value, int>::type = 0>
+void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, sycl::nd_item<1> &item)
 {
   uint32_t blockIdx_x   = item.get_group(0);
   uint32_t gridDim_x    = item.get_group_range(0);
@@ -137,18 +137,18 @@ void block_stride(uint32_t ntrials, uint32_t nsize, T *__restrict A, nd_item<1> 
 }
 
 template <typename T>
-void gpuKernel(queue &q, uint32_t nsize, uint32_t ntrials, buffer<T, 1> &A, 
+void gpuKernel(sycl::queue &q, uint32_t nsize, uint32_t ntrials, T *A,
                int *bytes_per_elem, int *mem_accesses_per_elem)
 {
   *bytes_per_elem        = sizeof(T);
   *mem_accesses_per_elem = 2;
 
-  range<1> gws (gpu_blocks * gpu_threads);
-  range<1> lws (gpu_threads);
-  q.submit([&] (handler &cgh) {
-    auto acc = A.template get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class blockStride<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      block_stride<T>(ntrials, nsize, acc.get_pointer(), item);
+  sycl::range<1> gws (gpu_blocks * gpu_threads);
+  sycl::range<1> lws (gpu_threads);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class blockStride<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      block_stride<T>(ntrials, nsize, A, item);
     });
   });
 }
