@@ -234,7 +234,7 @@ float extend2(struct extend2_dat *d)
   int *d_score;
   hipMalloc((void**)&d_score, 4);
 
-  hipLaunchKernelGGL(kernel_extend2, 1, 1, 0, 0, 
+  kernel_extend2<<<1,1>>>(
       d_query,
       d_target,
       d_mat,
@@ -318,6 +318,6 @@ int main(int argc, char *argv[])
     read_data(files[f%17], &d);
     time += extend2(&d);
   }
-  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average offload time %f (us)\n", (time * 1e-3f) / repeat);
   return 0;
 }

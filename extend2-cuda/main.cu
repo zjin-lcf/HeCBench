@@ -318,6 +318,6 @@ int main(int argc, char *argv[])
     read_data(files[f%17], &d);
     time += extend2(&d);
   }
-  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average offload time %f (us)\n", (time * 1e-3f) / repeat);
   return 0;
 }

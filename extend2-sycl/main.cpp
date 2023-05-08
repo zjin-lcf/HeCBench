@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "read_data.h"
 
 static void check(int a, int b, const char *s)
@@ -40,7 +40,7 @@ typedef struct {
 } eh_t;
 
 
-float extend2(queue &q, struct extend2_dat *d)
+float extend2(sycl::queue &q, struct extend2_dat *d)
 {
   eh_t *eh = NULL; /* score array*/
   char *qp = NULL; /* query profile*/
@@ -64,148 +64,173 @@ float extend2(queue &q, struct extend2_dat *d)
 
   auto start = std::chrono::steady_clock::now();
 
-  {
-    buffer<unsigned char, 1> d_query (d->query, qlen);
-    buffer<unsigned char, 1> d_target (d->target, tlen);
-    buffer<char, 1> d_mat (d->mat, m*m);
-    buffer<int, 1> d_qle (&qle, 1);
-    buffer<int, 1> d_tle (&tle, 1);
-    buffer<int, 1> d_gtle (&gtle, 1);
-    buffer<int, 1> d_gscore (&gscore, 1);
-    buffer<int, 1> d_max_off (&max_off, 1);
-    buffer<int, 1> d_score (&score, 1);
-    buffer<eh_t, 1> d_eh (eh, qlen + 1);
-    buffer<char, 1> d_qp (qp, qlen*m);
-    d_eh.set_final_data(nullptr);
-    d_qp.set_final_data(nullptr);
+  unsigned char *d_query = sycl::malloc_device<unsigned char>(qlen, q);
+  q.memcpy(d_query, d->query, qlen);
 
-    q.submit([&](handler &h) {
-        auto query = d_query.get_access<sycl_read>(h);
-        auto target = d_target.get_access<sycl_read>(h);
-        auto mat = d_mat.get_access<sycl_read>(h);
-        auto eh = d_eh.get_access<sycl_write>(h);
-        auto qp = d_qp.get_access<sycl_write>(h);
-        auto qle_acc = d_qle.get_access<sycl_discard_write>(h);
-        auto tle_acc = d_tle.get_access<sycl_discard_write>(h);
-        auto gtle_acc = d_gtle.get_access<sycl_discard_write>(h);
-        auto gscore_acc = d_gscore.get_access<sycl_discard_write>(h);
-        auto max_off_acc = d_max_off.get_access<sycl_discard_write>(h);
-        auto score_acc = d_score.get_access<sycl_discard_write>(h);
+  unsigned char *d_target = sycl::malloc_device<unsigned char>(tlen, q);
+  q.memcpy(d_target, d->target, tlen);
 
-        h.single_task<class ebwa>([=]() {
-          int oe_del = o_del + e_del;
-          int oe_ins = o_ins + e_ins; 
-          int i, j, k;
-          int beg, end;
-          int max, max_i, max_j, max_ins, max_del, max_ie;
-          int max_w; // w is not mutable by default
-          int gscore;
-          int max_off;
-	  int abs_v;
+  char *d_mat = sycl::malloc_device<char>(m*m, q);
+  q.memcpy(d_mat, d->mat, m*m);
 
-          // generate the query profile
-          for (k = i = 0; k < m; ++k) {
-            char *p = mat.get_pointer() + k * m;
-            for (j = 0; j < qlen; ++j)
-            qp[i++] = p[query[j]];
+  int *d_qle = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_qle, &qle, sizeof(int));
+
+  int *d_tle = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_tle, &tle, sizeof(int));
+
+  int *d_gtle = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_gtle, &gtle, sizeof(int));
+
+  int *d_gscore = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_gscore, &gscore, sizeof(int));
+
+  int *d_max_off = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_max_off, &max_off, sizeof(int));
+
+  int *d_score = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_score, &score, sizeof(int));
+
+  eh_t *d_eh = sycl::malloc_device<eh_t>(qlen + 1, q);
+  q.memcpy(d_eh, eh, sizeof(eh_t) * (qlen + 1));
+
+  char *d_qp = sycl::malloc_device<char>(qlen*m, q);
+  q.memcpy(d_qp, qp, qlen*m);
+
+  q.submit([&](sycl::handler &h) {
+    h.single_task<class ebwa>([=]() {
+      int oe_del = o_del + e_del;
+      int oe_ins = o_ins + e_ins; 
+      int i, j, k;
+      int beg, end;
+      int max, max_i, max_j, max_ins, max_del, max_ie;
+      int max_w; // w is not mutable by default
+      int gscore;
+      int max_off;
+      int abs_v;
+
+      // generate the d_query profile
+      for (k = i = 0; k < m; ++k) {
+        char *p = d_mat + k * m;
+        for (j = 0; j < qlen; ++j)
+        d_qp[i++] = p[d_query[j]];
+      }
+
+      // fill the first row
+      d_eh[0].h = h0; 
+      d_eh[1].h = h0 > oe_ins? h0 - oe_ins : 0;
+
+      for (j = 2; j <= qlen && d_eh[j-1].h > e_ins; ++j)
+        d_eh[j].h = d_eh[j-1].h - e_ins;
+
+      // adjust $w if it is too large
+      k = m * m;
+      for (i = 0, max = 0; i < k; ++i) // get the max score
+        max = max > d_mat[i]? max : d_mat[i];
+      max_ins = (int)((float)(qlen * max + end_bonus - o_ins) / e_ins + 1.f);
+      max_ins = max_ins > 1? max_ins : 1;
+      max_w = w < max_ins? w : max_ins;
+      max_del = (int)((float)(qlen * max + end_bonus - o_del) / e_del + 1.f);
+      max_del = max_del > 1? max_del : 1;
+      max_w = max_w < max_del? max_w : max_del; // TODO: is this necessary?
+      // DP loop
+      max = h0, max_i = max_j = -1; max_ie = -1, gscore = -1;
+      max_off = 0;
+      beg = 0, end = qlen;
+      for (i = 0; i < tlen; ++i) {
+        int t, f = 0, h1, m = 0, mj = -1;
+        char *q = d_qp + d_target[i] * qlen;
+
+        // apply the band and the constraint (if provided)
+        if (beg < i - max_w) beg = i - max_w;
+        if (end > i + max_w + 1) end = i + max_w + 1;
+        if (end > qlen) end = qlen;
+
+        // compute the first column
+        if (beg == 0) {
+          h1 = h0 - (o_del + e_del * (i + 1));
+          if (h1 < 0) h1 = 0;
+        } 
+        else 
+          h1 = 0;
+
+        for (j = beg; j < end; ++j) {
+          // At the beginning of the loop: d_eh[j] = { H(i-1,j-1), E(i,j) }, f = F(i,j) and h1 = H(i,j-1)
+          // Similar to SSE2-SW, cells are computed in the following order:
+          //   H(i,j)   = max{H(i-1,j-1)+S(i,j), E(i,j), F(i,j)}
+          //   E(i+1,j) = max{H(i,j)-gapo, E(i,j)} - gape
+          //   F(i,j+1) = max{H(i,j)-gapo, F(i,j)} - gape
+          eh_t *p = d_eh+j;
+          int h, M = p->h, e = p->e; // get H(i-1,j-1) and E(i-1,j)
+          p->h = h1;          // set H(i,j-1) for the next row
+          M = M? M + q[j] : 0;// separating H and M to disallow a cigar like "100M3I3D20M"
+          h = M > e? M : e;   // e and f are guaranteed to be non-negative, so h>=0 even if M<0
+          h = h > f? h : f;
+          h1 = h;             // save H(i,j) to h1 for the next column
+          mj = m > h? mj : j; // record the position where max score is achieved
+          m = m > h? m : h;   // m is stored at d_eh[mj+1]
+          t = M - oe_del;
+          t = t > 0? t : 0;
+          e -= e_del;
+          e = e > t? e : t;   // computed E(i+1,j)
+          p->e = e;           // save E(i+1,j) for the next row
+          t = M - oe_ins;
+          t = t > 0? t : 0;
+          f -= e_ins;
+          f = f > t? f : t;   // computed F(i,j+1)
+        }
+        d_eh[end].h = h1; d_eh[end].e = 0;
+        if (j == qlen) {
+          max_ie = gscore > h1? max_ie : i;
+          gscore = gscore > h1? gscore : h1;
+        }
+        if (m == 0) break;
+        if (m > max) {
+          max = m, max_i = i, max_j = mj;
+          abs_v = ( mj -i ) < 0 ? i - mj : mj - i;
+          max_off = max_off > abs_v ? max_off : abs_v;
+        } else if (zdrop > 0) {
+          if (i - max_i > mj - max_j) {
+            if (max - m - ((i - max_i) - (mj - max_j)) * e_del > zdrop) break;
+          } else {
+            if (max - m - ((mj - max_j) - (i - max_i)) * e_ins > zdrop) break;
           }
-
-          // fill the first row
-          eh[0].h = h0; 
-          eh[1].h = h0 > oe_ins? h0 - oe_ins : 0;
-
-          for (j = 2; j <= qlen && eh[j-1].h > e_ins; ++j)
-            eh[j].h = eh[j-1].h - e_ins;
-
-          // adjust $w if it is too large
-          k = m * m;
-          for (i = 0, max = 0; i < k; ++i) // get the max score
-            max = max > mat[i]? max : mat[i];
-          max_ins = (int)((float)(qlen * max + end_bonus - o_ins) / e_ins + 1.f);
-          max_ins = max_ins > 1? max_ins : 1;
-          max_w = w < max_ins? w : max_ins;
-          max_del = (int)((float)(qlen * max + end_bonus - o_del) / e_del + 1.f);
-          max_del = max_del > 1? max_del : 1;
-          max_w = max_w < max_del? max_w : max_del; // TODO: is this necessary?
-          // DP loop
-          max = h0, max_i = max_j = -1; max_ie = -1, gscore = -1;
-          max_off = 0;
-          beg = 0, end = qlen;
-          for (i = 0; i < tlen; ++i) {
-            int t, f = 0, h1, m = 0, mj = -1;
-            char *q = qp.get_pointer() + target[i] * qlen;
-
-            // apply the band and the constraint (if provided)
-            if (beg < i - max_w) beg = i - max_w;
-            if (end > i + max_w + 1) end = i + max_w + 1;
-            if (end > qlen) end = qlen;
-
-            // compute the first column
-            if (beg == 0) {
-              h1 = h0 - (o_del + e_del * (i + 1));
-              if (h1 < 0) h1 = 0;
-            } 
-            else 
-              h1 = 0;
-
-            for (j = beg; j < end; ++j) {
-              // At the beginning of the loop: eh[j] = { H(i-1,j-1), E(i,j) }, f = F(i,j) and h1 = H(i,j-1)
-              // Similar to SSE2-SW, cells are computed in the following order:
-              //   H(i,j)   = max{H(i-1,j-1)+S(i,j), E(i,j), F(i,j)}
-              //   E(i+1,j) = max{H(i,j)-gapo, E(i,j)} - gape
-              //   F(i,j+1) = max{H(i,j)-gapo, F(i,j)} - gape
-              eh_t *p = eh.get_pointer()+j;
-              int h, M = p->h, e = p->e; // get H(i-1,j-1) and E(i-1,j)
-              p->h = h1;          // set H(i,j-1) for the next row
-              M = M? M + q[j] : 0;// separating H and M to disallow a cigar like "100M3I3D20M"
-              h = M > e? M : e;   // e and f are guaranteed to be non-negative, so h>=0 even if M<0
-              h = h > f? h : f;
-              h1 = h;             // save H(i,j) to h1 for the next column
-              mj = m > h? mj : j; // record the position where max score is achieved
-              m = m > h? m : h;   // m is stored at eh[mj+1]
-              t = M - oe_del;
-              t = t > 0? t : 0;
-              e -= e_del;
-              e = e > t? e : t;   // computed E(i+1,j)
-              p->e = e;           // save E(i+1,j) for the next row
-              t = M - oe_ins;
-              t = t > 0? t : 0;
-              f -= e_ins;
-              f = f > t? f : t;   // computed F(i,j+1)
-            }
-            eh[end].h = h1; eh[end].e = 0;
-            if (j == qlen) {
-              max_ie = gscore > h1? max_ie : i;
-              gscore = gscore > h1? gscore : h1;
-            }
-            if (m == 0) break;
-            if (m > max) {
-              max = m, max_i = i, max_j = mj;
-	      abs_v = ( mj -i ) < 0 ? i - mj : mj - i;
-              max_off = max_off > abs_v ? max_off : abs_v;
-            } else if (zdrop > 0) {
-              if (i - max_i > mj - max_j) {
-                if (max - m - ((i - max_i) - (mj - max_j)) * e_del > zdrop) break;
-              } else {
-                if (max - m - ((mj - max_j) - (i - max_i)) * e_ins > zdrop) break;
-              }
-            }
-            // update beg and end for the next round
-            for (j = beg; j < end && eh[j].h == 0 && eh[j].e == 0; ++j);
-            beg = j;
-            for (j = end; j >= beg && eh[j].h == 0 && eh[j].e == 0; --j);
-            end = j + 2 < qlen? j + 2 : qlen;
-            //beg = 0; end = qlen; // uncomment this line for debugging
-          }
-          qle_acc[0] = max_j + 1;
-          tle_acc[0] = max_i + 1;
-          gtle_acc[0] = max_ie + 1;
-          gscore_acc[0] = gscore;
-          max_off_acc[0] = max_off;
-          score_acc[0] = max;
-        });
+        }
+        // update beg and end for the next round
+        for (j = beg; j < end && d_eh[j].h == 0 && d_eh[j].e == 0; ++j);
+        beg = j;
+        for (j = end; j >= beg && d_eh[j].h == 0 && d_eh[j].e == 0; --j);
+        end = j + 2 < qlen? j + 2 : qlen;
+        //beg = 0; end = qlen; // uncomment this line for debugging
+      }
+      d_qle[0] = max_j + 1;
+      d_tle[0] = max_i + 1;
+      d_gtle[0] = max_ie + 1;
+      d_gscore[0] = gscore;
+      d_max_off[0] = max_off;
+      d_score[0] = max;
     });
-  }
+  });
+  
+  q.memcpy(&qle, d_qle, 4);
+  q.memcpy(&tle, d_tle, 4);
+  q.memcpy(&gtle, d_gtle, 4);
+  q.memcpy(&max_off, d_max_off, 4);
+  q.memcpy(&gscore, d_gscore, 4);
+  q.memcpy(&score, d_score, 4);
+  q.wait();
+
+  sycl::free(d_query, q);
+  sycl::free(d_target, q);
+  sycl::free(d_mat, q);
+  sycl::free(d_eh, q);
+  sycl::free(d_qp, q);
+  sycl::free(d_qle, q);
+  sycl::free(d_tle, q);
+  sycl::free(d_gtle, q);
+  sycl::free(d_gscore, q);
+  sycl::free(d_max_off, q);
+  sycl::free(d_score, q);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -235,12 +260,11 @@ int main(int argc, char *argv[])
   }
   int repeat = atoi(argv[1]);
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   struct extend2_dat d;
 
@@ -254,6 +278,6 @@ int main(int argc, char *argv[])
     read_data(files[f%17], &d);
     time += extend2(q, &d);
   }
-  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
   return 0;
 }
