@@ -42,7 +42,7 @@ void calNumEigenValueInterval(
     const float *__restrict diagonal, 
     const float *__restrict offDiagonal,
     const uint     width,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint lowerId = 2 * gid; 
@@ -63,7 +63,7 @@ void recalculateEigenIntervals(
     const float *__restrict offDiagonal,
     const    uint    width,  
     const    float   tolerance,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint lowerId = 2 * gid; 

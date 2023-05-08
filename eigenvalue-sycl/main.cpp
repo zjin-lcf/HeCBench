@@ -19,18 +19,18 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "reference.h"
 #include "utils.cpp"
 #include "kernels.cpp"
 
 void runKernels(
-    queue &q,
-    buffer<float, 1> &diagonalBuffer,
-    buffer<uint, 1> numEigenValuesIntervalBuffer,
-    buffer<float, 1> offDiagonalBuffer,
-    std::vector<buffer<float, 1>> &eigenIntervalBuffer,
+    sycl::queue &q,
+    const float *diagonalBuffer,
+           uint *numEigenValuesIntervalBuffer,
+    const float *offDiagonalBuffer,
+    float **eigenIntervalBuffer,
 
     // reset the eigenvalue intervals buffer
     float **eigenIntervals,
@@ -40,48 +40,42 @@ void runKernels(
     // index of the two eigenInterval buffers
     uint &in )
 {
-  range<1> gws (length);
-  range<1> lws (256);
+  sycl::range<1> gws (length);
+  sycl::range<1> lws (256);
 
   for (int i = 0; i < 2; i++)
-    q.submit([&] (handler &cgh) {
-      auto acc = eigenIntervalBuffer[i].get_access<sycl_discard_write>(cgh);
-      cgh.copy(eigenIntervals[i], acc);
-    });
+    q.memcpy(eigenIntervalBuffer[i], eigenIntervals[i], length*2*sizeof(float));
+
   q.wait();
 
   in = 0;
   while (isComplete(eigenIntervals[in], length, tolerance)) {
 
-    q.submit([&] (handler &cgh) {
-      auto numEigenValuesInterval = numEigenValuesIntervalBuffer.get_access<sycl_discard_write>(cgh);
-      auto eigenInterval = eigenIntervalBuffer[in].get_access<sycl_read>(cgh);
-      auto diagonal = diagonalBuffer.get_access<sycl_read>(cgh);
-      auto offDiagonal = offDiagonalBuffer.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class kernel0>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      auto interval = eigenIntervalBuffer[in];
+      cgh.parallel_for<class kernel0>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         calNumEigenValueInterval(
-            numEigenValuesInterval.get_pointer(),
-            eigenInterval.get_pointer(),
-            diagonal.get_pointer(), 
-            offDiagonal.get_pointer(),
+            numEigenValuesIntervalBuffer,
+            interval,
+            diagonalBuffer,
+            offDiagonalBuffer,
             length,
             item);
       }); 
     }); 
 
-    q.submit([&] (handler &cgh) {
-      auto newEigenInterval = eigenIntervalBuffer[1 - in].get_access<sycl_read_write>(cgh);
-      auto eigenInterval = eigenIntervalBuffer[in].get_access<sycl_read>(cgh);
-      auto numEigenValuesInterval = numEigenValuesIntervalBuffer.get_access<sycl_read>(cgh);
-      auto diagonal = diagonalBuffer.get_access<sycl_read>(cgh);
-      auto offDiagonal = offDiagonalBuffer.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class kernel1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      auto interval_i = eigenIntervalBuffer[1-in];
+      auto interval_o = eigenIntervalBuffer[in];
+      cgh.parallel_for<class kernel1>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         recalculateEigenIntervals(
-          newEigenInterval.get_pointer(),
-          eigenInterval.get_pointer(),
-          numEigenValuesInterval.get_pointer(),
-          diagonal.get_pointer(),
-          offDiagonal.get_pointer(),
+          interval_i,
+          interval_o,
+          numEigenValuesIntervalBuffer,
+          diagonalBuffer,
+          offDiagonalBuffer,
           length,
           tolerance,
           item);
@@ -90,15 +84,17 @@ void runKernels(
 
     in = 1 - in;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = eigenIntervalBuffer[in].get_access<sycl_read>(cgh);
-      cgh.copy(acc, eigenIntervals[in]);
-    }).wait();
+    q.memcpy(eigenIntervals[in], eigenIntervalBuffer[in], length*2*sizeof(float)).wait();
   }
 }
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <length of the diagonal of the square matrix> <repeat>\n", argv[0]);
+    return 1;
+  }
+  
   // Length of the diagonal of the square matrix
   int length = atoi(argv[1]);
   // Number of iterations for kernel execution
@@ -182,26 +178,28 @@ int main(int argc, char * argv[])
 #endif
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // store the diagonal elements of the matrix
-  buffer<float, 1> diagonalBuffer (diagonal, length); 
+  float *diagonalBuffer = sycl::malloc_device<float>(length, q);
+  q.memcpy(diagonalBuffer, diagonal, diagonalSizeBytes); 
 
   // store the number of eigenvalues in each interval
-  buffer<uint, 1> numEigenValuesIntervalBuffer (length); 
+  uint *numEigenValuesIntervalBuffer = sycl::malloc_device<uint>(length, q); 
 
   // store the offDiagonal elements of the matrix
-  buffer<float, 1> offDiagonalBuffer (offDiagonal, length-1); 
+  float *offDiagonalBuffer = sycl::malloc_device<float>(length - 1, q);
+  q.memcpy(offDiagonalBuffer, offDiagonal, offDiagonalSizeBytes);
 
   // store the eigenvalue intervals
-  std::vector<buffer<float, 1>> eigenIntervalBuffer;
+  float *eigenIntervalBuffer[2];
+
   for(int i = 0 ; i < 2 ; ++ i)
   {
-    eigenIntervalBuffer.emplace_back(buffer<float, 1>(length * 2));
+    eigenIntervalBuffer[i] = sycl::malloc_device<float>(length * 2, q);
   }
 
   // Warm up
@@ -244,7 +242,7 @@ int main(int argc, char * argv[])
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time " << (time * 1e-3f) / iterations << " (us)\n";
 
   // Verify results
   for(int i = 0 ; i < 2; ++i)
@@ -290,6 +288,11 @@ int main(int argc, char * argv[])
   }
 
   // release program resources
+  sycl::free(diagonalBuffer, q);
+  sycl::free(offDiagonalBuffer, q);
+  sycl::free(numEigenValuesIntervalBuffer, q);
+  sycl::free(eigenIntervalBuffer[0], q);
+  sycl::free(eigenIntervalBuffer[1], q);
   free(diagonal);
   free(offDiagonal);
   free(eigenIntervals[0]);

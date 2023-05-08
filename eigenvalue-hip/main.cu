@@ -74,6 +74,11 @@ void runKernels(
 
 int main(int argc, char * argv[])
 {
+  if (argc != 3) {
+    printf("Usage: %s <length of the diagonal of the square matrix> <repeat>\n", argv[0]);
+    return 1;
+  }
+
   // Length of the diagonal of the square matrix
   int length = atoi(argv[1]);
   // Number of iterations for kernel execution
@@ -215,7 +220,7 @@ int main(int argc, char * argv[])
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Average kernel execution time " << (time * 1e-9f) / iterations << " (s)\n";
+  std::cout << "Average kernel execution time " << (time * 1e-3f) / iterations << " (us)\n";
 
   // Verify results
   for(int i = 0 ; i < 2; ++i)
@@ -263,6 +268,7 @@ int main(int argc, char * argv[])
   // release program resources
   hipFree(diagonalBuffer);
   hipFree(offDiagonalBuffer);
+  hipFree(numEigenValuesIntervalBuffer);
   hipFree(eigenIntervalBuffer[0]);
   hipFree(eigenIntervalBuffer[1]);
   free(diagonal);
