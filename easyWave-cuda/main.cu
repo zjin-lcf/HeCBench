@@ -42,7 +42,7 @@
 #include "cOgrd.h"
 #include "cOkadaEarthquake.h"
 
-// CUDA kernels
+// GPU kernels
 #include "kernels.cuh"
 
 double diff(timespec start, timespec end) {
@@ -293,8 +293,11 @@ int main( int argc, char **argv )
   Dx = Re * g2r( DLon );     // in m along the equator
   Dy = Re * g2r( DLat );
 
+  const size_t grid_size = (size_t)NLat*NLon*MAX_VARS_PER_NODE;
+  const size_t grid_size_bytes = grid_size * sizeof(float);
+
   // allocate memory for GRIDNODE structure and for caching arrays
-  float* node = (float*) malloc(sizeof(float)*NLon*NLat*MAX_VARS_PER_NODE);
+  float* node = (float*) malloc(grid_size_bytes);
   if (node == NULL) return Err.post( Err.msgAllocateMem() );
   float* R6 = (float*) malloc( sizeof(float) * (NLat+1) );
   if (R6 == NULL) return Err.post( Err.msgAllocateMem() );
@@ -837,8 +840,8 @@ int main( int argc, char **argv )
   clock_gettime(CLOCK_MONOTONIC, &start);
 
   float* d_node;
-  cudaMalloc((void**)&d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE);
-  cudaMemcpyAsync(d_node, node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, cudaMemcpyHostToDevice, 0);
+  cudaMalloc((void**)&d_node, grid_size_bytes);
+  cudaMemcpyAsync(d_node, node, grid_size_bytes, cudaMemcpyHostToDevice, 0);
   float* d_R6;
   cudaMalloc((void**)&d_R6, sizeof(float)*(NLat+1));
   cudaMemcpyAsync(d_R6, R6, sizeof(float)*(NLat+1), cudaMemcpyHostToDevice, 0);
@@ -870,7 +873,7 @@ int main( int argc, char **argv )
     /* FIXME: check if Par.poiDt can be used for those purposes */
     if( Par.filePOIs && Par.poiDt && ((Par.time/Par.poiDt)*Par.poiDt == Par.time) ) {
       // SavePOIs 
-      cudaMemcpy(node, d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, cudaMemcpyDeviceToHost);
+      cudaMemcpy(node, d_node, grid_size_bytes, cudaMemcpyDeviceToHost);
       it = Par.time / Par.poiDt;
       timePOI[it] = Par.time;
       for( n=0; n<NPOIs; n++ ) {
@@ -927,7 +930,7 @@ int main( int argc, char **argv )
     }
   } // main loop
 
-  cudaMemcpy(node, d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, cudaMemcpyDeviceToHost);
+  cudaMemcpy(node, d_node, grid_size_bytes, cudaMemcpyDeviceToHost);
   cudaFree(d_node);
   cudaFree(d_C1);
   cudaFree(d_C2);
@@ -1069,7 +1072,7 @@ int commandLineHelp( void )
   printf( "-ssh0_abs ...     absolute threshold for initial wave in [m], default- 0\n" );
   printf( "-ssh_arrival ...  threshold for arrival times in [m], default- 0.001\n" );
   printf( "                  negative value considered as relative threshold\n" );
-  printf( "-gpu              start GPU version of EasyWave (requires a CUDA capable device)\n" );
+  printf( "-gpu              start GPU version of EasyWave\n" );
   printf( "-verbose          generate verbose output on stdout\n" );
   printf( "\nExample:\n" );
   printf( "\t easyWave -grid gebcoIndonesia.grd  -source fault.inp  -time 120\n\n" );
