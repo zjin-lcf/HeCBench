@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Forward declarations
 template<typename T>
@@ -127,7 +127,7 @@ void cpu_relextrema_2D( const int  in_x,
 }
 
 template <typename T>
-long test_1D (queue &q, const int length, const int order, const bool clip,
+long test_1D (sycl::queue &q, const int length, const int order, const bool clip,
               const int repeat, const char* type)
 {
   T* x = (T*) malloc (sizeof(T)*length);
@@ -137,20 +137,21 @@ long test_1D (queue &q, const int length, const int order, const bool clip,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
-  T *d_x = malloc_device<T>(length, q);
+  T *d_x = sycl::malloc_device<T>(length, q);
   q.memcpy(d_x, x, length * sizeof(T));
 
-  bool *d_result = malloc_device<bool>(length, q);
+  bool *d_result = sycl::malloc_device<bool>(length, q);
 
-  range<1> gws ((length+255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((length+255)/256*256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class extrema1D<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class extrema1D<T>>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int tid = item.get_global_id(0);
         if (tid < length) {
           const T data = d_x[tid];
@@ -189,8 +190,8 @@ long test_1D (queue &q, const int length, const int order, const bool clip,
       break;
     }
 
-  free(d_x, q);
-  free(d_result, q);
+  sycl::free(d_x, q);
+  sycl::free(d_result, q);
   free(x);
   free(cpu_r);
   free(gpu_r);
@@ -201,7 +202,7 @@ long test_1D (queue &q, const int length, const int order, const bool clip,
 // length_x is the number of columns
 // length_y is the number of rows
 template <typename T>
-long test_2D (queue &q, const int length_x, const int length_y, 
+long test_2D (sycl::queue &q, const int length_x, const int length_y, 
               const int order, const bool clip, const int axis,
               const int repeat, const char* type) 
 {
@@ -213,20 +214,21 @@ long test_2D (queue &q, const int length_x, const int length_y,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
-  T *d_x = malloc_device<T>(length, q);
+  T *d_x = sycl::malloc_device<T>(length, q);
   q.memcpy(d_x, x, length * sizeof(T));
 
-  bool *d_result = malloc_device<bool>(length, q);
+  bool *d_result = sycl::malloc_device<bool>(length, q);
 
-  range<2> gws ((length_y+15)/16*16, (length_x+15)/16*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((length_y+15)/16*16, (length_x+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class extrema2D<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class extrema2D<T>>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int ty = item.get_global_id(1); 
         const int tx = item.get_global_id(0);
 
@@ -282,8 +284,8 @@ long test_2D (queue &q, const int length_x, const int length_y,
       break;
     }
 
-  free(d_x, q);
-  free(d_result, q);
+  sycl::free(d_x, q);
+  sycl::free(d_result, q);
   free(x);
   free(cpu_r);
   free(gpu_r);
@@ -299,11 +301,10 @@ int main(int argc, char* argv[]) {
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   long time = 0;
 
