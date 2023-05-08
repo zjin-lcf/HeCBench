@@ -2,16 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
-
-void entropy(
-  nd_item<2> &item,
-      float *__restrict d_entropy,
-  const char*__restrict d_val, 
-  int height, int width)
-{
-}
 
 int main(int argc, char* argv[]) {
   if (argc != 4) {
@@ -34,26 +26,26 @@ int main(int argc, char* argv[]) {
       input[i * width + j] = rand() % 16;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  char* d_input = malloc_device<char>(width * height, q);
+  char* d_input = sycl::malloc_device<char>(width * height, q);
   q.memcpy(d_input, input, input_bytes);
 
-  float* d_output = malloc_device<float>(width * height, q);
+  float* d_output = sycl::malloc_device<float>(width * height, q);
 
-  range<2> gws ((height+15)/16*16, (width+15)/16*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((height+15)/16*16, (width+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class base>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class base>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int x = item.get_global_id(1);
         const int y = item.get_global_id(0);
 
@@ -99,16 +91,17 @@ int main(int argc, char* argv[]) {
   float logTable[26];
   for (int i = 0; i <= 25; i++) logTable[i] = i <= 1 ? 0 : i*log2f(i);
 
-  float *d_logTable = malloc_device<float>(26, q);
+  float *d_logTable = sycl::malloc_device<float>(26, q);
   q.memcpy(d_logTable, logTable, 26 * sizeof(float));
 
   q.wait();
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<int, 2, sycl_read_write, access::target::local> sd_count ({16, 256}, cgh);
-      cgh.parallel_for<class opt>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 2> sd_count (sycl::range<2>{16, 256}, cgh);
+      cgh.parallel_for<class opt>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int x = item.get_global_id(1);
         const int y = item.get_global_id(0);
         const int idx = item.get_local_id(0)*16 + item.get_local_id(1);
@@ -145,9 +138,9 @@ int main(int argc, char* argv[]) {
 
   q.memcpy(output, d_output, output_bytes).wait();
 
-  free(d_input, q);
-  free(d_output, q);
-  free(d_logTable, q);
+  sycl::free(d_input, q);
+  sycl::free(d_output, q);
+  sycl::free(d_logTable, q);
 
   // verify
   reference(output_ref, input, height, width);
