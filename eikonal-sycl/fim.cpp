@@ -15,7 +15,7 @@
 #include "kernel.h"
 #include "fim.h"
 
-void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
+void runEikonalSolverSimple(sycl::queue &q, GPUMEMSTRUCT &cmem)
 {
   int xdim, ydim, zdim;
   xdim = cmem.xdim;
@@ -62,8 +62,8 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
   q.memset(cmem.d_con, 1, volSize*sizeof(bool));
 
   // set dimension of block and entire grid size
-  range<3> grids (1, 1, nActiveBlock);
-  range<3> blocks (BLOCK_LENGTH, BLOCK_LENGTH, BLOCK_LENGTH);
+  sycl::range<3> grids (1, 1, nActiveBlock);
+  sycl::range<3> blocks (BLOCK_LENGTH, BLOCK_LENGTH, BLOCK_LENGTH);
 
   int nTotalIter = 0;
   //uint sharedmemsize = sizeof(float)*BLOCK_LENGTH*BLOCK_LENGTH*(3*BLOCK_LENGTH + 2);
@@ -83,6 +83,8 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
   sdkCreateTimer(&timer_list2);
   sdkCreateTimer(&timer_coarse);
   sdkStartTimer(&timer_total);
+
+  q.wait();
 #endif
 
   uint nTotalBlockProcessed = 0;
@@ -123,8 +125,9 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
 
     q.memcpy(d_list, h_list, nActiveBlock*sizeof(uint));
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class solve>(nd_range<3>(grids*blocks, blocks), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class solve>(
+        sycl::nd_range<3>(grids*blocks, blocks), [=] (sycl::nd_item<3> item) {
         run_solver(item, d_spd, d_mask, d_sol, t_sol, d_con,
                    d_list, xdim, ydim, zdim, nIter, nActiveBlock);
       });
@@ -142,10 +145,11 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
     sdkStartTimer(&timer_reduction);
 #endif
     
-    range<3> lws_reduce (BLOCK_LENGTH/2, BLOCK_LENGTH, BLOCK_LENGTH);
+    sycl::range<3> lws_reduce (BLOCK_LENGTH/2, BLOCK_LENGTH, BLOCK_LENGTH);
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class reduce>(nd_range<3>(grids*lws_reduce, lws_reduce), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class reduce>(
+        sycl::nd_range<3>(grids*lws_reduce, lws_reduce), [=] (sycl::nd_item<3> item) {
         run_reduction(item, d_con, d_listVol, d_list, nActiveBlock);
       });
     });
@@ -226,8 +230,9 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
 
     q.memcpy(d_list, h_list, nActiveBlock*sizeof(uint)).wait();
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class check_neighbor>(nd_range<3>(grids*blocks, blocks), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class check_neighbor>(
+        sycl::nd_range<3>(grids*blocks, blocks), [=] (sycl::nd_item<3> item) {
         run_check_neighbor(item, d_spd, d_mask, t_sol, d_sol, d_con, d_list,
                            xdim, ydim, zdim, nOldActiveBlock, nActiveBlock);
       });
@@ -245,8 +250,9 @@ void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem)
     sdkStartTimer(&timer_reduction);
 #endif
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class reduce2>(nd_range<3>(grids*lws_reduce, lws_reduce), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class reduce2>(
+        sycl::nd_range<3>(grids*lws_reduce, lws_reduce), [=] (sycl::nd_item<3> item) {
         run_reduction(item, d_con, d_listVol, d_list, nActiveBlock);
       });
     });

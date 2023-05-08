@@ -13,6 +13,6 @@
 
 #define TIMER
 
-void runEikonalSolverSimple(queue &q, GPUMEMSTRUCT &cmem);
+void runEikonalSolverSimple(sycl::queue &q, GPUMEMSTRUCT &cmem);
 
 #endif
