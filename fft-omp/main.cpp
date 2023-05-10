@@ -161,11 +161,6 @@ int main(int argc, char** argv)
 
   memcpy(reference, source, used_bytes);
 
-  const char *sizeStr;
-  stringstream ss;
-  ss << "N=" << N;
-  sizeStr = strdup(ss.str().c_str());
-
   #pragma omp target data map (tofrom: source[0:N])
   {
     auto start = std::chrono::steady_clock::now();

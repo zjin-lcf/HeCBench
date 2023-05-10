@@ -155,11 +155,6 @@ int main(int argc, char** argv)
 
   memcpy(reference, source, used_bytes);
 
-  const char *sizeStr;
-  stringstream ss;
-  ss << "N=" << N;
-  sizeStr = strdup(ss.str().c_str());
-
   T2 *d_source;
   hipMalloc((void**)&d_source, N * sizeof(T2));
   hipMemcpy(d_source, source, N * sizeof(T2), hipMemcpyHostToDevice);
