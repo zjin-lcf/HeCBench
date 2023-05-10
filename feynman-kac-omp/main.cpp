@@ -185,7 +185,6 @@ int main ( int argc, char **argv )
           double w_exact;
           double we;
           double wt;
-          int steps;
           double chk = pow ( x / a, 2.0 ) + pow ( y / b, 2.0 );
 
           if ( 1.0 < chk )
@@ -197,7 +196,6 @@ int main ( int argc, char **argv )
             n_inside++;
             w_exact = exp ( pow ( x / a, 2.0 ) + pow ( y / b, 2.0 ) - 1.0 );
             wt = 0.0;
-            steps = 0;
             for ( int k = 0; k < N; k++ )
             {
               x1 = x;
@@ -236,8 +234,6 @@ int main ( int argc, char **argv )
                 vs = potential ( a, b, x1, x2 );
                 x1 = x1 + dx;
                 x2 = x2 + dy;
-
-                steps++;
 
                 vh = potential ( a, b, x1, x2 );
 
