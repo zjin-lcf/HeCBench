@@ -94,8 +94,8 @@ typedef struct myCascade
 /* sets images for haar classifier cascade */
 void setImageForCascadeClassifier( 
 #ifdef SYCL
-    queue &q,
-    buffer<int, 1> &d_rectangles_array, 
+    sycl::queue &q,
+    const int *d_rectangles_array,
 #endif
 myCascade* cascade, MyIntImage* sum, MyIntImage* sqsum, int total_nodes);
 

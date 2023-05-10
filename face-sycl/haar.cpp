@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "haar.h"
 #include "image.h"
 #include "stdio-wrapper.h"
@@ -124,14 +124,15 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   factor = 1;
 
 #ifdef SYCL
-  #ifdef USE_GPU
-  gpu_selector dev_sel;
-  #else
-  cpu_selector dev_sel;
-  #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> d_rectangles_array (rectangles_array, total_nodes*12);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
+  int *d_rectangles_array = sycl::malloc_device<int>(total_nodes*12, q);
+  q.memcpy(d_rectangles_array, rectangles_array, sizeof(int)*total_nodes*12);
 #endif
 
   /* iterate over the image pyramid */
@@ -195,7 +196,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
      *************************************************/
     setImageForCascadeClassifier(
                                  #ifdef SYCL
-                                 q, d_rectangles_array, 
+                                 q, d_rectangles_array,
                                  #endif
                                  cascade, sum1, sqsum1, total_nodes);
 
@@ -217,6 +218,9 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
     groupRectangles(allCandidates, minNeighbors, GROUP_EPS);
   }
 
+#ifdef SYCL
+  sycl::free(d_rectangles_array, q);
+#endif
   freeImage(img1);
   freeSumImage(sum1);
   freeSumImage(sqsum1);
@@ -261,8 +265,8 @@ unsigned int int_sqrt (unsigned int value)
 
 void setImageForCascadeClassifier( 
 #ifdef SYCL
-    queue &q,
-    buffer<int, 1> &d_rectangles_array, 
+    sycl::queue &q,
+    const int *d_rectangles_array,
 #endif
     myCascade* _cascade, MyIntImage* _sum, MyIntImage* _sqsum, int total_nodes)
 {
@@ -294,54 +298,53 @@ void setImageForCascadeClassifier(
    * Load the index of the four corners 
    * of the filter rectangle
    **************************************/
-  buffer<int*, 1> d_scaled_rectangles_array (total_nodes*12);
+  int **d_scaled_rectangles_array = sycl::malloc_device<int*>(total_nodes*12, q);
 
-  range<1> gws ((total_nodes+255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((total_nodes+255)/256*256);
+  sycl::range<1> lws (256);
 
   int* data = sum->data;
   const int width = sum->width;
-  q.submit([&] (handler &cgh) {
-    auto rectangles_array = d_rectangles_array.get_access<sycl_read>(cgh);
-    auto scaled_rectangles_array = d_scaled_rectangles_array.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class filtering>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class filtering>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       int gid = item.get_global_id(0);
       if (gid >= total_nodes) return;
 
       int idx = gid * 12;
       for (int k = 0; k < 3; k++)
       {
-        int tr_x = rectangles_array[idx + k * 4];
-        int tr_y = rectangles_array[idx + 1 + k * 4];
-        int tr_width = rectangles_array[idx + 2 + k * 4];
-        int tr_height = rectangles_array[idx + 3 + k * 4];
+        int tr_x = d_rectangles_array[idx + k * 4];
+        int tr_y = d_rectangles_array[idx + 1 + k * 4];
+        int tr_width = d_rectangles_array[idx + 2 + k * 4];
+        int tr_height = d_rectangles_array[idx + 3 + k * 4];
         int *p0 = data + width * (tr_y) + (tr_x);
         int *p1 = data + width * (tr_y) + (tr_x + tr_width);
         int *p2 = data + width * (tr_y + tr_height) + (tr_x);
         int *p3 = data + width * (tr_y + tr_height) + (tr_x + tr_width);
         if (k < 2)
         {
-          scaled_rectangles_array[idx + k * 4]     = p0;
-          scaled_rectangles_array[idx + k * 4 + 1] = p1; 
-          scaled_rectangles_array[idx + k * 4 + 2] = p2; 
-          scaled_rectangles_array[idx + k * 4 + 3] = p3; 
+          d_scaled_rectangles_array[idx + k * 4]     = p0;
+          d_scaled_rectangles_array[idx + k * 4 + 1] = p1;
+          d_scaled_rectangles_array[idx + k * 4 + 2] = p2;
+          d_scaled_rectangles_array[idx + k * 4 + 3] = p3;
         }
         else
         {
           bool z = ((tr_x == 0) && (tr_y == 0) && (tr_width == 0) && (tr_height == 0));
-          scaled_rectangles_array[idx + k * 4]     = z ? NULL : p0;
-          scaled_rectangles_array[idx + k * 4 + 1] = z ? NULL : p1;
-          scaled_rectangles_array[idx + k * 4 + 2] = z ? NULL : p2;
-          scaled_rectangles_array[idx + k * 4 + 3] = z ? NULL : p3;
+          d_scaled_rectangles_array[idx + k * 4]     = z ? NULL : p0;
+          d_scaled_rectangles_array[idx + k * 4 + 1] = z ? NULL : p1;
+          d_scaled_rectangles_array[idx + k * 4 + 2] = z ? NULL : p2;
+          d_scaled_rectangles_array[idx + k * 4 + 3] = z ? NULL : p3;
         } /* end of branch if(k<2) */
       }   /* end of k loop */
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_scaled_rectangles_array.get_access<sycl_read>(cgh);
-    cgh.copy(acc, scaled_rectangles_array);
-  }).wait();
+  q.memcpy(scaled_rectangles_array,
+           d_scaled_rectangles_array, total_nodes*12*sizeof(int*)).wait();
+
+  sycl::free(d_scaled_rectangles_array, q);
 #else
   /****************************************
    * Load the index of the four corners 
