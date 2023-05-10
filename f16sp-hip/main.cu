@@ -136,7 +136,9 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size_bytes = size * sizeof(half2);
+  const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
 
   half2 *a, *b;
   half2 *d_a, *d_b;
@@ -144,37 +146,37 @@ int main(int argc, char *argv[])
   float *r;  // result
   float *d_r;
 
-  a = (half2*) malloc (size*sizeof(half2));
-  b = (half2*) malloc (size*sizeof(half2));
-  hipMalloc((void**)&d_a, size*sizeof(half2));
-  hipMalloc((void**)&d_b, size*sizeof(half2));
+  a = (half2*) malloc (size_bytes);
+  b = (half2*) malloc (size_bytes);
+  hipMalloc((void**)&d_a, size_bytes);
+  hipMalloc((void**)&d_b, size_bytes);
 
-  r = (float*) malloc (NUM_OF_BLOCKS*sizeof(float));
-  hipMalloc((void**)&d_r, NUM_OF_BLOCKS*sizeof(float));
+  r = (float*) malloc (result_bytes);
+  hipMalloc((void**)&d_r, result_bytes);
 
   srand(123); 
   generateInput(a, size);
-  hipMemcpy(d_a, a, size*sizeof(half2), hipMemcpyHostToDevice);
+  hipMemcpy(d_a, a, size_bytes, hipMemcpyHostToDevice);
 
   generateInput(b, size);
-  hipMemcpy(d_b, b, size*sizeof(half2), hipMemcpyHostToDevice);
+  hipMemcpy(d_b, b, size_bytes, hipMemcpyHostToDevice);
 
   // warmup
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(scalarProductKernel_intrinsics, NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, d_a, d_b, d_r, size);
+    scalarProductKernel_intrinsics<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(scalarProductKernel_intrinsics, NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, d_a, d_b, d_r, size);
+    scalarProductKernel_intrinsics<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  hipMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), hipMemcpyDeviceToHost);
+  hipMemcpy(r, d_r, result_bytes, hipMemcpyDeviceToHost);
 
   float result_intrinsics = 0;
   for (int i = 0; i < NUM_OF_BLOCKS; ++i)
@@ -185,20 +187,20 @@ int main(int argc, char *argv[])
 
   // warmup
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(scalarProductKernel_native, NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, d_a, d_b, d_r, size);
+    scalarProductKernel_native<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
   hipDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(scalarProductKernel_native, NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, d_a, d_b, d_r, size);
+    scalarProductKernel_native<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  hipMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), hipMemcpyDeviceToHost);
+  hipMemcpy(r, d_r, result_bytes, hipMemcpyDeviceToHost);
 
   float result_native = 0;
   for (int i = 0; i < NUM_OF_BLOCKS; ++i)
