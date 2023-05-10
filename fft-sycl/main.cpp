@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 using namespace std;
 
@@ -24,7 +24,6 @@ using namespace std;
 # define M_SQRT1_2      0.70710678118654752440f
 #endif
 
-
 #define exp_1_8   (T2){  1, -1 }//requires post-multiply by 1/sqrt(2)
 #define exp_1_4   (T2){  0, -1 }
 #define exp_3_8   (T2){ -1, -1 }//requires post-multiply by 1/sqrt(2)
@@ -37,32 +36,30 @@ inline T2 exp_i( T phi ) {
   return (T2){ sycl::cos(phi), sycl::sin(phi) };
 }
 
-
 inline T2 cmplx_mul( T2 a, T2 b ) { return (T2){ a.x()*b.x()-a.y()*b.y(), a.x()*b.y()+a.y()*b.x() }; }
 inline T2 cm_fl_mul( T2 a, T  b ) { return (T2){ b*a.x(), b*a.y() }; }
 inline T2 cmplx_add( T2 a, T2 b ) { return (T2){ a.x() + b.x(), a.y() + b.y() }; }
 inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() }; }
 
 
-
-#define FFT2(a0, a1)                            \
-{                                               \
+#define FFT2(a0, a1)                     \
+{                                        \
   T2 c0 = *a0;                           \
-  *a0 = cmplx_add(c0,*a1);                    \
-  *a1 = cmplx_sub(c0,*a1);                    \
+  *a0 = cmplx_add(c0,*a1);               \
+  *a1 = cmplx_sub(c0,*a1);               \
 }
 
-#define FFT4(a0, a1, a2, a3)                    \
-{                                               \
-  FFT2( a0, a2 );                             \
-  FFT2( a1, a3 );                             \
-  *a3 = cmplx_mul(*a3,exp_1_4);               \
-  FFT2( a0, a1 );                             \
-  FFT2( a2, a3 );                             \
+#define FFT4(a0, a1, a2, a3)             \
+{                                        \
+  FFT2( a0, a2 );                        \
+  FFT2( a1, a3 );                        \
+  *a3 = cmplx_mul(*a3,exp_1_4);          \
+  FFT2( a0, a1 );                        \
+  FFT2( a2, a3 );                        \
 }
 
-#define FFT8(a)                                                 \
-{                                                               \
+#define FFT8(a)                                               \
+{                                                             \
   FFT2( &a[0], &a[4] );                                       \
   FFT2( &a[1], &a[5] );                                       \
   FFT2( &a[2], &a[6] );                                       \
@@ -78,8 +75,8 @@ inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() };
 
 #define IFFT2 FFT2
 
-#define IFFT4( a0, a1, a2, a3 )                 \
-{                                               \
+#define IFFT4( a0, a1, a2, a3 )               \
+{                                             \
   IFFT2( a0, a2 );                            \
   IFFT2( a1, a3 );                            \
   *a3 = cmplx_mul(*a3 , iexp_1_4);            \
@@ -87,8 +84,8 @@ inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() };
   IFFT2( a2, a3);                             \
 }
 
-#define IFFT8( a )                                              \
-{                                                               \
+#define IFFT8( a )                                            \
+{                                                             \
   IFFT2( &a[0], &a[4] );                                      \
   IFFT2( &a[1], &a[5] );                                      \
   IFFT2( &a[2], &a[6] );                                      \
@@ -125,8 +122,8 @@ int main(int argc, char** argv)
   const int half_n_ffts = bytes / (512*sizeof(T2)*2);
   const int n_ffts = half_n_ffts * 2;
   const int half_n_cmplx = half_n_ffts * 512;
-  unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
   const int N = half_n_cmplx*2;
+  unsigned long used_bytes = N * sizeof(T2);
 
   fprintf(stdout, "used_bytes=%lu, N=%d\n", used_bytes, N);
 
@@ -144,56 +141,50 @@ int main(int argc, char** argv)
 
   memcpy(reference, source, used_bytes);
 
-  const char *sizeStr;
-  stringstream ss;
-  ss << "N=" << N;
-  sizeStr = strdup(ss.str().c_str());
-
-  { // sycl scope
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-    queue q(dev_sel);
+  T2 *work = sycl::malloc_device<T2>(N, q);
+  q.memcpy(work, source, used_bytes);
 
-    const property_list props = property::buffer::use_host_ptr();
+  // local and global sizes are the same for the three kernels
+  size_t localsz = 64;
+  size_t globalsz = localsz * n_ffts;
 
-    buffer<T2, 1> d_work(source, N, props); 
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-    // local and global sizes are the same for the three kernels
-    size_t localsz = 64;
-    size_t globalsz = localsz * n_ffts; 
+  for (int k=0; k<passes; k++) {
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
-
-    for (int k=0; k<passes; k++) {
-
-      q.submit([&](handler& cgh) {
-        auto work = d_work.get_access<sycl_read_write>(cgh) ;
-        accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-        cgh.parallel_for<class fftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-          #include "fft1D_512.sycl"
-        });
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
+      cgh.parallel_for<class fft_Kernel>(
+        sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
+        [=] (sycl::nd_item<1> item) {
+        #include "fft1D_512.sycl"
       });
+    });
 
-      q.submit([&](handler& cgh) {
-        auto work = d_work.get_access<sycl_read_write>(cgh) ;
-        accessor <T, 1, sycl_read_write, access::target::local> smem (8*8*9, cgh);
-        cgh.parallel_for<class ifftKernel>(nd_range<1>(range<1>(globalsz), range<1>(localsz)), [=] (nd_item<1> item) {
-          #include "ifft1D_512.sycl"
-        });
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
+      cgh.parallel_for<class ifft_Kernel>(
+        sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
+        [=] (sycl::nd_item<1> item) {
+        #include "ifft1D_512.sycl"
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
+
+  q.memcpy(source, work, used_bytes).wait();
+  sycl::free(work, q);
 
   // Verification
   bool error = false;
@@ -213,4 +204,3 @@ int main(int argc, char** argv)
   free(reference);
   free(source);
 }
-
