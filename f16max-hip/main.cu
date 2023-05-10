@@ -63,27 +63,29 @@ int main(int argc, char *argv[])
 
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
+  const size_t size_bytes = size * sizeof(half2);
+
   half2 * a, *b, *r;
   half2 * d_a, *d_b, *d_r;
 
-  a = (half2*) malloc (size*sizeof(half2));
-  b = (half2*) malloc (size*sizeof(half2));
-  r = (half2*) malloc (size*sizeof(half2));
+  a = (half2*) malloc (size_bytes);
+  b = (half2*) malloc (size_bytes);
+  r = (half2*) malloc (size_bytes);
 
-  hipMalloc((void**)&d_a, size*sizeof(half2));
-  hipMalloc((void**)&d_b, size*sizeof(half2));
-  hipMalloc((void**)&d_r, size*sizeof(half2));
+  hipMalloc((void**)&d_a, size_bytes);
+  hipMalloc((void**)&d_b, size_bytes);
+  hipMalloc((void**)&d_r, size_bytes);
 
   // initialize input values
   srand(123); 
   generateInput(a, size);
-  hipMemcpy(d_a, a, size*sizeof(half2), hipMemcpyHostToDevice);
+  hipMemcpy(d_a, a, size_bytes, hipMemcpyHostToDevice);
 
   generateInput(b, size);
-  hipMemcpy(d_b, b, size*sizeof(half2), hipMemcpyHostToDevice);
+  hipMemcpy(d_b, b, size_bytes, hipMemcpyHostToDevice);
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half2>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+    hmax<half2><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       d_a, d_b, d_r, size);
   hipDeviceSynchronize();
 
@@ -91,16 +93,16 @@ int main(int argc, char *argv[])
   
   // run hmax2
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half2>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+    hmax<half2><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       d_a, d_b, d_r, size);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
   // verify
-  hipMemcpy(r, d_r, size*sizeof(half2), hipMemcpyDeviceToHost);
+  hipMemcpy(r, d_r, size_bytes, hipMemcpyDeviceToHost);
 
   bool ok = true;
   for (size_t i = 0; i < size; ++i)
@@ -118,7 +120,7 @@ int main(int argc, char *argv[])
   printf("fp16_hmax2 %s\n", ok ?  "PASS" : "FAIL");
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+    hmax<half><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       (half*)d_a, (half*)d_b, (half*)d_r, size*2);
   hipDeviceSynchronize();
 
@@ -126,13 +128,15 @@ int main(int argc, char *argv[])
   
   // run hmax (the size is doubled)
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(hmax<half>), NUM_OF_BLOCKS, NUM_OF_THREADS, 0, 0, 
+    hmax<half><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
       (half*)d_a, (half*)d_b, (half*)d_r, size*2);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+
+  hipMemcpy(r, d_r, size_bytes, hipMemcpyDeviceToHost);
 
   // verify
   ok = true;

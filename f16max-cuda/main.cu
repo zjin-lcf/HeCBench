@@ -63,24 +63,26 @@ int main(int argc, char *argv[])
 
   size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
 
+  const size_t size_bytes = size * sizeof(half2);
+
   half2 * a, *b, *r;
   half2 * d_a, *d_b, *d_r;
 
-  a = (half2*) malloc (size*sizeof(half2));
-  b = (half2*) malloc (size*sizeof(half2));
-  r = (half2*) malloc (size*sizeof(half2));
+  a = (half2*) malloc (size_bytes);
+  b = (half2*) malloc (size_bytes);
+  r = (half2*) malloc (size_bytes);
 
-  cudaMalloc((void**)&d_a, size*sizeof(half2));
-  cudaMalloc((void**)&d_b, size*sizeof(half2));
-  cudaMalloc((void**)&d_r, size*sizeof(half2));
+  cudaMalloc((void**)&d_a, size_bytes);
+  cudaMalloc((void**)&d_b, size_bytes);
+  cudaMalloc((void**)&d_r, size_bytes);
 
   // initialize input values
   srand(123); 
   generateInput(a, size);
-  cudaMemcpy(d_a, a, size*sizeof(half2), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_a, a, size_bytes, cudaMemcpyHostToDevice);
 
   generateInput(b, size);
-  cudaMemcpy(d_b, b, size*sizeof(half2), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_b, b, size_bytes, cudaMemcpyHostToDevice);
 
   for (int i = 0; i < repeat; i++)
     hmax<half2><<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(
@@ -97,10 +99,10 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
   // verify
-  cudaMemcpy(r, d_r, size*sizeof(half2), cudaMemcpyDeviceToHost);
+  cudaMemcpy(r, d_r, size_bytes, cudaMemcpyDeviceToHost);
 
   bool ok = true;
   for (size_t i = 0; i < size; ++i)
@@ -132,7 +134,9 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+
+  cudaMemcpy(r, d_r, size_bytes, cudaMemcpyDeviceToHost);
 
   // verify
   ok = true;
