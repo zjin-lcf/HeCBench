@@ -15,10 +15,10 @@
 #include <chrono>
 #include <random>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // compare device results with host results
-bool check(queue &q, int *d_nres, int *d_output, int h_nres, std::vector<int> &h_output) {
+bool check(sycl::queue &q, int *d_nres, int *d_output, int h_nres, std::vector<int> &h_output) {
   int nres;
   q.memcpy(&nres, d_nres, sizeof(int)).wait();
 
@@ -35,6 +35,53 @@ bool check(queue &q, int *d_nres, int *d_output, int h_nres, std::vector<int> &h
                std::equal(h_output.begin(),
                           h_output.begin() + h_nres, output.begin());
   return equal;
+}
+
+void filter_shared (int *__restrict d_output,
+                    int *__restrict d_nres,
+                    const int*__restrict__ d_input,
+                    const int num_elems,
+                    int &l_n,
+                    sycl::nd_item<1> &item)
+{
+  int i = item.get_global_id(0);
+
+  // zero the counter
+  if (item.get_local_id(0) == 0) l_n = 0;
+  item.barrier(sycl::access::fence_space::local_space);
+
+  // get the value, evaluate the predicate, and
+  // increment the counter if needed
+  int d, pos;
+
+  if(i < num_elems) {
+    d = d_input[i];
+    if(d > 0) {
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (l_n);
+      pos = ao.fetch_add(1);
+    }
+  }
+  item.barrier(sycl::access::fence_space::local_space);
+
+  // leader increments the global counter
+  if(item.get_local_id(0) == 0) {
+    auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
+              sycl::access::address_space::global_space> (d_nres[0]);
+    l_n = ao.fetch_add(l_n);
+  }
+  item.barrier(sycl::access::fence_space::local_space);
+
+  // threads with true predicates write their elements
+  if(i < num_elems && d > 0) {
+    pos += l_n; // increment local pos by global counter
+    d_output[pos] = d;
+  }
+  item.barrier(sycl::access::fence_space::local_space);
 }
 
 int main(int argc, char **argv) {
@@ -70,22 +117,21 @@ int main(int argc, char **argv) {
   std::sort(h_output.begin(), h_output.begin() + h_flt_count);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   int *d_input, *d_output, *d_nres;
 
-  d_input = malloc_device<int>(num_elems, q);
-  d_output = malloc_device<int>(num_elems, q);
-  d_nres = malloc_device<int>(1, q);
+  d_input = sycl::malloc_device<int>(num_elems, q);
+  d_output = sycl::malloc_device<int>(num_elems, q);
+  d_nres = sycl::malloc_device<int>(1, q);
 
   q.memcpy(d_input, input.data(), sizeof(int) * num_elems);
 
-  range<1> lws (block_size);
-  range<1> gws ((num_elems + block_size - 1) / block_size * block_size);
+  sycl::range<1> lws (block_size);
+  sycl::range<1> gws ((num_elems + block_size - 1) / block_size * block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -93,49 +139,11 @@ int main(int argc, char **argv) {
   for (int i = 0; i < repeat; i++) {
     q.memset(d_nres, 0, sizeof(int));
 
-    q.submit([&](handler &h) {
-      accessor <int, 1, sycl_read_write, access::target::local> l_n (1, h);
-      h.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-
-        int i = item.get_global_id(0); 
-
-        // zero the counter
-        if (item.get_local_id(0) == 0) l_n[0] = 0;
-        item.barrier(access::fence_space::local_space);
-
-        // get the value, evaluate the predicate, and
-        // increment the counter if needed
-        int d, pos;
-
-        if(i < num_elems) {
-          d = d_input[i];
-          if(d > 0) {
-            auto ao = atomic_ref<int, 
-                                 memory_order::relaxed,
-                                 memory_scope::work_group,
-                                 access::address_space::local_space> (l_n[0]);
-            pos = ao.fetch_add(1);
-          }
-        }
-        item.barrier(access::fence_space::local_space);
-
-        // leader increments the global counter
-        if(item.get_local_id(0) == 0) {
-          auto ao = atomic_ref<int, 
-                               memory_order::relaxed,
-                               memory_scope::device,
-                               access::address_space::global_space> (d_nres[0]);
-          l_n[0] = ao.fetch_add(l_n[0]);
-        }
-        item.barrier(access::fence_space::local_space);
-
-        // threads with true predicates write their elements
-        if(i < num_elems && d > 0) {
-          pos += l_n[0]; // increment local pos by global counter
-          d_output[pos] = d;
-        }
-        item.barrier(access::fence_space::local_space);
-
+    q.submit([&](sycl::handler &h) {
+      sycl::local_accessor <int, 0> l_n (h);
+      h.parallel_for<class filter>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        filter_shared(d_output, d_nres, d_input, num_elems, l_n, item);
       });
     });
   }
@@ -149,9 +157,9 @@ int main(int argc, char **argv) {
   bool match = check(q, d_nres, d_output, h_flt_count, h_output);
   printf("%s\n", match ? "PASS" : "FAIL");
 
-  free(d_input, q);
-  free(d_output, q);
-  free(d_nres, q);
+  sycl::free(d_input, q);
+  sycl::free(d_output, q);
+  sycl::free(d_nres, q);
 
   return 0;
 }
