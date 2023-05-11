@@ -455,7 +455,7 @@ void FWrem_64(
   if (ij_bb != orig_bb) AdjMat[idx0_bb] = ij_bb;
 }
 
-static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
+static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat, const int repeat)
 {
   // copy graph to GPU
   ECLgraph d_g = g;
@@ -485,33 +485,39 @@ static void FW_gpu_64(const ECLgraph g, mtype* const AdjMat)
   printf("GPU matrix size: %.1f MB\n", sizeof(mtype) * upper * upper / (1024.0 * 1024.0));
 
   timeval start, end;
+
+  cudaDeviceSynchronize();
   gettimeofday(&start, NULL);
 
-  // run GPU init code
-  init1<<<(upper * upper + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(g.nodes, d_AdjMat, upper);
-  init2<<<(g.nodes + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(d_g, d_AdjMat, upper);
+  for (int i = 0; i < repeat; i++) {
+    // run GPU init code
+    init1<<<(upper * upper + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(g.nodes, d_AdjMat, upper);
+    init2<<<(g.nodes + ThreadsPerBlock - 1) / ThreadsPerBlock, ThreadsPerBlock>>>(d_g, d_AdjMat, upper);
+  }
 
   cudaDeviceSynchronize();
   gettimeofday(&end, NULL);
   const double inittime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
-  printf("FW_64 gpu init time: %10.6f s\n", inittime);
+  printf("Average kernel (initialization) time: %10.6f s\n", inittime / repeat);
 
   const int subm1 = sub - 1;
   gettimeofday(&start, NULL);
 
-  // compute 64*64 tile
-  FW0_64<<<1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols);
+  for (int i = 0; i < repeat; i++) {
+    // compute 64*64 tile
+    FW0_64<<<1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols);
 
-  if (sub > 1) {
-    for (int x = 0; x < sub; x++) {
-      FWrowcol_64<<<2 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
-      FWrem_64<<<subm1 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
+    if (sub > 1) {
+      for (int x = 0; x < sub; x++) {
+        FWrowcol_64<<<2 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
+        FWrem_64<<<subm1 * subm1, ThreadsPerBlock>>>(d_AdjMat, upper, d_krows, d_kcols, x, subm1);
+      }
     }
   }
   cudaDeviceSynchronize();
   gettimeofday(&end, NULL);
   const double comptime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
-  printf("FW_64 gpu comp time: %10.6f s\n", comptime);
+  printf("Average kernel (compute) time: %10.6f s\n", comptime / repeat);
 
   // copy result back to CPU
   if (cudaSuccess != cudaMemcpy(AdjMat, d_AdjMat, sizeof(mtype) * upper * upper, cudaMemcpyDeviceToHost))
@@ -569,8 +575,8 @@ int main(int argc, char* argv[])
 {
   printf("ECL-APSP v1.0 (%s)\n", __FILE__);
   printf("Copyright 2021 Texas State University\n");
-  if (argc != 2) {
-    fprintf(stderr, "USAGE: %s input_graph_name\n\n", argv[0]);
+  if (argc != 3) {
+    fprintf(stderr, "USAGE: %s <input_graph_name> <repeat>\n\n", argv[0]);
     return 1;
   }
   if (ThreadsPerBlock != 1024) {
@@ -592,6 +598,9 @@ int main(int argc, char* argv[])
   printf("input: %s\n", argv[1]);
   printf("nodes: %d\n", g.nodes);
   printf("edges: %d\n", g.edges);
+
+  const int repeat = atoi(argv[2]);
+
   if (g.eweight == NULL) {
     fprintf(stderr, "ERROR: input graph has no edge weights\n\n");
     goto DONE;
@@ -612,7 +621,7 @@ int main(int argc, char* argv[])
     goto DONE;
   }
     
-  FW_gpu_64(g, AdjMat1);
+  FW_gpu_64(g, AdjMat1, repeat);
 
   // run on host
   AdjMat2 = (mtype*) malloc (sizeof(mtype) * g.nodes * g.nodes);

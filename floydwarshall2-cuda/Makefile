@@ -54,5 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) CollegeMsg.egr
-	#./$(program) soc-sign-bitcoin-alpha.egr
+	./$(program) CollegeMsg.egr 1000
+	#./$(program) soc-sign-bitcoin-alpha.egr 1000
