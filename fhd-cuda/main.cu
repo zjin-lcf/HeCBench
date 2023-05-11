@@ -40,12 +40,13 @@ void cmpfhd(const float*__restrict__ rmu,
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Usage: %s #samples #voxels\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <#samples> <#voxels> <verify>\n", argv[0]);
     exit(1);
   }
   const int samples = atoi(argv[1]); // in the order of 100000
   const int voxels = atoi(argv[2]);  // cube(128)/2097152
+  const int verify = atoi(argv[3]);
   const int sampleSize = samples * sizeof(float);
   const int voxelSize = voxels * sizeof(float);
 
@@ -128,12 +129,11 @@ int main(int argc, char* argv[]) {
     }
     cudaMemcpyToSymbol(k, &h_k[i * CHUNK_S], s);
 
-    cmpfhd<<<grid, block>>>(
-       d_rmu + i*CHUNK_S,
-       d_imu + i*CHUNK_S, 
-       d_rfhd, d_ifhd, 
-       d_x, d_y, d_z, 
-       samples, c);
+    cmpfhd<<<grid, block>>>(d_rmu + i*CHUNK_S,
+                            d_imu + i*CHUNK_S, 
+                            d_rfhd, d_ifhd, 
+                            d_x, d_y, d_z, 
+                            samples, c);
   }
 
   cudaDeviceSynchronize();
@@ -144,32 +144,34 @@ int main(int argc, char* argv[]) {
   cudaMemcpy(rfhd, d_rfhd, sampleSize, cudaMemcpyDeviceToHost);
   cudaMemcpy(ifhd, d_ifhd, sampleSize, cudaMemcpyDeviceToHost);
 
-  printf("Computing root mean square error between host and device results.\n");
-  printf("This will take a while..\n");
+  if (verify) {
+    printf("Computing root mean square error between host and device results.\n");
+    printf("This will take a while..\n");
 
-  #pragma omp parallel for 
-  for (int n = 0; n < samples; n++) {
-    float r = h_rfhd[n];
-    float i = h_ifhd[n];
-    #pragma omp parallel for simd reduction(+:r,i)
-    for (int m = 0; m < voxels; m++) {
-      float e = 2.f * (float)M_PI * 
-                (h_kx[m] * h_x[n] + h_ky[m] * h_y[n] + h_kz[m] * h_z[n]);
-      float c = cosf(e);
-      float s = sinf(e);
-      r += h_rmu[m] * c - h_imu[m] * s;
-      i += h_imu[m] * c + h_rmu[m] * s;
+    #pragma omp parallel for 
+    for (int n = 0; n < samples; n++) {
+      float r = h_rfhd[n];
+      float i = h_ifhd[n];
+      #pragma omp parallel for simd reduction(+:r,i)
+      for (int m = 0; m < voxels; m++) {
+        float e = 2.f * (float)M_PI * 
+                  (h_kx[m] * h_x[n] + h_ky[m] * h_y[n] + h_kz[m] * h_z[n]);
+        float c = cosf(e);
+        float s = sinf(e);
+        r += h_rmu[m] * c - h_imu[m] * s;
+        i += h_imu[m] * c + h_rmu[m] * s;
+      }
+      h_rfhd[n] = r;
+      h_ifhd[n] = i;   
     }
-    h_rfhd[n] = r;
-    h_ifhd[n] = i;   
-  }
 
-  float err = 0.f;
-  for (int i = 0; i < samples; i++) {
-    err += (h_rfhd[i] - rfhd[i]) * (h_rfhd[i] - rfhd[i]) +
-           (h_ifhd[i] - ifhd[i]) * (h_ifhd[i] - ifhd[i]) ;
+    float err = 0.f;
+    for (int i = 0; i < samples; i++) {
+      err += (h_rfhd[i] - rfhd[i]) * (h_rfhd[i] - rfhd[i]) +
+             (h_ifhd[i] - ifhd[i]) * (h_ifhd[i] - ifhd[i]) ;
+    }
+    printf("RMSE = %f\n", sqrtf(err / (2*samples)));
   }
-  printf("RMSE = %f\n", sqrtf(err / (2*samples)));
  
   cudaFree(d_rmu);
   cudaFree(d_imu);
@@ -193,5 +195,4 @@ int main(int argc, char* argv[]) {
   free(h_z);
 
   return 0;
-   
 }
