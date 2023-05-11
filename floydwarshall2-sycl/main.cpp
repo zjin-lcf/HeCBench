@@ -34,10 +34,10 @@ URL: The latest version of this code is available at
 https://cs.txstate.edu/~burtscher/research/ECL-APSP/.
 */
 
-#include <CL/sycl.hpp>
 #include <cstdio>
 #include <limits>
 #include <sys/time.h>
+#include <sycl/sycl.hpp>
 #include "graph.h"
 
 using mtype = int;
@@ -451,14 +451,13 @@ void FWrem_64(mtype* const __restrict AdjMat,
   if (ij_bb != orig_bb) AdjMat[idx0_bb] = ij_bb;
 }
 
-static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
+static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat, const int repeat) {
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   const int wgs = q.get_device().get_info<sycl::info::device::max_work_group_size>();
   if (wgs < TPB) {
@@ -490,86 +489,82 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat) {
   printf("GPU matrix size: %.1f MB\n", sizeof(mtype) * upper * upper / (1024.0 * 1024.0));
 
   timeval start, end;
-  gettimeofday(&start, NULL);
 
   sycl::range<1> init_gws ((upper*upper+TPB-1)/TPB*TPB);
   sycl::range<1> lws (TPB);
-
-  // run GPU init code
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(init_gws, lws), [=](sycl::nd_item<1> item) {
-      init1(g.nodes, d_AdjMat, upper, item);
-    });
-  });
-
   sycl::range<1> init2_gws ((g.nodes+TPB-1)/TPB*TPB);
 
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(init2_gws, lws), [=](sycl::nd_item<1> item) {
-      init2(d_g, d_AdjMat, upper, item);
-    });
-  });
+  gettimeofday(&start, NULL);
 
+  q.wait();
+
+  for (int i = 0; i < repeat; i++) {
+    // run GPU init code
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(init_gws, lws), [=](sycl::nd_item<1> item) {
+        init1(g.nodes, d_AdjMat, upper, item);
+      });
+    });
+
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(init2_gws, lws), [=](sycl::nd_item<1> item) {
+        init2(d_g, d_AdjMat, upper, item);
+      });
+    });
+  }
   q.wait();
   gettimeofday(&end, NULL);
   const double inittime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
-  printf("FW_64 gpu init time: %10.6f s\n", inittime);
+  printf("Average kernel (initialization) time: %10.6f s\n", inittime / repeat);
 
   const int subm1 = sub - 1;
   gettimeofday(&start, NULL);
 
-  // compute 64*64 tile
-  q.submit([&](sycl::handler &cgh) {
-    sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> temp(tile * tile, cgh);
-    sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> krow(tile * tile, cgh);
-
-    cgh.parallel_for(sycl::nd_range<1>(lws, lws),
-        [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
-          FW0_64(d_AdjMat, upper, d_krows, d_kcols, item,
-                 temp.get_pointer(), krow.get_pointer());
+  for (int i = 0; i < repeat; i++) {
+    // compute 64*64 tile
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<mtype, 1> temp(sycl::range<1>(tile * tile), cgh);
+      sycl::local_accessor<mtype, 1> krow(sycl::range<1>(tile * tile), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(lws, lws),
+          [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+            FW0_64(d_AdjMat, upper, d_krows, d_kcols, item,
+                   temp.get_pointer(), krow.get_pointer());
+      });
     });
-  });
 
-  if (sub > 1) {
-    sycl::range<1> fw64_gws (2 * subm1 * TPB);
-    sycl::range<1> fw64r_gws (subm1 * subm1 * TPB);
+    if (sub > 1) {
+      sycl::range<1> fw64_gws (2 * subm1 * TPB);
+      sycl::range<1> fw64r_gws (subm1 * subm1 * TPB);
 
-    for (int x = 0; x < sub; x++) {
-      q.submit([&](sycl::handler &cgh) {
-        sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                       sycl::access::target::local> temp(tile * tile, cgh);
-        sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> krow(tile * tile, cgh);
-
-        cgh.parallel_for(sycl::nd_range<1>(fw64_gws, lws),
-            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
-              FWrowcol_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
-                          temp.get_pointer(),
-                          krow.get_pointer());
+      for (int x = 0; x < sub; x++) {
+        q.submit([&](sycl::handler &cgh) {
+          sycl::local_accessor<mtype, 1> temp(sycl::range<1>(tile * tile), cgh);
+          sycl::local_accessor<mtype, 1> krow(sycl::range<1>(tile * tile), cgh);
+          cgh.parallel_for(sycl::nd_range<1>(fw64_gws, lws),
+              [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+                FWrowcol_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
+                            temp.get_pointer(),
+                            krow.get_pointer());
+          });
         });
-      });
 
-      q.submit([&](sycl::handler &cgh) {
-        sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                       sycl::access::target::local> s_kj(tile * tile, cgh);
-        sycl::accessor<mtype, 1, sycl::access_mode::read_write,
-                       sycl::access::target::local> s_ik(tile * tile, cgh);
-
-        cgh.parallel_for(
-            sycl::nd_range<1>(fw64r_gws, lws),
-            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
-              FWrem_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
-                       s_kj.get_pointer(), s_ik.get_pointer());
+        q.submit([&](sycl::handler &cgh) {
+          sycl::local_accessor<mtype, 1> s_kj(sycl::range<1>(tile * tile), cgh);
+          sycl::local_accessor<mtype, 1> s_ik(sycl::range<1>(tile * tile), cgh);
+          cgh.parallel_for(
+              sycl::nd_range<1>(fw64r_gws, lws),
+              [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+                FWrem_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
+                         s_kj.get_pointer(), s_ik.get_pointer());
+          });
         });
-      });
+      }
     }
   }
   q.wait();
   gettimeofday(&end, NULL);
   const double comptime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
-  printf("FW_64 gpu comp time: %10.6f s\n", comptime);
+  printf("Average kernel (compute) time: %10.6f s\n", comptime / repeat);
 
   // copy result back to CPU
   q.memcpy(AdjMat, d_AdjMat, sizeof(mtype) * upper * upper).wait();
@@ -626,8 +621,8 @@ int main(int argc, char* argv[])
 {
   printf("ECL-APSP v1.0 (%s)\n", __FILE__);
   printf("Copyright 2021 Texas State University\n");
-  if (argc != 2) {
-    fprintf(stderr, "USAGE: %s input_graph_name\n\n", argv[0]);
+  if (argc != 3) {
+    fprintf(stderr, "USAGE: %s <input_graph_name> <repeat>\n\n", argv[0]);
     return 1;
   }
   if (TPB != 1024) {
@@ -649,6 +644,9 @@ int main(int argc, char* argv[])
   printf("input: %s\n", argv[1]);
   printf("nodes: %d\n", g.nodes);
   printf("edges: %d\n", g.edges);
+
+  const int repeat = atoi(argv[2]);
+
   if (g.eweight == NULL) {
     fprintf(stderr, "ERROR: input graph has no edge weights\n\n");
     goto DONE;
@@ -669,7 +667,7 @@ int main(int argc, char* argv[])
     goto DONE;
   }
 
-  FW_gpu_64(g, AdjMat1);
+  FW_gpu_64(g, AdjMat1, repeat);
 
   // run on host
   AdjMat2 = (mtype*) malloc (sizeof(mtype) * g.nodes * g.nodes);
