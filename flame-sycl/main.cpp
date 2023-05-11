@@ -24,7 +24,7 @@
 #include <fstream>
 #include <cmath>
 #include <algorithm>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "flame.hpp"
 
 #define VARPARM(a,b) const_mem_params.variation_parameters[a][b]
@@ -117,25 +117,32 @@ int main(int argc, char **argv)
     }
   }
 
-  float2 *points_tmp = new float2[NUM_THREADS];
+  sycl::float2 *points_tmp = new sycl::float2[NUM_THREADS];
   for(int i = 0; i < NUM_THREADS; i++) {
     points_tmp[i].x() = (float(i) / NUM_THREADS - 0.5f) * 2.0f;
     points_tmp[i].y() = (radical_inverse(i, 2) - 0.5f) * 2.0f;
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> random_numbers(rn_tmp, NUM_RANDOMS);
-  buffer<unsigned short, 1> permutations (perm_data, NUM_THREADS * NUM_PERMUTATIONS);
-  buffer<short2, 1> short_points (NUM_THREADS);
-  buffer<short, 1> colors (NUM_THREADS);
-  buffer<float2, 1> start_points (points_tmp, NUM_THREADS);
-  buffer<float3, 1> vertices (NUM_POINTS_PER_THREAD * NUM_THREADS);
+  float *random_numbers = sycl::malloc_device<float>(NUM_RANDOMS, q);
+  q.memcpy(random_numbers, rn_tmp, NUM_RANDOMS * sizeof(float));
+
+  unsigned short *permutations = sycl::malloc_device<unsigned short>(NUM_THREADS * NUM_PERMUTATIONS, q);
+  q.memcpy(permutations, perm_data, NUM_THREADS * NUM_PERMUTATIONS * sizeof(unsigned short));
+
+  sycl::short2 *short_points = sycl::malloc_device<sycl::short2>(NUM_THREADS, q);
+
+  short *colors = sycl::malloc_device<short>(NUM_THREADS, q);
+
+  sycl::float2 *start_points = sycl::malloc_device<sycl::float2>(NUM_THREADS, q);
+  q.memcpy(start_points, points_tmp, NUM_THREADS * sizeof(sycl::float2));
+
+  sycl::float3 *vertices = sycl::malloc_device<sycl::float3>(NUM_POINTS_PER_THREAD * NUM_THREADS, q);
 
   printf("entering mainloop\n");
   struct timeval tv, tv2;
@@ -160,69 +167,55 @@ int main(int argc, char **argv)
         const_mem_params.thread_function_mapping[i - 1];
     }
 
-    range<1> gws (NUM_THREADS);
-    range<1> lws (THREADS_PER_BLOCK);
+    sycl::range<1> gws (NUM_THREADS);
+    sycl::range<1> lws (THREADS_PER_BLOCK);
 
-    q.submit([&] (handler &cgh) {
-      auto points_acc = short_points.get_access<sycl_discard_write>(cgh);
-      auto colors_acc = colors.get_access<sycl_discard_write>(cgh);
-      auto start_points_acc = start_points.get_access<sycl_read>(cgh);
-      auto perm_acc = permutations.get_access<sycl_read>(cgh);
-      auto rn_acc = random_numbers.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class init>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-         kernel_initialize (points_acc.get_pointer(), 
-                            colors_acc.get_pointer(), 
-                            perm_acc.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class init>(
+         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+         kernel_initialize (short_points,
+                            colors,
+                            permutations,
                             perm_pos, 
-                            start_points_acc.get_pointer(), 
-                            rn_acc.get_pointer(), 
+                            start_points,
+                            random_numbers,
                             const_mem_params, 
                             item);
       });
-    });
+    }).wait();
 
-    q.wait();
     perm_pos++;
 
     for(int i = 0; i < NUM_ITERATIONS; i++) {
-      q.submit([&] (handler &cgh) {
-        auto points_acc = short_points.get_access<sycl_read_write>(cgh);
-        auto colors_acc = colors.get_access<sycl_read_write>(cgh);
-        auto perm_acc = permutations.get_access<sycl_read>(cgh);
-        auto rn_acc = random_numbers.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class iterate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-           kernel_iterate (points_acc.get_pointer(), 
-                           colors_acc.get_pointer(), 
-                           perm_acc.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class iterate>(
+           sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+           kernel_iterate (short_points,
+                           colors,
+                           permutations,
                            perm_pos, 
-                           rn_acc.get_pointer(),
+                           random_numbers,
                            const_mem_params,
                            item);
         });
-      });
-      q.wait();
+      }).wait();
       perm_pos++;
       perm_pos %= NUM_PERMUTATIONS;
     }
 
-    q.submit([&] (handler &cgh) {
-      auto vertices_acc = vertices.get_access<sycl_discard_write>(cgh);
-      auto points_acc = short_points.get_access<sycl_read>(cgh);
-      auto colors_acc = colors.get_access<sycl_read>(cgh);
-      auto perm_acc = permutations.get_access<sycl_read>(cgh);
-      auto rn_acc = random_numbers.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class generate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-         kernel_generate_points (vertices_acc.get_pointer(), 
-                                 points_acc.get_pointer(), 
-                                 colors_acc.get_pointer(), 
-                                 perm_acc.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class generate>(
+         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+         kernel_generate_points (vertices,
+                                 short_points,
+                                 colors,
+                                 permutations,
                                  perm_pos, 
-                                 rn_acc.get_pointer(),
+                                 random_numbers,
                                  const_mem_params,
                                  item);
       });
-    });
-    q.wait();
+    }).wait();
     perm_pos++;
     perm_pos += NUM_POINTS_PER_THREAD - 1;
     perm_pos %= NUM_PERMUTATIONS;
@@ -234,17 +227,21 @@ int main(int argc, char **argv)
 
   #ifdef DUMP
   // dump vertices
-  float3 *pixels = new float3[NUM_POINTS_PER_THREAD * NUM_THREADS];
-  q.submit([&] (handler &cgh) {
-    auto vertices_acc = vertices.get_access<sycl_read>(cgh);
-    cgh.copy(vertices_acc, pixels);
-  }).wait();
+  sycl::float3 *pixels = new sycl::float3[NUM_POINTS_PER_THREAD * NUM_THREADS];
+  q.memcpy(pixels, vertices, NUM_POINTS_PER_THREAD * NUM_THREADS * sizeof(sycl::float3)).wait();
 
   for (int i = 0; i < NUM_POINTS_PER_THREAD * NUM_THREADS; i++)
     printf("%d x=%.1f y=%.1f color=%.1f\n", i, pixels[i].x(), pixels[i].y(), pixels[i].z());
 
   delete[] pixels;
   #endif
+
+  sycl::free(start_points, q);
+  sycl::free(short_points, q);
+  sycl::free(colors, q);
+  sycl::free(random_numbers, q);
+  sycl::free(permutations, q);
+  sycl::free(vertices, q);
 
   delete[] rn_tmp;
   delete[] points_tmp;

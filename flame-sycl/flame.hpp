@@ -60,12 +60,9 @@ struct PermSortElement
   }
 };
 
-
 unsigned mersenne_twister(unsigned *mersenne_state);
 
 float radical_inverse(unsigned int n, unsigned int base);
-
-void check_cuda_error(const char *msg);
 
 extern int num_samples;
 extern char *random_samples;

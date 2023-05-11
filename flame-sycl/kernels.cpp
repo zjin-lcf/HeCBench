@@ -61,14 +61,14 @@ get_function_idx(int idx, const ConstMemParams &params)
  * iteration
  */
 void
-kernel_initialize(short2 *short_points, 
+kernel_initialize(sycl::short2 *short_points, 
                   short *colors, 
                   const unsigned short *perms, 
                   const int perm_num,
-                  float2 *start_pos,
+                  sycl::float2 *start_pos,
                   const float *random_numbers,
                   const ConstMemParams params,
-                  nd_item<1> &item)
+                  sycl::nd_item<1> &item)
 {
   int idx = item.get_global_id(0);
 
@@ -76,7 +76,7 @@ kernel_initialize(short2 *short_points,
 
 
   int perm_idx = perms[NUM_THREADS * perm_num + idx];
-  float2 point = start_pos[perm_idx];
+  sycl::float2 point = start_pos[perm_idx];
 
   float color = 0.5f;
 
@@ -94,19 +94,19 @@ kernel_initialize(short2 *short_points,
 
 /* reads one point, applies one iteration step and writes the point out */
 void
-kernel_iterate(short2 *short_points, 
+kernel_iterate(sycl::short2 *short_points, 
                short *colors, 
                const unsigned short *perms,
                const int perm_num,
                const float *random_numbers,
                const ConstMemParams params,
-               nd_item<1> &item)
+               sycl::nd_item<1> &item)
 {
   int idx = item.get_global_id(0);
 
   int function = get_function_idx(idx, params);
 
-  float2 point;
+  sycl::float2 point;
   float color;
 
   int perm_idx = perms[NUM_THREADS * perm_num + idx];
@@ -135,27 +135,27 @@ kernel_iterate(short2 *short_points,
  * step and these new points get written into the destination VBO
  */
 void
-kernel_generate_points(float3 *vertices,
-                       short2 *short_points, 
+kernel_generate_points(sycl::float3 *vertices,
+                       sycl::short2 *short_points, 
                        short *colors, 
                        const unsigned short *perms, 
                        const int perm_num,
                        const float *random_numbers,
                        const ConstMemParams params,
-                       nd_item<1> &item)
+                       sycl::nd_item<1> &item)
 {
   int idx = item.get_global_id(0);
 
   int function = get_function_idx(idx, params);
 
-  float2 point;
+  sycl::float2 point;
   float color;
 
   for(int i = 0; i < NUM_POINTS_PER_THREAD; i++) {
     int perm_idx = perms[((perm_num + i) % NUM_PERMUTATIONS) *
       NUM_THREADS + idx];
 
-    short2 _p = short_points[perm_idx];
+    sycl::short2 _p = short_points[perm_idx];
     point.x() = sycl::vec<sycl::half, 1>{_p.x()}
                     .convert<float, sycl::rounding_mode::automatic>()[0];
     point.y() = sycl::vec<sycl::half, 1>{_p.y()}
