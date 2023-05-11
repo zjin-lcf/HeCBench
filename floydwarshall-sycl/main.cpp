@@ -25,7 +25,7 @@
 #include <assert.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define MAXDISTANCE    (200)
 
@@ -176,98 +176,89 @@ int main(int argc, char** argv) {
   memcpy(verificationPathDistanceMatrix, pathDistanceMatrix, matrixSizeBytes);
   memcpy(verificationPathMatrix, pathMatrix, matrixSizeBytes);
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    unsigned int numPasses = numNodes;
+  unsigned int numPasses = numNodes;
 
-    // assume numNodes is a multiple of blockSize
-    unsigned int globalThreads[2] = {numNodes, numNodes};
-    unsigned int localThreads[2] = {blockSize, blockSize};
+  // assume numNodes is a multiple of blockSize
+  unsigned int globalThreads[2] = {numNodes, numNodes};
+  unsigned int localThreads[2] = {blockSize, blockSize};
 
-    if((unsigned int)(localThreads[0] * localThreads[0]) >256)
-    {
-      blockSize = 16;
-      localThreads[0] = blockSize;
-      localThreads[1] = blockSize;
-    }
-
-    range<2> gws (globalThreads[0], globalThreads[1]);
-    range<2> lws (localThreads[0], localThreads[1]);
-
-    buffer<unsigned int, 1> pathDistanceBuffer (matrixSize);
-    buffer<unsigned int, 1> pathBuffer (matrixSize);
-
-    float total_time = 0.f;
-
-    for (unsigned int n = 0; n < numIterations; n++) {
-      /*
-       * The floyd Warshall algorithm is a multipass algorithm
-       * that calculates the shortest path between each pair of
-       * nodes represented by pathDistanceBuffer.
-       *
-       * In each pass a node k is introduced and the pathDistanceBuffer
-       * which has the shortest distance between each pair of nodes
-       * considering the (k-1) nodes (that are introduced in the previous
-       * passes) is updated such that
-       *
-       * ShortestPath(x,y,k) = min(ShortestPath(x,y,k-1), ShortestPath(x,k,k-1) + ShortestPath(k,y,k-1))
-       * where x and y are the pair of nodes between which the shortest distance
-       * is being calculated.
-       *
-       * pathBuffer stores the intermediate nodes through which the shortest
-       * path goes for each pair of nodes.
-       */
-
-      q.submit([&] (handler &cgh) {
-        auto acc = pathDistanceBuffer.get_access<sycl_write>(cgh);
-        cgh.copy(pathDistanceMatrix, acc);
-      });
-
-      q.wait();
-      auto start = std::chrono::steady_clock::now();
-
-      for(unsigned int k = 0; k < numPasses; k++)
-      {
-        q.submit([&] (handler &cgh) {
-          auto pathDistanceBuffer_acc = pathDistanceBuffer.get_access<sycl_read_write>(cgh);
-          auto pathBuffer_acc = pathBuffer.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class path_distance>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            int xValue = item.get_global_id(1);
-            int yValue = item.get_global_id(0); 
-
-            int oldWeight = pathDistanceBuffer_acc[yValue * numNodes + xValue];
-            int tempWeight = pathDistanceBuffer_acc[yValue * numNodes + k] + 
-                             pathDistanceBuffer_acc[k * numNodes + xValue];
-
-            if (tempWeight < oldWeight)
-            {
-                pathDistanceBuffer_acc[yValue * numNodes + xValue] = tempWeight;
-                pathBuffer_acc[yValue * numNodes + xValue] = k;
-            }
-          });
-        });
-      }
-
-      q.wait();
-      auto end = std::chrono::steady_clock::now();
-      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-      total_time += time;
-    }
-
-    printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / numIterations);
-
-    q.submit([&] (handler &cgh) {
-      auto acc = pathDistanceBuffer.get_access<sycl_read>(cgh);
-      cgh.copy(acc, pathDistanceMatrix);
-    });
-    q.wait();
+  if((unsigned int)(localThreads[0] * localThreads[0]) >256)
+  {
+    blockSize = 16;
+    localThreads[0] = blockSize;
+    localThreads[1] = blockSize;
   }
+
+  sycl::range<2> gws (globalThreads[0], globalThreads[1]);
+  sycl::range<2> lws (localThreads[0], localThreads[1]);
+
+  unsigned int *pathDistanceBuffer = sycl::malloc_device<unsigned int>(matrixSize, q);
+  unsigned int *pathBuffer = sycl::malloc_device<unsigned int>(matrixSize, q);
+
+  float total_time = 0.f;
+
+  for (unsigned int n = 0; n < numIterations; n++) {
+    /*
+     * The floyd Warshall algorithm is a multipass algorithm
+     * that calculates the shortest path between each pair of
+     * nodes represented by pathDistanceBuffer.
+     *
+     * In each pass a node k is introduced and the pathDistanceBuffer
+     * which has the shortest distance between each pair of nodes
+     * considering the (k-1) nodes (that are introduced in the previous
+     * passes) is updated such that
+     *
+     * ShortestPath(x,y,k) = min(ShortestPath(x,y,k-1), ShortestPath(x,k,k-1) + ShortestPath(k,y,k-1))
+     * where x and y are the pair of nodes between which the shortest distance
+     * is being calculated.
+     *
+     * pathBuffer stores the intermediate nodes through which the shortest
+     * path goes for each pair of nodes.
+     */
+
+    q.memcpy(pathDistanceBuffer, pathDistanceMatrix, matrixSizeBytes);
+
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+
+    for(unsigned int k = 0; k < numPasses; k++)
+    {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class path_distance>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          int xValue = item.get_global_id(1);
+          int yValue = item.get_global_id(0); 
+
+          int oldWeight = pathDistanceBuffer[yValue * numNodes + xValue];
+          int tempWeight = pathDistanceBuffer[yValue * numNodes + k] + 
+                           pathDistanceBuffer[k * numNodes + xValue];
+
+          if (tempWeight < oldWeight)
+          {
+              pathDistanceBuffer[yValue * numNodes + xValue] = tempWeight;
+              pathBuffer[yValue * numNodes + xValue] = k;
+          }
+        });
+      });
+    }
+
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+  }
+
+  printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / numIterations);
+
+  q.memcpy(pathDistanceMatrix, pathDistanceBuffer, matrixSizeBytes).wait();
+  sycl::free(pathDistanceBuffer, q);
+  sycl::free(pathBuffer, q);
 
   // verify
   floydWarshallCPUReference(verificationPathDistanceMatrix,
