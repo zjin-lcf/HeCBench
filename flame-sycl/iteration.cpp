@@ -18,9 +18,9 @@
  */
 
 void
-affine_transform(float2 &p, const float *params)
+affine_transform(sycl::float2 &p, const float *params)
 {
-  float2 tmp;
+  sycl::float2 tmp;
   tmp.x() = params[0] * p.x() + params[1] * p.y() + params[2];
   tmp.y() = params[3] * p.x() + params[4] * p.y() + params[5];
 
@@ -29,7 +29,7 @@ affine_transform(float2 &p, const float *params)
 }
 
 void
-sierpinski(float2 &p, int idx)
+sierpinski(sycl::float2 &p, int idx)
 {
   p.x() = p.x() / 2.0f;
   p.y() = p.y() / 2.0f;
@@ -49,7 +49,7 @@ sierpinski(float2 &p, int idx)
 #define M_PI 3.1415926535f
 
 void
-iteration_fractal_flame(float2 &p, 
+iteration_fractal_flame(sycl::float2 &p, 
     float &color,
     int idx,
     int threadidx,
@@ -88,7 +88,7 @@ iteration_fractal_flame(float2 &p,
         theta      = sycl::atan2(p.x(), p.y()),
         phi        = sycl::atan2(p.y(), p.x());
 
-  float2 point_out;
+  sycl::float2 point_out;
   point_out.x() = 0.0f;
   point_out.y() = 0.0f;
 
@@ -97,7 +97,7 @@ iteration_fractal_flame(float2 &p,
   for(int i = 0; i < VARIATIONS_PER_FUNCTION; i++) {
     if(sycl::fabs(vp[i].factor) < 0.01f)
       continue;
-    float2 point;
+    sycl::float2 point;
     switch(vp[i].idx) {
       /* {{{ Variations */
       case 0:
