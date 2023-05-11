@@ -2,14 +2,14 @@
 #include <stdlib.h>
 #include <chrono>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Example
 // https://pytorch.org/docs/stable/generated/torch.flip.html
 
 template <typename scalar_t>
 void flip_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const scalar_t* in_tensor,
           scalar_t* out_tensor,
     int64_t  n,
@@ -101,43 +101,42 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
   scalar_t *output = (scalar_t*) malloc(output_size_bytes);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   scalar_t *d_input, *d_output;
-  d_input = malloc_device<scalar_t>(n, q);
+  d_input = sycl::malloc_device<scalar_t>(n, q);
   q.memcpy(d_input, input, input_size_bytes);
 
-  d_output = malloc_device<scalar_t>(n, q);
+  d_output = sycl::malloc_device<scalar_t>(n, q);
 
   int64_t *d_flip_dims, *d_shape, *d_strides, *d_strides_contiguous;
 
-  d_flip_dims = malloc_device<int64_t>(num_flip_dims, q);
+  d_flip_dims = sycl::malloc_device<int64_t>(num_flip_dims, q);
   q.memcpy(d_flip_dims, flip.data(), flip_dims_bytes);
 
-  d_shape = malloc_device<int64_t>(num_dims, q);
+  d_shape = sycl::malloc_device<int64_t>(num_dims, q);
   q.memcpy(d_shape, shape.data(), dims_bytes);
 
-  d_strides = malloc_device<int64_t>(num_dims, q);
+  d_strides = sycl::malloc_device<int64_t>(num_dims, q);
   q.memcpy(d_strides, stride.data(), dims_bytes);
 
-  d_strides_contiguous = malloc_device<int64_t>(num_dims, q);
+  d_strides_contiguous = sycl::malloc_device<int64_t>(num_dims, q);
   q.memcpy(d_strides_contiguous, stride.data(), dims_bytes);
 
   const int threadsPerBlock = 256;
 
-  range<1> gws ((n + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
-  range<1> lws (threadsPerBlock);
+  sycl::range<1> gws ((n + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
+  sycl::range<1> lws (threadsPerBlock);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         flip_kernel<scalar_t>(
           item,
           d_input,
@@ -169,12 +168,12 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
 
   free(input);
   free(output);
-  free(d_input, q);
-  free(d_output, q);
-  free(d_flip_dims, q);
-  free(d_shape, q);
-  free(d_strides, q);
-  free(d_strides_contiguous, q);
+  sycl::free(d_input, q);
+  sycl::free(d_output, q);
+  sycl::free(d_flip_dims, q);
+  sycl::free(d_shape, q);
+  sycl::free(d_strides, q);
+  sycl::free(d_strides_contiguous, q);
 }
 
 int main(int argc, char* argv[])
