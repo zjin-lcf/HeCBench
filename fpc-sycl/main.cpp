@@ -1,7 +1,7 @@
 #include <stdio.h>      /* defines printf for tests */
 #include <stdlib.h> 
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 typedef unsigned long ulong;
 
@@ -117,131 +117,166 @@ unsigned f7(ulong value, bool* mask) {
   return 4;
 }
 
-void fpc (queue &q, const ulong* values, unsigned *cmp_size_hw, const int values_size, const int wgs)
+template<typename sycl::memory_scope MemoryScope = sycl::memory_scope::device>
+static inline void atomicAdd(unsigned& val, const unsigned delta)
 {
-  *cmp_size_hw = 0;
-  buffer<ulong, 1> d_values (values, values_size);
-  buffer<unsigned, 1> d_cmp_size (cmp_size_hw, 1);
-  range<1> gws (values_size);
-  range<1> lws (wgs);
-
-  q.submit([&](handler &h) {
-    auto values = d_values.get_access<sycl_read>(h);
-    auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
-    accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
-    h.parallel_for<class test1>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-
-      int gid = item.get_global_id(0);
-      int lid = item.get_local_id(0);
-      int WGS = item.get_local_range(0);
-
-      ulong value = values[gid];
-      unsigned inc;
-
-      // 000
-      if (value == 0){
-        inc = 1;
-      }
-      // 001 010
-      else if ((my_abs((int)(value)) <= 0xFF)) {
-        inc = 1;
-      }
-      // 011
-      else if ((my_abs((int)(value)) <= 0xFFFF)) {
-        inc = 2;
-      }
-      //100  
-      else if ((((value) & 0xFFFF) == 0 )) {
-        inc = 2;
-      }
-      //101
-      else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
-          && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
-        inc = 2;
-      }
-      //110
-      else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
-          (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
-          (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
-        inc = 1;
-      } else { 
-        inc = 4;
-      }
-
-      if (lid == 0) compressable[0].store(0);
-      item.barrier(access::fence_space::local_space);
-
-      atomic_fetch_add(compressable[0], inc);
-      item.barrier(access::fence_space::local_space);
-      if (lid == WGS-1) {
-        atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
-      }
-    });
-  });
+  sycl::atomic_ref<unsigned, sycl::memory_order::relaxed, 
+     MemoryScope, sycl::access::address_space::generic_space> ref(val);
+  ref.fetch_add(delta);
 }
 
-void fpc2 (queue &q, const ulong* values, unsigned *cmp_size_hw, const int values_size, const int wgs)
+void fpc_kernel (sycl::nd_item<1> &item, unsigned &compressable,
+                 const ulong* values, unsigned *cmp_size)
+{
+  int gid = item.get_global_id(0);
+  int lid = item.get_local_id(0);
+  int WGS = item.get_local_range(0);
+
+  ulong value = values[gid];
+  unsigned inc;
+
+  // 000
+  if (value == 0){
+    inc = 1;
+  }
+  // 001 010
+  else if ((my_abs((int)(value)) <= 0xFF)) {
+    inc = 1;
+  }
+  // 011
+  else if ((my_abs((int)(value)) <= 0xFFFF)) {
+    inc = 2;
+  }
+  //100  
+  else if ((((value) & 0xFFFF) == 0 )) {
+    inc = 2;
+  }
+  //101
+  else if ((my_abs((int)((value) & 0xFFFF))) <= 0xFF
+      && my_abs((int)((value >> 16) & 0xFFFF)) <= 0xFF ) {
+    inc = 2;
+  }
+  //110
+  else if( (((value) & 0xFF) == ((value >> 8) & 0xFF)) &&
+      (((value) & 0xFF) == ((value >> 16) & 0xFF)) &&
+      (((value) & 0xFF) == ((value >> 24) & 0xFF)) ) {
+    inc = 1;
+  } else { 
+    inc = 4;
+  }
+
+  if (lid == 0) compressable = 0;
+  item.barrier(sycl::access::fence_space::local_space);
+
+  atomicAdd<sycl::memory_scope::work_group>(compressable, inc);
+  item.barrier(sycl::access::fence_space::local_space);
+  if (lid == WGS-1) {
+    atomicAdd(cmp_size[0], compressable);
+  }
+}
+
+void fpc2_kernel (sycl::nd_item<1> &item, unsigned &compressable,
+                  const ulong* values, unsigned *cmp_size)
+{
+  int gid = item.get_global_id(0);
+  int lid = item.get_local_id(0);
+  int WGS = item.get_local_range(0);
+  unsigned inc;
+
+  bool m1 = 0;
+  bool m2 = 0;
+  bool m3 = 0;
+  bool m4 = 0;
+  bool m5 = 0;
+  bool m6 = 0;
+  bool m7 = 0;
+
+  ulong value = values[gid];
+  unsigned inc1 = f1(value, &m1);
+  unsigned inc2 = f2(value, &m2);
+  unsigned inc3 = f3(value, &m3);
+  unsigned inc4 = f4(value, &m4);
+  unsigned inc5 = f5(value, &m5);
+  unsigned inc6 = f6(value, &m6);
+  unsigned inc7 = f7(value, &m7);
+
+  if (m1)
+    inc = inc1;
+  else if (m2)
+    inc = inc2;
+  else if (m3)
+    inc = inc3;
+  else if (m4)
+    inc = inc4;
+  else if (m5)
+    inc = inc5;
+  else if (m6)
+    inc = inc6;
+  else
+    inc = inc7;
+
+  if (lid == 0) compressable = 0;
+  item.barrier(sycl::access::fence_space::local_space);
+
+  atomicAdd<sycl::memory_scope::work_group>(compressable, inc);
+  item.barrier(sycl::access::fence_space::local_space);
+  if (lid == WGS-1) {
+    atomicAdd(cmp_size[0], compressable);
+  }
+}
+
+void fpc (sycl::queue &q, const ulong* values, unsigned *cmp_size_hw,
+          const int values_size, const int wgs)
 {
   *cmp_size_hw = 0;
-  buffer<ulong, 1> d_values (values, values_size);
-  buffer<unsigned, 1> d_cmp_size (cmp_size_hw, 1);
 
-  range<1> gws (values_size);
-  range<1> lws (wgs);
+  ulong *d_values = sycl::malloc_device<ulong>(values_size, q);
+  q.memcpy(d_values, values, values_size * sizeof(ulong));
 
-  q.submit([&](handler &h) {
-    auto values = d_values.get_access<sycl_read>(h);
-    auto cmp_size = d_cmp_size.get_access<sycl_atomic>(h);
-    accessor<unsigned, 1, sycl_atomic, access::target::local> compressable(1, h);
-    h.parallel_for<class test2>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+  unsigned *d_cmp_size = sycl::malloc_device<unsigned>(1, q);
+  q.memset(d_cmp_size, 0, sizeof(unsigned));
 
-      int gid = item.get_global_id(0);
-      int lid = item.get_local_id(0);
-      int WGS = item.get_local_range(0);
-      unsigned inc;
+  sycl::range<1> gws (values_size);
+  sycl::range<1> lws (wgs);
 
-      bool m1 = 0;
-      bool m2 = 0;
-      bool m3 = 0;
-      bool m4 = 0;
-      bool m5 = 0;
-      bool m6 = 0;
-      bool m7 = 0;
-
-      ulong value = values[gid];
-      unsigned inc1 = f1(value, &m1);
-      unsigned inc2 = f2(value, &m2);
-      unsigned inc3 = f3(value, &m3);
-      unsigned inc4 = f4(value, &m4);
-      unsigned inc5 = f5(value, &m5);
-      unsigned inc6 = f6(value, &m6);
-      unsigned inc7 = f7(value, &m7);
-
-      if (m1)
-        inc = inc1;
-      else if (m2)
-        inc = inc2;
-      else if (m3)
-        inc = inc3;
-      else if (m4)
-        inc = inc4;
-      else if (m5)
-        inc = inc5;
-      else if (m6)
-        inc = inc6;
-      else
-        inc = inc7;
-
-      if (lid == 0) compressable[0].store(0);
-      item.barrier(access::fence_space::local_space);
-
-      atomic_fetch_add(compressable[0], inc);
-      item.barrier(access::fence_space::local_space);
-      if (lid == WGS-1) {
-        atomic_fetch_add(cmp_size[0], atomic_load(compressable[0]));
-      }
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<unsigned, 0> compressable(h);
+    h.parallel_for<class test1>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      fpc_kernel(item, compressable, d_values, d_cmp_size);
     });
   });
+
+  q.memcpy(cmp_size_hw, d_cmp_size, sizeof(unsigned)).wait();
+  sycl::free(d_values, q);
+  sycl::free(d_cmp_size, q);
+}
+
+void fpc2 (sycl::queue &q, const ulong* values, unsigned *cmp_size_hw,
+           const int values_size, const int wgs)
+{
+  *cmp_size_hw = 0;
+
+  ulong *d_values = sycl::malloc_device<ulong>(values_size, q);
+  q.memcpy(d_values, values, values_size * sizeof(ulong));
+
+  unsigned *d_cmp_size = sycl::malloc_device<unsigned>(1, q);
+  q.memset(d_cmp_size, 0, sizeof(unsigned));
+
+  sycl::range<1> gws (values_size);
+  sycl::range<1> lws (wgs);
+
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<unsigned, 0> compressable (h);
+    h.parallel_for<class test2>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      fpc2_kernel(item, compressable, d_values, d_cmp_size);
+    });
+  });
+
+  q.memcpy(cmp_size_hw, d_cmp_size, sizeof(unsigned)).wait();
+  sycl::free(d_values, q);
+  sycl::free(d_cmp_size, q);
 }
 
 int main(int argc, char** argv) {
@@ -270,12 +305,11 @@ int main(int argc, char** argv) {
 
   unsigned cmp_size_hw; 
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   bool ok = true;
  
