@@ -40,7 +40,7 @@ Authors: Martin Burtscher
 #include <string.h>
 #include <assert.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "parameters.h"
 #include "kernels.h"
 
@@ -80,62 +80,52 @@ int main(int argc, char *argv[])
   printf("%d\t#cutoff\n", CUTOFF);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<unsigned short, 1> d_data (data, length);
-  buffer<int, 1> d_best (FSMSIZE*2+3);
-  buffer<unsigned int, 1> d_state (POPCNT * POPSIZE);
-  buffer<unsigned char, 1> d_bfsm (POPCNT * FSMSIZE *2);
-  buffer<unsigned char, 1> d_same (POPCNT);
-  buffer<int, 1> d_smax (POPCNT);
-  buffer<int, 1> d_sbest (POPCNT);
-  buffer<int, 1> d_oldmax (POPCNT);
+  unsigned short *d_data = sycl::malloc_device<unsigned short>(length, q);
+  q.memcpy(d_data, data, sizeof(unsigned short) * length);
+
+  int *d_best = sycl::malloc_device<int>(FSMSIZE*2+3, q);
+  unsigned int *d_state = sycl::malloc_device<unsigned  int>(POPCNT * POPSIZE, q);
+  unsigned char *d_bfsm = sycl::malloc_device<unsigned char>(POPCNT * FSMSIZE *2, q);
+  unsigned char *d_same = sycl::malloc_device<unsigned char>(POPCNT, q);
+  int *d_smax = sycl::malloc_device<int>(POPCNT, q);
+  int *d_sbest = sycl::malloc_device<int>(POPCNT, q);
+  int *d_oldmax = sycl::malloc_device<int>(POPCNT, q);
 
   q.wait();
   gettimeofday(&starttime, NULL);
 
   for (int i = 0; i < REPEAT; i++) {
+    q.memset(d_best, 0, sizeof(int) * (FSMSIZE*2+3));
+
+    sycl::range<1> lws (POPSIZE);
+    sycl::range<1> gws (POPCNT * POPSIZE);
+
     q.submit([&](sycl::handler& cgh) {
-      auto acc = d_best.get_access<sycl_write>(cgh);
-      cgh.fill(acc, 0);
-    });
-
-    range<1> lws (POPSIZE);
-    range<1> gws (POPCNT * POPSIZE);
-
-    q.submit([&](handler& cgh) {
-      auto data = d_data.get_access<sycl_read>(cgh);
-      auto best = d_best.get_access<sycl_read_write>(cgh);
-      auto state = d_state.get_access<sycl_read_write>(cgh);
-      auto bfsm = d_bfsm.get_access<sycl_write>(cgh);
-      auto same = d_same.get_access<sycl_read_write>(cgh);
-      auto smax = d_smax.get_access<sycl_read_write>(cgh);
-      auto sbest = d_sbest.get_access<sycl_read_write>(cgh);
-      auto oldmax = d_oldmax.get_access<sycl_read_write>(cgh);
-      accessor<unsigned char, 1, sycl_read_write, access::target::local> sm (FSMSIZE*2*POPSIZE, cgh);
-      cgh.parallel_for<class fsm>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        FSMKernel(item, length,
-                  data.get_pointer(),
-                  best.get_pointer(),
-                  state.get_pointer(), 
-                  bfsm.get_pointer(),
-                  same.get_pointer(),
-                  smax.get_pointer(),
-                  sbest.get_pointer(),
-                  oldmax.get_pointer(),
+      sycl::local_accessor<unsigned char, 1> sm (sycl::range<1>(FSMSIZE*2*POPSIZE), cgh);
+      cgh.parallel_for<class fsm>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        FSMKernel(item,
+                  length,
+                  d_data,
+                  d_best,
+                  d_state,
+                  d_bfsm,
+                  d_same,
+                  d_smax,
+                  d_sbest,
+                  d_oldmax,
                   sm.get_pointer());
       });
     });
 
-    q.submit([&](handler& cgh) {
-      auto best = d_best.get_access<sycl_write>(cgh);
-      auto bfsm = d_bfsm.get_access<sycl_read>(cgh);
+    q.submit([&](sycl::handler& cgh) {
       cgh.single_task([=] () {
-         MaxKernel(best.get_pointer(), bfsm.get_pointer()); 
+         MaxKernel(d_best, d_bfsm);
       });
     });
   }
@@ -145,10 +135,7 @@ int main(int argc, char *argv[])
   runtime = endtime.tv_sec + endtime.tv_usec / 1000000.0 - starttime.tv_sec - starttime.tv_usec / 1000000.0;
   printf("%.6lf\t#runtime [s]\n", runtime / REPEAT);
 
-  q.submit([&](sycl::handler& cgh) {
-    auto acc = d_best.get_access<sycl_read>(cgh);
-    cgh.copy(acc, best);
-  }).wait();
+  q.memcpy(best, d_best, sizeof(int) * (FSMSIZE * 2 + 3)).wait();
 
   besthits = best[1];
   generations = best[2];
@@ -212,5 +199,13 @@ int main(int argc, char *argv[])
 #endif
 
   free(data);
+  sycl::free(d_data, q);
+  sycl::free(d_best, q);
+  sycl::free(d_state, q);  
+  sycl::free(d_bfsm, q);
+  sycl::free(d_same, q);
+  sycl::free(d_smax, q);
+  sycl::free(d_sbest, q);
+  sycl::free(d_oldmax, q);
   return 0;
 }
