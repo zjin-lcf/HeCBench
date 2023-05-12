@@ -325,7 +325,7 @@ DEV HOST static int_t *array_val(int_t *a, int i, int j, int n, const fbase_t *s
 GLOBAL static void calc_V_hairpin_and_V_stack
 (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
 #endif
   int d, 
   int n, 
@@ -361,11 +361,11 @@ GLOBAL static void calc_V_hairpin_and_V_stack
 #define NTHREAD 256
 #define SQRT_NTHREAD 16
 
-DEV static void free_energy_min_reduce(nd_item<3> &wi, int_t* buf, int_t *x, int tid, int nt)
+DEV static void free_energy_min_reduce(sycl::nd_item<3> &wi, int_t* buf, int_t *x, int tid, int nt)
 {
   buf[tid] = *x;
-  for (nt /= 2, wi.barrier(access::fence_space::local_space); nt > 0; 
-       nt /= 2, wi.barrier(access::fence_space::local_space))
+  for (nt /= 2, wi.barrier(sycl::access::fence_space::local_space); nt > 0; 
+       nt /= 2, wi.barrier(sycl::access::fence_space::local_space))
     if (tid < nt)
       free_energy_min(&buf[tid], buf[tid+nt]);
   if (tid == 0)
@@ -376,7 +376,7 @@ DEV static void free_energy_min_reduce(nd_item<3> &wi, int_t* buf, int_t *x, int
 
 GLOBAL static void calc_V_bulge_internal (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
   int_t *__restrict buf,
 #endif
   int d, 
@@ -438,7 +438,7 @@ GLOBAL static void calc_V_bulge_internal (
 
 GLOBAL static void calc_V_multibranch (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
 #endif
   int d,
   int n, 
@@ -484,7 +484,7 @@ GLOBAL static void calc_V_multibranch (
 
 GLOBAL static void calc_V_exterior (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
 #endif
   int d, 
   int n, 
@@ -524,7 +524,7 @@ GLOBAL static void calc_V_exterior (
 
 GLOBAL static void calc_W (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
 #endif
   int d,
   int n, 
@@ -589,7 +589,7 @@ GLOBAL static void calc_W (
 
 GLOBAL static void calc_WM (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
   int_t *__restrict buf,
 #endif
   int d,
@@ -652,7 +652,7 @@ GLOBAL static void calc_WM (
 
 GLOBAL static void calc_coaxial (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
   int_t *__restrict buf,
 #endif
   int d, 
@@ -767,7 +767,7 @@ GLOBAL static void calc_coaxial (
 
 GLOBAL static void calc_wl_coax(
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
   int_t *__restrict buf,
 #endif
   int d, 
@@ -827,7 +827,7 @@ GLOBAL static void calc_wl_coax(
 
 GLOBAL static void calc_w5_and_w3 (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
   int_t *__restrict buf,
 #endif
   int d,
@@ -891,7 +891,7 @@ GLOBAL static void calc_w5_and_w3 (
 
 GLOBAL static void init_w5_and_w3 (
 #ifdef __CUDACC__
-  nd_item<3> &wi,
+  sycl::nd_item<3> &wi,
 #endif
   int n,
   int_t *__restrict w5,
@@ -940,161 +940,129 @@ frna_t frna_new(const char *str, fparam_t par)
 #ifdef __CUDACC__ /* do multithreaded fill on GPU */
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int_t, 1> d_v (p->v, n*n); //best energy of structure closed by pair i,j. j>i: exterior fragment
-  buffer<int_t, 1> d_w (p->w, n*n); //best energy of structure from i to j
-  buffer<int_t, 1> d_wm (p->wm, n*n); //best energy of structure i to j containing 2 or more branches
-  buffer<int_t, 1> d_w5 (n+1); //best energy of structure from 1 to i
-  //w5++;//w5 is indexed from 1 -- is this a good idea?
-  buffer<int_t, 1> d_w3 (n+1); //best energy of structure from i to numberofbases
-  buffer<int_t, 1> d_wca (n*n);
-  buffer<struct fparam, 1> d_pm (par, 1);
-  buffer<fbase_t, 1> d_s (p->seq, n);
+  int_t *d_v = sycl::malloc_device<int_t>(n*n, q); //best energy of structure closed by pair i,j. j>i: exterior fragment
+  int_t *d_w = sycl::malloc_device<int_t>(n*n, q); //best energy of structure from i to j
+  int_t *d_wm = sycl::malloc_device<int_t>(n*n, q); //best energy of structure i to j containing 2 or more branches
+
+  q.memcpy(d_v, p->v, n*n*sizeof(int_t));
+  q.memcpy(d_w, p->w, n*n*sizeof(int_t));
+  q.memcpy(d_wm, p->wm, n*n*sizeof(int_t));
+
+  int_t *d_w5 = sycl::malloc_device<int_t>(n+1, q); //best energy of structure from 1 to i
+  d_w5++; // d_w5 is indexed from 1 -- is this a good idea?
+
+  int_t *d_w3 = sycl::malloc_device<int_t>(n+1, q); //best energy of structure from i to numberofbases
+  int_t *d_wca = sycl::malloc_device<int_t>(n*n, q);
+
+  struct fparam *d_pm = sycl::malloc_device<struct fparam>(1, q);
+  q.memcpy(d_pm, par, sizeof(struct fparam));
+
+  fbase_t *d_s = sycl::malloc_device<fbase_t>(n, q);
+  q.memcpy(d_s, p->seq, n*sizeof(fbase_t));
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  range<3> gws1 (1, 1, n+1);
-  range<3> lws1 (1, 1, 1);
+  sycl::range<3> gws1 (1, 1, n);
+  sycl::range<3> lws1 (1, 1, 1);
   
-  q.submit([&] (handler &cgh) {
-    auto w5 = d_w5.get_access<sycl_write>(cgh);
-    auto w3 = d_w3.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class init_w5_w3>(nd_range<3>(gws1, lws1), [=] (nd_item<3> wi) {
-      init_w5_and_w3(wi, n, w5.get_pointer(), w3.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class init_w5_w3>(
+      sycl::nd_range<3>(gws1, lws1), [=] (sycl::nd_item<3> wi) {
+      init_w5_and_w3(wi, n+1, d_w5-1, d_w3);
     });
   });
 
-  range<3> gws2 (1, 1, n);
-  range<3> lws2 (1, 1, 1);
-  range<3> gws3 (1, SQRT_NTHREAD, n*SQRT_NTHREAD);
-  range<3> lws3 (1, SQRT_NTHREAD, SQRT_NTHREAD);
-  range<3> gws4 (1, 1, n);
-  range<3> lws4 (1, 1, 1);
-  range<3> gws5 (1, 1, n);
-  range<3> lws5 (1, 1, 1);
-  range<3> gws6 (1, 1, NTHREAD*n);
-  range<3> lws6 (1, 1, NTHREAD);
-  range<3> gws7 (1, 1, n);
-  range<3> lws7 (1, 1, 1);
-  range<3> gws8 (1, 1, NTHREAD*n);
-  range<3> lws8 (1, 1, NTHREAD);
-  range<3> gws9 (1, 1, NTHREAD*n);
-  range<3> lws9 (1, 1, NTHREAD);
-  range<3> gws10 (1, 1, NTHREAD);
-  range<3> lws10 (1, 1, NTHREAD);
+  sycl::range<3> gws2 (1, 1, n);
+  sycl::range<3> lws2 (1, 1, 1);
+  sycl::range<3> gws3 (1, SQRT_NTHREAD, n*SQRT_NTHREAD);
+  sycl::range<3> lws3 (1, SQRT_NTHREAD, SQRT_NTHREAD);
+  sycl::range<3> gws4 (1, 1, n);
+  sycl::range<3> lws4 (1, 1, 1);
+  sycl::range<3> gws5 (1, 1, n);
+  sycl::range<3> lws5 (1, 1, 1);
+  sycl::range<3> gws6 (1, 1, NTHREAD*n);
+  sycl::range<3> lws6 (1, 1, NTHREAD);
+  sycl::range<3> gws7 (1, 1, n);
+  sycl::range<3> lws7 (1, 1, 1);
+  sycl::range<3> gws8 (1, 1, NTHREAD*n);
+  sycl::range<3> lws8 (1, 1, NTHREAD);
+  sycl::range<3> gws9 (1, 1, NTHREAD*n);
+  sycl::range<3> lws9 (1, 1, NTHREAD);
+  sycl::range<3> gws10 (1, 1, NTHREAD);
+  sycl::range<3> lws10 (1, 1, NTHREAD);
 
   for (int d = 0; d < n-1; d++) { //for fragment lengths (1 : n)
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_hairpin_stack>(nd_range<3>(gws2, lws2), [=] (nd_item<3> wi) {
-        calc_V_hairpin_and_V_stack(wi, d, n, s.get_pointer(), v.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_hairpin_stack>(
+        sycl::nd_range<3>(gws2, lws2), [=] (sycl::nd_item<3> wi) {
+        calc_V_hairpin_and_V_stack(wi, d, n, d_s, d_v, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      accessor<int_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_bulge>(nd_range<3>(gws3, lws3), [=] (nd_item<3> wi) {
-       calc_V_bulge_internal(wi, lmem.get_pointer(), d, n, 
-                             s.get_pointer(), v.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_bulge>(
+        sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> wi) {
+        calc_V_bulge_internal(wi, lmem.get_pointer(), d, n, d_s, d_v, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_exterior>(nd_range<3>(gws4, lws4), [=] (nd_item<3> wi) {
-        calc_V_exterior(wi, d, n, s.get_pointer(), v.get_pointer(), w5.get_pointer(), 
-                        w3.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_exterior>(
+        sycl::nd_range<3>(gws4, lws4), [=] (sycl::nd_item<3> wi) {
+        calc_V_exterior(wi, d, n, d_s, d_v, d_w5, d_w3, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto wm = d_wm.get_access<sycl_read>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_V_multibranch>(nd_range<3>(gws5, lws5), [=] (nd_item<3> wi) {
-        calc_V_multibranch(wi, d, n, s.get_pointer(), v.get_pointer(), 
-                           wm.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_V_multibranch>(
+        sycl::nd_range<3>(gws5, lws5), [=] (sycl::nd_item<3> wi) {
+        calc_V_multibranch(wi, d, n, d_s, d_v, d_wm, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto w = d_w.get_access<sycl_read>(cgh);
-      auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      accessor<int_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_coaxial>(nd_range<3>(gws6, lws6), [=] (nd_item<3> wi) {
-        calc_coaxial(wi, lmem.get_pointer(), d, n, s.get_pointer(), v.get_pointer(), 
-                     w.get_pointer(), w5.get_pointer(), w3.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_coaxial>(
+        sycl::nd_range<3>(gws6, lws6), [=] (sycl::nd_item<3> wi) {
+        calc_coaxial(wi, lmem.get_pointer(), d, n, d_s, d_v, d_w, d_w5, d_w3, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read>(cgh);
-      auto w = d_w.get_access<sycl_read_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_W>(nd_range<3>(gws7, lws7), [=] (nd_item<3> wi) {
-        calc_W(wi, d, n, s.get_pointer(), v.get_pointer(),
-               w.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_W>(
+        sycl::nd_range<3>(gws7, lws7), [=] (sycl::nd_item<3> wi) {
+        calc_W(wi, d, n, d_s, d_v, d_w, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto w = d_w.get_access<sycl_read_write>(cgh);
-      auto wm = d_wm.get_access<sycl_read_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      accessor<int_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_WM>(nd_range<3>(gws8, lws8), [=] (nd_item<3> wi) {
-        calc_WM(wi, lmem.get_pointer(), d, n, s.get_pointer(), w.get_pointer(), 
-                wm.get_pointer(), pm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_WM>(
+        sycl::nd_range<3>(gws8, lws8), [=] (sycl::nd_item<3> wi) {
+        calc_WM(wi, lmem.get_pointer(), d, n, d_s, d_w, d_wm, d_pm);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read>(cgh);
-      auto w = d_w.get_access<sycl_read_write>(cgh);
-      auto wm = d_wm.get_access<sycl_read_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      auto wca = d_wca.get_access<sycl_write>(cgh);
-      accessor<int_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_wl_coax>(nd_range<3>(gws9, lws9), [=] (nd_item<3> wi) {
-        calc_wl_coax(wi, lmem.get_pointer(), d, n, s.get_pointer(), v.get_pointer(),
-                     w.get_pointer(), wm.get_pointer(), pm.get_pointer(), wca.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_wl_coax>(
+        sycl::nd_range<3>(gws9, lws9), [=] (sycl::nd_item<3> wi) {
+        calc_wl_coax(wi, lmem.get_pointer(), d, n, d_s, d_v, d_w, d_wm, d_pm, d_wca);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read>(cgh);
-      auto w5 = d_w5.get_access<sycl_read_write>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read_write>(cgh);
-      auto pm = d_pm.get_access<sycl_read>(cgh);
-      auto wca = d_wca.get_access<sycl_read>(cgh);
-      accessor<int_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_w5_w3>(nd_range<3>(gws10, lws10), [=] (nd_item<3> wi) {
-        calc_w5_and_w3(wi, lmem.get_pointer(), d, n, s.get_pointer(), v.get_pointer(), 
-                       w5.get_pointer(), w3.get_pointer(), pm.get_pointer(), wca.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_w5_w3>(
+        sycl::nd_range<3>(gws10, lws10), [=] (sycl::nd_item<3> wi) {
+        calc_w5_and_w3(wi, lmem.get_pointer(), d, n, d_s, d_v, d_w5, d_w3, d_pm, d_wca);
       });
     });
   }
@@ -1104,32 +1072,22 @@ frna_t frna_new(const char *str, fparam_t par)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_v.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->v);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_w.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->w);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_wm.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->wm);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_w5.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->w5-1);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_w3.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->w3);
-  });
+  q.memcpy(p->v, d_v, n*n*sizeof(int_t));
+  q.memcpy(p->w, d_w, n*n*sizeof(int_t));
+  q.memcpy(p->wm, d_wm, n*n*sizeof(int_t));
+  q.memcpy(p->w5 - 1, d_w5 - 1, (n+1)*sizeof(int_t));
+  q.memcpy(p->w3, d_w3, (n+1)*sizeof(int_t));
 
   q.wait();
+
+  sycl::free(d_v, q);
+  sycl::free(d_w5 - 1, q);
+  sycl::free(d_w3, q);
+  sycl::free(d_w, q);
+  sycl::free(d_wm, q);
+  sycl::free(d_pm, q);
+  sycl::free(d_wca, q);
+  sycl::free(d_s, q);
 
 #else /* do serial fill on CPU */
 
