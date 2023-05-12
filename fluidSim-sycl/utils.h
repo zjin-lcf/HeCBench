@@ -1,17 +1,17 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 void fluidSim (
   const int iterations,
   const double omega,
   const int *dims,
   const bool *h_type,
-  double2 *u,
+  sycl::double2 *u,
   double *rho,
-  const double8 dirX,
-  const double8 dirY,
+  const sycl::double8 dirX,
+  const sycl::double8 dirY,
   const double w[9],     // Weights
         double *h_if0,
         double *h_if1234,

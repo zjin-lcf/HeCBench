@@ -28,24 +28,24 @@ int main(int argc, char * argv[])
   // Omega equals time step divided by Tau (viscosity of the fluid) 
   const double omega = 1.2f;
 
-  double8 dirX, dirY; // Directions
+  sycl::double8 dirX, dirY; // Directions
 
   // host inputs
   double *h_if0 = (double*)malloc(sizeof(double) * temp);
-  double *h_if1234 = (double*)malloc(sizeof(double4) * temp);
-  double *h_if5678 = (double*)malloc(sizeof(double4) * temp);
+  double *h_if1234 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *h_if5678 = (double*)malloc(sizeof(sycl::double4) * temp);
 
 #ifdef VERIFY
   // Reference outputs
   double *v_of0 = (double*)malloc(sizeof(double) * temp);
-  double *v_of1234 = (double*)malloc(sizeof(double4) * temp);
-  double *v_of5678 = (double*)malloc(sizeof(double4) * temp);
+  double *v_of1234 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *v_of5678 = (double*)malloc(sizeof(sycl::double4) * temp);
 #endif
 
   // Host outputs
   double *h_of0 = (double*)malloc(sizeof(double) * temp);
-  double *h_of1234 = (double*)malloc(sizeof(double4) * temp);
-  double *h_of5678 = (double*)malloc(sizeof(double4) * temp);
+  double *h_of1234 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *h_of5678 = (double*)malloc(sizeof(sycl::double4) * temp);
 
   // Cell Type - Boundary = 1 or Fluid = 0
   bool *h_type = (bool*)malloc(sizeof(bool) * temp);
@@ -54,7 +54,7 @@ int main(int argc, char * argv[])
   double *rho = (double*)malloc(sizeof(double) * temp);
   
   // Velocity
-  double2 *u = (double2*)malloc(sizeof(double2) * temp);
+  sycl::double2 *u = (sycl::double2*)malloc(sizeof(sycl::double2) * temp);
 
   // Initial velocity is nonzero for verifying host and device results
   double u0[2] = {0.01, 0.01};

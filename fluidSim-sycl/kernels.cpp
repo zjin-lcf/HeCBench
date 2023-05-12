@@ -1,21 +1,21 @@
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Thread block size
 #define GROUP_SIZE 256
 
 // Calculates equilibrium distribution 
-double ced(double rho, double weight, const double2 dir, const double2 u)
+double ced(double rho, double weight, const sycl::double2 dir, const sycl::double2 u)
 {
   double u2 = (u.x() * u.x()) + (u.y() * u.y());
   double eu = (dir.x() * u.x()) + (dir.y() * u.y());
   return rho * weight * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * u2);
 }
 
-// convert_int8() may be language specific
-inline int8 newPos (const int p, const double8 &dir) {
-  int8 np;
+// convert_sycl::int8() may be language specific
+inline sycl::int8 newPos (const int p, const sycl::double8 &dir) {
+  sycl::int8 np;
   np.s0() = p + (int)dir.s0();
   np.s1() = p + (int)dir.s1();
   np.s2() = p + (int)dir.s2();
@@ -28,16 +28,16 @@ inline int8 newPos (const int p, const double8 &dir) {
 }
 
 void lbm (
-    nd_item<2> &item, 
+    sycl::nd_item<2> &item, 
     const double *__restrict if0,
           double *__restrict of0, 
-    const double4 *__restrict if1234,
-          double4 *__restrict of1234,
-    const double4 *__restrict if5678,
-          double4 *__restrict of5678,
+    const sycl::double4 *__restrict if1234,
+          sycl::double4 *__restrict of1234,
+    const sycl::double4 *__restrict if5678,
+          sycl::double4 *__restrict of5678,
     const bool *__restrict type,
-    const double8 dirX,
-    const double8 dirY,
+    const sycl::double8 dirX,
+    const sycl::double8 dirY,
     const double *__restrict weight,
     double omega)
 {
@@ -49,16 +49,16 @@ void lbm (
 
   // Read input distributions
   double f0 = if0[pos];
-  double4 f1234 = if1234[pos];
-  double4 f5678 = if5678[pos];
+  sycl::double4 f1234 = if1234[pos];
+  sycl::double4 f5678 = if5678[pos];
 
   // intermediate results
   double e0;
-  double4 e1234;
-  double4 e5678;
+  sycl::double4 e1234;
+  sycl::double4 e5678;
 
   double rho; // Density
-  double2 u;  // Velocity
+  sycl::double2 u;  // Velocity
 
   // Collide
   if(type[pos]) // Boundary
@@ -78,20 +78,20 @@ void lbm (
     e5678.w() = f5678.y();
 
     rho = 0;
-    u = (double2)(0);
+    u = (sycl::double2)(0);
   }
   else // Fluid
   {
     // Compute Rho (density) of a cell by a reduction on f
-    double4 temp = f1234 + f5678;
+    sycl::double4 temp = f1234 + f5678;
     temp.lo() += temp.hi();
     rho = f0 + temp.x() + temp.y();
 
     // Compute u (velocity) of a cell in x and y directions
-    double4 x1234 = dirX.lo();
-    double4 x5678 = dirX.hi();
-    double4 y1234 = dirY.lo();
-    double4 y5678 = dirY.hi();
+    sycl::double4 x1234 = dirX.lo();
+    sycl::double4 x5678 = dirX.hi();
+    sycl::double4 y1234 = dirY.lo();
+    sycl::double4 y5678 = dirY.hi();
     u.x() = (sycl::dot(f1234, x1234) + sycl::dot(f5678, x5678)) / rho;
     u.y() = (sycl::dot(f1234, y1234) + sycl::dot(f5678, y5678)) / rho;
 
@@ -120,9 +120,9 @@ void lbm (
   if (t1 && t2 && t3 && t4) {
     // New positions to write (Each thread will write 8 values)
     // Note the propagation sources imply the OLD locations for each thread
-    int8 nX = newPos(idx, dirX);
-    int8 nY = newPos(idy, dirY);
-    int8 nPos = nX + (int8)(width) * nY;
+    sycl::int8 nX = newPos(idx, dirX);
+    sycl::int8 nY = newPos(idy, dirY);
+    sycl::int8 nPos = nX + (sycl::int8)(width) * nY;
 
     // Write center distribution to thread's location
     of0[pos] = e0;
@@ -158,10 +158,10 @@ void fluidSim (
   const double omega,
   const int *dims,
   const bool *h_type,
-  double2 *u,
+  sycl::double2 *u,
   double *rho,
-  const double8 dirX,
-  const double8 dirY,
+  const sycl::double8 dirX,
+  const sycl::double8 dirY,
   const double w[9],
         double *h_if0,
         double *h_if1234,
@@ -171,102 +171,80 @@ void fluidSim (
         double *h_of5678)
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   int groupSize = GROUP_SIZE;
   size_t temp = dims[0] * dims[1];
 
+  size_t dbl_size = temp * sizeof(double);
+  size_t dbl4_size = temp * sizeof(sycl::double4);
+  size_t bool_size = temp * sizeof(bool);
+
   // allocate and initialize device buffers
-  buffer<double, 1> d_if0 (h_if0, temp);
-  d_if0.set_final_data(nullptr);
-  buffer<double, 1> d_of0 (temp);
-  buffer<double4, 1> d_if1234 (temp);
-  buffer<double4, 1> d_if5678 (temp);
-  buffer<double4, 1> d_of1234 (temp);
-  buffer<double4, 1> d_of5678 (temp);
+  double *d_if0 = sycl::malloc_device<double>(temp, q);
+  q.memcpy(d_if0, h_if0, dbl_size);
 
-  q.submit([&] (handler &cgh) {
-    auto in = d_if0.get_access<sycl_read>(cgh);
-    auto out = d_of0.get_access<sycl_discard_write>(cgh);
-    cgh.copy(in, out);
-  });
+  double *d_of0 = sycl::malloc_device<double>(temp, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_if1234.get_access<sycl_discard_write>(cgh);
-    cgh.copy((double4*)h_if1234, acc);
-  });
+  sycl::double4 *d_if1234 = sycl::malloc_device<sycl::double4>(temp, q);
+  sycl::double4 *d_if5678 = sycl::malloc_device<sycl::double4>(temp, q);
+  sycl::double4 *d_of1234 = sycl::malloc_device<sycl::double4>(temp, q);
+  sycl::double4 *d_of5678 = sycl::malloc_device<sycl::double4>(temp, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_if5678.get_access<sycl_discard_write>(cgh);
-    cgh.copy((double4*)h_if5678, acc);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto in = d_if1234.get_access<sycl_read>(cgh);
-    auto out = d_of1234.get_access<sycl_discard_write>(cgh);
-    cgh.copy(in, out);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto in = d_if5678.get_access<sycl_read>(cgh);
-    auto out = d_of5678.get_access<sycl_discard_write>(cgh);
-    cgh.copy(in, out);
-  });
+  q.memcpy(d_of0, d_if0, dbl_size);
+  q.memcpy(d_if1234, (sycl::double4*)h_if1234, dbl4_size);
+  q.memcpy(d_if5678, (sycl::double4*)h_if5678, dbl4_size);
+  q.memcpy(d_of1234, d_if1234, dbl4_size);
+  q.memcpy(d_of5678, d_if5678, dbl4_size);
 
   // Constant bool array for position type = boundary or fluid
-  buffer<bool, 1> d_type (h_type, temp);
+  bool *d_type = sycl::malloc_device<bool>(temp, q);
+  q.memcpy(d_type, h_type, bool_size);
 
   // Weights for each distribution
-  buffer<double, 1> d_weight (w, 9);
+  double *d_weight = sycl::malloc_device<double>(9, q);
+  q.memcpy(d_weight, w, 9 * sizeof(double));
 
-  range<2> lws (1, groupSize);
-  range<2> gws (dims[1], dims[0]); 
+  sycl::range<2> lws (1, groupSize);
+  sycl::range<2> gws (dims[1], dims[0]); 
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int i = 0; i < iterations; ++i) {
-    q.submit([&] (handler &cgh) {
-      auto if0 = d_if0.get_access<sycl_read>(cgh);
-      auto of0 = d_of0.get_access<sycl_write>(cgh);
-      auto if1234 = d_if1234.get_access<sycl_read>(cgh);
-      auto of1234 = d_of1234.get_access<sycl_write>(cgh);
-      auto if5678 = d_if5678.get_access<sycl_read>(cgh);
-      auto of5678 = d_of5678.get_access<sycl_write>(cgh);
-      auto w = d_weight.get_access<sycl_read>(cgh);
-      auto t = d_type.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class fluidSim>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class fluidSim>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         lbm(item,
-            if0.get_pointer(),
-            of0.get_pointer(), 
-            if1234.get_pointer(),
-            of1234.get_pointer(),
-            if5678.get_pointer(),
-            of5678.get_pointer(),
-            t.get_pointer(),
+            d_if0,
+            d_of0,
+            d_if1234,
+            d_of1234,
+            d_if5678,
+            d_of5678,
+            d_type,
             dirX,
             dirY,
-            w.get_pointer(),
+            d_weight,
             omega);
       });
     });
 
     // Swap device buffers
-    auto temp0 = std::move(d_of0);
-    auto temp1234 = std::move(d_of1234);
-    auto temp5678 = std::move(d_of5678);
+    auto temp0 = d_of0;
+    auto temp1234 = d_of1234;
+    auto temp5678 = d_of5678;
 
-    d_of0 = std::move(d_if0);
-    d_of1234 = std::move(d_if1234);
-    d_of5678 = std::move(d_if5678);
+    d_of0 = d_if0;
+    d_of1234 = d_if1234;
+    d_of5678 = d_if5678;
 
-    d_if0 = std::move(temp0);
-    d_if1234 = std::move(temp1234);
-    d_if5678 = std::move(temp5678);
+    d_if0 = temp0;
+    d_if1234 = temp1234;
+    d_if5678 = temp5678;
   }
 
   q.wait();
@@ -274,20 +252,17 @@ void fluidSim (
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_if0.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_of0);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_if1234.get_access<sycl_read>(cgh);
-    cgh.copy(acc, (double4*)h_of1234);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_if5678.get_access<sycl_read>(cgh);
-    cgh.copy(acc, (double4*)h_of5678);
-  });
-
+  q.memcpy(h_of0, d_if0, dbl_size);
+  q.memcpy((sycl::double4*)h_of1234, d_if1234, dbl4_size);
+  q.memcpy((sycl::double4*)h_of5678, d_if5678, dbl4_size);
   q.wait();
+
+  free(d_if0, q);
+  free(d_of0, q);
+  free(d_if1234, q);
+  free(d_of1234, q);
+  free(d_if5678, q);
+  free(d_of5678, q);
+  free(d_type, q);
+  free(d_weight, q);
 }
