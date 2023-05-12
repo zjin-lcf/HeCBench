@@ -210,15 +210,17 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   }
   fclose(fp);
 
+  const int num_warps = blocks * warpsperblock;
+
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data
   if (dbuf == NULL) {
     fprintf(stderr, "cannot allocate dbuf\n");
   }
-  int *cut = (int *)malloc(sizeof(int) * blocks * warpsperblock); // chunk boundaries
+  int *cut = (int *)malloc(sizeof(int) * num_warps); // chunk boundaries
   if (cut == NULL) {
     fprintf(stderr, "cannot allocate cut\n");
   }
-  int *off = (int *)malloc(sizeof(int) * blocks * warpsperblock); // offset table
+  int *off = (int *)malloc(sizeof(int) * num_warps); // offset table
   if (off == NULL) {
     fprintf(stderr, "cannot allocate off\n");
   }
@@ -228,11 +230,11 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   doubles += padding;
 
   // determine chunk assignments per warp
-  int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock);
+  int per = (doubles + num_warps - 1) / (num_warps);
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
   int curr = 0, before = 0, d = 0;
-  for (int i = 0; i < blocks * warpsperblock; i++) {
+  for (int i = 0; i < num_warps; i++) {
     curr += per;
     cut[i] = min(curr, doubles);
     if (cut[i] - before > 0) {
@@ -253,9 +255,9 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   }
 
   #pragma omp target data map (to: cbuf[0:doubles], \
-                                    cut[0:blocks * warpsperblock]) \
+                                    cut[0:num_warps]) \
                           map (alloc: dbuf[0:(doubles+1)/2*17],\
-                                       off[0:blocks * warpsperblock])
+                                       off[0:num_warps])
   {
     auto start = std::chrono::steady_clock::now();
  
@@ -268,7 +270,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
     fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
     // transfer offsets back to CPU
-    #pragma omp target update from (off[0:blocks * warpsperblock])
+    #pragma omp target update from (off[0:num_warps])
 
     // output header
     fp = fopen("output.bin", "wb");
@@ -287,7 +289,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
     num = fwrite(&doublecnt, 4, 1, fp);
     assert(1 == num);
     // output offset table
-    for(int i = 0; i < blocks * warpsperblock; i++) {
+    for(int i = 0; i < num_warps; i++) {
       int start = 0;
       if(i > 0) start = cut[i-1];
       off[i] -= ((start+1)/2*17);
@@ -295,7 +297,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
       assert(1 == num);
     }
     // output compressed data by chunk
-    for(int i = 0; i < blocks * warpsperblock; i++) {
+    for(int i = 0; i < num_warps; i++) {
       int offset, start = 0;
       if(i > 0) start = cut[i-1];
       offset = ((start+1)/2*17);
