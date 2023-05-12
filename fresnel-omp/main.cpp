@@ -24,9 +24,10 @@ int main(int argc, char *argv[])
   // range [0, 8], interval 1e-7
   const double interval = 1e-7;
   const int points = (int)(8.0 / interval);
-  double *x = (double*) malloc (sizeof(double) * points);
-  double *output = (double*) malloc (sizeof(double) * points);
-  double *h_output = (double*) malloc (sizeof(double) * points);
+  const size_t points_size = points * sizeof(double);
+  double *x = (double*) malloc (points_size);
+  double *output = (double*) malloc (points_size);
+  double *h_output = (double*) malloc (points_size);
   for (int i = 0; i < points; i++)
     x[i] = (double)i * interval;
 	   
