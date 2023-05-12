@@ -79,15 +79,17 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
   }
   fclose(fp);
 
+  const int num_warps = blocks * warpsperblock;
+
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data
   if (dbuf == NULL) {
     fprintf(stderr, "cannot allocate dbuf\n");
   }
-  int *cut = (int *)malloc(sizeof(int) * blocks * warpsperblock); // chunk boundaries
+  int *cut = (int *)malloc(sizeof(int) * num_warps); // chunk boundaries
   if (cut == NULL) {
     fprintf(stderr, "cannot allocate cut\n");
   }
-  int *off = (int *)malloc(sizeof(int) * blocks * warpsperblock); // offset table
+  int *off = (int *)malloc(sizeof(int) * num_warps); // offset table
   if (off == NULL) {
     fprintf(stderr, "cannot allocate off\n");
   }
@@ -97,11 +99,11 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
   doubles += padding;
 
   // determine chunk assignments per warp
-  int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock);
+  int per = (doubles + num_warps - 1) / (num_warps);
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
   int curr = 0, before = 0, d = 0;
-  for (int i = 0; i < blocks * warpsperblock; i++) {
+  for (int i = 0; i < num_warps; i++) {
     curr += per;
     cut[i] = std::min(curr, doubles);
     if (cut[i] - before > 0) {
@@ -127,15 +129,15 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
 
   char *dbufd = sycl::malloc_device<char>((doubles + 1) / 2 * 17, q); // compressed data
 
-  int *cutd = sycl::malloc_device<int>(blocks * warpsperblock, q); // chunk boundaries
-  q.memcpy(cutd, cut, blocks * warpsperblock * sizeof(int));
+  int *cutd = sycl::malloc_device<int>(num_warps, q); // chunk boundaries
+  q.memcpy(cutd, cut, num_warps * sizeof(int));
 
-  int *offd = sycl::malloc_device<int>(blocks * warpsperblock, q); // offset table
+  int *offd = sycl::malloc_device<int>(num_warps, q); // offset table
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  sycl::range<1> gws (blocks * WARPSIZE * warpsperblock);
+  sycl::range<1> gws (WARPSIZE * num_warps);
   sycl::range<1> lws (WARPSIZE * warpsperblock);
 
   for (int i = 0; i < repeat; i++) {
@@ -155,7 +157,7 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
   fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer offsets back to CPU
-  q.memcpy(off, offd, sizeof(int) * blocks * warpsperblock).wait();
+  q.memcpy(off, offd, sizeof(int) * num_warps).wait();
 
   // output header
   fp = fopen("output.bin", "wb");
@@ -174,7 +176,7 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
   num = fwrite(&doublecnt, 4, 1, fp);
   assert(1 == num);
   // output offset table
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int start = 0;
     if(i > 0) start = cut[i-1];
     off[i] -= ((start+1)/2*17);
@@ -182,7 +184,7 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
     assert(1 == num);
   }
   // output compressed data by chunk
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int offset, start = 0;
     if(i > 0) start = cut[i-1];
     offset = ((start+1)/2*17);
