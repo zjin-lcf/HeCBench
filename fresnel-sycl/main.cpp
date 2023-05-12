@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 SYCL_EXTERNAL
 double Fresnel_Sine_Integral(double);
@@ -23,45 +23,46 @@ int main(int argc, char *argv[])
   // range [0, 8], interval 1e-7
   const double interval = 1e-7;
   const int points = (int)(8.0 / interval);
-  double *x = (double*) malloc (sizeof(double) * points);
-  double *output = (double*) malloc (sizeof(double) * points);
-  double *h_output = (double*) malloc (sizeof(double) * points);
+  const size_t points_size = points * sizeof(double);
+  double *x = (double*) malloc (points_size);
+  double *output = (double*) malloc (points_size);
+  double *h_output = (double*) malloc (points_size);
   for (int i = 0; i < points; i++)
     x[i] = (double)i * interval;
 	   
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-  buffer<double, 1> d_x (x, points);
-  buffer<double, 1> d_output (output, points);
+  double *d_x = sycl::malloc_device<double>(points, q);
+  q.memcpy(d_x, x, points_size);
 
-  range<1> gws ((points + 255)/256*256);
-  range<1> lws (256);
+  double *d_output = sycl::malloc_device<double>(points, q);
+
+  sycl::range<1> gws ((points + 255)/256*256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      auto input = d_x.get_access<sycl_read>(cgh);
-      auto output = d_output.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class fresnel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class fresnel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
-        if (i < points) output[i] = Fresnel_Sine_Integral(input[i]);
+        if (i < points) d_output[i] = Fresnel_Sine_Integral(d_x[i]);
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(output, d_output, points_size).wait();
 
   // verify
   reference(x, h_output, points);
@@ -75,6 +76,8 @@ int main(int argc, char *argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
   
+  sycl::free(d_x, q);
+  sycl::free(d_output, q);
   free(x);
   free(output);
   free(h_output);
