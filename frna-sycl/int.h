@@ -37,7 +37,7 @@ typedef long int int_t;
 #endif
 
 #ifdef __CUDACC__
-#include "common.h"
+#include <sycl/sycl.hpp>
 #define LOG sycl::log
 #define ABS sycl::abs
 #else
