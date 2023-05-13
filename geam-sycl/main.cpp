@@ -48,24 +48,16 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
       start = std::chrono::steady_clock::now();
     }
     try {
-      status = oneapi::mkl::blas::row_major::omatadd_batch(
+      status = oneapi::mkl::blas::row_major::omatcopy(
         q,
         oneapi::mkl::transpose::trans,
-        oneapi::mkl::transpose::nontrans,
         nrow,
         ncol,
         alpha,
         d_matrix,
         ncol,
-        size,
-        beta,
-        d_matrix,
-        nrow,
-        size,
         d_matrixT,
-        nrow,
-        size,
-        1);
+        nrow);
     } catch(sycl::exception const& e) {
       std::cout << "\t\tCaught SYCL exception during omatadd_batch:\n"
                 << e.what() << std::endl;
@@ -111,11 +103,10 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   printf("----------------FP32 transpose matrix (%d x %d)----------------\n",
          nrow, ncol);
