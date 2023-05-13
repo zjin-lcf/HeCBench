@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 float  distance_host ( int i, float latitude_1, float longitude_1,
                        float latitude_2, float longitude_2 )
@@ -75,28 +75,28 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
 
 void distance_device(const sycl::float4* VA, float* VC, const size_t N, const int iteration) {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<1> gws ((N+255)/256*256);
-  range<1> lws (256);
-  const  property_list props = { property::buffer::use_host_ptr()};
-  buffer<sycl::float4, 1> bufferA(VA, N, props);
-  buffer<float, 1> bufferC(VC, N, props);
+  sycl::range<1> gws ((N+255)/256*256);
+  sycl::range<1> lws (256);
+
+  sycl::float4 *d_A = sycl::malloc_device<sycl::float4>(N, q);
+  q.memcpy(d_A, VA, N * sizeof(sycl::float4));
+
+  float *d_C = sycl::malloc_device<float>(N, q);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < iteration; n++) {
-    q.submit([&](handler& cgh) {
-      auto accessorA = bufferA.get_access<sycl_read>(cgh);
-      auto accessorC = bufferC.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class geodesic_distance>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        const int wiID = item.get_global_id(0);
-        if (wiID >= N) return;
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class geodesic_distance>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        const int i = item.get_global_id(0);
+        if (i >= N) return;
 
         const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
         const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
@@ -107,7 +107,7 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
         float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
         D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-        const float4 rad4 = accessorA[wiID] * GDC_DEG_TO_RAD; 
+        const sycl::float4 rad4 = d_A[i] * GDC_DEG_TO_RAD; 
         const float rad_latitude_1  = rad4.x();
         const float rad_longitude_1 = rad4.y();
         const float rad_latitude_2  = rad4.z();
@@ -155,7 +155,7 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
         dist = 1.0f - E - E ;
         dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
                 X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
-        accessorC[wiID] = dist;
+        d_C[i] = dist;
       });
     });
   }
@@ -164,6 +164,10 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+
+  q.memcpy(VC, d_C, N * sizeof(float)).wait();
+  sycl::free(d_A, q);
+  sycl::free(d_C, q);
 }
 
 void verify( int size, const float *output, const float *expected_output) {
