@@ -27,7 +27,7 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Reference CPU FWT
 extern"C" void fwtCPU(float *h_Output, float *h_Input, int log2N);
@@ -85,33 +85,21 @@ int main(int argc, char *argv[])
   printf("Running GPU dyadic convolution using Fast Walsh Transform...\n");
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_Data (dataN);
-  buffer<float, 1> d_Kernel (dataN);
+  float *d_Data = sycl::malloc_device<float>(dataN, q);
+  float *d_Kernel = sycl::malloc_device<float>(dataN, q);
 
   float total_time = 0.f;
 
   for (i = 0; i < repeat; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_Kernel.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);  
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_Kernel.get_access<sycl_write>(cgh, range<1>(kernelN));
-      cgh.copy(h_Kernel, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_Data.get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_Data, acc);
-    });
+    q.memset(d_Kernel, 0, DATA_SIZE);
+    q.memcpy(d_Kernel, h_Kernel, KERNEL_SIZE);
+    q.memcpy(d_Data, h_Data, DATA_SIZE);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
@@ -129,10 +117,10 @@ int main(int argc, char *argv[])
   printf("Average device execution time %f (s)\n", (total_time * 1e-9f) / repeat);
 
   printf("Reading back GPU results...\n");
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Data.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_ResultGPU);
-  }).wait();
+  q.memcpy(h_ResultGPU, d_Data, DATA_SIZE).wait();
+
+  sycl::free(d_Data, q);
+  sycl::free(d_Kernel, q);
 
   printf("Running straightforward CPU dyadic convolution...\n");
   dyadicConvolutionCPU(h_ResultCPU, h_Data, h_Kernel, log2Data, log2Kernel);

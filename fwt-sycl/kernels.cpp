@@ -17,7 +17,7 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
                      const float *__restrict d_Input,
                            float *__restrict s_data,
                            int log2N,
-                           nd_item<1> &item)
+                           sycl::nd_item<1> &item)
 {
     int lid = item.get_local_id(0);
     int gid = item.get_group(0);
@@ -46,7 +46,7 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
         int i2 = i1 + stride;
         int i3 = i2 + stride;
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         float D0 = s_data[i0];
         float D1 = s_data[i1];
         float D2 = s_data[i2];
@@ -70,7 +70,7 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
     //Do single radix-2 stage for odd power of two
     if (log2N & 1)
     {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         for (int pos = lid; pos < N / 2; pos += gsz)
         {
@@ -84,7 +84,7 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
         }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     for (int pos = lid; pos < N; pos += gsz)
     {
@@ -97,7 +97,7 @@ void fwtBatch1Kernel(      float *__restrict d_Output,
 void fwtBatch2Kernel(
           float *__restrict d_Output,
     const float *__restrict d_Input,
-    int stride, nd_item<2> &item)
+    int stride, sycl::nd_item<2> &item)
 {
     const int gidx = item.get_group(1);
     const int lidx = item.get_local_id(1);
@@ -138,36 +138,34 @@ void fwtBatch2Kernel(
 }
 
 // Put everything together: batched Fast Walsh Transform CPU front-end
-void fwtBatchGPU(queue &q, buffer<float, 1> &d_Data, int M, int log2N)
+void fwtBatchGPU(sycl::queue &q, float *data, int M, int log2N)
 {
     const int THREAD_N = 256;
 
     int N = 1 << log2N;
 
-    range<2> gws (M, N / (4 * THREAD_N) * THREAD_N);
-    range<2> lws (1, THREAD_N);
+    sycl::range<2> gws (M, N / (4 * THREAD_N) * THREAD_N);
+    sycl::range<2> lws (1, THREAD_N);
 
     for (; log2N > ELEMENTARY_LOG2SIZE; log2N -= 2, N >>= 2, M <<= 2)
     {
-      q.submit([&] (handler &cgh) {
-        auto out = d_Data.get_access<sycl_write>(cgh);
-        auto in = d_Data.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class fwt2>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          fwtBatch2Kernel(out.get_pointer(), in.get_pointer(), N / 4, item);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class fwt2>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          fwtBatch2Kernel(data, data, N / 4, item);
         });
       });
     }
 
-    range<1> gws2 (M * N / 4);
-    range<1> lws2 (N/4);
+    sycl::range<1> gws2 (M * N / 4);
+    sycl::range<1> lws2 (N/4);
 
-    q.submit([&] (handler &cgh) {
-      auto out = d_Data.get_access<sycl_write>(cgh);
-      auto in = d_Data.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> lmem(N, cgh);
-      cgh.parallel_for<class fwt1>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
-        fwtBatch1Kernel( out.get_pointer(),
-                         in.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> lmem (sycl::range<1>(N), cgh);
+      cgh.parallel_for<class fwt1>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
+        fwtBatch1Kernel( data,
+                         data,
                          lmem.get_pointer(),
                          log2N, item);
       });
@@ -175,16 +173,15 @@ void fwtBatchGPU(queue &q, buffer<float, 1> &d_Data, int M, int log2N)
 }
 
 // Modulate two arrays
-void modulateGPU(queue &q, buffer<float, 1> &d_A, buffer<float, 1> &d_B, int N)
+void modulateGPU(sycl::queue &q, float *a, const float *b, int N)
 {
-    range<1> gws (128*256);
-    range<1> lws (256);
+    sycl::range<1> gws (128*256);
+    sycl::range<1> lws (256);
     float rcpN = 1.0f / (float)N;
 
-    q.submit([&] (handler &cgh) {
-      auto a = d_A.get_access<sycl_read_write>(cgh);
-      auto b = d_B.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class modulate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class modulate>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int        tid = item.get_global_id(0);
         int numThreads = item.get_group_range(0) * item.get_local_range(0);
 
