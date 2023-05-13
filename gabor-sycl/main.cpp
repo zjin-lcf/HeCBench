@@ -2,11 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 void gabor (
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   double *gabor_spatial,
   const unsigned int height,
   const unsigned int width,
@@ -29,7 +29,8 @@ void gabor (
     centered_x = (double)x - center_x;
     u = ctheta * centered_x - stheta * centered_y;
     v = ctheta * centered_y + stheta * centered_x;
-    gabor_spatial[y*width + x] = scale * sycl::exp(-0.5*(u*u/sx_2 + v*v/sy_2)) * sycl::cos(2.0*M_PI*fx*u);
+    gabor_spatial[y*width + x] = scale * sycl::exp(-0.5*(u*u/sx_2 + v*v/sy_2)) *
+                                 sycl::cos(2.0*M_PI*fx*u);
   }
 }
 
@@ -55,28 +56,27 @@ double* generateGaborKernelDevice(
   size_t image_size_bytes = height * width * sizeof(double);
   double *h_gabor_spatial = (double*) malloc (image_size_bytes);
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<double, 1> d_gabor_spatial(h_gabor_spatial, height * width);
+  double *d_gabor_spatial = sycl::malloc_device<double>(height * width, q);
+  q.memcpy(d_gabor_spatial, h_gabor_spatial, image_size_bytes);
 
-  range<2> gws ((height+15)/16*16, (width+15)/16*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((height+15)/16*16, (width+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto output = d_gabor_spatial.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class g>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class image_process>(
+         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
          gabor(item,
-               output.get_pointer(),
+               d_gabor_spatial,
                height,
                width, 
                center_y,
@@ -96,7 +96,8 @@ double* generateGaborKernelDevice(
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  } // sycl scope
+  q.memcpy(h_gabor_spatial, d_gabor_spatial, image_size_bytes).wait();
+  sycl::free(d_gabor_spatial, q);
 
   return h_gabor_spatial;
 }
