@@ -1,7 +1,7 @@
 #include <math.h>
 #include <sys/time.h>
+#include <sycl/sycl.hpp>
 #include "gaussianElim.h"
-#include "common.h"
 
 #define BLOCK_SIZE_0 256
 #define BLOCK_SIZE_1_X 16
@@ -185,30 +185,29 @@ int main(int argc, char *argv[]) {
 void ForwardSub(float *a, float *b, float *m, int size, int timing) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  range<1> lws(BLOCK_SIZE_0);
-  range<1> gws((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0 * BLOCK_SIZE_0);
+  sycl::range<1> lws(BLOCK_SIZE_0);
+  sycl::range<1> gws((size + BLOCK_SIZE_0 - 1) / BLOCK_SIZE_0 * BLOCK_SIZE_0);
 
-  range<2> lws2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
-  range<2> gws2((size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
-                (size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y);
+  sycl::range<2> lws2(BLOCK_SIZE_1_X, BLOCK_SIZE_1_Y);
+  sycl::range<2> gws2((size + BLOCK_SIZE_1_X - 1) / BLOCK_SIZE_1_X * BLOCK_SIZE_1_X,
+                      (size + BLOCK_SIZE_1_Y - 1) / BLOCK_SIZE_1_Y * BLOCK_SIZE_1_Y);
 
   size_t nelem = size * size;
   size_t nelems_bytes = nelem * sizeof(float);
   size_t size_bytes = size * sizeof(float);
 
-  float *d_a = malloc_device<float>(nelem, q);
+  float *d_a = sycl::malloc_device<float>(nelem, q);
   q.memcpy(d_a, a, nelems_bytes);
 
-  float *d_b = malloc_device<float>(size, q);
+  float *d_b = sycl::malloc_device<float>(size, q);
   q.memcpy(d_b, b, size_bytes);
 
-  float *d_m = malloc_device<float>(nelem, q);
+  float *d_m = sycl::malloc_device<float>(nelem, q);
   q.memcpy(d_m, m, nelems_bytes);
 
   q.wait();
@@ -216,8 +215,9 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing) {
 
   // Run kernels
   for (int t=0; t<(size-1); t++) {
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class fan1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class fan1>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int globalId = item.get_global_id(0);
         if (globalId < size-1-t) {
           d_m[size * (globalId + t + 1) + t] = 
@@ -226,8 +226,9 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing) {
       });
     });
 
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class fan2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class fan2>(
+        sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
         int globalIdx = item.get_global_id(0);
         int globalIdy = item.get_global_id(1);
         if (globalIdx < size-1-t && globalIdy < size-t) {
@@ -253,9 +254,9 @@ void ForwardSub(float *a, float *b, float *m, int size, int timing) {
   q.memcpy(m, d_m, nelems_bytes);
   q.wait();
 
-  free(d_a, q);
-  free(d_b, q);
-  free(d_m, q);
+  sycl::free(d_a, q);
+  sycl::free(d_b, q);
+  sycl::free(d_m, q);
 }
 
 int parseCommandline(int argc, char *argv[], char* filename,
