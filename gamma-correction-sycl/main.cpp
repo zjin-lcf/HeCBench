@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.hpp"
 
 int main(int argc, char* argv[]) {
@@ -25,8 +25,8 @@ int main(int argc, char* argv[]) {
 
   // Lambda to process image with gamma = 2
   auto gamma_f = [](ImgPixel& pixel) {
-    float v = (0.3f * pixel.r + 0.59f * pixel.g + 0.11f * pixel.b) / 255.0;
-    std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
+    float v = (0.3f * pixel.r + 0.59f * pixel.g + 0.11f * pixel.b) / 255.f;
+    std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255.f * v * v);
     if (gamma_pixel > 255) gamma_pixel = 255;
     pixel.set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
   };
@@ -57,35 +57,31 @@ int main(int argc, char* argv[]) {
 #endif
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<ImgPixel, 1> d_image (image2.width() * image2.height());
+  ImgPixel *pixel = sycl::malloc_device<ImgPixel>(
+    image2.width() * image2.height(), q);
 
-  range<1> gws (width * height);
-  range<1> lws (block_size); 
+  sycl::range<1> gws (width * height);
+  sycl::range<1> lws (block_size); 
 
   float total_time = 0.f;
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler& cgh) { 
-      auto acc = d_image.get_access<sycl_write>(cgh);
-      cgh.copy(image2.data(), acc);
-    }).wait();
+    q.memcpy(pixel, image2.data(), sizeof(ImgPixel) * image2.width() * image2.height()).wait();
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&](handler& cgh) { 
-      auto pixel = d_image.get_access<sycl_read_write>(cgh);
+    q.submit([&](sycl::handler& cgh) { 
       cgh.parallel_for<class gamma_correction>( 
-        nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0); 
         // Lambda to process image with gamma = 2
         const float v = (0.3f * pixel[i].r + 0.59f * pixel[i].g + 0.11f * pixel[i].b) / 255.f;
-        std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
+        std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255.f * v * v);
         if (gamma_pixel > 255) gamma_pixel = 255;
         pixel[i].set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
       });
@@ -98,10 +94,7 @@ int main(int argc, char* argv[]) {
   
   printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / repeat);
 
-  q.submit([&](handler& cgh) { 
-    auto acc = d_image.get_access<sycl_read>(cgh);
-    cgh.copy(acc, image2.data());
-  }).wait();
+  q.memcpy(image2.data(), pixel, sizeof(ImgPixel) * image2.width() * image2.height()).wait();
 
   // check correctness
   if (check(image.begin(), image.end(), image2.begin())) {
@@ -113,5 +106,7 @@ int main(int argc, char* argv[]) {
 #ifdef DEBUG
   image.write("fractal_gamma_parallel.bmp");
 #endif
+  sycl::free(pixel, q); 
+
   return 0;
 }
