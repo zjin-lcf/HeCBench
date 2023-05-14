@@ -87,11 +87,13 @@ int main(int argc, char** argv) {
   float* B = 0;
   float* C = 0;
   float* golden = 0;
-  float* A_data_dev = 0;
-  int* A_indices_dev = 0;
-  int* A_indptr_dev = 0;
-  float* B_dev = 0;
-  float* C_dev = 0;
+
+  // Device allocate
+  float* A_data_dev = nullptr;
+  int* A_indices_dev = nullptr;
+  int* A_indptr_dev = nullptr;
+  float* B_dev = nullptr;
+  float* C_dev = nullptr;
 
   printf("reading data file ...\n");
   readMtx<float>(argv[1], row_indices, col_indices, values, A_nrows, A_ncols, nnz);
@@ -195,7 +197,7 @@ int main(int argc, char** argv) {
       hipDeviceSynchronize();
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-      printf("Average kernel (method %d) execution time %f (s)\n", method, (time * 1e-9f) / repeat);
+      printf("Average kernel (method %d) execution time %f (us)\n", method, (time * 1e-3f) / repeat);
 
       checkHipError(hipMemcpy(C, C_dev, A_nrows*B_ncols*sizeof(C[0]), hipMemcpyDeviceToHost));
       #ifdef VALIDATE
