@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <vector>
 #include <fstream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 #include "./util/mmio.hpp"
@@ -21,84 +22,69 @@
     if (B) free(B); \
     if (C) free(C); \
     if (golden) free(golden); \
+    if (A_data_dev) sycl::free(A_data_dev, q); \
+    if (A_indptr_dev) sycl::free(A_indptr_dev, q); \
+    if (A_indices_dev) sycl::free(A_indices_dev, q); \
+    if (B_dev) sycl::free(B_dev, q); \
+    if (C_dev) sycl::free(C_dev, q); \
     fflush(stdout); \
   } while (0)
 
 void spmmWrapper(
-    queue &q,
+    sycl::queue &q,
     int method, int tile_row, int A_nrows, int B_ncols, 
-    buffer<int, 1> &A_rowPtr, buffer<int, 1> &A_colInd,
-    buffer<float, 1> &A_val, buffer<float, 1> &B, buffer<float, 1> &C)
+    int *A_rowPtr, int *A_colInd,
+    float *A_val, float *B, float *C)
 {
   const int smem_size = 8*tile_row*(sizeof(int)+sizeof(float)); // size in words
-  range<2> lws (tile_row, 32);
+  sycl::range<2> lws (tile_row, 32);
 
   switch(method) {
     case 1:
-      q.submit([&] (handler &cgh) {
-        auto a_rptr = A_rowPtr.get_access<sycl_read>(cgh);
-        auto a_cidx = A_colInd.get_access<sycl_read>(cgh);
-        auto a_val = A_val.get_access<sycl_read>(cgh);
-        auto b = B.get_access<sycl_read>(cgh);
-        auto c = C.get_access<sycl_discard_write>(cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> sm(smem_size, cgh);
-        cgh.parallel_for<class t1>(nd_range<2>(range<2> ((B_ncols+31)/32 * tile_row, 
-                                                         (A_nrows+tile_row-1)/tile_row * 32),
-                                               lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<int, 1> sm (sycl::range<1>(smem_size), cgh);
+        cgh.parallel_for<class t1>(sycl::nd_range<2>(
+          sycl::range<2> ((B_ncols+31)/32 * tile_row,
+                          (A_nrows+tile_row-1)/tile_row * 32), lws),
+          [=] (sycl::nd_item<2> item) {
           spmm_test1<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            a_rptr.get_pointer() , a_cidx.get_pointer(),
-                            a_val.get_pointer(), b.get_pointer(), c.get_pointer());
+                            A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
     case 2:
-      q.submit([&] (handler &cgh) {
-        auto a_rptr = A_rowPtr.get_access<sycl_read>(cgh);
-        auto a_cidx = A_colInd.get_access<sycl_read>(cgh);
-        auto a_val = A_val.get_access<sycl_read>(cgh);
-        auto b = B.get_access<sycl_read>(cgh);
-        auto c = C.get_access<sycl_discard_write>(cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> sm(smem_size, cgh);
-        cgh.parallel_for<class t2>(nd_range<2>(range<2> ((B_ncols+63)/64 * tile_row, 
-                                                         (A_nrows+tile_row-1)/tile_row * 32),
-                                               lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<int, 1> sm (sycl::range<1>(smem_size), cgh);
+        cgh.parallel_for<class t2>(sycl::nd_range<2>(
+          sycl::range<2> ((B_ncols+63)/64 * tile_row, 
+                          (A_nrows+tile_row-1)/tile_row * 32), lws),
+          [=] (sycl::nd_item<2> item) {
           spmm_test2<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            a_rptr.get_pointer() , a_cidx.get_pointer(),
-                            a_val.get_pointer(), b.get_pointer(), c.get_pointer());
+                            A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
     case 3:
-      q.submit([&] (handler &cgh) {
-        auto a_rptr = A_rowPtr.get_access<sycl_read>(cgh);
-        auto a_cidx = A_colInd.get_access<sycl_read>(cgh);
-        auto a_val = A_val.get_access<sycl_read>(cgh);
-        auto b = B.get_access<sycl_read>(cgh);
-        auto c = C.get_access<sycl_discard_write>(cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> sm(smem_size, cgh);
-        cgh.parallel_for<class t3>(nd_range<2>(range<2> ((B_ncols+127)/128 * tile_row, 
-                                                         (A_nrows+tile_row-1)/tile_row * 32),
-                                               lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<int, 1> sm (sycl::range<1>(smem_size), cgh);
+        cgh.parallel_for<class t3>(sycl::nd_range<2>(
+          sycl::range<2> ((B_ncols+127)/128 * tile_row, 
+                          (A_nrows+tile_row-1)/tile_row * 32), lws),
+          [=] (sycl::nd_item<2> item) {
           spmm_test3<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            a_rptr.get_pointer() , a_cidx.get_pointer(),
-                            a_val.get_pointer(), b.get_pointer(), c.get_pointer());
+                            A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
     case 4:
-      q.submit([&] (handler &cgh) {
-        auto a_rptr = A_rowPtr.get_access<sycl_read>(cgh);
-        auto a_cidx = A_colInd.get_access<sycl_read>(cgh);
-        auto a_val = A_val.get_access<sycl_read>(cgh);
-        auto b = B.get_access<sycl_read>(cgh);
-        auto c = C.get_access<sycl_discard_write>(cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> sm(smem_size, cgh);
-        cgh.parallel_for<class t4>(nd_range<2>(range<2> ((B_ncols+255)/256 * tile_row, 
-                                                         (A_nrows+tile_row-1)/tile_row * 32),
-                                               lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<int, 1> sm (sycl::range<1>(smem_size), cgh);
+        cgh.parallel_for<class t4>(sycl::nd_range<2>(
+          sycl::range<2> ((B_ncols+255)/256 * tile_row, 
+                          (A_nrows+tile_row-1)/tile_row * 32), lws),
+          [=] (sycl::nd_item<2> item) {
           spmm_test4<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            a_rptr.get_pointer() , a_cidx.get_pointer(),
-                            a_val.get_pointer(), b.get_pointer(), c.get_pointer());
+                            A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
@@ -127,6 +113,19 @@ int main(int argc, char** argv) {
   float* B = 0;
   float* C = 0;
   float* golden = 0;
+
+  // Device allocate
+  float* A_data_dev = nullptr;
+  int* A_indices_dev = nullptr;
+  int* A_indptr_dev = nullptr;
+  float* B_dev = nullptr;
+  float* C_dev = nullptr;
+
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
   printf("reading data file ...\n");
   readMtx<float>(argv[1], row_indices, col_indices, values, A_nrows, A_ncols, nnz);
@@ -198,31 +197,25 @@ int main(int argc, char** argv) {
   }
 #endif
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
   // allocate device memory 
-  buffer<int, 1> A_indptr_dev (A_indptr, A_nrows+1);
-  buffer<int, 1> A_indices_dev (A_indices, nnz);
-  buffer<float, 1> A_data_dev (A_data, nnz);
-  buffer<float, 1> B_dev (B, max_ncols*A_ncols);
-  buffer<float, 1> C_dev (max_ncols*A_nrows);
+  A_indptr_dev  = sycl::malloc_device<int>(A_nrows+1, q);
+  A_indices_dev  = sycl::malloc_device<int>(nnz, q);
+  A_data_dev  = sycl::malloc_device<float>(nnz, q);
+  B_dev  = sycl::malloc_device<float>(max_ncols*A_ncols, q);
+  C_dev  = sycl::malloc_device<float>(max_ncols*A_nrows, q);
+
+  q.memcpy(A_indptr_dev, A_indptr, (A_nrows+1)*sizeof(int));
+  q.memcpy(A_indices_dev, A_indices, nnz*sizeof(int));
+  q.memcpy(A_data_dev, A_data, nnz*sizeof(float));
+  q.memcpy(B_dev, B, max_ncols*A_ncols*sizeof(float));
 
   // execute spmm
   bool ok = true;
   for (B_ncols=256; B_ncols<=max_ncols; B_ncols *= 2) {
     NEXT_METHOD:
     for (int method=1; method<5; method++) {
-      q.submit([&] (handler &cgh) {
-        auto acc = C_dev.get_access<sycl_write>(cgh);
-        cgh.fill(acc, 0.f);
-      });
+      q.memset(C_dev, 0, A_nrows*B_ncols*sizeof(float)).wait();
 
-      q.wait();
       auto start = std::chrono::steady_clock::now();
 
       for (int i=0; i<repeat; i++)
@@ -232,12 +225,9 @@ int main(int argc, char** argv) {
       q.wait();
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-      printf("Average kernel (method %d) execution time %f (s)\n", method, (time * 1e-9f) / repeat);
+      printf("Average kernel (method %d) execution time %f (us)\n", method, (time * 1e-3f) / repeat);
 
-      q.submit([&] (handler &cgh) {
-        auto acc = C_dev.get_access<sycl_read>(cgh);
-        cgh.copy(acc, C);
-      }).wait();
+      q.memcpy(C, C_dev, A_nrows*B_ncols*sizeof(float)).wait();
 
       #ifdef VALIDATE
       for (int i=0; i<A_nrows; i++) 

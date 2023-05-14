@@ -1,9 +1,8 @@
-//#define __syncwarp() item.barrier(access::fence_space::local_space)
 #define __syncwarp() sg.barrier()
 
 template<typename T>
 void spmm_test1(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int *__restrict colInd_sh,
   int A_nrows, int B_ncols,
   const int*__restrict A_csrRowPtr,
@@ -77,7 +76,7 @@ void spmm_test1(
 
 template<typename T>
 void spmm_test2(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int *__restrict colInd_sh,
   int A_nrows, int B_ncols,
   const int*__restrict A_csrRowPtr,
@@ -164,7 +163,7 @@ void spmm_test2(
 
 template<typename T>
 void spmm_test3(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int *__restrict colInd_sh,
   int A_nrows, int B_ncols,
   const int*__restrict A_csrRowPtr,
@@ -267,7 +266,7 @@ void spmm_test3(
 
 template<typename T>
 void spmm_test4(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int *__restrict colInd_sh,
   int A_nrows, int B_ncols,
   const int*__restrict A_csrRowPtr,
