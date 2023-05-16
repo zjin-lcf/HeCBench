@@ -4,11 +4,11 @@
 #include <chrono>
 #include <random>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 void glu_kernel(
-   nd_item<1> &item,
+   sycl::nd_item<1> &item,
    const int M,
    const int split_dim_size,
    const int N,
@@ -68,16 +68,15 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_X = malloc_device<float>(nelems, q);
+  float *d_X = sycl::malloc_device<float>(nelems, q);
   q.memcpy(d_X, X, nelems_bytes);
 
-  float *d_Y = malloc_device<float>(nelems, q);
+  float *d_Y = sycl::malloc_device<float>(nelems, q);
 
   const int block_size = 256; 
 
@@ -95,15 +94,16 @@ int main(int argc, char* argv[])
 
     ComputeGlu(m, split_dim_size, n, X, Y_ref);
 
-    range<1> gws ((m * split_dim_size * n + block_size - 1) / block_size * block_size);
-    range<1> lws (block_size);
+    sycl::range<1> gws ((m * split_dim_size * n + block_size - 1) / block_size * block_size);
+    sycl::range<1> lws (block_size);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class glu>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class glu>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           glu_kernel(item, m, split_dim_size, n, d_X, d_Y);
         });
       });
@@ -130,8 +130,8 @@ int main(int argc, char* argv[])
   free(X);
   free(Y);
   free(Y_ref);
-  free(d_X, q);
-  free(d_Y, q);
+  sycl::free(d_X, q);
+  sycl::free(d_Y, q);
 
   return 0;
 }
