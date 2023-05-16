@@ -83,9 +83,9 @@ __global__ void workloadDiagonals(
     int32_t current_y = y_top + ((y_bottom - y_top) >> 1) + threadOffset;
 
     // Are we a '1' or '0' with respect to A[x] <= B[x]
-    if(current_x >= A_length || current_y < 0) {
+    if(current_x >= (int32_t)A_length || current_y < 0) {
       oneorzero[threadIdx.x] = 0;
-    } else if(current_y >= B_length || current_x < 1) {
+    } else if(current_y >= (int32_t)B_length || current_x < 1) {
       oneorzero[threadIdx.x] = 1;
     } else {
       oneorzero[threadIdx.x] = (A[current_x-1] <= B[current_y]) ? 1 : 0;
