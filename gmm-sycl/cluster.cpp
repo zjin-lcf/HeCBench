@@ -247,104 +247,46 @@ void setupCluster(clusters_t* c, const int num_clusters, const int num_events, c
 }
 
 
-void copyClusterFromDevice(queue &q, 
+void copyClusterFromDevice(sycl::queue &q, 
                            clusters_t* c, 
-                           buffer<float, 1> &d_N,
-                           buffer<float, 1> &d_R,
-                           buffer<float, 1> &d_Rinv,
-                           buffer<float, 1> &d_pi,
-                           buffer<float, 1> &d_constant,
-                           buffer<float, 1> &d_avgvar,
-                           buffer<float, 1> &d_means,
+                           float *d_N,
+                           float *d_R,
+                           float *d_Rinv,
+                           float *d_pi,
+                           float *d_constant,
+                           float *d_avgvar,
+                           float *d_means,
                            const int num_clusters, 
                            const int num_dimensions) {
   
-  // CUDA_SAFE_CALL(cudaMemcpy(c->N, c_tmp->N, sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_N.get_access<sycl_read>(cgh, range<1>(num_clusters)); 
-    cgh.copy(acc, c->N);
-  });
-
-  // CUDA_SAFE_CALL(cudaMemcpy(c->R, c_tmp->R, sizeof(float)*num_dimensions*num_dimensions*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_R.get_access<sycl_read>(cgh, range<1>(num_dimensions*num_dimensions*num_clusters)); 
-    cgh.copy(acc, c->R);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c->Rinv, c_tmp->Rinv, sizeof(float)*num_dimensions*num_dimensions*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Rinv.get_access<sycl_read>(cgh, range<1>(num_dimensions*num_dimensions*num_clusters));
-    cgh.copy(acc, c->Rinv);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c->pi, c_tmp->pi, sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pi.get_access<sycl_read>(cgh, range<1>(num_clusters));
-    cgh.copy(acc, c->pi);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c->constant, c_tmp->constant, sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_constant.get_access<sycl_read>(cgh, range<1>(num_clusters)); 
-    cgh.copy(acc, c->constant);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c->avgvar, c_tmp->avgvar, sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_avgvar.get_access<sycl_read>(cgh, range<1>(num_clusters)); 
-    cgh.copy(acc, c->avgvar);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c->means, c_tmp->means, sizeof(float)*num_dimensions*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_means.get_access<sycl_read>(cgh, range<1>(num_dimensions*num_clusters)); 
-    cgh.copy(acc, c->means);
-  });
+  q.memcpy(c->N, d_N, sizeof(float)*num_clusters);
+  q.memcpy(c->R, d_R, sizeof(float)*num_dimensions*num_dimensions*num_clusters);
+  q.memcpy(c->Rinv, d_Rinv, sizeof(float)*num_dimensions*num_dimensions*num_clusters);
+  q.memcpy(c->pi, d_pi, sizeof(float)*num_clusters);
+  q.memcpy(c->constant, d_constant, sizeof(float)*num_clusters);
+  q.memcpy(c->avgvar, d_avgvar, sizeof(float)*num_clusters);
+  q.memcpy(c->means, d_means, sizeof(float)*num_dimensions*num_clusters);
 }
 
-void copyClusterToDevice(queue &q, 
+void copyClusterToDevice(sycl::queue &q, 
                          clusters_t* c, 
-                         buffer<float, 1> &d_N,
-                         buffer<float, 1> &d_R,
-                         buffer<float, 1> &d_Rinv,
-                         buffer<float, 1> &d_pi,
-                         buffer<float, 1> &d_constant,
-                         buffer<float, 1> &d_avgvar,
-                         buffer<float, 1> &d_means,
+                         float *d_N,
+                         float *d_R,
+                         float *d_Rinv,
+                         float *d_pi,
+                         float *d_constant,
+                         float *d_avgvar,
+                         float *d_means,
                          const int num_clusters, 
                          const int num_dimensions) {
   
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->N, c->N, sizeof(float)*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_N.get_access<sycl_write>(cgh, range<1>(num_clusters)); 
-    cgh.copy(c->N, acc);
-  });
-
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->R, c->R, sizeof(float)*num_dimensions*num_dimensions*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_R.get_access<sycl_write>(cgh, range<1>(num_dimensions*num_dimensions*num_clusters)); 
-    cgh.copy(c->R, acc);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->Rinv, c->Rinv, sizeof(float)*num_dimensions*num_dimensions*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Rinv.get_access<sycl_write>(cgh, range<1>(num_dimensions*num_dimensions*num_clusters));
-    cgh.copy(c->Rinv, acc);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->pi, c->pi, sizeof(float)*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pi.get_access<sycl_write>(cgh, range<1>(num_clusters));
-    cgh.copy(c->pi, acc);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->constant, c->constant, sizeof(float)*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_constant.get_access<sycl_write>(cgh, range<1>(num_clusters)); 
-    cgh.copy(c->constant, acc);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->avgvar, c->avgvar, sizeof(float)*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_avgvar.get_access<sycl_write>(cgh, range<1>(num_clusters)); 
-    cgh.copy(c->avgvar, acc);
-  });
-  // CUDA_SAFE_CALL(cudaMemcpy(c_tmp->means, c->means, sizeof(float)*num_dimensions*num_clusters,cudaMemcpyHostToDevice));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_means.get_access<sycl_write>(cgh, range<1>(num_dimensions*num_clusters)); 
-    cgh.copy(c->means, acc);
-  });
+  q.memcpy(d_N, c->N, sizeof(float)*num_clusters);
+  q.memcpy(d_R, c->R, sizeof(float)*num_dimensions*num_dimensions*num_clusters);
+  q.memcpy(d_Rinv, c->Rinv, sizeof(float)*num_dimensions*num_dimensions*num_clusters);
+  q.memcpy(d_pi, c->pi, sizeof(float)*num_clusters);
+  q.memcpy(d_constant, c->constant, sizeof(float)*num_clusters);
+  q.memcpy(d_avgvar, c->avgvar, sizeof(float)*num_clusters);
+  q.memcpy(d_means, c->means, sizeof(float)*num_dimensions*num_clusters);
 }
 
 clusters_t* cluster(int original_num_clusters, int desired_num_clusters, 
@@ -379,7 +321,6 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     }
   }    
 
-
   PRINT("Number of events: %d\n",num_events);
   PRINT("Number of dimensions: %d\n\n",num_dimensions);
   PRINT("Starting with %d cluster(s), will stop at %d cluster(s).\n",original_num_clusters,stop_number);
@@ -387,7 +328,6 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   // This the shared memory space between the GPUs
   clusters_t clusters;
   setupCluster(&clusters, original_num_clusters, num_events, num_dimensions);
-
 
   // another set of clusters for saving the results of the best configuration
   clusters_t *saved_clusters = (clusters_t*) malloc(sizeof(clusters_t));
@@ -409,29 +349,29 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   // Setup the cluster data structures on device
   // First allocate structures on the host, then allocate the arrays and copy them over
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // clusters_t *d_clusters = setupClusterDevice(&temp_clusters, original_num_clusters, num_events, num_dimensions);
-  buffer<float, 1> d_N(original_num_clusters);
-  buffer<float, 1> d_pi(original_num_clusters);
-  buffer<float, 1> d_constant(original_num_clusters);
-  buffer<float, 1> d_avgvar(original_num_clusters);
-  buffer<float, 1> d_means(num_dimensions*original_num_clusters);
-  buffer<float, 1> d_R(num_dimensions*num_dimensions*original_num_clusters);
-  buffer<float, 1> d_Rinv(num_dimensions*num_dimensions*original_num_clusters);
-  buffer<float, 1> d_memberships(num_events*(original_num_clusters+
-                   NUM_CLUSTERS_PER_BLOCK-original_num_clusters % NUM_CLUSTERS_PER_BLOCK));
+  float *d_N = sycl::malloc_device<float>(original_num_clusters, q);
+  float *d_pi = sycl::malloc_device<float>(original_num_clusters, q);
+  float *d_constant = sycl::malloc_device<float>(original_num_clusters, q);
+  float *d_avgvar = sycl::malloc_device<float>(original_num_clusters, q);
+  float *d_means = sycl::malloc_device<float>(num_dimensions*original_num_clusters, q);
+  float *d_R = sycl::malloc_device<float>(num_dimensions*num_dimensions*original_num_clusters, q);
+  float *d_Rinv = sycl::malloc_device<float>(num_dimensions*num_dimensions*original_num_clusters, q);
+  float *d_memberships = sycl::malloc_device<float>(num_events * (
+    original_num_clusters + NUM_CLUSTERS_PER_BLOCK - original_num_clusters % NUM_CLUSTERS_PER_BLOCK), q);
 
   // allocate and copy relavant FCS data to device.
-  //CUDA_SAFE_CALL(cudaMalloc( (void**) &d_fcs_data_by_event, mem_size));
-  //CUDA_SAFE_CALL(cudaMalloc( (void**) &d_fcs_data_by_dimension, mem_size));
-  //CUDA_SAFE_CALL(cudaMemcpy( d_fcs_data_by_event, fcs_data_by_event, mem_size,cudaMemcpyHostToDevice) );
-  buffer<float, 1> d_fcs_data_by_event (fcs_data_by_event, num_dimensions * num_events);
-  buffer<float, 1> d_fcs_data_by_dimension (fcs_data_by_dimension, num_dimensions * num_events);
+  int mem_size = num_dimensions * num_events * sizeof(float);
+  float *d_fcs_data_by_event = sycl::malloc_device<float>(num_dimensions * num_events, q);
+  q.memcpy(d_fcs_data_by_event, fcs_data_by_event, mem_size);
+
+  float *d_fcs_data_by_dimension = sycl::malloc_device<float>(num_dimensions * num_events, q);
+  q.memcpy(d_fcs_data_by_dimension, fcs_data_by_dimension, mem_size);
 
   DEBUG("GPU: Finished copying FCS data to device.\n");
 
@@ -441,19 +381,14 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   // seed_clusters sets initial pi values, 
   // finds the means / covariances and copies it to all the clusters
   // seed_clusters_kernel<<< 1, NUM_THREADS_MSTEP >>>( d_fcs_data_by_event, d_clusters, num_dimensions, original_num_clusters, num_events);
-  q.submit([&] (handler &cgh) {
-    auto fcs_data = d_fcs_data_by_event.get_access<sycl_read>(cgh);
-    auto clusters_means = d_means.get_access<sycl_discard_write>(cgh);
-    auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
-    auto clusters_R = d_R.get_access<sycl_discard_write>(cgh);
-    auto clusters_N = d_N.get_access<sycl_discard_write>(cgh);
-    auto clusters_avgvar = d_avgvar.get_access<sycl_discard_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> means(NUM_DIMENSIONS, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> avgvar(1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> total_variance(1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> variances(NUM_DIMENSIONS, cgh);
-    cgh.parallel_for<class seed_clusters>(nd_range<1>(range<1>(NUM_THREADS_MSTEP), range<1>(NUM_THREADS_MSTEP)),
-      [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> means(sycl::range<1>(NUM_DIMENSIONS), cgh);
+    sycl::local_accessor<float, 0> avgvar(cgh);
+    sycl::local_accessor<float, 0> total_variance(cgh);
+    sycl::local_accessor<float, 1> variances(sycl::range<1>(NUM_DIMENSIONS), cgh);
+    cgh.parallel_for<class seed_clusters>(
+      sycl::nd_range<1>(sycl::range<1>(NUM_THREADS_MSTEP), sycl::range<1>(NUM_THREADS_MSTEP)),
+      [=] (sycl::nd_item<1> item) {
       int tid = item.get_local_id(0);
       int num_threads = item.get_local_range(0);
       float seed;
@@ -468,14 +403,14 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
           // Sum up all the values for each dimension
           for(int i = 0; i < num_events; i++) {
-              means[tid] += fcs_data[i*num_dimensions+tid];
+              means[tid] += d_fcs_data_by_event[i*num_dimensions+tid];
           }
 
           // Divide by the # of elements to get the average
           means[tid] /= (float) num_events;
       }
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       
       // Compute average variance for each dimension
       if(tid < num_dimensions) {
@@ -483,22 +418,22 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
           // Sum up all the variance
           for(int i = 0; i < num_events; i++) {
               // variance = (data - mean)^2
-              variances[tid] += (fcs_data[i*num_dimensions + tid])*(fcs_data[i*num_dimensions + tid]);
+              variances[tid] += (d_fcs_data_by_event[i*num_dimensions + tid])*(d_fcs_data_by_event[i*num_dimensions + tid]);
           }
           variances[tid] /= (float) num_events;
           variances[tid] -= means[tid]*means[tid];
       }
       
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       
       if(tid == 0) {
-        total_variance[0] = 0.0;
+        total_variance = 0.0;
         for(int i=0; i<num_dimensions;i++)
-          total_variance[0] += variances[i];
-        avgvar[0] = total_variance[0] / (float) num_dimensions;
+          total_variance += variances[i];
+        avgvar = total_variance / (float) num_dimensions;
       }
           
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if(original_num_clusters > 1) {
         seed = (num_events-1.0f)/(original_num_clusters-1.0f);
@@ -509,7 +444,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       // Seed the pi, means, and covariances for every cluster
       for(int c=0; c < original_num_clusters; c++) {
         if(tid < num_dimensions) {
-            clusters_means[c*num_dimensions+tid] = fcs_data[((int)(c*seed))*num_dimensions+tid];
+            d_means[c*num_dimensions+tid] = d_fcs_data_by_event[((int)(c*seed))*num_dimensions+tid];
         }
           
         for(int i=tid; i < num_elements; i+= num_threads) {
@@ -518,15 +453,15 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
             int col = (i) % num_dimensions;
 
             if(row == col) {
-                clusters_R[c*num_dimensions*num_dimensions+i] = 1.0f;
+                d_R[c*num_dimensions*num_dimensions+i] = 1.0f;
             } else {
-                clusters_R[c*num_dimensions*num_dimensions+i] = 0.0f;
+                d_R[c*num_dimensions*num_dimensions+i] = 0.0f;
             }
         }
         if(tid == 0) {
-            clusters_pi[c] = 1.0f/((float)original_num_clusters);
-            clusters_N[c] = ((float) num_events) / ((float)original_num_clusters);
-            clusters_avgvar[c] = avgvar[0] / COVARIANCE_DYNAMIC_RANGE;
+            d_pi[c] = 1.0f/((float)original_num_clusters);
+            d_N[c] = ((float) num_events) / ((float)original_num_clusters);
+            d_avgvar[c] = avgvar / COVARIANCE_DYNAMIC_RANGE;
         }
       }
     });
@@ -534,29 +469,24 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
   // Computes the R matrix inverses, and the gaussian constant
   // constants_kernel<<<original_num_clusters, NUM_THREADS_MSTEP>>>(d_clusters,original_num_clusters,num_dimensions);
-  range<1> constants_gws(original_num_clusters*NUM_THREADS_MSTEP);
-  range<1> constants_lws(NUM_THREADS_MSTEP);
-  q.submit([&] (handler &cgh) {
-    auto clusters_R = d_R.get_access<sycl_read>(cgh);
-    auto clusters_Rinv = d_Rinv.get_access<sycl_discard_write>(cgh);
-    auto clusters_N = d_N.get_access<sycl_read>(cgh);
-    auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
-    auto clusters_constant = d_constant.get_access<sycl_discard_write>(cgh);
-    auto clusters_avgvar = d_avgvar.get_access<sycl_discard_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> matrix(NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> determinant_arg(1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sum(1, cgh);
-    cgh.parallel_for<class constants>(nd_range<1>(constants_gws, constants_lws), [=] (nd_item<1> item) {
+  sycl::range<1> constants_gws(original_num_clusters*NUM_THREADS_MSTEP);
+  sycl::range<1> constants_lws(NUM_THREADS_MSTEP);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> matrix(sycl::range<1>(NUM_DIMENSIONS*NUM_DIMENSIONS), cgh);
+    sycl::local_accessor<float, 0> determinant_arg(cgh);
+    sycl::local_accessor<float, 0> sum(cgh);
+    cgh.parallel_for<class constants>(
+      sycl::nd_range<1>(constants_gws, constants_lws), [=] (sycl::nd_item<1> item) {
       constants_kernel( item, 
-                        clusters_R.get_pointer(), 
-                        clusters_Rinv.get_pointer(), 
-                        clusters_N.get_pointer(), 
-                        clusters_pi.get_pointer(), 
-                        clusters_constant.get_pointer(), 
-                        clusters_avgvar.get_pointer(), 
+                        d_R,
+                        d_Rinv,
+                        d_N,
+                        d_pi,
+                        d_constant,
+                        d_avgvar,
                         matrix.get_pointer(),
-                        determinant_arg.get_pointer(),
-                        sum.get_pointer(),
+                        determinant_arg,
+                        sum,
                         original_num_clusters, 
                         num_dimensions);
     });
@@ -608,11 +538,9 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   int iters;
 
   //epsilon = 1e-6;
-  PRINT("Gaussian.cu: epsilon = %f\n",epsilon);
+  PRINT("Gaussian.cpp: epsilon = %f\n",epsilon);
 
-  //float* d_likelihoods;
-  //CUDA_SAFE_CALL(cudaMalloc((void**) &d_likelihoods, sizeof(float)*NUM_BLOCKS));
-  buffer<float, 1> d_likelihoods (NUM_BLOCKS);
+  float* d_likelihoods = sycl::malloc_device<float>(NUM_BLOCKS, q);
 
   // Variables for GMM reduce order
   float distance, min_distance = 0.0;
@@ -627,26 +555,21 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     // for each event and each cluster.
     DEBUG("Invoking E-step kernels.");
   //  estep1<<<dim3(num_clusters,NUM_BLOCKS), NUM_THREADS_ESTEP>>>(d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
-    range<2> estep1_gws (NUM_BLOCKS, num_clusters*NUM_THREADS_ESTEP);
-    range<2> estep1_lws (1, NUM_THREADS_ESTEP);
-    q.submit([&] (handler &cgh) {
-      auto data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_Rinv = d_Rinv.get_access<sycl_read>(cgh);
-      auto clusters_pi = d_pi.get_access<sycl_read>(cgh);
-      auto clusters_constant = d_constant.get_access<sycl_read>(cgh);
-      auto clusters_means = d_means.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> means (NUM_DIMENSIONS, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> Rinv (NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
-      cgh.parallel_for<class init_estep1>(nd_range<2>(estep1_gws, estep1_lws), [=] (nd_item<2> item) {
-        estep1_kernel( 
+    sycl::range<2> estep1_gws (NUM_BLOCKS, num_clusters*NUM_THREADS_ESTEP);
+    sycl::range<2> estep1_lws (1, NUM_THREADS_ESTEP);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> means (sycl::range<1>(NUM_DIMENSIONS), cgh);
+      sycl::local_accessor<float, 1> Rinv (sycl::range<1>(NUM_DIMENSIONS*NUM_DIMENSIONS), cgh);
+      cgh.parallel_for<class init_estep1>(
+        sycl::nd_range<2>(estep1_gws, estep1_lws), [=] (sycl::nd_item<2> item) {
+        estep1_kernel(
             item,
-            data.get_pointer(), 
-            clusters_Rinv.get_pointer(), 
-            clusters_memberships.get_pointer(), 
-            clusters_pi.get_pointer(), 
-            clusters_constant.get_pointer(), 
-            clusters_means.get_pointer(), 
+            d_fcs_data_by_dimension,
+            d_Rinv,
+            d_memberships, 
+            d_pi, 
+            d_constant, 
+            d_means, 
             means.get_pointer(), 
             Rinv.get_pointer(), 
             num_dimensions, 
@@ -655,18 +578,16 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     });
 
     //  estep2<<<NUM_BLOCKS, NUM_THREADS_ESTEP>>>(d_fcs_data_by_dimension,d_clusters,num_dimensions,num_clusters,num_events,d_likelihoods);
-    range<1> estep2_gws (NUM_BLOCKS*NUM_THREADS_ESTEP);
-    range<1> estep2_lws (NUM_THREADS_ESTEP);
-    q.submit([&] (handler &cgh) {
-      //auto fcs_data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_read_write>(cgh);
-      auto likelihood = d_likelihoods.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> total_likelihoods (NUM_THREADS_ESTEP, cgh);
-      cgh.parallel_for<class init_estep2>(nd_range<1>(estep2_gws, estep2_lws), [=] (nd_item<1> item) {
+    sycl::range<1> estep2_gws (NUM_BLOCKS*NUM_THREADS_ESTEP);
+    sycl::range<1> estep2_lws (NUM_THREADS_ESTEP);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> total_likelihoods (sycl::range<1>(NUM_THREADS_ESTEP), cgh);
+      cgh.parallel_for<class init_estep2>(
+        sycl::nd_range<1>(estep2_gws, estep2_lws), [=] (sycl::nd_item<1> item) {
         estep2_kernel(
             item,
-            clusters_memberships.get_pointer(), 
-            likelihood.get_pointer(), 
+            d_memberships,
+            d_likelihoods,
             total_likelihoods.get_pointer(), 
             num_dimensions, 
             num_clusters, 
@@ -677,12 +598,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
     regroup_iterations++;
 
     // Copy the likelihood totals from each block, sum them up to get a total
-    // CUDA_SAFE_CALL(cudaMemcpy(shared_likelihoods,d_likelihoods,sizeof(float)*NUM_BLOCKS,cudaMemcpyDeviceToHost));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_likelihoods.get_access<sycl_read>(cgh); 
-      cgh.copy(acc, shared_likelihoods);
-    });
-    q.wait();
+    q.memcpy(shared_likelihoods, d_likelihoods, sizeof(float)*NUM_BLOCKS).wait();
 
     likelihood = 0.0;
     for(int i=0;i<NUM_BLOCKS;i++) {
@@ -704,15 +620,12 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
       // This kernel computes a new N, pi isn't updated until compute_constants though
       //mstep_N<<<num_clusters, NUM_THREADS_MSTEP>>>(d_clusters,num_dimensions,num_clusters,num_events);
-    range<1> mStepN_gws (num_clusters*NUM_THREADS_MSTEP);
-    range<1> mStepN_lws (NUM_THREADS_MSTEP);
-    q.submit([&] (handler &cgh) {
-      // auto fcs_data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_read>(cgh);
-      auto clusters_N = d_N.get_access<sycl_discard_write>(cgh);
-      auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> temp_sums (NUM_THREADS_MSTEP, cgh);
-      cgh.parallel_for<class mstepN>(nd_range<1>(mStepN_gws, mStepN_lws), [=] (nd_item<1> item) {
+    sycl::range<1> mStepN_gws (num_clusters*NUM_THREADS_MSTEP);
+    sycl::range<1> mStepN_lws (NUM_THREADS_MSTEP);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> temp_sums (sycl::range<1>(NUM_THREADS_MSTEP), cgh);
+      cgh.parallel_for<class mstepN>(
+        sycl::nd_range<1>(mStepN_gws, mStepN_lws), [=] (sycl::nd_item<1> item) {
         int tid = item.get_local_id(0);
         int num_threads = item.get_local_range(0);
         int c = item.get_group(0);
@@ -721,45 +634,38 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
         float sum = 0.0f;
         // Break all the events accross the threads, add up probabilities
         for(int event=tid; event < num_events; event += num_threads) {
-            sum += clusters_memberships[c*num_events+event];
+            sum += d_memberships[c*num_events+event];
         }
         temp_sums[tid] = sum;
  
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         // sum = parallelSum(temp_sums,NUM_THREADS_MSTEP);
 
         for(unsigned int bit = NUM_THREADS_MSTEP >> 1; bit > 0; bit >>= 1) {
           float t = temp_sums[tid] + temp_sums[tid^bit];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           temp_sums[tid] = t;
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         }
         sum = temp_sums[tid];
         if(tid == 0) {
-          clusters_N[c] = sum;
-          clusters_pi[c] = sum;
+          d_N[c] = sum;
+          d_pi[c] = sum;
         }
       });
     });
  
-      //CUDA_SAFE_CALL(cudaMemcpy(clusters.N,temp_clusters.N,sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_N.get_access<sycl_read>(cgh, range<1>(num_clusters)); 
-      cgh.copy(acc, clusters.N);
-    });
-
+    q.memcpy(clusters.N, d_N, sizeof(float)*num_clusters);
 
     //  mstep_means<<<gridDim1, blockDim1>>>(d_fcs_data_by_dimension,d_clusters, num_dimensions,num_clusters,num_events);
-    range<2> mstepMeans_gws (num_dimensions, num_clusters*NUM_THREADS_MSTEP);
-    range<2> mstepMeans_lws (1, NUM_THREADS_MSTEP);
+    sycl::range<2> mstepMeans_gws (num_dimensions, num_clusters*NUM_THREADS_MSTEP);
+    sycl::range<2> mstepMeans_lws (1, NUM_THREADS_MSTEP);
 
-    q.submit([&] (handler &cgh) {
-      auto fcs_data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_read>(cgh);
-      auto clusters_means = d_means.get_access<sycl_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> temp_sum (NUM_THREADS_MSTEP, cgh);
-      cgh.parallel_for<class mstepMeans>(nd_range<2>(mstepMeans_gws, mstepMeans_lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> temp_sum (sycl::range<1>(NUM_THREADS_MSTEP), cgh);
+      cgh.parallel_for<class mstepMeans>(
+        sycl::nd_range<2>(mstepMeans_gws, mstepMeans_lws), [=] (sycl::nd_item<2> item) {
         int tid = item.get_local_id(1);
         int num_threads = item.get_local_range(1);
         int c = item.get_group(1);
@@ -767,34 +673,27 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
         float sum = 0.0f;
         for(int event=tid; event < num_events; event+= num_threads) {
-            sum += fcs_data[d*num_events+event]*clusters_memberships[c*num_events+event];
+            sum += d_fcs_data_by_dimension[d*num_events+event]*d_memberships[c*num_events+event];
         }
         temp_sum[tid] = sum;
         
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         // Reduce partial sums
         // sum = parallelSum(temp_sum,NUM_THREADS_MSTEP);
         for(unsigned int bit = NUM_THREADS_MSTEP >> 1; bit > 0; bit >>= 1) {
           float t = temp_sum[tid] + temp_sum[tid^bit];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           temp_sum[tid] = t;
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         }
         sum = temp_sum[tid];
-        if(tid == 0) clusters_means[c*num_dimensions+d] = sum;
-     });
-   });
-
-
-    //  CUDA_SAFE_CALL(cudaMemcpy(clusters.means,temp_clusters.means,
-      //      sizeof(float)*num_clusters*num_dimensions,cudaMemcpyDeviceToHost));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_means.get_access<sycl_read>(cgh, range<1>(num_clusters*num_dimensions)); 
-      cgh.copy(acc, clusters.means);
+        if(tid == 0) d_means[c*num_dimensions+d] = sum;
+      });
     });
 
-    q.wait();
+
+    q.memcpy(clusters.means, d_means, sizeof(float)*num_clusters*num_dimensions).wait();
 
     // Reduce means for all clusters, copy back to device
     for(int c=0; c < num_clusters; c++) {
@@ -809,61 +708,51 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       }
       DEBUG("\n");
     }
-    //  CUDA_SAFE_CALL(cudaMemcpy(temp_clusters.means,clusters.means,
-     //       sizeof(float)*num_clusters*num_dimensions,cudaMemcpyHostToDevice));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_means.get_access<sycl_write>(cgh, range<1>(num_clusters*num_dimensions)); 
-      cgh.copy(clusters.means, acc);
-    });
 
+    q.memcpy(d_means, clusters.means, sizeof(float)*num_clusters*num_dimensions);
 
-      // Covariance is symmetric, so we only need to compute N*(N+1)/2 matrix elements per cluster
-      //dim3 gridDim2((num_clusters+NUM_CLUSTERS_PER_BLOCK-1)/NUM_CLUSTERS_PER_BLOCK, num_dimensions*(num_dimensions+1)/2);
-      // mstep_covariance2<<<gridDim2, blockDim1>>>(d_fcs_data_by_dimension,d_clusters,
-         // num_dimensions,num_clusters,num_events);
-      range<2> cov2_gws(num_dimensions*(num_dimensions+1)/2, 
-                        (num_clusters+NUM_CLUSTERS_PER_BLOCK-1)/NUM_CLUSTERS_PER_BLOCK*NUM_THREADS_MSTEP); 
-      range<2> cov2_lws (1, NUM_THREADS_MSTEP);
+    // Covariance is symmetric, so we only need to compute N*(N+1)/2 matrix elements per cluster
+    //dim3 gridDim2((num_clusters+NUM_CLUSTERS_PER_BLOCK-1)/NUM_CLUSTERS_PER_BLOCK, num_dimensions*(num_dimensions+1)/2);
+    // mstep_covariance2<<<gridDim2, blockDim1>>>(d_fcs_data_by_dimension,d_clusters,
+       // num_dimensions,num_clusters,num_events);
+    sycl::range<2> cov2_gws(num_dimensions*(num_dimensions+1)/2, 
+                           (num_clusters+NUM_CLUSTERS_PER_BLOCK-1)/NUM_CLUSTERS_PER_BLOCK*NUM_THREADS_MSTEP); 
+    sycl::range<2> cov2_lws (1, NUM_THREADS_MSTEP);
 
-    q.submit([&] (handler &cgh) {
-      auto fcs_data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_write>(cgh);
-      auto clusters_means = d_means.get_access<sycl_read>(cgh);
-      auto clusters_R = d_R.get_access<sycl_read_write>(cgh);
-      auto clusters_avgvar = d_avgvar.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> means_row (NUM_CLUSTERS_PER_BLOCK, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> means_col (NUM_CLUSTERS_PER_BLOCK, cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> means_row (sycl::range<1>(NUM_CLUSTERS_PER_BLOCK), cgh);
+      sycl::local_accessor<float, 1> means_col (sycl::range<1>(NUM_CLUSTERS_PER_BLOCK), cgh);
       // 256 * 6
-      accessor<float, 1, sycl_read_write, access::target::local> temp_sums (NUM_THREADS_MSTEP*NUM_CLUSTERS_PER_BLOCK, cgh);
-      cgh.parallel_for<class covariance2>(nd_range<2>(cov2_gws, cov2_lws), [=] (nd_item<2> item) {
+      sycl::local_accessor<float, 1> temp_sums (sycl::range<1>(NUM_THREADS_MSTEP*NUM_CLUSTERS_PER_BLOCK), cgh);
+      cgh.parallel_for<class covariance2>(
+        sycl::nd_range<2>(cov2_gws, cov2_lws), [=] (sycl::nd_item<2> item) {
         int tid = item.get_local_id(1);
 
         // Determine what row,col this matrix is handling, also handles the symmetric element
         int row,col,c1;
         compute_row_col(item, num_dimensions, &row, &col);
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         
-         c1 = item.get_group(1) * NUM_CLUSTERS_PER_BLOCK; // Determines what cluster this block is handling    
+        c1 = item.get_group(1) * NUM_CLUSTERS_PER_BLOCK; // Determines what cluster this block is handling    
 
         #if DIAG_ONLY
         if(row != col) {
-            clusters_R[c*num_dimensions*num_dimensions+row*num_dimensions+col] = 0.0f;
-            clusters_R[c*num_dimensions*num_dimensions+col*num_dimensions+row] = 0.0f;
+            d_R[c*num_dimensions*num_dimensions+row*num_dimensions+col] = 0.0f;
+            d_R[c*num_dimensions*num_dimensions+col*num_dimensions+row] = 0.0f;
             return;
         }
         #endif 
 
-        if ( (tid < min(num_clusters, NUM_CLUSTERS_PER_BLOCK))  // c1 = 0
+        if ( (tid < sycl::min(num_clusters, NUM_CLUSTERS_PER_BLOCK))  // c1 = 0
              && (c1+tid < num_clusters)) { 
-            means_row[tid] = clusters_means[(c1+tid)*num_dimensions+row];
-            means_col[tid] = clusters_means[(c1+tid)*num_dimensions+col];
+            means_row[tid] = d_means[(c1+tid)*num_dimensions+row];
+            means_col[tid] = d_means[(c1+tid)*num_dimensions+col];
         }
 
         // Sync to wait for all params to be loaded to shared memory
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
-        
         float cov_sum1 = 0.0f;
         float cov_sum2 = 0.0f;
         float cov_sum3 = 0.0f;
@@ -877,14 +766,14 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
         } 
 
         for(int event=tid; event < num_events; event+=NUM_THREADS_MSTEP) {
-            val1 = fcs_data[row*num_events+event];
-            val2 = fcs_data[col*num_events+event];
-            cov_sum1 += (val1-means_row[0])*(val2-means_col[0])*clusters_memberships[c1*num_events+event]; 
-            cov_sum2 += (val1-means_row[1])*(val2-means_col[1])*clusters_memberships[(c1+1)*num_events+event]; 
-            cov_sum3 += (val1-means_row[2])*(val2-means_col[2])*clusters_memberships[(c1+2)*num_events+event]; 
-            cov_sum4 += (val1-means_row[3])*(val2-means_col[3])*clusters_memberships[(c1+3)*num_events+event]; 
-            cov_sum5 += (val1-means_row[4])*(val2-means_col[4])*clusters_memberships[(c1+4)*num_events+event]; 
-            cov_sum6 += (val1-means_row[5])*(val2-means_col[5])*clusters_memberships[(c1+5)*num_events+event]; 
+            val1 = d_fcs_data_by_dimension[row*num_events+event];
+            val2 = d_fcs_data_by_dimension[col*num_events+event];
+            cov_sum1 += (val1-means_row[0])*(val2-means_col[0])*d_memberships[c1*num_events+event]; 
+            cov_sum2 += (val1-means_row[1])*(val2-means_col[1])*d_memberships[(c1+1)*num_events+event]; 
+            cov_sum3 += (val1-means_row[2])*(val2-means_col[2])*d_memberships[(c1+2)*num_events+event]; 
+            cov_sum4 += (val1-means_row[3])*(val2-means_col[3])*d_memberships[(c1+3)*num_events+event]; 
+            cov_sum5 += (val1-means_row[4])*(val2-means_col[4])*d_memberships[(c1+4)*num_events+event]; 
+            cov_sum6 += (val1-means_row[5])*(val2-means_col[5])*d_memberships[(c1+5)*num_events+event]; 
         }
         temp_sums[0*NUM_THREADS_MSTEP+tid] = cov_sum1;
         temp_sums[1*NUM_THREADS_MSTEP+tid] = cov_sum2;
@@ -893,46 +782,39 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
         temp_sums[4*NUM_THREADS_MSTEP+tid] = cov_sum5;
         temp_sums[5*NUM_THREADS_MSTEP+tid] = cov_sum6;
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
    
         for (int c=0; c < NUM_CLUSTERS_PER_BLOCK; c++) {
           //temp_sums[c*NUM_THREADS_MSTEP+tid] = parallelSum(&temp_sums[c*NUM_THREADS_MSTEP],NUM_THREADS_MSTEP);
           float *temp_sum = &temp_sums[c*NUM_THREADS_MSTEP];
           for(unsigned int bit = NUM_THREADS_MSTEP >> 1; bit > 0; bit >>= 1) {
             float t = temp_sum[tid] + temp_sum[tid^bit];
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
             temp_sum[tid] = t;
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
           }
           temp_sums[c*NUM_THREADS_MSTEP+tid] = temp_sum[tid];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         }
         
         if (tid == 0) {
           for (int c=0; c < NUM_CLUSTERS_PER_BLOCK && (c+c1) < num_clusters; c++) {
             int offset = (c+c1)*num_dimensions*num_dimensions;
             cov_sum1 = temp_sums[c*NUM_THREADS_MSTEP];
-            clusters_R[offset+row*num_dimensions+col] = cov_sum1;
+            d_R[offset+row*num_dimensions+col] = cov_sum1;
             // Set the symmetric value
-            clusters_R[offset+col*num_dimensions+row] = cov_sum1;
+            d_R[offset+col*num_dimensions+row] = cov_sum1;
             
             // Regularize matrix - adds some variance to the diagonal elements
             // Helps keep covariance matrix non-singular (so it can be inverted)
             // The amount added is scaled down based on COVARIANCE_DYNAMIC_RANGE constant defined in gaussian.h
-            if(row == col) clusters_R[offset+row*num_dimensions+col] += clusters_avgvar[c+c1];
+            if(row == col) d_R[offset+row*num_dimensions+col] += d_avgvar[c+c1];
           }
         }
       });
     });
 
-    //  CUDA_SAFE_CALL(cudaMemcpy(clusters.R,temp_clusters.R,
-     //       sizeof(float)*num_clusters*num_dimensions*num_dimensions,cudaMemcpyDeviceToHost));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_R.get_access<sycl_read>(cgh, range<1>(num_clusters*num_dimensions*num_dimensions)); 
-      cgh.copy(acc, clusters.R);
-    });
-
-    q.wait();
+    q.memcpy(clusters.R, d_R, sizeof(float)*num_clusters*num_dimensions*num_dimensions).wait();
 
     // Reduce R for all clusters, copy back to device
     for(int c=0; c < num_clusters; c++) {
@@ -953,13 +835,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       }
     }
 
-    // CUDA_SAFE_CALL(cudaMemcpy(temp_clusters.R,clusters.R,
-    //     sizeof(float)*num_clusters*num_dimensions*num_dimensions,cudaMemcpyHostToDevice));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_R.get_access<sycl_write>(cgh, range<1>(num_clusters*num_dimensions*num_dimensions)); 
-      cgh.copy(clusters.R, acc);
-    });
-
+    q.memcpy(d_R, clusters.R, sizeof(float)*num_clusters*num_dimensions*num_dimensions);
 
     //CUT_CHECK_ERROR("M-step Kernel execution failed: ");
     params_iterations++;
@@ -968,41 +844,29 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
     // Inverts the R matrices, computes the constant, normalizes cluster probabilities
     // constants_kernel<<<num_clusters, NUM_THREADS_MSTEP>>>(d_clusters,num_clusters,num_dimensions);
-    range<1> constants2_gws(num_clusters*NUM_THREADS_MSTEP);
-    q.submit([&] (handler &cgh) {
-      auto clusters_R = d_R.get_access<sycl_read>(cgh);
-      auto clusters_Rinv = d_Rinv.get_access<sycl_discard_write>(cgh);
-      auto clusters_N = d_N.get_access<sycl_read>(cgh);
-      auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
-      auto clusters_constant = d_constant.get_access<sycl_discard_write>(cgh);
-      auto clusters_avgvar = d_avgvar.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> matrix(NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> determinant_arg(1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sum(1, cgh);
-      cgh.parallel_for<class constants2>(nd_range<1>(constants2_gws, constants_lws), [=] (nd_item<1> item) {
+    sycl::range<1> constants2_gws(num_clusters*NUM_THREADS_MSTEP);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> matrix(NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
+      sycl::local_accessor<float, 0> determinant_arg(cgh);
+      sycl::local_accessor<float, 0> sum(cgh);
+      cgh.parallel_for<class constants2>(
+        sycl::nd_range<1>(constants2_gws, constants_lws), [=] (sycl::nd_item<1> item) {
         constants_kernel( item, 
-                          clusters_R.get_pointer(), 
-                          clusters_Rinv.get_pointer(), 
-                          clusters_N.get_pointer(), 
-                          clusters_pi.get_pointer(), 
-                          clusters_constant.get_pointer(), 
-                          clusters_avgvar.get_pointer(), 
+                          d_R, 
+                          d_Rinv, 
+                          d_N, 
+                          d_pi, 
+                          d_constant, 
+                          d_avgvar, 
                           matrix.get_pointer(),
-                          determinant_arg.get_pointer(),
-                          sum.get_pointer(),
+                          determinant_arg,
+                          sum,
                           num_clusters, // original_num_clusters, 
                           num_dimensions);
       });
     });
 
-    //    CUDA_SAFE_CALL(cudaMemcpy(clusters.constant, temp_clusters.constant, 
-     //         sizeof(float)*num_clusters,cudaMemcpyDeviceToHost));
-        
-    q.submit([&] (handler &cgh) {
-      auto acc = d_constant.get_access<sycl_read>(cgh, range<1>(num_clusters)); 
-      cgh.copy(acc, clusters.constant);
-    });
-    q.wait();
+    q.memcpy(clusters.constant, d_constant, sizeof(float)*num_clusters).wait();
 
     for(int temp_c=0; temp_c < num_clusters; temp_c++)
       DEBUG("Cluster %d constant: %e\n",temp_c,clusters.constant[temp_c]);
@@ -1011,24 +875,19 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
 
       // Compute new cluster membership probabilities for all the events
       // estep1<<<dim3(num_clusters,NUM_BLOCKS), NUM_THREADS_ESTEP>>>(d_fcs_data_by_dimension,d_clusters,num_dimensions,num_events);
-    q.submit([&] (handler &cgh) {
-      auto data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_Rinv = d_Rinv.get_access<sycl_read>(cgh);
-      auto clusters_memberships = d_memberships.get_access<sycl_discard_write>(cgh);
-      auto clusters_pi = d_pi.get_access<sycl_discard_write>(cgh);
-      auto clusters_constant = d_constant.get_access<sycl_discard_write>(cgh);
-      auto clusters_means = d_means.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> means (NUM_DIMENSIONS, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> Rinv (NUM_DIMENSIONS*NUM_DIMENSIONS, cgh);
-      cgh.parallel_for<class estep1>(nd_range<2>(estep1_gws, estep1_lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> means (sycl::range<1>(NUM_DIMENSIONS), cgh);
+      sycl::local_accessor<float, 1> Rinv (sycl::range<1>(NUM_DIMENSIONS*NUM_DIMENSIONS), cgh);
+      cgh.parallel_for<class estep1>(
+        sycl::nd_range<2>(estep1_gws, estep1_lws), [=] (sycl::nd_item<2> item) {
         estep1_kernel( 
             item,
-            data.get_pointer(), 
-            clusters_Rinv.get_pointer(), 
-            clusters_memberships.get_pointer(), 
-            clusters_pi.get_pointer(), 
-            clusters_constant.get_pointer(), 
-            clusters_means.get_pointer(), 
+            d_fcs_data_by_dimension, 
+            d_Rinv, 
+            d_memberships, 
+            d_pi, 
+            d_constant, 
+            d_means, 
             means.get_pointer(),
             Rinv.get_pointer(),
             num_dimensions, 
@@ -1036,16 +895,14 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       });
     });
   //    estep2<<<NUM_BLOCKS, NUM_THREADS_ESTEP>>>(d_fcs_data_by_dimension,d_clusters,num_dimensions,num_clusters,num_events,d_likelihoods);
-    q.submit([&] (handler &cgh) {
-      // auto fcs_data = d_fcs_data_by_dimension.get_access<sycl_read>(cgh);
-      auto clusters_memberships= d_memberships.get_access<sycl_discard_write>(cgh);
-      auto likelihood = d_likelihoods.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> total_likelihoods (NUM_THREADS_ESTEP, cgh);
-      cgh.parallel_for<class estep2>(nd_range<1>(estep2_gws, estep2_lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> total_likelihoods (sycl::range<1>(NUM_THREADS_ESTEP), cgh);
+      cgh.parallel_for<class estep2>(
+        sycl::nd_range<1>(estep2_gws, estep2_lws), [=] (sycl::nd_item<1> item) {
         estep2_kernel(
             item,
-            clusters_memberships.get_pointer(), 
-            likelihood.get_pointer(), 
+            d_memberships,
+            d_likelihoods,
             total_likelihoods.get_pointer(), 
             num_dimensions, 
             num_clusters, 
@@ -1059,12 +916,8 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
       //CUT_CHECK_ERROR("Kernel execution failed");
 
       // Copy the likelihood totals from each block, sum them up to get a total
-  //    CUDA_SAFE_CALL(cudaMemcpy(shared_likelihoods,d_likelihoods,sizeof(float)*NUM_BLOCKS,cudaMemcpyDeviceToHost));
-    q.submit([&] (handler &cgh) {
-      auto acc = d_likelihoods.get_access<sycl_read>(cgh); 
-      cgh.copy(acc, shared_likelihoods);
-    });
-    q.wait();
+    q.memcpy(shared_likelihoods, d_likelihoods, sizeof(float)*NUM_BLOCKS).wait();
+
     likelihood = 0.0;
     for(int i=0;i<NUM_BLOCKS;i++) likelihood += shared_likelihoods[i]; 
     DEBUG("Likelihood: %e\n",likelihood);
@@ -1079,12 +932,7 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   copyClusterFromDevice(q, &clusters, d_N, d_R, d_Rinv, d_pi, d_constant, d_avgvar, d_means, 
                           num_clusters, num_dimensions);
 
-    //  CUDA_SAFE_CALL(cudaMemcpy(clusters.memberships, temp_clusters.memberships, sizeof(float)*num_events*num_clusters,cudaMemcpyDeviceToHost));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_memberships.get_access<sycl_read>(cgh, range<1>(num_events*num_clusters)); 
-    cgh.copy(acc, clusters.memberships);
-  });
-
+  q.memcpy(clusters.memberships, d_memberships, sizeof(float)*num_events*num_clusters);
 
   DEBUG("GPU done with copying cluster data from device\n");
 
@@ -1169,6 +1017,18 @@ clusters_t* cluster(int original_num_clusters, int desired_num_clusters,
   freeCluster(&clusters);
   free(fcs_data_by_dimension);
   free(shared_likelihoods);
+
+  sycl::free(d_N, q);
+  sycl::free(d_pi, q);
+  sycl::free(d_constant, q);
+  sycl::free(d_avgvar, q);
+  sycl::free(d_means, q);
+  sycl::free(d_R, q);
+  sycl::free(d_Rinv, q);
+  sycl::free(d_memberships, q);
+  sycl::free(d_likelihoods, q);
+  sycl::free(d_fcs_data_by_event, q);
+  sycl::free(d_fcs_data_by_dimension, q);
 
   *final_num_clusters = ideal_num_clusters;
   return saved_clusters;
