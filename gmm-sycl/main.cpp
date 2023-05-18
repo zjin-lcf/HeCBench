@@ -22,7 +22,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "gaussian.h"
 
 #include "gaussian_kernel.cpp"

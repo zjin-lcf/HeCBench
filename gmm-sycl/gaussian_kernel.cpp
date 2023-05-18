@@ -13,15 +13,15 @@
 // Inverts an NxN matrix 'data' stored as a 1D array in-place
 // 'actualsize' is N
 // Computes the log of the determinant of the origianl matrix in the process
-void invert(float* data, int actualsize, float* log_determinant)  {
+void invert(float* data, int actualsize, float &log_determinant)  {
   int maxsize = actualsize;
   int n = actualsize;
 
-  *log_determinant = 0.0;
+  log_determinant = 0.0;
 
   // sanity check        
   if (actualsize == 1) {
-    *log_determinant = cl::sycl::log(data[0]);
+    log_determinant = sycl::log(data[0]);
     data[0] = 1.f / data[0];
   } else {
 
@@ -44,7 +44,7 @@ void invert(float* data, int actualsize, float* log_determinant)  {
     }
 
     for(int i=0; i<actualsize; i++) {
-      *log_determinant += cl::sycl::log(cl::sycl::fabs(data[i*n+i]));
+      log_determinant += sycl::log(sycl::fabs(data[i*n+i]));
     }
 
     for ( int i = 0; i < actualsize; i++ )  // invert L
@@ -82,7 +82,7 @@ void invert(float* data, int actualsize, float* log_determinant)  {
  * Used to determine what row/col should be computed for covariance
  * based on a block index.
  */
-void compute_row_col(nd_item<2> &item, const int n, int* row, int* col) {
+void compute_row_col(sycl::nd_item<2> &item, const int n, int* row, int* col) {
   int i = 0;
   for(int r=0; r < n; r++) {
     for(int c=0; c <= r; c++) {
@@ -101,7 +101,8 @@ void compute_row_col(nd_item<2> &item, const int n, int* row, int* col) {
  * 
  * Needs to be launched with the number of blocks = number of clusters
  */
-void constants_kernel(nd_item<1> &item, 
+void constants_kernel(
+    sycl::nd_item<1> &item, 
     const float *clusters_R,
     float *clusters_Rinv,
     const float *clusters_N,
@@ -109,8 +110,8 @@ void constants_kernel(nd_item<1> &item,
     float *clusters_constant,
     float *clusters_avgvar,
     float *matrix,
-    float *determinant_arg,
-    float *sum,
+    float &determinant_arg,
+    float &sum,
     const int num_clusters, 
     const int num_dimensions) {
 
@@ -131,62 +132,63 @@ void constants_kernel(nd_item<1> &item,
     matrix[i] = clusters_R[bid*num_dimensions*num_dimensions+i];
   }
 
-  item.barrier(access::fence_space::local_space); 
+  item.barrier(sycl::access::fence_space::local_space); 
 
   if(tid == 0) { 
 #if DIAG_ONLY
-    determinant_arg[0] = 1.0f;
+    determinant_arg = 1.0f;
     for(int i=0; i < num_dimensions; i++) {
-      determinant_arg[0] *= matrix[i*num_dimensions+i];
+      determinant_arg *= matrix[i*num_dimensions+i];
       matrix[i*num_dimensions+i] = 1.0f / matrix[i*num_dimensions+i];
     }
-    determinant_arg[0] = cl::sycl::log(determinant_arg[0]);
+    determinant_arg = sycl::log(determinant_arg);
 #else 
   invert(matrix,num_dimensions,determinant_arg);
 #endif
   }
-  item.barrier(access::fence_space::local_space); 
-  log_determinant = determinant_arg[0];
+  item.barrier(sycl::access::fence_space::local_space); 
+  log_determinant = determinant_arg;
 
   // Copy the matrx from shared memory back into the cluster memory
   for(int i=tid; i<num_elements; i+= num_threads) {
     clusters_Rinv[bid*num_dimensions*num_dimensions+i] = matrix[i];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Compute the constant
   // Equivilent to: log(1/((2*PI)^(M/2)*det(R)^(1/2)))
   // This constant is used in all E-step likelihood calculations
   if(tid == 0) {
-    clusters_constant[bid] = -num_dimensions*0.5f*cl::sycl::log(2.0f*PI) - 0.5f*log_determinant;
+    clusters_constant[bid] = -num_dimensions*0.5f*sycl::log(2.0f*PI) - 0.5f*log_determinant;
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(bid == 0) {
     // compute_pi(clusters,num_clusters);
 
     if(tid == 0) {
-      sum[0] = 0.0;
+      sum = 0.0;
       for(int i=0; i<num_clusters; i++) {
-        sum[0] += clusters_N[i];
+        sum += clusters_N[i];
       }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     for(int i = tid; i < num_clusters; i += num_threads) {
       if(clusters_N[i] < 0.5f) {
         clusters_pi[tid] = 1e-10;
       } else {
-        clusters_pi[tid] = clusters_N[i] / sum[0];
+        clusters_pi[tid] = clusters_N[i] / sum;
       }
     }
   }
 }
 
-void estep1_kernel(nd_item<2> &item,
+void estep1_kernel(
+    sycl::nd_item<2> &item,
     const float *data, 
     const float* clusters_Rinv, 
     float *clusters_memberships, 
@@ -244,7 +246,7 @@ void estep1_kernel(nd_item<2> &item,
   float constant = clusters_constant[c];
 
   // Sync to wait for all params to be loaded to shared memory
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for(int event=start_index; event<end_index; event += NUM_THREADS_ESTEP) {
     float like = 0.0f;
@@ -261,11 +263,12 @@ void estep1_kernel(nd_item<2> &item,
     }
 #endif
     // numerator of the E-step probability computation
-    clusters_memberships[c*num_events+event] = -0.5f * like + constant + cl::sycl::log(cluster_pi);
+    clusters_memberships[c*num_events+event] = -0.5f * like + constant + sycl::log(cluster_pi);
   }
 }
 
-void estep2_kernel(nd_item<1> &item,
+void estep2_kernel(
+    sycl::nd_item<1> &item,
     float* clusters_memberships,
     float* likelihood,
     float* total_likelihoods, 
@@ -311,36 +314,36 @@ void estep2_kernel(nd_item<1> &item,
     // find the maximum likelihood for this event
     max_likelihood = clusters_memberships[pixel];
     for(int c=1; c<num_clusters; c++) {
-      max_likelihood = cl::sycl::fmax(max_likelihood,clusters_memberships[c*num_events+pixel]);
+      max_likelihood = sycl::fmax(max_likelihood,clusters_memberships[c*num_events+pixel]);
     }
 
     // Compute P(x_n), the denominator of the probability (sum of weighted likelihoods)
     denominator_sum = 0.0;
     for(int c=0; c<num_clusters; c++) {
-      temp = cl::sycl::exp(clusters_memberships[c*num_events+pixel]-max_likelihood);
+      temp = sycl::exp(clusters_memberships[c*num_events+pixel]-max_likelihood);
       denominator_sum += temp;
     }
-    denominator_sum = max_likelihood + cl::sycl::log(denominator_sum);
+    denominator_sum = max_likelihood + sycl::log(denominator_sum);
     thread_likelihood += denominator_sum;
 
     // Divide by denominator, also effectively normalize probabilities
     // exp(log(p) - log(denom)) == p / denom
     for(int c=0; c<num_clusters; c++) {
       clusters_memberships[c*num_events+pixel] = 
-        cl::sycl::exp(clusters_memberships[c*num_events+pixel] - denominator_sum);
+        sycl::exp(clusters_memberships[c*num_events+pixel] - denominator_sum);
       //printf("Probability that pixel #%d is in cluster #%d: %f\n",pixel,c,clusters->memberships[c*num_events+pixel]);
     }
   }
 
   total_likelihoods[tid] = thread_likelihood;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // temp = parallelSum(total_likelihoods,NUM_THREADS_ESTEP);
   for (unsigned int bit = NUM_THREADS_ESTEP >> 1; bit > 0; bit >>= 1) {
     float t = total_likelihoods[tid] + total_likelihoods[tid^bit];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     total_likelihoods[tid] = t;
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if(tid == 0) {
