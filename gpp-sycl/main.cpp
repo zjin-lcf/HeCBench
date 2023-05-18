@@ -1,6 +1,6 @@
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifndef dataType
 #define dataType double
@@ -154,32 +154,49 @@ int main(int argc, char **argv) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Creating device versions of the data
-  buffer<CustomComplex<dataType>, 1> d_aqsmtemp (aqsmtemp, aqsmtemp_size);
-  buffer<CustomComplex<dataType>, 1> d_aqsntemp (aqsntemp, aqsntemp_size);
-  buffer<CustomComplex<dataType>, 1> d_I_eps_array (I_eps_array, I_eps_array_size);
-  buffer<CustomComplex<dataType>, 1> d_wtilde_array (wtilde_array, wtilde_array_size);
+  CustomComplex<dataType> *d_aqsmtemp = 
+    sycl::malloc_device<CustomComplex<dataType>>(aqsmtemp_size, q);
+  q.memcpy(d_aqsmtemp, aqsmtemp, aqsmtemp_size * sizeof(CustomComplex<dataType>));
 
-  buffer<dataType, 1> d_vcoul (vcoul, vcoul_size);
-  buffer<dataType, 1> d_wx_array (wx_array, wx_array_size);
-  buffer<dataType, 1> d_achtemp_re (achtemp_re_size);
-  buffer<dataType, 1> d_achtemp_im (achtemp_im_size);
+  CustomComplex<dataType> *d_aqsntemp =
+    sycl::malloc_device<CustomComplex<dataType>>(aqsntemp_size, q);
+  q.memcpy(d_aqsntemp, aqsntemp, aqsntemp_size * sizeof(CustomComplex<dataType>));
 
-  buffer<int, 1> d_inv_igp_index (inv_igp_index, inv_igp_index_size);
-  buffer<int, 1> d_indinv (indinv, indinv_size);
+  CustomComplex<dataType> *d_I_eps_array = 
+    sycl::malloc_device<CustomComplex<dataType>>(I_eps_array_size, q);
+  q.memcpy(d_I_eps_array, I_eps_array, I_eps_array_size * sizeof(CustomComplex<dataType>));
+
+  CustomComplex<dataType> *d_wtilde_array =
+    sycl::malloc_device<CustomComplex<dataType>>(wtilde_array_size, q);
+  q.memcpy(d_wtilde_array, wtilde_array, wtilde_array_size * sizeof(CustomComplex<dataType>));
+
+  dataType *d_vcoul = sycl::malloc_device<dataType>(vcoul_size, q);
+  q.memcpy(d_vcoul, vcoul, vcoul_size * sizeof(dataType));
+
+  dataType *d_wx_array = sycl::malloc_device<dataType>(wx_array_size, q); 
+  q.memcpy(d_wx_array, wx_array, wx_array_size * sizeof(dataType));
+
+  dataType *d_achtemp_re = sycl::malloc_device<dataType>(achtemp_re_size, q);
+  dataType *d_achtemp_im = sycl::malloc_device<dataType>(achtemp_im_size, q);
+
+  int *d_inv_igp_index = sycl::malloc_device<int>(inv_igp_index_size, q);
+  int *d_indinv = sycl::malloc_device<int>(indinv_size, q);
+
+  q.memcpy(d_inv_igp_index, inv_igp_index, inv_igp_index_size * sizeof(int));
+  q.memcpy(d_indinv, indinv, indinv_size * sizeof(int));
 
   // Time the kernel execution
   timeval startKernelTimer, endKernelTimer;
   gettimeofday(&startKernelTimer, NULL);
 
-  range<3> gws(1, ngpown, 32 * number_bands);
-  range<3> lws(1, 1, 32);
+  sycl::range<3> gws(1, ngpown, 32 * number_bands);
+  sycl::range<3> lws(1, 1, 32);
   printf("Launching a kernel with global work size = "
          "(%d,%d,%d), and local work size = (%d,%d,%d) \n",
          number_bands * 32, ngpown, 1, 32, 1, 1);
@@ -188,40 +205,21 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < 10; i++) {
     // Reset the atomic sums
-    q.submit([&] (handler &cgh) {
-      auto acc = d_achtemp_re.get_access<sycl_discard_write>(cgh);
-      cgh.copy(achtemp_re, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_achtemp_im.get_access<sycl_discard_write>(cgh);
-      cgh.copy(achtemp_im, acc);
-    });
+    q.memcpy(d_achtemp_re, achtemp_re, achtemp_re_size * sizeof(dataType));
+    q.memcpy(d_achtemp_im, achtemp_im, achtemp_im_size * sizeof(dataType));
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto igp = d_inv_igp_index.get_access<sycl_read>(cgh);
-      auto ind = d_indinv.get_access<sycl_read>(cgh);
-      auto wxa = d_wx_array.get_access<sycl_read>(cgh);
-      auto wta = d_wtilde_array.get_access<sycl_read>(cgh);
-      auto amt = d_aqsmtemp.get_access<sycl_read>(cgh);
-      auto ant = d_aqsntemp.get_access<sycl_read>(cgh);
-      auto eps = d_I_eps_array.get_access<sycl_read>(cgh);
-      auto vc = d_vcoul.get_access<sycl_read>(cgh);
-      auto re = d_achtemp_re.get_access<sycl_read_write>(cgh);
-      auto im = d_achtemp_im.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class gpp_kernel>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class gpp_kernel>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         solver(item, number_bands, ngpown, ncouls, 
-               igp.get_pointer(), ind.get_pointer(), wxa.get_pointer(),
-               wta.get_pointer(), amt.get_pointer(), ant.get_pointer(),
-               eps.get_pointer(), vc.get_pointer(), re.get_pointer(), im.get_pointer());
+               d_inv_igp_index, d_indinv, d_wx_array, d_wtilde_array,  
+               d_aqsmtemp, d_aqsntemp, d_I_eps_array, d_vcoul, d_achtemp_re, d_achtemp_im);
       });
-    });
+    }).wait();
 
-    q.wait();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     total_time += time;
@@ -229,16 +227,8 @@ int main(int argc, char **argv) {
 
   printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / 10.f);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_achtemp_re.get_access<sycl_read>(cgh);
-    cgh.copy(acc, achtemp_re);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_achtemp_im.get_access<sycl_read>(cgh);
-    cgh.copy(acc, achtemp_im);
-  });
-
+  q.memcpy(achtemp_re, d_achtemp_re, achtemp_re_size * sizeof(dataType));
+  q.memcpy(achtemp_im, d_achtemp_im, achtemp_im_size * sizeof(dataType));
   q.wait();
 
   gettimeofday(&endKernelTimer, NULL);
@@ -278,6 +268,17 @@ int main(int argc, char **argv) {
   free(achtemp_re);
   free(achtemp_im);
   free(wx_array);
+
+  sycl::free(d_aqsmtemp, q);
+  sycl::free(d_aqsntemp, q);
+  sycl::free(d_I_eps_array, q);
+  sycl::free(d_wtilde_array, q);
+  sycl::free(d_vcoul, q);
+  sycl::free(d_inv_igp_index, q);
+  sycl::free(d_indinv, q);
+  sycl::free(d_achtemp_re, q);
+  sycl::free(d_achtemp_im, q);
+  sycl::free(d_wx_array, q);
 
   std::cout << "********** Kernel Time Taken **********= " << elapsedKernelTimer
             << " secs" << std::endl;
