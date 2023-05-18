@@ -1,13 +1,14 @@
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline void atomicFetchAdd(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
+  sycl::atomic_ref<T, 
+     sycl::memory_order::relaxed, 
      MemoryScope, sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
 
 void solver(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     int number_bands, int ngpown, int ncouls,
     const int *__restrict inv_igp_index,
     const int *__restrict indinv,
