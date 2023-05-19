@@ -33,7 +33,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "pnfa.h"
 #include "cycleTimer.h"
 #include "pnfa.cpp"
@@ -114,11 +114,10 @@ int main(int argc, char **argv)
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   //===============================================================================
   // match just a single regex  on a device
@@ -134,8 +133,8 @@ int main(int argc, char **argv)
 
   int postsize = (strlen(builder.re) + 1) * sizeof (char);
 
-  buffer<char, 1> device_regex(builder.re, postsize);
-  device_regex.set_final_data(nullptr);
+  char *device_regex = sycl::malloc_device<char>(postsize, q);
+  q.memcpy(device_regex, builder.re, postsize);
 
   u32 * table = (u32 *) malloc(sizeof(u32) * strlen(*lines));
   table[0] = 0;
@@ -152,47 +151,46 @@ int main(int argc, char **argv)
   if((lines[0])[len-1] == '\n')/*if at the end file not '\n', then we not forgot last offset */
     --num_lines;
 
-  buffer<u32, 1> device_line_table(table, len);
-  buffer<char, 1> device_line(*lines, len+1);
-  device_line.set_final_data(nullptr);
+  u32 *device_line_table = sycl::malloc_device<u32>(len, q);
+  q.memcpy(device_line_table, table, sizeof(u32) * len);
+
+  char *device_line = sycl::malloc_device<char>(len+1, q);
+  q.memcpy(device_line, *lines, len+1);
 
   u32 host_regex_table[1]; /*offsets to regexes on host*/
   host_regex_table[0]=0;   /*in case of one regex offset must be 0*/
 
-  buffer<u32, 1> device_regex_table(host_regex_table, 1);
+  u32 *device_regex_table = sycl::malloc_device<u32>(1, q);
+  q.memcpy(device_regex_table, host_regex_table, sizeof(u32));
 
-  buffer<unsigned char, 1> device_result(num_lines);
+  unsigned char *device_result = sycl::malloc_device<unsigned char>(num_lines, q);
 
   State pmatchstate = { Match };  /* matching state */
-  buffer<State, 1> device_match_state(&pmatchstate, 1);
-  device_match_state.set_final_data(nullptr);
 
+  State *device_match_state = sycl::malloc_device<State>(1, q);
+  q.memcpy(device_match_state, &pmatchstate, sizeof(State));
+
+  q.wait();
   endSetup = CycleTimer::currentSeconds();
 
   // measure kernel execution time
-  q.submit([&] (handler &cgh) {
-    auto bigLine = device_line.get_access<sycl_read_write>(cgh);
-    auto tableOfLineStarts = device_line_table.get_access<sycl_read>(cgh);
-    auto regexLines = device_regex.get_access<sycl_read_write>(cgh);
-    auto regexTable = device_regex_table.get_access<sycl_read>(cgh);
-    auto devResult = device_result.get_access<sycl_discard_write>(cgh);
-    auto pmatchstate = device_match_state.get_access<sycl_read_write>(cgh);
-
-    accessor<char, 1, sycl_read_write, access::target::local> buf(BUFFER_SIZE, cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> pnstate(1, cgh);
-    accessor<State, 1, sycl_read_write, access::target::local> s(100, cgh);
-    accessor<State*, 1, sycl_read_write, access::target::local> st(1, cgh);
-
-    cgh.parallel_for<class regExpMatch>(nd_range<1>(range<1>(512*160), range<1>(160)), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<char, 1> buf(sycl::range<1>(BUFFER_SIZE), cgh);
+    sycl::local_accessor<int, 0> pnstate(cgh);
+    sycl::local_accessor<State, 1> s(sycl::range<1>(100), cgh);
+    sycl::local_accessor<State*, 0> st(cgh);
+    cgh.parallel_for<class regExpMatch>(
+      sycl::nd_range<1>(sycl::range<1>(512*160), sycl::range<1>(160)),
+      [=] (sycl::nd_item<1> item) {
       if (item.get_local_id(0) == 0) {
-        pre2post(regexLines.get_pointer() + regexTable[0], buf.get_pointer());
+        pre2post(device_regex + device_regex_table[0], buf.get_pointer());
 
-        pnstate[0] = 0;
-        st[0] = ppost2nfa(buf.get_pointer(), s.get_pointer(), 
-                          pnstate.get_pointer(), pmatchstate.get_pointer());
+        pnstate = 0;
+        st = ppost2nfa(buf.get_pointer(), s.get_pointer(),
+                       pnstate, device_match_state);
       }
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       List d1;
       List d2;  
@@ -201,24 +199,19 @@ int main(int argc, char **argv)
       for (i = item.get_global_id(0); i < num_lines;
            i += item.get_local_range(0) * item.get_group_range(0)) { 
 
-        char * lineSegment = bigLine.get_pointer() + tableOfLineStarts[i];
-        if (panypmatch(st[0], lineSegment, &d1, &d2)) 
-          devResult[i] = 1;
+        char * lineSegment = device_line + device_line_table[i];
+        if (panypmatch(st, lineSegment, &d1, &d2)) 
+          device_result[i] = 1;
         else
-          devResult[i] = 0;
+          device_result[i] = 0;
       }
     });  
-  });  
-
-  q.wait();
+  }).wait();
 
   endKernel = CycleTimer::currentSeconds();
 
   unsigned char *host_result = (unsigned char *) malloc (num_lines * sizeof(unsigned char));
-  q.submit([&] (handler &cgh) {
-    auto acc = device_result.get_access<sycl_read>(cgh);
-    cgh.copy(acc, host_result);
-  }).wait();
+  q.memcpy(host_result, device_result, num_lines * sizeof(unsigned char)).wait();
 
   // print the "grep" results for verification
   if (!timerOn) {  
@@ -227,6 +220,13 @@ int main(int argc, char **argv)
         PRINT(timerOn, "%s\n", lines[0] + table[i]);
     }
   }
+
+  sycl::free(device_result, q);
+  sycl::free(device_match_state, q);
+  sycl::free(device_line, q);
+  sycl::free(device_line_table, q);
+  sycl::free(device_regex, q);
+  sycl::free(device_regex_table, q);
 
   free(table);
   free(host_result);
