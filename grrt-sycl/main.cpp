@@ -22,7 +22,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "constants.h"
 
 #include "kernels.cpp"
@@ -53,41 +53,35 @@ int main()
   Results = new double[IMAGE_SIZE * IMAGE_SIZE * 3];
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   BlockDimX = 100;
   BlockDimY = 1;
   GridDimX  = 1;
   GridDimY  = 50;
-  range<2> gws (GridDimY*BlockDimY, GridDimX*BlockDimX);
-  range<2> lws (BlockDimY, BlockDimX);
+  sycl::range<2> gws (GridDimY*BlockDimY, GridDimX*BlockDimX);
+  sycl::range<2> lws (BlockDimY, BlockDimX);
 
   //compute number of grides, to cover the whole image plane
   ImaDimX = (int)ceil((double)IMAGE_SIZE / (BlockDimX * GridDimX));
   ImaDimY = (int)ceil((double)IMAGE_SIZE / (BlockDimY * GridDimY));
 
-  buffer<double, 1> d_ResultsPixel (IMAGE_SIZE * IMAGE_SIZE * 3);
-  buffer<double, 1> d_VariablesIn (VarINNUM);
+  double *d_ResultsPixel = sycl::malloc_device<double>(IMAGE_SIZE * IMAGE_SIZE * 3, q);
+  double *d_VariablesIn = sycl::malloc_device<double>(VarINNUM, q);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_VariablesIn.get_access<sycl_discard_write>(cgh);
-    cgh.copy(VariablesIn, acc);
-  });
+  q.memcpy(d_VariablesIn, VariablesIn, sizeof(double) * VarINNUM).wait();
 
-  q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
-      q.submit([&] (handler &cgh) {
-        auto result = d_ResultsPixel.get_access<sycl_discard_write>(cgh);
-        auto input = d_VariablesIn.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class k1>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          task1(item, result.get_pointer(), input.get_pointer(), GridIdxX, GridIdxY);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k1>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          task1(item, d_ResultsPixel, d_VariablesIn, GridIdxX, GridIdxY);
         });
       });
     }
@@ -98,10 +92,7 @@ int main()
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time (task1) %f (s)\n", time * 1e-9f);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_ResultsPixel.get_access<sycl_read>(cgh);
-    cgh.copy(acc, Results);
-  }).wait();
+  q.memcpy(Results, d_ResultsPixel, sizeof(double) * IMAGE_SIZE * IMAGE_SIZE * 3).wait();
 
   //save result to output
   fp=fopen("Output_task1.txt","w");  
@@ -124,24 +115,20 @@ int main()
   freq_obs    = 340e9; // observed frequency
   printf("task2: image size = %d  x  %d  pixels\n",IMAGE_SIZE,IMAGE_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_VariablesIn.get_access<sycl_discard_write>(cgh);
-    cgh.copy(VariablesIn, acc);
-  });
+  q.memcpy(d_VariablesIn, VariablesIn, sizeof(double) * VarINNUM);
 
-  buffer<const double, 1> d_K2_tab (K2_tab, 50); 
+  double *d_K2_tab = sycl::malloc_device<double>(50, q);
+  q.memcpy(d_K2_tab, K2_tab, sizeof(double) * 50);
 
   q.wait();
   start = std::chrono::steady_clock::now();
 
   for(int GridIdxY = 0; GridIdxY < ImaDimY; GridIdxY++){
     for(int GridIdxX = 0; GridIdxX < ImaDimX; GridIdxX++){                      
-      q.submit([&] (handler &cgh) {
-        auto result = d_ResultsPixel.get_access<sycl_discard_write>(cgh);
-        auto input = d_VariablesIn.get_access<sycl_read>(cgh);
-        auto table = d_K2_tab.get_access<sycl_read, sycl_cmem>(cgh);
-        cgh.parallel_for<class k2>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          task2(item, result.get_pointer(), input.get_pointer(), table.get_pointer(), GridIdxX, GridIdxY);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k2>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          task2(item, d_ResultsPixel, d_VariablesIn, d_K2_tab, GridIdxX, GridIdxY);
         });
       });
     }
@@ -152,10 +139,11 @@ int main()
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time (task2) %f (s)\n", time * 1e-9f);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_ResultsPixel.get_access<sycl_read>(cgh);
-    cgh.copy(acc, Results);
-  }).wait();
+  q.memcpy(Results, d_ResultsPixel, sizeof(double) * IMAGE_SIZE * IMAGE_SIZE * 3).wait();
+
+  sycl::free(d_ResultsPixel, q);
+  sycl::free(d_VariablesIn, q);
+  sycl::free(d_K2_tab, q);
 
   fp=fopen("Output_task2.txt","w");  
   if (fp != NULL) {

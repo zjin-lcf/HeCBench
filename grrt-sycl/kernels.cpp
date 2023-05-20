@@ -359,7 +359,7 @@ double task1fun_GetZ(double* Variables, const double* VariablesIn, double *y)
   return E_local / E_inf; 
 }
 
-void task1(nd_item<2> &item, double*__restrict ResultsPixel, const double*__restrict VariablesIn, 
+void task1(sycl::nd_item<2> &item, double*__restrict ResultsPixel, const double*__restrict VariablesIn, 
            int GridIdxX, int GridIdxY)
 {
   // to check whether the photon is inside image plane
@@ -477,7 +477,7 @@ double task2fun_GetZ(double* Variables, const double* VariablesIn, double *y)
 
 }
 
-void task2(nd_item<2> &item, double*__restrict ResultsPixel, const double*__restrict VariablesIn, 
+void task2(sycl::nd_item<2> &item, double*__restrict ResultsPixel, const double*__restrict VariablesIn, 
            const double*__restrict K2_tab, int GridIdxX, int GridIdxY)
 {
 
