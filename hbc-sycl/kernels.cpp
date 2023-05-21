@@ -4,17 +4,15 @@
 
 #define DIAMETER_SAMPLES 512
 
-template <typename T, sycl::access::address_space
-          addressSpace = sycl::access::address_space::global_space>
-T atomicCAS(T *addr, T expected, T desired,
-            sycl::memory_order success = sycl::memory_order::relaxed,
-            sycl::memory_order fail = sycl::memory_order::relaxed)
+inline int atomicCAS(int &val, int expected, int desired)
 {
-  // add a pair of parentheses to declare a variable
-  sycl::atomic_ref<T, sycl::memory_order::relaxed,
-    sycl::memory_scope::device, addressSpace> obj(*addr);
-  obj.compare_exchange_strong(expected, desired, success, fail);
-  return expected;
+  int expected_value = expected;
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  atm.compare_exchange_strong(expected_value, desired);
+  return expected_value;
 }
 
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
@@ -100,19 +98,19 @@ void bc_kernel(
   const int *__restrict source_vertices,
   const bool approx,
   sycl::nd_item<1> &item,
-  int *ind,
-  int *i,
-  int **Q_row,
-  int **Q2_row,
-  int **S_row,
-  int **endpoints_row,
-  int *Q_len,
-  int *Q2_len,
-  int *S_len,
-  int *current_depth,
-  int *endpoints_len,
-  bool *sp_calc_done,
-  int *next_index,
+  int &ind,
+  int &i,
+  int *&Q_row,
+  int *&Q2_row,
+  int *&S_row,
+  int *&endpoints_row,
+  int &Q_len,
+  int &Q2_len,
+  int &S_len,
+  int &current_depth,
+  int &endpoints_len,
+  bool &sp_calc_done,
+  int &next_index,
   int *diameter_keys)
 {
 
@@ -122,28 +120,28 @@ void bc_kernel(
   float *delta_row = (float *)((char *)delta + item.get_group(0) * pitch_delta);
   if(j == 0)
   {
-    *ind = item.get_group(0) + start;
-    *i = approx ? source_vertices[(*ind)] : *ind;
-    *Q_row = (int *)((char *)Q + item.get_group(0) * pitch_Q);
-    *Q2_row = (int *)((char *)Q2 + item.get_group(0) * pitch_Q2);
-    *S_row = (int *)((char *)S + item.get_group(0) * pitch_S);
-    *endpoints_row = (int *)((char *)endpoints + item.get_group(0) * pitch_endpoints);
+    ind = item.get_group(0) + start;
+    i = approx ? source_vertices[(ind)] : ind;
+    Q_row = (int *)((char *)Q + item.get_group(0) * pitch_Q);
+    Q2_row = (int *)((char *)Q2 + item.get_group(0) * pitch_Q2);
+    S_row = (int *)((char *)S + item.get_group(0) * pitch_S);
+    endpoints_row = (int *)((char *)endpoints + item.get_group(0) * pitch_endpoints);
     *jia = 0;
   }
   item.barrier(sycl::access::fence_space::local_space);
 
-  if ((*ind == 0) && (j < DIAMETER_SAMPLES))
+  if ((ind == 0) && (j < DIAMETER_SAMPLES))
   {
     diameters[j] = INT_MAX;
   }
   item.barrier(sycl::access::fence_space::local_space);
 
-  while (*ind < end)
+  while (ind < end)
   {
     //Initialization
     for (int k = item.get_local_id(0); k < n; k += item.get_local_range(0))
     {
-      if (k == *i) // If k is the source node...
+      if (k == i) // If k is the source node...
       {
         d_row[k] = 0;
         sigma_row[k] = 1;
@@ -161,76 +159,75 @@ void bc_kernel(
 
     if(j == 0)
     {
-      (*Q_row)[0] = *i;
-      *Q_len = 1;
-      *Q2_len = 0;
-      (*S_row)[0] = *i;
-      *S_len = 1;
-      (*endpoints_row)[0] = 0;
-      (*endpoints_row)[1] = 1;
-      *endpoints_len = 2;
-      *current_depth = 0;
-      *sp_calc_done = false;
+      Q_row[0] = i;
+      Q_len = 1;
+      Q2_len = 0;
+      S_row[0] = i;
+      S_len = 1;
+      endpoints_row[0] = 0;
+      endpoints_row[1] = 1;
+      endpoints_len = 2;
+      current_depth = 0;
+      sp_calc_done = false;
     }
     item.barrier(sycl::access::fence_space::local_space);
 
     //Do first iteration separately since we already know the edges to traverse
-    for (int r = item.get_local_id(0) + R[(*i)]; r < R[*i + 1]; r += item.get_local_range(0))
+    for (int r = item.get_local_id(0) + R[i]; r < R[i + 1]; r += item.get_local_range(0))
     {
       int w = C[r];
       //No multiple/self edges - each value of w is unique, so no need for atomics
       if(d_row[w] == INT_MAX)
       {
         d_row[w] = 1;
-        int t = atomicAddLocal(*Q2_len, 1);
-        (*Q2_row)[t] = w;
+        int t = atomicAddLocal(Q2_len, 1);
+        Q2_row[t] = w;
       }
-      if (d_row[w] == (d_row[(*i)] + 1))
+      if (d_row[w] == (d_row[i] + 1))
       {
         atomicAdd(sigma_row[w], 1ULL);
       }
     }
     item.barrier(sycl::access::fence_space::local_space);
 
-    if (*Q2_len == 0)
+    if (Q2_len == 0)
     {
-      *sp_calc_done = true;
+      sp_calc_done = true;
     }
     else
     {
-      for (int kk = item.get_local_id(0); kk < *Q2_len; kk += item.get_local_range(0))
+      for (int kk = item.get_local_id(0); kk < Q2_len; kk += item.get_local_range(0))
       {
-        (*Q_row)[kk] = (*Q2_row)[kk];
-        (*S_row)[kk + *S_len] = (*Q2_row)[kk];
+        Q_row[kk] = Q2_row[kk];
+        S_row[kk + S_len] = Q2_row[kk];
       }
       item.barrier(sycl::access::fence_space::local_space);
       if(j == 0)
       {
-        (*endpoints_row)[(*endpoints_len)] =
-            (*endpoints_row)[*endpoints_len - 1] + *Q2_len;
-        (*endpoints_len)++;
-        *Q_len = *Q2_len;
-        *S_len += *Q2_len;
-        *Q2_len = 0;
-        (*current_depth)++;
+        endpoints_row[endpoints_len] = endpoints_row[endpoints_len - 1] + Q2_len;
+        endpoints_len++;
+        Q_len = Q2_len;
+        S_len += Q2_len;
+        Q2_len = 0;
+        current_depth++;
       }
     }
     item.barrier(sycl::access::fence_space::local_space);
 
-    while (!(*sp_calc_done))
+    while (!sp_calc_done)
     {
-      if ((*jia) && (*Q_len > 512))
+      if ((*jia) && (Q_len > 512))
       {
         for (int k = item.get_local_id(0); k < 2 * m; k += item.get_local_range(0))
         {
           int v = F[k];
-          if (d_row[v] == *current_depth)
+          if (d_row[v] == current_depth)
           {
             int w = C[k];
-            if(atomicCAS(&d_row[w],INT_MAX,d_row[v]+1) == INT_MAX)
+            if(atomicCAS(d_row[w],INT_MAX,d_row[v]+1) == INT_MAX)
             {
-              int t = atomicAddLocal(*Q2_len, 1);
-              (*Q2_row)[t] = w;
+              int t = atomicAddLocal(Q2_len, 1);
+              Q2_row[t] = w;
             }
             if(d_row[w] == (d_row[v]+1))
             {
@@ -244,54 +241,53 @@ void bc_kernel(
 
         if(j == 0)
         {
-          *next_index = item.get_local_range(0);
+          next_index = item.get_local_range(0);
         }
         item.barrier(sycl::access::fence_space::local_space);
         int k = item.get_local_id(0); // Initial vertices
-        while (k < *Q_len)
+        while (k < Q_len)
         {
-          int v = (*Q_row)[k];
+          int v = Q_row[k];
           for(int r=R[v]; r<R[v+1]; r++)
           {
             int w = C[r];
             //Use atomicCAS to prevent duplicates
-            if(atomicCAS(&d_row[w],INT_MAX,d_row[v]+1) == INT_MAX)
+            if(atomicCAS(d_row[w],INT_MAX,d_row[v]+1) == INT_MAX)
             {
-              int t = atomicAddLocal(*Q2_len, 1);
-              (*Q2_row)[t] = w;
+              int t = atomicAddLocal(Q2_len, 1);
+              Q2_row[t] = w;
             }
             if(d_row[w] == (d_row[v]+1))
             {
               atomicAdd(sigma_row[w], sigma_row[v]);
             }
           }
-          k = atomicAddLocal(*next_index, 1);
+          k = atomicAddLocal(next_index, 1);
         }
       }
       item.barrier(sycl::access::fence_space::local_space);
 
-      if (*Q2_len == 0) // If there is no additional work found, we're
+      if (Q2_len == 0) // If there is no additional work found, we're
                               // done
       {
         break;
       }
       else //If there is additional work, transfer elements from Q2 to Q, reset lengths, and add vertices to the stack
       {
-        for (int kk = item.get_local_id(0); kk < *Q2_len; kk += item.get_local_range(0))
+        for (int kk = item.get_local_id(0); kk < Q2_len; kk += item.get_local_range(0))
         {
-          (*Q_row)[kk] = (*Q2_row)[kk];
-          (*S_row)[kk + *S_len] = (*Q2_row)[kk];
+          Q_row[kk] = Q2_row[kk];
+          S_row[kk + S_len] = Q2_row[kk];
         }
         item.barrier(sycl::access::fence_space::local_space);
         if(j == 0)
         {
-          (*endpoints_row)[(*endpoints_len)] =
-              (*endpoints_row)[*endpoints_len - 1] + *Q2_len;
-          (*endpoints_len)++;
-          *Q_len = *Q2_len;
-          *S_len += *Q2_len;
-          *Q2_len = 0;
-          (*current_depth)++;
+          endpoints_row[endpoints_len] = endpoints_row[endpoints_len - 1] + Q2_len;
+          endpoints_len++;
+          Q_len = Q2_len;
+          S_len += Q2_len;
+          Q2_len = 0;
+          current_depth++;
         }
         item.barrier(sycl::access::fence_space::local_space);
       }
@@ -301,24 +297,24 @@ void bc_kernel(
     //Using the successor method, we can start from one depth earlier
     if(j == 0)
     {
-      *current_depth = d_row[(*S_row)[*S_len - 1]] - 1;
-      if (*ind < DIAMETER_SAMPLES)
+      current_depth = d_row[S_row[S_len - 1]] - 1;
+      if (ind < DIAMETER_SAMPLES)
       {
-        diameters[(*ind)] = *current_depth + 1;
+        diameters[(ind)] = current_depth + 1;
       }
     }
     item.barrier(sycl::access::fence_space::local_space);
 
     //Dependency Accumulation (Madduri/Ediger successor method)
-    while (*current_depth > 0)
+    while (current_depth > 0)
     {
-      int stack_iter_len = (*endpoints_row)[*current_depth + 1] -
-                           (*endpoints_row)[(*current_depth)];
+      int stack_iter_len = endpoints_row[current_depth + 1] -
+                           endpoints_row[(current_depth)];
       if((*jia) && (stack_iter_len>512))
       {
         for (int kk = item.get_local_id(0); kk < 2 * m; kk += item.get_local_range(0)) {
           int w = F[kk];
-          if (d_row[w] == *current_depth)
+          if (d_row[w] == current_depth)
           {
             int v = C[kk];
             if(d_row[v] == (d_row[w]+1))
@@ -331,11 +327,11 @@ void bc_kernel(
       }
       else
       {
-        for (int kk = item.get_local_id(0) + (*endpoints_row)[(*current_depth)];
-             kk < (*endpoints_row)[*current_depth + 1];
+        for (int kk = item.get_local_id(0) + endpoints_row[(current_depth)];
+             kk < endpoints_row[current_depth + 1];
              kk += item.get_local_range(0))
         {
-          int w = (*S_row)[kk];
+          int w = S_row[kk];
           float dsw = 0;
           float sw = (float)sigma_row[w];
           for(int z=R[w]; z<R[w+1]; z++)
@@ -352,7 +348,7 @@ void bc_kernel(
       item.barrier(sycl::access::fence_space::local_space);
       if(j == 0)
       {
-        (*current_depth)--;
+        current_depth--;
       }
       item.barrier(sycl::access::fence_space::local_space);
     }
@@ -365,19 +361,19 @@ void bc_kernel(
 
     if(j == 0)
     {
-      *ind = atomicAdd(*next_source, 1);
+      ind = atomicAdd(*next_source, 1);
       if(approx)
       {
-        *i = source_vertices[(*ind)];
+        i = source_vertices[(ind)];
       }
       else
       {
-        *i = *ind;
+        i = ind;
       }
     }
     item.barrier(sycl::access::fence_space::local_space);
 
-    if (*ind == 2 * DIAMETER_SAMPLES)
+    if (ind == 2 * DIAMETER_SAMPLES)
     {
 
       for (int kk = item.get_local_id(0); kk < DIAMETER_SAMPLES;
@@ -423,65 +419,59 @@ std::vector<float> bc_gpu(
   sycl::range<1> gws (dimGrid_x * max_threads_per_block);
   sycl::range<1> lws (max_threads_per_block);
 
-  sycl::buffer<float, 1> bc_d (g.n);
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = bc_d.get_access<sycl::access::mode::write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  float *bc_d = sycl::malloc_device<float>(g.n, q);
+  q.memset(bc_d, 0, g.n * sizeof(float));
 
-  sycl::buffer<int, 1> R_d (g.R, g.n+1);
-  sycl::buffer<int, 1> C_d (g.C, 2*g.m);
-  sycl::buffer<int, 1> F_d (g.F, 2*g.m);
+  int *R_d = sycl::malloc_device<int>(g.n+1, q);
+  q.memcpy(R_d, g.R, sizeof(int) * (g.n + 1));
+
+  int *C_d = sycl::malloc_device<int>(2*g.m, q);
+  q.memcpy(C_d, g.C, sizeof(int) * (2*g.m));
+
+  int *F_d = sycl::malloc_device<int>(2*g.m, q);
+  q.memcpy(F_d, g.F, sizeof(int) * (2*g.m));
 
   #define PITCH_DEFAULT_ALIGN(x) (((x) + 31) & ~(0x1F))
 
   pitch_d = PITCH_DEFAULT_ALIGN(sizeof(int) * g.n);
-  sycl::buffer<int, 1> d_d (pitch_d/sizeof(int) * dimGrid_x);
+  int *d_d = (int*) sycl::malloc_device(pitch_d * dimGrid_x, q);
 
   pitch_sigma = PITCH_DEFAULT_ALIGN(sizeof(unsigned long long) * g.n);
-  sycl::buffer<unsigned long long, 1> sigma_d (pitch_sigma/sizeof(unsigned long long) * dimGrid_x);
+  unsigned long long *sigma_d = (unsigned long long*) sycl::malloc_device(pitch_sigma * dimGrid_x, q);
 
   pitch_delta = PITCH_DEFAULT_ALIGN(sizeof(float) * g.n);
-  sycl::buffer<float, 1> delta_d (pitch_delta/sizeof(float) * dimGrid_x);
+  float *delta_d = (float *) sycl::malloc_device(pitch_delta * dimGrid_x, q);
 
   pitch_Q = PITCH_DEFAULT_ALIGN(sizeof(int) * g.n);
-  sycl::buffer<int, 1> Q_d (pitch_Q/sizeof(int) * dimGrid_x);
+  int *Q_d = (int*) sycl::malloc_device(pitch_Q * dimGrid_x, q);
 
   pitch_Q2 = PITCH_DEFAULT_ALIGN(sizeof(int) * g.n);
-  sycl::buffer<int, 1> Q2_d (pitch_Q2/sizeof(int) * dimGrid_x);
+  int *Q2_d = (int*) sycl::malloc_device(pitch_Q2 * dimGrid_x, q);
 
   pitch_S = PITCH_DEFAULT_ALIGN(sizeof(int) * g.n);
-  sycl::buffer<int, 1> S_d (pitch_S/sizeof(int) * dimGrid_x);
+  int *S_d = (int*) sycl::malloc_device(pitch_S * dimGrid_x, q);
 
   pitch_endpoints = PITCH_DEFAULT_ALIGN(sizeof(int) * (g.n+1));
-  sycl::buffer<int, 1> endpoints_d (pitch_endpoints/sizeof(int) * dimGrid_x);
+  int *endpoints_d = (int*) sycl::malloc_device(pitch_endpoints * dimGrid_x, q);
 
-  sycl::buffer<int, 1> next_source_d (&next_source, 1);
+  int *next_source_d = sycl::malloc_device<int>(1, q);
+  q.memcpy(next_source_d, &next_source, sizeof(int));
 
   // source_vertices of type "std::set" has no data() method
   std::vector<int> source_vertices_h(source_vertices.size());
   std::copy(source_vertices.begin(),source_vertices.end(),source_vertices_h.begin());
-  sycl::buffer<int, 1> source_vertices_d (source_vertices.size() + 1); // nonzeron buffer size
+  int *source_vertices_d = sycl::malloc_device<int>(source_vertices.size() + 1, q); // nonzeron buffer size
 
   if(op.approx)
   {
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = source_vertices_d.get_access<sycl::access::mode::write>(cgh, sycl::range<1>(source_vertices.size()));
-      cgh.copy(source_vertices_h.data(), acc);
-    });
+    q.memcpy(source_vertices_d, source_vertices_h.data(), source_vertices.size() * sizeof(int));
   }
 
-  sycl::buffer<int, 1> jia_d (1);
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = jia_d.get_access<sycl::access::mode::write>(cgh);
-    cgh.fill(acc, 0);
-  });
+  int *jia_d = sycl::malloc_device<int>(1, q);
+  q.memset(jia_d, 0, sizeof(int));
 
-  sycl::buffer<int, 1> diameters_d (DIAMETER_SAMPLES);
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = diameters_d.get_access<sycl::access::mode::write>(cgh);
-    cgh.fill(acc, 0);
-  });
+  int *diameters_d = sycl::malloc_device<int>(DIAMETER_SAMPLES, q);
+  q.memset(diameters_d, 0, sizeof(int));
 
   int end;
   bool approx;
@@ -500,51 +490,36 @@ std::vector<float> bc_gpu(
   q.submit([&](sycl::handler &cgh) {
     auto g_n = g.n;
     auto g_m = g.m;
-    auto bc = bc_d.get_access<sycl::access::mode::read_write>(cgh);
-    auto R = R_d.get_access<sycl::access::mode::read>(cgh);
-    auto C = C_d.get_access<sycl::access::mode::read>(cgh);
-    auto F = F_d.get_access<sycl::access::mode::read>(cgh);
-    auto d = d_d.get_access<sycl::access::mode::read>(cgh);
-    auto sigma = sigma_d.get_access<sycl::access::mode::read>(cgh);
-    auto delta = delta_d.get_access<sycl::access::mode::read>(cgh);
-    auto Q = Q_d.get_access<sycl::access::mode::read>(cgh);
-    auto Q2 = Q2_d.get_access<sycl::access::mode::read>(cgh);
-    auto S = S_d.get_access<sycl::access::mode::read>(cgh);
-    auto endpoints = endpoints_d.get_access<sycl::access::mode::read>(cgh);
-    auto next_source = next_source_d.get_access<sycl::access::mode::read>(cgh);
-    auto jia = jia_d.get_access<sycl::access::mode::read_write>(cgh);
-    auto diameters = diameters_d.get_access<sycl::access::mode::read_write>(cgh);
-    auto source_vertices = source_vertices_d.get_access<sycl::access::mode::read_write>(cgh);
-    sycl::local_accessor<int> ind_sm (1, cgh);
-    sycl::local_accessor<int> i_sm (1, cgh);
-    sycl::local_accessor<int*> Q_row_sm (1, cgh);
-    sycl::local_accessor<int*> Q2_row_sm (1, cgh);
-    sycl::local_accessor<int*> S_row_sm (1, cgh);
-    sycl::local_accessor<int*> endpoints_row_sm (1, cgh);
-    sycl::local_accessor<int> Q_len_sm (1, cgh);
-    sycl::local_accessor<int> Q2_len_sm (1, cgh);
-    sycl::local_accessor<int> S_len_sm (1, cgh);
-    sycl::local_accessor<int> current_depth_sm (1, cgh);
-    sycl::local_accessor<int> endpoints_len_sm (1, cgh);
-    sycl::local_accessor<bool> sp_calc_done_sm (1, cgh);
-    sycl::local_accessor<int> next_index_sm (1, cgh);
-    sycl::local_accessor<int> diameter_keys_sm (DIAMETER_SAMPLES, cgh);
+    sycl::local_accessor<int, 0> ind_sm (cgh);
+    sycl::local_accessor<int, 0> i_sm (cgh);
+    sycl::local_accessor<int*, 0> Q_row_sm (cgh);
+    sycl::local_accessor<int*, 0> Q2_row_sm (cgh);
+    sycl::local_accessor<int*, 0> S_row_sm (cgh);
+    sycl::local_accessor<int*, 0> endpoints_row_sm (cgh);
+    sycl::local_accessor<int, 0> Q_len_sm (cgh);
+    sycl::local_accessor<int, 0> Q2_len_sm (cgh);
+    sycl::local_accessor<int, 0> S_len_sm (cgh);
+    sycl::local_accessor<int, 0> current_depth_sm (cgh);
+    sycl::local_accessor<int, 0> endpoints_len_sm (cgh);
+    sycl::local_accessor<bool, 0> sp_calc_done_sm (cgh);
+    sycl::local_accessor<int, 0> next_index_sm (cgh);
+    sycl::local_accessor<int, 1> diameter_keys_sm (sycl::range<1>(DIAMETER_SAMPLES), cgh);
 
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       bc_kernel(
-        bc.get_pointer(),
-        R.get_pointer(),
-        C.get_pointer(),
-        F.get_pointer(),
+        bc_d,
+        R_d,
+        C_d,
+        F_d,
         g_n, g_m,
-        d.get_pointer(),
-        sigma.get_pointer(),
-        delta.get_pointer(),
-        Q.get_pointer(),
-        Q2.get_pointer(),
-        S.get_pointer(),
-        endpoints.get_pointer(),
-        next_source.get_pointer(),
+        d_d,
+        sigma_d,
+        delta_d,
+        Q_d,
+        Q2_d,
+        S_d,
+        endpoints_d,
+        next_source_d,
         pitch_d,
         pitch_sigma,
         pitch_delta,
@@ -553,19 +528,19 @@ std::vector<float> bc_gpu(
         pitch_S,
         pitch_endpoints,
         0, end,
-        jia.get_pointer(),
-        diameters.get_pointer(),
-        source_vertices.get_pointer(),
+        jia_d,
+        diameters_d,
+        source_vertices_d,
         approx,
         item,
-        ind_sm.get_pointer(), i_sm.get_pointer(),
-        Q_row_sm.get_pointer(), Q2_row_sm.get_pointer(),
-        S_row_sm.get_pointer(), endpoints_row_sm.get_pointer(),
-        Q_len_sm.get_pointer(), Q2_len_sm.get_pointer(),
-        S_len_sm.get_pointer(), current_depth_sm.get_pointer(),
-        endpoints_len_sm.get_pointer(),
-        sp_calc_done_sm.get_pointer(),
-        next_index_sm.get_pointer(),
+        ind_sm, i_sm,
+        Q_row_sm, Q2_row_sm,
+        S_row_sm, endpoints_row_sm,
+        Q_len_sm, Q2_len_sm,
+        S_len_sm, current_depth_sm,
+        endpoints_len_sm,
+        sp_calc_done_sm,
+        next_index_sm,
         diameter_keys_sm.get_pointer());
      });
   }).wait();
@@ -575,10 +550,23 @@ std::vector<float> bc_gpu(
   std::cout << "Kernel execution time " << time * 1e-9f << " (s)\n";
 
   // GPU result
-  q.submit([&](sycl::handler &cgh) {
-    auto acc = bc_d.get_access<sycl::access::mode::read>(cgh);
-    cgh.copy(acc, bc_gpu);
-  }).wait();
+  q.memcpy(bc_gpu, bc_d, g.n * sizeof(float)).wait();
+
+  sycl::free(bc_d, q);
+  sycl::free(R_d, q);
+  sycl::free(C_d, q);
+  sycl::free(F_d, q);
+  sycl::free(d_d, q);
+  sycl::free(sigma_d, q);
+  sycl::free(delta_d, q);
+  sycl::free(Q_d, q);
+  sycl::free(Q2_d, q);
+  sycl::free(S_d, q);
+  sycl::free(endpoints_d, q);
+  sycl::free(next_source_d, q);
+  sycl::free(jia_d, q);
+  sycl::free(diameters_d, q);
+  sycl::free(source_vertices_d, q);
 
   //Copy GPU result to a vector
   std::vector<float> bc_gpu_v(bc_gpu,bc_gpu+g.n);
