@@ -19,7 +19,7 @@ typedef struct __attribute__((__aligned__(16)))
 } double4;
 
 #else
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #endif
 
