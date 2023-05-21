@@ -3,7 +3,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
+
+using float2 = sycl::float2;
+
 #include "reference.h"
 
 inline float hd (const float2 ap, const float2 bp)
@@ -12,7 +22,7 @@ inline float hd (const float2 ap, const float2 bp)
        + (ap.y() - bp.y()) * (ap.y() - bp.y());
 }
 
-void computeDistance(nd_item<1> &item,
+void computeDistance(sycl::nd_item<1> &item,
                      const float2* __restrict Apoints,
                      const float2* __restrict Bpoints,
                            float*  __restrict distance,
@@ -22,18 +32,18 @@ void computeDistance(nd_item<1> &item,
   if (i >= numA) return;
 
   float d = std::numeric_limits<float>::max();
-  float2 p = Apoints[i];
+  float2 p = ldg(&Apoints[i]);
   for (int j = 0; j < numB; j++)
   {
-    float t = hd(p, Bpoints[j]);
-    d = std::min(t, d);
+    float t = hd(p, ldg(&Bpoints[j]));
+    d = sycl::min(t, d);
   }
   
-  auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
-    ext::oneapi::memory_order::relaxed,
-    ext::oneapi::memory_scope::device,
-    access::address_space::global_space> (distance[0]);
-  atomic_obj_ref.fetch_max(d);
+  auto ao = sycl::atomic_ref<float, 
+            sycl::memory_order::relaxed,
+            sycl::memory_scope::device,
+            sycl::access::address_space::global_space> (distance[0]);
+  ao.fetch_max(d);
 }
 
 int main(int argc, char* argv[]) {
@@ -64,48 +74,44 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-  buffer<float2, 1> d_Apoints (h_Apoints, num_Apoints);
-  buffer<float2, 1> d_Bpoints (h_Bpoints, num_Bpoints);
-  buffer<float, 1> d_distance (2);
+  float2 *d_Apoints = sycl::malloc_device<float2>(num_Apoints, q);
+  q.memcpy(d_Apoints, h_Apoints, num_Apoints_bytes);
 
-  range<1> gwsA ((num_Apoints + 255) / 256 * 256);
-  range<1> gwsB ((num_Bpoints + 255) / 256 * 256);
-  range<1> lws (256);
+  float2 *d_Bpoints = sycl::malloc_device<float2>(num_Bpoints, q);
+  q.memcpy(d_Bpoints, h_Bpoints, num_Bpoints_bytes);
+
+  float *d_distance = sycl::malloc_device<float>(2, q);
+
+  sycl::range<1> gwsA ((num_Apoints + 255) / 256 * 256);
+  sycl::range<1> gwsB ((num_Bpoints + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   float h_distance[2] = {-1.f, -1.f}; 
 
   double time = 0.0;
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_distance.get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_distance, acc);
-    }).wait();
+    q.memcpy(d_distance, h_distance, 2 * sizeof(float)).wait();
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto a = d_Apoints.get_access<sycl_read>(cgh);
-      auto b = d_Bpoints.get_access<sycl_read>(cgh);
-      auto d = d_distance.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class distanceAB>(nd_range<1>(gwsA, lws), [=] (nd_item<1> item) {
-        computeDistance(item, a.get_pointer(), b.get_pointer(), d.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class distanceAB>(
+        sycl::nd_range<1>(gwsA, lws), [=] (sycl::nd_item<1> item) {
+        computeDistance(item, d_Apoints, d_Bpoints, d_distance,
                         num_Apoints, num_Bpoints);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto a = d_Bpoints.get_access<sycl_read>(cgh);
-      auto b = d_Apoints.get_access<sycl_read>(cgh);
-      auto d = d_distance.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class distanceBA>(nd_range<1>(gwsB, lws), [=] (nd_item<1> item) {
-        computeDistance(item, a.get_pointer(), b.get_pointer(), d.get_pointer() + 1,
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class distanceBA>(
+        sycl::nd_range<1>(gwsB, lws), [=] (sycl::nd_item<1> item) {
+        computeDistance(item, d_Bpoints, d_Apoints, d_distance + 1,
                         num_Bpoints, num_Apoints);
       });
     });
@@ -116,10 +122,7 @@ int main(int argc, char* argv[]) {
   }
   printf("Average execution time of kernels: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_distance.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_distance);
-  }).wait();
+  q.memcpy(h_distance, d_distance, 2 * sizeof(float)).wait();
 
   printf("Verifying the result may take a while..\n");
   float r_distance = hausdorff_distance(h_Apoints, h_Bpoints, num_Apoints, num_Bpoints);
@@ -130,5 +133,8 @@ int main(int argc, char* argv[]) {
 
   free(h_Apoints);
   free(h_Bpoints);
+  sycl::free(d_distance, q);
+  sycl::free(d_Apoints, q);
+  sycl::free(d_Bpoints, q);
   return 0;
 }
