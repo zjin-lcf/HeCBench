@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include "kernels.h"
+#include "timer.h"
 
 // grids and blocks are constant for the findPeak kernel
 #define findPeakNBlocks 128
@@ -188,6 +189,10 @@ void HogbomTest::deconvolve(const std::vector<float>& dirty,
     << idxToPos(psfPeak.pos, psfWidth).y << std::endl;
   assert(psfPeak.pos <= psf_size);
 
+  cudaDeviceSynchronize();
+  Stopwatch sw;
+  sw.start();
+
   for (unsigned int i = 0; i < niters; ++i) {
     // Find peak in the residual image
     Peak peak = findPeak(d_residual, d_peaks, residual_size);
@@ -206,6 +211,15 @@ void HogbomTest::deconvolve(const std::vector<float>& dirty,
     // Add to model
     model[peak.pos] += peak.val * gain;
   }
+
+  cudaDeviceSynchronize();
+  const double time = sw.stop();
+
+  // Report on timings
+  std::cout << "    Time " << time << " (s) " << std::endl;
+  std::cout << "    Time per cycle " << time / niters * 1000 << " (ms)" << std::endl;
+  std::cout << "    Cleaning rate  " << niters / time << " (iterations per second)" << std::endl;
+  std::cout << "Done" << std::endl;
 
   // Copy device arrays back into the host 
   cudaMemcpy(&residual[0], d_residual, residual.size() * sizeof(float), cudaMemcpyDeviceToHost);

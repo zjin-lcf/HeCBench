@@ -70,13 +70,11 @@ reference.o: $(src)/reference.cpp $(src)/reference.h
 timer.o: $(src)/timer.cpp $(src)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o: kernels.cpp $(src)/kernels.h 
+kernels.o: kernels.cpp $(src)/kernels.h $(src)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
-
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) $(src)/data/dirty_4096.img $(src)/data/psf_4096.img 1000
-

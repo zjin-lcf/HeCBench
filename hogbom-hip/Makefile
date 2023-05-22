@@ -60,7 +60,7 @@ reference.o: $(src)/reference.cpp $(src)/reference.h
 timer.o: $(src)/timer.cpp $(src)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o: kernels.cu $(src)/kernels.h 
+kernels.o: kernels.cu $(src)/kernels.h $(src)/timer.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
