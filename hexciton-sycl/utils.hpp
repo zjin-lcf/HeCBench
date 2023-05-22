@@ -11,13 +11,13 @@
 #include <cstring> // memcpy
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define SINGLE_PRECISION
 
 #ifdef SINGLE_PRECISION
 using real_t = float;
-using real_2_t = float2;
+using real_2_t = sycl::float2;
 // == 1 / Pi
 #define hbar  (1.f / sycl::acos(-1.f)) 
 #define dt  1e-3f
@@ -26,7 +26,7 @@ using real_2_t = float2;
 
 #else
 using real_t = double;
-using real_2_t = double2;
+using real_2_t = sycl::double2;
 #define hbar  (1.0 / sycl::acos(-1.0))
 #define dt  1e-3
 #define hdt  (dt / hbar)
@@ -44,19 +44,19 @@ using complex_t = std::complex<real_t>;
 // consistent with CUDA/HIP though simd8 and sim16 are supported by SYCL
 #ifdef SINGLE_PRECISION
 #if  VEC_LENGTH == 2
-  #define real_vec_t float2
+  #define real_vec_t sycl::float2
 #elif VEC_LENGTH == 4
-  #define real_vec_t float4
+  #define real_vec_t sycl::float4
 #else
-  #define real_vec_t float4
+  #define real_vec_t sycl::float4
 #endif
 #else
 #if  VEC_LENGTH == 2
-  #define real_vec_t double2
+  #define real_vec_t sycl::double2
 #elif VEC_LENGTH == 4
-  #define real_vec_t double4
+  #define real_vec_t sycl::double4
 #else 
-  #define real_vec_t double4
+  #define real_vec_t sycl::double4
 #endif
 #endif
 

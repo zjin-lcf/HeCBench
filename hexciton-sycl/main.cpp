@@ -6,7 +6,7 @@
 #include "utils.hpp"
 
 long benchmark(
-    queue &q,
+    sycl::queue &q,
     complex_t *sigma_in,
     complex_t *sigma_out,
     complex_t *hamiltonian,
@@ -64,9 +64,13 @@ long benchmark(
   }
 
   // allocate device memory
-  buffer<real_2_t, 1> d_hamiltonian (ham, size_hamiltonian);
-  buffer<real_2_t, 1> d_sigma_in (sin, size_sigma);
-  buffer<real_2_t, 1> d_sigma_out(size_sigma);
+  real_2_t *d_hamiltonian = sycl::malloc_device<real_2_t>(size_hamiltonian, q);
+  q.memcpy(d_hamiltonian, ham, sizeof(real_2_t) * size_hamiltonian);
+
+  real_2_t *d_sigma_in = sycl::malloc_device<real_2_t>(size_sigma, q);
+  q.memcpy(d_sigma_in, sin, sizeof(real_2_t) * size_sigma);
+
+  real_2_t *d_sigma_out = sycl::malloc_device<real_2_t>(size_sigma, q);
 
   long total_time = 0;
 
@@ -74,10 +78,7 @@ long benchmark(
   for (size_t i = 0; i < NUM_ITERATIONS; ++i) {
 
     // clear output 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_sigma_out.get_access<sycl_discard_write>(cgh);
-      cgh.copy(sout, acc); 
-    });
+    q.memcpy(d_sigma_out, sout, sizeof(real_2_t) * size_sigma);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
@@ -85,13 +86,10 @@ long benchmark(
     // empty kernel
     switch(kernel_id) {
       case 0:  {
-        range<1> k0_gws (num);
-        range<1> k0_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_empty>(nd_range<1>(k0_gws, k0_lws), [=] (nd_item<1> item) { 
+        sycl::range<1> k0_gws (num);
+        sycl::range<1> k0_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_empty>(sycl::nd_range<1>(k0_gws, k0_lws), [=] (sycl::nd_item<1> item) { 
           }); 
         });
         break;
@@ -99,13 +97,11 @@ long benchmark(
 
       // initial kernel
       case 1: {
-        range<1> k1_gws (num);
-        range<1> k1_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_init>(nd_range<1>(k1_gws, k1_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k1_gws (num);
+        sycl::range<1> k1_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_init>(
+            sycl::nd_range<1>(k1_gws, k1_lws), [=] (sycl::nd_item<1> item) {
             int sigma_id = item.get_global_id(0) * dim * dim;
             // compute commutator: -i * dt/hbar * (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < dim; ++i) {
@@ -115,18 +111,18 @@ long benchmark(
                 tmp.y() = 0.0;
                 for (int k = 0; k < dim; ++k) {
                   // z=(x,y), w=(u,v)  z*w = (xu-yv, xv+yu)
-                  tmp.x() += (hamiltonian[i * dim + k].x() * sigma_in[sigma_id + k * dim + j].x() - 
-                            sigma_in[sigma_id + i * dim + k].x() * hamiltonian[k * dim + j].x());
-                  tmp.x() -= (hamiltonian[i * dim + k].y() * sigma_in[sigma_id + k * dim + j].y() - 
-                            sigma_in[sigma_id + i * dim + k].y() * hamiltonian[k * dim + j].y());
-                  tmp.y() += (hamiltonian[i * dim + k].x() * sigma_in[sigma_id + k * dim + j].y() - 
-                            sigma_in[sigma_id + i * dim + k].x() * hamiltonian[k * dim + j].y());
-                  tmp.y() += (hamiltonian[i * dim + k].y() * sigma_in[sigma_id + k * dim + j].x() -
-                            sigma_in[sigma_id + i * dim + k].y() * hamiltonian[k * dim + j].x());
+                  tmp.x() += (d_hamiltonian[i * dim + k].x() * d_sigma_in[sigma_id + k * dim + j].x() - 
+                            d_sigma_in[sigma_id + i * dim + k].x() * d_hamiltonian[k * dim + j].x());
+                  tmp.x() -= (d_hamiltonian[i * dim + k].y() * d_sigma_in[sigma_id + k * dim + j].y() - 
+                            d_sigma_in[sigma_id + i * dim + k].y() * d_hamiltonian[k * dim + j].y());
+                  tmp.y() += (d_hamiltonian[i * dim + k].x() * d_sigma_in[sigma_id + k * dim + j].y() - 
+                            d_sigma_in[sigma_id + i * dim + k].x() * d_hamiltonian[k * dim + j].y());
+                  tmp.y() += (d_hamiltonian[i * dim + k].y() * d_sigma_in[sigma_id + k * dim + j].x() -
+                            d_sigma_in[sigma_id + i * dim + k].y() * d_hamiltonian[k * dim + j].x());
                 }
                 // multiply with -i * dt / hbar
-                sigma_out[sigma_id + i * dim + j].x() += hdt * tmp.y();
-                sigma_out[sigma_id + i * dim + j].y() -= hdt * tmp.x();
+                d_sigma_out[sigma_id + i * dim + j].x() += hdt * tmp.y();
+                d_sigma_out[sigma_id + i * dim + j].y() -= hdt * tmp.x();
               }
             }
           });
@@ -136,21 +132,20 @@ long benchmark(
 
       // refactored initial kernel
       case 2: {
-        range<1> k2_gws (num);
-        range<1> k2_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_refactor>(nd_range<1>(k2_gws, k2_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k2_gws (num);
+        sycl::range<1> k2_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_refactor>(
+            sycl::nd_range<1>(k2_gws, k2_lws), [=] (sycl::nd_item<1> item) {
             #define sigma_real(i, j) (sigma_id + 2 * ((i) * dim + (j)))
             #define sigma_imag(i, j) (sigma_id + 2 * ((i) * dim + (j)) + 1)
             
             #define ham_real(i, j) (2 * ((i) * dim + (j)))
             #define ham_imag(i, j) (2 * ((i) * dim + (k)) + 1)
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
 
             int sigma_id = item.get_global_id(0) * dim * dim * 2;
 
@@ -180,20 +175,19 @@ long benchmark(
 
       // refactored initial kernel with direct store
       case 3: {
-        range<1> k3_gws (num);
-        range<1> k3_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_refactor_direct_store>(nd_range<1>(k3_gws, k3_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k3_gws (num);
+        sycl::range<1> k3_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_refactor_direct_store>(
+            sycl::nd_range<1>(k3_gws, k3_lws), [=] (sycl::nd_item<1> item) {
             #define sigma_real(i, j) (sigma_id + 2 * ((i) * dim + (j)))
             #define sigma_imag(i, j) (sigma_id + 2 * ((i) * dim + (j)) + 1)
             #define ham_real(i, j) (2 * ((i) * dim + (j)))
             #define ham_imag(i, j) (2 * ((i) * dim + (k)) + 1)
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
 
             int sigma_id = item.get_global_id(0) * dim * dim * 2;
 
@@ -218,16 +212,11 @@ long benchmark(
 
       // vectorised kernel with 1D range
       case 4: {
-        range<1> k4_gws (num);
-        range<1> k4_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive>(nd_range<1>(k4_gws, k4_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k4_gws (num);
+        sycl::range<1> k4_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive>(
+            sycl::nd_range<1>(k4_gws, k4_lws), [=] (sycl::nd_item<1> item) {
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * dim * dim)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
             
@@ -236,6 +225,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
 
             for (int i = 0; i < dim; ++i) {
               for (int j = 0; j < dim; ++j) {
@@ -262,16 +255,11 @@ long benchmark(
 
       // vectorised kernel with 1D range and compile time constants
       case 5: {
-        range<1> k5_gws (num);
-        range<1> k5_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive_constants>(nd_range<1>(k5_gws, k5_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k5_gws (num);
+        sycl::range<1> k5_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive_constants>(
+            sycl::nd_range<1>(k5_gws, k5_lws), [=] (sycl::nd_item<1> item) {
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
             
@@ -280,6 +268,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
 
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
@@ -306,16 +298,11 @@ long benchmark(
 
       // vectorised kernel with 1D range, compile time constants, and permuted loops with temporaries
       case 6: {
-        range<1> k6_gws (num);
-        range<1> k6_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive_constants_perm>(nd_range<1>(k6_gws, k6_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k6_gws (num);
+        sycl::range<1> k6_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive_constants_perm>(
+            sycl::nd_range<1>(k6_gws, k6_lws), [=] (sycl::nd_item<1> item) {
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
             
@@ -324,6 +311,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
@@ -365,16 +356,11 @@ long benchmark(
 
       // vectorised kernel with 1D range and direct store
       case 7: {
-        range<1> k7_gws (num);
-        range<1> k7_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive_direct>(nd_range<1>(k7_gws, k7_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k7_gws (num);
+        sycl::range<1> k7_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive_direct>(
+            sycl::nd_range<1>(k7_gws, k7_lws), [=] (sycl::nd_item<1> item) {
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * dim * dim)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
             
@@ -384,6 +370,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
             
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < dim; ++i) {
               for (int j = 0; j < dim; ++j) {
@@ -406,16 +396,11 @@ long benchmark(
 
       // vectorised kernel with 1D range, compile time constants, and direct store
       case 8: {
-        range<1> k8_gws (num);
-        range<1> k8_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive_constants_direct>(nd_range<1>(k8_gws, k8_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k8_gws (num);
+        sycl::range<1> k8_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive_constants_direct>(
+            sycl::nd_range<1>(k8_gws, k8_lws), [=] (sycl::nd_item<1> item) {
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
             
@@ -425,6 +410,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
@@ -447,16 +436,11 @@ long benchmark(
 
       // vectorised kernel with 1D range, compile time constants, direct store, and permuted loops with temporaries
       case 9: {
-        range<1> k9_gws (num);
-        range<1> k9_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_naive_constants_direct_perm>(nd_range<1>(k9_gws, k9_lws), [=] (nd_item<1> item) {
+        sycl::range<1> k9_gws (num);
+        sycl::range<1> k9_lws (VEC_LENGTH_AUTO * PACKAGES_PER_WG);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_naive_constants_direct_perm>(
+            sycl::nd_range<1>(k9_gws, k9_lws), [=] (sycl::nd_item<1> item) {
 
             #define package_id ((item.get_global_id(0) / VEC_LENGTH_AUTO) * VEC_LENGTH_AUTO * 2 * DIM * DIM)
             #define sigma_id (item.get_global_id(0) % VEC_LENGTH_AUTO)
@@ -466,6 +450,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             int i, j, k;
@@ -494,16 +482,11 @@ long benchmark(
 
       // vectorised kernel with 2D-range
       case 10: {
-        range<2> k10_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k10_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa>(nd_range<2>(k10_gws, k10_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k10_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k10_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa>(
+            sycl::nd_range<2>(k10_gws, k10_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * dim * dim))
             #define sigma_id item.get_local_id(1)
             
@@ -512,6 +495,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             for (int i = 0; i < dim; ++i) {
               for (int j = 0; j < dim; ++j) {
@@ -538,16 +525,11 @@ long benchmark(
 
       // vectorised kernel with 2D-range and compile-time constants
       case 11: {
-        range<2> k11_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k11_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_constants>(nd_range<2>(k11_gws, k11_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k11_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k11_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_constants>(
+            sycl::nd_range<2>(k11_gws, k11_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
             #define sigma_id item.get_local_id(1)
             
@@ -557,6 +539,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
                 real_t tmp_real = 0.0;
@@ -582,16 +568,11 @@ long benchmark(
 
       // vectorised kernel with 2D-range, compile-time constants, and permuted loops with temporaries
       case 12: {
-        range<2> k12_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k12_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_constants_perm>(nd_range<2>(k12_gws, k12_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k12_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k12_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_constants_perm>(
+            sycl::nd_range<2>(k12_gws, k12_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
             #define sigma_id item.get_local_id(1)
             
@@ -600,6 +581,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             for (int i = 0; i < DIM; ++i) {
               for (int k = 0; k < DIM; ++k) {
@@ -640,16 +625,11 @@ long benchmark(
 
       // vectorised kernel with 2D range and direct store
       case 13: {
-        range<2> k13_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k13_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_direct>(nd_range<2>(k13_gws, k13_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k13_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k13_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_direct>(
+            sycl::nd_range<2>(k13_gws, k13_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * dim * dim))
             #define sigma_id item.get_local_id(1)
             
@@ -658,6 +638,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             for (int i = 0; i < dim; ++i) {
               for (int j = 0; j < dim; ++j) {
@@ -680,16 +664,11 @@ long benchmark(
 
       // vectorised kernel with 2D range, compile-time constants, and direct store
       case 14: {
-        range<2> k14_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k14_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_constants_direct>(nd_range<2>(k14_gws, k14_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k14_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k14_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_constants_direct>(
+            sycl::nd_range<2>(k14_gws, k14_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
             #define sigma_id item.get_local_id(1)
             
@@ -699,6 +678,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
 	        for (int k = 0; k < DIM; ++k) {
@@ -720,16 +703,11 @@ long benchmark(
 
       // vectorised kernel with compile-time constants, direct store, and permuted loops with temporaries
       case 15: {
-        range<2> k15_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
-        range<2> k15_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_t>(range<1>(2*size_sigma));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_aosoa_constants_direct_perm>(nd_range<2>(k15_gws, k15_lws), [=] (nd_item<2> item) {
+        sycl::range<2> k15_gws (num / VEC_LENGTH_AUTO, VEC_LENGTH_AUTO);
+        sycl::range<2> k15_lws (PACKAGES_PER_WG, VEC_LENGTH_AUTO);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_aosoa_constants_direct_perm>(
+            sycl::nd_range<2>(k15_gws, k15_lws), [=] (sycl::nd_item<2> item) {
             #define package_id ((PACKAGES_PER_WG * item.get_group(0) + item.get_local_id(0)) * (VEC_LENGTH_AUTO * 2 * DIM * DIM))
             #define sigma_id item.get_local_id(1)
             
@@ -738,6 +716,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_t *__restrict__ sigma_in = (real_t*) d_sigma_in;
+            real_t *__restrict__ sigma_out = (real_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             for (int i = 0; i < DIM; ++i) {
               for (int k = 0; k < DIM; ++k) {
@@ -764,17 +746,12 @@ long benchmark(
 
       // manually vectorised kernel
       case 16: {
-        range<1> k16_gws (num / VEC_LENGTH);
-        range<1> k16_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa>(nd_range<1>(k16_gws, k16_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k16_gws (num / VEC_LENGTH);
+        sycl::range<1> k16_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa>(
+            sycl::nd_range<1>(k16_gws, k16_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
 
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * dim * dim * 2)
@@ -784,6 +761,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
+
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < dim; ++i) {
@@ -811,17 +792,12 @@ long benchmark(
 
       // manually vectorised kernel with compile-time constants
       case 17: {
-        range<1> k17_gws (num / VEC_LENGTH);
-        range<1> k17_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants>(nd_range<1>(k17_gws, k17_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k17_gws (num / VEC_LENGTH);
+        sycl::range<1> k17_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants>(
+            sycl::nd_range<1>(k17_gws, k17_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
 
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
@@ -832,6 +808,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
@@ -858,17 +838,12 @@ long benchmark(
 
       // manually vectorised kernel with compile-time constants and permuted loops with temporaries
       case 18: {
-        range<1> k18_gws (num / VEC_LENGTH);
-        range<1> k18_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants_perm>(nd_range<1>(k18_gws, k18_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k18_gws (num / VEC_LENGTH);
+        sycl::range<1> k18_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants_perm>(
+            sycl::nd_range<1>(k18_gws, k18_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
 
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
@@ -878,6 +853,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
@@ -919,17 +898,12 @@ long benchmark(
 
       // manually vectorised kernel with compile-time constants and prefetch
       case 19: {
-        range<1> k19_gws (num / VEC_LENGTH);
-        range<1> k19_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants_prefetch>(nd_range<1>(k19_gws, k19_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k19_gws (num / VEC_LENGTH);
+        sycl::range<1> k19_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants_prefetch>(
+            sycl::nd_range<1>(k19_gws, k19_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
 
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
@@ -940,11 +914,14 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
               int j = 0;
               // prefetch(&sigma_out[sigma_real(i, j)], 2 * DIM);
-              (sigma_out.get_pointer() + sigma_real(i, j)).prefetch(2 * DIM);
               for (j = 0; j < DIM; ++j) {
                 real_vec_t tmp_real(0.0);
                 real_vec_t tmp_imag(0.0);
@@ -969,17 +946,12 @@ long benchmark(
 
       // manually vectorised kernel with direct store
       case 20: {
-        range<1> k20_gws (num / VEC_LENGTH);
-        range<1> k20_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_direct>(nd_range<1>(k20_gws, k20_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k20_gws (num / VEC_LENGTH);
+        sycl::range<1> k20_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_direct>(
+            sycl::nd_range<1>(k20_gws, k20_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * dim * dim * 2)
             
@@ -988,6 +960,10 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * dim + (j))
             #define ham_imag(i, j) (dim * dim + (i) * dim + (j))
+
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             for (int i = 0; i < dim; ++i) {
               for (int j = 0; j < dim; ++j) {
@@ -1010,17 +986,12 @@ long benchmark(
 
       // manually vectorised kernel with compile time constants and direct store
       case 21: {
-        range<1> k21_gws (num / VEC_LENGTH);
-        range<1> k21_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants_direct>(nd_range<1>(k21_gws, k21_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k21_gws (num / VEC_LENGTH);
+        sycl::range<1> k21_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants_direct>(
+            sycl::nd_range<1>(k21_gws, k21_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
             
@@ -1030,6 +1001,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             for (int i = 0; i < DIM; ++i) {
               for (int j = 0; j < DIM; ++j) {
                 for (int k = 0; k < DIM; ++k) {
@@ -1051,17 +1026,12 @@ long benchmark(
 
       // manually vectorised kernel with compile time constants, direct store, and prefetch
       case 22: {
-        range<1> k22_gws (num / VEC_LENGTH);
-        range<1> k22_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants_direct_prefetch>(nd_range<1>(k22_gws, k22_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k22_gws (num / VEC_LENGTH);
+        sycl::range<1> k22_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants_direct_prefetch>(
+            sycl::nd_range<1>(k22_gws, k22_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
             
@@ -1070,13 +1040,16 @@ long benchmark(
             
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
+
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
             
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
               // prefetch result memory for the next inner loops 
               int j = 0;
               //prefetch(&sigma_out[sigma_real(i, j)], 2 * DIM);
-              (sigma_out.get_pointer() + sigma_real(i, j)).prefetch(2 * DIM);
               for (j = 0; j < DIM; ++j) {
                 for (int k = 0; k < DIM; ++k)
                 {
@@ -1098,17 +1071,12 @@ long benchmark(
 
        // manually vectorised kernel with compile time constants, direct store, and permuted loops with temporaries
       case 23: {
-        range<1> k23_gws (num / VEC_LENGTH);
-        range<1> k23_lws (VEC_LENGTH);
-        auto d_sigma_in_re = d_sigma_in.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_sigma_out_re = d_sigma_out.reinterpret<real_vec_t>(range<1>(2*size_sigma/VEC_LENGTH));
-        auto d_hamiltonian_re = d_hamiltonian.reinterpret<real_t>(range<1>(2*size_hamiltonian));
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in_re.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out_re.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian_re.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class comm_manual_aosoa_constants_direct_perm>(nd_range<1>(k23_gws, k23_lws), 
-            [=] (nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
+        sycl::range<1> k23_gws (num / VEC_LENGTH);
+        sycl::range<1> k23_lws (VEC_LENGTH);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class comm_manual_aosoa_constants_direct_perm>(
+            sycl::nd_range<1>(k23_gws, k23_lws), 
+            [=] (sycl::nd_item<1> item) [[vec_type_hint(real_vec_t)]] {
             // number of package to process == get_global_id(0)
             #define package_id (item.get_global_id(0) * DIM * DIM * 2)
             
@@ -1118,6 +1086,10 @@ long benchmark(
             #define ham_real(i, j) ((i) * DIM + (j))
             #define ham_imag(i, j) (DIM * DIM + (i) * DIM + (j))
             
+            real_vec_t *__restrict__ sigma_in = (real_vec_t*) d_sigma_in;
+            real_vec_t *__restrict__ sigma_out = (real_vec_t*) d_sigma_out;
+            real_t *__restrict__ hamiltonian = (real_t*) d_hamiltonian;
+
             // compute commutator: (hamiltonian * sigma_in[sigma_id] - sigma_in[sigma_id] * hamiltonian)
             for (int i = 0; i < DIM; ++i) {
               for (int k = 0; k < DIM; ++k) {
@@ -1147,22 +1119,20 @@ long benchmark(
         size_t block_dim_x = (dim * dim + WARP_SIZE - 1) / WARP_SIZE * WARP_SIZE;
         size_t block_dim_y = NUM_SUB_GROUPS;
 
-        range<2> k24_gws (block_dim_y, num / (block_dim_y * CHUNK_SIZE) * block_dim_x);
-        range<2> k24_lws (block_dim_y, block_dim_x);
-        q.submit([&] (handler &cgh) {
-          auto sigma_in = d_sigma_in.get_access<sycl_read>(cgh);
-          auto sigma_out = d_sigma_out.get_access<sycl_read_write>(cgh);
-          auto hamiltonian = d_hamiltonian.get_access<sycl_read>(cgh);
+        sycl::range<2> k24_gws (block_dim_y, num / (block_dim_y * CHUNK_SIZE) * block_dim_x);
+        sycl::range<2> k24_lws (block_dim_y, block_dim_x);
+        q.submit([&] (sycl::handler &cgh) {
           // Local memory: shared between all work items in the same work group
           // 2-way shared memory bank conflicts will occur for real_t = double
           // real parts and imaginary parts are stored separately to avoid 4-way bank conflicts in case of real_2_t = double2
           // Input sigma matrix: real part (2 matrices are processed at once)
           // Input sigma matrix: imag part (2 matrices are processed at once)
-          accessor<real_t, 1, sycl_read_write, access::target::local> ham_local_real(DIM*DIM, cgh);
-          accessor<real_t, 1, sycl_read_write, access::target::local> ham_local_imag(DIM*DIM, cgh);
-          accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_real({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
-          accessor<real_t, 3, sycl_read_write, access::target::local> sigma_local_imag({2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
-          cgh.parallel_for<class final_gpu_kernel>(nd_range<2>(k24_gws, k24_lws), [=] (nd_item<2> item) {
+          sycl::local_accessor<real_t, 1> ham_local_real(sycl::range<1>{DIM*DIM}, cgh);
+          sycl::local_accessor<real_t, 1> ham_local_imag(sycl::range<1>{DIM*DIM}, cgh);
+          sycl::local_accessor<real_t, 3> sigma_local_real(sycl::range<3>{2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
+          sycl::local_accessor<real_t, 3> sigma_local_imag(sycl::range<3>{2, NUM_SUB_GROUPS, DIM*DIM}, cgh);
+          cgh.parallel_for<class final_gpu_kernel>(
+            sycl::nd_range<2>(k24_gws, k24_lws), [=] (sycl::nd_item<2> item) {
             #define id_2d_to_1d(i,j) ((i) * DIM + (j))
             #define sigma_id(i,j,m) ((m) * DIM * DIM + ((i) * DIM + (j)))
             #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -1183,7 +1153,7 @@ long benchmark(
             // Load Hamiltonian into local memory: only the first sub-group participates
             if (ij < (DIM * DIM) && sub_group_id == 0)
             {
-              const real_2_t h = hamiltonian[ij];
+              const real_2_t h = d_hamiltonian[ij];
               ham_local_real[ij] = h.x();
               ham_local_imag[ij] = h.y();
             }
@@ -1191,26 +1161,26 @@ long benchmark(
             // Process all CHUNK_SIZE matrices: two matrices are processed at once (therefore increment 2)
             for (int m = start; m < stop; m += 2)
             {
-              item.barrier(access::fence_space::local_space);
+              item.barrier(sycl::access::fence_space::local_space);
               if (ij < (DIM * DIM)) 
               { // Load input sigma matrix into local memory: only threads with valid IDs participate
-                s1 = sigma_in[sigma_id(i, j, m)]; // Real and imaginary part of matrix 'm', element (i,j)
+                s1 = d_sigma_in[sigma_id(i, j, m)]; // Real and imaginary part of matrix 'm', element (i,j)
                 sigma_local_real[0][sub_group_id][ij] = s1.x();
                 sigma_local_imag[0][sub_group_id][ij] = s1.y();
 
-                s2 = sigma_in[sigma_id(i, j, m + 1)]; // Real and imaginary part of matrix 'm+1', element (i,j)
+                s2 = d_sigma_in[sigma_id(i, j, m + 1)]; // Real and imaginary part of matrix 'm+1', element (i,j)
                 sigma_local_real[1][sub_group_id][ij] = s2.x();
                 sigma_local_imag[1][sub_group_id][ij] = s2.y();
 
-                s1 = sigma_out[sigma_id(i, j, m)]; // Prefetch real and imaginary part of output sigma matrix 'm', element (i,j)
+                s1 = d_sigma_out[sigma_id(i, j, m)]; // Prefetch real and imaginary part of output sigma matrix 'm', element (i,j)
                 snew1_ij.x() = s1.x();
                 snew2_ij.x() = s1.y();
 
-                s2 = sigma_out[sigma_id(i, j, m + 1)]; // Prefetch real and imaginary part of output sigma matrix 'm+1', element (i,j)
+                s2 = d_sigma_out[sigma_id(i, j, m + 1)]; // Prefetch real and imaginary part of output sigma matrix 'm+1', element (i,j)
                 snew1_ij.y() = s2.x();
                 snew2_ij.y() = s2.y();
               }
-              item.barrier(access::fence_space::local_space);
+              item.barrier(sycl::access::fence_space::local_space);
 
               if (ij < (DIM * DIM))
               {
@@ -1238,8 +1208,8 @@ long benchmark(
                 }
 
                 // Write output sigma matrices 'm' and 'm+1', element (i,j)
-                sigma_out[sigma_id(i, j, m)] = (real_2_t)(snew1_ij.x(), snew2_ij.x());
-                sigma_out[sigma_id(i, j, m + 1)] = (real_2_t)(snew1_ij.y(), snew2_ij.y());
+                d_sigma_out[sigma_id(i, j, m)] = (real_2_t)(snew1_ij.x(), snew2_ij.x());
+                d_sigma_out[sigma_id(i, j, m + 1)] = (real_2_t)(snew1_ij.y(), snew2_ij.y());
               }
             }
           });
@@ -1261,10 +1231,7 @@ long benchmark(
   real_t deviation = 0;
 
   if (kernel_id > 0)  {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_sigma_out.get_access<sycl_read>(cgh);
-      cgh.copy(acc, sout); 
-    }).wait();
+    q.memcpy(sout, d_sigma_out, sizeof(real_2_t) * size_sigma).wait();
 
     for (size_t i = 0; i < size_sigma; i++) {
       sigma_out[i] = {sout[i].x(), sout[i].y()};
@@ -1276,11 +1243,14 @@ long benchmark(
     std::cout << "Deviation of kernel " << look_up(kernel_id) << ": " << deviation << std::endl;
   } else {
     // the deviation of an empty kernel does not make sense
-    std::cout << "Deviation of kernel " << look_up(kernel_id) << "N/A";
+    std::cout << "Deviation of kernel " << look_up(kernel_id) << ": N/A";
   }
 
   std::cout << std::endl << std::endl;
 
+  sycl::free(d_hamiltonian, q);
+  sycl::free(d_sigma_in, q);
+  sycl::free(d_sigma_out, q);
   free(sin);
   free(sout);
   free(ham);
@@ -1320,11 +1290,10 @@ int main(int argc, char* argv[])
   long ktime = 0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // The macro "BENCHMARK(...)" is defined in utils.hpp
   ktime += BENCHMARK(0, VEC_LENGTH, NO_TRANSFORM, NO_SCALE_HAMILT, NO_TRANSFORM);
