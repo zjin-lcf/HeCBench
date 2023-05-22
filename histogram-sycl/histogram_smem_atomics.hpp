@@ -29,11 +29,11 @@ template <
     int         NUM_BINS,
     typename    PixelType>
 double run_smem_atomics(
-    queue &q, 
-    buffer<PixelType,1> &d_image,
+    sycl::queue &q,
+    PixelType *d_image,
     int width,
     int height,
-    buffer<unsigned int,1> &d_hist,
+    unsigned int *d_hist,
     bool warmup)
 {
     enum
@@ -47,18 +47,17 @@ double run_smem_atomics(
     //int total_blocks = grid.x * grid.y;
     int total_blocks = 256;
 
-    buffer<unsigned int, 1> d_part_hist (total_blocks * NUM_PARTS);
+    unsigned int *d_part_hist = sycl::malloc_device<unsigned int>(total_blocks * NUM_PARTS, q);
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler& cgh) {
-      auto in = d_image.template get_access<sycl_read>(cgh);
-      auto out = d_part_hist.get_access<sycl_write>(cgh);
-      accessor <unsigned int, 1, sycl_atomic, access::target::local> 
-        smem (ACTIVE_CHANNELS * NUM_BINS + 3, cgh);
+    q.submit([&] (sycl::handler& cgh) {
+      sycl::local_accessor <unsigned int, 1>
+        smem (sycl::range<1>(ACTIVE_CHANNELS * NUM_BINS + 3), cgh);
 
       cgh.parallel_for<class hist_smem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>>(
-        nd_range<2>(range<2>(64, 512), range<2>(4, 32)), [=] (nd_item<2> item) {
+        sycl::nd_range<2>(sycl::range<2>(64, 512), sycl::range<2>(4, 32)),
+        [=] (sycl::nd_item<2> item) {
         int x = item.get_global_id(1);
         int y = item.get_global_id(0);
         int nx = item.get_global_range(1);
@@ -69,8 +68,8 @@ double run_smem_atomics(
 
         // initialize smem
         for (int i = t; i < ACTIVE_CHANNELS * NUM_BINS + 3; i += nt)
-            smem[i].store(0);
-        item.barrier(access::fence_space::local_space);
+            smem[i] = 0;
+        item.barrier(sycl::access::fence_space::local_space);
 
         // process pixels
         // updates our group's partial histogram in smem
@@ -78,43 +77,46 @@ double run_smem_atomics(
         {
             for (int row = y; row < height; row += ny)
             {
-                PixelType pixel = in[row * width + col];
+                PixelType pixel = d_image[row * width + col];
 
                 unsigned int bins[ACTIVE_CHANNELS];
-	DecodePixel<NUM_BINS>(pixel, bins);
+	        DecodePixel<NUM_BINS>(pixel, bins);
 
                 #pragma unroll
-                for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
-                    atomic_fetch_add(smem[(NUM_BINS * CHANNEL) + bins[CHANNEL] + CHANNEL], 1U);
+                for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL) {
+                   auto ao = sycl::atomic_ref<unsigned int, sycl::memory_order::relaxed, \
+                                    sycl::memory_scope::work_group,\
+                                    sycl::access::address_space::local_space>(
+                     smem[(NUM_BINS * CHANNEL) + bins[CHANNEL] + CHANNEL]);
+                   ao.fetch_add(1U);
+                }
             }
         }
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         // store local output to global
         for (int i = t; i < NUM_BINS; i += nt)
         {
             #pragma unroll
             for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
-                out[g*NUM_PARTS + i + NUM_BINS * CHANNEL] = atomic_load(smem[i + NUM_BINS * CHANNEL + CHANNEL]);
+                d_part_hist[g*NUM_PARTS + i + NUM_BINS * CHANNEL] = smem[i + NUM_BINS * CHANNEL + CHANNEL];
         }
       });
     });
 
-    q.submit([&] (handler& cgh) {
-      auto in = d_part_hist.get_access<sycl_read>(cgh);
-      auto out = d_hist.get_access<sycl_write>(cgh);
+    q.submit([&] (sycl::handler& cgh) {
       cgh.parallel_for<class hist_smem_accum<ACTIVE_CHANNELS, NUM_BINS, PixelType>>(
-        nd_range<1>(range<1>(((ACTIVE_CHANNELS * NUM_BINS + 127) / 128 * 128)), range<1>(128)), [=] (
-          nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>((ACTIVE_CHANNELS * NUM_BINS + 127) / 128 * 128), sycl::range<1>(128)),
+        [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i > ACTIVE_CHANNELS * NUM_BINS) return; // out of range
 
         unsigned int total = 0;
         for (int j = 0; j < total_blocks; j++)
-            total += in[i + NUM_PARTS * j];
+            total += d_part_hist[i + NUM_PARTS * j];
 
-        out[i] = total;
+        d_hist[i] = total;
       });
     });
 
@@ -124,4 +126,3 @@ double run_smem_atomics(
     float elapsed_millis = elapsed_seconds.count()  * 1000;
     return elapsed_millis;
 }
-
