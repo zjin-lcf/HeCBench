@@ -5,7 +5,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUMTHREADS 256  // number of threads per GPU block
 
@@ -89,7 +89,7 @@ double compute(double x, double y, double z,
 // Calls function to compute Boltzmann factor at this point
 // Stores Boltzmann factor computed at this thread in boltzmannFactors
 void insertions(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     double *__restrict boltzmannFactors, 
     const StructureAtom * __restrict structureAtoms, 
     int natoms, double L) 
@@ -197,14 +197,14 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Allocate space for storing atoms
-  buffer<StructureAtom, 1> d_structureAtoms (structureAtoms, natoms);
+  StructureAtom *d_structureAtoms = sycl::malloc_device<StructureAtom>(natoms, q);
+  q.memcpy(d_structureAtoms, structureAtoms, natoms * sizeof(StructureAtom));
 
   // calculate number of MC insertions
   const int nBlocks = 1024;
@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
   const int ninsertions = ncycles * insertionsPerCycle;  
 
   // Allocate space for storing Boltzmann factors computed on each thread
-  buffer<double, 1> d_boltzmannFactors (insertionsPerCycle);
+  double *d_boltzmannFactors = sycl::malloc_device<double>(insertionsPerCycle, q);
 
   double * boltzmannFactors = (double*) malloc (insertionsPerCycle * sizeof(double));
 
@@ -220,8 +220,8 @@ int main(int argc, char *argv[]) {
   //  KH = < e^{-E/(kB * T)} > / (R * T)
   //  Brackets denote average over space
 
-  range<1> gws (insertionsPerCycle);
-  range<1> lws (NUMTHREADS);
+  sycl::range<1> gws (insertionsPerCycle);
+  sycl::range<1> lws (NUMTHREADS);
 
   double total_time = 0.0;
 
@@ -231,11 +231,10 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::steady_clock::now();
 
     //  Perform Monte Carlo insertions in parallel on the GPU
-    q.submit([&] (handler &cgh) {
-      auto out = d_boltzmannFactors.get_access<sycl_discard_write>(cgh);
-      auto in = d_structureAtoms.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class insertations>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        insertions(item, out.get_pointer(), in.get_pointer(), natoms, L);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class insertations>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        insertions(item, d_boltzmannFactors, d_structureAtoms, natoms, L);
       });
     }).wait();
 
@@ -243,10 +242,7 @@ int main(int argc, char *argv[]) {
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     total_time += time;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_boltzmannFactors.get_access<sycl_read>(cgh);
-      cgh.copy(acc, boltzmannFactors);
-    }).wait();
+    q.memcpy(boltzmannFactors, d_boltzmannFactors, insertionsPerCycle * sizeof(double)).wait();
 
     // Compute Henry coefficient from the sampled Boltzmann factors
     for(int i = 0; i < insertionsPerCycle; i++)
@@ -262,6 +258,8 @@ int main(int argc, char *argv[]) {
   printf("Number of times we called the device kernel: %d\n", ncycles);
   printf("Average kernel execution time %f (s)\n", (total_time * 1e-9) / ncycles);
 
+  sycl::free(d_structureAtoms, q);
+  sycl::free(d_boltzmannFactors, q);
   free(structureAtoms);
   free(boltzmannFactors);
   return EXIT_SUCCESS;
