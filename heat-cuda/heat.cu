@@ -192,7 +192,8 @@ int main(int argc, char *argv[]) {
     << LINE << std::endl;
 
   delete[] u_host;
-
+  cudaFree(u);
+  cudaFree(u_tmp);
 }
 
 // Sets the mesh to an initial value, determined by the MMS scheme
