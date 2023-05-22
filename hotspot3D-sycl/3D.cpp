@@ -1,6 +1,6 @@
 #include <sys/types.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "3D_helper.h"
 
 #define TOL      (0.001)
@@ -89,63 +89,56 @@ int main(int argc, char** argv)
 
   long long start = get_time();
 
-  { // SYCL scope
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<float, 1> d_tIn (tIn, size, props);
-    buffer<float, 1> d_pIn (pIn, size, props);
-    buffer<float, 1> d_tOut (tOut, size, props);
-    d_tIn.set_final_data(nullptr);
-    d_tOut.set_final_data(nullptr);
+  float *d_tIn = sycl::malloc_device<float>(size, q);
+  float *d_pIn = sycl::malloc_device<float>(size, q);
+  float *d_tOut = sycl::malloc_device<float>(size, q);
 
-    global_work_size[1] = numCols;
-    global_work_size[0] = numRows;
+  q.memcpy(d_tIn, tIn, sizeof(float)*size);
+  q.memcpy(d_pIn, pIn, sizeof(float)*size);
 
-    local_work_size[1] = WG_SIZE_X;
-    local_work_size[0] = WG_SIZE_Y;
+  global_work_size[1] = numCols;
+  global_work_size[0] = numRows;
 
-    range<2> gws (global_work_size[0], global_work_size[1]);
-    range<2> lws (local_work_size[0], local_work_size[1]);
+  local_work_size[1] = WG_SIZE_X;
+  local_work_size[0] = WG_SIZE_Y;
 
-    q.wait();
-    auto kstart = std::chrono::steady_clock::now();
+  sycl::range<2> gws (global_work_size[0], global_work_size[1]);
+  sycl::range<2> lws (local_work_size[0], local_work_size[1]);
 
-    for(int j = 0; j < iterations; j++)
-    {
-      q.submit([&](handler& cgh) {
-        auto pIn_acc = d_pIn.get_access<sycl_read>(cgh); 
-        auto tIn_acc = d_tIn.get_access<sycl_read>(cgh);
-        auto tOut_acc = d_tOut.get_access<sycl_discard_write>(cgh);
+  q.wait();
+  auto kstart = std::chrono::steady_clock::now();
 
-        cgh.parallel_for<class hotspot>(
-          nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-            #include "kernel_hotspot.sycl"
-        });
+  for(int j = 0; j < iterations; j++)
+  {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class hotspot>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          #include "kernel_hotspot.sycl"
       });
+    });
 
-      auto temp = std::move(d_tIn);
-      d_tIn = std::move(d_tOut);
-      d_tOut = std::move(temp);
-    }
+    float* temp = d_tIn;
+    d_tIn = d_tOut;
+    d_tOut = temp;
+  }
 
-    q.wait();
-    auto kend = std::chrono::steady_clock::now();
-    auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
-    printf("Average kernel execution time %f (us)\n", (ktime * 1e-3f) / iterations);
+  q.wait();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+  printf("Average kernel execution time %f (us)\n", (ktime * 1e-3f) / iterations);
 
-    q.submit([&](handler& cgh) {
-      auto d_sel = (iterations & 01) ? d_tIn : d_tOut;
-      auto d_tOut_acc = d_sel.get_access<sycl_read>(cgh);
-      cgh.copy(d_tOut_acc, tOut);
-    }).wait();
+  float* d_sel = (iterations & 01) ? d_tIn : d_tOut;
+  q.memcpy(tOut, d_sel, sizeof(float)*size).wait();
 
-  } // SYCL scope
+  sycl::free(d_tIn, q);
+  sycl::free(d_pIn, q);
+  sycl::free(d_tOut, q);
 
   long long stop = get_time();
 
