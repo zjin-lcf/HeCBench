@@ -508,6 +508,7 @@ kernel_gpu_wrapper(  params_common common,
   hipFree(d_checksum);
 #endif
   hipFree(d_epiT);
+  hipFree(d_endoT);
   hipFree(d_in2);
   hipFree(d_conv);
   hipFree(d_in2_pad_cumv);
