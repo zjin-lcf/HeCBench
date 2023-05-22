@@ -5,8 +5,8 @@
 #include <sys/time.h>
 #include <math.h>
 #include <vector>
+#include <sycl/sycl.hpp>
 #include "defs.h"
-#include "common.h"
 
 #include "io.c"
 #include "lapl_ss.c"
@@ -100,22 +100,21 @@ int main(int argc, char *argv[]) {
   float xdelta = sigma / (1.0+4.0*sigma);
   float xnorm = 1.0/(1.0+4.0*sigma);
 
-  #ifdef USE_GPU
-  gpu_selector dev_sel;
-  #else
-  cpu_selector dev_sel;
-  #endif
-  queue q(dev_sel);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
   
   int lx = Lx;
   int ly = Ly;
-  float* in = malloc_device<float>(lx*ly, q);
+  float* in = sycl::malloc_device<float>(lx*ly, q);
   q.memcpy(in, gpu_arr, sizeof(float) * lx * ly);
 
-  float* out = malloc_device<float>(lx*ly, q);
+  float* out = sycl::malloc_device<float>(lx*ly, q);
 
-  auto global_range = range<1>(ly*lx);
-  auto local_range = range<1>(NTY*NTX);
+  sycl::range<1> gws (ly*lx);
+  sycl::range<1> lws (NTY*NTX);
 
   // start timer
   q.wait();
@@ -123,7 +122,8 @@ int main(int argc, char *argv[]) {
 
   for(int i=0; i<niter; i++) {
     q.submit([&](auto &h) {
-      h.template parallel_for<class stencil>(nd_range<1>(global_range, local_range), [=](nd_item<1> item) {
+      h.template parallel_for<class stencil>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         int idx = item.get_global_id(0);
         int x = idx % lx; 
         int y = idx / lx;
@@ -145,8 +145,8 @@ int main(int argc, char *argv[]) {
   t0 = stop_watch(t0)/(double)niter;
 
   q.memcpy(gpu_arr, in, sizeof(float) * lx * ly).wait();
-  free(in, q);
-  free(out, q);
+  sycl::free(in, q);
+  sycl::free(out, q);
 
   printf("Device: iters = %8d, (Lx,Ly) = %6d, %6d, t = %8.1f usec/iter, BW = %6.3f GB/s, P = %6.3f Gflop/s\n",
   	 niter, Lx, Ly, t0,
