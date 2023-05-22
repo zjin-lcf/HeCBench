@@ -12,7 +12,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstdio>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Using Viterbi algorithm to search for a Hidden Markov Model for the most
 // probable state path given the observation sequence.
@@ -30,44 +30,39 @@ int ViterbiGPU(float &viterbiProb,
   float maxProbNew[nState];
   int path[(nObs-1)*nState];
 
-  { // sycl scope
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float,1> d_mtState(mtState, nState*nState);
-  buffer<float,1> d_mtEmit(mtEmit, nEmit*nState);
-  buffer<int,1> d_obs(obs, nObs);
-  buffer<float,1> d_maxProbOld(nState);
-  buffer<float,1> d_maxProbNew(maxProbNew, nState);
-  buffer<int,1> d_path(path, (nObs-1)*nState);
+  float *d_mtState = sycl::malloc_device<float>(nState*nState, q);
+  q.memcpy(d_mtState, mtState, sizeof(float)*nState*nState);
 
-  range<1> global_size ((nState + 255)/256*256);
-  range<1> local_size (256);
+  float *d_mtEmit = sycl::malloc_device<float>(nEmit*nState, q);
+  q.memcpy(d_mtEmit, mtEmit, sizeof(float)*nEmit*nState);
+
+  int *d_obs = sycl::malloc_device<int>(nObs, q);
+  q.memcpy(d_obs, obs, sizeof(int)*nObs);
+
+  float *d_maxProbOld = sycl::malloc_device<float>(nState, q);
+  float *d_maxProbNew = sycl::malloc_device<float>(nState, q);
+  int *d_path = sycl::malloc_device<int>((nObs-1)*nState, q);
+
+  sycl::range<1> gws ((nState + 255)/256*256);
+  sycl::range<1> lws (256);
 
   // initial probability
-  q.submit([&] (handler &h) {
-    auto maxProbOld = d_maxProbOld.get_access<sycl_write>(h);
-    h.copy(initProb, maxProbOld);
-  });
+  q.memcpy(d_maxProbOld, initProb, sizeof(float)*nState).wait();
 
-  q.wait();
   auto start = std::chrono::steady_clock::now();
 
   // main iteration of Viterbi algorithm
   for (int t = 1; t < nObs; t++) // for every input observation
   { 
-    q.submit([&] (handler &h) {
-      auto maxProbOld = d_maxProbOld.get_access<sycl_read>(h);
-      auto mtState = d_mtState.get_access<sycl_read>(h);
-      auto mtEmit = d_mtEmit.get_access<sycl_read>(h);
-      auto obs = d_obs.get_access<sycl_read>(h);
-      auto maxProbNew = d_maxProbNew.get_access<sycl_discard_write>(h);
-      auto path = d_path.get_access<sycl_discard_write>(h);
-      h.parallel_for<class hmm>(nd_range<1>(global_size, local_size), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class hmm>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         // find the most probable previous state leading to iState
         int iState = item.get_global_id(0);
         if (iState < nState) {
@@ -75,31 +70,29 @@ int ViterbiGPU(float &viterbiProb,
           int maxState = -1;
           for (int preState = 0; preState < nState; preState++) 
           {
-            float p = maxProbOld[preState] + mtState[iState*nState + preState];
+            float p = d_maxProbOld[preState] + d_mtState[iState*nState + preState];
             if (p > maxProb) 
             {
               maxProb = p;
               maxState = preState;
             }
           }
-          maxProbNew[iState] = maxProb + mtEmit[obs[t]*nState+iState];
-          path[(t-1)*nState+iState] = maxState;
+          d_maxProbNew[iState] = maxProb + d_mtEmit[d_obs[t]*nState+iState];
+          d_path[(t-1)*nState+iState] = maxState;
         }
       });
     });
 
-    q.submit([&] (handler &h) {
-      auto maxProbNew_acc = d_maxProbNew.get_access<sycl_read>(h);
-      auto maxProbOld_acc = d_maxProbOld.get_access<sycl_discard_write>(h);
-      h.copy(maxProbNew_acc, maxProbOld_acc);
-    });
+    q.memcpy(d_maxProbOld, d_maxProbNew, sizeof(float)*nState);
   }
+
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Device execution time of Viterbi iterations %f (s)\n", time * 1e-9f);
 
-  }
+  q.memcpy(maxProbNew, d_maxProbNew, sizeof(float)*nState);
+  q.memcpy(path, d_path, sizeof(int)*(nObs-1)*nState);
 
   // find the final most probable state
   float maxProb = 0.0;
@@ -120,6 +113,13 @@ int ViterbiGPU(float &viterbiProb,
   {
     viterbiPath[t] = path[t*nState+viterbiPath[t+1]];
   }
+  
+  sycl::free(d_mtState, q);
+  sycl::free(d_mtEmit, q);
+  sycl::free(d_obs, q);
+  sycl::free(d_maxProbOld, q);
+  sycl::free(d_maxProbNew, q);
+  sycl::free(d_path, q);
 
   return 1;
 }
