@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
-
 #include <sys/resource.h>
 #include <stdio.h>
 #include <math.h>
@@ -41,17 +39,10 @@
 #include <sstream>
 #include <iostream>
 #include <limits>
+#include <sycl/sycl.hpp>
+
 
 #include "mersenne.h"
-
-
-using namespace cl::sycl;
-constexpr access::mode sycl_read       = access::mode::read;
-constexpr access::mode sycl_write      = access::mode::write;
-constexpr access::mode sycl_read_write = access::mode::read_write;
-constexpr access::mode sycl_discard_read_write = access::mode::discard_read_write;
-constexpr access::mode sycl_discard_write = access::mode::discard_write;
-constexpr access::mode sycl_atomic = access::mode::atomic;
 
 
 /******************************************************************************
@@ -317,19 +308,19 @@ inline bool IsNaN<float>(float val)
 
 
 template<>
-inline bool IsNaN<cl::sycl::float2>(cl::sycl::float2 val)
+inline bool IsNaN<sycl::float2>(sycl::float2 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<cl::sycl::float3>(cl::sycl::float3 val)
+inline bool IsNaN<sycl::float3>(sycl::float3 val)
 {
     return (IsNaN(val.z()) || IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<cl::sycl::float4>(cl::sycl::float4 val)
+inline bool IsNaN<sycl::float4>(sycl::float4 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()) || IsNaN(val.w()) || IsNaN(val.z()));
 }
@@ -344,19 +335,19 @@ inline bool IsNaN<double>(double val)
 }
 
 template<>
-inline bool IsNaN<cl::sycl::double2>(cl::sycl::double2 val)
+inline bool IsNaN<sycl::double2>(sycl::double2 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<cl::sycl::double3>(cl::sycl::double3 val)
+inline bool IsNaN<sycl::double3>(sycl::double3 val)
 {
     return (IsNaN(val.z()) || IsNaN(val.y()) || IsNaN(val.x()));
 }
 
 template<>
-inline bool IsNaN<cl::sycl::double4>(cl::sycl::double4 val)
+inline bool IsNaN<sycl::double4>(sycl::double4 val)
 {
     return (IsNaN(val.y()) || IsNaN(val.x()) || IsNaN(val.w()) || IsNaN(val.z()));
 }
@@ -588,9 +579,9 @@ int CompareResults(double* computed, double* reference, OffsetT len, bool verbos
  */
 template <typename S, typename T>
 int CompareDeviceResults(
-    queue &q,
+    sycl::queue &q,
     S *h_reference,
-    buffer<T,1> &d_data,
+    T *d_data,
     size_t num_items,
     bool verbose = true,
     bool display_data = false)
@@ -599,12 +590,7 @@ int CompareDeviceResults(
     T *h_data = (T*) malloc(num_items * sizeof(T));
 
     // Copy data back
-    //cudaMemcpy(h_data, d_data, sizeof(T) * num_items, cudaMemcpyDeviceToHost);
-    q.submit([&] (handler& cgh) {
-        auto data_acc = d_data.template get_access<sycl_read>(cgh);
-        cgh.copy(data_acc, h_data);
-    });
-    q.wait();
+    q.memcpy(h_data, d_data, sizeof(T) * num_items).wait();
 
     // Display data
     if (display_data)

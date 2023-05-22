@@ -46,7 +46,7 @@ bool                    g_report = false;   // Whether to display a full report 
 
 // Decode float4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-inline void DecodePixel(cl::sycl::float4 &pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+inline void DecodePixel(sycl::float4 &pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     float samples[4];
     samples[0] = pixel.x();
@@ -61,7 +61,7 @@ inline void DecodePixel(cl::sycl::float4 &pixel, unsigned int (&bins)[ACTIVE_CHA
 
 // Decode uchar4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-inline void DecodePixel(cl::sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+inline void DecodePixel(sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     unsigned char samples[4];
     samples[0] = pixel.x();
@@ -167,7 +167,7 @@ struct TgaHeader
 /**
  * Decode image byte data into pixel
  */
-void ParseTgaPixel(cl::sycl::uchar4 &pixel, unsigned char *tga_pixel, int bytes)
+void ParseTgaPixel(sycl::uchar4 &pixel, unsigned char *tga_pixel, int bytes)
 {
     if (bytes == 4)
     {
@@ -196,7 +196,7 @@ void ParseTgaPixel(cl::sycl::uchar4 &pixel, unsigned char *tga_pixel, int bytes)
 /**
  * Reads a .tga image file
  */
-void ReadTga(cl::sycl::uchar4* &pixels, int &width, int &height, const char *filename)
+void ReadTga(sycl::uchar4* &pixels, int &width, int &height, const char *filename)
 {
     // Open the file
     FILE *fptr;
@@ -238,8 +238,8 @@ void ReadTga(cl::sycl::uchar4* &pixels, int &width, int &height, const char *fil
     int pixel_bytes = header.bitsperpixel / 8;
 
     // Allocate and initialize pixel data
-    size_t image_bytes = width * height * sizeof(cl::sycl::uchar4);
-    if ((pixels == NULL) && ((pixels = (cl::sycl::uchar4*) malloc(image_bytes)) == NULL))
+    size_t image_bytes = width * height * sizeof(sycl::uchar4);
+    if ((pixels == NULL) && ((pixels = (sycl::uchar4*) malloc(image_bytes)) == NULL))
     {
         fprintf(stderr, "malloc of image failed\n");
         exit(-1);
@@ -313,11 +313,11 @@ void ReadTga(cl::sycl::uchar4* &pixels, int &width, int &height, const char *fil
 /**
  * Generate a random image with specified entropy
  */
-void GenerateRandomImage(cl::sycl::uchar4* &pixels, int width, int height, int entropy_reduction)
+void GenerateRandomImage(sycl::uchar4* &pixels, int width, int height, int entropy_reduction)
 {
     int num_pixels = width * height;
-    size_t image_bytes = num_pixels * sizeof(cl::sycl::uchar4);
-    if ((pixels == NULL) && ((pixels = (cl::sycl::uchar4*) malloc(image_bytes)) == NULL))
+    size_t image_bytes = num_pixels * sizeof(sycl::uchar4);
+    if ((pixels == NULL) && ((pixels = (sycl::uchar4*) malloc(image_bytes)) == NULL))
     {
         fprintf(stderr, "malloc of image failed\n");
         exit(-1);
@@ -340,7 +340,7 @@ void GenerateRandomImage(cl::sycl::uchar4* &pixels, int width, int height, int e
 
 // Decode float4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-void DecodePixelGold(cl::sycl::float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+void DecodePixelGold(sycl::float4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     float* samples = reinterpret_cast<float*>(&pixel);
 
@@ -350,7 +350,7 @@ void DecodePixelGold(cl::sycl::float4 pixel, unsigned int (&bins)[ACTIVE_CHANNEL
 
 // Decode uchar4 pixel into bins
 template <int NUM_BINS, int ACTIVE_CHANNELS>
-void DecodePixelGold(cl::sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
+void DecodePixelGold(sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 {
     unsigned char* samples = reinterpret_cast<unsigned char*>(&pixel);
 
@@ -406,20 +406,20 @@ template <
     typename    PixelType>
 void RunTest(
     std::vector<std::pair<std::string, double> >&   timings,
-    queue                                           &q,
-    buffer<PixelType, 1>                            &d_pixels,
+    sycl::queue                                     &q,
+    PixelType *                                     d_pixels,
     const int                                       width,
     const int                                       height,
-    buffer<unsigned int, 1>                         &d_hist,
+    unsigned int *                                  d_hist,
     unsigned int *                                  h_hist,
     int                                             timing_iterations,
     const char *                                    long_name,
     const char *                                    short_name,
-    double (*f)(queue&, 
-                buffer<PixelType,1>&, 
+    double (*f)(sycl::queue&, 
+                PixelType*,
                 int,   // width
                 int,   // height
-                buffer<unsigned int,1>&, 
+                unsigned int*,
                 bool)
     )
 {
@@ -468,52 +468,54 @@ void TestMethods(
     double      bandwidth_GBs)
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-    // Copy data to gpu
-    size_t pixel_bytes = width * height * sizeof(PixelType);
-    buffer<PixelType, 1> d_pixels (h_pixels, width*height);
+  // Copy data to gpu
+  size_t pixel_bytes = width * height * sizeof(PixelType);
+  PixelType *d_pixels = sycl::malloc_device<PixelType>(width * height, q);
+  q.memcpy(d_pixels, h_pixels, pixel_bytes);
 
-    if (g_report) printf("%.3f, ", double(pixel_bytes) / bandwidth_GBs / 1000);
+  if (g_report) printf("%.3f, ", double(pixel_bytes) / bandwidth_GBs / 1000);
 
-    // Allocate results arrays on cpu/gpu
-    unsigned int *h_hist;
-    //unsigned int *d_hist;
-    size_t histogram_bytes = NUM_BINS * ACTIVE_CHANNELS * sizeof(unsigned int);
-    h_hist = (unsigned int *) malloc(histogram_bytes);
-    buffer<unsigned int, 1> d_hist (NUM_BINS * ACTIVE_CHANNELS);
+  // Allocate results arrays on cpu/gpu
+  unsigned int *h_hist;
+  //unsigned int *d_hist;
+  size_t histogram_bytes = NUM_BINS * ACTIVE_CHANNELS * sizeof(unsigned int);
+  h_hist = (unsigned int *) malloc(histogram_bytes);
+  unsigned int *d_hist = sycl::malloc_device<unsigned int>(NUM_BINS * ACTIVE_CHANNELS, q);
 
-    // Compute reference cpu histogram
-    HistogramGold<ACTIVE_CHANNELS, NUM_BINS>(h_pixels, width, height, h_hist);
+  // Compute reference cpu histogram
+  HistogramGold<ACTIVE_CHANNELS, NUM_BINS>(h_pixels, width, height, h_hist);
 
-    // Store timings
-    std::vector<std::pair<std::string, double> > timings;
+  // Store timings
+  std::vector<std::pair<std::string, double> > timings;
 
-    // Run experiments
-    RunTest<ACTIVE_CHANNELS, NUM_BINS>(timings, q, d_pixels, width, height, d_hist, h_hist, timing_iterations,
-        "Shared memory atomics", "smem atomics", run_smem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>);
-    RunTest<ACTIVE_CHANNELS, NUM_BINS>(timings, q, d_pixels, width, height, d_hist, h_hist, timing_iterations,
-        "Global memory atomics", "gmem atomics", run_gmem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>);
+  // Run experiments
+  RunTest<ACTIVE_CHANNELS, NUM_BINS>(timings, q, d_pixels, width, height, d_hist, h_hist, timing_iterations,
+      "Shared memory atomics", "smem atomics", run_smem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>);
+  RunTest<ACTIVE_CHANNELS, NUM_BINS>(timings, q, d_pixels, width, height, d_hist, h_hist, timing_iterations,
+      "Global memory atomics", "gmem atomics", run_gmem_atomics<ACTIVE_CHANNELS, NUM_BINS, PixelType>);
 
-    // Report timings
-    if (!g_report)
-    {
-        std::sort(timings.begin(), timings.end(), less_than_value());
-        printf("Timings (us):\n");
-        for (int i = 0; i < timings.size(); i++)
-        {
-            double bandwidth = height * width * sizeof(PixelType) / timings[i].second / 1000;
-            printf("\t %.3f %s (%.3f GB/s, %.3f%% peak)\n", timings[i].second, timings[i].first.c_str(), bandwidth, bandwidth / bandwidth_GBs * 100);
-        }
-        printf("\n");
-    }
+  // Report timings
+  if (!g_report)
+  {
+      std::sort(timings.begin(), timings.end(), less_than_value());
+      printf("Timings (us):\n");
+      for (int i = 0; i < timings.size(); i++)
+      {
+          double bandwidth = height * width * sizeof(PixelType) / timings[i].second / 1000;
+          printf("\t %.3f %s (%.3f GB/s, %.3f%% peak)\n", timings[i].second, timings[i].first.c_str(), bandwidth, bandwidth / bandwidth_GBs * 100);
+      }
+      printf("\n");
+  }
 
-    // Free data
-    free(h_hist);
+  // Free data
+  free(h_hist);
+  sycl::free(d_pixels, q);
+  sycl::free(d_hist, q);
 }
 
 
@@ -521,7 +523,7 @@ void TestMethods(
  * Test different problem genres
  */
 void TestGenres(
-    cl::sycl::uchar4*     uchar4_pixels,
+    sycl::uchar4*     uchar4_pixels,
     int         height,
     int         width,
     int         timing_iterations,
@@ -532,8 +534,8 @@ void TestGenres(
     {
         if (!g_report) printf("1 channel unsigned char tests (256-bin):\n\n"); fflush(stdout);
 
-        size_t      image_bytes     = num_pixels * sizeof(unsigned char);
-        unsigned char*     uchar1_pixels   = (unsigned char*) malloc(image_bytes);
+        size_t image_bytes = num_pixels * sizeof(unsigned char);
+        unsigned char *uchar1_pixels = (unsigned char*) malloc(image_bytes);
 
         // Convert to 1-channel (averaging first 3 channels)
         for (int i = 0; i < num_pixels; ++i)
@@ -557,8 +559,8 @@ void TestGenres(
 
     {
         if (!g_report) printf("3/4 channel float4 tests (256-bin):\n\n"); fflush(stdout);
-        size_t      image_bytes     = num_pixels * sizeof(cl::sycl::float4);
-	cl::sycl::float4*     float4_pixels   = (cl::sycl::float4*) malloc(image_bytes);
+        size_t image_bytes = num_pixels * sizeof(sycl::float4);
+	sycl::float4 *float4_pixels = (sycl::float4*) malloc(image_bytes);
 
         // Convert to float4 with range [0.0, 1.0)
         for (int i = 0; i < num_pixels; ++i)
@@ -625,7 +627,7 @@ int main(int argc, char **argv)
     double bandwidth_GBs = 41;  // hardcoded 
 
     // Run test(s)
-    cl::sycl::uchar4* uchar4_pixels = NULL;
+    sycl::uchar4* uchar4_pixels = NULL;
     if (!g_report)
     {
         if (!filename.empty())
