@@ -36,7 +36,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I$(inc) -fsycl
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
@@ -80,7 +80,7 @@ reference.o: $(inc)/reference.cpp $(inc)/reference.h
 timer.o: $(inc)/timer.cpp $(inc)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o: kernels.cpp $(inc)/kernels.h 
+kernels.o: kernels.cpp $(inc)/kernels.h $(inc)/timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
