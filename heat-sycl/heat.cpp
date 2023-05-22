@@ -32,16 +32,15 @@
 #include <iostream>
 #include <chrono>
 #include <cmath>
-
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // Key constants used in this program
 #define PI sycl::acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
-void initial_value(sycl::queue &q, const unsigned int n, const double dx, const double length, sycl::buffer<double,1>& u);
-void zero(sycl::queue &q, const unsigned int n, sycl::buffer<double,1>& u);
-void solve(sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, sycl::buffer<double,1>& u, sycl::buffer<double,1>& u_tmp);
+void initial_value(sycl::queue &q, const unsigned int n, const double dx, const double length, double *u);
+void zero(sycl::queue &q, const unsigned int n, double *u);
+void solve(sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, double *u, double *u_tmp);
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const unsigned int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
@@ -88,11 +87,10 @@ int main(int argc, char *argv[]) {
   double r = alpha * dt / (dx * dx);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   // Print message detailing runtime configuration
   std::cout
@@ -119,39 +117,37 @@ int main(int argc, char *argv[]) {
     std::cout << " Warning: unstable" << std::endl;
   std::cout << LINE << std::endl;
 
+  const unsigned int grid_size = n * n;
+
   // Allocate two nxn grids
-  sycl::buffer<double, 1> u{sycl::range<1>{n*n}};
-  sycl::buffer<double, 1> u_tmp{sycl::range<1>{n*n}};
+  double *u = sycl::malloc_device<double>(grid_size, q);
+  double *u_tmp = sycl::malloc_device<double>(grid_size, q);
 
   const int block_size = 256;
-  const int n_ceil = (n*n+block_size-1) / block_size * block_size;
+  const int n_ceil = (grid_size+block_size-1) / block_size * block_size;
 
   // Set the initial value of the grid under the MMS scheme
   q.submit([&](sycl::handler& cgh) {
-    auto ua = u.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class initial_value_kernel>(
-		    sycl::nd_range<1>(
-			    sycl::range<1>(n_ceil), 
-			    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
+      sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
+      [=](sycl::nd_item<1> item) {
       int idx = item.get_global_id(0);
-      if (idx < n*n) {
+      if (idx < grid_size) {
         int i = idx % n;
         int j = idx / n;
         double y = dx * (j+1); // Physical y position
         double x = dx * (i+1); // Physical x position
-        ua[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
+        u[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
       }
     });
   });
 
   q.submit([&](sycl::handler& cgh) {
-    auto ua = u_tmp.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class zero_kernel>(
-		    sycl::nd_range<1>(
-			    sycl::range<1>(n_ceil), 
-			    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
+      sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
+      [=](sycl::nd_item<1> item) {
       int idx = item.get_global_id(0);
-      if (idx < n*n) ua[idx] = 0.0;
+      if (idx < grid_size) u_tmp[idx] = 0.0;
     });
   });
 
@@ -173,44 +169,37 @@ int main(int argc, char *argv[]) {
     // Computes u_tmp at the next timestep
     // given the value of u at the current timestep
     q.submit([&](sycl::handler& cgh) {
-      auto u_tmp_acc = u_tmp.get_access<sycl::access::mode::discard_write>(cgh);
-      auto u_acc = u.get_access<sycl::access::mode::read>(cgh);
-
       // Loop over the nxn grid
-      cgh.parallel_for<class solve_kernel>( sycl::nd_range<1>(
-          		    sycl::range<1>(n_ceil), 
-          		    sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class solve_kernel>(
+        sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
+        [=](sycl::nd_item<1> item) {
         int idx = item.get_global_id(0);
-        if (idx < n*n) {
+        if (idx < grid_size) {
           int i = idx % n;
           int j = idx / n;
 
           // Update the 5-point stencil, using boundary conditions on the edges of the domain.
           // Boundaries are zero because the MMS solution is zero there.
-          u_tmp_acc[i+j*n] =  r2 * u_acc[i+j*n] +
-          r * ((i < n-1) ? u_acc[i+1+j*n] : 0.0) +
-          r * ((i > 0)   ? u_acc[i-1+j*n] : 0.0) +
-          r * ((j < n-1) ? u_acc[i+(j+1)*n] : 0.0) +
-          r * ((j > 0)   ? u_acc[i+(j-1)*n] : 0.0);
+          u_tmp[i+j*n] = r2 * u[i+j*n] +
+          r * ((i < n-1) ? u[i+1+j*n] : 0.0) +
+          r * ((i > 0)   ? u[i-1+j*n] : 0.0) +
+          r * ((j < n-1) ? u[i+(j+1)*n] : 0.0) +
+          r * ((j > 0)   ? u[i+(j-1)*n] : 0.0);
         }
       });
     });
 
     // Pointer swap
-    auto tmp = std::move(u);
-    u = std::move(u_tmp);
-    u_tmp = std::move(tmp);
+    auto tmp = u;
+    u = u_tmp;
+    u_tmp = tmp;
   }
 
   q.wait();
   auto toc = std::chrono::high_resolution_clock::now();
 
-  double *u_host = new double[n*n];
-  q.submit([&](sycl::handler& cgh) {
-      auto u_acc = u.get_access<sycl::access::mode::read>(cgh);
-      cgh.copy(u_acc, u_host);
-  });
-  q.wait();
+  double *u_host = new double[grid_size];
+  q.memcpy(u_host, u, sizeof(double) * grid_size).wait();
 
   //
   // Check the L2-norm of the computed solution
@@ -230,6 +219,8 @@ int main(int argc, char *argv[]) {
     << "Bandwidth (GB/s): " << 1.0E-9*2.0*n*n*nsteps*sizeof(double)/std::chrono::duration_cast<std::chrono::duration<double>>(toc-tic).count() << std::endl
     << LINE << std::endl;
 
+  sycl::free(u, q);
+  sycl::free(u_tmp, q);
   delete[] u_host;
 }
 
