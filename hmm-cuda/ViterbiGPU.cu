@@ -117,5 +117,12 @@ int ViterbiGPU(float &viterbiProb,
     viterbiPath[t] = path[t*nState+viterbiPath[t+1]];
   }
 
+  cudaFree(d_mtState);
+  cudaFree(d_mtEmit);
+  cudaFree(d_obs);
+  cudaFree(d_maxProbOld);
+  cudaFree(d_maxProbNew);
+  cudaFree(d_path);
+
   return 1;
 }
