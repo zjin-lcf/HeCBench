@@ -68,15 +68,14 @@ int main(int argc, char * argv[])
   memset(hOutData, 0, signalLength * sizeof(float));
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> inDataBuf (signalLength);
-  buffer<float, 1> partialOutDataBuf (signalLength);
-  buffer<float, 1> outDataBuf (signalLength);
+  float *inDataBuf = sycl::malloc_device<float>(signalLength, q);
+  float *partialOutDataBuf = sycl::malloc_device<float>(signalLength, q);
+  float *outDataBuf = sycl::malloc_device<float>(signalLength, q);
 
   std::cout << "Executing kernel for " 
             << iterations << " iterations" << std::endl;
@@ -88,7 +87,7 @@ int main(int argc, char * argv[])
   for(int i = 0; i < iterations; i++)
   {
     runKernel(q, inData, hOutData, dOutData, dPartialOutData,
-        signalLength, inDataBuf, partialOutDataBuf, outDataBuf);
+              signalLength, inDataBuf, partialOutDataBuf, outDataBuf);
   }
 
   auto end = std::chrono::steady_clock::now();
@@ -107,6 +106,10 @@ int main(int argc, char * argv[])
       break;
     }
   }
+
+  sycl::free(inDataBuf, q);
+  sycl::free(outDataBuf, q);
+  sycl::free(partialOutDataBuf, q);
 
   free(inData);
   free(dOutData);

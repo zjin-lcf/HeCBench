@@ -27,20 +27,20 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <math.h>
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 int getLevels(unsigned int length, unsigned int* levels);
 void calApproxFinalOnHost(float *inData, float *hOutData, unsigned int signalLength);
 
 int runKernel(
-    queue &q,
+    sycl::queue &q,
     float *inData, 
     float *dOutData, 
     float *hOutData, 
     float *dPartialOutData,
     const unsigned int signalLength,
-    buffer<float, 1> &inDataBuf,
-    buffer<float, 1> &partialOutDataBuf,
-    buffer<float, 1> &outDataBuf);
+    float *inDataBuf,
+    float *partialOutDataBuf,
+    float *outDataBuf);
 
 #endif
