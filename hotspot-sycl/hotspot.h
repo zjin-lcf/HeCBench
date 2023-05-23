@@ -38,7 +38,7 @@ const static float chip_width = 0.016;
 /* ambient temperature, assuming no package at all */
 const static float amb_temp = 80.0;
 
-void writeoutput(buffer<float,1>&, int, int, char *);
+void writeoutput(float *, int, int, char *);
 void readinput(float *, int, int, char *);
 void usage(int, char **);
 void run(int, char **);
