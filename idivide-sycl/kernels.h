@@ -1,6 +1,6 @@
 template<typename divisor_type>
 void throughput_test(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     divisor_type d1,
     divisor_type d2,
     divisor_type d3,
@@ -17,7 +17,7 @@ void throughput_test(
 
 template<typename divisor_type>
 void latency_test(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     divisor_type d1,
     divisor_type d2,
     divisor_type d3,
@@ -47,14 +47,13 @@ void latency_test(
 
 inline int atomicFetchAdd(int &val, const int delta)
 {
-  sycl::ext::oneapi::atomic_ref<int, sycl::memory_order::relaxed, 
-                                sycl::memory_scope::device,
-                                sycl::access::address_space::global_space> 
-  ref(val);
+  sycl::atomic_ref<int, sycl::memory_order::relaxed, 
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
   return ref.fetch_add(delta);
 }
 
-void check(nd_item<1> &item, int_fastdiv divisor, int * results)
+void check(sycl::nd_item<1> &item, int_fastdiv divisor, int * results)
 {
   int divident = item.get_global_id(0);
 
