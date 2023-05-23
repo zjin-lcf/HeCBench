@@ -3,7 +3,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUM_ELEMENTS 4096
 #define COUNT 4096       // accumulation count
@@ -58,7 +58,7 @@ typedef struct
 #include "util.cpp"
 
 void add_test_interleaved(
-    queue &q,
+    sycl::queue &q,
     INTERLEAVED_T * const h_dst,
     const INTERLEAVED_T * const h_src,
     const int repeat,
@@ -69,38 +69,41 @@ void add_test_interleaved(
   const unsigned int global_work_size = 
 	  (num_elements + (local_work_size-1)) / local_work_size * local_work_size;
 
-  buffer<INTERLEAVED_T, 1> d_src(h_src, num_elements);
-  buffer<INTERLEAVED_T, 1> d_dst(h_dst, num_elements);
+  INTERLEAVED_T *d_src = sycl::malloc_device<INTERLEAVED_T>(num_elements, q);
+  INTERLEAVED_T *d_dst = sycl::malloc_device<INTERLEAVED_T>(num_elements, q);
+  
+  const size_t num_bytes = (sizeof(INTERLEAVED_T) * num_elements);
+  q.memcpy(d_src, h_src, num_bytes);
+  q.memcpy(d_dst, h_dst, num_bytes);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&](handler &h) {
-      auto src_acc = d_src.get_access<sycl_read>(h);
-      auto dest_acc = d_dst.get_access<sycl_write>(h);
-      h.parallel_for<class interleaved>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class interleaved>(
+        sycl::nd_range<1>(global_work_size, local_work_size), [=](sycl::nd_item<1> item) {
         const unsigned int tid = item.get_global_id(0);
         if (tid < num_elements)
         {
           for (unsigned int i=0; i<COUNT; i++)
           {
-            dest_acc[tid].s0 += src_acc[tid].s0;
-            dest_acc[tid].s1 += src_acc[tid].s1;
-            dest_acc[tid].s2 += src_acc[tid].s2;
-            dest_acc[tid].s3 += src_acc[tid].s3;
-            dest_acc[tid].s4 += src_acc[tid].s4;
-            dest_acc[tid].s5 += src_acc[tid].s5;
-            dest_acc[tid].s6 += src_acc[tid].s6;
-            dest_acc[tid].s7 += src_acc[tid].s7;
-            dest_acc[tid].s8 += src_acc[tid].s8;
-            dest_acc[tid].s9 += src_acc[tid].s9;
-            dest_acc[tid].sa += src_acc[tid].sa;
-            dest_acc[tid].sb += src_acc[tid].sb;
-            dest_acc[tid].sc += src_acc[tid].sc;
-            dest_acc[tid].sd += src_acc[tid].sd;
-            dest_acc[tid].se += src_acc[tid].se;
-            dest_acc[tid].sf += src_acc[tid].sf;
+            d_dst[tid].s0 += d_src[tid].s0;
+            d_dst[tid].s1 += d_src[tid].s1;
+            d_dst[tid].s2 += d_src[tid].s2;
+            d_dst[tid].s3 += d_src[tid].s3;
+            d_dst[tid].s4 += d_src[tid].s4;
+            d_dst[tid].s5 += d_src[tid].s5;
+            d_dst[tid].s6 += d_src[tid].s6;
+            d_dst[tid].s7 += d_src[tid].s7;
+            d_dst[tid].s8 += d_src[tid].s8;
+            d_dst[tid].s9 += d_src[tid].s9;
+            d_dst[tid].sa += d_src[tid].sa;
+            d_dst[tid].sb += d_src[tid].sb;
+            d_dst[tid].sc += d_src[tid].sc;
+            d_dst[tid].sd += d_src[tid].sd;
+            d_dst[tid].se += d_src[tid].se;
+            d_dst[tid].sf += d_src[tid].sf;
           }
         }
       });
@@ -111,10 +114,14 @@ void add_test_interleaved(
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel (interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(h_dst, d_dst, num_bytes).wait();
+  sycl::free(d_src, q);
+  sycl::free(d_dst, q);
 }
 
 void add_test_non_interleaved(
-    queue &q,
+    sycl::queue &q,
     NON_INTERLEAVED_T * const h_dst,
     const NON_INTERLEAVED_T * const h_src,
     const int repeat,
@@ -126,40 +133,41 @@ void add_test_non_interleaved(
 	  (num_elements + (local_work_size-1)) / local_work_size * local_work_size;
 
   // Allocate memory on the device
-  buffer<NON_INTERLEAVED_T, 1> d_src(h_src, 1);
-  buffer<NON_INTERLEAVED_T, 1> d_dst(h_dst, 1);
+  NON_INTERLEAVED_T *d_src = sycl::malloc_device<NON_INTERLEAVED_T>(1, q);
+  NON_INTERLEAVED_T *d_dst = sycl::malloc_device<NON_INTERLEAVED_T>(1, q);
+
+  const size_t num_bytes = sizeof(NON_INTERLEAVED_T);
+  q.memcpy(d_src, h_src, num_bytes);
+  q.memcpy(d_dst, h_dst, num_bytes);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&](handler &h) {
-      auto src_acc = d_src.get_access<sycl_read>(h);
-      auto dest_acc = d_dst.get_access<sycl_write>(h);
-      h.parallel_for<class non_interleaved>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class non_interleaved>(
+        sycl::nd_range<1>(global_work_size, local_work_size), [=](sycl::nd_item<1> item) {
         const unsigned int tid = item.get_global_id(0);
         if (tid < num_elements)
         {
-	  auto src_ptr = src_acc.get_pointer();
-	  auto dest_ptr = dest_acc.get_pointer();
           for (unsigned int i=0; i<COUNT; i++)
           {
-            dest_ptr->s0[tid] += src_ptr->s0[tid];
-            dest_ptr->s1[tid] += src_ptr->s1[tid];
-            dest_ptr->s2[tid] += src_ptr->s2[tid];
-            dest_ptr->s3[tid] += src_ptr->s3[tid];
-            dest_ptr->s4[tid] += src_ptr->s4[tid];
-            dest_ptr->s5[tid] += src_ptr->s5[tid];
-            dest_ptr->s6[tid] += src_ptr->s6[tid];
-            dest_ptr->s7[tid] += src_ptr->s7[tid];
-            dest_ptr->s8[tid] += src_ptr->s8[tid];
-            dest_ptr->s9[tid] += src_ptr->s9[tid];
-            dest_ptr->sa[tid] += src_ptr->sa[tid];
-            dest_ptr->sb[tid] += src_ptr->sb[tid];
-            dest_ptr->sc[tid] += src_ptr->sc[tid];
-            dest_ptr->sd[tid] += src_ptr->sd[tid];
-            dest_ptr->se[tid] += src_ptr->se[tid];
-            dest_ptr->sf[tid] += src_ptr->sf[tid];
+            d_dst->s0[tid] += d_src->s0[tid];
+            d_dst->s1[tid] += d_src->s1[tid];
+            d_dst->s2[tid] += d_src->s2[tid];
+            d_dst->s3[tid] += d_src->s3[tid];
+            d_dst->s4[tid] += d_src->s4[tid];
+            d_dst->s5[tid] += d_src->s5[tid];
+            d_dst->s6[tid] += d_src->s6[tid];
+            d_dst->s7[tid] += d_src->s7[tid];
+            d_dst->s8[tid] += d_src->s8[tid];
+            d_dst->s9[tid] += d_src->s9[tid];
+            d_dst->sa[tid] += d_src->sa[tid];
+            d_dst->sb[tid] += d_src->sb[tid];
+            d_dst->sc[tid] += d_src->sc[tid];
+            d_dst->sd[tid] += d_src->sd[tid];
+            d_dst->se[tid] += d_src->se[tid];
+            d_dst->sf[tid] += d_src->sf[tid];
           }
         }
       });
@@ -170,6 +178,10 @@ void add_test_non_interleaved(
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel (non-interleaved) execution time %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(h_dst, d_dst, num_bytes).wait();
+  sycl::free(d_src, q);
+  sycl::free(d_dst, q);
 }
 
 int main(int argc, char* argv[]) {
@@ -185,12 +197,11 @@ int main(int argc, char* argv[]) {
   initialize (interleaved_src, interleaved_dst,
               non_interleaved_src, non_interleaved_dst, NUM_ELEMENTS);
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   add_test_non_interleaved(q, &non_interleaved_dst, &non_interleaved_src,
                            repeat, NUM_ELEMENTS);
