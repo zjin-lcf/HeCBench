@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "mergesort.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -17,6 +17,12 @@
 #define BLOCKSIZE  256
 #define ROW_LENGTH  BLOCKSIZE * 4
 #define ROWS    4096
+
+constexpr sycl::access::mode sycl_read       = sycl::access::mode::read;
+constexpr sycl::access::mode sycl_write      = sycl::access::mode::write;
+constexpr sycl::access::mode sycl_read_write = sycl::access::mode::read_write;
+constexpr sycl::access::mode sycl_discard_read_write = sycl::access::mode::discard_read_write;
+constexpr sycl::access::mode sycl_discard_write = sycl::access::mode::discard_write;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The mergesort algorithm
@@ -27,8 +33,8 @@
 //        detail::vec_ops::logical_return<sizeof(float)>::type, 1>'
 //              (aka 'vec<int, 1>') to 'bool'
 //                b.z() = a.y() >= b.z() ? a.y() : b.z();
-cl::sycl::float4 sortElem(cl::sycl::float4 r) {
-  cl::sycl::float4 nr;
+sycl::float4 sortElem(sycl::float4 r) {
+  sycl::float4 nr;
 
   float xt = r.x();
   float yt = r.y();
@@ -52,7 +58,7 @@ cl::sycl::float4 sortElem(cl::sycl::float4 r) {
   return nr;
 }
 
-cl::sycl::float4 getLowest(cl::sycl::float4 a, cl::sycl::float4 b)
+sycl::float4 getLowest(sycl::float4 a, sycl::float4 b)
 {
   float ax = a.x();
   float ay = a.y();
@@ -69,7 +75,7 @@ cl::sycl::float4 getLowest(cl::sycl::float4 a, cl::sycl::float4 b)
   return a;
 }
 
-cl::sycl::float4 getHighest(cl::sycl::float4 a, cl::sycl::float4 b)
+sycl::float4 getHighest(sycl::float4 a, sycl::float4 b)
 {
   float ax = a.x();
   float ay = a.y();
@@ -86,8 +92,8 @@ cl::sycl::float4 getHighest(cl::sycl::float4 a, cl::sycl::float4 b)
   return b;
 }
 
-cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
-    cl::sycl::float4 *d_origList, cl::sycl::float4 *d_resultList,
+sycl::float4* runMergeSort(sycl::queue &q, int listsize, int divisions,
+    sycl::float4 *d_origList, sycl::float4 *d_resultList,
     int *sizes, int *nullElements,
     unsigned int *origOffsets){
 
@@ -112,19 +118,20 @@ cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
   size_t global[] = {blocks*THREADS,1,1};
   size_t grid[3];
 
-  const property_list props = property::buffer::use_host_ptr();
+  const sycl::property_list props = sycl::property::buffer::use_host_ptr();
 
   // divided by four 
-  buffer<cl::sycl::float4,1> d_resultList_buff (listsize/4);
-  buffer<cl::sycl::float4,1> d_origList_buff (d_origList, listsize/4, props);
-  buffer<int, 1> d_constStartAddr (startaddr, (divisions+1), props);
+  sycl::buffer<sycl::float4,1> d_resultList_buff (listsize/4);
+  sycl::buffer<sycl::float4,1> d_origList_buff (d_origList, listsize/4, props);
+  sycl::buffer<int, 1> d_constStartAddr (startaddr, (divisions+1), props);
   d_origList_buff.set_final_data(nullptr);
 
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
       auto input_acc = d_origList_buff.get_access<sycl_read>(cgh);
       auto result_acc = d_resultList_buff.get_access<sycl_write>(cgh);
       cgh.parallel_for<class mergesort_first>(
-          nd_range<1>(range<1>(global[0]), range<1>(local[0])), [=] (nd_item<1> item) {
+          sycl::nd_range<1>(sycl::range<1>(global[0]), sycl::range<1>(local[0])),
+          [=] (sycl::nd_item<1> item) {
           int gid = item.get_global_id(0);
           if (gid < listsize/4) 
           result_acc[gid] = sortElem(input_acc[gid]);
@@ -160,15 +167,16 @@ cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
 
     global[0] = grid[0]*local[0];
 
-    q.submit([&](handler& cgh) {
-        auto input_acc = d_origList_buff.get_access<sycl_read>(cgh);
-        auto result_acc = d_resultList_buff.get_access<sycl_write>(cgh);
-        auto constStartAddr_acc = d_constStartAddr.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class mergepass>(
-            nd_range<1>(range<1>(global[0]), range<1>(local[0])), [=] (nd_item<1> item) {
-#include "kernel_mergeSortPass.sycl"
-            });
-        });
+    q.submit([&](sycl::handler& cgh) {
+      auto input_acc = d_origList_buff.get_access<sycl_read>(cgh);
+      auto result_acc = d_resultList_buff.get_access<sycl_write>(cgh);
+      auto constStartAddr_acc = d_constStartAddr.get_access<sycl_read>(cgh);
+      cgh.parallel_for<class mergepass>(
+        sycl::nd_range<1>(sycl::range<1>(global[0]), sycl::range<1>(local[0])),
+        [=] (sycl::nd_item<1> item) {
+        #include "kernel_mergeSortPass.sycl"
+      });
+    });
 
     nrElems *= 2;
     floatsperthread = (nrElems*4);
@@ -187,21 +195,22 @@ cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
   global[0] = grid[0]*local[0];
   global[1] = grid[1]*local[1];
 
-  buffer<unsigned int, 1> finalStartAddr(origOffsets, divisions+1, props);
-  buffer<int, 1> nullElems(nullElements, divisions, props);
+  sycl::buffer<unsigned int, 1> finalStartAddr(origOffsets, divisions+1, props);
+  sycl::buffer<int, 1> nullElems(nullElements, divisions, props);
 
-  // reinterpreted buffer
-  auto d_orig = d_origList_buff.reinterpret<float>(range<1>(listsize));
-  auto d_res = d_resultList_buff.reinterpret<float>(range<1>(listsize));
+  // reinterpreted sycl::buffer
+  auto d_orig = d_origList_buff.reinterpret<float>(sycl::range<1>(listsize));
+  auto d_res = d_resultList_buff.reinterpret<float>(sycl::range<1>(listsize));
 
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
       auto orig_acc = d_res.get_access<sycl_read>(cgh);
       auto result_acc = d_orig.get_access<sycl_write>(cgh);
       auto finalStartAddr_acc = finalStartAddr.get_access<sycl_read>(cgh);
       auto nullElems_acc = nullElems.get_access<sycl_read>(cgh);
       auto constStartAddr_acc = d_constStartAddr.get_access<sycl_read>(cgh);
       cgh.parallel_for<class mergepack>(
-          nd_range<2>(range<2>(global[1],global[0]), range<2>(local[1], local[0])), [=] (nd_item<2> item) {
+          sycl::nd_range<2>(sycl::range<2>(global[1],global[0]),
+                            sycl::range<2>(local[1], local[0])), [=] (sycl::nd_item<2> item) {
           int idx = item.get_global_id(1);
           int division = item.get_group(0);
           if((finalStartAddr_acc[division] + idx) < finalStartAddr_acc[division + 1])
@@ -210,7 +219,7 @@ cl::sycl::float4* runMergeSort(queue &q, int listsize, int divisions,
           });
       });
 
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
       auto orig_acc = d_origList_buff.get_access<sycl_read>(cgh);
       cgh.copy(orig_acc, d_origList);
       });
