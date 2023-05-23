@@ -3,7 +3,16 @@
 #define T23 sycl::pow(2.0, 23.0)
 #define T46 (T23*T23)
 
-#define syncthreads() item.barrier(access::fence_space::local_space);
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space);
+
+inline int atomicAdd(int &val, int operand) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  return atm.fetch_add(operand);
+}
 
 double randlc_device(double* X, const double* A)
 {
@@ -83,7 +92,7 @@ double find_my_seed_device(
 }
 
 void create_seq_gpu_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int* key_array,
     double seed,
     double a,
@@ -119,7 +128,7 @@ void create_seq_gpu_kernel(
 }
 
 void full_verify_gpu_kernel_1(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int*__restrict key_array,
     int*__restrict key_buff2,
     int number_of_blocks,
@@ -130,7 +139,7 @@ void full_verify_gpu_kernel_1(
 }
 
 void full_verify_gpu_kernel_2(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int* __restrict key_buff2,
     int*__restrict  key_buff_ptr_global,
     int*__restrict  key_array,
@@ -138,18 +147,12 @@ void full_verify_gpu_kernel_2(
     int amount_of_work)
 {    
   int value = key_buff2[item.get_global_id(0)];
-  //int index = atomicAdd(&key_buff_ptr_global[value], -1) - 1;
-  auto ao = ext::oneapi::atomic_ref<int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (
-              key_buff_ptr_global[value]);
-  int index = ao.fetch_add(-1) - 1;
+  int index = atomicAdd(key_buff_ptr_global[value], -1) - 1;
   key_array[index] = value;
 }
 
 void full_verify_gpu_kernel_3(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int *__restrict shared_data,
     const int *__restrict key_array,
     int *__restrict global_aux,
@@ -184,7 +187,7 @@ void full_verify_gpu_kernel_3(
 
 
 void rank_gpu_kernel_1(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int*__restrict key_array,
     int*__restrict partial_verify_vals,
     const int*__restrict test_index_array,
@@ -208,7 +211,7 @@ void rank_gpu_kernel_1(
 }
 
 void rank_gpu_kernel_2(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int* key_buff1,
     int number_of_blocks,
     int amount_of_work)
@@ -217,7 +220,7 @@ void rank_gpu_kernel_2(
 }
 
 void rank_gpu_kernel_3(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int*__restrict key_buff_ptr,
     const int*__restrict key_buff_ptr2,
     int number_of_blocks,
@@ -230,16 +233,12 @@ void rank_gpu_kernel_3(
    * individual population  
    * --------------------------------------------------------------------
    */
-  auto ao = ext::oneapi::atomic_ref<int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (
-              key_buff_ptr[key_buff_ptr2[item.get_global_id(0)]]);
-  ao.fetch_add(1);
+  
+  atomicAdd(key_buff_ptr[key_buff_ptr2[item.get_global_id(0)]], 1);
 }
 
 void rank_gpu_kernel_4(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int *__restrict shared_data,
     const int*__restrict source,
     int*__restrict destiny,
@@ -278,7 +277,7 @@ void rank_gpu_kernel_4(
 }
 
 void rank_gpu_kernel_5(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int *__restrict shared_data,
     const int*__restrict source,
     int*__restrict destiny,
@@ -305,7 +304,7 @@ void rank_gpu_kernel_5(
 }
 
 void rank_gpu_kernel_6(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int*__restrict source,
     int*__restrict destiny,
     const int*__restrict offset,
@@ -325,7 +324,7 @@ void rank_gpu_kernel_6(
 }
 
 void rank_gpu_kernel_7(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int*__restrict partial_verify_vals,
     const int*__restrict key_buff_ptr,
     const int*__restrict test_rank_array,
@@ -437,4 +436,3 @@ void rank_gpu_kernel_7(
   }
   *passed_verification_device += passed_verification;
 }
-
