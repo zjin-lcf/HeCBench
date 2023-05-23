@@ -18,7 +18,7 @@
 
 #include <fstream>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "iso2dfd.h"
 
 #define MIN(a, b) (a) < (b) ? (a) : (b)
@@ -145,8 +145,9 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
  * Range kernel is used to spawn work-items in x, y dimension
  *
  */
-void iso_2dfd_kernel(nd_item<2> &item, float* next, const float* prev, const float* vel, 
-			        const float dtDIVdxy, const int nRows, const int nCols) {
+void iso_2dfd_kernel(sycl::nd_item<2> &item,
+                     float* next, const float* prev, const float* vel, 
+		     const float dtDIVdxy, const int nRows, const int nCols) {
   // Compute global id
   // We can use the get.global.id() function of the item variable
   //   to compute global id. The 2D array is laid out in memory in row major
@@ -221,29 +222,30 @@ int main(int argc, char* argv[]) {
   std::cout << std::endl;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   std::cout << "Computing wavefield in device .." << std::endl;
 
   auto device = q.get_device();
-  auto device_name = device.get_info<info::device::name>();
-  auto device_wgs = device.get_info<info::device::max_work_group_size>();
+  auto device_name = device.get_info<sycl::info::device::name>();
+  auto device_wgs = device.get_info<sycl::info::device::max_work_group_size>();
   std::cout << "Running on:: " << device_name << std::endl;
   std::cout << "The Device Max Work Group Size is : " << device_wgs << std::endl;
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float, 1> b_next(next_base, nsize, props);
-  buffer<float, 1> b_prev(prev_base, nsize, props);
-  buffer<float, 1> b_vel(vel_base, nsize, props);
-  b_next.set_final_data(nullptr);
-  b_prev.set_final_data(nullptr);
+  float *d_next = sycl::malloc_device<float>(nsize, q);
+  q.memcpy(d_next, next_base, sizeof(float)*nsize);
 
-  auto global_range = range<2>((nRows+15)/16*16, (nCols+15)/16*16);
-  auto local_range = range<2>(16, 16);
+  float *d_prev = sycl::malloc_device<float>(nsize, q);
+  q.memcpy(d_prev, prev_base, sizeof(float)*nsize);
+
+  float *d_vel = sycl::malloc_device<float>(nsize, q);
+  q.memcpy(d_vel, vel_base, sizeof(float)*nsize);
+
+  sycl::range<2> gws ((nRows+15)/16*16, (nCols+15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
@@ -253,15 +255,13 @@ int main(int argc, char* argv[]) {
 
     //    alternating the 'next' and 'prev' parameters which effectively
     //    swaps their content at every iteration.
-    q.submit([&](auto &h) {
+    q.submit([&](sycl::handler &h) {
       // Create accessors
-      auto next = b_next.get_access<access::mode::read_write>(h);
-      auto prev = b_prev.get_access<access::mode::read_write>(h);
-      auto vel = b_vel.get_access<access::mode::read>(h);
-      h.template parallel_for<class kernel_next>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
-        iso_2dfd_kernel(item, k % 2 ? prev.get_pointer() : next.get_pointer(), 
-                              k % 2 ? next.get_pointer() : prev.get_pointer(),
-                              vel.get_pointer(), dtDIVdxy, nRows, nCols);
+      h.parallel_for<class kernel_next>(
+        sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
+        iso_2dfd_kernel(item, k % 2 ? d_prev : d_next, 
+                              k % 2 ? d_next : d_prev,
+                              d_vel, dtDIVdxy, nRows, nCols);
       });
     });
   }  // end for
@@ -272,10 +272,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Total kernel execution time " << ktime * 1e-6f << " (ms)\n";
   std::cout << "Average kernel execution time " << (ktime * 1e-3f) / nIterations << " (us)\n";
 
-  q.submit([&](auto &h) {
-    auto next = b_next.get_access<access::mode::read>(h);
-    h.copy(next, next_base);
-  }).wait();
+  q.memcpy(next_base, d_next, sizeof(float)*nsize).wait();
 
   // Output final wavefield (computed by device) to binary file
   std::ofstream outFile;
@@ -328,6 +325,9 @@ int main(int argc, char* argv[]) {
   delete[] prev_base;
   delete[] next_base;
   delete[] vel_base;
+  sycl::free(d_prev, q);
+  sycl::free(d_next, q);
+  sycl::free(d_vel, q);
 
   return error ? 1 : 0;
 }
