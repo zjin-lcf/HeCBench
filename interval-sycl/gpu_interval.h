@@ -300,7 +300,7 @@ void test_interval_newton(interval_gpu<T> *buffer,
                           int *nresults,
                           interval_gpu<T> i,
                           int implementation_choice,
-                          nd_item<1> &item)
+                          sycl::nd_item<1> &item)
 {
   int thread_id = item.get_global_id(0);
   typedef interval_gpu<T> I;
