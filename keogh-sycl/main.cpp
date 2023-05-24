@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 int main(int argc, char* argv[]) {
@@ -35,39 +35,42 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < M; ++i) upper[i] = (float)rand() / (float)RAND_MAX;
   for (int i = 0; i < M; ++i) lower[i] = (float)rand() / (float)RAND_MAX;
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<const float, 1> d_subject (subject, N);
-  buffer<const float, 1> d_avgs (avgs, N-M+1);
-  buffer<const float, 1> d_stds (stds, N-M+1);
-  buffer<      float, 1> d_lb (lb, N-M+1);
-  buffer<const float, 1> d_lower (lower, N);
-  buffer<const float, 1> d_upper (upper, N);
+  float *d_subject = sycl::malloc_device<float>(N, q);
+  q.memcpy(d_subject, subject, sizeof(float)*N);
+
+  float *d_avgs = sycl::malloc_device<float>(N-M+1, q);
+  q.memcpy(d_avgs, avgs, sizeof(float)*(N-M+1));
+
+  float *d_stds = sycl::malloc_device<float>(N-M+1, q);
+  q.memcpy(d_stds, stds, sizeof(float)*(N-M+1));
+
+  float *d_lb = sycl::malloc_device<float>(N-M+1, q);
+
+  float *d_lower = sycl::malloc_device<float>(N, q);
+  q.memcpy(d_lower, lower, sizeof(float)*M);
+
+  float *d_upper = sycl::malloc_device<float>(N, q);
+  q.memcpy(d_upper, upper, sizeof(float)*M);
 
   const int blocks = 256;
   const int grids = (N-M+1 + blocks - 1) / blocks;
-  range<1> gws (grids * blocks);
-  range<1> lws (blocks);
+  sycl::range<1> gws (grids * blocks);
+  sycl::range<1> lws (blocks);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto subject = d_subject.get_access<sycl_read>(cgh);
-      auto avgs = d_avgs.get_access<sycl_read>(cgh);
-      auto stds = d_stds.get_access<sycl_read>(cgh);
-      auto lb = d_lb.get_access<sycl_discard_write>(cgh);
-      auto lower_bound = d_lower.get_access<sycl_read>(cgh);
-      auto upper_bound = d_upper.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> cache(M+blocks, cgh);
-      cgh.parallel_for<class lp_koegh>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> cache (sycl::range<1>(M+blocks), cgh);
+      cgh.parallel_for<class lp_koegh>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int lid = item.get_local_id(0);
         int blockDim = item.get_local_range(0);
         int blockIdx = item.get_group(0);
@@ -76,29 +79,29 @@ int main(int argc, char* argv[]) {
 
         for (int k = lid; k < blockDim + M; k += blockDim)
           if (blockSize + k < N) {
-            cache[k] = subject[blockSize + k];
+            cache[k] = d_subject[blockSize + k];
           }
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         if (idx < N-M+1) {
 
           // obtain statistics
           float residues = 0;
-          float avg = avgs[idx];
-          float std = stds[idx];
+          float avg = d_avgs[idx];
+          float std = d_stds[idx];
 
           for (int i = 0; i < M; ++i) {
             // differences to envelopes
             float value = (cache[lid+i] - avg) / std;
-            float lower = value - lower_bound[i];
-            float upper = value - upper_bound[i];
+            float lower = value - d_lower[i];
+            float upper = value - d_upper[i];
 
             // Euclidean distance
             residues += upper*upper*(upper > 0) + lower*lower*(lower < 0);
           }
 
-          lb[idx] = residues;
+          d_lb[idx] = residues;
         }
       });
     });
@@ -109,7 +112,7 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(lb, d_lb, sizeof(float)*(N-M+1)).wait();
 
   // verify
   reference(subject, avgs, stds, lb_h, lower, upper, M, N);
@@ -123,6 +126,12 @@ int main(int argc, char* argv[]) {
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
+  sycl::free(d_lb, q);
+  sycl::free(d_avgs, q);
+  sycl::free(d_stds, q);
+  sycl::free(d_subject, q);
+  sycl::free(d_lower, q);
+  sycl::free(d_upper, q);
   free(lb);
   free(lb_h);
   free(avgs);
