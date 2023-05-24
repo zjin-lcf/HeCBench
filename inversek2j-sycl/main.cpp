@@ -9,7 +9,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define MAX_LOOP 25
 #define MAX_DIFF 0.15f
@@ -20,7 +20,7 @@
 
 void invkin_cpu(float *xTarget_in, float *yTarget_in, float *angles, int size)
 {
-  for (int idx = 0; idx < size; idx++) 
+  for (int idx = 0; idx < size; idx++)
   {
     float angle_out[NUM_JOINTS];
     float xData[NUM_JOINTS_P1];
@@ -163,113 +163,118 @@ int main(int argc, char* argv[])
 
   std::cout << "# Coordinates are read from file..." << std::endl;
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<float,1> xTarget_in_d(xTarget_in_h, data_size, props);
-    buffer<float,1> yTarget_in_d(yTarget_in_h, data_size, props);
-    buffer<float,1> angle_out_d(angle_out_h, data_size*NUM_JOINTS, props);
-    size_t global_work_size = (data_size +  BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+  float *xTarget_in_d = sycl::malloc_device<float>(data_size, q);
+  float *yTarget_in_d = sycl::malloc_device<float>(data_size, q);
+  float *angle_out_d = sycl::malloc_device<float>(data_size*NUM_JOINTS, q);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  std::cout << "# Memory allocation on GPU is done..." << std::endl;
 
-    for (int n = 0; n < iteration; n++) {
-      q.submit([&](handler& cgh) {
-        auto xTarget_in = xTarget_in_d.get_access<sycl_read>(cgh);
-        auto yTarget_in = yTarget_in_d.get_access<sycl_read>(cgh);
-        auto angles = angle_out_d.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class inversek>(
-          nd_range<1>(range<1>(global_work_size), range<1>(BLOCK_SIZE)), [=] (nd_item<1> item) {
+  q.memcpy(xTarget_in_d, xTarget_in_h, data_size * sizeof(float));
+  q.memcpy(yTarget_in_d, yTarget_in_h, data_size * sizeof(float));
 
-          int idx = item.get_global_id(0);
+  size_t global_work_size = (data_size +  BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
 
-          if(idx < data_size)
-          {  
-            float angle_out[NUM_JOINTS];
-            float curr_xTargetIn = xTarget_in[idx];
-            float curr_yTargetIn = yTarget_in[idx];
+  q.wait();
 
-            for(int i = 0; i < NUM_JOINTS; i++)
+  std::cout << "# Data are transfered to GPU..." << std::endl;
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < iteration; n++) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class inversek>(
+        sycl::nd_range<1>(sycl::range<1>(global_work_size), sycl::range<1>(BLOCK_SIZE)),
+        [=] (sycl::nd_item<1> item) {
+
+        int idx = item.get_global_id(0);
+
+        if(idx < data_size)
+        {  
+          float angle_out[NUM_JOINTS];
+          float curr_xTargetIn = xTarget_in_d[idx];
+          float curr_yTargetIn = yTarget_in_d[idx];
+
+          for(int i = 0; i < NUM_JOINTS; i++)
+          {
+            angle_out[i] = 0.0;
+          }
+
+          float angle;
+          // Initialize x and y data
+          float xData[NUM_JOINTS_P1];
+          float yData[NUM_JOINTS_P1];
+
+          for (int i = 0 ; i < NUM_JOINTS_P1; i++)
+          {
+            xData[i] = i;
+            yData[i] = 0.f;
+          }
+
+          for(int curr_loop = 0; curr_loop < MAX_LOOP; curr_loop++)
+          {
+            for (int iter = NUM_JOINTS; iter > 0; iter--)
             {
-              angle_out[i] = 0.0;
-            }
-
-            float angle;
-            // Initialize x and y data
-            float xData[NUM_JOINTS_P1];
-            float yData[NUM_JOINTS_P1];
-
-            for (int i = 0 ; i < NUM_JOINTS_P1; i++)
-            {
-              xData[i] = i;
-              yData[i] = 0.f;
-            }
-
-            for(int curr_loop = 0; curr_loop < MAX_LOOP; curr_loop++)
-            {
-              for (int iter = NUM_JOINTS; iter > 0; iter--) 
+              float pe_x = xData[NUM_JOINTS];
+              float pe_y = yData[NUM_JOINTS];
+              float pc_x = xData[iter-1];
+              float pc_y = yData[iter-1];
+              float diff_pe_pc_x = pe_x - pc_x;
+              float diff_pe_pc_y = pe_y - pc_y;
+              float diff_tgt_pc_x = curr_xTargetIn - pc_x;
+              float diff_tgt_pc_y = curr_yTargetIn - pc_y;
+              float len_diff_pe_pc = sycl::sqrt(diff_pe_pc_x * diff_pe_pc_x + diff_pe_pc_y * diff_pe_pc_y);
+              float len_diff_tgt_pc = sycl::sqrt(diff_tgt_pc_x * diff_tgt_pc_x + diff_tgt_pc_y * diff_tgt_pc_y);
+              float a_x = diff_pe_pc_x / len_diff_pe_pc;
+              float a_y = diff_pe_pc_y / len_diff_pe_pc;
+              float b_x = diff_tgt_pc_x / len_diff_tgt_pc;
+              float b_y = diff_tgt_pc_y / len_diff_tgt_pc;
+              float a_dot_b = a_x * b_x + a_y * b_y;
+              if (a_dot_b > 1.f)
+                a_dot_b = 1.f;
+              else if (a_dot_b < -1.f)
+                a_dot_b = -1.f;
+              angle = sycl::acos(a_dot_b) * (180.f / PI);
+              // Determine angle direction
+              float direction = a_x * b_y - a_y * b_x;
+              if (direction < 0.f)
+                angle = -angle;
+              // Make the result look more natural (these checks may be omitted)
+              if (angle > 30.f)
+                angle = 30.f;
+              else if (angle < -30.f)
+                angle = -30.f;
+              // Save angle
+              angle_out[iter - 1] = angle;
+              for (int i = 0; i < NUM_JOINTS; i++) 
               {
-                float pe_x = xData[NUM_JOINTS];
-                float pe_y = yData[NUM_JOINTS];
-                float pc_x = xData[iter-1];
-                float pc_y = yData[iter-1];
-                float diff_pe_pc_x = pe_x - pc_x;
-                float diff_pe_pc_y = pe_y - pc_y;
-                float diff_tgt_pc_x = curr_xTargetIn - pc_x;
-                float diff_tgt_pc_y = curr_yTargetIn - pc_y;
-                float len_diff_pe_pc = sycl::sqrt(diff_pe_pc_x * diff_pe_pc_x + diff_pe_pc_y * diff_pe_pc_y);
-                float len_diff_tgt_pc = sycl::sqrt(diff_tgt_pc_x * diff_tgt_pc_x + diff_tgt_pc_y * diff_tgt_pc_y);
-                float a_x = diff_pe_pc_x / len_diff_pe_pc;
-                float a_y = diff_pe_pc_y / len_diff_pe_pc;
-                float b_x = diff_tgt_pc_x / len_diff_tgt_pc;
-                float b_y = diff_tgt_pc_y / len_diff_tgt_pc;
-                float a_dot_b = a_x * b_x + a_y * b_y;
-                if (a_dot_b > 1.f)
-                  a_dot_b = 1.f;
-                else if (a_dot_b < -1.f)
-                  a_dot_b = -1.f;
-                angle = sycl::acos(a_dot_b) * (180.f / PI);
-                // Determine angle direction
-                float direction = a_x * b_y - a_y * b_x;
-                if (direction < 0.f)
-                  angle = -angle;
-                // Make the result look more natural (these checks may be omitted)
-                if (angle > 30.f)
-                  angle = 30.f;
-                else if (angle < -30.f)
-                  angle = -30.f;
-                // Save angle
-                angle_out[iter - 1] = angle;
-                for (int i = 0; i < NUM_JOINTS; i++) 
+                if(i < NUM_JOINTS - 1)
                 {
-                  if(i < NUM_JOINTS - 1)
-                  {
-                    angle_out[i+1] += angle_out[i];
-                  }
+                  angle_out[i+1] += angle_out[i];
                 }
               }
             }
-
-            angles[idx * NUM_JOINTS + 0] = angle_out[0];
-            angles[idx * NUM_JOINTS + 1] = angle_out[1];
-            angles[idx * NUM_JOINTS + 2] = angle_out[2];
           }
-        });
+
+          angle_out_d[idx * NUM_JOINTS + 0] = angle_out[0];
+          angle_out_d[idx * NUM_JOINTS + 1] = angle_out[1];
+          angle_out_d[idx * NUM_JOINTS + 2] = angle_out[2];
+        }
       });
-    }
-   
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Average kernel execution time " << (time * 1e-3f) / iteration << " (us)\n";
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average kernel execution time " << (time * 1e-3f) / iteration << " (us)\n";
+
+  q.memcpy(angle_out_h, angle_out_d, data_size * NUM_JOINTS * sizeof(float)).wait();
 
   // CPU
   invkin_cpu(xTarget_in_h, yTarget_in_h, angle_out_cpu, data_size);
@@ -297,6 +302,10 @@ int main(int argc, char* argv[])
   delete[] angle_out_h;
   delete[] angle_out_cpu;
 
+  sycl::free(xTarget_in_d, q);
+  sycl::free(yTarget_in_d, q);
+  sycl::free(angle_out_d, q);
+
   if (error) 
     std::cout << "FAIL\n";
   else 
@@ -304,4 +313,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
