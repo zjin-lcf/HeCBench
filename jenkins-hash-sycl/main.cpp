@@ -1,7 +1,7 @@
 #include <stdio.h>      /* defines printf for tests */
 #include <stdlib.h>     /* defines atol and posix_memalign */
 #include <string.h>     /* defines memcpy */
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define rot(x,k) (((x)<<(k)) | ((x)>>(32-(k))))
 
@@ -24,7 +24,7 @@ This was tested for:
   the output delta to a Gray code (a^(a>>1)) so a string of 1's (as
   is commonly produced by subtraction) look like a single 1-bit
   difference.
-* the base values were pseudorandom, all zero but one bit set, or 
+* the base values were pseudorandom, all zero but one bit set, or
   all zero plus a counter that starts at zero.
 
 Some k values for my "a-=c; a^=rot(c,k); c+=b;" arrangement that
@@ -34,7 +34,7 @@ satisfy this are
    14  9  3  7 17  3
 Well, "9 15 3 18 27 15" didn't quite get 32 bits diffing
 for "differ" defined as + with a one-bit base and a two-bit delta.  I
-used http://burtleburtle.net/bob/hash/avalanche.html to choose 
+used http://burtleburtle.net/bob/hash/avalanche.html to choose
 the operations, constants, and arrangements of the variables.
 
 This does not achieve avalanche.  There are input bits of (a,b,c)
@@ -73,7 +73,7 @@ produce values of c that look totally different.  This was tested for
   the output delta to a Gray code (a^(a>>1)) so a string of 1's (as
   is commonly produced by subtraction) look like a single 1-bit
   difference.
-* the base values were pseudorandom, all zero but one bit set, or 
+* the base values were pseudorandom, all zero but one bit set, or
   all zero plus a counter that starts at zero.
 
 These constants passed:
@@ -97,13 +97,13 @@ and these came close:
 }
 
 
-unsigned int mixRemainder(unsigned int a, 
-                  unsigned int b, 
-                  unsigned int c, 
+unsigned int mixRemainder(unsigned int a,
+                  unsigned int b,
+                  unsigned int c,
                   unsigned int k0,
                   unsigned int k1,
                   unsigned int k2,
-                  unsigned int length ) 
+                  unsigned int length )
 {
   switch(length)
   {
@@ -147,7 +147,7 @@ unsigned int hashlittle( const void *key, size_t length, unsigned int initval)
   }
 
   /*----------------------------- handle the last (probably partial) block */
-  /* 
+  /*
    * "k[2]&0xffffff" actually reads beyond the end of the string, but
    * then masks off the part it's not allowed to read.  Because the
    * string is aligned, the masked-off tail is in the same word as the
@@ -216,43 +216,42 @@ int main(int argc, char** argv) {
     initvals[i] = i%2;
   }
 
-  { // SYCL scope
-
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<unsigned int,1> d_keys(keys, N*16);
-  buffer<unsigned int,1> d_lens(lens, N);
-  buffer<unsigned int,1> d_initvals(initvals, N);
-  buffer<unsigned int,1> d_out(out, N);
+  unsigned int *d_keys = sycl::malloc_device<unsigned int>(N*16, q);
+  q.memcpy(d_keys, keys, sizeof(unsigned int)*N*16);
+
+  unsigned int *d_lens = sycl::malloc_device<unsigned int>(N, q);
+  q.memcpy(d_lens, lens, sizeof(unsigned int)*N);
+
+  unsigned int *d_initvals = sycl::malloc_device<unsigned int>(N, q);
+  q.memcpy(d_initvals, initvals, sizeof(unsigned int)*N);
+
+  unsigned int *d_out = sycl::malloc_device<unsigned int>(N, q);
 
   // Set NDRange dimensions
-  range<1> gws ((N+block_size-1)/block_size*block_size);
-  range<1> lws (block_size);
+  sycl::range<1> gws ((N+block_size-1)/block_size*block_size);
+  sycl::range<1> lws (block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&](handler &h) {
-      auto lengths = d_lens.get_access<sycl_read>(h);
-      auto initvals = d_initvals.get_access<sycl_read>(h);
-      auto keys = d_keys.get_access<sycl_read>(h);
-      auto out = d_out.get_access<sycl_write>(h);
-
-      h.parallel_for<class jk3_hash>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-        unsigned long id = item.get_global_id(0); 
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class jk3_hash>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        unsigned long id = item.get_global_id(0);
         if (id >= N) return;
-        unsigned int length = lengths[id];
-        const unsigned int initval = initvals[id];
-        const unsigned int *k = keys.get_pointer()+id*16;  // each key has at most 15 words (60 bytes)
+        unsigned int length = d_lens[id];
+        const unsigned int initval = d_initvals[id];
+        const unsigned int *k = d_keys+id*16;  // each key has at most 15 words (60 bytes)
 
         /* Set up the internal state */
-        unsigned int a,b,c; 
+        unsigned int a,b,c;
         unsigned int r0,r1,r2;
         a = b = c = 0xdeadbeef + length + initval;
 
@@ -270,7 +269,7 @@ int main(int argc, char** argv) {
         r2 = k[2];
 
         /*----------------------------- handle the last (probably partial) block */
-        /* 
+        /*
          * "k[2]&0xffffff" actually reads beyond the end of the string, but
          * then masks off the part it's not allowed to read.  Because the
          * string is aligned, the masked-off tail is in the same word as the
@@ -279,7 +278,7 @@ int main(int argc, char** argv) {
          * still catch it and complain.  The masking trick does make the hash
          * noticably faster for short strings (like English words).
          */
-        out[id] = mixRemainder(a, b, c, r0, r1, r2, length);
+        d_out[id] = mixRemainder(a, b, c, r0, r1, r2, length);
       });
     });
   }
@@ -289,7 +288,11 @@ int main(int argc, char** argv) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(out, d_out, sizeof(unsigned int)*N).wait();
+  sycl::free(d_keys, q);
+  sycl::free(d_lens, q);
+  sycl::free(d_initvals, q);
+  sycl::free(d_out, q);
 
   printf("Verify the results computed on the device..\n");
   bool error = false;
@@ -303,7 +306,7 @@ int main(int argc, char** argv) {
   }
 
   printf("%s\n", error ? "FAIL" : "PASS");
-   
+
   free(keys);
   free(lens);
   free(initvals);
