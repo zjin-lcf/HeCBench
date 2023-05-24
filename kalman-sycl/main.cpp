@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //! Thread-local Matrix-Vector multiplication.
 template <int n>
@@ -88,7 +88,7 @@ void MM_l(const double* A, const double* B, double* out)
  */
 template <int rd>
 void kalman(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const double*__restrict ys,
   int nobs,
   const double*__restrict T,
@@ -135,7 +135,7 @@ void kalman(
 
     double b_sum_logFs = 0.0;
     const double* b_ys = ys + bid * nobs;
-    double* b_vs       = vs + bid * nobs; 
+    double* b_vs       = vs + bid * nobs;
     double* b_Fs       = Fs + bid * nobs;
 
     double mu = intercept ? d_mu[bid] : 0.0;
@@ -270,8 +270,8 @@ int main(int argc, char* argv[]) {
     printf("Usage: %s <#series> <#observations> <forcast steps> <repeat>\n", argv[0]);
     return 1;
   }
-  
-  const int nseries = atoi(argv[1]); 
+
+  const int nseries = atoi(argv[1]);
   const int nobs = atoi(argv[2]);
   const int fc_steps = atoi(argv[3]);
   const int repeat = atoi(argv[4]);
@@ -293,11 +293,10 @@ int main(int argc, char* argv[]) {
   const int fc_size = fc_word * sizeof(double);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   int i;
   srand(123);
@@ -305,97 +304,93 @@ int main(int argc, char* argv[]) {
   for (i = 0; i < rd2 * nseries; i++)
     RQR[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double, 1> d_RQR (RQR, rd2_word);
+  double *d_RQR = sycl::malloc_device<double>(rd2_word, q);
+  q.memcpy(d_RQR, RQR, rd2_size);
 
   double *T = (double*) malloc (rd2_size);
   for (i = 0; i < rd2 * nseries; i++)
     T[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double, 1> d_T (T, rd2_word);
+  double *d_T = sycl::malloc_device<double>(rd2_word, q);
+  q.memcpy(d_T, T, rd2_size);
 
   double *P = (double*) malloc (rd2_size);
   for (i = 0; i < rd2 * nseries; i++)
     P[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double,  1> d_P (P, rd2_word);
+  double *d_P = sycl::malloc_device<double>(rd2_word, q);
+  q.memcpy(d_P, P, rd2_size);
 
   double *Z = (double*) malloc (rd_size);
   for (i = 0; i < rd * nseries; i++)
     Z[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double,  1> d_Z (Z, rd_word);
+  double *d_Z = sycl::malloc_device<double>(rd_word, q);
+  q.memcpy(d_Z, Z, rd_size);
 
   double *alpha = (double*) malloc (rd_size);
   for (i = 0; i < rd * nseries; i++)
     alpha[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double,  1> d_alpha (alpha, rd_word);
+  double *d_alpha = sycl::malloc_device<double>(rd_word, q);
+  q.memcpy(d_alpha, alpha, rd_size);
 
   double *ys = (double*) malloc (nobs_size);
   for (i = 0; i < nobs * nseries; i++)
     ys[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double,  1> d_ys (ys, nobs_word);
+  double *d_ys = sycl::malloc_device<double>(nobs_word, q);
+  q.memcpy(d_ys, ys, nobs_size);
 
   double *mu = (double*) malloc (ns_size);
   for (i = 0; i < nseries; i++)
     mu[i] = (double)rand() / (double)RAND_MAX;
 
-  buffer<double,  1> d_mu (mu, ns_word);
+  double *d_mu = sycl::malloc_device<double>(ns_word, q);
+  q.memcpy(d_mu, mu, ns_size);
 
-  buffer<double,  1> d_vs (nobs_word);
+  double *d_vs = sycl::malloc_device<double>(nobs_word, q);
 
-  buffer<double,  1> d_Fs (nobs_word);
+  double *d_Fs = sycl::malloc_device<double>(nobs_word, q);
 
-  buffer<double,  1> d_sum_logFs (ns_word);
+  double *d_sum_logFs = sycl::malloc_device<double>(ns_word, q);
 
-  buffer<double,  1> d_fc (fc_word);
+  double *d_fc = sycl::malloc_device<double>(fc_word, q);
 
   double *F_fc = (double*) malloc (fc_size);
-  buffer<double,  1> d_F_fc (fc_word);
+  double *d_F_fc = sycl::malloc_device<double>(fc_word, q);
 
-  range<1> gws ((nseries + 255)/256*256);
-  range<1> lws  (256);
-  
+  sycl::range<1> gws ((nseries + 255)/256*256);
+  sycl::range<1> lws  (256);
+
   for (int n_diff = 0; n_diff < rd; n_diff++) {
     q.wait();
     auto start = std::chrono::steady_clock::now();
-  
+
     for (i = 0; i < repeat; i++)
-      q.submit([&] (handler &cgh) {
-        auto ys = d_ys.get_access<sycl_read>(cgh);
-        auto t = d_T.get_access<sycl_read>(cgh);
-        auto z = d_Z.get_access<sycl_read>(cgh);
-        auto rqr = d_RQR.get_access<sycl_read>(cgh);
-        auto p = d_P.get_access<sycl_read>(cgh);
-        auto a = d_alpha.get_access<sycl_read>(cgh);
-        auto mu = d_mu.get_access<sycl_read>(cgh);
-        auto vs = d_vs.get_access<sycl_discard_write>(cgh);
-        auto fs = d_Fs.get_access<sycl_discard_write>(cgh);
-        auto s = d_sum_logFs.get_access<sycl_discard_write>(cgh);
-        auto fc = d_fc.get_access<sycl_discard_write>(cgh);
-        auto ffc = d_F_fc.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class filter>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class filter>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           kalman<rd> (
             item,
-            ys.get_pointer(),
+            d_ys,
             nobs,
-            t.get_pointer(),
-            z.get_pointer(),
-            rqr.get_pointer(),
-            p.get_pointer(),
-            a.get_pointer(),
+            d_T,
+            d_Z,
+            d_RQR,
+            d_P,
+            d_alpha,
             true, // intercept,
-            mu.get_pointer(),
+            d_mu,
             batch_size,
-            vs.get_pointer(),
-            fs.get_pointer(),
-            s.get_pointer(),
+            d_vs,
+            d_Fs,
+            d_sum_logFs,
             n_diff,
             fc_steps,
-            fc.get_pointer(),
+            d_fc,
             true, // forcast
-            ffc.get_pointer() );
+            d_F_fc );
         });
      });
 
@@ -405,10 +400,7 @@ int main(int argc, char* argv[]) {
     printf("Average kernel execution time (n_diff = %d): %f (s)\n", n_diff, (time * 1e-9f) / repeat);
   }
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_F_fc.get_access<sycl_read>(cgh);
-    cgh.copy(acc, F_fc);
-  }).wait();
+  q.memcpy(F_fc, d_F_fc, fc_size).wait();
 
   double sum = 0.0;
   for (i = 0; i < fc_steps * nseries - 1; i++)
@@ -423,5 +415,17 @@ int main(int argc, char* argv[]) {
   free(P);
   free(T);
   free(RQR);
+  sycl::free(d_RQR, q);
+  sycl::free(d_T, q);
+  sycl::free(d_P, q);
+  sycl::free(d_Z, q);
+  sycl::free(d_alpha, q);
+  sycl::free(d_ys, q);
+  sycl::free(d_vs, q);
+  sycl::free(d_Fs, q);
+  sycl::free(d_mu, q);
+  sycl::free(d_sum_logFs, q);
+  sycl::free(d_F_fc, q);
+  sycl::free(d_fc, q);
   return 0;
 }
