@@ -17,7 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <ctime>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // A multiple of thread block size
 #define N 2048
@@ -56,25 +56,18 @@ int main () {
   initialize_data(f_old);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_f (N * N);
-  q.submit([&] (handler &cgh) {
-    auto acc = d_f.get_access<sycl_discard_write>(cgh);
-    cgh.copy(f, acc);
-  });
+  float *d_f = sycl::malloc_device<float>(N * N, q);
+  q.memcpy(d_f, f, N * N * sizeof(float));
 
-  buffer<float, 1> d_f_old (N * N);
-  q.submit([&] (handler &cgh) {
-    auto acc = d_f_old.get_access<sycl_discard_write>(cgh);
-    cgh.copy(f_old, acc);
-  });
+  float *d_f_old = sycl::malloc_device<float>(N * N, q);
+  q.memcpy(d_f_old, f_old, N * N * sizeof(float));
 
-  buffer<float, 1> d_error (1);
+  float *d_error = sycl::malloc_device<float>(1, q);
 
   // Initialize error to a large number
   float error = std::numeric_limits<float>::max();
@@ -85,27 +78,21 @@ int main () {
   const int max_iters = 10000;
   int num_iters = 0;
 
-  range<2> gws (N, N);
-  range<2> lws (16, 16);
+  sycl::range<2> gws (N, N);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
-    q.submit([&] (handler &cgh) {
-      auto err = d_error.get_access<sycl_discard_write>(cgh);
-      cgh.fill(err, 0.f);
-    });
+    q.memset(d_error, 0, sizeof(float));
 
     // Perform a Jacobi relaxation step
-    q.submit([&] (handler &cgh) {
-      auto f = d_f.get_access<sycl_read_write>(cgh);
-      auto f_old = d_f.get_access<sycl_read>(cgh);
-      auto error = d_error.get_access<sycl_read_write>(cgh);
-      accessor<float, 2, sycl_read_write, access::target::local> f_old_tile({18,18}, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> reduction_array(16, cgh);
-      cgh.parallel_for<class step>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 2> f_old_tile(sycl::range<2>{18,18}, cgh);
+      sycl::local_accessor<float, 1> reduction_array(sycl::range<1>(16), cgh);
+      cgh.parallel_for<class step>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int i = item.get_global_id(1);
         int j = item.get_global_id(0);
 
@@ -115,7 +102,7 @@ int main () {
         // First read in the "interior" data, one value per thread
         // Note the offset by 1, to reserve space for the "left"/"bottom" halo
 
-        f_old_tile[ty+1][tx+1] = f_old[IDX(i,j)];
+        f_old_tile[ty+1][tx+1] = d_f[IDX(i,j)];
 
         // Now read in the halo data; we'll pick the "closest" thread
         // to each element. When we do this, make sure we don't fall
@@ -124,31 +111,31 @@ int main () {
         // this stencil.
 
         if (tx == 0 && i >= 1) {
-          f_old_tile[ty+1][tx+0] = f_old[IDX(i-1,j)];
+          f_old_tile[ty+1][tx+0] = d_f[IDX(i-1,j)];
         }
         if (tx == 15 && i <= N-2) {
-          f_old_tile[ty+1][tx+2] = f_old[IDX(i+1,j)];
+          f_old_tile[ty+1][tx+2] = d_f[IDX(i+1,j)];
         }
         if (ty == 0 && j >= 1) {
-          f_old_tile[ty+0][tx+1] = f_old[IDX(i,j-1)];
+          f_old_tile[ty+0][tx+1] = d_f[IDX(i,j-1)];
         }
         if (ty == 15 && j <= N-2) {
-          f_old_tile[ty+2][tx+1] = f_old[IDX(i,j+1)];
+          f_old_tile[ty+2][tx+1] = d_f[IDX(i,j+1)];
         }
 
         // Synchronize all threads
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         float err = 0.0f;
 
         if (j >= 1 && j <= N-2) {
           if (i >= 1 && i <= N-2) {
             // Perform the read from shared memory
-            f[IDX(i,j)] = 0.25f * (f_old_tile[ty+1][tx+2] + 
-                                   f_old_tile[ty+1][tx+0] + 
-                                   f_old_tile[ty+2][tx+1] + 
-                                   f_old_tile[ty+0][tx+1]);
-            float df = f[IDX(i,j)] - f_old_tile[ty+1][tx+1];
+            d_f[IDX(i,j)] = 0.25f * (f_old_tile[ty+1][tx+2] +
+                                     f_old_tile[ty+1][tx+0] +
+                                     f_old_tile[ty+2][tx+1] +
+                                     f_old_tile[ty+0][tx+1]);
+            float df = d_f[IDX(i,j)] - f_old_tile[ty+1][tx+1];
             err = df * df;
           }
         }
@@ -170,7 +157,7 @@ int main () {
         }
 
         // Synchronize the block before reading any values from smem
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         // Using the first warp in the block, reduce over the partial sums
         // in the shared memory array.
@@ -180,38 +167,34 @@ int main () {
             err += sg.shuffle_down(err, offset);
           }
           if (tx == 0) {
-            auto atomic_obj_ref = ext::oneapi::atomic_ref<float, 
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (error[0]);
-            atomic_obj_ref.fetch_add(err);
+            auto ao = sycl::atomic_ref<float,
+                     sycl::memory_order::relaxed,
+                     sycl::memory_scope::device,
+                     sycl::access::address_space::global_space> (d_error[0]);
+            ao.fetch_add(err);
           }
         }
       });
     });
-      
+
     // Swap the old data and the new data
     // We're doing this explicitly for pedagogical purposes, even though
     // in this specific application a std::swap would have been OK
-    q.submit([&] (handler &cgh) {
-      auto f = d_f.get_access<sycl_read>(cgh);
-      auto f_old = d_f.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class swap_data>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swap_data>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         int i = item.get_global_id(1);
         int j = item.get_global_id(0);
 
         if (j >= 1 && j <= N-2) {
           if (i >= 1 && i <= N-2) {
-            f_old[IDX(i,j)] = f[IDX(i,j)];
+            d_f[IDX(i,j)] = d_f[IDX(i,j)];
           }
         }
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_error.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &error);
-    }).wait();
+    q.memcpy(&error, d_error, sizeof(float)).wait();
 
     // Normalize the L2-norm of the error by the number of data points
     // and then take the square root
@@ -243,6 +226,9 @@ int main () {
   }
 
   // CLean up memory allocations
+  sycl::free(d_f, q);
+  sycl::free(d_f_old, q);
+  sycl::free(d_error, q);
   free(f);
   free(f_old);
 
