@@ -23,8 +23,8 @@ void cal_km(struct svm_problem *pecm)
   double g_val = (double)gamma;
 
   for ( i_r = 0; i_r < ntv ; i_r++ )
-  {         
-    for ( i_c = 0; i_c < len_tv; i_c++ ) 
+  {
+    for ( i_c = 0; i_c < len_tv; i_c++ )
       tva[i_r * len_tv + i_c] = (float)prob.x[i_r].values[i_c];
   }
 
@@ -68,7 +68,7 @@ void cal_km(struct svm_problem *pecm)
 
     auto gemv_e = oneapi::mkl::blas::column_major::gemv(
       q, oneapi::mkl::transpose::nontrans, ntv, len_tv, alpha, g_tva,
-      ntv, g_vtm, 1, beta, g_dp, 1, {copy_e});  
+      ntv, g_vtm, 1, beta, g_dp, 1, {copy_e});
 
     q.memcpy(dp, g_dp, ntv * sizeof(float), gemv_e).wait();
 
@@ -82,7 +82,7 @@ void cal_km(struct svm_problem *pecm)
     pecm-> x[trvei].values[0] = trvei + 1;
 
     for ( i_c = 0; i_c < ntv; i_c++ )
-      pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];        
+      pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];
     break;
   }
 
