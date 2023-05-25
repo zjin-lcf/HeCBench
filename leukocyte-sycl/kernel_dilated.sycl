@@ -26,10 +26,10 @@ for (el_i = 0; el_i < strel_m; el_i++) {
       //  and that the current structuring element value is not zero
       if ( (x >= 0) &&
           (x < max_gicov_n) &&
-          (c_strel_acc[(el_i * strel_n) + el_j] != 0) ) {
+          (d_strel[(el_i * strel_n) + el_j] != 0) ) {
         // Determine if this is the maximal value seen so far
         int addr = (x * max_gicov_m) + y;
-        float temp = img_acc[addr];
+        float temp = d_gicov[addr];
         if (temp > max) max = temp;
       }
     }
@@ -37,5 +37,5 @@ for (el_i = 0; el_i < strel_m; el_i++) {
 }
 
 // Store the maximum value found
-dilated_acc[(i * max_gicov_n) + j] = max;
+d_img_dilated[(i * max_gicov_n) + j] = max;
 

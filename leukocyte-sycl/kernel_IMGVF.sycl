@@ -3,13 +3,13 @@
 	int cell_num = item.get_group_linear_id();
 	
 	// Get pointers to current cell's input image and inital matrix
-	int I_offset = I_offsets_acc[cell_num];
-	auto IMGVF_global = &(IMGVF_array_acc[I_offset]);
-	//auto I = &(I_array_acc[I_offset]);
+	int I_offset = d_I_offsets[cell_num];
+	auto IMGVF_global = &(d_IMGVF_all[I_offset]);
+	//auto I = &(d_I_all[I_offset]);
 	
 	// Get current cell's matrix dimensions
-	int m = m_array_acc[cell_num];
-	int n = n_array_acc[cell_num];
+	int m = d_m_array[cell_num];
+	int n = d_n_array[cell_num];
 	
 	// Compute the number of virtual thread blocks
 	int IMGVF_Size = m * n;
@@ -24,11 +24,11 @@
 		j = (thread_id + offset) % n;
 		if (i < m) IMGVF_acc[(i * n) + j] = IMGVF_global[(i * n) + j];
 	}
-	item.barrier(access::fence_space::local_space);
+	item.barrier(sycl::access::fence_space::local_space);
 	
 	// Set the converged flag to false
 	if (thread_id == 0) cell_converged_acc[0] = 0;
-	item.barrier(access::fence_space::local_space);
+	item.barrier(sycl::access::fence_space::local_space);
 	
 	// Constants used to iterate through virtual thread blocks
 	const float one_nth = 1.0f / (float) n;
@@ -101,7 +101,7 @@
 													 URHe * UR + DRHe * DR + ULHe * UL + DLHe * DL);
 				// 2) Compute IMGVF -= (1 / lambda)(I .* (IMGVF - I))
 				//FP_TYPE vI = I[(i * n) + j];
-				FP_TYPE vI = I_array_acc[I_offset+ (i * n) + j];
+				FP_TYPE vI = d_I_all[I_offset+ (i * n) + j];
 				new_val -= ((1.0 / LAMBDA) * vI * (new_val - vI));
 
 			}
@@ -125,19 +125,19 @@
 			// We need to synchronize between virtual thread blocks to prevent
 			//  threads from writing the values from the buffer to the actual
 			//  IMGVF matrix too early
-			item.barrier(access::fence_space::local_space);
+			item.barrier(sycl::access::fence_space::local_space);
 		}
 		
 		// We need to compute the overall sum of the change at each matrix element
 		//  by performing a tree reduction across the whole threadblock
 		IMGVF_buffer_acc[thread_id] = total_diff;
-		item.barrier(access::fence_space::local_space);
+		item.barrier(sycl::access::fence_space::local_space);
 		
 		// Account for thread block sizes that are not a power of 2
 		if (thread_id >= NEXT_LOWEST_POWER_OF_TWO) {
                   IMGVF_buffer_acc[thread_id - NEXT_LOWEST_POWER_OF_TWO] += IMGVF_buffer_acc[thread_id];
 		}
-		item.barrier(access::fence_space::local_space);
+		item.barrier(sycl::access::fence_space::local_space);
 		
 		// Perform the tree reduction
 		int th;
@@ -145,7 +145,7 @@
 			if (thread_id < th) {
 				IMGVF_buffer_acc[thread_id] += IMGVF_buffer_acc[thread_id + th];
 			}
-			item.barrier(access::fence_space::local_space);
+			item.barrier(sycl::access::fence_space::local_space);
 		}
 		
 		// Figure out if we have converged
@@ -159,7 +159,7 @@
 		
 		// We need to synchronize to ensure that all threads
 		//  read the correct value of the convergence flag
-		item.barrier(access::fence_space::local_space);
+		item.barrier(sycl::access::fence_space::local_space);
 		
 		// Keep track of the number of iterations we have performed
 		iterations++;

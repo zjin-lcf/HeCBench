@@ -1,5 +1,5 @@
 #include "track_ellipse.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Host and device arrays to hold matrices for all cells
 // (so we can copy to and from the device in a single transfer)
@@ -20,7 +20,7 @@ FP_TYPE heaviside(FP_TYPE x) {
 }
 
 // Host function that launches an OpenCL kernel to compute the MGVF matrices for the specified cells
-void IMGVF_SYCL(sycl::queue &q, MAT **IE, MAT **IMGVF, 
+void IMGVF_SYCL(sycl::queue &q, MAT **IE, MAT **IMGVF,
 		double vx, double vy, double e, int max_iterations, double cutoff, int num_cells) {
 
   // Initialize the data on the GPU
@@ -69,54 +69,61 @@ void IMGVF_SYCL(sycl::queue &q, MAT **IE, MAT **IMGVF,
     offset += size;
   }
 
-  {  // SYCL scope 
+  // Setup execution parameters
+  size_t num_work_groups = num_cells;
+  size_t gws = num_work_groups * LOCAL_WORK_SIZE;
 
-    // Setup execution parameters
-    size_t num_work_groups = num_cells;
-    size_t global_work_size = num_work_groups * LOCAL_WORK_SIZE;
+  // Convert double-precision parameters to single-precision
+  float vx_float = (float) vx;
+  float vy_float = (float) vy;
+  //float e_float = (float) e;
+  float cutoff_float = (float) cutoff;
 
-    // Convert double-precision parameters to single-precision
-    float vx_float = (float) vx;
-    float vy_float = (float) vy;
-    //float e_float = (float) e;
-    float cutoff_float = (float) cutoff;
+  int *d_I_offsets = sycl::malloc_device<int>(num_cells, q);
+  q.memcpy(d_I_offsets, host_I_offsets, sizeof(int)*num_cells);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<int,1> d_I_offsets (host_I_offsets, num_cells, props);
-    buffer<int,1> d_m_array (host_m_array, num_cells, props);
-    buffer<int,1> d_n_array (host_n_array, num_cells, props);
-    buffer<float,1> d_I_all (host_I_all, total_size, props);
-    buffer<float,1> d_IMGVF_all (host_I_all, total_size, props);
+  int *d_m_array = sycl::malloc_device<int>(num_cells, q);
+  q.memcpy(d_m_array, host_m_array, sizeof(int)*num_cells);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  int *d_n_array = sycl::malloc_device<int>(num_cells, q);
+  q.memcpy(d_n_array, host_n_array, sizeof(int)*num_cells);
 
-    q.submit([&](handler& cgh) {
-      auto IMGVF_array_acc = d_IMGVF_all.get_access<sycl_read_write>(cgh);
-      auto I_array_acc = d_I_all.get_access<sycl_read>(cgh);
-      auto I_offsets_acc = d_I_offsets.get_access<sycl_read>(cgh);
-      auto m_array_acc = d_m_array.get_access<sycl_read>(cgh);
-      auto n_array_acc = d_n_array.get_access<sycl_read>(cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> IMGVF_acc(41 * 81, cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> IMGVF_buffer_acc(LOCAL_WORK_SIZE, cgh);
-      accessor <int, 1, sycl_read_write, access::target::local> cell_converged_acc(1, cgh);
+  float *d_I_all = sycl::malloc_device<float>(total_size, q);
+  q.memcpy(d_I_all, host_I_all, sizeof(float)*total_size);
 
-      // Compute the MGVF on the GPU
-      cgh.parallel_for<class IMGVF>(
-          nd_range<1>(range<1>(global_work_size), range<1>(LOCAL_WORK_SIZE)), [=] (nd_item<1> item) {
-          #include "kernel_IMGVF.sycl"
-      });
+  float *d_IMGVF_all = sycl::malloc_device<float>(total_size, q);
+  q.memcpy(d_IMGVF_all, host_I_all, sizeof(float)*total_size);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  q.submit([&](sycl::handler& cgh) {
+    sycl::local_accessor <float, 1> IMGVF_acc(sycl::range<1>(41 * 81), cgh);
+    sycl::local_accessor <float, 1> IMGVF_buffer_acc(sycl::range<1>(LOCAL_WORK_SIZE), cgh);
+    sycl::local_accessor <int, 1> cell_converged_acc(1, cgh);
+    // Compute the MGVF on the GPU
+    cgh.parallel_for<class IMGVF>(
+        sycl::nd_range<1>(sycl::range<1>(gws), sycl::range<1>(LOCAL_WORK_SIZE)),
+        [=] (sycl::nd_item<1> item) {
+        #include "kernel_IMGVF.sycl"
     });
+  });
 
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Kernel execution time (IMGVF): %f (s)\n", time * 1e-9f);
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Kernel execution time (IMGVF): %f (s)\n", time * 1e-9f);
 
-  } // SYCL scope end
+  q.memcpy(host_I_all, d_IMGVF_all, sizeof(float)*total_size).wait();
+
+  sycl::free(d_I_offsets, q);
+  sycl::free(d_m_array, q);
+  sycl::free(d_n_array, q);
+  sycl::free(d_I_all, q);
+  sycl::free(d_IMGVF_all, q);
 
   // Copy each result matrix into its appropriate host matrix
-  offset = 0;  
+  offset = 0;
   for (int cell_num = 0; cell_num < num_cells; cell_num++) {
     MAT *IMGVF_out = IMGVF[cell_num];
 
