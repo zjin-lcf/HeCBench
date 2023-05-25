@@ -26,7 +26,7 @@ void ldpc_cnp_kernel_1st_iter(
     float * dev_R,
     const char * dev_h_element_count1,
     const h_element * dev_h_compact1,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
 #if MODE == WIFI
   if(item.get_local_id(1) >= Z)
@@ -81,7 +81,7 @@ void ldpc_cnp_kernel_1st_iter(
     iCol = iBlkCol * Z + shift_t;
 
     Q = dev_llr[size_llr_CW * iCurrentCW + iCol];// - R_temp;
-    Q_abs = cl::sycl::fabs(Q);
+    Q_abs = sycl::fabs(Q);
     sq = Q < 0;
 
     // quick version
@@ -122,7 +122,7 @@ void ldpc_cnp_kernel(
     const char * dev_h_element_count1,
     const h_element * dev_h_compact1,
     float * RCache,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
 #if MODE == WIFI
   if(item.get_local_id(1) >= Z)
@@ -188,7 +188,7 @@ void ldpc_cnp_kernel(
     RCache[i * THREADS_PER_BLOCK + iRCacheLine] =  R_temp;
 
     Q = dev_llr[size_llr_CW * iCurrentCW + iCol] - R_temp;
-    Q_abs = cl::sycl::fabs(Q);
+    Q_abs = sycl::fabs(Q);
 
     sq = Q < 0;
     sign = sign * (1 - sq * 2);
@@ -205,7 +205,7 @@ void ldpc_cnp_kernel(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // The 2nd recursion
   //#pragma unroll
@@ -224,11 +224,11 @@ void ldpc_cnp_kernel(
 
 // Kernel 2: VNP processing
 void ldpc_vnp_kernel_normal(
-    float * dev_llr, 
-    const float * dev_dt, 
+    float * dev_llr,
+    const float * dev_dt,
     const char *dev_h_element_count2,
     const h_element *dev_h_compact2,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
 
 #if MODE == WIFI
@@ -292,7 +292,7 @@ void ldpc_vnp_kernel_last_iter(
     int * dev_hd,
     const char *dev_h_element_count2,
     const h_element *dev_h_compact2,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
 #if MODE == WIFI
   if(item.get_local_id(1) >= Z)
@@ -351,4 +351,3 @@ void ldpc_vnp_kernel_last_iter(
   else
     dev_hd[llr_index] = 1;
 }
-
