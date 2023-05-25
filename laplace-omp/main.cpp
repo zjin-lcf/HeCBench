@@ -172,83 +172,83 @@ int main (void) {
   printf("Problem size: %d x %d \n", NUM, NUM);
 
   // iteration loop
-#pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], \
-                                b[0:size], bl_norm_L2[0:size_norm]) \
-                        map(tofrom: temp_red[0:size_temp], temp_black[0:size_temp])
-{
-  StartTimer();
-
-  for (iter = 1; iter <= it_max; ++iter) {
-
-    Real norm_L2 = ZERO;
-
-    #pragma omp target teams distribute parallel for collapse(2)
-    for (int row = 1; row <= NUM/2; row++) {
-      for (int col = 1; col <= NUM; col++) {
-        int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-        int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
-
-        Real temp_old = temp_red[ind_red];
-
-        Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
-
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-
-        temp_red[ind_red] = temp_new;
-        res = temp_new - temp_old;
-
-        bl_norm_L2[ind_red] = res * res;
+  #pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], \
+                                  b[0:size], bl_norm_L2[0:size_norm]) \
+                          map(tofrom: temp_red[0:size_temp], temp_black[0:size_temp])
+  {
+    StartTimer();
+  
+    for (iter = 1; iter <= it_max; ++iter) {
+  
+      Real norm_L2 = ZERO;
+  
+      #pragma omp target teams distribute parallel for collapse(2)
+      for (int row = 1; row <= NUM/2; row++) {
+        for (int col = 1; col <= NUM; col++) {
+          int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
+          int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
+  
+          Real temp_old = temp_red[ind_red];
+  
+          Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
+                + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
+                + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
+                + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
+  
+          Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+  
+          temp_red[ind_red] = temp_new;
+          res = temp_new - temp_old;
+  
+          bl_norm_L2[ind_red] = res * res;
+        }
       }
-    }
-    #pragma omp target update from (bl_norm_L2[0:size_norm])
-
-    // add red cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) {
-      norm_L2 += bl_norm_L2[i];
-    }
-
-    #pragma omp target teams distribute parallel for collapse(2)
-    for (int row = 1; row <= NUM/2; row++) {
-      for (int col = 1; col <= NUM; col++) {
-        int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
-        int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
-
-        Real temp_old = temp_black[ind_black];
-
-        Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
-
-        Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-
-        temp_black[ind_black] = temp_new;
-        res = temp_new - temp_old;
-
-        bl_norm_L2[ind_black] = res * res;
+      #pragma omp target update from (bl_norm_L2[0:size_norm])
+  
+      // add red cell contributions to residual
+      for (int i = 0; i < size_norm; ++i) {
+        norm_L2 += bl_norm_L2[i];
       }
+  
+      #pragma omp target teams distribute parallel for collapse(2)
+      for (int row = 1; row <= NUM/2; row++) {
+        for (int col = 1; col <= NUM; col++) {
+          int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
+          int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
+  
+          Real temp_old = temp_black[ind_black];
+  
+          Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
+                + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
+                + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
+                + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
+  
+          Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+  
+          temp_black[ind_black] = temp_new;
+          res = temp_new - temp_old;
+  
+          bl_norm_L2[ind_black] = res * res;
+        }
+      }
+      #pragma omp target update from (bl_norm_L2[0:size_norm])
+  
+      // transfer residual value(s) back to CPU and 
+      // add black cell contributions to residual
+      for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
+  
+      // calculate residual
+      norm_L2 = sqrt(norm_L2 / ((Real)size));
+  
+      if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
+  
+      // if tolerance has been reached, end SOR iterations
+      if (norm_L2 < tol) break;
     }
-    #pragma omp target update from (bl_norm_L2[0:size_norm])
-
-    // transfer residual value(s) back to CPU and 
-    // add black cell contributions to residual
-    for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
-
-    // calculate residual
-    norm_L2 = sqrt(norm_L2 / ((Real)size));
-
-    if (iter % 1000 == 0) printf("%5d, %0.6f\n", iter, norm_L2);
-
-    // if tolerance has been reached, end SOR iterations
-    if (norm_L2 < tol) break;
+  
+    double runtime = GetTimer();
+    printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
   }
-
-  double runtime = GetTimer();
-  printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
-}
 
   // print temperature data to file
   FILE * pfile;
