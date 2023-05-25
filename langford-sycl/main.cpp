@@ -116,7 +116,7 @@
 #include <vector>
 #include <algorithm>
 #include <stdlib.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 using namespace std;
 
 // to avoid integer overflow, n should not exceed this constant
@@ -188,8 +188,7 @@ constexpr int kNumLogicalThreads = 16383;
 
 // To do:  Run on CPU (right now only runs on GPU).
 template <int n>
-void dfs(const accessor<int64_t, 1, sycl_atomic, access::target::global_buffer> &p_count,
-         int64_t* p_result,
+void dfs(int64_t *p_result,
          Availability<n> &availability,
          Open<n> &open,
          Stack<n> &stack,
@@ -254,10 +253,13 @@ if (k == two_n) {
   // this is equivalent to results.push_back(pos);
   // p_results[0] is a counter;  after it follow the data
   // atomic increment of counter in device memory (i.e., RAM DIMMs on the GPU board)
-  int64_t cnt = atomic_fetch_add(p_count[0], (int64_t)1);
+  sycl::atomic_ref<int64_t, sycl::memory_order::relaxed, \
+                   sycl::memory_scope::device,\
+                   sycl::access::address_space::global_space> ao (p_result[0]);
+  int64_t cnt = ao.fetch_add((int64_t)1);
   if (cnt < kLimit) {
     constexpr int kAlignedCnt = (n + 7) / 8;
-    int64_t* dst = p_result + kAlignedCnt * cnt;
+    int64_t* dst = p_result + 1 + kAlignedCnt * cnt;
 #pragma unroll
     for (int i=0; i<kAlignedCnt; ++i) {
       dst[i] = pgpualigned[i];
@@ -333,42 +335,37 @@ class langford;
 
 // Start and manage the computation on GPU device "device"
 template <int n>
-void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
+void run_gpu_d(sycl::queue &q, int64_t* count, Results<n>& final_results) {
   assert(sizeof(int64_t) == 8);
 
   constexpr int64_t kAlignedCnt = (n + 7) / 8;
 
-  // split the CUDA buffer so that only count performs atomic add 
-  buffer<int64_t, 1> count_device (count, 1);
-  buffer<int64_t, 1> results_device (kLimit * kAlignedCnt); 
-  count_device.set_final_data(nullptr);
+  int64_t *result_device = sycl::malloc_device<int64_t>(1 + kLimit * kAlignedCnt, q);
+  q.memcpy(result_device, count, sizeof(int64_t));
 
   int blocks_x = div_up(kNumLogicalThreads, kThreadsPerBlock);
-  range<1> gws (blocks_x*kThreadsPerBlock);
-  range<1> lws (kThreadsPerBlock);
+  sycl::range<1> gws (blocks_x*kThreadsPerBlock);
+  sycl::range<1> lws (kThreadsPerBlock);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto p_result = results_device.template get_access<sycl_discard_write>(cgh);
-    auto p_count = count_device.template get_access<sycl_atomic>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<Availability<n>, 1>
+      availability(sycl::range<1>(kThreadsPerBlock), cgh);
+    sycl::local_accessor<Open<n>, 1>
+      open(sycl::range<1>(kThreadsPerBlock), cgh);
+    sycl::local_accessor<Stack<n>, 1>
+      stack(sycl::range<1>(kThreadsPerBlock), cgh);
+    sycl::local_accessor<PositionsGPUAligned<n>, 1>
+      pgpualigned(sycl::range<1>(kThreadsPerBlock), cgh);
 
-    accessor<Availability<n>, 1, sycl_read_write, access::target::local> 
-      availability(kThreadsPerBlock, cgh);
-    accessor<Open<n>, 1, sycl_read_write, access::target::local> 
-      open(kThreadsPerBlock, cgh);
-    accessor<Stack<n>, 1, sycl_read_write, access::target::local> 
-      stack(kThreadsPerBlock, cgh);
-    accessor<PositionsGPUAligned<n>, 1, sycl_read_write, access::target::local>
-      pgpualigned(kThreadsPerBlock, cgh);
-
-    cgh.parallel_for<class langford<n>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class langford<n>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       int lid = item.get_local_id(0);
       const int32_t result_index = item.get_global_id(0);
       dfs<n>(
-      p_count,
-      p_result.get_pointer(),
+      result_device,
       availability[lid],
       open[lid],
       stack[lid],
@@ -382,11 +379,7 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto acc = count_device.template get_access<sycl_read>(cgh, range<1>(1));
-    cgh.copy(acc, count);
-  });
-  q.wait();
+  q.memcpy(count, result_device, sizeof(int64_t)).wait();
 
   if (*count >= kLimit) {
     cout << "Result for n = " << n << " will be bogus because GPU "
@@ -394,18 +387,15 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
   }
   int64_t r_count = *count;
 
-  int64_t data_size = r_count * kAlignedCnt;
-  int64_t* results_host = (int64_t*) malloc (sizeof(int64_t) * data_size);
-  q.submit([&] (handler &cgh) {
-    auto acc = results_device.template get_access<sycl_read>(cgh, range<1>(data_size));
-    cgh.copy(acc, results_host);
-  });
-  q.wait();
+  int64_t data_size = (1 + r_count * kAlignedCnt) * sizeof(int64_t);
+  int64_t* results_host = (int64_t*) malloc (data_size);
+  q.memcpy(results_host, result_device, data_size).wait();
+  sycl::free(result_device, q);
 
   // Compact results into a vector
   for (int i=0; i<r_count; ++i) {
     Positions<n> pos;
-    PositionsGPU<n>& gpos = *((PositionsGPU<n>*)(results_host + (kAlignedCnt * i)));
+    PositionsGPU<n>& gpos = *((PositionsGPU<n>*)(results_host + 1 + (kAlignedCnt * i)));
     for (int j=0; j<n; ++j) {
       pos[j] = gpos[j];
     }
@@ -416,7 +406,7 @@ void run_gpu_d(queue &q, int64_t* count, Results<n>& final_results) {
 
 // Start a CPU thread to manage each GPU device and wait for the computation to end.
 template <int n>
-void run_gpu(queue &q, const int64_t* known_results) {
+void run_gpu(sycl::queue &q, const int64_t* known_results) {
   cout << "\n";
   cout << "------\n";
   cout << unixtime() << " Computing PL(2, " << n << ")\n";
@@ -499,11 +489,10 @@ int main(int argc, char **argv) {
   int64_t known_results[64];
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   init_known_results(known_results);
   /* we cannot do 3 and 4 anymore due to unrolling */
