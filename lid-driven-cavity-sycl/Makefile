@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp
+source = main.cpp set.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -29,13 +29,13 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
@@ -66,9 +66,12 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp black_kernel.sycl calculate_F.sycl calculate_u.sycl set_BCs.sycl \
+main.o: main.cpp black_kernel.sycl calculate_F.sycl calculate_u.sycl set_BCs.sycl \
  	set_vert_pres_BCs.sycl calc_residual.sycl calculate_G.sycl calculate_v.sycl  \
-	red_kernel.sycl set_horz_pres_BCs.sycl sum_pressure.sycl
+	red_kernel.sycl set_horz_pres_BCs.sycl sum_pressure.sycl constants.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+set.o: set.cpp constants.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -76,4 +79,3 @@ clean:
 
 run: $(program)
 	./$(program)
-

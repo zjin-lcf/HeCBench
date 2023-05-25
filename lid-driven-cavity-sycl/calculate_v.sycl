@@ -29,11 +29,11 @@ if (row != NUM_2) {
 
 
   // check for max of these two
-  new_v = cl::sycl::fmax(cl::sycl::fabs(new_v), cl::sycl::fabs(new_v2));
+  new_v = sycl::fmax(sycl::fabs(new_v), sycl::fabs(new_v2));
 
   if (col == NUM) {
     // also test for max velocity at vertical boundary
-    new_v = cl::sycl::fmax(new_v, cl::sycl::fabs( v(NUM + 1, (2 * row)) ));
+    new_v = sycl::fmax(new_v, sycl::fabs( v(NUM + 1, (2 * row)) ));
   }
 
 } else {
@@ -56,13 +56,13 @@ if (row != NUM_2) {
   }
 
   // get maximum v velocity
-  new_v = cl::sycl::fabs(new_v);
+  new_v = sycl::fabs(new_v);
 
   // check for maximum velocity in boundary cells also
-  new_v = cl::sycl::fmax(cl::sycl::fabs( v(col, NUM) ), new_v);
-  new_v = cl::sycl::fmax(cl::sycl::fabs( v(col, 0) ), new_v);
+  new_v = sycl::fmax(sycl::fabs( v(col, NUM) ), new_v);
+  new_v = sycl::fmax(sycl::fabs( v(col, 0) ), new_v);
 
-  new_v = cl::sycl::fmax(cl::sycl::fabs( v(col, NUM + 1) ), new_v);
+  new_v = sycl::fmax(sycl::fabs( v(col, NUM + 1) ), new_v);
 
 } // end if
 
@@ -70,21 +70,19 @@ if (row != NUM_2) {
 max_cache[lid] = new_v;
 
 // synchronize threads in block to ensure all velocities stored
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 // calculate maximum for block
 int i = BLOCK_SIZE >> 1;
 while (i != 0) {
   if (lid < i) {
-    max_cache[lid] = cl::sycl::fmax(max_cache[lid], max_cache[lid + i]);
+    max_cache[lid] = sycl::fmax(max_cache[lid], max_cache[lid + i]);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   i >>= 1;
 }
 
 // store block's summed residuals
 if (lid == 0) {
-  max_v[item.get_group_linear_id()] = max_cache[0];
+  max_v_d[item.get_group_linear_id()] = max_cache[0];
 }
-
-
