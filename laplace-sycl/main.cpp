@@ -2,10 +2,10 @@
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
  * on GPU using SYCL with the red-black Gauss–Seidel with sucessive overrelaxation
- * (SOR) that has been "optimized". This means that the red and black kernels 
+ * (SOR) that has been "optimized". This means that the red and black kernels
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
- * 
+ *
  * Boundary conditions:
  * T = 0 at x = 0, x = L, y = 0
  * T = TN at y = H
@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <sycl/sycl.hpp>
 #include "timer.h"
-#include "common.h"
 
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 512
@@ -32,7 +32,7 @@
 const Real omega = 1.85;
 
 /** Function to evaluate coefficient matrix and right-hand side vector.
- * 
+ *
  * \param[in]   rowmax   number of rows
  * \param[in]   colmax   number of columns
  * \param[in]   th_cond  thermal conductivity
@@ -48,7 +48,7 @@ const Real omega = 1.85;
  * \param[out]  b        right-hand side array
  */
 void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
-    Real width, Real TN, Real * aP, Real * aW, Real * aE, 
+    Real width, Real TN, Real * aP, Real * aW, Real * aE,
     Real * aS, Real * aN, Real * b)
 {
   int col, row;
@@ -98,7 +98,7 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
 } // end fill_coeffs
 
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
- * 
+ *
  * Contains iteration loop for red-black Gauss-Seidel with SOR GPU kernels
  */
 int main (void) {
@@ -170,118 +170,101 @@ int main (void) {
   printf("Problem size: %d x %d \n", NUM, NUM);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<Real, 1> aP_d (aP, size);
-  buffer<Real, 1> aW_d (aW, size);
-  buffer<Real, 1> aE_d (aE, size);
-  buffer<Real, 1> aS_d (aS, size);
-  buffer<Real, 1> aN_d (aN, size);
-  buffer<Real, 1> b_d (b, size);
-  buffer<Real, 1> temp_red_d (temp_red, size_temp);
-  buffer<Real, 1> temp_black_d (temp_black, size_temp);
-  buffer<Real, 1> bl_norm_L2_d (bl_norm_L2, size_norm);
+  // allocate device memory
+  Real *aP_d = sycl::malloc_device<Real>(size, q);
+  Real *aW_d = sycl::malloc_device<Real>(size, q);
+  Real *aE_d = sycl::malloc_device<Real>(size, q);
+  Real *aS_d = sycl::malloc_device<Real>(size, q);
+  Real *aN_d = sycl::malloc_device<Real>(size, q);
+  Real *b_d = sycl::malloc_device<Real>(size, q);
+  Real *temp_red_d = sycl::malloc_device<Real>(size_temp, q);
+  Real *temp_black_d = sycl::malloc_device<Real>(size_temp, q);
+  Real *bl_norm_L2_d = sycl::malloc_device<Real>(size_norm, q);
 
-  bl_norm_L2_d.set_final_data(nullptr);
-  temp_red_d.set_final_data(nullptr);
-  temp_black_d.set_final_data(nullptr);
+  // copy to device memory
+  q.memcpy (aP_d, aP, size * sizeof(Real));
+  q.memcpy (aW_d, aW, size * sizeof(Real));
+  q.memcpy (aE_d, aE, size * sizeof(Real));
+  q.memcpy (aS_d, aS, size * sizeof(Real));
+  q.memcpy (aN_d, aN, size * sizeof(Real));
+  q.memcpy (b_d, b, size * sizeof(Real));
+  q.memcpy (temp_red_d, temp_red, size_temp * sizeof(Real));
+  q.memcpy (temp_black_d, temp_black, size_temp * sizeof(Real));
+  q.memcpy (bl_norm_L2_d, bl_norm_L2, size_norm * sizeof(Real));
 
-  auto global_range = range<2>(NUM, NUM/2); 
-  auto local_range = range<2>(1, BLOCK_SIZE);
+  sycl::range<2> gws (NUM, NUM/2);
+  sycl::range<2> lws (1, BLOCK_SIZE);
 
   q.wait();
   StartTimer();
-  
+
   for (iter = 1; iter <= it_max; ++iter) {
 
     Real norm_L2 = ZERO;
 
     q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read_write>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
-
-      h.template parallel_for<class stencil_black>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+      h.template parallel_for<class stencil_black>(
+        sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
         int ind_red = col * ((NUM >> 1) + 2) + row;
         int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);
 
-        Real temp_old = temp_red[ind_red];
-        Real res = b[ind]
-              + aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
+        Real temp_old = temp_red_d[ind_red];
+        Real res = b_d[ind]
+              + aW_d[ind] * temp_black_d[row + (col - 1) * ((NUM >> 1) + 2)]
+              + aE_d[ind] * temp_black_d[row + (col + 1) * ((NUM >> 1) + 2)]
+              + aS_d[ind] * temp_black_d[row - (col & 1) + col * ((NUM >> 1) + 2)]
+              + aN_d[ind] * temp_black_d[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
 
-        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
+        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP_d[ind]);
 
-        temp_red[ind_red] = temp_new;
+        temp_red_d[ind_red] = temp_new;
         res = temp_new - temp_old;
 
-        bl_norm_L2[ind_red] = res * res;
+        bl_norm_L2_d[ind_red] = res * res;
       });
     });
 
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    }).wait();
+    // transfer residual value(s) back to CPU
+    q.memcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real)).wait();
 
     // add red cell contributions to residual
     for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
     q.submit([&](auto &h) {
-      // Create accessors
-      auto temp_red = temp_red_d.get_access<sycl_read>(h);
-      auto temp_black = temp_black_d.get_access<sycl_read_write>(h);
-      auto b = b_d.get_access<sycl_read>(h);
-      auto aW = aW_d.get_access<sycl_read>(h);
-      auto aE = aE_d.get_access<sycl_read>(h);
-      auto aS = aS_d.get_access<sycl_read>(h);
-      auto aN = aN_d.get_access<sycl_read>(h);
-      auto aP = aP_d.get_access<sycl_read>(h);
-      auto bl_norm_L2 = bl_norm_L2_d.get_access<sycl_write>(h);
-
-      h.template parallel_for<class stencil_red>(nd_range<2>(global_range, local_range), [=](nd_item<2> item) {
+      h.template parallel_for<class stencil_red>(
+        sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
         int row = 1 + item.get_global_id(1);
         int col = 1 + item.get_global_id(0);
         int ind_black = col * ((NUM >> 1) + 2) + row;
         int ind = 2 * row - ((col+1) & 1) - 1 + NUM * (col - 1);
 
-        Real temp_old = temp_black[ind_black];
-        Real res = b[ind]
-              + aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
-              + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
-              + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-              + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)];
+        Real temp_old = temp_black_d[ind_black];
+        Real res = b_d[ind]
+              + aW_d[ind] * temp_red_d[row + (col - 1) * ((NUM >> 1) + 2)]
+              + aE_d[ind] * temp_red_d[row + (col + 1) * ((NUM >> 1) + 2)]
+              + aS_d[ind] * temp_red_d[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
+              + aN_d[ind] * temp_red_d[row + (col & 1) + col * ((NUM >> 1) + 2)];
 
-        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP[ind]);
+        Real temp_new = temp_old * ((Real)ONE - omega) + omega * (res / aP_d[ind]);
 
-        temp_black[ind_black] = temp_new;
+        temp_black_d[ind_black] = temp_new;
         res = temp_new - temp_old;
 
-        bl_norm_L2[ind_black] = res * res;
+        bl_norm_L2_d[ind_black] = res * res;
       });
     });
 
-    q.submit([&](auto &h) {
-      auto bl_norm_L2_d_acc = bl_norm_L2_d.get_access<sycl_read>(h);
-      h.copy(bl_norm_L2_d_acc, bl_norm_L2); 
-    }).wait();
+    // transfer residual value(s) back to CPU and
+    q.memcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real)).wait();
 
-    // transfer residual value(s) back to CPU and 
+    // transfer residual value(s) back to CPU and
     // add black cell contributions to residual
     for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
 
@@ -298,15 +281,8 @@ int main (void) {
   printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
 
   // transfer final temperature values back
-  q.submit([&](auto &h) {
-    auto acc = temp_red_d.get_access<sycl_read>(h);
-    h.copy(acc, temp_red); 
-  });
-
-  q.submit([&](auto &h) {
-    auto acc = temp_black_d.get_access<sycl_read>(h);
-    h.copy(acc, temp_black); 
-  });
+  q.memcpy (temp_red, temp_red_d, size_temp * sizeof(Real));
+  q.memcpy (temp_black, temp_black_d, size_temp * sizeof(Real));
 
   q.wait();
 
@@ -331,13 +307,23 @@ int main (void) {
           // odd, so black cell
           int ind = col * num_rows + (row + ((col + 1) % 2)) / 2;
           fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
-        }	
+        }
       }
       fprintf(pfile, "\n");
     }
   }
 
   fclose(pfile);
+
+  sycl::free(aP_d, q);
+  sycl::free(aW_d, q);
+  sycl::free(aE_d, q);
+  sycl::free(aS_d, q);
+  sycl::free(aN_d, q);
+  sycl::free(b_d, q);
+  sycl::free(temp_red_d, q);
+  sycl::free(temp_black_d, q);
+  sycl::free(bl_norm_L2_d, q);
 
   free(aP);
   free(aW);
