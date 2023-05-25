@@ -8,7 +8,7 @@
 #include <math.h>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernel.h"
 #include "reference.h"
 
@@ -67,35 +67,33 @@ int main(int argc, char **argv){
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_u1 (h_u1, grid3D_size);
-  d_u1.set_final_data(nullptr);
+  float *d_u1 = sycl::malloc_device<float>(grid3D_size, q);
+  q.memcpy(d_u1, h_u1, grid3D_bytes);
 
-  buffer<float, 1> d_u2 (grid3D_size);
+  float *d_u2 = sycl::malloc_device<float>(grid3D_size, q);
 
   // Set up the execution configuration
   const int bx = 1 + (NX-1)/BLOCK_X;
   const int by = 1 + (NY-1)/BLOCK_Y;
 
-  range<2> lws (BLOCK_Y, BLOCK_X);
-  range<2> gws (by * BLOCK_Y, bx * BLOCK_X);
+  sycl::range<2> lws (BLOCK_Y, BLOCK_X);
+  sycl::range<2> gws (by * BLOCK_Y, bx * BLOCK_X);
 
   printf("\nglobal work size  = %d %d %d \n", bx * BLOCK_X, by * BLOCK_Y, 1);
   printf("local work size = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
 
   // Warmup
-  q.submit([&] (handler &cgh) {
-    auto u1 = d_u1.get_access<sycl_read>(cgh);
-    auto u2 = d_u2.get_access<sycl_discard_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sm (3*KOFF, cgh);
-    cgh.parallel_for<class warmup>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm (3*KOFF, cgh);
+    cgh.parallel_for<class warmup>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       laplace3d(item, NX, NY, NZ, pitch,
-                u1.get_pointer(), u2.get_pointer(), sm.get_pointer());
+                d_u1, d_u2, sm.get_pointer());
     });
   }).wait();
 
@@ -103,13 +101,12 @@ int main(int argc, char **argv){
   auto start = std::chrono::steady_clock::now();
 
   for (i = 1; i <= REPEAT; ++i) {
-    q.submit([&] (handler &cgh) {
-      auto u1 = d_u1.get_access<sycl_read>(cgh);
-      auto u2 = d_u2.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sm (3*KOFF, cgh);
-      cgh.parallel_for<class stencil>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> sm (3*KOFF, cgh);
+      cgh.parallel_for<class eval>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         laplace3d(item, NX, NY, NZ, pitch,
-                  u1.get_pointer(), u2.get_pointer(), sm.get_pointer());
+                  d_u1, d_u2, sm.get_pointer());
       });
     });
     std::swap(d_u1, d_u2);
@@ -120,10 +117,7 @@ int main(int argc, char **argv){
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / REPEAT);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_u1.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_u2);
-  }).wait();
+  q.memcpy(h_u2, d_u1, grid3D_bytes).wait();
 
   if (verify) {
     // Reference
@@ -145,7 +139,9 @@ int main(int argc, char **argv){
     printf("\n rms error = %f \n",sqrtf(err/ NX*NY*NZ));
   }
 
- // Release CPU memory
+ // Release GPU and CPU memory
+  sycl::free(d_u1, q);
+  sycl::free(d_u2, q);
   free(h_u1);
   free(h_u2);
   free(h_u3);
