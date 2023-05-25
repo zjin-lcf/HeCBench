@@ -1,13 +1,13 @@
 #include <math.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 void lebesgue_kernel (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   double *__restrict__ lmax,
   double *__restrict__ linterp,
-  const double *__restrict__ xfun, 
+  const double *__restrict__ xfun,
   const double *__restrict__ x,
-  const int n, const int nfun) 
+  const int n, const int nfun)
 {
   int j = item.get_global_id(0);
   if (j >= nfun) return;
@@ -21,50 +21,48 @@ void lebesgue_kernel (
 
   double t = 0.0;
   for (int i = 0; i < n; i++ )
-    t += fabs ( linterp[i*nfun+j] );
+    t += sycl::fabs ( linterp[i*nfun+j] );
 
   // atomicMax(lmax, t);
-  auto lmax_ref = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (lmax[0]);
+  auto lmax_ref = sycl::atomic_ref<double,
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space>(lmax[0]);
   lmax_ref.fetch_max(t);
 }
 
-double lebesgue_function ( queue &q, int n, double x[], int nfun, double xfun[] )
+double lebesgue_function ( sycl::queue &q, int n, double x[], int nfun, double xfun[] )
 {
   double lmax = 0.0;
 
-  buffer<double, 1> d_max ( &lmax, 1 );
+  double *d_max = sycl::malloc_device<double>( 1, q );
+  q.memcpy(d_max, &lmax, sizeof ( double ));
 
-  buffer<double, 1> d_interp ( n * nfun );
+  double *d_interp = sycl::malloc_device<double>( n * nfun, q );
 
-  buffer<double, 1> d_x ( x, n );
+  double *d_x = sycl::malloc_device<double>( n, q );
+  q.memcpy(d_x, x, n * sizeof ( double ));
 
-  buffer<double, 1> d_xfun ( xfun, nfun );
+  double *d_xfun = sycl::malloc_device<double>( nfun, q );
+  q.memcpy(d_xfun, xfun, nfun * sizeof ( double ));
 
-  range<1> gws ((nfun + 255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((nfun + 255)/256*256);
+  sycl::range<1> lws (256);
 
-  q.submit([&] (handler &cgh) {
-    auto lmax = d_max.get_access<sycl_read_write>(cgh);
-    auto interp = d_interp.get_access<sycl_read_write>(cgh);
-    auto xfun = d_xfun.get_access<sycl_read>(cgh);
-    auto x = d_x.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class k>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      lebesgue_kernel (item,
-              lmax.get_pointer(), 
-              interp.get_pointer(),
-              xfun.get_pointer(),
-              x.get_pointer(),
-              n, nfun);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class k>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      lebesgue_kernel (
+        item, d_max, d_interp, d_xfun, d_x, n, nfun);
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_max.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &lmax);
-  }).wait();
+  q.memcpy(&lmax, d_max, sizeof ( double )).wait();
+
+  sycl::free(d_max, q);
+  sycl::free(d_interp, q);
+  sycl::free(d_xfun, q);
+  sycl::free(d_x, q);
 
   return lmax;
 }
