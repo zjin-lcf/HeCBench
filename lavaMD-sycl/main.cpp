@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sycl/sycl.hpp>
 #include "./util/timer/timer.h"
 #include "./util/num/num.h"
-#include "common.h"
 #include "./main.h"
 
 int main(  int argc, char *argv [])
@@ -73,7 +73,7 @@ int main(  int argc, char *argv [])
   par_cpu.alpha = 0.5;
 
   // total number of boxes
-  dim_cpu.number_boxes = dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg; 
+  dim_cpu.number_boxes = dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg;
 
   // how many particles space has in each direction
   dim_cpu.space_elem = dim_cpu.number_boxes * NUMBER_PAR_PER_BOX;
@@ -121,8 +121,8 @@ int main(  int argc, char *argv [])
                 box_cpu[nh].nei[box_cpu[nh].nn].x = (k+n);
                 box_cpu[nh].nei[box_cpu[nh].nn].y = (j+m);
                 box_cpu[nh].nei[box_cpu[nh].nn].z = (i+l);
-                box_cpu[nh].nei[box_cpu[nh].nn].number =  (box_cpu[nh].nei[box_cpu[nh].nn].z * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg) + 
-                  (box_cpu[nh].nei[box_cpu[nh].nn].y * dim_cpu.boxes1d_arg) + 
+                box_cpu[nh].nei[box_cpu[nh].nn].number =  (box_cpu[nh].nei[box_cpu[nh].nn].z * dim_cpu.boxes1d_arg * dim_cpu.boxes1d_arg) +
+                  (box_cpu[nh].nei[box_cpu[nh].nn].y * dim_cpu.boxes1d_arg) +
                   box_cpu[nh].nei[box_cpu[nh].nn].x;
                 box_cpu[nh].nei[box_cpu[nh].nn].offset = box_cpu[nh].nei[box_cpu[nh].nn].number * NUMBER_PAR_PER_BOX;
 
@@ -174,90 +174,82 @@ int main(  int argc, char *argv [])
   long long kstart, kend;
   long long start = get_time();
 
-  { // SYCL scope
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    //  EXECUTION PARAMETERS
-    size_t local_work_size = NUMBER_THREADS;
-    size_t global_work_size = dim_cpu.number_boxes * local_work_size;
+  //  EXECUTION PARAMETERS
+  size_t local_work_size = NUMBER_THREADS;
+  size_t global_work_size = dim_cpu.number_boxes * local_work_size;
 
 #ifdef DEBUG
-    printf("# of blocks = %lu, # of threads/block = %lu (ensure that device can handle)\n", 
-        global_work_size/local_work_size, local_work_size);
+  printf("# of blocks = %lu, # of threads/block = %lu (ensure that device can handle)\n",
+         global_work_size/local_work_size, local_work_size);
 #endif
 
-    const property_list props = property::buffer::use_host_ptr();
+  int dim_cpu_number_boxes = dim_cpu.number_boxes;
 
-    int dim_cpu_number_boxes = dim_cpu.number_boxes;
+  box_str* d_box_gpu = sycl::malloc_device<box_str>(dim_cpu.number_boxes, q);
 
-    //  boxes
-    buffer<box_str, 1> d_box_gpu(box_cpu, dim_cpu.number_boxes, props);
+  FOUR_VECTOR* d_rv_gpu = sycl::malloc_device<FOUR_VECTOR>(dim_cpu.space_elem, q);
 
-    //  rv
-    buffer<FOUR_VECTOR, 1> d_rv_gpu(rv_cpu, dim_cpu.space_elem, props);
+  fp* d_qv_gpu = sycl::malloc_device<fp>(dim_cpu.space_elem, q);
 
-    //  qv
-    buffer<fp, 1> d_qv_gpu(qv_cpu, dim_cpu.space_elem, props);
+  FOUR_VECTOR* d_fv_gpu = sycl::malloc_device<FOUR_VECTOR>(dim_cpu.space_elem, q);
 
-    //  fv
-    buffer<FOUR_VECTOR, 1> d_fv_gpu(fv_cpu, dim_cpu.space_elem, props);
+  q.memcpy(d_box_gpu, box_cpu, dim_cpu.box_mem);
+  q.memcpy(d_rv_gpu, rv_cpu, dim_cpu.space_mem);
+  q.memcpy(d_qv_gpu, qv_cpu, dim_cpu.space_mem2);
+  q.memcpy(d_fv_gpu, fv_cpu, dim_cpu.space_mem);
 
-    range<1> gws (global_work_size);
-    range<1> lws (local_work_size);
+  sycl::range<1> gws (global_work_size);
+  sycl::range<1> lws (local_work_size);
 
-    q.wait();
-    kstart = get_time();
+  q.wait();
+  kstart = get_time();
 
-    q.submit([&](handler& cgh) {
-      auto d_box_gpu_acc = d_box_gpu.get_access<sycl_read>(cgh);
-      auto d_rv_gpu_acc = d_rv_gpu.get_access<sycl_read>(cgh);
-      auto d_qv_gpu_acc = d_qv_gpu.get_access<sycl_read>(cgh);
-      auto d_fv_gpu_acc = d_fv_gpu.get_access<sycl_read_write>(cgh);
-
-      accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rA_shared (100, cgh);
-      accessor <FOUR_VECTOR, 1, sycl_read_write, access::target::local> rB_shared (100, cgh);
-      accessor <fp, 1, sycl_read_write, access::target::local> qB_shared (100, cgh);
-
-      cgh.parallel_for<class lavamd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        #include "kernel.sycl"
-      });
+  q.submit([&](sycl::handler& cgh) {
+    sycl::local_accessor <FOUR_VECTOR> rA_shared (100, cgh);
+    sycl::local_accessor <FOUR_VECTOR> rB_shared (100, cgh);
+    sycl::local_accessor <fp, 1> qB_shared (100, cgh);
+    cgh.parallel_for<class lavamd>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      #include "kernel.sycl"
     });
+  }).wait();
 
-    q.wait();
-    kend = get_time();
-    
-  } // SYCL scope
+  kend = get_time();
+
+  q.memcpy(fv_cpu, d_fv_gpu, dim_cpu.space_mem).wait();
+
+  sycl::free(d_box_gpu, q);
+  sycl::free(d_rv_gpu, q);
+  sycl::free(d_qv_gpu, q);
+  sycl::free(d_fv_gpu, q);
 
   long long end = get_time();
-  printf("Device offloading time:\n"); 
-  printf("%.12f s\n", (float) (end-start) / 1000000); 
+  printf("Device offloading time:\n");
+  printf("%.12f s\n", (float) (end-start) / 1000000);
 
-  printf("Kernel execution time:\n"); 
-  printf("%.12f s\n", (float) (kend-kstart) / 1000000); 
+  printf("Kernel execution time:\n");
+  printf("%.12f s\n", (float) (kend-kstart) / 1000000);
 
   // dump results
 #ifdef OUTPUT
   FILE *fptr;
-  fptr = fopen("result.txt", "w");  
+  fptr = fopen("result.txt", "w");
   for(i=0; i<dim_cpu.space_elem; i=i+1){
     fprintf(fptr, "%f, %f, %f, %f\n", fv_cpu[i].v, fv_cpu[i].x, fv_cpu[i].y, fv_cpu[i].z);
   }
   fclose(fptr);
-#endif         
-
+#endif
 
   free(rv_cpu);
   free(qv_cpu);
   free(fv_cpu);
   free(box_cpu);
 
-  return 0; 
+  return 0;
 }
-
-
