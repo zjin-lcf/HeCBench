@@ -33,11 +33,10 @@ static void print_finish(std::string, real);
 // Use a global queue for minimal code changes
 #ifndef CPU_ONLY
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 #endif
 
 int main(int argc, char* argv[])

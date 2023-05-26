@@ -41,21 +41,12 @@ private:
   void initialize_gpu(Model&);
   void initialize_cpu(Model&);
 
-#ifndef CPU_ONLY
-  buffer< int, 1> neighbor_number;
-  buffer< int, 1> neighbor_list;
-  buffer<real, 1> potential;
-  buffer<real, 1> hopping_real;
-  buffer<real, 1> hopping_imag;
-  buffer<real, 1> xx;
-#else
   int* neighbor_number;
   int* neighbor_list;
   real* potential;
   real* hopping_real;
   real* hopping_imag;
   real* xx;
-#endif
 
   int grid_size;
   int n;
