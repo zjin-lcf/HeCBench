@@ -42,12 +42,12 @@ std::vector<KeyValue> shuffle_keyvalues(std::mt19937& rnd, std::vector<KeyValue>
 
 using Time = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-Time start_timer() 
+Time start_timer()
 {
   return std::chrono::high_resolution_clock::now();
 }
 
-double get_elapsed_time(Time start) 
+double get_elapsed_time(Time start)
 {
   Time end = std::chrono::high_resolution_clock::now();
 
@@ -56,7 +56,7 @@ double get_elapsed_time(Time start)
   return us.count() / 1000.0f;
 }
 
-void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs) 
+void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs)
 {
   Time timer = start_timer();
 
@@ -64,7 +64,7 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   {
     std::unordered_map<uint32_t, uint32_t> kvs_map;
-    for (auto& kv : insert_kvs) 
+    for (auto& kv : insert_kvs)
     {
       kvs_map[kv.key] = kv.value;
     }
@@ -78,13 +78,13 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   double milliseconds = get_elapsed_time(timer);
   double seconds = milliseconds / 1000.0f;
-  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n", 
+  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n",
       milliseconds, kNumKeyValues / seconds / 1000000.0f);
 }
 
 void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
   if (argc != 3) {
     printf("Usage: %s <number of insert batches> <number of delete batches>\n", argv[0]);
@@ -118,14 +118,14 @@ int main(int argc, char* argv[])
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
-  hipMemset(pHashTable, 0xff, sizeof(KeyValue) * kHashTableCapacity);
+  hipMemset(pHashTable, kEmpty, sizeof(KeyValue) * kHashTableCapacity);
 
   double total_ktime = 0.0;
 
   // Insert items into the hash table
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
 
-  // Create insert key values 
+  // Create insert key values
   KeyValue* pInsertKvs;
   hipMalloc ((void**) &pInsertKvs, sizeof(KeyValue) * num_inserts_per_batch);
 
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
   total_ktime = 0.0;
   uint32_t num_deletes_per_batch = (uint32_t)delete_kvs.size() / num_delete_batches;
 
-  // Create delete key values 
+  // Create delete key values
   KeyValue* pDeleteKvs;
   hipMalloc ((void**) &pDeleteKvs, sizeof(KeyValue) * num_deletes_per_batch);
 
