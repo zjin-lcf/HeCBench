@@ -38,7 +38,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 void lombscargle_cpu( const int x_shape,
     const int freqs_shape,
@@ -57,7 +57,7 @@ void lombscargle_cpu( const int x_shape,
     float ss = 0;
     float cs = 0;
     float c;
-    float s; 
+    float s;
 
     for ( int j = 0; j < x_shape; j++ ) {
       sincosf( freq * x[j], &s, &c );
@@ -94,13 +94,13 @@ int main(int argc, char* argv[]) {
   const int freqs_shape = 100000;
   const float A = 2.f;
   const float w = 1.0f;
-  const float phi = 1.57f; 
+  const float phi = 1.57f;
 
-  float* x = (float*) malloc (sizeof(float)*x_shape); 
-  float* y = (float*) malloc (sizeof(float)*x_shape); 
-  float* f = (float*) malloc (sizeof(float)*freqs_shape); 
-  float* p  = (float*) malloc (sizeof(float)*freqs_shape); 
-  float* p2 = (float*) malloc (sizeof(float)*freqs_shape); 
+  float* x = (float*) malloc (sizeof(float)*x_shape);
+  float* y = (float*) malloc (sizeof(float)*x_shape);
+  float* f = (float*) malloc (sizeof(float)*freqs_shape);
+  float* p  = (float*) malloc (sizeof(float)*freqs_shape);
+  float* p2 = (float*) malloc (sizeof(float)*freqs_shape);
 
   for (int i = 0; i < x_shape; i++)
     x[i] = 0.01f + i*(31.4f - 0.01f)/x_shape;
@@ -113,77 +113,75 @@ int main(int argc, char* argv[]) {
 
   const float y_dot = 2.0f/1.5f;
 
-  {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    buffer<float,1> d_x (x, x_shape);
-    buffer<float,1> d_y (y, x_shape);
-    buffer<float,1> d_f (f, freqs_shape);
-    buffer<float,1> d_p (p, freqs_shape);
+  float *d_x = sycl::malloc_device<float>(x_shape, q);
+  float *d_y = sycl::malloc_device<float>(x_shape, q);
+  float *d_f = sycl::malloc_device<float>(freqs_shape, q);
+  float *d_p = sycl::malloc_device<float>(freqs_shape, q);
 
-    const float y_dot = 2.0f/1.5f;
+  q.memcpy(d_x, x, sizeof(float)*x_shape);
+  q.memcpy(d_y, y, sizeof(float)*x_shape);
+  q.memcpy(d_f, f, sizeof(float)*freqs_shape);
 
-    range<1> gws ((freqs_shape+255)/256*256);
-    range<1> lws (256);
+  sycl::range<1> gws ((freqs_shape+255)/256*256);
+  sycl::range<1> lws (256);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-    for (int n = 0; n < repeat; n++) {
-      q.submit([&] (handler &cgh) {
-        auto p = d_p.template get_access<sycl_discard_write>(cgh);
-        auto x = d_x.template get_access<sycl_read>(cgh);
-        auto y = d_y.template get_access<sycl_read>(cgh);
-        auto f = d_f.template get_access<sycl_read>(cgh);
-        cgh.parallel_for<class lombscargle>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          const int tx = item.get_global_id(0);
-	  const int stride = item.get_local_range(0) * item.get_group_range(0);
-          for ( int tid = tx; tid < freqs_shape; tid += stride ) {
-            float freq = f[tid] ;
-            float xc = 0;
-            float xs = 0;
-            float cc = 0;
-            float ss = 0;
-            float cs = 0;
-            float c;
-            float s; 
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class lombscargle>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        const int tx = item.get_global_id(0);
+        const int stride = item.get_local_range(0) * item.get_group_range(0);
+        for ( int tid = tx; tid < freqs_shape; tid += stride ) {
+          float freq = d_f[tid] ;
+          float xc = 0;
+          float xs = 0;
+          float cc = 0;
+          float ss = 0;
+          float cs = 0;
+          float c;
+          float s;
 
-            for ( int j = 0; j < x_shape; j++ ) {
-              s = cl::sycl::sincos( freq * x[j],  &c );
-              xc += y[j] * c;
-              xs += y[j] * s;
-              cc += c * c;
-              ss += s * s;
-              cs += c * s;
-            }
-
-            float c_tau;
-            float s_tau;
-            float tau = cl::sycl::atan2( 2.0f * cs, cc - ss ) / ( 2.0f * freq ) ;
-            s_tau = cl::sycl::sincos( freq * tau, &c_tau );
-            float c_tau2 = c_tau * c_tau ;
-            float s_tau2 = s_tau * s_tau ;
-            float cs_tau = 2.0f * c_tau * s_tau ;
-
-            p[tid] = ( 0.5f * ( ( ( c_tau * xc + s_tau * xs ) * ( c_tau * xc + s_tau * xs ) /
-                    ( c_tau2 * cc + cs_tau * cs + s_tau2 * ss ) ) +
-                  ( ( c_tau * xs - s_tau * xc ) * ( c_tau * xs - s_tau * xc ) /
-                    ( c_tau2 * ss - cs_tau * cs + s_tau2 * cc ) ) ) ) * y_dot;
+          for ( int j = 0; j < x_shape; j++ ) {
+            s = sycl::sincos( freq * d_x[j],  &c );
+            xc += d_y[j] * c;
+            xs += d_y[j] * s;
+            cc += c * c;
+            ss += s * s;
+            cs += c * s;
           }
-        });
-      });
-    }
 
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3) / repeat);
+          float c_tau;
+          float s_tau;
+          float tau = sycl::atan2( 2.0f * cs, cc - ss ) / ( 2.0f * freq ) ;
+          s_tau = sycl::sincos( freq * tau, &c_tau );
+          float c_tau2 = c_tau * c_tau ;
+          float s_tau2 = s_tau * s_tau ;
+          float cs_tau = 2.0f * c_tau * s_tau ;
+
+          d_p[tid] = ( 0.5f * ( ( ( c_tau * xc + s_tau * xs ) * ( c_tau * xc + s_tau * xs ) /
+                  ( c_tau2 * cc + cs_tau * cs + s_tau2 * ss ) ) +
+                ( ( c_tau * xs - s_tau * xc ) * ( c_tau * xs - s_tau * xc ) /
+                  ( c_tau2 * ss - cs_tau * cs + s_tau2 * cc ) ) ) ) * y_dot;
+        }
+      });
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3) / repeat);
+
+  q.memcpy(p, d_p, sizeof(float)*freqs_shape).wait();
 
   // verification
   lombscargle_cpu(x_shape, freqs_shape, x, y, f, p2, y_dot);
@@ -199,6 +197,10 @@ int main(int argc, char* argv[]) {
 
   printf("%s\n", error ? "FAIL" : "PASS");
 
+  sycl::free(d_x, q);
+  sycl::free(d_y, q);
+  sycl::free(d_f, q);
+  sycl::free(d_p, q);
   free(x);
   free(y);
   free(f);
