@@ -43,12 +43,12 @@ std::vector<KeyValue> shuffle_keyvalues(std::mt19937& rnd, std::vector<KeyValue>
 
 using Time = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-Time start_timer() 
+Time start_timer()
 {
   return std::chrono::high_resolution_clock::now();
 }
 
-double get_elapsed_time(Time start) 
+double get_elapsed_time(Time start)
 {
   Time end = std::chrono::high_resolution_clock::now();
 
@@ -57,7 +57,7 @@ double get_elapsed_time(Time start)
   return us.count() / 1000.0f;
 }
 
-void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs) 
+void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs)
 {
   Time timer = start_timer();
 
@@ -65,7 +65,7 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   {
     std::unordered_map<uint32_t, uint32_t> kvs_map;
-    for (auto& kv : insert_kvs) 
+    for (auto& kv : insert_kvs)
     {
       kvs_map[kv.key] = kv.value;
     }
@@ -79,13 +79,13 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   double milliseconds = get_elapsed_time(timer);
   double seconds = milliseconds / 1000.0f;
-  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n", 
+  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n",
       milliseconds, kNumKeyValues / seconds / 1000000.0f);
 }
 
 void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
   if (argc != 3) {
     printf("Usage: %s <number of insert batches> <number of delete batches>\n", argv[0]);
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
-  memset(pHashTable, 0xff, sizeof(KeyValue) * kHashTableCapacity);
+  memset(pHashTable, kEmpty, sizeof(KeyValue) * kHashTableCapacity);
 
   // Create key value store for hashtable insert
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
@@ -161,15 +161,15 @@ int main(int argc, char* argv[])
 
     // Get all the key-values from the hash table
     std::vector<KeyValue> kvs = iterate_hashtable(pHashTable, iter_kvs);
-  
+
     // Summarize results
     double milliseconds = get_elapsed_time(timer);
     double seconds = milliseconds / 1000.0f;
     printf("Total time (including memory copies, readback, etc): %f ms (%f million keys/second)\n", milliseconds,
         kNumKeyValues / seconds / 1000000.0f);
-  
+
     test_unordered_map(insert_kvs, delete_kvs);
-  
+
     test_correctness(insert_kvs, delete_kvs, kvs);
   }
 
