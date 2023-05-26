@@ -1,16 +1,16 @@
 template<typename T>
-inline T warpReduceSum(T val, nd_item<2> &item)
+inline T warpReduceSum(T val, sycl::nd_item<2> &item)
 {
   auto sg = item.get_sub_group();
   #pragma unroll
   for (int mask = SG/2; mask > 0; mask >>= 1)
-    val += permute_group_by_xor(sg, val, mask);
+    val += sycl::permute_group_by_xor(sg, val, mask);
   return val;
 }
 
 /* Calculate the sum of all elements in a block */
 template<typename T>
-inline T blockReduceSum(T val, nd_item<2> &item, T *shared)
+inline T blockReduceSum(T val, sycl::nd_item<2> &item, T *shared)
 {
 #ifdef WAVE64
   int lane = item.get_local_id(1) & 0x3f; // in-warp idx
@@ -25,7 +25,7 @@ inline T blockReduceSum(T val, nd_item<2> &item, T *shared)
   if (lane == 0)
     shared[wid] = val;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Modify from blockDim.x << 5 to blockDim.x / 32. to prevent
   // blockDim.x is not divided by 32
@@ -37,18 +37,18 @@ inline T blockReduceSum(T val, nd_item<2> &item, T *shared)
 }
 
 template<typename T>
-inline T warpReduceMax(T val, nd_item<2> &item)
+inline T warpReduceMax(T val, sycl::nd_item<2> &item)
 {
   auto sg = item.get_sub_group();
   #pragma unroll
   for (int mask = SG/2; mask > 0; mask >>= 1)
-    val = sycl::max(val, permute_group_by_xor(sg, val, mask));
+    val = sycl::max(val, sycl::permute_group_by_xor(sg, val, mask));
   return val;
 }
 
 /* Calculate the maximum of all elements in a block */
 template<typename T>
-inline T blockReduceMax(T val, nd_item<2> &item, T *shared)
+inline T blockReduceMax(T val, sycl::nd_item<2> &item, T *shared)
 {
 
 #ifdef WAVE64
@@ -64,7 +64,7 @@ inline T blockReduceMax(T val, nd_item<2> &item, T *shared)
   if (lane == 0)  // record in-warp maxx by warp Idx
     shared[wid] = val;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Modify from blockDim.x << 5 to blockDim.x / 32. to prevent
   // blockDim.x is not divided by 32

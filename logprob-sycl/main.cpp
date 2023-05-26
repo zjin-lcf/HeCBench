@@ -20,7 +20,7 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef WAVE64
 #define SG 64
@@ -36,7 +36,7 @@ static const float HALF_FLT_MAX = 65504.F;
 
 template<typename T>
 void log_probs_kernel(
-    nd_item<2>   &item,
+    sycl::nd_item<2>   &item,
 #ifndef USE_SYCL_GROUP_REDUCE
     float        *shared,
 #endif
@@ -63,7 +63,7 @@ void log_probs_kernel(
   // vocab_size: [1], vocab_size,
   // vocab_size: [1], vocab_size_padded, padded vocab size.
 
-  const bool IS_FP16 = std::is_same<T, half>::value;
+  const bool IS_FP16 = std::is_same<T, sycl::half>::value;
   const T    MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
 
   int tidx = item.get_local_id(1); // vocab dim
@@ -85,14 +85,14 @@ void log_probs_kernel(
     }
 
 #ifdef USE_SYCL_GROUP_REDUCE
-    float max_val = reduce_over_group(item.get_group(), local_max, maximum<>()); 
+    float max_val = reduce_over_group(item.get_group(), local_max, maximum<>());
 #else
     float max_val = blockReduceMax<float>(local_max, item, shared);
 #endif
     if (tidx == 0) {
       s_max_logit = max_val;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // Calculate the denominator: sum_i exp(logits[i])
     float local_sum_exp = 0.0f;
@@ -102,7 +102,7 @@ void log_probs_kernel(
     }
 
 #ifdef USE_SYCL_GROUP_REDUCE
-    float sum_exp  = reduce_over_group(item.get_group(), local_sum_exp, plus<>()); 
+    float sum_exp  = reduce_over_group(item.get_group(), local_sum_exp, plus<>());
 #else
     float sum_exp = blockReduceSum<float>(local_sum_exp, item, shared);
 #endif
@@ -117,7 +117,7 @@ void log_probs_kernel(
 }
 
 void accumulate_log_probs(
-    nd_item<2>   &item,
+    sycl::nd_item<2>   &item,
 #ifndef USE_SYCL_GROUP_REDUCE
           float *shared,
 #endif
@@ -150,7 +150,7 @@ void accumulate_log_probs(
     local_accum += static_cast<float>(log_probs[step * stride]);
   }
 #ifdef USE_SYCL_GROUP_REDUCE
-  float accum  = reduce_over_group(item.get_group(), local_accum, plus<>()); 
+  float accum  = reduce_over_group(item.get_group(), local_accum, plus<>());
 #else
   float accum = blockReduceSum<float>(local_accum, item, shared);
 #endif
@@ -191,20 +191,19 @@ int main(int argc, char* argv[])
     h_logits[i] = distr(g);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_logits = malloc_device<float>(logits_size, q);
+  float *d_logits = sycl::malloc_device<float>(logits_size, q);
   q.memcpy(d_logits, h_logits, logits_size_bytes);
 
   float *h_log_probs = (float*) malloc (log_probs_size_bytes);
-  float *d_log_probs = malloc_device<float>(log_probs_size, q);
+  float *d_log_probs = sycl::malloc_device<float>(log_probs_size, q);
 
   float *h_cum_log_probs = (float*) malloc (batch_size_bytes);
-  float *d_cum_log_probs = malloc_device<float>(batch_size, q);
+  float *d_cum_log_probs = sycl::malloc_device<float>(batch_size, q);
 
   int *h_lengths = (int*) malloc (length_size_bytes);
 
@@ -212,7 +211,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < batch_size; i++)
     h_lengths[i] = rand() % max_length + max_length / 2;
 
-  int *d_lengths = malloc_device<int>(batch_size, q);
+  int *d_lengths = sycl::malloc_device<int>(batch_size, q);
   q.memcpy(d_lengths, h_lengths, length_size_bytes);
 
   size_t ids_size = batch_size * max_length;
@@ -222,7 +221,7 @@ int main(int argc, char* argv[])
   for (size_t i = 0; i < ids_size; i++)
     h_ids[i] = rand() % vocab_size;
 
-  int *d_ids = malloc_device<int>(ids_size, q);
+  int *d_ids = sycl::malloc_device<int>(ids_size, q);
   q.memcpy(d_ids, h_ids, ids_size_bytes);
 
   // A batched version of log prob computation.
@@ -239,9 +238,9 @@ int main(int argc, char* argv[])
   const int gx = batch_first ? batch_size : max_length - 1;
   const int gy = batch_first ? max_length - 1 : batch_size;
 
-  range<2> gws (gy, gx * block_size);
-  range<2> gws2 (1, batch_size * block_size);
-  range<2> lws (1, block_size);
+  sycl::range<2> gws (gy, gx * block_size);
+  sycl::range<2> gws2 (1, batch_size * block_size);
+  sycl::range<2> lws (1, block_size);
 
   q.wait();
 
@@ -249,12 +248,12 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
 
-    q.submit([&](handler &cgh) {
+    q.submit([&](sycl::handler &cgh) {
 #ifndef USE_SYCL_GROUP_REDUCE
-      local_accessor<float, 1> sm (range<1>(SG), cgh);
+      sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
 #endif
-      local_accessor<float, 0> s_max_logit (cgh);
-      cgh.parallel_for(nd_range<2>(gws, lws), [=](nd_item<2> item)
+      sycl::local_accessor<float, 0> s_max_logit (cgh);
+      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item)
         [[intel::reqd_sub_group_size(SG)]] {
         log_probs_kernel<float>(
             item,
@@ -267,11 +266,11 @@ int main(int argc, char* argv[])
       });
     });
 
-    q.submit([&](handler &cgh) {
+    q.submit([&](sycl::handler &cgh) {
 #ifndef USE_SYCL_GROUP_REDUCE
-      local_accessor<float, 1> sm (range<1>(SG), cgh);
+      sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
 #endif
-      cgh.parallel_for(nd_range<2>(gws2, lws), [=](nd_item<2> item)
+      cgh.parallel_for(sycl::nd_range<2>(gws2, lws), [=](sycl::nd_item<2> item)
         [[intel::reqd_sub_group_size(SG)]] {
         accumulate_log_probs(
            item,
