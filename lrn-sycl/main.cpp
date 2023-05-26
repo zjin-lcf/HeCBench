@@ -2,12 +2,12 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 using namespace std::chrono;
 
-void Forward(queue &q, int repeat)
+void Forward(sycl::queue &q, int repeat)
 {
   int64_t ndims = 5;
   int64_t size = 5;
@@ -26,16 +26,16 @@ void Forward(queue &q, int repeat)
   std::vector<float> dst(wk_size, 0);
 
   srand(123);
-  for (int64_t i = 0; i < wk_size; i++) { 
+  for (int64_t i = 0; i < wk_size; i++) {
     src[i] = rand() / (float)RAND_MAX;
   }
 
   size_t bytes_to_copy_s = wk_size * sizeof(float);
-  float *src_mem = malloc_device<float>(wk_size, q);
+  float *src_mem = sycl::malloc_device<float>(wk_size, q);
   q.memcpy(src_mem, src.data(), bytes_to_copy_s);
 
   size_t bytes_to_copy_d = wk_size * sizeof(float);
-  float *dst_mem = malloc_device<float>(wk_size, q);
+  float *dst_mem = sycl::malloc_device<float>(wk_size, q);
   q.memcpy(dst_mem, dst.data(), bytes_to_copy_d);
 
   printf("Sweep the work-group sizes from 64 to 512\n");
@@ -43,15 +43,15 @@ void Forward(queue &q, int repeat)
 
     int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-    range<1> gws (wg_size * wg_cnt);
-    range<1> lws (wg_size);
+    sycl::range<1> gws (wg_size * wg_cnt);
+    sycl::range<1> lws (wg_size);
 
     q.wait();
     auto start = high_resolution_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class fwd>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class fwd>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           lrn_fwd_kernel(item, src_mem, dst_mem, N, C, D, H, W,
                          stride_mb, ndims, wk_size, size, alpha, beta, k);
         });
@@ -72,7 +72,7 @@ void Forward(queue &q, int repeat)
 
   q.memcpy(dst.data(), dst_mem, bytes_to_copy_d).wait();
   double checksum = 0;
-  for (int64_t i = 0; i < wk_size; i++) { 
+  for (int64_t i = 0; i < wk_size; i++) {
     checksum += dst[i];
   }
   printf("Checksum: %lf\n", checksum / wk_size);
@@ -81,7 +81,7 @@ void Forward(queue &q, int repeat)
   free(dst_mem, q);
 }
 
-void Backward(queue &q, int repeat)
+void Backward(sycl::queue &q, int repeat)
 {
   int64_t ndims = 5;
   int64_t size = 5;
@@ -101,20 +101,20 @@ void Backward(queue &q, int repeat)
   std::vector<float> diff_src(wk_size, 0);
 
   srand(123);
-  for (int64_t i = 0; i < wk_size; i++) { 
+  for (int64_t i = 0; i < wk_size; i++) {
     diff_src[i] = src[i] = rand() / (float)RAND_MAX;
   }
 
   size_t bytes_to_copy_s = wk_size * sizeof(float);
-  float *src_mem = malloc_device<float>(wk_size, q);
+  float *src_mem = sycl::malloc_device<float>(wk_size, q);
   q.memcpy(src_mem, src.data(), bytes_to_copy_s);
 
   size_t bytes_to_copy_diff = wk_size * sizeof(float);
-  float *diff_src_mem = malloc_device<float>(wk_size, q);
+  float *diff_src_mem = sycl::malloc_device<float>(wk_size, q);
   q.memcpy(diff_src_mem, diff_src.data(), bytes_to_copy_diff);
 
   size_t bytes_to_copy_d = wk_size * sizeof(float);
-  float *dst_mem = malloc_device<float>(wk_size, q);
+  float *dst_mem = sycl::malloc_device<float>(wk_size, q);
   q.memcpy(dst_mem, src.data(), bytes_to_copy_d);
 
   printf("Sweep the work-group sizes from 64 to 512\n");
@@ -122,15 +122,15 @@ void Backward(queue &q, int repeat)
 
     int64_t wg_cnt = (wk_size + wg_size - 1) / wg_size;
 
-    range<1> gws (wg_size * wg_cnt);
-    range<1> lws (wg_size);
+    sycl::range<1> gws (wg_size * wg_cnt);
+    sycl::range<1> lws (wg_size);
 
     q.wait();
     auto start = high_resolution_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class bwd>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
            lrn_bwd_kernel(item, src_mem, dst_mem, diff_src_mem, N, C,
                           D, H, W, stride_mb, ndims, wk_size,
                           size, alpha, beta, k);
@@ -152,7 +152,7 @@ void Backward(queue &q, int repeat)
 
   q.memcpy(dst.data(), dst_mem, bytes_to_copy_d).wait();
   double checksum = 0;
-  for (int64_t i = 0; i < wk_size; i++) { 
+  for (int64_t i = 0; i < wk_size; i++) {
     checksum += dst[i];
   }
   printf("Checksum: %lf\n", checksum / wk_size);
@@ -170,11 +170,10 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Forward(q, repeat);
   Backward(q, repeat);

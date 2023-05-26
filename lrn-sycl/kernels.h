@@ -2,20 +2,20 @@
 #define KERNELS
 
 void lrn_fwd_kernel(
-    nd_item<1> &item,
-    const float* __restrict__ src_, 
+    sycl::nd_item<1> &item,
+    const float* __restrict__ src_,
           float* __restrict__ dst_,
     int64_t N_,
-    int64_t C_, 
-    int64_t D_, 
-    int64_t H_, 
-    int64_t W_, 
-    int64_t stride_mb_, 
-    int64_t ndims_, 
-    int64_t wk_size_, 
-    int64_t size_, 
-    float alpha_, 
-    float beta_, 
+    int64_t C_,
+    int64_t D_,
+    int64_t H_,
+    int64_t W_,
+    int64_t stride_mb_,
+    int64_t ndims_,
+    int64_t wk_size_,
+    int64_t size_,
+    float alpha_,
+    float beta_,
     float k_)
 {
   for (int64_t idx = item.get_global_id(0);
@@ -74,7 +74,7 @@ void lrn_fwd_kernel(
         const int64_t off = mb * stride_mb_ + h * W_ * C_ + w * C_ + c;
         auto val = ker(mb, c, 0, h, w);
         dst_[off] = val;
-      }   
+      }
       else {
         const int64_t off = data_off(mb, c, d, h, w);
         auto val = ker(mb, c, d, h, w);
@@ -93,21 +93,21 @@ void lrn_fwd_kernel(
 }
 
 void  lrn_bwd_kernel(
-    nd_item<1> &item,
-    const float* __restrict__ src_, 
+    sycl::nd_item<1> &item,
+    const float* __restrict__ src_,
           float* __restrict__ dst_,
-          float* __restrict__ diff_src_mem_, 
+          float* __restrict__ diff_src_mem_,
     int64_t N_,
-    int64_t C_, 
-    int64_t D_, 
-    int64_t H_, 
-    int64_t W_, 
-    int64_t stride_mb_, 
-    int64_t ndims_, 
-    int64_t wk_size_, 
-    int64_t size_, 
-    float alpha_, 
-    float beta_, 
+    int64_t C_,
+    int64_t D_,
+    int64_t H_,
+    int64_t W_,
+    int64_t stride_mb_,
+    int64_t ndims_,
+    int64_t wk_size_,
+    int64_t size_,
+    float alpha_,
+    float beta_,
     float k_)
 {
   for (int64_t idx = item.get_global_id(0);
@@ -210,7 +210,7 @@ void  lrn_bwd_kernel(
         const int64_t off = mb * stride_mb_ + h * W_ * C_ + w * C_ + c;
         auto val = ker(mb, c, 0, h, w);
         dst_[off] = val;
-      }   
+      }
       else {
         const int64_t off = data_off(mb, c, d, h, w);
         auto val = ker(mb, c, d, h, w);
