@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 void reference (
-    int numNeurons, int neurons_per_item, float dt, 
+    int numNeurons, int neurons_per_item, float dt,
     float*__restrict encode_result,
     float*__restrict voltage_array,
     float*__restrict reftime_array,
@@ -53,8 +53,8 @@ void reference (
 }
 
 void lif (
-    nd_item<1> &item,
-    int numNeurons, int neurons_per_item, float dt, 
+    sycl::nd_item<1> &item,
+    int numNeurons, int neurons_per_item, float dt,
     const float*__restrict encode_result,
           float*__restrict voltage_array,
           float*__restrict reftime_array,
@@ -85,7 +85,7 @@ void lif (
 
     mult = mult > 1.f ? 1.f : mult;
     mult = mult < 0.f ? 0.f : mult;
-    
+
     voltage *= mult;
 
     if(voltage > 1.f){
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
   const size_t neurons_per_item_size = neurons_per_item * sizeof(float);
 
   float dt = 0.1;    // time step
-  float tau_rc = 10; // membrane time constant 
+  float tau_rc = 10; // membrane time constant
   float tau_ref = 2; // refactory time
 
   float* encode_result = (float*) malloc (items_size);
@@ -147,50 +147,47 @@ int main(int argc, char* argv[]) {
     gain[i] = rand() / (float)RAND_MAX + 0.5f;
   }
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_encode_result (encode_result, num_items);
-  buffer<float, 1> d_bias (bias, neurons_per_item);
-  buffer<float, 1> d_gain (gain, neurons_per_item);
+  float *d_encode_result = sycl::malloc_device<float>(num_items, q);
+  float *d_bias = sycl::malloc_device<float>(neurons_per_item, q);
+  float *d_gain = sycl::malloc_device<float>(neurons_per_item, q);
+  float *d_voltage = sycl::malloc_device<float>(num_neurons, q);
+  float *d_reftime = sycl::malloc_device<float>(num_neurons, q);
+  float *d_spikes = sycl::malloc_device<float>(num_neurons, q);
 
-  // test
-  buffer<float, 1> d_voltage (voltage, num_neurons);
-  buffer<float, 1> d_reftime (reftime, num_neurons);
-  buffer<float, 1> d_spikes (spikes, num_neurons);
+  q.memcpy(d_encode_result, encode_result, items_size);
+  q.memcpy(d_bias, bias, neurons_per_item_size);
+  q.memcpy(d_gain, gain, neurons_per_item_size);
+  q.memcpy(d_voltage, voltage, neurons_size);
+  q.memcpy(d_reftime, reftime, neurons_size);
 
-  range<1> lws (256);
-  range<1> gws ((num_neurons + 255) / 256 * 256);
+  sycl::range<1> lws (256);
+  sycl::range<1> gws ((num_neurons + 255) / 256 * 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int step = 0; step < num_steps; step++) {
-    q.submit([&] (handler &cgh) {
-      auto encode = d_encode_result.get_access<sycl_read>(cgh);
-      auto voltage = d_voltage.get_access<sycl_read_write>(cgh);
-      auto reftime = d_reftime.get_access<sycl_read_write>(cgh);
-      auto bias = d_bias.get_access<sycl_read>(cgh);
-      auto gain = d_gain.get_access<sycl_read>(cgh);
-      auto spikes = d_spikes.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class k>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         lif(item,
-            num_neurons, 
+            num_neurons,
             neurons_per_item,
             dt,
-            encode.get_pointer(),
-            voltage.get_pointer(),
-            reftime.get_pointer(),
+            d_encode_result,
+            d_voltage,
+            d_reftime,
             tau_rc,
-            tau_ref, 
-            bias.get_pointer(),
-            gain.get_pointer(),
-            spikes.get_pointer());
+            tau_ref,
+            d_bias,
+            d_gain,
+            d_spikes);
       });
     });
   }
@@ -200,20 +197,23 @@ int main(int argc, char* argv[]) {
   auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (elapsed_time * 1e-3) / num_steps);
 
-  }
+  q.memcpy(spikes, d_spikes, neurons_size);
+  q.memcpy(voltage, d_voltage, neurons_size);
+  q.memcpy(reftime, d_reftime, neurons_size);
+  q.wait();
 
   for(int step = 0; step < num_steps; step++) {
-    reference(num_neurons, 
-        neurons_per_item,
-        dt,
-        encode_result,
-        voltage_gold,
-        reftime_gold, 
-        tau_rc,
-        tau_ref, 
-        bias,
-        gain, 
-        spikes_gold);
+    reference(num_neurons,
+              neurons_per_item,
+              dt,
+              encode_result,
+              voltage_gold,
+              reftime_gold,
+              tau_rc,
+              tau_ref,
+              bias,
+              gain,
+              spikes_gold);
   }
 
   bool ok = true;
@@ -224,6 +224,13 @@ int main(int argc, char* argv[]) {
       break;
     }
   }
+
+  sycl::free(d_encode_result, q);
+  sycl::free(d_voltage, q);
+  sycl::free(d_reftime, q);
+  sycl::free(d_bias, q);
+  sycl::free(d_gain, q);
+  sycl::free(d_spikes, q);
 
   free(encode_result);
   free(voltage);
@@ -238,4 +245,3 @@ int main(int argc, char* argv[]) {
   printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }
-
