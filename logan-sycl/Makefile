@@ -32,7 +32,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
           -Isrc -I$(OPENMP_INCLUDE) \
           -fopenmp -fsycl
 
@@ -40,7 +40,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include \
 LDFLAGS = -L$(OPENMP_LIB) -lomp
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
