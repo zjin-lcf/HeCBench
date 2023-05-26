@@ -12,7 +12,7 @@ unsigned LCGStep(unsigned &z)
 // Uniform, need to do box muller on this
 float getRandomValueTauswortheUniform(unsigned &z1, unsigned &z2, unsigned &z3, unsigned &z4)
 {
-  unsigned taus = TausStep(z1, 13, 19, 12, 4294967294U) ^ 
+  unsigned taus = TausStep(z1, 13, 19, 12, 4294967294U) ^
                   TausStep(z2, 2, 25, 4, 4294967288U) ^ TausStep(z3, 3, 11, 17, 4294967280U);
   unsigned lcg = LCGStep(z4);
 
@@ -28,7 +28,7 @@ void boxMuller(float u1, float u2, float &uo1, float &uo2)
   uo2 = z1 * s2;
 }
 
-float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3, 
+float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3,
                                unsigned &z4, float &temporary, unsigned phase)
 {
   if (phase & 1)
@@ -48,11 +48,11 @@ float getRandomValueTausworthe(unsigned &z1, unsigned &z2, unsigned &z3,
 }
 
 float tausworthe_lookback_sim(
-    unsigned T, float VOL_0, float EPS_0, 
+    unsigned T, float VOL_0, float EPS_0,
     float A_0, float A_1, float A_2, float S_0,
     float MU, unsigned &z1, unsigned &z2,
     unsigned &z3, unsigned &z4, float* path,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 {
   float temp_random_value;
   float vol = VOL_0, eps = EPS_0;
@@ -100,7 +100,7 @@ void tausworthe_lookback(
     const float *__restrict g_S_0,
     const float *__restrict g_MU,
     float *__restrict path,
-    nd_item<1> &item)
+    sycl::nd_item<1> &item)
 {
   unsigned address = item.get_global_id(0);
 
@@ -122,7 +122,7 @@ void tausworthe_lookback(
   float mean = 0, variance = 0;
   for (unsigned i = 1; i <= LOOKBACK_PATHS_PER_SIM; i++)
   {
-    // simulate a path for num_cyles cyles 
+    // simulate a path for num_cyles cyles
     float res = tausworthe_lookback_sim(num_cycles, VOL_0, EPS_0,
         A_0, A_1, A_2, S_0,
         MU,

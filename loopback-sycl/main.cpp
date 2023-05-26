@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "loopback.h"
 #include "kernels.cpp"
 
@@ -47,60 +47,58 @@ int main(int argc, char* argv[]) {
   for (unsigned i = 0; i < TAUSWORTHE_NUM_SEEDS; i++)
     tauswortheSeeds[i] = (uint)rand() + 16;
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<unsigned int,1> d_tauswortheSeeds (tauswortheSeeds, TAUSWORTHE_NUM_SEEDS);
-  buffer<float,1> d_lookback_VOL_0 (lookback_VOL_0, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_A_0 (lookback_A_0, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_A_1 (lookback_A_1, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_A_2 (lookback_A_2, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_S_0 (lookback_S_0, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_EPS_0 (lookback_EPS_0, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookback_MU (lookback_MU, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookbackSimulationResultsMean (lookbackSimulationResultsMean, LOOKBACK_NUM_PARAMETER_VALUES);
-  buffer<float,1> d_lookbackSimulationResultsVariance (lookbackSimulationResultsVariance, LOOKBACK_NUM_PARAMETER_VALUES);
+  unsigned int *d_tauswortheSeeds = sycl::malloc_device<unsigned int>(TAUSWORTHE_NUM_SEEDS, q);
+  float *d_lookback_VOL_0 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_A_0 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_A_1 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_A_2 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_S_0 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_EPS_0 = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookback_MU = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookbackSimulationResultsMean = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+  float *d_lookbackSimulationResultsVariance = sycl::malloc_device<float>(LOOKBACK_NUM_PARAMETER_VALUES, q);
+
+  q.memcpy(d_tauswortheSeeds, tauswortheSeeds, seed_size);
+  q.memcpy(d_lookback_VOL_0, lookback_VOL_0, loopback_size);
+  q.memcpy(d_lookback_A_0, lookback_A_0, loopback_size);
+  q.memcpy(d_lookback_A_1, lookback_A_1, loopback_size);
+  q.memcpy(d_lookback_A_2, lookback_A_2, loopback_size);
+  q.memcpy(d_lookback_S_0, lookback_S_0, loopback_size);
+  q.memcpy(d_lookback_EPS_0, lookback_EPS_0, loopback_size);
+  q.memcpy(d_lookback_MU, lookback_MU, loopback_size);
 
   // Execute the Tausworthe version of the lookback option
-  range<1> gws (LOOKBACK_TAUSWORTHE_NUM_BLOCKS * LOOKBACK_TAUSWORTHE_NUM_THREADS); 
-  range<1> lws (LOOKBACK_TAUSWORTHE_NUM_THREADS);
+  sycl::range<1> gws (LOOKBACK_TAUSWORTHE_NUM_BLOCKS * LOOKBACK_TAUSWORTHE_NUM_THREADS);
+  sycl::range<1> lws (LOOKBACK_TAUSWORTHE_NUM_THREADS);
   const unsigned num_cycles = LOOKBACK_MAX_T;
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto mean = d_lookbackSimulationResultsMean.get_access<sycl_discard_write>(cgh);
-      auto var  = d_lookbackSimulationResultsVariance.get_access<sycl_discard_write>(cgh);
-      auto seed = d_tauswortheSeeds.get_access<sycl_read>(cgh);
-      auto vol  = d_lookback_VOL_0.get_access<sycl_read>(cgh);
-      auto eps  = d_lookback_EPS_0.get_access<sycl_read>(cgh);
-      auto a0   = d_lookback_A_0.get_access<sycl_read>(cgh);
-      auto a1   = d_lookback_A_1.get_access<sycl_read>(cgh);
-      auto a2   = d_lookback_A_2.get_access<sycl_read>(cgh);
-      auto s0   = d_lookback_S_0.get_access<sycl_read>(cgh);
-      auto mu   = d_lookback_MU.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> sm(
-        LOOKBACK_TAUSWORTHE_NUM_THREADS*LOOKBACK_MAX_T, cgh);
-      cgh.parallel_for<class loopback>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> sm (sycl::range<1>(
+        LOOKBACK_TAUSWORTHE_NUM_THREADS*LOOKBACK_MAX_T), cgh);
+      cgh.parallel_for<class loopback>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         tausworthe_lookback(
           num_cycles,
-          seed.get_pointer(),
-          mean.get_pointer(),
-          var.get_pointer(),
-          vol.get_pointer(),
-          eps.get_pointer(),
-          a0.get_pointer(),
-          a1.get_pointer(),
-          a2.get_pointer(),
-          s0.get_pointer(),
-          mu.get_pointer(),
+          d_tauswortheSeeds,
+          d_lookbackSimulationResultsMean,
+          d_lookbackSimulationResultsVariance,
+          d_lookback_VOL_0,
+          d_lookback_EPS_0,
+          d_lookback_A_0,
+          d_lookback_A_1,
+          d_lookback_A_2,
+          d_lookback_S_0,
+          d_lookback_MU,
           sm.get_pointer(),
 	  item);
       });
@@ -111,12 +109,14 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
-  
-  } // sycl scope
+
+  q.memcpy(lookbackSimulationResultsMean, d_lookbackSimulationResultsMean, loopback_size);
+  q.memcpy(lookbackSimulationResultsVariance, d_lookbackSimulationResultsVariance, loopback_size);
+  q.wait();
 
   if (dump) {
     for (unsigned i = 0; i < LOOKBACK_NUM_PARAMETER_VALUES; i++)
-      printf("%d %.3f %.3f\n", i, lookbackSimulationResultsMean[i], 
+      printf("%d %.3f %.3f\n", i, lookbackSimulationResultsMean[i],
                               lookbackSimulationResultsVariance[i]);
   }
 
@@ -131,5 +131,15 @@ int main(int argc, char* argv[]) {
   free(lookbackSimulationResultsVariance);
   free(tauswortheSeeds);
 
+  sycl::free(d_tauswortheSeeds, q);
+  sycl::free(d_lookback_VOL_0, q);
+  sycl::free(d_lookback_A_0, q);
+  sycl::free(d_lookback_A_1, q);
+  sycl::free(d_lookback_A_2, q);
+  sycl::free(d_lookback_S_0, q);
+  sycl::free(d_lookback_EPS_0, q);
+  sycl::free(d_lookback_MU, q);
+  sycl::free(d_lookbackSimulationResultsMean, q);
+  sycl::free(d_lookbackSimulationResultsVariance, q);
   return 0;
 }
