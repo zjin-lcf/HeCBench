@@ -2,7 +2,7 @@
 #define LINEAR_H__
 
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define RESULT_FILENAME "assets/_results.txt"
 #define TEMP_FILENAME "assets/temperature.txt"
@@ -46,9 +46,9 @@ typedef struct {
  size_t wg_count;
 } linear_param_t;
 
-typedef float2 data_t;
+typedef sycl::float2 data_t;
 
-typedef float4 sum_t;
+typedef sycl::float4 sum_t;
 
 typedef struct {
   float a0;
@@ -62,7 +62,7 @@ typedef struct {
   result_t parallelized;
 } results_t;
 
-typedef float2 rsquared_t;
+typedef sycl::float2 rsquared_t;
 
 extern clock_t start, end;
 
