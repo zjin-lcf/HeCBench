@@ -6,8 +6,8 @@
 #include <sys/time.h>
 #include <string.h>
 #include <chrono>
+#include <sycl/sycl.hpp>
 #include "lud.h"
-#include "common.h"
 
 #define BLOCK_SIZE 16
 
@@ -37,7 +37,7 @@ int main ( int argc, char *argv[] )
   float *m, *mm;
   stopwatch sw;
 
-  while ((opt = getopt_long(argc, argv, "::vs:i:", 
+  while ((opt = getopt_long(argc, argv, "::vs:i:",
           long_options, &option_index)) != -1 ) {
     switch(opt){
       case 'i':
@@ -69,7 +69,7 @@ int main ( int argc, char *argv[] )
   if ( (optind < argc) || (optind == 1)) {
     fprintf(stderr, "Usage: %s [-v] [-s matrix_size|-i input_file]\n", argv[0]);
     exit(EXIT_FAILURE);
-  }  
+  }
 
   if (input_file) {
     printf("Reading matrix from file %s\n", input_file);
@@ -79,7 +79,7 @@ int main ( int argc, char *argv[] )
       fprintf(stderr, "error create matrix from file %s\n", input_file);
       exit(EXIT_FAILURE);
     }
-  } 
+  }
 
   else if (matrix_dim) {
     printf("Creating matrix internally size=%d\n", matrix_dim);
@@ -105,71 +105,67 @@ int main ( int argc, char *argv[] )
   /* beginning of timing point */
   stopwatch_start(&sw);
 
-  { // SYCL scope
-
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float, 1> d_m (m, matrix_dim*matrix_dim, props);
+  float *d_m = sycl::malloc_device<float>(matrix_dim * matrix_dim, q);
+  q.memcpy(d_m, m, sizeof(float) * matrix_dim * matrix_dim);
 
-  range<1> global_work1(BLOCK_SIZE);
-  range<1> local_work1(BLOCK_SIZE);
+  sycl::range<1> global_work1(BLOCK_SIZE);
+  sycl::range<1> local_work1(BLOCK_SIZE);
   int offset;
   int i=0;
-  
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
 
-    offset = i;  // add the offset 
+    offset = i;  // add the offset
 
-    q.submit([&](handler& cgh) {
-      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      cgh.parallel_for<class diagonal>(nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <float, 1> shadow (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      cgh.parallel_for<class diagonal>(
+        sycl::nd_range<1>(global_work1, local_work1), [=] (sycl::nd_item<1> item) {
         #include "kernel_lud_diagonal.sycl"
       });
     });
 
-    range<1> global_work2 (BLOCK_SIZE * 2 * ((matrix_dim-i)/BLOCK_SIZE-1));
-    range<1> local_work2 (BLOCK_SIZE * 2);
+    sycl::range<1> global_work2 (BLOCK_SIZE * 2 * ((matrix_dim-i)/BLOCK_SIZE-1));
+    sycl::range<1> local_work2 (BLOCK_SIZE * 2);
 
-    q.submit([&](handler& cgh) {
-      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> dia (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      cgh.parallel_for<class peri>(nd_range<1>(global_work2, local_work2), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <float, 1> dia (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      sycl::local_accessor <float, 1> peri_row (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      sycl::local_accessor <float, 1> peri_col (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      cgh.parallel_for<class peri>(
+        sycl::nd_range<1>(global_work2, local_work2), [=] (sycl::nd_item<1> item) {
         #include "kernel_lud_perimeter.sycl"
       });
     });
 
-    range<2> global_work3(BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1), BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1));
-    range<2> local_work3(BLOCK_SIZE, BLOCK_SIZE);
+    sycl::range<2> global_work3(BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1), BLOCK_SIZE * ((matrix_dim-i)/BLOCK_SIZE-1));
+    sycl::range<2> local_work3(BLOCK_SIZE, BLOCK_SIZE);
 
-    q.submit([&](handler& cgh) {
-      auto m_acc = d_m.get_access<sycl_read_write>(cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> peri_col (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      accessor <float, 1, sycl_read_write, access::target::local> peri_row (BLOCK_SIZE * BLOCK_SIZE, cgh);
-      cgh.parallel_for<class internal>(nd_range<2>(global_work3, local_work3) , [=] (nd_item<2> item) {
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <float, 1> peri_row (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      sycl::local_accessor <float, 1> peri_col (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
+      cgh.parallel_for<class internal>(
+        sycl::nd_range<2>(global_work3, local_work3) , [=] (sycl::nd_item<2> item) {
         #include "kernel_lud_internal.sycl"
       });
     });
   } // for
 
-  offset = i;  // add the offset 
+  offset = i;  // add the offset
 
-  q.submit([&](handler& cgh) {
-    auto m_acc = d_m.get_access<sycl_read_write>(cgh);
-    accessor <float, 1, sycl_read_write, access::target::local> shadow (BLOCK_SIZE * BLOCK_SIZE, cgh);
+  q.submit([&](sycl::handler& cgh) {
+    sycl::local_accessor <float, 1> shadow (sycl::range<1>(BLOCK_SIZE * BLOCK_SIZE), cgh);
     cgh.parallel_for<class diagonal2>(
-        nd_range<1>(global_work1, local_work1), [=] (nd_item<1> item) {
+      sycl::nd_range<1>(global_work1, local_work1), [=] (sycl::nd_item<1> item) {
       #include "kernel_lud_diagonal.sycl"
     });
   });
@@ -179,7 +175,7 @@ int main ( int argc, char *argv[] )
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
 
-  } // SYCL scope
+  q.memcpy(m, d_m, sizeof(float) * matrix_dim * matrix_dim).wait();
 
   /* end of timing point */
   stopwatch_stop(&sw);
@@ -189,9 +185,10 @@ int main ( int argc, char *argv[] )
     printf("After LUD\n");
     // print_matrix(m, matrix_dim);
     printf(">>>Verify<<<<\n");
-    lud_verify(mm, m, matrix_dim); 
+    lud_verify(mm, m, matrix_dim);
     free(mm);
   }
 
   free(m);
+  sycl::free(d_m, q);
 }

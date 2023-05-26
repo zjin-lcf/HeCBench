@@ -9,13 +9,13 @@
       idx = tx;
       array_offset = offset*matrix_dim+offset;
       for (i=0; i < BLOCK_SIZE/2; i++){
-      dia[i * BLOCK_SIZE + idx]=m_acc[array_offset+idx];
+      dia[i * BLOCK_SIZE + idx]=d_m[array_offset+idx];
       array_offset += matrix_dim;
       }
     
     array_offset = offset*matrix_dim+offset;
     for (i=0; i < BLOCK_SIZE; i++) {
-      peri_row[i * BLOCK_SIZE+ idx]=m_acc[array_offset+(bx+1)*BLOCK_SIZE+idx];
+      peri_row[i * BLOCK_SIZE+ idx]=d_m[array_offset+(bx+1)*BLOCK_SIZE+idx];
       array_offset += matrix_dim;
     }
 
@@ -24,18 +24,18 @@
     
     array_offset = (offset+BLOCK_SIZE/2)*matrix_dim+offset;
     for (i=BLOCK_SIZE/2; i < BLOCK_SIZE; i++){
-      dia[i * BLOCK_SIZE + idx]=m_acc[array_offset+idx];
+      dia[i * BLOCK_SIZE + idx]=d_m[array_offset+idx];
       array_offset += matrix_dim;
     }
     
     array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
     for (i=0; i < BLOCK_SIZE; i++) {
-      peri_col[i * BLOCK_SIZE + idx] = m_acc[array_offset+idx];
+      peri_col[i * BLOCK_SIZE + idx] = d_m[array_offset+idx];
       array_offset += matrix_dim;
     }
   
    }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if (tx < BLOCK_SIZE) { //peri-row
      idx=tx;
@@ -52,20 +52,20 @@
      }
    }
 
-	item.barrier(access::fence_space::local_space);
+	item.barrier(sycl::access::fence_space::local_space);
     
   if (tx < BLOCK_SIZE) { //peri-row
     idx=tx;
     array_offset = (offset+1)*matrix_dim+offset;
     for(i=1; i < BLOCK_SIZE; i++){
-      m_acc[array_offset+(bx+1)*BLOCK_SIZE+idx] = peri_row[i*BLOCK_SIZE+idx];
+      d_m[array_offset+(bx+1)*BLOCK_SIZE+idx] = peri_row[i*BLOCK_SIZE+idx];
       array_offset += matrix_dim;
     }
   } else { //peri-col
     idx=tx - BLOCK_SIZE;
     array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
     for(i=0; i < BLOCK_SIZE; i++){
-      m_acc[array_offset+idx] =  peri_col[i*BLOCK_SIZE+idx];
+      d_m[array_offset+idx] =  peri_col[i*BLOCK_SIZE+idx];
       array_offset += matrix_dim;
     }
   }

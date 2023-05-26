@@ -9,14 +9,14 @@
   int global_row_id = offset + (by+1)*BLOCK_SIZE;
   int global_col_id = offset + (bx+1)*BLOCK_SIZE;
 
-  peri_row[ty * BLOCK_SIZE + tx] = m_acc[(offset+ty)*matrix_dim+global_col_id+tx];
-  peri_col[ty * BLOCK_SIZE + tx] = m_acc[(global_row_id+ty)*matrix_dim+offset+tx];
+  peri_row[ty * BLOCK_SIZE + tx] = d_m[(offset+ty)*matrix_dim+global_col_id+tx];
+  peri_col[ty * BLOCK_SIZE + tx] = d_m[(global_row_id+ty)*matrix_dim+offset+tx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   float sum = 0;
   for (i=0; i < BLOCK_SIZE; i++)
     sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
 
-  m_acc[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum; 
+  d_m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum; 
 
