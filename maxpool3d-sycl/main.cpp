@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 typedef float DTYPE;
 
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     printf("Usage: %s <image width> <image height> <image count> <repeat>\n", argv[0]);
     return 1;
   }
-  int i_img_width  = atoi(argv[1]);  
+  int i_img_width  = atoi(argv[1]);
   int i_img_height = atoi(argv[2]);
 
   if (i_img_width % 16 != 0 || i_img_height % 16 != 0) {
@@ -53,22 +53,20 @@ int main(int argc, char** argv)
   DTYPE* d_output = (DTYPE*) malloc(mem_size_output*i_img_count);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-
-  // Create the input and output arrays in device memory 
-  DTYPE *d_image = malloc_device<DTYPE>(size_image*i_img_count, q);
+  // Create the input and output arrays in device memory
+  DTYPE *d_image = sycl::malloc_device<DTYPE>(size_image*i_img_count, q);
   q.memcpy(d_image, h_image, mem_size_image*i_img_count);
 
-  DTYPE *d_result = malloc_device<DTYPE>(size_output*i_img_count, q);
+  DTYPE *d_result = sycl::malloc_device<DTYPE>(size_output*i_img_count, q);
 
   // assume output image dimensions are multiple of 16
-  range<3> lws (1, 16, 16);
-  range<3> gws (i_img_count, o_img_height, o_img_width);
+  sycl::range<3> lws (1, 16, 16);
+  sycl::range<3> gws (i_img_count, o_img_height, o_img_width);
 
   // filter size same as stride size
   const int pool_width  = Hstride;
@@ -78,22 +76,23 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &h) {
-      h.parallel_for<class maxpool3>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        const int x = item.get_global_id(2); 
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class maxpool3>(
+      sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        const int x = item.get_global_id(2);
         const int y = item.get_global_id(1);
         const int z = item.get_global_id(0);
         const int xidx = Hstride*x;
         const int yidx = Vstride*y;
         DTYPE maxval = (DTYPE)0;
 
-        for (int r = 0; r < pool_height; r++) 
-        { 
+        for (int r = 0; r < pool_height; r++)
+        {
           const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
           for(int c = 0; c < pool_width; c++)
           {
             const int idxIn = idxIntmp + c;
-            maxval = sycl::fmax(maxval,d_image[idxIn]);
+            maxval = sycl::fmax(maxval, d_image[idxIn]);
           }
         }
         d_result[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
@@ -115,13 +114,13 @@ int main(int argc, char** argv)
         const int xidx = Hstride*x;
         const int yidx = Vstride*y;
         DTYPE maxval = (DTYPE)0;
-        for (int r = 0; r < pool_height; r++) 
-        { 
+        for (int r = 0; r < pool_height; r++)
+        {
           const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
           for(int c = 0; c < pool_width; c++)
           {
             const int idxIn = idxIntmp + c;
-            maxval = fmaxf(maxval,h_image[idxIn]);
+            maxval = fmaxf(maxval, h_image[idxIn]);
           }
         }
         h_output[(((z*o_img_height)+y)*o_img_width)+x] = maxval;
@@ -135,7 +134,7 @@ int main(int argc, char** argv)
   free(h_image);
   free(h_output);
   free(d_output);
-  free(d_image, q);
-  free(d_result, q);
+  sycl::free(d_image, q);
+  sycl::free(d_result, q);
   return status;
 }
