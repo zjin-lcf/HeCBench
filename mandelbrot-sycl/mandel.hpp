@@ -9,7 +9,7 @@
 #include <exception>
 #include <iomanip>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 constexpr int row_size = 1080;
 constexpr int col_size = 1920;
@@ -37,7 +37,7 @@ struct MandelParameters {
 
   int row_count() const { return row_count_; }
   int col_count() const { return col_count_; }
-  int max_iterations() const { return max_iterations_; } 
+  int max_iterations() const { return max_iterations_; }
 
   // scale from 0..row_count to -1.5..0.5
   float ScaleRow(int i) const { return -1.5f + (i * (2.0f / row_count_)); }
@@ -115,7 +115,7 @@ class Mandel {
     int diff = 0;
     for (int i = 0; i < p_.row_count(); ++i) {
       for (int j = 0; j < p_.col_count(); ++j) {
-        if (m.GetValue(i,j) != GetValue(i,j)) 
+        if (m.GetValue(i,j) != GetValue(i,j))
           diff++;
       }
     }
@@ -163,7 +163,7 @@ public:
   MandelParallel(int row_count, int col_count, int max_iterations)
     : Mandel(row_count, col_count, max_iterations) { }
 
-  double Evaluate(queue &q) {
+  double Evaluate(sycl::queue &q) {
     // iterate over image and check if each point is in mandelbrot set
     MandelParameters p = GetParameters();
 
@@ -173,21 +173,21 @@ public:
     const int data_size = rows * cols;
     const size_t data_size_bytes = data_size * sizeof(int);
 
-    int *data_buf = malloc_device<int>(data_size, q);
+    int *data_buf = sycl::malloc_device<int>(data_size, q);
     q.memcpy(data_buf, data(), data_size_bytes).wait();
 
     size_t block_x = (rows + THREADS_PER_BLOCK_X - 1)/THREADS_PER_BLOCK_X * THREADS_PER_BLOCK_X;
     size_t block_y = (cols + THREADS_PER_BLOCK_Y - 1)/THREADS_PER_BLOCK_Y * THREADS_PER_BLOCK_Y;
 
-    size_t global_work_size[] = {block_x, block_y};
-    size_t local_work_size[] = {THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y};
+    size_t gws[] = {block_x, block_y};
+    size_t lws[] = {THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y};
 
     common::MyTimer t_ker;
 
-    q.submit([&](handler &h) {
+    q.submit([&](sycl::handler &h) {
       h.parallel_for<class mandel_kernel>(
-      nd_range<2>(range<2>(global_work_size[0], global_work_size[1]), 
-                  range<2>(local_work_size[0], local_work_size[1])), [=] (nd_item<2> item) {
+      sycl::nd_range<2>(sycl::range<2>(gws[0], gws[1]),
+                        sycl::range<2>(lws[0], lws[1])), [=] (sycl::nd_item<2> item) {
         int i = item.get_global_id(0);
         int j = item.get_global_id(1);
         if (i < rows && j < cols)
@@ -199,7 +199,7 @@ public:
 
     q.memcpy(data(), data_buf, data_size_bytes).wait();
 
-    free(data_buf, q);
+    sycl::free(data_buf, q);
 
     return kernel_time.count();
   }
