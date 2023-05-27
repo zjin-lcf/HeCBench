@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define GPU_THREADS 256
 
@@ -12,7 +12,7 @@
 
 template <typename T>
 void sequenceMaskKernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int N,
     int M,
     int B,
@@ -40,7 +40,7 @@ void sequenceMaskKernel(
 
 template <typename T>
 void windowMaskKernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int N,
     int M,
     int B,
@@ -75,8 +75,8 @@ void windowMaskKernel(
 }
 
 template <typename T>
-void upperMaskKernel(nd_item<1> &item, int N, int M, int B,
-                     const T* in, T fill_val, T* out) 
+void upperMaskKernel(sycl::nd_item<1> &item, int N, int M, int B,
+                     const T* in, T fill_val, T* out)
 {
   if (B >= 0) {
     KERNEL_LOOP(index, B * N * M) {
@@ -98,7 +98,7 @@ void upperMaskKernel(nd_item<1> &item, int N, int M, int B,
 }
 
 template <typename T>
-void lowerMaskKernel(nd_item<1> &item, int N, int M, int B,
+void lowerMaskKernel(sycl::nd_item<1> &item, int N, int M, int B,
                      const T* in, T fill_val, T* out)
 {
   if (B >= 0) {
@@ -121,7 +121,7 @@ void lowerMaskKernel(nd_item<1> &item, int N, int M, int B,
 }
 
 template <typename T>
-void upperDiagMaskKernel(nd_item<1> &item, int N, int M, int B,
+void upperDiagMaskKernel(sycl::nd_item<1> &item, int N, int M, int B,
                          const T* in, T fill_val, T* out)
 {
   if (B >= 0) {
@@ -144,7 +144,7 @@ void upperDiagMaskKernel(nd_item<1> &item, int N, int M, int B,
 }
 
 template <typename T>
-void lowerDiagMaskKernel(nd_item<1> &item, int N, int M, int B,
+void lowerDiagMaskKernel(sycl::nd_item<1> &item, int N, int M, int B,
                          const T* in, T fill_val, T* out)
 {
   if (B >= 0) {
@@ -167,7 +167,7 @@ void lowerDiagMaskKernel(nd_item<1> &item, int N, int M, int B,
 }
 
 template<typename T>
-void print_mask_ratio (queue &q, T *h_out, T *d_out, T fill_val, int data_size) {
+void print_mask_ratio (sycl::queue &q, T *h_out, T *d_out, T fill_val, int data_size) {
   q.memcpy(h_out, d_out, data_size * sizeof(T));
   int cnt_fill = 0;
   for (int i = 0; i < data_size; i++) {
@@ -187,13 +187,13 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   printf("\nM = %d, N = %d, B = %d\n", M, N, batch_dim);
 
   int data_size = N * M * batch_dim;
-  size_t data_size_in_bytes = data_size * sizeof(T); 
+  size_t data_size_in_bytes = data_size * sizeof(T);
 
   int window_size = N;
   size_t window_size_in_bytes = N * sizeof(int);
 
   int seq_len = N;
-  size_t seq_len_in_bytes = seq_len * sizeof(int); 
+  size_t seq_len_in_bytes = seq_len * sizeof(int);
 
   T *h_in = (T*) malloc (data_size_in_bytes);
   T *h_out = (T*) malloc (data_size_in_bytes);
@@ -210,35 +210,35 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   for (int i = 0; i < data_size; i++) {
     h_in[i] = rand() % (M * N);
   }
-  
+
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   T *d_in, *d_out;
   int *d_seq_len, *d_window;
-  d_in = malloc_device<T>(data_size, q);
-  d_out = malloc_device<T>(data_size, q);
-  d_window = malloc_device<int>(window_size, q);
-  d_seq_len = malloc_device<int>(seq_len, q);
+  d_in = sycl::malloc_device<T>(data_size, q);
+  d_out = sycl::malloc_device<T>(data_size, q);
+  d_window = sycl::malloc_device<int>(window_size, q);
+  d_seq_len = sycl::malloc_device<int>(seq_len, q);
 
   q.memcpy(d_in, h_in, data_size_in_bytes);
   q.memcpy(d_seq_len, h_seq_len, seq_len_in_bytes);
   q.memcpy(d_window, h_window, window_size_in_bytes);
 
   int nblocks = (B <= 0) ? (N * M / GPU_THREADS) : (N * M);
-  range<1> gws (nblocks * GPU_THREADS);
-  range<1> lws (GPU_THREADS);
+  sycl::range<1> gws (nblocks * GPU_THREADS);
+  sycl::range<1> lws (GPU_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class sequence>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class sequence>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         sequenceMaskKernel(item, N, M, batch_dim, d_in, d_seq_len, fill_val, d_out);
       });
     });
@@ -250,12 +250,13 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   printf("Average execution time of sequenceMask kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
   print_mask_ratio(q, h_out, d_out, fill_val, data_size);
- 
+
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class window>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class window>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         windowMaskKernel(item, N, M, batch_dim, d_in, d_window,
                          radius, fill_val, d_out);
       });
@@ -272,8 +273,9 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class upper>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class upper>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         upperMaskKernel(item, N, M, batch_dim, d_in, fill_val, d_out);
       });
     });
@@ -289,8 +291,9 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class lower>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class lower>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         lowerMaskKernel(item, N, M, batch_dim, d_in, fill_val, d_out);
       });
     });
@@ -306,8 +309,9 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class upperDiag>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class upperDiag>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         upperDiagMaskKernel(item, N, M, batch_dim, d_in, fill_val, d_out);
       });
     });
@@ -323,8 +327,9 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class lowerDiag>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class lowerDiag>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         lowerDiagMaskKernel(item, N, M, batch_dim, d_in, fill_val, d_out);
       });
     });
@@ -337,10 +342,10 @@ void eval_mask (const int M, const int N, const int B, const int repeat) {
          (time * 1e-3f) / repeat);
   print_mask_ratio(q, h_out, d_out, fill_val, data_size);
 
-  free(d_in, q);
-  free(d_out, q);
-  free(d_window, q);
-  free(d_seq_len, q);
+  sycl::free(d_in, q);
+  sycl::free(d_out, q);
+  sycl::free(d_window, q);
+  sycl::free(d_seq_len, q);
 
   free(h_in);
   free(h_out);
