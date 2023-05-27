@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using uchar4 = sycl::uchar4;
 #include "tables.h"
 
 // problem size
@@ -34,6 +36,16 @@ constexpr unsigned int gridXLv2(gridXLv1* blockXLv2);
 constexpr unsigned int gridYLv2(gridYLv1* blockYLv2);
 //constexpr unsigned int gridZLv2(gridZLv1* blockZLv2);
 
+template <typename T>
+inline T atomicAdd(T *var, T val)
+{
+  auto atm = sycl::atomic_ref<T,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*var);
+  return atm.fetch_add(val);
+}
+
 inline float f(unsigned int x, unsigned int y, unsigned int z)
 {
   constexpr float d(2.0f / N);
@@ -53,7 +65,7 @@ inline float transformToCoord(unsigned int x)
   return (int(x) - int(Nd2)) * (2.0f / N);
 }
 
-void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, nd_item<3> &item)
+void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, sycl::nd_item<3> &item)
 {
   constexpr unsigned int threadNum(voxelXLv1 * voxelYLv1);
   constexpr unsigned int warpNum(threadNum / 32);
@@ -93,7 +105,7 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, nd_ite
     sminMax[warpid] = minV;
     sminMax[warpid + warpNum] = maxV;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (warpid == 0)
   {
     minV = sminMax[laneid];
@@ -116,12 +128,12 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, nd_ite
 }
 
 void compactLv1(
-  float isoValue, 
+  float isoValue,
   const float*__restrict minMax,
   unsigned int*__restrict blockIndices,
   unsigned int*__restrict countedBlockNum,
   unsigned int*__restrict sums,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
   constexpr unsigned int warpNum(countingThreadNumLv1 / 32);
@@ -140,7 +152,7 @@ void compactLv1(
     if (laneid >= c0) testSum += tp;
   }
   if (laneid == 31)sums[warpid] = testSum;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (warpid == 0)
   {
     unsigned warpSum = sums[laneid];
@@ -152,24 +164,19 @@ void compactLv1(
     }
     sums[laneid] = warpSum;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (warpid != 0)testSum += sums[warpid - 1];
   if (tid == countingThreadNumLv1 - 1 && testSum != 0) {
-    //sums[31] = atomicAdd(countedBlockNum, testSum);
-    auto atomic_obj_ref = ext::oneapi::atomic_ref<unsigned int, 
-                          ext::oneapi::memory_order::relaxed,
-                          ext::oneapi::memory_scope::device,
-                          access::address_space::global_space> (countedBlockNum[0]);
-    sums[31] = atomic_obj_ref.fetch_add(testSum);
+    sums[31] = atomicAdd(countedBlockNum, testSum);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (test) blockIndices[testSum + sums[31] - 1] = bIdx;
 }
 
 void computeMinMaxLv2(
   const unsigned int*__restrict blockIndicesLv1,
   float*__restrict minMax,
-  nd_item<2> &item)
+  sycl::nd_item<2> &item)
 {
   auto sg = item.get_sub_group();
   unsigned int tid(item.get_local_id(1));
@@ -223,7 +230,7 @@ void compactLv2(
   unsigned int counterBlockNumLv1,
   unsigned int*__restrict countedBlockNumLv2,
   unsigned int*__restrict sums,
-  nd_item<1> &item)
+  sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
   constexpr unsigned int warpNum(countingThreadNumLv2 / 32);
@@ -249,7 +256,7 @@ void compactLv2(
     if (laneid >= c0) testSum += tp;
   }
   if (laneid == 31) sums[warpid] = testSum;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (warpid == 0)
   {
     unsigned int warpSum = sums[laneid];
@@ -261,17 +268,12 @@ void compactLv2(
     }
     sums[laneid] = warpSum;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (warpid != 0) testSum += sums[warpid - 1];
   if (tid == countingThreadNumLv2 - 1) {
-    //sums[31] = atomicAdd(countedBlockNumLv2, testSum);
-    auto atomic_obj_ref = ext::oneapi::atomic_ref<unsigned int, 
-                          ext::oneapi::memory_order::relaxed,
-                          ext::oneapi::memory_scope::device,
-                          access::address_space::global_space> (countedBlockNumLv2[0]);
-    sums[31] = atomic_obj_ref.fetch_add(testSum);
+    sums[31] = atomicAdd(countedBlockNumLv2, testSum);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if (test)
   {
@@ -306,33 +308,39 @@ int main(int argc, char* argv[])
   std::mt19937 mt(123);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> minMaxLv1Device ( blockNum * 2 );
-  buffer<unsigned int, 1> blockIndicesLv1Device ( blockNum );
-  buffer<unsigned int, 1> countedBlockNumLv1Device (1);
-  buffer<unsigned int, 1> countedBlockNumLv2Device (1);
-  buffer<unsigned short, 1> distinctEdgesTableDevice (distinctEdgesTable, 256);
-  buffer<int, 1> triTableDevice (triTable, 256*16);
-  buffer<uchar4, 1> edgeIDTableDevice (edgeIDTable, 12);
-  buffer<unsigned int, 1> countedVerticesNumDevice (1);
-  buffer<unsigned int, 1> countedTrianglesNumDevice (1);
+  float *minMaxLv1Device = sycl::malloc_device<float>(blockNum * 2 , q);
+  unsigned int *blockIndicesLv1Device = sycl::malloc_device<unsigned int>( blockNum , q);
+  unsigned int *countedBlockNumLv1Device = sycl::malloc_device<unsigned int>(1, q);
+  unsigned int *countedBlockNumLv2Device = sycl::malloc_device<unsigned int>(1, q);
 
-  // simulate rendering without memory allocation for vertices and triangles 
-  buffer<unsigned long long, 1> trianglesDevice (1);
-  buffer<float, 1> coordXDevice (1);
-  buffer<float, 1> coordYDevice (1);
-  buffer<float, 1> coordZDevice (1);
-  buffer<float, 1> coordZPDevice (1);
+  unsigned short *distinctEdgesTableDevice = sycl::malloc_device<unsigned short>(256, q);
+  q.memcpy(distinctEdgesTableDevice, distinctEdgesTable, sizeof(distinctEdgesTable));
 
-  const range<3> BlockSizeLv1{ 1, voxelYLv1, voxelXLv1};
-  const range<3> GridSizeLv1{ gridZLv1, gridYLv1, gridXLv1 };
-  const range<2> BlockSizeLv2{ blockXLv2 * blockYLv2, voxelXLv2 * voxelYLv2 };
-  const range<3> BlockSizeGenerating{ voxelZLv2, voxelYLv2, voxelXLv2 };
+  int *triTableDevice = sycl::malloc_device<int>(256*16, q);
+  q.memcpy(triTableDevice, triTable, sizeof(triTable));
+
+  uchar4 *edgeIDTableDevice = sycl::malloc_device<uchar4>(12, q);
+  q.memcpy(edgeIDTableDevice, edgeIDTable, sizeof(edgeIDTable));
+
+  unsigned int *countedVerticesNumDevice = sycl::malloc_device<unsigned int>(1, q);
+  unsigned int *countedTrianglesNumDevice = sycl::malloc_device<unsigned int>(1, q);
+
+  // simulate rendering without memory allocation for vertices and triangles
+  unsigned long long *trianglesDevice = sycl::malloc_device<unsigned long long>(1, q);
+  float *coordXDevice = sycl::malloc_device<float>(1, q);
+  float *coordYDevice = sycl::malloc_device<float>(1, q);
+  float *coordZDevice = sycl::malloc_device<float>(1, q);
+  float *coordZPDevice = sycl::malloc_device<float>(1, q);
+
+  const sycl::range<3> BlockSizeLv1{ 1, voxelYLv1, voxelXLv1};
+  const sycl::range<3> GridSizeLv1{ gridZLv1, gridYLv1, gridXLv1 };
+  const sycl::range<2> BlockSizeLv2{ blockXLv2 * blockYLv2, voxelXLv2 * voxelYLv2 };
+  const sycl::range<3> BlockSizeGenerating{ voxelZLv2, voxelYLv2, voxelXLv2 };
 
   float isoValue(-0.9f);
 
@@ -347,150 +355,89 @@ int main(int argc, char* argv[])
   {
     q.wait();
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedBlockNumLv1Device.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0u);
-    });
+    q.memset(countedBlockNumLv1Device, 0, sizeof(unsigned int));
+    q.memset(countedBlockNumLv2Device, 0, sizeof(unsigned int));
+    q.memset(countedVerticesNumDevice, 0, sizeof(unsigned int));
+    q.memset(countedTrianglesNumDevice,0, sizeof(unsigned int));
+    q.memset(trianglesDevice, 0, sizeof(unsigned long long));
+    q.memset(coordXDevice, 0, sizeof(float));
+    q.memset(coordYDevice, 0, sizeof(float));
+    q.memset(coordZDevice, 0, sizeof(float));
+    q.memset(coordZPDevice, 0, sizeof(float));
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedBlockNumLv2Device.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0u);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = countedVerticesNumDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0u);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = countedTrianglesNumDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0u);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = trianglesDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0ull);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = coordXDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = coordYDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = coordZDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = coordZPDevice.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0.f);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto minMaxLv1 = minMaxLv1Device.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> smem(64, cgh);
-      cgh.parallel_for<class min_max1>(nd_range<3>(GridSizeLv1*BlockSizeLv1, BlockSizeLv1), [=] (nd_item<3> item) {
-        computeMinMaxLv1(minMaxLv1.get_pointer(), smem.get_pointer(), item);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> smem (sycl::range<1>(64), cgh);
+      cgh.parallel_for<class min_max1>(
+        sycl::nd_range<3>(GridSizeLv1*BlockSizeLv1, BlockSizeLv1), [=] (sycl::nd_item<3> item) {
+        computeMinMaxLv1(minMaxLv1Device, smem.get_pointer(), item);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto minMaxLv1 = minMaxLv1Device.get_access<sycl_read>(cgh);
-      auto blockIndicesLv1 = blockIndicesLv1Device.get_access<sycl_discard_write>(cgh);
-      auto countedBlockNumLv1 = countedBlockNumLv1Device.get_access<sycl_discard_write>(cgh);
-      accessor<unsigned int, 1, sycl_read_write, access::target::local> smem(32, cgh);
-      cgh.parallel_for<class compact1>(nd_range<1>(
-        range<1>(countingBlockNumLv1*countingThreadNumLv1), 
-        range<1>(countingThreadNumLv1)), [=] (nd_item<1> item) {
-        compactLv1(isoValue, 
-                     minMaxLv1.get_pointer(),
-                     blockIndicesLv1.get_pointer(),
-                     countedBlockNumLv1.get_pointer(),
-                     smem.get_pointer(),
-                     item);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<unsigned int, 1> smem (sycl::range<1>(32), cgh);
+      cgh.parallel_for<class compact1>(sycl::nd_range<1>(
+        sycl::range<1>(countingBlockNumLv1*countingThreadNumLv1),
+        sycl::range<1>(countingThreadNumLv1)), [=] (sycl::nd_item<1> item) {
+        compactLv1(isoValue,
+                   minMaxLv1Device,
+                   blockIndicesLv1Device,
+                   countedBlockNumLv1Device,
+                   smem.get_pointer(),
+                   item);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedBlockNumLv1Device.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &countedBlockNumLv1);
-    }).wait();
+    q.memcpy(&countedBlockNumLv1, countedBlockNumLv1Device, sizeof(unsigned int));
 
-    buffer<float, 1> minMaxLv2Device (countedBlockNumLv1 * voxelNumLv2 * 2);
+    float *minMaxLv2Device = sycl::malloc_device<float>(countedBlockNumLv1 * voxelNumLv2 * 2, q);
 
-    const range<2> GridSizeLv2 (1, countedBlockNumLv1);
+    const sycl::range<2> GridSizeLv2 (1, countedBlockNumLv1);
 
-    q.submit([&] (handler &cgh) {
-      auto blockIndicesLv1 = blockIndicesLv1Device.get_access<sycl_read>(cgh);
-      auto minMaxLv2 = minMaxLv2Device.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class min_max2>(nd_range<2>(GridSizeLv2*BlockSizeLv2, BlockSizeLv2), [=] (nd_item<2> item) {
-        computeMinMaxLv2(blockIndicesLv1.get_pointer(), minMaxLv2.get_pointer(), item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class min_max2>(
+        sycl::nd_range<2>(GridSizeLv2*BlockSizeLv2, BlockSizeLv2), [=] (sycl::nd_item<2> item) {
+        computeMinMaxLv2(blockIndicesLv1Device, minMaxLv2Device, item);
       });
     });
 
-    buffer<unsigned int, 1> blockIndicesLv2Device (countedBlockNumLv1 * voxelNumLv2);
+    unsigned int *blockIndicesLv2Device = sycl::malloc_device<unsigned int>(countedBlockNumLv1 * voxelNumLv2, q);
     unsigned int countingBlockNumLv2((countedBlockNumLv1 * voxelNumLv2 + countingThreadNumLv2 - 1) / countingThreadNumLv2);
 
-    q.submit([&] (handler &cgh) {
-      auto minMaxLv2 = minMaxLv2Device.get_access<sycl_read>(cgh);
-      auto blockIndicesLv1 = blockIndicesLv1Device.get_access<sycl_read>(cgh);
-      auto blockIndicesLv2 = blockIndicesLv2Device.get_access<sycl_discard_write>(cgh);
-      auto countedBlockNumLv2 = countedBlockNumLv2Device.get_access<sycl_discard_write>(cgh);
-      accessor<unsigned int, 1, sycl_read_write, access::target::local> smem(32, cgh);
-      cgh.parallel_for<class compact2>(nd_range<1>(
-        range<1>(countingBlockNumLv2*countingThreadNumLv2),
-        range<1>(countingThreadNumLv2)), [=] (nd_item<1> item) {
-        compactLv2(isoValue, 
-                     minMaxLv2.get_pointer(),
-                     blockIndicesLv1.get_pointer(),
-                     blockIndicesLv2.get_pointer(),
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<unsigned int, 1> smem (sycl::range<1>(32), cgh);
+      cgh.parallel_for<class compact2>(sycl::nd_range<1>(
+        sycl::range<1>(countingBlockNumLv2*countingThreadNumLv2),
+        sycl::range<1>(countingThreadNumLv2)), [=] (sycl::nd_item<1> item) {
+        compactLv2(isoValue,
+                     minMaxLv2Device,
+                     blockIndicesLv1Device,
+                     blockIndicesLv2Device,
                      countedBlockNumLv1,
-                     countedBlockNumLv2.get_pointer(),
+                     countedBlockNumLv2Device,
                      smem.get_pointer(),
                      item);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedBlockNumLv2Device.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &countedBlockNumLv2);
-    }).wait();
+    q.memcpy(&countedBlockNumLv2, countedBlockNumLv2Device, sizeof(unsigned int)).wait();
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto blockIndicesLv2 = blockIndicesLv2Device.get_access<sycl_read>(cgh);
-      auto distinctEdgesTable = distinctEdgesTableDevice.get_access<sycl_read>(cgh); 
-      auto triTable = triTableDevice.get_access<sycl_read>(cgh); 
-      auto edgeIDTable = edgeIDTableDevice.get_access<sycl_read>(cgh);
-      auto countedVerticesNum = countedVerticesNumDevice.get_access<sycl_read_write>(cgh); 
-      auto countedTrianglesNum = countedTrianglesNumDevice.get_access<sycl_read_write>(cgh); 
-      auto triangles = trianglesDevice.get_access<sycl_read_write>(cgh);
-      auto coordX = coordXDevice.get_access<sycl_read_write>(cgh); 
-      auto coordY = coordYDevice.get_access<sycl_read_write>(cgh); 
-      auto coordZ = coordZDevice.get_access<sycl_read_write>(cgh); 
-      auto coordZP = coordZPDevice.get_access<sycl_read_write>(cgh);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<unsigned short, 3> vertexIndices(sycl::range<3>{voxelZLv2, voxelYLv2, voxelXLv2}, cgh);
+      sycl::local_accessor<float, 3> value(sycl::range<3>{voxelZLv2+1, voxelYLv2+1, voxelXLv2+1}, cgh);
+      sycl::local_accessor<unsigned int, 1> sumsVertices(sycl::range<1>(32), cgh);
+      sycl::local_accessor<unsigned int, 1> sumsTriangles(sycl::range<1>(32), cgh);
 
-      accessor<unsigned short, 3, sycl_read_write, access::target::local> vertexIndices({voxelZLv2, voxelYLv2, voxelXLv2}, cgh);
-      accessor<float, 3, sycl_read_write, access::target::local> value({voxelZLv2+1, voxelYLv2+1, voxelXLv2+1}, cgh);
-      accessor<unsigned int, 1, sycl_read_write, access::target::local> sumsVertices(32, cgh);
-      accessor<unsigned int, 1, sycl_read_write, access::target::local> sumsTriangles(32, cgh);
-
-      const range<3> trianglesBlock (1,1,countedBlockNumLv2);
+      const sycl::range<3> trianglesBlock (1,1,countedBlockNumLv2);
       cgh.parallel_for<class triangles_gen>(
-        nd_range<3>(trianglesBlock*BlockSizeGenerating, BlockSizeGenerating), [=] (nd_item<3> item) {
+        sycl::nd_range<3>(trianglesBlock*BlockSizeGenerating, BlockSizeGenerating), [=] (sycl::nd_item<3> item) {
         auto sg = item.get_sub_group();
         unsigned int threadIdx_x = item.get_local_id(2);
         unsigned int threadIdx_y = item.get_local_id(1);
         unsigned int threadIdx_z = item.get_local_id(0);
 
-        unsigned int blockId(blockIndicesLv2[item.get_group(2)]);
+        unsigned int blockId(blockIndicesLv2Device[item.get_group(2)]);
         unsigned int tp(blockId);
         unsigned int x((tp % gridXLv2) * (voxelXLv2 - 1) + threadIdx_x);
         tp /= gridXLv2;
@@ -520,7 +467,7 @@ int main(int argc, char* argv[])
             value[voxelZLv2][threadIdx_y][voxelXLv2] = f(x + 1, y, z + 1);
         }
         eds <<= 13;
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         unsigned int cubeCase(0);
         if (value[threadIdx_z][threadIdx_y][threadIdx_x] < isoValue) cubeCase |= 1;
         if (value[threadIdx_z][threadIdx_y][threadIdx_x + 1] < isoValue) cubeCase |= 2;
@@ -531,7 +478,7 @@ int main(int argc, char* argv[])
         if (value[threadIdx_z + 1][threadIdx_y + 1][threadIdx_x + 1] < isoValue) cubeCase |= 64;
         if (value[threadIdx_z + 1][threadIdx_y + 1][threadIdx_x] < isoValue) cubeCase |= 128;
 
-        unsigned int distinctEdges(eds ? distinctEdgesTable[cubeCase] : 0);
+        unsigned int distinctEdges(eds ? distinctEdgesTableDevice[cubeCase] : 0);
         unsigned int numTriangles(eds != 0xe000 ? 0 : distinctEdges & 7);
         unsigned int numVertices(sycl::popcount(distinctEdges &= eds));
         unsigned int laneid = (threadIdx_x + voxelXLv2 * (threadIdx_y + voxelYLv2 * threadIdx_z)) % 32;
@@ -557,7 +504,7 @@ int main(int argc, char* argv[])
           sumsVertices[warpid] = sumVertices;
           sumsTriangles[warpid] = sumTriangles;
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if (warpid == 0)
         {
           unsigned warpSumVertices = sumsVertices[laneid];
@@ -576,7 +523,7 @@ int main(int argc, char* argv[])
           sumsVertices[laneid] = warpSumVertices;
           sumsTriangles[laneid] = warpSumTriangles;
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if (warpid != 0)
         {
           sumVertices += sumsVertices[warpid - 1];
@@ -584,44 +531,27 @@ int main(int argc, char* argv[])
         }
         if (eds == 0)
         {
-          //sumsVertices[31] = atomicAdd(countedVerticesNum, sumVertices);
-          //sumsTriangles[31] = atomicAdd(countedTrianglesNum, sumTriangles);
-          auto cv_ref = ext::oneapi::atomic_ref<unsigned int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (countedVerticesNum[0]);
-
-          auto ct_ref = ext::oneapi::atomic_ref<unsigned int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (countedTrianglesNum[0]);
-
-          sumsVertices[31] = cv_ref.fetch_add(sumVertices);
-          sumsTriangles[31] = ct_ref.fetch_add(sumTriangles);
+          sumsVertices[31] = atomicAdd(countedVerticesNumDevice, sumVertices);
+          sumsTriangles[31] = atomicAdd(countedTrianglesNumDevice, sumTriangles);
         }
 
         unsigned int interOffsetVertices(sumVertices - numVertices);
         sumVertices = interOffsetVertices + sumsVertices[31];//exclusive offset
         sumTriangles = sumTriangles + sumsTriangles[31] - numTriangles;//exclusive offset
         vertexIndices[threadIdx_z][threadIdx_y][threadIdx_x] = interOffsetVertices | distinctEdges;
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         for (unsigned int c0(0); c0 < numTriangles; ++c0)
         {
           #pragma unroll
           for (unsigned int c1(0); c1 < 3; ++c1)
           {
-            int edgeID(triTable[16 * cubeCase + 3 * c0 + c1]);
-            uchar4 edgePos(edgeIDTable[edgeID]);
+            int edgeID(triTableDevice[16 * cubeCase + 3 * c0 + c1]);
+            uchar4 edgePos(edgeIDTableDevice[edgeID]);
             unsigned short vertexIndex(
               vertexIndices[threadIdx_z + edgePos.z()][threadIdx_y + edgePos.y()][threadIdx_x + edgePos.x()]);
             unsigned int tp(sycl::popcount(vertexIndex >> (16 - edgePos.w())) + (vertexIndex & 0x1fff));
-            //atomicAdd(triangles, (unsigned long long)(sumsVertices[31] + tp));
-            auto triangles_ref = ext::oneapi::atomic_ref<unsigned long long, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (triangles[0]);
-            triangles_ref.fetch_add((unsigned long long)(sumsVertices[31] + tp));
+            atomicAdd(trianglesDevice, (unsigned long long)(sumsVertices[31] + tp));
           }
         }
 
@@ -646,50 +576,23 @@ int main(int argc, char* argv[])
           cy += transformToCoord(y);
           zp += zeroPoint(z, v, value[threadIdx_z + 1][threadIdx_y][threadIdx_x], isoValue);
         }
-        //atomicAdd(coordX, cx);
-        //atomicAdd(coordY, cy);
-        //atomicAdd(coordZ, cz);
-        //atomicAdd(coordZP, zp);
-        auto x_ref = ext::oneapi::atomic_ref<float, 
-          ext::oneapi::memory_order::relaxed,
-          ext::oneapi::memory_scope::device,
-          access::address_space::global_space> (coordX[0]);
-        x_ref.fetch_add(cx);
-
-        auto y_ref = ext::oneapi::atomic_ref<float, 
-          ext::oneapi::memory_order::relaxed,
-          ext::oneapi::memory_scope::device,
-          access::address_space::global_space> (coordY[0]);
-        y_ref.fetch_add(cy);
-
-        auto z_ref = ext::oneapi::atomic_ref<float, 
-          ext::oneapi::memory_order::relaxed,
-          ext::oneapi::memory_scope::device,
-          access::address_space::global_space> (coordZ[0]);
-        z_ref.fetch_add(cz);
-
-        auto zp_ref = ext::oneapi::atomic_ref<float, 
-          ext::oneapi::memory_order::relaxed,
-          ext::oneapi::memory_scope::device,
-          access::address_space::global_space> (coordZP[0]);
-        zp_ref.fetch_add(zp);
+        atomicAdd(coordXDevice, cx);
+        atomicAdd(coordYDevice, cy);
+        atomicAdd(coordZDevice, cz);
+        atomicAdd(coordZPDevice, zp);
       });
-    });
+    }).wait();
 
-    q.wait();
     auto end = std::chrono::steady_clock::now();
     auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     time += ktime;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedVerticesNumDevice.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &countedVerticesNum);
-    }).wait();
+    q.memcpy(&countedVerticesNum, countedVerticesNumDevice, sizeof(unsigned int));
+    q.memcpy(&countedTrianglesNum, countedTrianglesNumDevice, sizeof(unsigned int));
+    q.wait();
 
-    q.submit([&] (handler &cgh) {
-      auto acc = countedTrianglesNumDevice.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &countedTrianglesNum);
-    }).wait();
+    sycl::free(minMaxLv2Device, q);
+    sycl::free(blockIndicesLv2Device, q);
   }
 
   printf("Block Lv1: %u\nBlock Lv2: %u\n", countedBlockNumLv1, countedBlockNumLv2);
@@ -703,5 +606,19 @@ int main(int argc, char* argv[])
              countedVerticesNum == 4856560 && countedTrianglesNum == 6101640);
   printf("%s\n", ok ? "PASS" : "FAIL");
 
+  sycl::free(minMaxLv1Device, q);
+  sycl::free(blockIndicesLv1Device, q);
+  sycl::free(countedBlockNumLv1Device, q);
+  sycl::free(countedBlockNumLv2Device, q);
+  sycl::free(distinctEdgesTableDevice, q);
+  sycl::free(triTableDevice, q);
+  sycl::free(edgeIDTableDevice, q);
+  sycl::free(countedVerticesNumDevice, q);
+  sycl::free(countedTrianglesNumDevice, q);
+  sycl::free(trianglesDevice, q);
+  sycl::free(coordXDevice, q);
+  sycl::free(coordYDevice, q);
+  sycl::free(coordZDevice, q);
+  sycl::free(coordZPDevice, q);
   return 0;
 }
