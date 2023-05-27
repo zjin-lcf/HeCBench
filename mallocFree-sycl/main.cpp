@@ -50,7 +50,7 @@ void setup(size_t *size, int &num, int **pA, const size_t totalGlobalMem) {
 void testInit(sycl::queue &q, size_t size, int type) {
   printf("Initial allocation and deallocation\n");
 
-  int *Ad;
+  int *Ad = nullptr;
   auto start = Clock();
   if (type == 0)
     Ad = (int *)sycl::malloc_shared(size, q);
@@ -95,11 +95,10 @@ int main(int argc, char* argv[])
   setup(size, num, &A, totalGlobalMem);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   printf("\n==== Evaluate malloc_shared and free ====\n");
   testInit(q, size[0], 0);

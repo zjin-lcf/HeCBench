@@ -51,7 +51,7 @@ void testInit(size_t size, int type) {
 
   printf("Initial allocation and deallocation\n");
 
-  int *Ad;
+  int *Ad = nullptr;
   auto start = Clock();
   if (type == 0)
     cudaMallocManaged(&Ad, size);
