@@ -1,6 +1,6 @@
 #include <math.h>
 #include <stdio.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // minimal data needed to compute forces on a device
 typedef struct atom_t {
@@ -15,9 +15,18 @@ typedef struct atom_t {
   double polar=0; // polarizability
 } d_atom;
 
+inline void atomicAdd(double &var, double val) 
+{
+  auto atm = sycl::atomic_ref<double,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  atm.fetch_add(val);
+}
+
 void calculateForceKernel(
-  nd_item<1> &item,
-  d_atom *__restrict atom_list, 
+  sycl::nd_item<1> &item,
+  d_atom *__restrict atom_list,
   const int N,
   const double cutoffD,
   const double *__restrict basis,
@@ -103,12 +112,7 @@ void calculateForceKernel(
           for (n=0; n<3; n++) {
             holder = 24.0*dimg[n]*eps*(2*(s6*s6)/(r6*r6*rsq) - s6/(r6*rsq));
 
-            // atomicAdd(&(atom_list[j].f[n]), -holder);
-            auto alr = ext::oneapi::atomic_ref<double, 
-                       ext::oneapi::memory_order::relaxed,
-                       ext::oneapi::memory_scope::device,
-                       access::address_space::global_space> (atom_list[j].f[n]);
-            alr.fetch_add(-holder);
+            atomicAdd(atom_list[j].f[n], -holder);
             af[n] += holder;
           }
         }
@@ -116,12 +120,7 @@ void calculateForceKernel(
 
       // finally add the accumulated forces (stored on register) to the anchor atom
       for (n=0; n<3; n++) {
-        // atomicAdd(&(atom_list[i].f[n]), af[n]);
-        auto alr = ext::oneapi::atomic_ref<double, 
-                   ext::oneapi::memory_order::relaxed,
-                   ext::oneapi::memory_scope::device,
-                   access::address_space::global_space> (atom_list[i].f[n]);
-        alr.fetch_add(af[n]);
+        atomicAdd(atom_list[i].f[n], af[n]);
       }
 
     } // end if LJ
@@ -183,15 +182,10 @@ void calculateForceKernel(
           chargeprod = anchoratom.charge * atom_list[j].charge;
           for (n=0; n<3; n++) u[n] = dimg[n]/rimg;
           for (n=0; n<3; n++) {
-            holder = -((-2.0 * chargeprod * alpha * sycl::exp(-alpha*alpha*rsq)) / (sqrtPI*rimg) - 
+            holder = -((-2.0 * chargeprod * alpha * sycl::exp(-alpha*alpha*rsq)) / (sqrtPI*rimg) -
                        (chargeprod * sycl::erfc(alpha*rimg)/rsq)) * u[n];
             af[n] += holder;
-            //atomicAdd(&(atom_list[j].f[n]), -holder);
-            auto alr = ext::oneapi::atomic_ref<double, 
-                       ext::oneapi::memory_order::relaxed,
-                       ext::oneapi::memory_scope::device,
-                       access::address_space::global_space> (atom_list[j].f[n]);
-            alr.fetch_add(-holder);
+            atomicAdd(atom_list[j].f[n], -holder);
           }
         }
         // k-space
@@ -217,13 +211,7 @@ void calculateForceKernel(
                     sycl::sin(k[0]*dimg[0] + k[1]*dimg[1] + k[2]*dimg[2])/k_sq * 2; // times 2 b/c half-Ewald sphere
 
                   af[n] += holder;
-                  // atomicAdd(&(atom_list[j].f[n]), -holder);
-                  auto alr = ext::oneapi::atomic_ref<double, 
-                             ext::oneapi::memory_order::relaxed,
-                             ext::oneapi::memory_scope::device,
-                             access::address_space::global_space> (atom_list[j].f[n]);
-                  alr.fetch_add(-holder);
-
+                  atomicAdd(atom_list[j].f[n], -holder);
                 } // end for l[2], n
               } // end for l[1], m
             } // end for l[0], l
@@ -234,12 +222,7 @@ void calculateForceKernel(
 
       // finally add ES contribution to anchor-atom
       for (n=0; n<3; n++) {
-        // atomicAdd(&(atom_list[i].f[n]), af[n]);
-        auto alr = ext::oneapi::atomic_ref<double, 
-                   ext::oneapi::memory_order::relaxed,
-                   ext::oneapi::memory_scope::device,
-                   access::address_space::global_space> (atom_list[i].f[n]);
-        alr.fetch_add(af[n]);
+        atomicAdd(atom_list[i].f[n], af[n]);
       }
     } // end ES component
 
@@ -259,7 +242,7 @@ void calculateForceKernel(
         for (n=0; n<3; n++) af[n] = 0; // reset local force for this pair.
         if (anchoratom.molid == atom_list[j].molid) continue; // no same-molecule
         // get R (nearest image)
-        
+
         for (n=0; n<3; n++) d[n] = anchoratom.pos[n] - atom_list[j].pos[n];
         for (n=0; n<3; n++) {
           img[n]=0;
@@ -356,19 +339,8 @@ void calculateForceKernel(
 
         // apply Newton for pair.
         for (n=0; n<3; n++) {
-          // atomicAdd(&(atom_list[i].f[n]), af[n]);
-          // atomicAdd(&(atom_list[j].f[n]), -af[n]);
-          auto apr = ext::oneapi::atomic_ref<double, 
-                     ext::oneapi::memory_order::relaxed,
-                     ext::oneapi::memory_scope::device,
-                     access::address_space::global_space> (atom_list[i].f[n]);
-          apr.fetch_add(af[n]);
-
-          auto aqr = ext::oneapi::atomic_ref<double, 
-                     ext::oneapi::memory_order::relaxed,
-                     ext::oneapi::memory_scope::device,
-                     access::address_space::global_space> (atom_list[j].f[n]);
-          aqr.fetch_add(-af[n]);
+          atomicAdd(atom_list[i].f[n], af[n]);
+          atomicAdd(atom_list[j].f[n], -af[n]);
         }
       } // end pair loop with atoms j
     } // end polarization forces
@@ -377,7 +349,7 @@ void calculateForceKernel(
 
 void force_kernel(
     sycl::queue &q,
-    const int total_atoms, 
+    const int total_atoms,
     const int block_size,
     const int pform,
     const double cutoff,
@@ -389,30 +361,39 @@ void force_kernel(
     const double *h_rbasis,
     d_atom *h_atom_list)
 {
-  sycl::buffer<double, 1> d_basis (h_basis, 9);
-  sycl::buffer<double, 1> d_rbasis (h_basis, 9);
-  sycl::buffer<d_atom, 1> d_atom_list (h_atom_list, total_atoms);
+  const int basis_size = sizeof(double) * 9;
+  const int atoms_size = sizeof(d_atom) * total_atoms;
+
+  double *d_basis = sycl::malloc_device<double>(9, q);
+  q.memcpy(d_basis, h_basis, basis_size);
+  double *d_rbasis = sycl::malloc_device<double>(9, q);
+  q.memcpy(d_rbasis, h_rbasis, basis_size);
+  d_atom *d_atom_list = sycl::malloc_device<d_atom>(total_atoms, q);
+  q.memcpy(d_atom_list, h_atom_list, atoms_size);
 
   sycl::range<1> gws ( ceil((float)total_atoms/block_size) * block_size );
   sycl::range<1> lws ( block_size );
- 
+
   q.submit([&] (sycl::handler &cgh) {
-    auto basis = d_basis.get_access<sycl_read>(cgh); 
-    auto rbasis = d_rbasis.get_access<sycl_read>(cgh); 
-    auto atoms = d_atom_list.get_access<sycl_read_write>(cgh); 
-    cgh.parallel_for<class calc_force>(sycl::nd_range<1>(gws, lws), 
-                                       [=] (sycl::nd_item<1> item) {
+    cgh.parallel_for<class calc_force>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       calculateForceKernel(item,
-                           atoms.get_pointer(),
+                           d_atom_list,
                            total_atoms,
-                           cutoff, 
-                           basis.get_pointer(),
-                           rbasis.get_pointer(), 
+                           cutoff,
+                           d_basis,
+                           d_rbasis,
                            pform,
                            ewald_alpha,
                            ewald_kmax,
                            kspace_option,
                            polar_damp);
     });
-  }).wait();
+  });
+
+  q.memcpy(h_atom_list, d_atom_list, atoms_size).wait();
+
+  sycl::free(d_atom_list, q);
+  sycl::free(d_basis, q);
+  sycl::free(d_rbasis, q);
 }
