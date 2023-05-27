@@ -120,7 +120,7 @@ template <class T>
 class mmadd8;
 
 template <class T>
-void Add1(nd_item<1> &item, T *data, int nIters, T v) {
+void Add1(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid];
   for (int j=0 ; j<nIters ; ++j) {
@@ -134,7 +134,7 @@ void Add1(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Add2(nd_item<1> &item, T *data, int nIters, T v) {
+void Add2(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s;
   for (int j=0 ; j<nIters ; ++j) {
@@ -148,7 +148,7 @@ void Add2(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Add4(nd_item<1> &item, T *data, int nIters, T v) {
+void Add4(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2;
   for (int j=0 ; j<nIters ; ++j) {
@@ -162,7 +162,7 @@ void Add4(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Add8(nd_item<1> &item, T *data, int nIters, T v) {
+void Add8(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2, s5=8.0f-s, s6=8.0f-s2, s7=7.0f-s, s8=7.0f-s2;
   for (int j=0 ; j<nIters ; ++j) {
@@ -176,7 +176,7 @@ void Add8(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Mul1(nd_item<1> &item, T *data, int nIters, T v) {
+void Mul1(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid]-data[gid]+0.999f;
   for (int j=0 ; j<nIters ; ++j) {
@@ -190,7 +190,7 @@ void Mul1(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Mul2(nd_item<1> &item, T *data, int nIters, T v) {
+void Mul2(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid]-data[gid]+0.999f, s2=s-0.0001f;
   for (int j=0 ; j<nIters ; ++j) {
@@ -204,7 +204,7 @@ void Mul2(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Mul4(nd_item<1> &item, T *data, int nIters, T v) {
+void Mul4(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
   T s = data[gid]-data[gid]+0.999f, s2=s-0.0001f, s3=s-0.0002f, s4=s-0.0003f;
   for (int j=0 ; j<nIters ; ++j) {
@@ -218,9 +218,9 @@ void Mul4(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void Mul8(nd_item<1> &item, T *data, int nIters, T v) {
+void Mul8(sycl::nd_item<1> &item, T *data, int nIters, T v) {
   int gid = item.get_global_id(0);
-  T s = data[gid]-data[gid]+0.999f, s2=s-0.0001f, s3=s-0.0002f, 
+  T s = data[gid]-data[gid]+0.999f, s2=s-0.0001f, s3=s-0.0002f,
     s4=s-0.0003f, s5=s-0.0004f, s6=s-0.0005f, s7=s-0.0006f, s8=s-0.0007f;
   for (int j=0 ; j<nIters ; ++j) {
      /* Each macro op has 5 operations.
@@ -233,7 +233,7 @@ void Mul8(nd_item<1> &item, T *data, int nIters, T v) {
 }
 
 template <class T>
-void MAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MAdd1(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid];
   for (int j=0 ; j<nIters ; ++j) {
@@ -247,7 +247,7 @@ void MAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MAdd2(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MAdd2(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s;
   for (int j=0 ; j<nIters ; ++j) {
@@ -261,7 +261,7 @@ void MAdd2(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MAdd4(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MAdd4(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2;
   for (int j=0 ; j<nIters ; ++j) {
@@ -275,9 +275,9 @@ void MAdd4(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MAdd8(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MAdd8(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
-  T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2, 
+  T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2,
     s5=8.0f-s, s6=8.0f-s2, s7=7.0f-s, s8=7.0f-s2;
   for (int j=0 ; j<nIters ; ++j) {
      /* Each macro op has 5 operations.
@@ -290,7 +290,7 @@ void MAdd8(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MulMAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MulMAdd1(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid];
   for (int j=0 ; j<nIters ; ++j) {
@@ -304,7 +304,7 @@ void MulMAdd1(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MulMAdd2(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MulMAdd2(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s;
   for (int j=0 ; j<nIters ; ++j) {
@@ -318,7 +318,7 @@ void MulMAdd2(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MulMAdd4(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MulMAdd4(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2;
   for (int j=0 ; j<nIters ; ++j) {
@@ -332,7 +332,7 @@ void MulMAdd4(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
 }
 
 template <class T>
-void MulMAdd8(nd_item<1> &item, T *data, int nIters, T v1, T v2) {
+void MulMAdd8(sycl::nd_item<1> &item, T *data, int nIters, T v1, T v2) {
   int gid = item.get_global_id(0);
   T s = data[gid], s2=10.0f-s, s3=9.0f-s, s4=9.0f-s2,
     s5=8.0f-s, s6=8.0f-s2, s7=7.0f-s, s8=7.0f-s2;
