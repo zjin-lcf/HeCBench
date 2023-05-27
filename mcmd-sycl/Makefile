@@ -28,7 +28,7 @@ obj = main.o force_kernel.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I../include -I../mcmd-cuda -fsycl \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I../mcmd-cuda -fsycl \
           -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES -D__STRICT_ANSI__ \
           -DSYCL
 
@@ -40,16 +40,14 @@ ifeq ($(GPU),yes)
 endif
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN) \
-            -DSYCL_USE_NATIVE_FP_ATOMICS
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
-            -DSYCL_USE_NATIVE_FP_ATOMICS
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
 endif
 
 # Debug Flags
