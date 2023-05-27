@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Each block transposes/copies a tile of TILE_DIM x TILE_DIM elements
 // using TILE_DIM x BLOCK_ROWS threads, so that each thread transposes
@@ -29,7 +29,7 @@ int MUL_FACTOR    = TILE_DIM;
 int MAX_TILES = (FLOOR(MATRIX_SIZE_X,512) * FLOOR(MATRIX_SIZE_Y,512)) / (TILE_DIM *TILE_DIM);
 
 #define __syncthreads() \
-  item.barrier(access::fence_space::local_space)
+  item.barrier(sycl::access::fence_space::local_space)
 
 // -------------------------------------------------------
 // Copies
@@ -37,7 +37,7 @@ int MAX_TILES = (FLOOR(MATRIX_SIZE_X,512) * FLOOR(MATRIX_SIZE_Y,512)) / (TILE_DI
 // -------------------------------------------------------
 
 void copy(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict odata,
   const float *__restrict idata,
   int width, int height)
@@ -54,7 +54,7 @@ void copy(
 }
 
 void copySharedMem(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -93,7 +93,7 @@ void copySharedMem(
 // -------------------------------------------------------
 
 void transposeNaive(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict odata,
   const float *__restrict idata,
   int width, int height)
@@ -116,7 +116,7 @@ void transposeNaive(
 // coalesced transpose (with bank conflicts)
 
 void transposeCoalesced(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -151,7 +151,7 @@ void transposeCoalesced(
 // Coalesced transpose with no bank conflicts
 
 void transposeNoBankConflicts(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -195,7 +195,7 @@ void transposeNoBankConflicts(
 // bloclIdx.y with the subscripted versions in the remaining code
 
 void transposeDiagonal(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -256,7 +256,7 @@ void transposeDiagonal(
 // --------------------------------------------------------------------
 
 void transposeFineGrained(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -286,7 +286,7 @@ void transposeFineGrained(
 
 
 void transposeCoarseGrained(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict tile,
         float *__restrict odata,
   const float *__restrict idata,
@@ -369,18 +369,16 @@ int main(int argc, char **argv)
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   const char *kernelName;
 
   // execution configuration parameters
-  range<2> gws (size_y/TILE_DIM * BLOCK_ROWS,
-                size_x/TILE_DIM * TILE_DIM); 
-  range<2> lws (BLOCK_ROWS, TILE_DIM);
+  sycl::range<2> gws (size_y/TILE_DIM * BLOCK_ROWS, size_x/TILE_DIM * TILE_DIM);
+  sycl::range<2> lws (BLOCK_ROWS, TILE_DIM);
 
   if (size_y/TILE_DIM < 1 || size_x/TILE_DIM < 1)
   {
@@ -405,8 +403,10 @@ int main(int argc, char **argv)
   }
 
   // allocate device memory
-  buffer<float, 1> d_idata (h_idata, mat_size);
-  buffer<float, 1> d_odata (mat_size);
+  float *d_idata = sycl::malloc_device<float>(mat_size, q);
+  q.memcpy(d_idata, h_idata, sizeof(float) * mat_size).wait();
+
+  float *d_odata = sycl::malloc_device<float>(mat_size, q);
 
   // Compute reference transpose solution
   computeTransposeGold(transposeGold, h_idata, size_x, size_y);
@@ -430,14 +430,10 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            cgh.parallel_for<class simple_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-              copy(item,
-                   odata.get_pointer(),
-                   idata.get_pointer(),
-                   size_x, size_y);
+          q.submit([&] (sycl::handler &cgh) {
+            cgh.parallel_for<class simple_copy>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+              copy(item, d_odata, d_idata, size_x, size_y);
             });
           });
         }
@@ -454,16 +450,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
-            cgh.parallel_for<class shared_mem_copy>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*TILE_DIM), cgh);
+            cgh.parallel_for<class shared_mem_copy>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               copySharedMem(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -481,14 +476,12 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            cgh.parallel_for<class naive>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            cgh.parallel_for<class naive>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeNaive(
                 item,
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -506,16 +499,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*TILE_DIM, cgh);
-            cgh.parallel_for<class coalesced>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*TILE_DIM), cgh);
+            cgh.parallel_for<class coalesced>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeCoalesced(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -533,16 +525,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-            cgh.parallel_for<class optimized>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*(TILE_DIM+1)), cgh);
+            cgh.parallel_for<class optimized>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeNoBankConflicts(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -560,16 +551,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-            cgh.parallel_for<class coarse_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*(TILE_DIM+1)), cgh);
+            cgh.parallel_for<class coarse_grained>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeCoarseGrained(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -587,16 +577,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-            cgh.parallel_for<class fine_grained>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*(TILE_DIM+1)), cgh);
+            cgh.parallel_for<class fine_grained>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeFineGrained(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -614,16 +603,15 @@ int main(int argc, char **argv)
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          q.submit([&] (handler &cgh) {
-            auto odata = d_odata.get_access<sycl_discard_write>(cgh);
-            auto idata = d_idata.get_access<sycl_read>(cgh);
-            accessor<float, 1, sycl_read_write, sycl_lmem> sm (TILE_DIM*(TILE_DIM+1), cgh);
-            cgh.parallel_for<class diagonal>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> sm (sycl::range<1>(TILE_DIM*(TILE_DIM+1)), cgh);
+            cgh.parallel_for<class diagonal>(
+              sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeDiagonal(
                 item,
                 sm.get_pointer(),
-                odata.get_pointer(),
-                idata.get_pointer(),
+                d_odata,
+                d_idata,
                 size_x, size_y);
             });
           });
@@ -637,10 +625,7 @@ int main(int argc, char **argv)
       break;
     }
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_odata.get_access<sycl_read>(cgh);
-      cgh.copy(acc, h_odata);
-    }).wait();
+    q.memcpy(h_odata, d_odata, mem_size).wait();
 
     // set reference solution
     if (k == 0 || k == 1)
@@ -655,7 +640,7 @@ int main(int argc, char **argv)
     {
       gold = transposeGold;
     }
-    
+
     bool ok = true;
     for (int i = 0; i < size_x*size_y; i++)
       if (fabsf(gold[i] - h_odata[i]) > 0.01f) {
@@ -676,6 +661,8 @@ int main(int argc, char **argv)
   free(h_idata);
   free(h_odata);
   free(transposeGold);
+  sycl::free(d_idata, q);
+  sycl::free(d_odata, q);
 
   return 0;
 }
