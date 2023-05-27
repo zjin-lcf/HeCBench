@@ -18,7 +18,6 @@ void test (const int repeat, const int numFloats)
   {
     // warmup
     for (int i = 0; i < 4; i++) {
-      #pragma omp target update to (hostMem[0:numFloats])
       Add1<T>(hostMem, numFloats, repeat, 10.0);
       Add2<T>(hostMem, numFloats, repeat, 10.0);
       Add4<T>(hostMem, numFloats, repeat, 10.0);
@@ -55,7 +54,6 @@ void test (const int repeat, const int numFloats)
 
     // warmup
     for (int i = 0; i < 4; i++) {
-      #pragma omp target update to (hostMem[0:numFloats])
       Mul1<T>(hostMem, numFloats, repeat, 1.01);
       Mul2<T>(hostMem, numFloats, repeat, 1.01);
       Mul4<T>(hostMem, numFloats, repeat, 1.01);
@@ -91,7 +89,6 @@ void test (const int repeat, const int numFloats)
 
     // warmup
     for (int i = 0; i < 4; i++) {
-      #pragma omp target update to (hostMem[0:numFloats])
       MAdd1<T>(hostMem, numFloats, repeat, 10.0, 0.9899);
       MAdd2<T>(hostMem, numFloats, repeat, 10.0, 0.9899);
       MAdd4<T>(hostMem, numFloats, repeat, 10.0, 0.9899);
@@ -128,7 +125,6 @@ void test (const int repeat, const int numFloats)
 
     // warmup
     for (int i = 0; i < 4; i++) {
-      #pragma omp target update to (hostMem[0:numFloats])
       MulMAdd1<T>(hostMem, numFloats, repeat, 3.75, 0.355);
       MulMAdd2<T>(hostMem, numFloats, repeat, 3.75, 0.355);
       MulMAdd4<T>(hostMem, numFloats, repeat, 3.75, 0.355);
