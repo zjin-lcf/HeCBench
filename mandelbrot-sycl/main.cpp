@@ -8,7 +8,7 @@
 #include "util.hpp"
 #include "mandel.hpp"
 
-void Execute(queue &q) {
+void Execute(sycl::queue &q) {
   // Demonstrate the Mandelbrot calculation serial and parallel
   MandelParallel m_par(row_size, col_size, max_iterations);
   MandelSerial m_ser(row_size, col_size, max_iterations);
@@ -22,7 +22,7 @@ void Execute(queue &q) {
   //
   common::MyTimer t_par;
 
-  for (int i = 0; i < repetitions; ++i) 
+  for (int i = 0; i < repetitions; ++i)
     kernel_time += m_par.Evaluate(q);
 
   common::Duration parallel_time = t_par.elapsed();
@@ -61,11 +61,10 @@ int main(int argc, char *argv[]) {
 
   try {
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel, property::queue::in_order());
 
     repetitions = atoi(argv[1]);
     Execute(q);
