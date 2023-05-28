@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "WKFUtils.h"
 #include <sycl/sycl.hpp>
+#include "WKFUtils.h"
 
 #define SEP printf("\n")
 
@@ -73,23 +73,40 @@ void run_gpu_kernel(
           float *val)
 {
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   wkf_timerhandle timer = wkf_timer_create();
 
   //Allocate memory for programs and kernels
-  sycl::buffer<float, 1> ax_mem (ax, natom);
-  sycl::buffer<float, 1> ay_mem (ay, natom);
-  sycl::buffer<float, 1> az_mem (az, natom);
-  sycl::buffer<float, 1> charge_mem (charge, natom);
-  sycl::buffer<float, 1> size_mem (size, natom);
-  sycl::buffer<float, 1> gx_mem (gx, ngadj);
-  sycl::buffer<float, 1> gy_mem (gy, ngadj);
-  sycl::buffer<float, 1> gz_mem (gz, ngadj);
-  sycl::buffer<float, 1> val_mem (ngadj);
+  float *d_ax = sycl::malloc_device<float>(natom, q);
+  q.memcpy(d_ax, ax, sizeof(float)*natom);
+
+  float *d_ay = sycl::malloc_device<float>(natom, q);
+  q.memcpy(d_ay, ay, sizeof(float)*natom);
+
+  float *d_az = sycl::malloc_device<float>(natom, q);
+  q.memcpy(d_az, az, sizeof(float)*natom);
+
+  float *d_charge = sycl::malloc_device<float>(natom, q);
+  q.memcpy(d_charge, charge, sizeof(float)*natom);
+
+  float *d_size = sycl::malloc_device<float>(natom, q);
+  q.memcpy(d_size, size, sizeof(float)*natom);
+
+  float *d_gx = sycl::malloc_device<float>(ngadj, q);
+  q.memcpy(d_gx, gx, sizeof(float)*ngadj);
+
+  float *d_gy = sycl::malloc_device<float>(ngadj, q);
+  q.memcpy(d_gy, gy, sizeof(float)*ngadj);
+
+  float *d_gz = sycl::malloc_device<float>(ngadj, q);
+  q.memcpy(d_gz, gz, sizeof(float)*ngadj);
+
+  float *d_val = sycl::malloc_device<float>(ngadj, q);
+  q.wait();
 
   wkf_timer_start(timer);
 
@@ -98,43 +115,29 @@ void run_gpu_kernel(
   sycl::range<1> gws (ngadj / 4);
   sycl::range<1> lws (wgsize);
 
-  auto gx_mem_re = gx_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
-  auto gy_mem_re = gy_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
-  auto gz_mem_re = gz_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
-  auto val_mem_re = val_mem.reinterpret<sycl::float4>(sycl::range<1>(ngadj/4));
-
   for(int n = 0; n < itmax; n++) {
     if (choice == 0)
       q.submit([&] (sycl::handler &cgh) {
-        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
-        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
-        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
-        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
-        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
-        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        sycl::local_accessor<float> shared(sycl::range<1>(5*wgsize), cgh);
         cgh.parallel_for<class mdh_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
           sycl::float4 v (0.0f);
-          sycl::float4 lgx = gx[igrid];
-          sycl::float4 lgy = gy[igrid];
-          sycl::float4 lgz = gz[igrid];
+          sycl::float4 lgx = reinterpret_cast<const sycl::float4*>(d_gx)[igrid];
+          sycl::float4 lgy = reinterpret_cast<const sycl::float4*>(d_gy)[igrid];
+          sycl::float4 lgz = reinterpret_cast<const sycl::float4*>(d_gz)[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
             if((jatom+lsize) > natom) lsize = natom - jatom;
 
             if((jatom + lid) < natom) {
-              shared[lid * 5    ] = ax[jatom + lid];
-              shared[lid * 5 + 1] = ay[jatom + lid];
-              shared[lid * 5 + 2] = az[jatom + lid];
-              shared[lid * 5 + 3] = charge[jatom + lid];
-              shared[lid * 5 + 4] = size[jatom + lid];
+              shared[lid * 5    ] = d_ax[jatom + lid];
+              shared[lid * 5 + 1] = d_ay[jatom + lid];
+              shared[lid * 5 + 2] = d_az[jatom + lid];
+              shared[lid * 5 + 3] = d_charge[jatom + lid];
+              shared[lid * 5 + 4] = d_size[jatom + lid];
             }
             item.barrier(sycl::access::fence_space::local_space);
 
@@ -149,40 +152,31 @@ void run_gpu_kernel(
             }
             item.barrier(sycl::access::fence_space::local_space);
           }
-          val[ igrid ] = v;
+          reinterpret_cast<sycl::float4*>(d_val)[ igrid ] = v;
         });
       });
     else if (choice == 1)
       q.submit([&] (sycl::handler &cgh) {
-        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
-        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
-        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
-        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
-        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
-        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        sycl::local_accessor<float> shared(sycl::range<1>(5*wgsize), cgh);
         cgh.parallel_for<class mdh2_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
           sycl::float4 v (0.0f);
-          sycl::float4 lgx = gx[igrid];
-          sycl::float4 lgy = gy[igrid];
-          sycl::float4 lgz = gz[igrid];
+          sycl::float4 lgx = reinterpret_cast<const sycl::float4*>(d_gx)[igrid];
+          sycl::float4 lgy = reinterpret_cast<const sycl::float4*>(d_gy)[igrid];
+          sycl::float4 lgz = reinterpret_cast<const sycl::float4*>(d_gz)[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
             if((jatom+lsize) > natom) lsize = natom - jatom;
 
             if((jatom + lid) < natom) {
-              shared[lid          ] = ax[jatom + lid];
-              shared[lid +   lsize] = ay[jatom + lid];
-              shared[lid + 2*lsize] = az[jatom + lid];
-              shared[lid + 3*lsize] = charge[jatom + lid];
-              shared[lid + 4*lsize] = size[jatom + lid];
+              shared[lid          ] = d_ax[jatom + lid];
+              shared[lid +   lsize] = d_ay[jatom + lid];
+              shared[lid + 2*lsize] = d_az[jatom + lid];
+              shared[lid + 3*lsize] = d_charge[jatom + lid];
+              shared[lid + 4*lsize] = d_size[jatom + lid];
             }
             item.barrier(sycl::access::fence_space::local_space);
 
@@ -198,40 +192,31 @@ void run_gpu_kernel(
             }
             item.barrier(sycl::access::fence_space::local_space);
           }
-          val[ igrid ] = v;
+          reinterpret_cast<sycl::float4*>(d_val)[ igrid ] = v;
         });
       });
     else
       q.submit([&] (sycl::handler &cgh) {
-        auto ax = ax_mem.get_access<sycl::access::mode::read>(cgh);
-        auto ay = ay_mem.get_access<sycl::access::mode::read>(cgh);
-        auto az = az_mem.get_access<sycl::access::mode::read>(cgh);
-        auto charge = charge_mem.get_access<sycl::access::mode::read>(cgh);
-        auto size = size_mem.get_access<sycl::access::mode::read>(cgh);
-        auto gx = gx_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gy = gy_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto gz = gz_mem_re.get_access<sycl::access::mode::read>(cgh);
-        auto val = val_mem_re.get_access<sycl::access::mode::discard_write>(cgh);
-        sycl::local_accessor<float> shared(5*wgsize, cgh);
+        sycl::local_accessor<float> shared(sycl::range<1>(5*wgsize), cgh);
         cgh.parallel_for<class mdh3_v4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int igrid = item.get_global_id(0);
           int lsize = item.get_local_range(0);
           int lid = item.get_local_id(0);
           sycl::float4 v (0.0f);
-          sycl::float4 lgx = gx[igrid];
-          sycl::float4 lgy = gy[igrid];
-          sycl::float4 lgz = gz[igrid];
+          sycl::float4 lgx = reinterpret_cast<const sycl::float4*>(d_gx)[igrid];
+          sycl::float4 lgy = reinterpret_cast<const sycl::float4*>(d_gy)[igrid];
+          sycl::float4 lgz = reinterpret_cast<const sycl::float4*>(d_gz)[igrid];
 
           for(int jatom = 0; jatom < natom; jatom+=lsize )
           {
             if((jatom+lsize) > natom) lsize = natom - jatom;
 
             if((jatom + lid) < natom) {
-              shared[lid          ] = ax[jatom + lid];
-              shared[lid +   lsize] = ay[jatom + lid];
-              shared[lid + 2*lsize] = az[jatom + lid];
-              shared[lid + 3*lsize] = charge[jatom + lid];
-              shared[lid + 4*lsize] = size[jatom + lid];
+              shared[lid          ] = d_ax[jatom + lid];
+              shared[lid +   lsize] = d_ay[jatom + lid];
+              shared[lid + 2*lsize] = d_az[jatom + lid];
+              shared[lid + 3*lsize] = d_charge[jatom + lid];
+              shared[lid + 4*lsize] = d_size[jatom + lid];
             }
             item.barrier(sycl::access::fence_space::local_space);
 
@@ -247,7 +232,7 @@ void run_gpu_kernel(
             }
             item.barrier(sycl::access::fence_space::local_space);
           }
-          val[ igrid ] = v;
+          reinterpret_cast<sycl::float4*>(d_val)[ igrid ] = v;
         });
       });
   }
@@ -258,10 +243,17 @@ void run_gpu_kernel(
   printf("Average kernel execution time: %1.12g\n", avg_kernel_time);
 
   // read output image
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = val_mem.get_access<sycl::access::mode::read>(cgh, sycl::range<1>(ngrid));
-    cgh.copy(acc, val);
-  }).wait();
+  q.memcpy(val, d_val, sizeof(float)*ngrid).wait();
+
+  sycl::free(d_ax, q);
+  sycl::free(d_ay, q);
+  sycl::free(d_az, q);
+  sycl::free(d_gx, q);
+  sycl::free(d_gy, q);
+  sycl::free(d_gz, q);
+  sycl::free(d_val, q);
+  sycl::free(d_size, q);
+  sycl::free(d_charge, q);
 
   wkf_timer_destroy(timer);
 }
