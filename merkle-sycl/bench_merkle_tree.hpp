@@ -1,5 +1,5 @@
 #pragma once
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // Returns exact time of kernel execution in nanosecond
 //
