@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <chrono>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 #include "constants.h"
 
-#define __syncthreads() item.barrier(access::fence_space::local_space)
-
 namespace mean_shift::gpu {
-  void mean_shift(nd_item<1> &item, const float *data, float *data_next) {
+  void mean_shift(sycl::nd_item<1> &item, const float *data, float *data_next) {
     size_t tid = item.get_global_id(0);
     if (tid < N) {
       size_t row = tid * D;
@@ -34,7 +32,7 @@ namespace mean_shift::gpu {
     }
   }
 
-  void mean_shift_tiling(nd_item<1> &item,
+  void mean_shift_tiling(sycl::nd_item<1> &item,
                          float *__restrict local_data,
                          float *__restrict valid_data,
                          const float* data,
@@ -64,7 +62,7 @@ namespace mean_shift::gpu {
           valid_data[lid] = 0;
         }
       }
-      __syncthreads();
+      item.barrier(sycl::access::fence_space::local_space);
       for (int i = 0; i < TILE_WIDTH; ++i) {
         int local_row_tile = i * D;
         float valid_radius = RADIUS * valid_data[i];
@@ -81,7 +79,7 @@ namespace mean_shift::gpu {
           tot_weight += (weight * valid_data[i]);
         }
       }
-      __syncthreads();
+      item.barrier(sycl::access::fence_space::local_space);
     }
     if (tid < N) {
       for (int j = 0; j < D; ++j) {
@@ -115,29 +113,29 @@ int main(int argc, char* argv[]) {
   std::array<float, N * D> result {};
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
-    
+
   // Allocate GPU memory
   size_t data_bytes = N * D * sizeof(float);
-  float *d_data = (float*) malloc_device (data_bytes, q);
-  float *d_data_next = (float*) malloc_device (data_bytes, q);;
+  float *d_data = (float*) sycl::malloc_device (data_bytes, q);
+  float *d_data_next = (float*) sycl::malloc_device (data_bytes, q);;
 
   // Copy to GPU memory
   q.memcpy(d_data, data.data(), data_bytes).wait();
 
-  range<1> gws (BLOCKS * THREADS);
-  range<1> lws (THREADS);
+  sycl::range<1> gws (BLOCKS * THREADS);
+  sycl::range<1> lws (THREADS);
 
   // Run mean shift clustering and time the execution
   auto start = std::chrono::steady_clock::now();
 
   for (size_t i = 0; i < mean_shift::gpu::NUM_ITER; ++i) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class base>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class base>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         mean_shift::gpu::mean_shift(item, d_data, d_data_next);
       });
     }).wait();
@@ -162,10 +160,10 @@ int main(int argc, char* argv[]) {
 
   start = std::chrono::steady_clock::now();
   for (size_t i = 0; i < mean_shift::gpu::NUM_ITER; ++i) {
-    q.submit([&] (handler &cgh) {
-      accessor<float, 1, sycl_read_write, access::target::local> local_data (TILE_WIDTH * D, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> valid_data (TILE_WIDTH, cgh);
-      cgh.parallel_for<class opt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> local_data (sycl::range<1>(TILE_WIDTH * D), cgh);
+      sycl::local_accessor<float, 1> valid_data (sycl::range<1>(TILE_WIDTH), cgh);
+      cgh.parallel_for<class opt>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         mean_shift::gpu::mean_shift_tiling(item, local_data.get_pointer(),
                                            valid_data.get_pointer(),
                                            d_data, d_data_next);
