@@ -7,7 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // leftrotate function definition
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
@@ -166,7 +166,7 @@ inline void md5_2words(unsigned int *words, unsigned int len,
 // Function:  FindKeyspaceSize
 //
 // Purpose:
-///   Multiply out the byteLength by valsPerByte to find the 
+///   Multiply out the byteLength by valsPerByte to find the
 ///   total size of the key space, with error checking.
 //
 // Arguments:
@@ -211,6 +211,7 @@ int FindKeyspaceSize(int byteLength, int valsPerByte)
 //
 // Modifications:
 // ****************************************************************************
+inline
 void IndexToKey(unsigned int index, int byteLength, int valsPerByte,
                 unsigned char vals[8])
 {
@@ -358,16 +359,19 @@ void FindKeyWithDigest_GPU(const unsigned int searchDigest[4],
   int keyspace = FindKeyspaceSize(byteLength, valsPerByte);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<int, 1> d_foundIndex (foundIndex, 1, props);
-  buffer<unsigned char, 1> d_foundKey (foundKey, 8, props);
-  buffer<unsigned int, 1> d_foundDigest (foundDigest, 4, props);
+  int *d_foundIndex = sycl::malloc_device<int>(1, q);
+  q.memcpy(d_foundIndex, foundIndex, sizeof(int));
+
+  unsigned char *d_foundKey = sycl::malloc_device<unsigned char>(8, q);
+  q.memcpy(d_foundKey, foundKey, sizeof(unsigned char) * 8);
+
+  unsigned int *d_foundDigest = sycl::malloc_device<unsigned int>(4, q);
+  q.memcpy(d_foundDigest, foundDigest, sizeof(unsigned int) * 4);
 
   //
   // calculate work thread shape
@@ -380,12 +384,11 @@ void FindKeyWithDigest_GPU(const unsigned int searchDigest[4],
   unsigned int searchDigest2 = searchDigest[2];
   unsigned int searchDigest3 = searchDigest[3];
 
-  q.submit([&](handler& cgh) {
-    auto foundKey = d_foundKey.get_access<sycl_write>(cgh);
-    auto foundIndex = d_foundIndex.get_access<sycl_write>(cgh);
-    auto foundDigest = d_foundDigest.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class md5hash>(range<1>(globalsize), [=] (id<1> index) {
-      int threadid = index[0];
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class md5hash>(
+      sycl::nd_range<1>(sycl::range<1>(globalsize), sycl::range<1>(nthreads)),
+      [=] (sycl::nd_item<1> index) {
+      int threadid = index.get_global_id(0);
       int startindex = threadid * valsPerByte;
       unsigned char key[8] = {0,0,0,0, 0,0,0,0};
       IndexToKey(startindex, byteLength, valsPerByte, key);
@@ -399,24 +402,33 @@ void FindKeyWithDigest_GPU(const unsigned int searchDigest[4],
             digest[2] == searchDigest2 &&
             digest[3] == searchDigest3)
         {
-          foundIndex[0] = startindex + j;
-          foundKey[0] = key[0];
-          foundKey[1] = key[1];
-          foundKey[2] = key[2];
-          foundKey[3] = key[3];
-          foundKey[4] = key[4];
-          foundKey[5] = key[5];
-          foundKey[6] = key[6];
-          foundKey[7] = key[7];
-          foundDigest[0] = digest[0];
-          foundDigest[1] = digest[1];
-          foundDigest[2] = digest[2];
-          foundDigest[3] = digest[3];
+          d_foundIndex[0] = startindex + j;
+          d_foundKey[0] = key[0];
+          d_foundKey[1] = key[1];
+          d_foundKey[2] = key[2];
+          d_foundKey[3] = key[3];
+          d_foundKey[4] = key[4];
+          d_foundKey[5] = key[5];
+          d_foundKey[6] = key[6];
+          d_foundKey[7] = key[7];
+          d_foundDigest[0] = digest[0];
+          d_foundDigest[1] = digest[1];
+          d_foundDigest[2] = digest[2];
+          d_foundDigest[3] = digest[3];
         }
         ++key[0];
-      }   
+      }
     });
   });
+
+  q.memcpy(foundKey, d_foundKey, sizeof(unsigned char) * 8);
+  q.memcpy(foundIndex, d_foundIndex, sizeof(int));
+  q.memcpy(foundDigest, d_foundDigest, sizeof(unsigned int) * 4);
+  q.wait();
+
+  sycl::free(d_foundDigest, q);
+  sycl::free(d_foundIndex, q);
+  sycl::free(d_foundKey, q);
 }
 
 
@@ -442,7 +454,7 @@ void FindKeyWithDigest_GPU(const unsigned int searchDigest[4],
 //
 // ****************************************************************************
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
   int offload = atoi(argv[1]);
   int passes = atoi(argv[2]);
