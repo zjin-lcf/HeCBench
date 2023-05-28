@@ -10,7 +10,7 @@
  */
 
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "shrUtils.h"
 #include "MedianFilter.cpp"
 
@@ -23,11 +23,11 @@ extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOut
                                  unsigned int uiWidth, unsigned int uiHeight);
 
 double MedianFilterGPU(
-    queue &q,
+    sycl::queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
-    buffer<sycl::uchar4> &cmDevBufIn,
-    buffer<unsigned int> &cmDevBufOut,
+    sycl::uchar4 *cmDevBufIn,
+    unsigned int *cmDevBufOut,
     const int uiImageWidth,
     const int uiImageHeight);
 
@@ -64,14 +64,13 @@ int main(int argc, char** argv)
          cPathAndName, uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<sycl::uchar4, 1> cmDevBufIn(szBuffWords);
-  buffer<unsigned int, 1> cmDevBufOut(szBuffWords);
+  sycl::uchar4 *cmDevBufIn = sycl::malloc_device<sycl::uchar4>(szBuffWords, q);
+  unsigned int *cmDevBufOut = sycl::malloc_device<unsigned int>(szBuffWords, q);
 
   // Warmup call 
   MedianFilterGPU (q, uiInput, uiOutput, cmDevBufIn, 
@@ -102,6 +101,8 @@ int main(int argc, char** argv)
   free(uiGolden);
   free(uiInput);
   free(uiOutput);
+  sycl::free(cmDevBufIn, q);
+  sycl::free(cmDevBufOut, q);
 
   if(bMatch == shrTRUE) 
     printf("PASS\n");
@@ -114,11 +115,11 @@ int main(int argc, char** argv)
 // Copies input data from host buf to the device, runs kernel, 
 // copies output data back to output host buf
 double MedianFilterGPU(
-    queue &q,
+    sycl::queue &q,
     unsigned int* uiInputImage, 
     unsigned int* uiOutputImage, 
-    buffer<sycl::uchar4> &cmDevBufIn,
-    buffer<unsigned int> &cmDevBufOut,
+    sycl::uchar4 *cmDevBufIn,
+    unsigned int *cmDevBufOut,
     const int uiImageWidth,
     const int uiImageHeight)
 {
@@ -128,29 +129,26 @@ double MedianFilterGPU(
   const int iBlockDimY = 4;
   const int iLocalPixPitch = iBlockDimX + 2;
 
-  q.submit([&] (handler &cgh) {
-    auto acc = cmDevBufIn.get_access<sycl_discard_write>(cgh);
-    cgh.copy((sycl::uchar4*)uiInputImage, acc);
-  });
+  q.memcpy(cmDevBufIn, (sycl::uchar4*)uiInputImage, 
+    uiImageWidth * uiImageHeight * sizeof(sycl::uchar4));
 
   szLocalWorkSize[0] = iBlockDimX;
   szLocalWorkSize[1] = iBlockDimY;
   szGlobalWorkSize[0] = shrRoundUp((int)szLocalWorkSize[0], uiImageWidth); 
   szGlobalWorkSize[1] = shrRoundUp((int)szLocalWorkSize[1], uiImageHeight);
 
-  range<2> lws(szLocalWorkSize[1], szLocalWorkSize[0]);
-  range<2> gws(szGlobalWorkSize[1], szGlobalWorkSize[0]);
+  sycl::range<2> lws(szLocalWorkSize[1], szLocalWorkSize[0]);
+  sycl::range<2> gws(szGlobalWorkSize[1], szGlobalWorkSize[0]);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto uc4Source = cmDevBufIn.get_access<sycl_read>(cgh);
-    auto uiDest = cmDevBufOut.get_access<sycl_discard_write>(cgh);
-    accessor<sycl::uchar4, 1, sycl_read_write, access::target::local> 
-      uc4LocalData(iLocalPixPitch * (iBlockDimY + 2), cgh);
-    cgh.parallel_for<class media_filter>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      ckMedian(item, uc4Source.get_pointer(), uiDest.get_pointer(),
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<sycl::uchar4, 1>
+      uc4LocalData(sycl::range<1>(iLocalPixPitch * (iBlockDimY + 2)), cgh);
+    cgh.parallel_for<class media_filter>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      ckMedian(item, cmDevBufIn, cmDevBufOut,
                uc4LocalData.get_pointer(), iLocalPixPitch, uiImageWidth, uiImageHeight);
     });
   });
@@ -159,10 +157,8 @@ double MedianFilterGPU(
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = cmDevBufOut.get_access<sycl_read>(cgh);
-    cgh.copy(acc, uiOutputImage);
-  }).wait();
+  q.memcpy((sycl::uchar4*)uiOutputImage, cmDevBufOut, 
+           uiImageWidth * uiImageHeight * sizeof(sycl::uchar4)).wait();
 
   return time;
 }
