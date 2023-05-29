@@ -122,6 +122,12 @@ int main(int argc, char *argv[])
   double total_modeling_time = 0.0;
   bool warm_up_iter = !disable_warm_up_iter;
 
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
   for (uint iiter = 0; iiter < (disable_warm_up_iter ? niters : niters+1); iiter++) {
 
     const struct grid_t grid = init_grid(nx,ny,nz,tsx,tsy,ngpus);
@@ -178,13 +184,6 @@ int main(int argc, char *argv[])
 
     target_init(grid,nsteps,u,v,phi,eta,coefx,coefy,coefz,vp,source);
 
-#ifdef USE_GPU 
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
-    queue q(dev_sel);
-
     // Time loop
     struct timespec start_m,end_m;
     clock_gettime(CLOCK_REALTIME, &start_m);
@@ -220,7 +219,7 @@ int main(int argc, char *argv[])
 
     // --grids 100 --nsteps 1000
     printf("FINAL min_u,  max_u = %f, %f\n", min_u, max_u);
-    if ( fabsf(fabsf(min_u) - 0.2058f) < 1e-4f && 
+    if ( fabsf(fabsf(min_u) - 0.2058f) < 1e-4f &&
          fabsf(max_u - 0.1401f) < 1e-4f )
       printf("PASS\n");
     else
