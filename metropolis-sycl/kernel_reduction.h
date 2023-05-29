@@ -75,18 +75,18 @@ void kernel_redenergy(const int *s, int L, T *out, const int *H, float h,
             item.get_local_id(2);
   int id = C(x,y,z,L);
   // this optimization only works for L being a power of 2
-  //float sum = -(float)(s[id] * ((float)(s[C((x+1) & (L-1), y, z, L)] + 
+  //float sum = -(float)(s[id] * ((float)(s[C((x+1) & (L-1), y, z, L)] +
   // s[C(x, (y+1) & (L-1), z, L)] + s[C(x, y, (z+1) & (L-1), L)]) + h*H[id]));
 
   // this line works always
-  float sum = -(float)(s[id] * ((float)(s[C((x+1) >=  L? 0: x+1, y, z, L)] + 
+  float sum = -(float)(s[id] * ((float)(s[C((x+1) >=  L? 0: x+1, y, z, L)] +
               s[C(x, (y+1) >= L? 0 : y+1, z, L)] + s[C(x, y, (z+1) >= L? 0 : z+1, L)]) + h*H[id]));
   sum = block_reduce<T>(sum, item, shared);
 
   if (tid == 0) {
-    auto ao = sycl::ext::oneapi::atomic_ref<T,
-              sycl::ext::oneapi::memory_order::relaxed,
-              sycl::ext::oneapi::memory_scope::device,
+    auto ao = sycl::atomic_ref<T,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
               sycl::access::address_space::global_space> (out[0]);
      ao.fetch_add(sum);
   }

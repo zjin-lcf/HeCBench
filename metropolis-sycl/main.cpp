@@ -38,15 +38,15 @@ int main(int argc, char **argv) {
   int ains      = 1;
   int apts      = 1;
   int ams       = 1;
-  uint64_t seed = 2;  
-  float TR      = 0.1f; 
-  float dT      = 0.1f; 
+  uint64_t seed = 2;
+  float TR      = 0.1f;
+  float dT      = 0.1f;
   float h       = 0.1f;
 
   for (int i=0; i<argc; i++) {
     /* lattice size and number of replicas */
     if(strcmp(argv[i],"-l") == 0){
-      L = atoi(argv[i+1]);  
+      L = atoi(argv[i+1]);
       if ( (L % 32) != 0 ) {
         fprintf(stderr, "lattice dimensional size must be multiples of 32");
         exit(1);
@@ -95,11 +95,10 @@ int main(int argc, char **argv) {
   seed = gpu_pcg32_random_r(&hpcgs, &hpcgi);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   /* build the space of computation for the lattices */
   sycl::range<3> mc_lws(BZ, BY / 2, BX);
@@ -249,9 +248,7 @@ int main(int argc, char **argv) {
       for(int i = 0; i < ams; ++i) {
         for(int k = 0; k < ar; ++k) {
           q.submit([&](sycl::handler &cgh) {
-            sycl::accessor<site_t, 1, sycl::access_mode::read_write,
-                           sycl::access::target::local>
-                ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
+            sycl::local_accessor<site_t, 1> ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
 
             auto mdlat_k_ct2 = mdlat[k];
             auto aT_atrs_k_i_ct5 = -2.0f / aT[atrs[k].i];
@@ -271,9 +268,7 @@ int main(int argc, char **argv) {
 
         for(int k = 0; k < ar; ++k) {
           q.submit([&](sycl::handler &cgh) {
-            sycl::accessor<site_t, 1, sycl::access_mode::read_write,
-                           sycl::access::target::local>
-                ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
+            sycl::local_accessor<site_t, 1> ss_acc(sycl::range<1>(sLx*sLy*sLz), cgh);
 
             auto mdlat_k_ct2 = mdlat[k];
             auto aT_atrs_k_i_ct5 = -2.0f / aT[atrs[k].i];
@@ -293,7 +288,7 @@ int main(int argc, char **argv) {
       }
 
       double k_end = rtclock();
-      total_ktime += k_end - k_start; 
+      total_ktime += k_end - k_start;
 
       /* compute energies for exchange */
       // adapt_ptenergies(s, tid);
@@ -308,9 +303,7 @@ int main(int argc, char **argv) {
       for(int k = 0; k < ar; ++k){
         /* launch reduction kernel for k-th replica */
         q.submit([&](sycl::handler &cgh) {
-          sycl::accessor<float, 1, sycl::access_mode::read_write,
-                         sycl::access::target::local>
-              shared_acc(sycl::range<1>(32), cgh);
+          sycl::local_accessor<float, 1> shared_acc(sycl::range<1>(32), cgh);
 
           auto mdlat_k = mdlat[k];
 
@@ -381,7 +374,7 @@ int main(int argc, char **argv) {
       if (aavex[k] > maxex)  maxex = aavex[k];
     }
 
-    fprintf(fw, "%d %f  %f  %f\n", trial, avex, minex, maxex); 
+    fprintf(fw, "%d %f  %f  %f\n", trial, avex, minex, maxex);
     fflush(fw);
 
     printf(" [<avg> = %.3f <min> = %.3f <max> = %.3f]\n\n", avex, minex, maxex);
