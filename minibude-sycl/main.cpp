@@ -41,22 +41,23 @@ struct Params {
   }
 };
 
+SYCL_EXTERNAL
 void fasten_main(
-    handler &h,
-    //    size_t posesPerWI,
+    sycl::nd_item<1> &item,
+    FFParams *local_forcefield,
     size_t wgSize,
     size_t ntypes, size_t nposes,
     size_t natlig, size_t natpro,
-    accessor<Atom,  1, sycl_read, sycl_gmem> protein_molecule,
-    accessor<Atom,  1, sycl_read, sycl_gmem> ligand_molecule,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_0,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_1,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_2,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_3,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_4,
-    accessor<float, 1, sycl_read, sycl_gmem> transforms_5,
-    accessor<FFParams, 1, sycl_read, sycl_gmem> forcefield,
-    accessor<float, 1, sycl_discard_write, sycl_gmem> etotals);
+    Atom *protein_molecule,
+    Atom *ligand_molecule,
+    float *transforms_0,
+    float *transforms_1,
+    float *transforms_2,
+    float *transforms_3,
+    float *transforms_4,
+    float *transforms_5,
+    FFParams *forcefield,
+    float *etotals);
 
 double elapsedMillis( const TimePoint &start, const TimePoint &end){
   auto elapsedNs = static_cast<double>(
@@ -208,77 +209,124 @@ Params loadParameters(const std::vector<std::string> &args) {
 
 std::vector<float> runKernel(Params params) {
 
-  std::vector<float> energies(params.nposes);
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
+  const size_t wgSize = params.wgSize;
+  const size_t ntypes = params.ntypes;
+  const size_t nposes = params.nposes;
+  const size_t natlig = params.natlig;
+  const size_t natpro = params.natpro;
 
-  buffer<Atom,  1> protein (params.protein.data(), params.natpro);
-  buffer<Atom,  1> ligand (params.ligand.data(), params.natlig);
-  buffer<float, 1> transforms_0 (params.poses[0].data(), params.nposes);
-  buffer<float, 1> transforms_1 (params.poses[1].data(), params.nposes);
-  buffer<float, 1> transforms_2 (params.poses[2].data(), params.nposes);
-  buffer<float, 1> transforms_3 (params.poses[3].data(), params.nposes);
-  buffer<float, 1> transforms_4 (params.poses[4].data(), params.nposes);
-  buffer<float, 1> transforms_5 (params.poses[5].data(), params.nposes);
-  buffer<FFParams, 1> forcefield (params.forcefield.data(), params.ntypes);
-  buffer<float> results (energies.size());
+  std::vector<float> energies(nposes);
+
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
+  Atom *protein = sycl::malloc_device<Atom>(natpro, q);
+  q.memcpy(protein, params.protein.data(), sizeof(Atom) * natpro);
+
+  Atom *ligand = sycl::malloc_device<Atom>(natlig, q);
+  q.memcpy(ligand, params.ligand.data(), sizeof(Atom) * natlig);
+
+  float *transforms_0 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_0, params.poses[0].data(), sizeof(float) * nposes);
+
+  float *transforms_1 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_1, params.poses[1].data(), sizeof(float) * nposes);
+
+  float *transforms_2 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_2, params.poses[2].data(), sizeof(float) * nposes);
+
+  float *transforms_3 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_3, params.poses[3].data(), sizeof(float) * nposes);
+
+  float *transforms_4 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_4, params.poses[4].data(), sizeof(float) * nposes);
+
+  float *transforms_5 = sycl::malloc_device<float>(nposes, q);
+  q.memcpy(transforms_5, params.poses[5].data(), sizeof(float) * nposes);
+
+  FFParams *forcefield = sycl::malloc_device<FFParams>(ntypes, q);
+  q.memcpy(forcefield, params.forcefield.data(), sizeof(FFParams) * ntypes);
+
+  float *results = sycl::malloc_device<float>(nposes, q);
+
+  size_t global = ceil((nposes) / static_cast<double> (NUM_TD_PER_THREAD));
+  global = wgSize * ceil(static_cast<double> (global) / wgSize);
+
+  sycl::range<1> gws (global);
+  sycl::range<1> lws (wgSize);
 
   // warmup
-  q.submit([&](handler &h) {
-    fasten_main(h, 
-                params.wgSize,
-                params.ntypes,
-                params.nposes,
-                params.natlig,
-                params.natpro,
-                protein.get_access<sycl_read>(h),
-                ligand.get_access<sycl_read>(h),
-                transforms_0.get_access<sycl_read>(h),
-                transforms_1.get_access<sycl_read>(h),
-                transforms_2.get_access<sycl_read>(h),
-                transforms_3.get_access<sycl_read>(h),
-                transforms_4.get_access<sycl_read>(h),
-                transforms_5.get_access<sycl_read>(h),
-                forcefield.get_access<sycl_read>(h),
-                results.get_access<sycl_discard_write>(h));
-  });
-  q.wait();
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<FFParams, 1> s_forcefield(sycl::range<1>(ntypes), h);
+    h.parallel_for<class warmup>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      fasten_main(item,
+                  s_forcefield.get_pointer(),
+                  wgSize,
+                  ntypes,
+                  nposes,
+                  natlig,
+                  natpro,
+                  protein,
+                  ligand,
+                  transforms_0,
+                  transforms_1,
+                  transforms_2,
+                  transforms_3,
+                  transforms_4,
+                  transforms_5,
+                  forcefield,
+                  results);
+    });
+  }).wait();
 
   auto kernelStart = std::chrono::high_resolution_clock::now();
   for (size_t i = 0; i < params.iterations; ++i) {
-    q.submit([&](handler &h) {
-      fasten_main(h, 
-                  params.wgSize,
-                  params.ntypes,
-                  params.nposes,
-                  params.natlig,
-                  params.natpro,
-                  protein.get_access<sycl_read>(h),
-                  ligand.get_access<sycl_read>(h),
-                  transforms_0.get_access<sycl_read>(h),
-                  transforms_1.get_access<sycl_read>(h),
-                  transforms_2.get_access<sycl_read>(h),
-                  transforms_3.get_access<sycl_read>(h),
-                  transforms_4.get_access<sycl_read>(h),
-                  transforms_5.get_access<sycl_read>(h),
-                  forcefield.get_access<sycl_read>(h),
-                  results.get_access<sycl_discard_write>(h));
+    q.submit([&](sycl::handler &h) {
+      sycl::local_accessor<FFParams, 1> s_forcefield(sycl::range<1>(ntypes), h);
+      h.parallel_for<class run>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        fasten_main(item,
+                    s_forcefield.get_pointer(),
+                    wgSize,
+                    ntypes,
+                    nposes,
+                    natlig,
+                    natpro,
+                    protein,
+                    ligand,
+                    transforms_0,
+                    transforms_1,
+                    transforms_2,
+                    transforms_3,
+                    transforms_4,
+                    transforms_5,
+                    forcefield,
+                    results);
+      });
     });
   }
   q.wait();
   auto kernelEnd = std::chrono::high_resolution_clock::now();
 
-  q.submit([&](handler &h) { 
-    auto acc = results.get_access<sycl_read>(h);
-    h.copy(acc, energies.data());
-  });
-  q.wait();
+  q.memcpy(energies.data(), results, nposes*sizeof(float)).wait();
 
   printTimings(params, elapsedMillis(kernelStart, kernelEnd));
+
+  sycl::free(protein, q);
+  sycl::free(ligand, q);
+  sycl::free(transforms_0, q);
+  sycl::free(transforms_1, q);
+  sycl::free(transforms_2, q);
+  sycl::free(transforms_3, q);
+  sycl::free(transforms_4, q);
+  sycl::free(transforms_5, q);
+  sycl::free(forcefield, q);
+  sycl::free(results, q);
+
   return energies;
 }
 
