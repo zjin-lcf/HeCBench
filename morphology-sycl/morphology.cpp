@@ -51,11 +51,11 @@ void twoWayScan(unsigned char* __restrict sMem,
                 unsigned char* __restrict opArray,
                 const int selSize,
                 const int tid,
-                nd_item<2> &item)
+                sycl::nd_item<2> &item)
 {
   opArray[tid] = sMem[tid];
   opArray[tid + selSize] = sMem[tid + selSize];
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for (int offset = 1; offset < selSize; offset *= 2) {
     if (tid >= offset) {
@@ -65,7 +65,7 @@ void twoWayScan(unsigned char* __restrict sMem,
     if (tid <= selSize - 1 - offset) {
         opArray[tid] = elementOp<opType>(opArray[tid], opArray[tid + offset]);
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
@@ -76,7 +76,7 @@ void vhgw_horiz(unsigned char* __restrict dst,
                 const int width,
                 const int height,
                 const int selSize,
-                nd_item<2> &item)
+                sycl::nd_item<2> &item)
 {
   unsigned char* opArray = sMem + 2 * selSize;
 
@@ -90,7 +90,7 @@ void vhgw_horiz(unsigned char* __restrict dst,
   if (tidx + selSize < width) {
     sMem[lidx + selSize] = src[tidy * width + tidx + selSize];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   twoWayScan<opType>(sMem, opArray, selSize, lidx, item);
 
@@ -107,7 +107,7 @@ void vhgw_vert(unsigned char* __restrict dst,
                const int width,
                const int height,
                const int selSize,
-               nd_item<2> &item)
+               sycl::nd_item<2> &item)
 {
   unsigned char* opArray = sMem + 2 * selSize;
 
@@ -121,7 +121,7 @@ void vhgw_vert(unsigned char* __restrict dst,
   if (tidy + selSize < height) {
     sMem[lidy + selSize] = src[(tidy + selSize) * width + tidx];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   twoWayScan<opType>(sMem, opArray, selSize, lidy, item);
 
@@ -137,52 +137,48 @@ void vhgw_vert(unsigned char* __restrict dst,
 
 template <MorphOpType opType>
 double morphology(
-        queue &q,
-        buffer<unsigned char> &img_d,
-        buffer<unsigned char> &tmp_d,
+        sycl::queue &q,
+        unsigned char *img_d,
+        unsigned char *tmp_d,
         const int width,
         const int height,
         const int hsize,
         const int vsize)
 {
-  q.submit([&] (handler &cgh) {
-    auto acc = tmp_d.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, (unsigned char)0);
-  });
+  unsigned int memSize = width * height * sizeof(unsigned char);
+  q.memset(tmp_d, 0, memSize);
 
   int blockSize_x = hsize;
   int blockSize_y = 1;
   int gridSize_x = roundUp(width, blockSize_x);
   int gridSize_y = roundUp(height, blockSize_y);
-  range<2> h_gws (gridSize_y * blockSize_y, gridSize_x * blockSize_x);
-  range<2> h_lws (blockSize_y, blockSize_x);
+  sycl::range<2> h_gws (gridSize_y * blockSize_y, gridSize_x * blockSize_x);
+  sycl::range<2> h_lws (blockSize_y, blockSize_x);
 
   blockSize_x = 1;
   blockSize_y = vsize;
   gridSize_x = roundUp(width, blockSize_x);
   gridSize_y = roundUp(height, blockSize_y);
-  range<2> v_gws (gridSize_y * blockSize_y, gridSize_x * blockSize_x);
-  range<2> v_lws (blockSize_y, blockSize_x);
+  sycl::range<2> v_gws (gridSize_y * blockSize_y, gridSize_x * blockSize_x);
+  sycl::range<2> v_lws (blockSize_y, blockSize_x);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto tmp = tmp_d.get_access<sycl_discard_write>(cgh);
-    auto img = img_d.get_access<sycl_read>(cgh);
-    accessor<unsigned char, 1, sycl_read_write, access::target::local> sMem(4*hsize, cgh);
-    cgh.parallel_for<class horiz<opType>>(nd_range<2>(h_gws, h_lws), [=] (nd_item<2> item) {
-      vhgw_horiz<opType>(tmp.get_pointer(), img.get_pointer(), sMem.get_pointer(),
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<unsigned char, 1> sMem(sycl::range<1>(4*hsize), cgh);
+    cgh.parallel_for<class horiz<opType>>(
+      sycl::nd_range<2>(h_gws, h_lws), [=] (sycl::nd_item<2> item) {
+      vhgw_horiz<opType>(tmp_d, img_d, sMem.get_pointer(),
                          width, height, hsize, item);
     });
   });
 
-  q.submit([&] (handler &cgh) {
-    auto tmp = img_d.get_access<sycl_discard_write>(cgh);
-    auto img = tmp_d.get_access<sycl_read>(cgh);
-    accessor<unsigned char, 1, sycl_read_write, access::target::local> sMem(4*vsize, cgh);
-    cgh.parallel_for<class vert<opType>>(nd_range<2>(v_gws, v_lws), [=] (nd_item<2> item) {
-      vhgw_vert<opType>(tmp.get_pointer(), img.get_pointer(), sMem.get_pointer(), 
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<unsigned char, 1> sMem(sycl::range<1>(4*vsize), cgh);
+    cgh.parallel_for<class vert<opType>>(
+      sycl::nd_range<2>(v_gws, v_lws), [=] (sycl::nd_item<2> item) {
+      vhgw_vert<opType>(tmp_d, img_d, sMem.get_pointer(), 
                         width, height, vsize, item);
     });
   });
@@ -195,9 +191,9 @@ double morphology(
 
 extern "C"
 double erode(
-        queue &q,
-        buffer<unsigned char,1> &img_d,
-        buffer<unsigned char,1> &tmp_d,
+        sycl::queue &q,
+        unsigned char *img_d,
+        unsigned char *tmp_d,
         const int width,
         const int height,
         const int hsize,
@@ -208,9 +204,9 @@ double erode(
 
 extern "C"
 double dilate(
-        queue &q,
-        buffer<unsigned char,1> &img_d,
-        buffer<unsigned char,1> &tmp_d,
+        sycl::queue &q,
+        unsigned char *img_d,
+        unsigned char *tmp_d,
         const int width,
         const int height,
         const int hsize,
