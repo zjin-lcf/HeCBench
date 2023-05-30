@@ -23,10 +23,10 @@ int Quantities_scalefactor_space_acceldir(int ix_g, int iy_g, int iz_g)
 P Quantities_init_face_acceldir(int ia, int ie, int iu, int scalefactor_space, int octant)
 {
   /*--- Quantities_affinefunction_ inline ---*/
-  return ( (P) (1 + ia) ) 
+  return ( (P) (1 + ia) )
 
     /*--- Quantities_scalefactor_angle_ inline ---*/
-    * ( (P) (1 << (ia & ( (1<<3) - 1))) ) 
+    * ( (P) (1 << (ia & ( (1<<3) - 1))) )
 
     /*--- Quantities_scalefactor_space_ inline ---*/
     * ( (P) scalefactor_space)
@@ -97,7 +97,7 @@ void Quantities_solve_acceldir(P* __restrict vs_local,
                            octant + NOCTANT * (
                            0))))));
 
-      const P result = ( vs_local[vs_local_index] * scalefactor_space_r + 
+      const P result = ( vs_local[vs_local_index] * scalefactor_space_r +
                (
                 /*--- ref_facexy inline ---*/
                 facexy[ia + dims.na      * (
@@ -140,7 +140,7 @@ void Quantities_solve_acceldir(P* __restrict vs_local,
                         * (P) ( 1 / (P) 4 - 1 / (P) (1 << ( ia & ( (1<<3) - 1 ) )) )
 
                * scalefactor_space_x_r
-               ) 
+               )
                * scalefactor_octant_r ) * scalefactor_space;
 
       vs_local[vs_local_index] = result;
@@ -227,10 +227,10 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
 //  int ixwav, iywav, izwav;
 //  if (dir_x==DIR_UP) { ixwav = ix; } else { ixwav = (dims_ncell_x-1) - ix; }
 //  if (dir_y==DIR_UP) { iywav = iy; } else { iywav = (dims_ncell_y-1) - iy; }
-  
+
 //  if (dir_z==DIR_UP) {
-//    iz = wavefront - (ixwav + iywav); } 
-//  else { 
+//    iz = wavefront - (ixwav + iywav); }
+//  else {
 //    iz = (dims_ncell_z-1) - (wavefront - (ixwav + iywav));
 //  }
 
@@ -257,7 +257,7 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
 
       for( iu=0; iu<NU; ++iu )
       for( ia=0; ia<dims_na; ++ia )
-      { 
+      {
         // reset reduction
         P result = (P)0;
         for( im=0; im < dims_nm; ++im )
@@ -266,7 +266,7 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
           result += a_from_m[ ia     + dims_na * (
                               im     +      NM * (
                               octant + NOCTANT * (
-                              0 ))) ] * 
+                              0 ))) ] *
 
             /*--- const_ref_state inline ---*/
             vi[im + dims.nm      * (
@@ -296,7 +296,7 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
 //   /*---Loop over energy groups---*/
       for( ia=0; ia<dims_na; ++ia )
       {
-        Quantities_solve_acceldir(vs_local, dims, facexy, facexz, faceyz, 
+        Quantities_solve_acceldir(vs_local, dims, facexy, facexz, faceyz,
                              ix, iy, iz,
                              ix_g, iy_g, iz_g,
                              ie, ia,
@@ -335,18 +335,18 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
         }
 
         /*--- ref_state inline ---*/
-        auto atomic_obj_ref = ext::oneapi::atomic_ref<P,
-                     ext::oneapi::memory_order::relaxed, 
-                     ext::oneapi::memory_scope::device, 
-                     access::address_space::global_space> (
+        auto ao = sycl::atomic_ref<P,
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space> (
          vo[im + dims.nm     * (
            iu + NU           * (
            ix + dims_ncell_x * (
            iy + dims_ncell_y * (
            ie + dims_ne      * (
            iz + dims_ncell_z * (
-           0 ))))))]); 
-          atomic_obj_ref.fetch_add(result);
+           0 ))))))]);
+          ao.fetch_add(result);
       }
 
 //      } /*---ie---*/
@@ -355,7 +355,7 @@ void Sweeper_sweep_cell_acceldir( const Dimensions &dims,
 }
 
 void init_facexy(
-    const int ix_base, 
+    const int ix_base,
     const int iy_base,
     const int dims_b_ne,
     const int dims_b_na,
@@ -364,7 +364,7 @@ void init_facexy(
     const int dims_b_ncell_z,
     const int dims_ncell_z,
     P* facexy,
-    nd_item<3> &item) 
+    sycl::nd_item<3> &item)
 {
   int ix = item.get_global_id(2);
   int iy = item.get_global_id(1);
@@ -391,14 +391,14 @@ void init_facexy(
         facexy[FACEXY_ADDR(dims_b_ncell_x, dims_b_ncell_y)]
           /*--- Quantities_init_face routine ---*/
           = Quantities_init_face_acceldir(ia, ie, iu, scalefactor_space, octant);
-        //printf("kernel facexy: %d %d %d %d %d %f\n", 
+        //printf("kernel facexy: %d %d %d %d %d %f\n",
           //ia, ie, iu, scalefactor_space, octant,
           //Quantities_init_face_acceldir(ia, ie, iu, scalefactor_space, octant));
       } /*---for---*/
 }
 
 void init_facexz(
-    const int ix_base, 
+    const int ix_base,
     const int iy_base,
     const int dims_b_ne,
     const int dims_b_na,
@@ -409,7 +409,7 @@ void init_facexz(
     const int proc_y_max,
     StepInfoAll stepinfoall,
     P* facexz,
-    nd_item<3> &item) 
+    sycl::nd_item<3> &item)
 {
   int ix = item.get_global_id(2);
   int iz = item.get_global_id(1);
@@ -442,7 +442,7 @@ void init_facexz(
 }
 
 void init_faceyz(
-    const int ix_base, 
+    const int ix_base,
     const int iy_base,
     const int dims_b_ne,
     const int dims_b_na,
@@ -453,7 +453,7 @@ void init_faceyz(
     const int proc_x_max,
     StepInfoAll stepinfoall,
     P* faceyz,
-    nd_item<3> &item)
+    sycl::nd_item<3> &item)
 {
   int iy = item.get_global_id(2);
   int iz = item.get_global_id(1);
@@ -487,22 +487,22 @@ void init_faceyz(
 }
 
 void wavefronts(
-    const int num_wavefronts,  
-    const int ix_base, 
+    const int num_wavefronts,
+    const int ix_base,
     const int iy_base,
     const int v_b_size,
     const int noctant_per_block,
     const Dimensions dims_b,
     StepInfoAll stepinfoall,
-    P* __restrict facexy, 
-    P* __restrict facexz, 
-    P* __restrict faceyz, 
+    P* __restrict facexy,
+    P* __restrict facexz,
+    P* __restrict faceyz,
     P* __restrict a_from_m,
     P* __restrict m_from_a,
     P* __restrict vi,
     P* __restrict vo,
     P* __restrict vs_local,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
   int octant = item.get_global_id(1);
   int ie = item.get_global_id(0);
