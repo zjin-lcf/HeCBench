@@ -27,37 +27,40 @@ int main(int argc, char* argv[])
   unsigned int memSize = width * height * sizeof(unsigned char);
   unsigned char* srcImg = (unsigned char*) malloc (memSize);
 
-  for (int i = 0; i < height; i++) 
+  for (int i = 0; i < height; i++)
     for (int j = 0; j < width; j++)
-      srcImg[i*width+j] = (i == (height/2 - 1) && 
+      srcImg[i*width+j] = (i == (height/2 - 1) &&
                            j == (width/2 - 1)) ? WHITE : BLACK;
 
-  { // sycl scope
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
-    
-    buffer<unsigned char, 1> img_d (srcImg, memSize);
-    buffer<unsigned char, 1> tmp_d (memSize);
 
-    double dilate_time = 0.0, erode_time = 0.0;
+  unsigned char *img_d = sycl::malloc_device<unsigned char>(memSize, q);
+  q.memcpy(img_d, srcImg, memSize);
 
-    for (int n = 0; n < repeat; n++) {
-      dilate_time += dilate(q, img_d, tmp_d, width, height, hsize, vsize);
-      erode_time += erode(q, img_d, tmp_d, width, height, hsize, vsize);
-    }
+  unsigned char *tmp_d = sycl::malloc_device<unsigned char>(memSize, q);
 
-    printf("Average kernel execution time (dilate): %f (s)\n", (dilate_time * 1e-9f) / repeat);
-    printf("Average kernel execution time (erode): %f (s)\n", (erode_time * 1e-9f) / repeat);
+  double dilate_time = 0.0, erode_time = 0.0;
+
+  for (int n = 0; n < repeat; n++) {
+    dilate_time += dilate(q, img_d, tmp_d, width, height, hsize, vsize);
+    erode_time += erode(q, img_d, tmp_d, width, height, hsize, vsize);
   }
+
+  printf("Average kernel execution time (dilate): %f (s)\n", (dilate_time * 1e-9f) / repeat);
+  printf("Average kernel execution time (erode): %f (s)\n", (erode_time * 1e-9f) / repeat);
+
+  q.memcpy(srcImg, img_d, memSize).wait();
 
   int s = 0;
   for (unsigned int i = 0; i < memSize; i++) s += srcImg[i];
   printf("%s\n", s == WHITE ? "PASS" : "FAIL");
 
+  sycl::free(img_d, q);
+  sycl::free(tmp_d, q);
   free(srcImg);
   return 0;
 }

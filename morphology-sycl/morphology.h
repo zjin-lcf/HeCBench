@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLACK 0
 #define WHITE 255
@@ -38,9 +38,9 @@ inline int roundUp(const int x, const int y)
  */
 extern "C"
 double erode(
-        queue &q,
-        buffer<unsigned char,1> &img_d,
-        buffer<unsigned char,1> &tmp_d,
+        sycl::queue &q,
+        unsigned char *img_d,
+        unsigned char *tmp_d,
         const int width,
         const int height,
         const int hsize,
@@ -58,9 +58,9 @@ double erode(
  */
 extern "C"
 double dilate(
-        queue &q,
-        buffer<unsigned char,1> &img_d,
-        buffer<unsigned char,1> &tmp_d,
+        sycl::queue &q,
+        unsigned char *img_d,
+        unsigned char *tmp_d,
         const int width,
         const int height,
         const int hsize,
