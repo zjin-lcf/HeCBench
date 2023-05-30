@@ -15,12 +15,12 @@
 /*
 *
 *  Content:
-*       This example demonstrates use of DPCPP API mkl::blas::gemm to perform General 
+*       This example demonstrates use of DPCPP API mkl::blas::gemm to perform General
 *       Matrix-Matrix Multiplication on a SYCL device (HOST, CPU, GPU).
 *
 *       C = alpha * op(A) * op(B) + beta * C
 *
-*       where op() is defined by one of mkl::transpose::{nontrans,trans,conjtrans} 
+*       where op() is defined by one of mkl::transpose::{nontrans,trans,conjtrans}
 *
 *
 *       The supported floating point data types for gemm matrix data are:
@@ -45,12 +45,12 @@
 #include <vector>
 
 // mkl/sycl includes
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "oneapi/mkl/blas.hpp"
 #include "mkl.h"
 
 template <typename T>
-void print_2x2_matrix_values(T M, int ldM, std::string M_name) 
+void print_2x2_matrix_values(T M, int ldM, std::string M_name)
 {
   std::cout << std::endl;
   std::cout << "\t\t\t" << M_name << " = [ " << M[0*ldM + 0] << ", " << M[1*ldM + 0]         << ", ...\n";
@@ -70,8 +70,8 @@ template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
 }
 
 //
-// Main example for Gemm consisting of 
-// initialization of A, B and C matrices as well as 
+// Main example for Gemm consisting of
+// initialization of A, B and C matrices as well as
 // scalars alpha and beta.  Then the product
 //
 // C = alpha * op(A) * op(B) + beta * C
@@ -84,7 +84,7 @@ void run_gemm_example(int repeat) {
   //
   // Initialize data for Gemm
   //
-  // C = alpha * op(A) * op(B)  + beta * C 
+  // C = alpha * op(A) * op(B)  + beta * C
   //
 
   oneapi::mkl::transpose transA = oneapi::mkl::transpose::nontrans;
@@ -92,11 +92,11 @@ void run_gemm_example(int repeat) {
 
   // matrix data sizes
   MKL_INT m = 79;
-  MKL_INT n = 83; 
+  MKL_INT n = 83;
   MKL_INT k = 91;
 
-  // set scalar fp values     
-  fp alpha = fp(2.0); 
+  // set scalar fp values
+  fp alpha = fp(2.0);
   fp beta  = fp(0.5);
 
   // prepare matrix data
@@ -109,31 +109,41 @@ void run_gemm_example(int repeat) {
   rand_matrix(b, k, n);
   rand_matrix(c, m, n);
 
-  {
-    // create execution queue and buffers of matrix data
-    sycl::gpu_selector dev;
-    sycl::queue q(dev);
+  // create execution queue and buffers of matrix data
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
-    sycl::buffer<fp, 1> A_buffer(a, m*k);
-    sycl::buffer<fp, 1> B_buffer(b, k*n);
-    sycl::buffer<fp, 1> C_buffer(c, m*n);
+  fp *d_a = sycl::malloc_device<fp>(m*k, q);
+  fp *d_b = sycl::malloc_device<fp>(k*n, q);
+  fp *d_c = sycl::malloc_device<fp>(m*n, q);
+  q.memcpy(d_a, a, sizeof(fp) * m * k);
+  q.memcpy(d_b, b, sizeof(fp) * k * n);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < repeat; i++) 
-      oneapi::mkl::blas::gemm(
-          q, transA, transB, 
-          n, m, k, alpha, 
-          B_buffer, n, 
-          A_buffer, k, 
-          beta, C_buffer, n);
+  for (int i = 0; i < repeat; i++)
+    oneapi::mkl::blas::gemm(
+        q, transA, transB,
+        n, m, k, alpha,
+        d_b, n,
+        d_a, k,
+        beta, d_c, n);
 
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average sgemm execution time: %f (s)\n", (time * 1e-9f) / repeat);
-  }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average sgemm execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+
+  q.memcpy(c, d_c, sizeof(fp) * m * n).wait();
+
+  sycl::free(d_a, q);
+  sycl::free(d_b, q);
+  sycl::free(d_c, q);
 
   //
   // Post Processing
@@ -156,7 +166,7 @@ void run_gemm_example(int repeat) {
 }
 
 //
-// Main entry point for example.  
+// Main entry point for example.
 //
 int main (int argc, char ** argv) {
   if (argc != 2) {
