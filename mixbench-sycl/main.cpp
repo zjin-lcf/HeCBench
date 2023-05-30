@@ -7,14 +7,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define VECTOR_SIZE (8*1024*1024)
 #define granularity (8)
 #define fusion_degree (4)
 #define seed 0.1f
 
-void benchmark_func(nd_item<1> &item,
+void benchmark_func(sycl::nd_item<1> &item,
                     float *g_data, const int block_dim,
                     const int compute_iterations)
 {
@@ -54,45 +54,46 @@ void mixbenchGPU(long size, int repeat) {
   const int block_dim = 256;
   const int grid_dim = reduced_grid_size;
 
-  {
-#ifdef USE_GPU 
-    gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    buffer<float, 1> d_cd (cd, size);
+  float *d_cd = sycl::malloc_device<float>(size, q);
+  q.memcpy(d_cd, cd, sizeof(float) * size);
 
-    range<1> gws (grid_dim);
-    range<1> lws (block_dim);
+  sycl::range<1> gws (grid_dim);
+  sycl::range<1> lws (block_dim);
 
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&](handler &h) {
-        auto g_data = d_cd.get_access<sycl_read_write>(h);
-        h.parallel_for<class mixbench_warmup>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-          benchmark_func(item, g_data.get_pointer(), block_dim, i);
-        });
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class mixbench_warmup>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        benchmark_func(item, d_cd, block_dim, i);
       });
-    }
-    q.wait();
-
-    auto start = std::chrono::steady_clock::now();
-
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&](handler &h) {
-        auto g_data = d_cd.get_access<sycl_read_write>(h);
-        h.parallel_for<class mixbench_timing>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
-          benchmark_func(item, g_data.get_pointer(), block_dim, i);
-        });
-      });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
+    });
   }
+  q.wait();
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class mixbench_timing>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        benchmark_func(item, d_cd, block_dim, i);
+      });
+    });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
+  
+  q.memcpy(cd, d_cd, sizeof(float) * size).wait();
+  sycl::free(d_cd, q);
 
   // verification
   bool ok = true;
