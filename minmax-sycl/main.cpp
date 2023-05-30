@@ -35,11 +35,10 @@ struct compare
 template <typename T> void eval(const T bounding_box_size, const int repeat) {
 
 #ifdef USE_GPU
-  auto dev_sel = sycl::gpu_selector_v;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  auto dev_sel = sycl::cpu_selector_v;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   auto const [total_points, points] = generate_points(bounding_box_size);
 
@@ -111,5 +110,5 @@ int main(int argc, char* argv[])
 
   eval((float)size, repeat);
 
-  return 0; 
+  return 0;
 }
