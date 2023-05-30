@@ -43,13 +43,13 @@ CFLAGS := $(EXTRA_CFLAGS) \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_INCLUDE) \
-          -std=c++17 -Wall -I../include -fsycl
+          -std=c++17 -Wall -fsycl
 
 # Linker Flags
 LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
