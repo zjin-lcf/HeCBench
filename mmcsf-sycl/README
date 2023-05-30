@@ -1,0 +1,1 @@
+Navigate to `../mmcsf-cuda` and generate the file `output.tns` with `make output.tns`

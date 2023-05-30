@@ -2,7 +2,7 @@
 #define MTTKRP_GPU_H
 
 #include "util.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 int MTTKRP_MIHCSR_GPU(TiledTensor *TiledX, Matrix *U, const Options &Opt);
 
