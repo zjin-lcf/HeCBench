@@ -9,7 +9,7 @@
 #include <cstring>
 #include <cassert>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 256
 
@@ -168,50 +168,36 @@ int main(int argc, char** argv)
     assert (0 == memcmp(d_keys+d_length[i], keys[i], length[i]));
   }
 
-  {
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  buffer<uint8_t, 1> dev_keys(d_keys, total_length);
-  buffer<uint64_t, 1> dev_out(d_out, 2*numKeys);
-  buffer<uint32_t, 1> dev_length(d_length, numKeys+1);
-  buffer<uint32_t, 1> key_length(length, numKeys);
+  uint8_t *dev_keys = sycl::malloc_device<uint8_t>(total_length, q);
+  q.memcpy(dev_keys, d_keys, sizeof(uint8_t)*total_length);
 
-  range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-  range<1> local_work_size (BLOCK_SIZE);
+  uint64_t *dev_out = sycl::malloc_device<uint64_t>(2*numKeys, q);
 
-  // warmup
-  for (uint32_t n = 0; n < repeat; n++) {
-    q.submit([&](handler &h) {
-      auto d_keys = dev_keys.get_access<sycl_read>(h);
-      auto d_length = dev_length.get_access<sycl_read>(h);
-      auto length = key_length.get_access<sycl_read>(h);
-      auto d_out = dev_out.get_access<sycl_discard_write>(h);
-      h.parallel_for<class warmup>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
-        int i = item.get_global_id(0); 
-        if (i < numKeys) 
-          MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
-        });
-    });
-  }
+  uint32_t *dev_length = sycl::malloc_device<uint32_t>(numKeys+1, q);
+  q.memcpy(dev_length, d_length, sizeof(uint32_t)*(numKeys+1));
+
+  uint32_t *key_length = sycl::malloc_device<uint32_t>(numKeys, q);
+  q.memcpy(key_length, length, sizeof(uint32_t)*(numKeys));
+
+  sycl::range<1> global_work_size ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  sycl::range<1> local_work_size (BLOCK_SIZE);
+
   q.wait();
-
   auto start = std::chrono::steady_clock::now();
 
   for (uint32_t n = 0; n < repeat; n++) {
-    q.submit([&](handler &h) {
-      auto d_keys = dev_keys.get_access<sycl_read>(h);
-      auto d_length = dev_length.get_access<sycl_read>(h);
-      auto length = key_length.get_access<sycl_read>(h);
-      auto d_out = dev_out.get_access<sycl_discard_write>(h);
-      h.parallel_for<class mmh>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class mmh>(
+        sycl::nd_range<1>(global_work_size, local_work_size), [=](sycl::nd_item<1> item) {
         int i = item.get_global_id(0); 
         if (i < numKeys) 
-          MurmurHash3_x64_128 (d_keys.get_pointer()+d_length[i], length[i], i, d_out.get_pointer()+i*2);
+          MurmurHash3_x64_128 (dev_keys+dev_length[i], key_length[i], i, dev_out+i*2);
         });
     });
   }
@@ -221,7 +207,7 @@ int main(int argc, char** argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  } // sycl scope
+  q.memcpy(d_out, dev_out, sizeof(uint64_t)*(numKeys*2)).wait();
 
   // verify
   bool error = false;
@@ -244,5 +230,9 @@ int main(int argc, char** argv)
   free(d_keys);
   free(d_out);
   free(d_length);
+  sycl::free(dev_keys, q);
+  sycl::free(dev_out, q);
+  sycl::free(dev_length, q);
+  sycl::free(key_length, q);
   return 0;
 }
