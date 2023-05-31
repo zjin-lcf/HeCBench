@@ -1,6 +1,6 @@
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -19,7 +19,7 @@ std::vector<char> mtf(sycl::queue &q, std::vector<char> &word)
 
     // copy word from host to device
     sycl::buffer<char, 1> d_word (word.data(), word.size());
-  
+
     // store the mtf result since input word is read-only
     d_word.set_final_data(h_word.data());
 
@@ -83,11 +83,10 @@ int main(int argc, char *argv[])
   for (size_t i = 0; i < len; i++) word[i] = a[rand() % 52];
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   auto d_result = mtf(q, word);
   auto h_result = reference(word);
@@ -101,10 +100,10 @@ int main(int argc, char *argv[])
     // output MTF result
     if (len < 16) {
       printf("host: ");
-      for (size_t i = 0; i < len; i++) 
+      for (size_t i = 0; i < len; i++)
         printf("%d ", h_result[i]);
       printf("\ndevice: ");
-      for (size_t i = 0; i < len; i++) 
+      for (size_t i = 0; i < len; i++)
         printf("%d ", d_result[i]);
       printf("\n");
     }
