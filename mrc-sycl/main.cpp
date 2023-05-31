@@ -3,14 +3,14 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 void MRCGradient (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
-  int i = item.get_global_id(0); 
+  int i = item.get_global_id(0);
   if (i < N) {
     float dist = -Y[i] * (X1[i] - X2[i]) + margin;
     if (dist < 0.f) {
@@ -23,10 +23,10 @@ void MRCGradient (
 }
 
 void MRCGradient2(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
-  int i = item.get_global_id(0); 
+  int i = item.get_global_id(0);
   if (i < N) {
     float y = Y[i];
     float o = dOutput[i];
@@ -68,41 +68,40 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   float *d_X1, *d_X2, *d_O, *d_dX1, *d_dX2;
   int *d_Y;
-  d_X1 = malloc_device<float>(length, q);
+  d_X1 = sycl::malloc_device<float>(length, q);
   q.memcpy(d_X1, h_X1, size_bytes);
 
-  d_X2 = malloc_device<float>(length, q);
+  d_X2 = sycl::malloc_device<float>(length, q);
   q.memcpy(d_X2, h_X2, size_bytes);
 
-  d_O = malloc_device<float>(length, q);
+  d_O = sycl::malloc_device<float>(length, q);
   q.memcpy(d_O, h_O, size_bytes);
 
-  d_Y = malloc_device<int>(length, q);
+  d_Y = sycl::malloc_device<int>(length, q);
   q.memcpy(d_Y, h_Y, size_bytes);
 
-  d_dX1 = malloc_device<float>(length, q);
-  d_dX2 = malloc_device<float>(length, q);
+  d_dX1 = sycl::malloc_device<float>(length, q);
+  d_dX2 = sycl::malloc_device<float>(length, q);
 
-  range<1> gws ((length + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((length + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         MRCGradient(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
       });
     });
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         MRCGradient2(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
       });
     });
@@ -112,8 +111,8 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         MRCGradient(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
       });
     });
@@ -127,8 +126,8 @@ int main(int argc, char* argv[])
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         MRCGradient2(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
       });
     });
@@ -154,12 +153,12 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_X1, q);
-  free(d_X2, q);
-  free(d_O, q);
-  free(d_Y, q);
-  free(d_dX1, q);
-  free(d_dX2, q);
+  sycl::free(d_X1, q);
+  sycl::free(d_X2, q);
+  sycl::free(d_O, q);
+  sycl::free(d_Y, q);
+  sycl::free(d_dX1, q);
+  sycl::free(d_dX2, q);
 
   free(h_X1);
   free(h_X2);
