@@ -43,7 +43,6 @@
 #define hbw_malloc malloc
 #define hbw_free free
 #endif
-#include "common.h"
 
 struct full_data
 {
@@ -98,7 +97,7 @@ extern void full_matrix_material_centric(full_data cc, full_data mc);
 
 extern bool full_matrix_check_results(full_data cc, full_data mc);
 
-extern void compact_cell_centric(queue &q, full_data cc, compact_data ccc, int argc, char** argv);
+extern void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv);
 
 extern bool compact_check_results(full_data cc, compact_data ccc);
 
@@ -620,23 +619,9 @@ int main(int argc, char** argv) {
 
   full_matrix_cell_centric(cc);
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
 #define MIN(a,b) (a)<(b)?(a):(b)
 
-  auto start = std::chrono::system_clock::now();
-
-  for (int i = 0; i < 10; i++) {
-    compact_cell_centric(q, cc, ccc, argc, argv);
-  }
-
-  std::chrono::duration<double> t = std::chrono::system_clock::now() - start;
-  printf("Total offload time for compact cell centric: %g sec\n", t.count());
+  compact_cell_centric(cc, ccc, argc, argv);
 
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];

@@ -378,38 +378,32 @@ __global__ void ccc_loop3(
 
         // Cell-centric algorithms
         // Computational loop 1 - average density in cell
-#ifdef DEBUG
         cudaDeviceSynchronize();
         auto t0 = std::chrono::system_clock::now();
-#endif
         ccc_loop1 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
 #ifndef FUSED
         ccc_loop1_2 <<< dim3((mmc_cells-1)/(thx*thy)+1), dim3((thx*thy)) >>> (d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, d_mmc_index, mmc_cells, d_mmc_i, d_mmc_j, sizex, sizey);
 #endif
-#ifdef DEBUG
         cudaDeviceSynchronize();
         std::chrono::duration<double> t1 = std::chrono::system_clock::now() - t0;
-        printf("Compact matrix, cell centric, alg 1: %g sec\n", t1.count());
+        printf("Compact matrix, cell centric, alg 1: %g msec\n", t1.count() * 1000);
+
         // Computational loop 2 - Pressure for each cell and each material
         t0 = std::chrono::system_clock::now();
-#endif
         ccc_loop2 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
 #ifndef FUSED
         ccc_loop2_2 <<< dim3((mm_len-1)/(thx*thy)+1), dim3((thx*thy)) >>> (d_matids, d_rho_compact_list, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact_list, d_mmc_index, mm_len);
 #endif
-#ifdef DEBUG
         cudaDeviceSynchronize();
         std::chrono::duration<double> t2 = std::chrono::system_clock::now() - t0;
-        printf("Compact matrix, cell centric, alg 2: %g sec\n", t2.count());
+        printf("Compact matrix, cell centric, alg 2: %g msec\n", t2.count() * 1000);
+
         // Computational loop 3 - Average density of each material over neighborhood of each cell
         t0 = std::chrono::system_clock::now();
-#endif
         ccc_loop3 <<< dim3(blocks), dim3(threads) >>> (d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
-#ifdef DEBUG
         cudaDeviceSynchronize();
         std::chrono::duration<double> t3 = std::chrono::system_clock::now() - t0;
-        printf("Compact matrix, cell centric, alg 3: %g sec\n", t3.count());
-#endif
+        printf("Compact matrix, cell centric, alg 3: %g msec\n", t3.count() * 1000);
 
         cp_to_host((char*)ccc.x, (char*)d_x, sizex*sizey*sizeof(double));
         cp_to_host((char*)ccc.y, (char*)d_y, sizex*sizey*sizeof(double));

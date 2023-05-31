@@ -106,9 +106,7 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
 
   // Cell-centric algorithms
   // Computational loop 1 - average density in cell
-#ifdef DEBUG
   auto t0 = std::chrono::system_clock::now();
-#endif
   //ccc_loop1 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
 
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
@@ -157,12 +155,11 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
     }
 #endif
 
-#ifdef DEBUG
   std::chrono::duration<double> t1 = std::chrono::system_clock::now() - t0;
-  printf("Compact matrix, cell centric, alg 1: %g sec\n", t1.count());
+  printf("Compact matrix, cell centric, alg 1: %g msec\n", t1.count() * 1000);
+
   // Computational loop 2 - Pressure for each cell and each material
   t0 = std::chrono::system_clock::now();
-#endif
   // ccc_loop2 <<< dim3(blocks), dim3(threads) >>> (d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
   
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
@@ -206,13 +203,11 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
     }
 #endif
 
-#ifdef DEBUG
   std::chrono::duration<double> t2 = std::chrono::system_clock::now() - t0;
-  printf("Compact matrix, cell centric, alg 2: %g sec\n", t2.count());
+  printf("Compact matrix, cell centric, alg 2: %g msec\n", t2.count() * 1000);
 
   // Computational loop 3 - Average density of each material over neighborhood of each cell
   t0 = std::chrono::system_clock::now();
-#endif
   //ccc_loop3 <<< dim3(blocks), dim3(threads) >>> (d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
 #pragma omp target teams distribute parallel for collapse(2) thread_limit(thy*thx)
     // if (i >= sizex-1 || j >= sizey-1 || i < 1 || j < 1) return;
@@ -343,13 +338,11 @@ void compact_cell_centric(full_data cc, compact_data ccc, int argc, char** argv)
     } // end for (int nj)
     rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
   } // end else
- }
-}
-}
-#ifdef DEBUG
+  }
+  }
   std::chrono::duration<double> t3 = std::chrono::system_clock::now() - t0;
-  printf("Compact matrix, cell centric, alg 3: %g sec\n", t3.count());
-#endif
+  printf("Compact matrix, cell centric, alg 3: %g msec\n", t3.count() * 1000);
+  } // omp target region
 }
 
 bool compact_check_results(full_data cc, compact_data ccc)

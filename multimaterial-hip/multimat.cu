@@ -622,14 +622,7 @@ int main(int argc, char** argv) {
 #define MIN(a,b) (a)<(b)?(a):(b)
   double a1,a2,a3;
 
-  auto start = std::chrono::system_clock::now();
-
-  for (int i = 0; i < 10; i++) {
-    compact_cell_centric(cc, ccc, argc, argv);
-  }
-
-  std::chrono::duration<double> t = std::chrono::system_clock::now() - start;
-  printf("Total offload time for compact cell centric: %g sec\n", t.count());
+  compact_cell_centric(cc, ccc, argc, argv);
 
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];
