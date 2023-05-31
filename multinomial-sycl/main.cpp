@@ -2,16 +2,16 @@
 #include <stdlib.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define GPU_NUM_THREADS 256
 
 template <typename scalar_t, typename accscalar_t>
 void sampleMultinomialOnce(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     accscalar_t *smem,
-    bool *found,
-    int *__restrict foundPos,
+    bool &found,
+    int &foundPos,
     int *__restrict dest,
     int distributions,
     int categories,
@@ -42,20 +42,20 @@ void sampleMultinomialOnce(
     }
 
     // threadIdx_x == 0 has the sum value from this
-    sum = reduce_over_group(g, sum, plus<>());
+    sum = reduce_over_group(g, sum, std::plus<>());
 
     // Broadcast sum and sample value
     if (threadIdx_x == 0) {
       // Make sure the sum of our distribution didn't overflow
-      *foundPos = 0;
+      foundPos = 0;
       smem[0] = sum;
       smem[1] = sampled[curDist];
     }
-    group_barrier(g, memory_scope::work_group);
+    group_barrier(g, sycl::memory_scope::work_group);
 
     sum = smem[0];
     scalar_t sample = static_cast<scalar_t>(smem[1]);
-    group_barrier(g, memory_scope::work_group);
+    group_barrier(g, sycl::memory_scope::work_group);
 
     // zero sum
     if (sum == accZero) {
@@ -68,9 +68,9 @@ void sampleMultinomialOnce(
 
     int chunks = (categories + (int)blockDim_x - 1) / blockDim_x;
     accscalar_t prevHighProb = accZero;
-    *found = false;
+    found = false;
 
-    for (int chunk = 0; chunk < chunks && !*found; ++chunk) {
+    for (int chunk = 0; chunk < chunks && !found; ++chunk) {
       // All threads in bounds load a value
       int cat = chunk * blockDim_x + threadIdx_x;
 
@@ -79,7 +79,7 @@ void sampleMultinomialOnce(
                              accZero;
 
       smem[threadIdx_x] = dist_val;
-      group_barrier(g, memory_scope::work_group);
+      group_barrier(g, sycl::memory_scope::work_group);
 
       // Perform an inclusive prefix sum of the shared memory contents
       for (int offset = 1; offset < blockDim_x; offset *= 2) {
@@ -89,11 +89,11 @@ void sampleMultinomialOnce(
           val = smem[threadIdx_x - offset] + smem[threadIdx_x];
         }
 
-        group_barrier(g, memory_scope::work_group);
+        group_barrier(g, sycl::memory_scope::work_group);
         if (threadIdx_x >= offset) {
           smem[threadIdx_x] = val;
         }
-        group_barrier(g, memory_scope::work_group);
+        group_barrier(g, sycl::memory_scope::work_group);
       }
 
       // Each thread will check to see if the sample falls in its bucket
@@ -108,23 +108,23 @@ void sampleMultinomialOnce(
           (dist_val > zero));
 
       if (inBucket) {
-        auto ao = atomic_ref<int, memory_order::relaxed,
-                             memory_scope::device, 
-                             access::address_space::local_space>(*foundPos);
+        auto ao = sycl::atomic_ref<int, sycl::memory_order::relaxed,
+                                   sycl::memory_scope::work_group,
+                                   sycl::access::address_space::local_space>(foundPos);
         ao.fetch_max(cat);
 
-        *found = true;
+        found = true;
       }
 
       // Store the previous scan's high value for future use
       prevHighProb = prevHighProb + smem[blockDim_x - 1];
 
-      group_barrier(g, memory_scope::work_group);
+      group_barrier(g, sycl::memory_scope::work_group);
     }
 
     if (threadIdx_x == 0) {
-      if (*found) {
-          dest[curDist] = *foundPos;
+      if (found) {
+          dest[curDist] = foundPos;
       } else {
         // This should address a rare bug where we don't select a valid index. This likely occurs when
         // due to floating point arithmetic rounding errors, our cumulative sum does not add up to 1, but
@@ -154,8 +154,8 @@ int main(int argc, char* argv[])
   const int numCategories = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
 
-  int sample_size_bytes = numDist * sizeof(float); 
-  float *sample = (float*) malloc (sample_size_bytes); 
+  int sample_size_bytes = numDist * sizeof(float);
+  float *sample = (float*) malloc (sample_size_bytes);
 
   std::default_random_engine g (123);
   std::uniform_real_distribution<float> uniform_distr (0.f, 1.f);
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
   size_t distr_size_bytes = numDist * numCategories * sizeof(float);
   float *distr = (float*) malloc (distr_size_bytes);
-  
+
   srand(123);
   for (int i = 0; i < numDist; i++) {
     for (int j = 0; j < numCategories; j++) {
@@ -179,36 +179,35 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float *d_sample = malloc_device<float>(numDist, q);
+  float *d_sample = sycl::malloc_device<float>(numDist, q);
   q.memcpy(d_sample, sample, sample_size_bytes);
 
-  float *d_distr = malloc_device<float>(numDist * numCategories, q);
+  float *d_distr = sycl::malloc_device<float>(numDist * numCategories, q);
   q.memcpy(d_distr, distr, distr_size_bytes);
 
-  int *d_result = malloc_device<int>(numDist, q);
+  int *d_result = sycl::malloc_device<int>(numDist, q);
 
   int requiredThreads = GPU_NUM_THREADS;
-  range<1> gws (512 * requiredThreads);
-  range<1> lws (requiredThreads);
+  sycl::range<1> gws (512 * requiredThreads);
+  sycl::range<1> lws (requiredThreads);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<float, 1, sycl_read_write, access::target::local> smem (requiredThreads, cgh);
-      accessor<bool, 1, sycl_read_write, access::target::local> found (1, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> foundPos (1, cgh);
-      cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> smem (sycl::range<1>(requiredThreads), cgh);
+      sycl::local_accessor<bool, 0> found (cgh);
+      sycl::local_accessor<int, 0> foundPos (cgh);
+      cgh.parallel_for<class k1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         sampleMultinomialOnce<float, float> (
-          item, smem.get_pointer(), found.get_pointer(), foundPos.get_pointer(),
-          d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1); 
+          item, smem.get_pointer(), found, foundPos,
+          d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
       });
     });
   }
@@ -222,13 +221,13 @@ int main(int argc, char* argv[])
   double sum = 0, var = 0;
   for (int i = 0; i < numDist; i++) sum += result[i];
   sum = sum / numDist;
-  for (int i = 0; i < numDist; i++) 
+  for (int i = 0; i < numDist; i++)
     var += (result[i] - sum) * (result[i] - sum);
   printf("Variance = %lf\n", var / numDist);
 
-  free(d_result, q);
-  free(d_sample, q);
-  free(d_distr, q);
+  sycl::free(d_result, q);
+  sycl::free(d_sample, q);
+  sycl::free(d_distr, q);
 
   free(result);
   free(sample);
