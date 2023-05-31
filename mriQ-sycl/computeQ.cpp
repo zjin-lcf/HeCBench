@@ -24,7 +24,7 @@ struct kValues {
 };
 
 void ComputePhiMag_GPU(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int numK,
   const float* __restrict phiR,
   const float* __restrict phiI,
@@ -39,7 +39,7 @@ void ComputePhiMag_GPU(
 }
 
 void ComputeQ_GPU(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int numK,
         int kGlobalIndex,
   const kValues* __restrict ck,
@@ -91,43 +91,41 @@ void ComputeQ_GPU(
 }
 
 void computePhiMag_GPU(
-  queue &q,
+  sycl::queue &q,
   int numK,
-  buffer<float, 1> &phiR_d,
-  buffer<float, 1> &phiI_d,
-  buffer<float, 1> &phiMag_d)
+  float *phiR_d,
+  float *phiI_d,
+  float *phiMag_d)
 {
   int phiMagBlocks = numK / KERNEL_PHI_MAG_THREADS_PER_BLOCK;
   if (numK % KERNEL_PHI_MAG_THREADS_PER_BLOCK)
     phiMagBlocks++;
 
-  range<1> lws (KERNEL_PHI_MAG_THREADS_PER_BLOCK);
-  range<1> gws (KERNEL_PHI_MAG_THREADS_PER_BLOCK * phiMagBlocks);
+  sycl::range<1> lws (KERNEL_PHI_MAG_THREADS_PER_BLOCK);
+  sycl::range<1> gws (KERNEL_PHI_MAG_THREADS_PER_BLOCK * phiMagBlocks);
 
-  q.submit([&] (handler &cgh) {
-    auto r = phiR_d.get_access<sycl_read>(cgh);
-    auto i = phiI_d.get_access<sycl_read>(cgh);
-    auto m = phiMag_d.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class compute_phi_mag>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_phi_mag>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       ComputePhiMag_GPU (
         item,
         numK,
-        r.get_pointer(),
-        i.get_pointer(),
-        m.get_pointer());
+        phiR_d,
+        phiI_d,
+        phiMag_d);
     });
   });
 }
 
 void computeQ_GPU(
-  queue &q,
+  sycl::queue &q,
   int numK, int numX,
-  buffer<float, 1> &x_d,
-  buffer<float, 1> &y_d,
-  buffer<float, 1> &z_d,
-  kValues          *kVals,
-  buffer<float, 1> &Qr_d,
-  buffer<float, 1> &Qi_d)
+  float *x_d,
+  float *y_d,
+  float *z_d,
+  kValues *kVals,
+  float *Qr_d,
+  float *Qi_d)
 {
   int QGrids = numK / KERNEL_Q_K_ELEMS_PER_GRID;
   if (numK % KERNEL_Q_K_ELEMS_PER_GRID) QGrids++;
@@ -135,12 +133,12 @@ void computeQ_GPU(
   int QBlocks = numX / KERNEL_Q_THREADS_PER_BLOCK;
   if (numX % KERNEL_Q_THREADS_PER_BLOCK) QBlocks++;
 
-  range<1> lws (KERNEL_Q_THREADS_PER_BLOCK);
-  range<1> gws (KERNEL_Q_THREADS_PER_BLOCK * QBlocks);
+  sycl::range<1> lws (KERNEL_Q_THREADS_PER_BLOCK);
+  sycl::range<1> gws (KERNEL_Q_THREADS_PER_BLOCK * QBlocks);
 
 /* Values in the k-space coordinate system are stored in constant memory
  * on the GPU */
-  buffer<kValues, 1> ck (KERNEL_Q_K_ELEMS_PER_GRID);
+  kValues *ck = sycl::malloc_device<kValues>(KERNEL_Q_K_ELEMS_PER_GRID, q);
 
   for (int QGrid = 0; QGrid < QGrids; QGrid++) {
     // Put the tile of K values into constant mem
@@ -148,32 +146,26 @@ void computeQ_GPU(
     kValues* kValsTile = kVals + QGridBase;
     int numElems = MIN(KERNEL_Q_K_ELEMS_PER_GRID, numK - QGridBase);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = ck.get_access<sycl_write>(cgh, range<1>(numElems));
-      cgh.copy(kValsTile, acc);
-    });
+    q.memcpy(ck, kValsTile, numElems * sizeof(kValues));
 
-    q.submit([&] (handler &cgh) {
-      auto k = ck.get_access<sycl_read, sycl_cmem>(cgh);
-      auto x = x_d.get_access<sycl_read>(cgh);
-      auto y = y_d.get_access<sycl_read>(cgh);
-      auto z = z_d.get_access<sycl_read>(cgh);
-      auto Qr = Qr_d.get_access<sycl_read_write>(cgh);
-      auto Qi = Qi_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class compute_q>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class compute_q>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         ComputeQ_GPU (
           item,
           numK,
-          QGridBase, 
-          k.get_pointer(),
-          x.get_pointer(),
-          y.get_pointer(),
-          z.get_pointer(),
-          Qr.get_pointer(),
-          Qi.get_pointer());
+          QGridBase,
+          ck,
+          x_d,
+          y_d,
+          z_d,
+          Qr_d,
+          Qi_d);
       });
     });
   }
+  q.wait();
+  sycl::free(ck, q);
 }
 
 void createDataStructsCPU(int numK, int numX, float** phiMag,
