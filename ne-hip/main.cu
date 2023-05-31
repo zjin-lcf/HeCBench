@@ -124,9 +124,6 @@ int main(int argc, char* argv[]) {
   dim3 grids ((numPts + 255)/256);
   dim3 blocks (256);
 
-  // warmup
-  hipLaunchKernelGGL(ne, grids, blocks , 0, 0, d_points, d_normal_points, width, height, numPts); 
-
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
