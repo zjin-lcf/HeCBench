@@ -4,7 +4,7 @@
 #include <chrono>
 #include <vector>
 #include <oneapi/mkl.hpp>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -18,11 +18,10 @@ int main(int argc, char *argv[]) {
   bool ok = true;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   // store the nrm2 results
   float* h_result = (float*) sycl::malloc_host (repeat * sizeof(float), q);
@@ -54,7 +53,7 @@ int main(int argc, char *argv[]) {
     }
 
     // reference
-    double gold = 0.0;  // double is required to match host and device results 
+    double gold = 0.0;  // double is required to match host and device results
     for (i = 0; i < n; i++) {
       a[i] = (float)((i+1) % 7);
       gold += a[i]*a[i];
@@ -91,7 +90,7 @@ int main(int argc, char *argv[]) {
     sycl::free(d_a, q);
 
     // snrm2 results match across all iterations
-    for (j = 0; j < repeat; j++) 
+    for (j = 0; j < repeat; j++)
       if (fabsf((float)gold - h_result[j]) > 1e-1f) {
         printf("FAIL at iteration %d: gold=%f actual=%f for %d elements\n",
                j, (float)gold, h_result[j], i);
