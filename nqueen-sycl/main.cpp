@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define _QUEENS_BLOCK_SIZE_   128
 #define _EMPTY_      -1
@@ -53,7 +53,7 @@ bool queens_stillLegal(const char *board, const int r)
 
 
 void BP_queens_root_dfs(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int N, unsigned int nPreFixos, int depthPreFixos,
   const QueenRoot *__restrict root_prefixes,
   unsigned long long *__restrict vector_of_tree_size,
@@ -65,7 +65,7 @@ void BP_queens_root_dfs(
      unsigned int bit_test = 0;
      char vertice[20];
      int N_l = N;
-     int i, depth; 
+     int i, depth;
      unsigned long long  qtd_solutions_thread = 0ULL;
      int depthGlobal = depthPreFixos;
      unsigned long long tree_size = 0ULL;
@@ -94,7 +94,7 @@ void BP_queens_root_dfs(
         flag |= (1ULL<<vertice[depth]);
         depth++;
         if (depth == N_l) { //sol
-          ++qtd_solutions_thread; 
+          ++qtd_solutions_thread;
         } else continue;
       } else continue;
       depth--;
@@ -106,7 +106,7 @@ void BP_queens_root_dfs(
   }//if
 }//kernel
 
-unsigned long long BP_queens_prefixes(int size, int initialDepth, 
+unsigned long long BP_queens_prefixes(int size, int initialDepth,
                                       unsigned long long *tree_size,
                                       QueenRoot *root_prefixes)
 {
@@ -159,52 +159,34 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
   int num_blocks = ceil((double)n_explorers/_QUEENS_BLOCK_SIZE_);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<unsigned long long, 1> vector_of_tree_size_d (vector_of_tree_size_h, n_explorers);
-  buffer<unsigned long long, 1> sols_d (sols_h, n_explorers);
-  buffer<QueenRoot, 1> root_prefixes_d (root_prefixes_h, n_explorers);
+  unsigned long long *vector_of_tree_size_d = sycl::malloc_device<unsigned long long>(n_explorers, q);
+  unsigned long long *sols_d = sycl::malloc_device<unsigned long long>(n_explorers, q);
+  QueenRoot *root_prefixes_d = sycl::malloc_device<QueenRoot>(n_explorers, q);
+  q.memcpy(root_prefixes_d, root_prefixes_h, n_explorers * sizeof(QueenRoot));
 
   printf("\n### Regular BP-DFS search. ###\n");
-  range<1> gws (num_blocks * _QUEENS_BLOCK_SIZE_);
-  range<1> lws (_QUEENS_BLOCK_SIZE_);
-
-  // warmup
-  q.submit([&] (handler &cgh) {
-    auto root_prefixes = root_prefixes_d.get_access<sycl_read>(cgh);
-    auto vector_of_tree_size = vector_of_tree_size_d.get_access<sycl_discard_write>(cgh);
-    auto sols =  sols_d.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      BP_queens_root_dfs(item,
-                         size,
-                         n_explorers,
-                         initial_depth,
-                         root_prefixes.get_pointer(),
-                         vector_of_tree_size.get_pointer(),
-                         sols.get_pointer());
-    });
-  });
+  sycl::range<1> gws (num_blocks * _QUEENS_BLOCK_SIZE_);
+  sycl::range<1> lws (_QUEENS_BLOCK_SIZE_);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto root_prefixes = root_prefixes_d.get_access<sycl_read>(cgh);
-      auto vector_of_tree_size = vector_of_tree_size_d.get_access<sycl_discard_write>(cgh);
-      auto sols =  sols_d.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class nqueen>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class nqueen>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         BP_queens_root_dfs(item,
                            size,
                            n_explorers,
                            initial_depth,
-                           root_prefixes.get_pointer(),
-                           vector_of_tree_size.get_pointer(),
-                           sols.get_pointer());
+                           root_prefixes_d,
+                           vector_of_tree_size_d,
+                           sols_d);
       });
     });
   }
@@ -213,6 +195,13 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+
+  q.memcpy(vector_of_tree_size_h, vector_of_tree_size_d, n_explorers*sizeof(unsigned long long));
+  q.memcpy(sols_h, sols_d, n_explorers*sizeof(unsigned long long));
+
+  sycl::free(vector_of_tree_size_d, q);
+  sycl::free(sols_d, q);
+  sycl::free(root_prefixes_d, q);
 }
 
 
@@ -254,12 +243,12 @@ int main(int argc, char *argv[])
   for(unsigned long long i = 0; i<n_explorers;++i){
     if(solutions_h[i]>0)
       qtd_sols_global += solutions_h[i];
-    if(vector_of_tree_size_h[i]>0) 
+    if(vector_of_tree_size_h[i]>0)
       tree_size +=vector_of_tree_size_h[i];
   }
 
   printf("\nNumber of solutions found: %llu \nTree size: %llu\n", qtd_sols_global, tree_size );
-  
+
   // Initial depth: 7 - Size: 15:
   // Tree size: 2466109
   // Number of solutions found: 2279184
@@ -275,4 +264,4 @@ int main(int argc, char *argv[])
   free(vector_of_tree_size_h);
   free(solutions_h);
   return 0;
-}  
+}
