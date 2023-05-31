@@ -1,3 +1,6 @@
+using float4 = sycl::float4;
+using float3 = sycl::float3;
+
 typedef struct {
   int width; 
   int height; 
