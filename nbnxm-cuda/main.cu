@@ -9,6 +9,11 @@ typedef float4 Float4;
 
 #include "constants.h"
 
+#if (CUDART_VERSION >= 9000)
+#define __shfl_up(v, d) __shfl_up_sync(0xffffffff, v, d)
+#define __shfl_down(v, d) __shfl_down_sync(0xffffffff, v, d)
+#endif
+
 inline __device__ void operator+=(float4 &a, float4 b)
 {
   a.x += b.x;
@@ -495,7 +500,7 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/o shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/o shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
   float f0 = 0, f1 = 0, f2 = 0; 
@@ -566,7 +571,7 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/ shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/ shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
   f0 = 0, f1 = 0, f2 = 0; 
