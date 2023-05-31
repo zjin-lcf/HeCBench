@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
+#include <sycl/sycl.hpp>
 #include "GSimulation.hpp"
-#include "common.h"
 
 /* Default Constructor for the GSimulation class which sets up the default
  * values for number of particles, number of integration steps, time steo and
@@ -102,20 +102,19 @@ void GSimulation::Start() {
 
   // Create a queue to the selected device and enabled asynchronous exception
   // handling for that queue
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  range<1> gws ((n+255)/256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((n+255)/256 * 256);
+  sycl::range<1> lws (256);
 
-  Particle *p = malloc_device<Particle>(n, q);
+  Particle *p = sycl::malloc_device<Particle>(n, q);
   q.memcpy(p, particles_.data(), n * sizeof(Particle)).wait();
 
-  RealType *e = malloc_device<RealType>(n, q);
+  RealType *e = sycl::malloc_device<RealType>(n, q);
 
   TimeInterval t0;
   int nsteps = get_nsteps();
@@ -125,8 +124,9 @@ void GSimulation::Start() {
 
     // Submitting first kernel to device which computes acceleration of all
     // particles
-    q.submit([&](handler& h) {
-      h.parallel_for<class compute_acceleration>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler& h) {
+      h.parallel_for<class compute_acceleration>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i >= n) return;
 
@@ -159,8 +159,9 @@ void GSimulation::Start() {
       });
     });
     // Second kernel updates the velocity and position for all particles
-    q.submit([&](handler& h) {
-      h.parallel_for<class update_velocity_position>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+    q.submit([&](sycl::handler& h) {
+      h.parallel_for<class update_velocity_position>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         auto i = item.get_global_id(0);
         if (i >= n) return;
 
@@ -188,7 +189,7 @@ void GSimulation::Start() {
     /* Third kernel accumulates the energy of this Nbody system
      * Reduction operation can be done using reducer interface in SYCL 2020
      */
-    q.submit([&](handler& h) {
+    q.submit([&](sycl::handler& h) {
       h.single_task<class accumulate_energy>([=]() {
         for (int i = 1; i < n; i++) e[0] += e[i];
       });
@@ -231,8 +232,8 @@ void GSimulation::Start() {
   std::cout << "===============================";
   std::cout << "\n";
 
-  free(p, q);
-  free(e, q);
+  sycl::free(p, q);
+  sycl::free(e, q);
 }
 
 #ifdef DEBUG
