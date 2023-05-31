@@ -1,7 +1,14 @@
-#include "common.h"
+inline int atomicAdd(int *var, int val)
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*var);
+  return atm.fetch_add(val);
+}
 
 void mr32_sf(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const uint32_t *__restrict bases,
   const uint32_t *__restrict n32,
   int *__restrict val,
@@ -11,18 +18,13 @@ void mr32_sf(
   if (j < iter) {
     int n = n32[j];
     for (int cnt = 1; cnt <= BASES_CNT32; cnt++) {
-      // atomicAdd(val, straightforward_mr32(bases, cnt, n));
-      auto ao = ext::oneapi::atomic_ref<int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (val[0]);
-      ao.fetch_add(straightforward_mr32(bases, cnt, n));
+      atomicAdd(val, straightforward_mr32(bases, cnt, n));
     }
   }
 }
 
 void mr32_eff(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const uint32_t *__restrict bases,
   const uint32_t *__restrict n32,
   int *__restrict val,
@@ -32,12 +34,7 @@ void mr32_eff(
   if (j < iter) {
     int n = n32[j];
     for (int cnt = 1; cnt <= BASES_CNT32; cnt++) {
-      // atomicAdd(val, efficient_mr32(bases, cnt, n));
-      auto ao = ext::oneapi::atomic_ref<int, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::device,
-            access::address_space::global_space> (val[0]);
-      ao.fetch_add(efficient_mr32(bases, cnt, n));
+      atomicAdd(val, efficient_mr32(bases, cnt, n));
     }
   }
 }
