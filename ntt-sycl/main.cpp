@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define  bidx  item.get_group(0)
 #define  tidx  item.get_local_id(0)
@@ -9,7 +9,7 @@
 #include "modP.h"
 
 void intt_3_64k_modcrt(
-        nd_item<1> &item,
+        sycl::nd_item<1> &item,
         uint64 *__restrict buffer,
         uint32 *__restrict dst,
   const uint64 *__restrict src)
@@ -28,7 +28,7 @@ void intt_3_64k_modcrt(
 #pragma unroll
   for (int i=0; i<8; i++)
     buffer[tbuf|i] = _ls_modP(samples[i], ((tidx&0x1)<<2)*i*3);
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
   for (int i=0; i<8; i++)
@@ -65,30 +65,28 @@ int main(int argc, char* argv[]) {
     ntt[i] = (hi << 32) | lo;
   }
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<uint64, 1> d_ntt (ntt, nttLen);
-  buffer<uint32, 1> d_res (res, nttLen);
+  uint64 *d_ntt = sycl::malloc_device<uint64>(nttLen, q);
+  uint32 *d_res = sycl::malloc_device<uint32>(nttLen, q);
+  q.memcpy(d_ntt, ntt, nttLen*sizeof(uint64));
 
-  range<1> gws (nttLen/512 * 64);
-  range<1> lws (64);
-  
+  sycl::range<1> gws (nttLen/512 * 64);
+  sycl::range<1> lws (64);
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto dst = d_res.get_access<sycl_discard_write>(cgh);
-      auto src = d_ntt.get_access<sycl_read>(cgh);
-      accessor<uint64, 1, sycl_read_write, access::target::local> sm (512, cgh);
-      cgh.parallel_for<class intt_modcrt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        intt_3_64k_modcrt(item, sm.get_pointer(), dst.get_pointer(), src.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<uint64, 1> sm (sycl::range<1>(512), cgh);
+      cgh.parallel_for<class intt_modcrt>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        intt_3_64k_modcrt(item, sm.get_pointer(), d_res, d_ntt);
       });
     });
   }
@@ -97,13 +95,16 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
-  }
+
+  q.memcpy(res, d_res, nttLen*sizeof(uint32)).wait();
 
   uint64_t checksum = 0;
   for (int i = 0; i < nttLen; i++)
     checksum += res[i];
   printf("Checksum: %lu\n", checksum);
 
+  sycl::free(d_ntt, q);
+  sycl::free(d_res, q);
   free(ntt);
   free(res);
   return 0;
