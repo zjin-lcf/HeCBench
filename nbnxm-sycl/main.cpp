@@ -1,19 +1,20 @@
 #include <iostream>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "vectypes.h"
 
-typedef sycl::cl_float2 Float2;
+typedef sycl::float2 Float2;
 typedef gmx::BasicVector<float> Float3;
-typedef sycl::cl_float4 Float4;
+typedef sycl::float4 Float4;
 
 #include "constants.h"
 
-template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
-static inline void atomicFetchAdd(T& val, const T delta)
+template<typename T>
+static inline void atomicAdd(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
-     MemoryScope, sycl::access::address_space::global_space> ref(val);
+  sycl::atomic_ref<T, sycl::memory_order::relaxed,
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
 
@@ -103,7 +104,7 @@ static __attribute__((always_inline))
       {
         const float f =
           sm_buf[tidxj * bufStride + tidxi] + sm_buf[tidxj * bufStride + c_clSize + tidxi];
-        atomicFetchAdd(a_f[aidx][tidxj], f);
+        atomicAdd(a_f[aidx][tidxj], f);
         if (calcFShift)
         {
           fShiftBuf += f;
@@ -132,12 +133,12 @@ static __attribute__((always_inline))
           fShiftBuf += sg.shuffle_down(fShiftBuf, 2);
           if (tidxi == 0)
           {
-            atomicFetchAdd(a_fShift[shift][tidxj], fShiftBuf);
+            atomicAdd(a_fShift[shift][tidxj], fShiftBuf);
           }
         }
         else
         {
-          atomicFetchAdd(a_fShift[shift][tidxj], fShiftBuf);
+          atomicAdd(a_fShift[shift][tidxj], fShiftBuf);
         }
       }
     }
@@ -174,7 +175,7 @@ static __attribute__((always_inline)) void reduceForceJShuffle(Float3           
 
   if (tidxi < 3)
   {
-    atomicFetchAdd(a_f[aidx][tidxi], f[0]);
+    atomicAdd(a_f[aidx][tidxi], f[0]);
   }
 }
 
@@ -365,7 +366,7 @@ auto nbnxmKernelTest(
       } // for (int jm = 0; jm < c_nbnxnGpuJgroupSize; jm++)
     } // for (int j4 = cij4Start; j4 < cij4End; j4 += 1)
 
-    {  
+    {
       const nbnxn_sci_t nbSci     = a_plistSci[itemIdx.get_group(0)];
       const int         sci       = nbSci.sci;
 
@@ -409,7 +410,7 @@ int main(int argc, char* argv[]) {
   }
   const int repeat = atoi(argv[1]);
 
-  sycl::queue q(sycl::gpu_selector{});
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 
   const sycl::range<3>    blockSize{ 1, block_y, block_x };
   const sycl::range<3>    globalSize{ grid_z, block_y, block_x };
@@ -501,10 +502,10 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/o shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/o shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
-  float f0 = 0, f1 = 0, f2 = 0; 
+  float f0 = 0, f1 = 0, f2 = 0;
   for (int i = 0; i < NUM_ATOMS; ++i) {
     f0 += a_f[i][0];
     f1 += a_f[i][1];
@@ -512,7 +513,7 @@ int main(int argc, char* argv[]) {
   }
   printf("Checksum (a_f): %f %f %f\n", f0, f1, f2);
 
-  f0 = 0, f1 = 0, f2 = 0; 
+  f0 = 0, f1 = 0, f2 = 0;
   for (int i = 0; i < 45; ++i) {
     f0 += fShift[i][0];
     f1 += fShift[i][1];
@@ -576,10 +577,10 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/ shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/ shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
-  f0 = 0, f1 = 0, f2 = 0; 
+  f0 = 0, f1 = 0, f2 = 0;
   for (int i = 0; i < NUM_ATOMS; ++i) {
     f0 += a_f[i][0];
     f1 += a_f[i][1];
@@ -587,7 +588,7 @@ int main(int argc, char* argv[]) {
   }
   printf("Checksum (a_f): %f %f %f\n", f0, f1, f2);
 
-  f0 = 0, f1 = 0, f2 = 0; 
+  f0 = 0, f1 = 0, f2 = 0;
   for (int i = 0; i < 45; ++i) {
     f0 += fShift[i][0];
     f1 += fShift[i][1];
