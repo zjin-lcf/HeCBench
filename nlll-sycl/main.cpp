@@ -3,13 +3,13 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
-template <typename scalar_t, typename accscalar_t, 
+template <typename scalar_t, typename accscalar_t,
           typename index_t, int NLL_LOSS_THREADS>
 void nll_loss_forward_reduce2d_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     scalar_t* __restrict__ output,
     scalar_t* __restrict__ total_weight,
     const scalar_t* __restrict__ input,
@@ -22,12 +22,12 @@ void nll_loss_forward_reduce2d_kernel(
 {
    auto g = item.get_group();
 
-   multi_ptr<accscalar_t[NLL_LOSS_THREADS], access::address_space::local_space>
-     ip = ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
+   sycl::multi_ptr<accscalar_t[NLL_LOSS_THREADS], sycl::access::address_space::local_space>
+     ip = sycl::ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
    accscalar_t* sm_inputs = *ip;
 
-   multi_ptr<accscalar_t[NLL_LOSS_THREADS], access::address_space::local_space>
-     wp = ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
+   sycl::multi_ptr<accscalar_t[NLL_LOSS_THREADS], sycl::access::address_space::local_space>
+     wp = sycl::ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
    accscalar_t* acc_weight = *wp;
 
   int tid = item.get_local_id(0);
@@ -44,7 +44,7 @@ void nll_loss_forward_reduce2d_kernel(
     }
   }
 
-  group_barrier(g, memory_scope::work_group);
+  group_barrier(g, sycl::memory_scope::work_group);
 
   if (tid == 0) {
     accscalar_t output_acc = 0;
@@ -90,17 +90,16 @@ void eval(const int64_t nframe,
   scalar_t h_total_weight;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  scalar_t *d_output = malloc_device<scalar_t>(1, q);
-  scalar_t *d_total_weight = malloc_device<scalar_t>(1, q);
-  scalar_t *d_input = malloc_device<scalar_t>(input_size, q);
-   index_t *d_target = malloc_device<index_t>(target_size, q);
-  scalar_t *d_weights = malloc_device<scalar_t>(weights_size, q);
+  scalar_t *d_output = sycl::malloc_device<scalar_t>(1, q);
+  scalar_t *d_total_weight = sycl::malloc_device<scalar_t>(1, q);
+  scalar_t *d_input = sycl::malloc_device<scalar_t>(input_size, q);
+   index_t *d_target = sycl::malloc_device<index_t>(target_size, q);
+  scalar_t *d_weights = sycl::malloc_device<scalar_t>(weights_size, q);
 
   q.memcpy(d_input, h_input, input_size_bytes);
 
@@ -108,18 +107,18 @@ void eval(const int64_t nframe,
 
   q.memcpy(d_target, h_target, target_size_bytes);
 
-  range<1> gws (GPU_THREADS);
-  range<1> lws (GPU_THREADS);
+  sycl::range<1> gws (GPU_THREADS);
+  sycl::range<1> lws (GPU_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         nll_loss_forward_reduce2d_kernel
           <scalar_t, scalar_t, index_t, GPU_THREADS>(
-                        item, 
+                        item,
                         d_output,
                         d_total_weight,
                         d_input,
@@ -146,17 +145,17 @@ void eval(const int64_t nframe,
 
   bool ok = true;
   if (fabs(h_output - r_output) > 1e-1 || fabs(h_total_weight - r_total_weight) > 1e-1) {
-    printf("%f %f %f %f\n", (float)h_output, (float)r_output, 
+    printf("%f %f %f %f\n", (float)h_output, (float)r_output,
                             (float)h_total_weight, (float)r_total_weight);
     ok = false;
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_output, q);
-  free(d_total_weight, q);
-  free(d_input, q);
-  free(d_target, q);
-  free(d_weights, q);
+  sycl::free(d_output, q);
+  sycl::free(d_total_weight, q);
+  sycl::free(d_input, q);
+  sycl::free(d_target, q);
+  sycl::free(d_weights, q);
 }
 
 
@@ -198,7 +197,7 @@ void driver(char** argv) {
 
   // the index may not necessarily be in the class range
   const int64_t ignore_index = n_classes / 2;
-  
+
   // verify the loss function
   scalar_t r_output;
   scalar_t r_total_weight;
@@ -236,4 +235,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
