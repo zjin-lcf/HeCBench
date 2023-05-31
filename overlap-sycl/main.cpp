@@ -49,7 +49,7 @@ int *d_data_in[STREAM_COUNT];
 int *h_data_out[STREAM_COUNT];
 int *d_data_out[STREAM_COUNT];
 
-sycl::queue q[STREAM_COUNT];
+sycl::queue q[STREAM_COUNT + 1];
 
 int N = 1 << 22;
 int nreps = 10;  // number of times each experiment is repeated
@@ -71,24 +71,27 @@ int main(int argc, char *argv[]) {
 
   memsize = N * sizeof(int);
 
-
-
   // Allocate resources
-  for (int i = 0; i < STREAM_COUNT; ++i) {
 #ifdef USE_GPU
-      q[i] = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
+  sycl::queue q0 (sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-      q[i] = sycl::queue(sycl::device_selector_v, sycl::property::queue::in_order());
+  sycl::queue q0 (sycl::device_selector_v, sycl::property::queue::in_order());
 #endif
 
+  for (int i = 0; i < STREAM_COUNT; ++i) {
+#ifdef USE_GPU
+    q[i] = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+    q[i] = sycl::queue(sycl::device_selector_v, sycl::property::queue::in_order());
+#endif
 
-    h_data_in[i] = sycl::malloc_host<int>(N, q[0]);
-    h_data_out[i] = sycl::malloc_host<int>(N, q[0]);
+    h_data_in[i] = sycl::malloc_host<int>(N, q0);
+    h_data_out[i] = sycl::malloc_host<int>(N, q0);
 
-    d_data_in[i] = sycl::malloc_device<int>(N, q[0]);
-    q[0].memset(d_data_in[i], 0, memsize);
+    d_data_in[i] = sycl::malloc_device<int>(N, q0);
+    q0.memset(d_data_in[i], 0, memsize);
 
-    d_data_out[i] = sycl::malloc_device<int>(N, q[0]);
+    d_data_out[i] = sycl::malloc_device<int>(N, q0);
   }
 
   // initialize host memory
@@ -98,19 +101,21 @@ int main(int argc, char *argv[]) {
 
   // Process pipelined work
   float serial_time = processWithStreams(1);
+  float overlap_time = processWithStreams(STREAM_COUNT);
+
   printf("\nAverage measured timings over %d repetitions:\n", nreps);
   printf(" Avg. time when execution fully serialized\t: %f ms\n",
          serial_time / nreps);
-//  printf(" Avg. time when overlapped using %d streams\t: %f ms\n", STREAM_COUNT,
-//         overlap_time / nreps);
-//  printf(" Avg. speedup gained (serialized - overlapped)\t: %f ms\n",
-//         (serial_time - overlap_time) / nreps);
+  printf(" Avg. time when overlapped using %d streams\t: %f ms\n", STREAM_COUNT,
+         overlap_time / nreps);
+  printf(" Avg. speedup gained (serialized - overlapped)\t: %f\n",
+         (serial_time - overlap_time) / nreps);
 
   printf("\nMeasured throughput:\n");
   printf(" Fully serialized execution\t\t: %f GB/s\n",
          (nreps * (memsize * 2e-6)) / serial_time);
-//  printf(" Overlapped using %d streams\t\t: %f GB/s\n", STREAM_COUNT,
-//         (nreps * (memsize * 2e-6)) / overlap_time);
+  printf(" Overlapped using %d streams\t\t: %f GB/s\n", STREAM_COUNT,
+         (nreps * (memsize * 2e-6)) / overlap_time);
 
   // Verify the results, we will use the results for final output
   bool bResults = check();
@@ -118,11 +123,11 @@ int main(int argc, char *argv[]) {
 
   // Free resources
   for (int i = 0; i < STREAM_COUNT; ++i) {
-    sycl::free(h_data_in[i], q[0]);
-    sycl::free(d_data_in[i], q[0]);
+    sycl::free(h_data_in[i], q0);
+    sycl::free(d_data_in[i], q0);
 
-    sycl::free(h_data_out[i], q[0]);
-    sycl::free(d_data_out[i], q[0]);
+    sycl::free(h_data_out[i], q0);
+    sycl::free(d_data_out[i], q0);
   }
 
   // Test result
@@ -164,7 +169,7 @@ float processWithStreams(int streams_used) {
     current_stream = next_stream;
   }
 
-  for (int i = 0; i < STREAM_COUNT; i++) q[i].wait();
+  for (int i = 0; i < streams_used; i++) q[i].wait();
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
