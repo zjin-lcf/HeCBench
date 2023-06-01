@@ -20,7 +20,7 @@
 #include <float.h>
 #include <chrono>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "reference.cpp"
 
@@ -28,11 +28,11 @@
 template <typename value_idx, typename value_t>
 class search;
 
-// Find the best Gaussian bandwidth for each row in the dataset 
+// Find the best Gaussian bandwidth for each row in the dataset
 template <typename value_idx, typename value_t>
-void perplexity_search(queue &q,
-                       buffer<const value_t> &d_distances,
-                       buffer<value_t> &d_data,
+void perplexity_search(sycl::queue &q,
+                       const value_t *d_distances,
+                       value_t *d_data,
                        const float perplexity,
                        const int epochs,
                        const float tol,
@@ -41,15 +41,14 @@ void perplexity_search(queue &q,
                        double &time)
 {
   const float desired_entropy = logf(perplexity);
-  range<1> gws ((n+255)/256*256);
-  range<1> lws  (256);
+  sycl::range<1> gws ((n+255)/256*256);
+  sycl::range<1> lws  (256);
 
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto distances = d_distances.template get_access<sycl_read>(cgh); 
-    auto data = d_data.template get_access<sycl_discard_write>(cgh); 
-    cgh.parallel_for<class search<value_idx, value_t>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class search<value_idx, value_t>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       // For every item in row
       const int i = item.get_global_id(0);
       if (i >= n) return;
@@ -64,16 +63,16 @@ void perplexity_search(queue &q,
 
         // Exponentiate to get Gaussian
         for (int j = 0; j < k; j++) {
-          data[ik + j] = sycl::native::exp(-distances[ik + j] * beta);
-          sum += data[ik + j];
+          d_data[ik + j] = sycl::native::exp(-d_distances[ik + j] * beta);
+          sum += d_data[ik + j];
         }
 
         // Normalize
         value_t sum_dist = 0;
         const value_t div    = sycl::native::divide(1.0f, sum);
         for (int j = 0; j < k; j++) {
-          data[ik + j] *= div;
-          sum_dist += distances[ik + j] * data[ik + j];
+          d_data[ik + j] *= div;
+          sum_dist += d_distances[ik + j] * d_data[ik + j];
         }
 
         const value_t entropy      = sycl::native::log(sum) + beta * sum_dist;
@@ -118,7 +117,7 @@ int main(int argc, char* argv[]) {
   const int max_iter = 100;    // maximum number of iterations
   const float tol = 1e-8f;     // tolerance
 
-  srand(123); 
+  srand(123);
   std::vector<float> data(n * n_nbrs);
   std::vector<float> h_data(n * n_nbrs);
   std::vector<float> distance(n * n_nbrs);
@@ -126,25 +125,25 @@ int main(int argc, char* argv[]) {
     distance[i] = rand() / (float)RAND_MAX;
   }
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_data(data.data(), n*n_nbrs);
-  buffer<const float, 1> d_distances(distance.data(), n*n_nbrs);
+  float *d_data = sycl::malloc_device<float>(n*n_nbrs, q);
+
+  float *d_distance = sycl::malloc_device<float>(n*n_nbrs, q);
+  q.memcpy(d_distance, distance.data(), sizeof(float)*n*n_nbrs).wait();
 
   double time = 0.0;
 
-  for (int i = 0; i < repeat; i++) 
-    perplexity_search(q, d_distances, d_data, p, max_iter, tol, n, n_nbrs, time);
+  for (int i = 0; i < repeat; i++)
+    perplexity_search(q, d_distance, d_data, p, max_iter, tol, n, n_nbrs, time);
 
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
-  } // sycl scope
+  q.memcpy(data.data(), d_data, sizeof(float)*n*n_nbrs).wait();
 
   // verify
   reference(distance.data(), h_data.data(), p, max_iter, tol, n, n_nbrs);
@@ -158,7 +157,9 @@ int main(int argc, char* argv[]) {
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-  
+
+  sycl::free(d_distance, q);
+  sycl::free(d_data, q);
   return 0;
 }
 
