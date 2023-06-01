@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "constants_types.h"
 #include "kernel.h"
 
@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
   size_t start_transitions_size = start_transitions_elem * sizeof(double);
   size_t likelihood_size = likelihood_elem * sizeof(double);
 
-  fArray *h_cur_forward = (fArray*) malloc (forward_matrix_size); 
+  fArray *h_cur_forward = (fArray*) malloc (forward_matrix_size);
   fArray *h_emis = (fArray*) malloc (emissions_size);
   tArray *h_trans = (tArray*) malloc (transitions_size);
   lArray *h_like = (lArray*) malloc (likelihood_size);
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-         
+
   for (int i = 0; i < batch; i++) {
     for (int s = 0; s < states-1; s++) {
       h_start[i][s] = dist(rng);
@@ -71,31 +71,30 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  fArray *d_cur_forward = malloc_device<fArray>(forward_matrix_elem, q);
+  fArray *d_cur_forward = sycl::malloc_device<fArray>(forward_matrix_elem, q);
   q.memcpy(d_cur_forward, h_cur_forward, forward_matrix_size);
 
-  fArray *d_next_forward = malloc_device<fArray>(forward_matrix_elem, q);
+  fArray *d_next_forward = sycl::malloc_device<fArray>(forward_matrix_elem, q);
 
-  fArray *d_emis = malloc_device<fArray>(emissions_elem, q);
+  fArray *d_emis = sycl::malloc_device<fArray>(emissions_elem, q);
   q.memcpy(d_emis, h_emis, emissions_size);
 
-  tArray *d_trans = malloc_device<tArray>(transitions_elem, q);
+  tArray *d_trans = sycl::malloc_device<tArray>(transitions_elem, q);
   q.memcpy(d_trans, h_trans, transitions_size);
 
-  lArray *d_like = malloc_device<lArray>(likelihood_elem, q);
+  lArray *d_like = sycl::malloc_device<lArray>(likelihood_elem, q);
   q.memcpy(d_like, h_like, likelihood_size);
 
-  sArray *d_start = malloc_device<sArray>(start_transitions_elem, q);
+  sArray *d_start = sycl::malloc_device<sArray>(start_transitions_elem, q);
   q.memcpy(d_start, h_start, start_transitions_size);
 
-  range<1> gws (batch * (states-1));
-  range<1> lws (batch);
+  sycl::range<1> gws (batch * (states-1));
+  sycl::range<1> lws (batch);
 
   q.wait();
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -103,8 +102,9 @@ int main(int argc, char* argv[]) {
   for(int count = 0; count < repeat; count++) {
     for (int i = 1; i < x_dim + 1; i++) {
       for (int j = 1; j < y_dim + 1; j++) {
-        q.submit([&] (handler &cgh) {
-          cgh.parallel_for<class pair_hmm_forward>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class pair_hmm_forward>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             pair_HMM_forward(item, i, j, d_cur_forward, d_trans, d_emis,
                              d_like, d_start, d_next_forward);
           });
@@ -138,12 +138,12 @@ int main(int argc, char* argv[]) {
   }
   std::cout << "Checksum " << checkSum << std::endl;
 
-  free(d_cur_forward, q);
-  free(d_next_forward, q);
-  free(d_emis, q);
-  free(d_trans, q);
-  free(d_like, q);
-  free(d_start, q);
+  sycl::free(d_cur_forward, q);
+  sycl::free(d_next_forward, q);
+  sycl::free(d_emis, q);
+  sycl::free(d_trans, q);
+  sycl::free(d_like, q);
+  sycl::free(d_start, q);
   free(h_cur_forward);
   free(h_emis);
   free(h_trans);
