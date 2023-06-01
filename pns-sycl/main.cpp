@@ -10,7 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 /*
@@ -41,7 +41,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 
 */
 
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 #include "rand_gen.cpp"
 #include "petri_kernel.cpp"
 
@@ -61,9 +61,9 @@ long long get_time() {
   return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
-  if (argc<4) 
+  if (argc<4)
     {
       printf("Usage: petri n s t\n"
 	     "n: the place-transition grid is 2nX2n\n"
@@ -84,10 +84,10 @@ int main(int argc, char** argv)
     return -1;
 
   NSQUARE2 = N*(N+N);
-  
+
   h_vars = (float*)malloc(T*sizeof(float));
   h_maxs = (int*)malloc(T*sizeof(int));
-  
+
   long long ktime = 0;
 
   auto start = get_time();
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
 
   free(h_vars);
   free(h_maxs);
-    
+
   printf("petri N=%d S=%d T=%d\n", N, S, T);
   printf("mean_vars: %f    var_vars: %f\n", results[0], results[1]);
   printf("mean_maxs: %f    var_maxs: %f\n", results[2], results[3]);
@@ -111,14 +111,14 @@ int main(int argc, char** argv)
   return 0;
 }
 
-void compute_statistics() 
+void compute_statistics()
 {
   float sum = 0;
   float sum_vars = 0;
   float sum_max = 0;
   float sum_max_vars = 0;
   int i;
-  for (i=0; i<T; i++) 
+  for (i=0; i<T; i++)
     {
       sum += h_vars[i];
       sum_vars += h_vars[i]*h_vars[i];
@@ -144,19 +144,18 @@ void PetrinetOnDevice(long long &time)
 
   // compute the simulation on the GPU
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  int *g_places = malloc_device<int>(g_places_size, q);
-  float *g_vars = malloc_device<float>(block_num, q);
-  int *g_maxs = malloc_device<int>(block_num, q);
+    int *g_places = sycl::malloc_device<int>(g_places_size, q);
+  float *g_vars = sycl::malloc_device<float>(block_num, q);
+    int *g_maxs = sycl::malloc_device<int>(block_num, q);
 
   // Setup the execution configuration
-  range<1> gws (256 * block_num);
-  range<1> lws (256);  // each block has 256 threads
+  sycl::range<1> gws (256 * block_num);
+  sycl::range<1> lws (256);  // each block has 256 threads
 
   int *p_hmaxs = h_maxs;
   float *p_hvars = h_vars;
@@ -165,16 +164,17 @@ void PetrinetOnDevice(long long &time)
   const int s = S;
 
   // Launch the device computation threads!
-  for (i = 0; i<T-block_num; i+=block_num) 
+  for (i = 0; i<T-block_num; i+=block_num)
   {
     q.wait();
-    auto start = get_time(); 
+    auto start = get_time();
 
-    q.submit([&] (handler &cgh) {
-      accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
-      cgh.parallel_for<class pn_loop>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<uint32, 1> mt(sycl::range<1>(MERS_N), cgh);
+      cgh.parallel_for<class pn_loop>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         PetrinetKernel(
-          item, 
+          item,
           mt.get_pointer(),
           g_places,
           g_vars,
@@ -182,7 +182,7 @@ void PetrinetOnDevice(long long &time)
           n, s, 5489*(i+1));
       });
     }).wait();
-    
+
     auto end = get_time();
     time += end - start;
 
@@ -193,16 +193,17 @@ void PetrinetOnDevice(long long &time)
     p_hvars += block_num;
   }
 
-  range<1> gws1 (256*(T-i));
+  sycl::range<1> gws1 (256*(T-i));
 
   q.wait();
   auto start = get_time();
 
-  q.submit([&] (handler &cgh) {
-    accessor<uint32, 1, sycl_read_write, access::target::local> mt(MERS_N, cgh);
-    cgh.parallel_for<class pn_final>(nd_range<1>(gws1, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<uint32, 1> mt(sycl::range<1>(MERS_N), cgh);
+    cgh.parallel_for<class pn_final>(
+      sycl::nd_range<1>(gws1, lws), [=] (sycl::nd_item<1> item) {
       PetrinetKernel(
-        item, 
+        item,
         mt.get_pointer(),
         g_places,
         g_vars,
@@ -219,7 +220,7 @@ void PetrinetOnDevice(long long &time)
   q.memcpy(p_hvars, g_vars, (T-i)*sizeof(float));
   q.wait();
 
-  free(g_places, q);
-  free(g_vars, q);
-  free(g_maxs, q);
+  sycl::free(g_places, q);
+  sycl::free(g_vars, q);
+  sycl::free(g_maxs, q);
 }
