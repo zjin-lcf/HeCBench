@@ -30,7 +30,7 @@
 #include <math.h>
 #include <getopt.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef __NVPTX__
   #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
@@ -44,7 +44,7 @@
 #define BLOCK_SIZE 256
 #endif
 
-// default values 
+// default values
 const int max_iter = 1000;
 const float threshold= 1e-16f;
 
@@ -170,30 +170,29 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  int *d_pages = malloc_device<int>(n*n, q);
+  int *d_pages = sycl::malloc_device<int>(n*n, q);
   q.memcpy(d_pages, pages, sizeof(int) * n * n);
 
-  float *d_page_ranks = malloc_device<float>(n, q);
+  float *d_page_ranks = sycl::malloc_device<float>(n, q);
   q.memcpy(d_page_ranks, page_ranks, sizeof(float) * n);
 
-  float *d_maps = malloc_device<float>(n*n, q);
+  float *d_maps = sycl::malloc_device<float>(n*n, q);
 
-  unsigned int *d_noutlinks = malloc_device<unsigned int>(n, q);
+  unsigned int *d_noutlinks = sycl::malloc_device<unsigned int>(n, q);
   q.memcpy(d_noutlinks, noutlinks, sizeof(unsigned int) * n);
 
-  float *d_diffs = malloc_device<float>(n, q);
+  float *d_diffs = sycl::malloc_device<float>(n, q);
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t global_work_size = (n+block_size-1) / block_size * block_size;
 
-  range<1> gws (global_work_size);
-  range<1> lws (block_size);
+  sycl::range<1> gws (global_work_size);
+  sycl::range<1> lws (block_size);
 
   q.wait();
   double ktime = 0.0;
@@ -202,9 +201,9 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
 
     //map <<< dim3(num_blocks), dim3(block_size) >>> ( d_pages, d_page_ranks, d_maps, d_noutlinks, n);
-    q.submit([&](handler& cgh) { 
-      cgh.parallel_for<class map>( 
-        nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class map>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
           float outbound_rank = ldg(&d_page_ranks[i])/(float)ldg(&d_noutlinks[i]);
@@ -215,8 +214,9 @@ int main(int argc, char *argv[]) {
     });
 
     //reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
-    q.submit([&](handler& cgh) { 
-      cgh.parallel_for<class reduce>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class reduce>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int j = item.get_global_id(0);
         float new_rank;
         float old_rank;
@@ -241,11 +241,11 @@ int main(int argc, char *argv[]) {
     max_diff = maximum_dif(diffs, n);
   }
 
-  free(d_pages, q);
-  free(d_maps, q);
-  free(d_page_ranks, q);
-  free(d_noutlinks, q);
-  free(d_diffs, q);
+  sycl::free(d_pages, q);
+  sycl::free(d_maps, q);
+  sycl::free(d_page_ranks, q);
+  sycl::free(d_noutlinks, q);
+  sycl::free(d_diffs, q);
 
   fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
   printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
