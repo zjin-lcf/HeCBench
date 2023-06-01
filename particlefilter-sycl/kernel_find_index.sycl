@@ -1,22 +1,21 @@
 
 int i = item.get_global_id(0);
 if(i < Nparticles){
-	int index = -1;
-	int x;
+  int index = -1;
+  int x;
 
-	for(x = 0; x < Nparticles; x++){
-		if(CDF[x] >= u[i]){
-			index = x;
-			break;
-		}
-	}
-	if(index == -1){
-		index = Nparticles-1;
-	}
+  for(x = 0; x < Nparticles; x++){
+    if(CDF_d[x] >= u_d[i]){
+      index = x;
+      break;
+    }
+  }
+  if(index == -1){
+    index = Nparticles-1;
+  }
 
-	xj[i] = arrayX[index];
-	yj[i] = arrayY[index];
+  xj_d[i] = arrayX_d[index];
+  yj_d[i] = arrayY_d[index];
 
-	//weights[i] = 1 / ((float) (Nparticles)); //moved this code to the beginning of likelihood kernel
-
+  //weights[i] = 1 / ((float) (Nparticles)); //moved this code to the beginning of likelihood kernel
 }
