@@ -4,15 +4,14 @@
  *
  * The kernel pnpoly_base is used for correctness checking.
  *
- * The algorithm used here is adapted from: 
+ * The algorithm used here is adapted from:
  *     'Inclusion of a Point in a Polygon', Dan Sunday, 2001
  *     (http://geomalgorithms.com/a03-_inclusion.html)
  *
  * Author: Ben van Werkhoven <b.vanwerkhoven@esciencecenter.nl>
  */
 
-//template <int>
-//class pnpoly_tilesize;
+using float2 = sycl::float2;
 
 /*
  * The is_between method returns a boolean that is True when the a is between c and b.
@@ -26,11 +25,11 @@ int is_between(float a, float b, float c) {
  */
 template <int tile_size>
 void pnpoly_opt(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int*__restrict__ bitmap,
     const float2*__restrict__ point,
     const float2*__restrict__ vertex,
-    int n) 
+    int n)
 {
   int i = item.get_group(0) * BLOCK_SIZE_X * tile_size + item.get_local_id(0);
   if (i < n) {
@@ -47,8 +46,8 @@ void pnpoly_opt(
     int k = VERTICES-1;
 
     for (int j=0; j<VERTICES; k = j++) {    // edge from vj to vk
-      float2 vj = vertex[j]; 
-      float2 vk = vertex[k]; 
+      float2 vj = vertex[j];
+      float2 vk = vertex[k];
 
       float slope = (vk.x()-vj.x()) / (vk.y()-vj.y());
 
@@ -79,11 +78,11 @@ void pnpoly_opt(
  * The naive implementation is used for verifying correctness of the optimized implementation
  */
 void pnpoly_base(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int*__restrict__ bitmap,
     const float2*__restrict__ point,
     const float2*__restrict__ vertex,
-    int n) 
+    int n)
 {
   int i = item.get_global_id(0);
   if (i < n) {
@@ -93,8 +92,8 @@ void pnpoly_base(
     int k = VERTICES-1;
 
     for (int j=0; j<VERTICES; k = j++) {    // edge from v to vp
-      float2 vj = vertex[j]; 
-      float2 vk = vertex[k]; 
+      float2 vj = vertex[j];
+      float2 vk = vertex[k];
 
       float slope = (vk.x()-vj.x()) / (vk.y()-vj.y());
 
