@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
@@ -19,7 +19,7 @@
 #define M INT_MAX
 #define SCALE_FACTOR 300.0f
 
-#ifndef BLOCK_SIZE 
+#ifndef BLOCK_SIZE
 #define BLOCK_SIZE 256
 #endif
 
@@ -376,184 +376,124 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 
   long long offload_start = get_time();
 
-  { // sycl scope
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
+
+  int k;
+  const int threads_per_block = BLOCK_SIZE;
+
+  int num_blocks = std::ceil((float) Nparticles / (float) threads_per_block);
+  sycl::range<1> lws (threads_per_block);
+  sycl::range<1> gws (num_blocks*threads_per_block);
+#ifdef DEBUG
+  printf("BLOCK_SIZE=%d \n",BLOCK_SIZE);
+#endif
+
+  float *likelihood_d = sycl::malloc_device<float>(Nparticles + 1, q);
+  float *arrayX_d = sycl::malloc_device<float>(Nparticles, q);
+  float *arrayY_d = sycl::malloc_device<float>(Nparticles, q);
+
+  float *xj_d = sycl::malloc_device<float>(Nparticles, q);
+  float *yj_d = sycl::malloc_device<float>(Nparticles, q);
+  q.memcpy(xj_d, xj, Nparticles*sizeof(float));
+  q.memcpy(yj_d, yj, Nparticles*sizeof(float));
+
+  float *CDF_d = sycl::malloc_device<float>(Nparticles, q);
+  float *u_d = sycl::malloc_device<float>(Nparticles, q);
+  int *ind_d = sycl::malloc_device<int>(countOnes * Nparticles, q);
+
+  float *weights_d = sycl::malloc_device<float>(Nparticles, q);
+  q.memcpy(weights_d, weights, Nparticles*sizeof(float));
+
+  unsigned char *I_d = sycl::malloc_device<unsigned char>(IszX * IszY * Nfr, q);
+  q.memcpy(I_d, I, IszX * IszY * Nfr * sizeof(unsigned char));
+
+  int *seed_d = sycl::malloc_device<int>(Nparticles, q);
+  q.memcpy(seed_d, seed, Nparticles*sizeof(int));
+
+  float *partial_sums_d = sycl::malloc_device<float>(Nparticles+1, q);
+
+  int *objxy_d = sycl::malloc_device<int>(2*countOnes, q);
+  q.memcpy(objxy_d, objxy, 2*countOnes*sizeof(int));
+
+  q.wait();
+  long long start = get_time();
+
+  for (k = 1; k < Nfr; k++) {
+    /****************** L I K E L I H O O D ************************************/
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<float, 1> weights_local(sycl::range<1>(threads_per_block), cgh);
+      cgh.parallel_for<class likelihood>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        #include "kernel_likelihood.sycl"
+      });
+    });
 
 #ifdef DEBUG
-    auto exception_handler = [] (cl::sycl::exception_list exceptions) {
-      for (std::exception_ptr const& e : exceptions) {
-        try {
-          std::rethrow_exception(e);
-        } catch(cl::sycl::exception const& e) {
-          std::cout << "Caught asynchronous SYCL exception:\n"
-            << e.what() << std::endl;
-        }
-      }
-    };
-    queue q(dev_sel, exception_handler);
-#else
-    queue q(dev_sel);
+    float * sum = (float *) calloc(Nparticles + 1, sizeof (float));
+    q.memcpy(sum, partial_sums_d, (Nparticles+1)*sizeof(float)).wait();
+    for (int i = 0; i < Nparticles+1; i++)
+      printf("%f ", sum[i]);
+    printf("\n");
 #endif
 
-    const property_list props = property::buffer::use_host_ptr();
-
-    int k;
-    const int threads_per_block = BLOCK_SIZE;
-
-    int num_blocks = std::ceil((float) Nparticles / (float) threads_per_block);
-    size_t local_work_size = threads_per_block;
-    size_t global_work_size = num_blocks*threads_per_block;
-#ifdef DEBUG
-    printf("threads_per_block=%d \n",threads_per_block);
-#endif
-
-    buffer<float, 1>likelihood_GPU(Nparticles + 1);
-    buffer<float, 1>arrayX_GPU(arrayX, Nparticles, props);
-    buffer<float, 1>arrayY_GPU(arrayY, Nparticles, props);
-    buffer<float, 1>xj_GPU(xj, Nparticles, props);  
-    buffer<float, 1>yj_GPU(yj, Nparticles, props);
-    buffer<float, 1>CDF_GPU(Nparticles);
-    buffer<float, 1>u_GPU(Nparticles);
-    buffer<int, 1>ind_GPU(countOnes * Nparticles);
-    buffer<float, 1>weights_GPU(weights, Nparticles, props);
-    buffer<unsigned char, 1>I_GPU(I, IszX * IszY * Nfr, props);
-    buffer<int, 1>seed_GPU(seed, Nparticles, props);
-    buffer<float, 1>partial_sums_GPU(Nparticles+1);
-    buffer<int, 1>objxy_GPU(objxy, 2*countOnes, props);
-
-    xj_GPU.set_final_data(nullptr);
-    yj_GPU.set_final_data(nullptr);
-    seed_GPU.set_final_data(nullptr);
-
-    q.wait();
-    long long start = get_time();
-
-    for (k = 1; k < Nfr; k++) {
-      /****************** L I K E L I H O O D ************************************/
-      q.submit([&](handler& cgh) {
-          auto arrayX_acc = arrayX_GPU.get_access<sycl_discard_read_write>(cgh);
-          auto arrayY_acc = arrayY_GPU.get_access<sycl_discard_read_write>(cgh);
-          auto xj_acc = xj_GPU.get_access<sycl_read>(cgh);
-          auto yj_acc = yj_GPU.get_access<sycl_read>(cgh);
-          //auto ind_acc = ind_GPU.get_access<sycl_discard_read_write>(cgh);
-          auto ind_acc = ind_GPU.get_access<sycl_read_write>(cgh);
-          auto objxy_acc = objxy_GPU.get_access<sycl_read>(cgh);
-          auto likelihood_acc = likelihood_GPU.get_access<sycl_read_write>(cgh);
-          auto I_acc = I_GPU.get_access<sycl_read>(cgh);
-          //auto u_acc = u_GPU.get_access<sycl_read>(cgh);
-          auto weights_acc = weights_GPU.get_access<sycl_read_write>(cgh);
-          auto seed_acc = seed_GPU.get_access<sycl_read_write>(cgh);
-          auto partial_sums_acc = partial_sums_GPU.get_access<sycl_write>(cgh);
-          accessor <float, 1, sycl_read_write, access::target::local> weights_local(threads_per_block, cgh);
-
-          cgh.parallel_for<class likelihood>(
-              nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
-#include "kernel_likelihood.sycl"
-              });
-          });
-#ifdef DEBUG
-      try {
-        q.wait_and_throw();
-      } catch (cl::sycl::exception const& e) {
-        std::cout << "Caught synchronous SYCL exception:\n"
-          << e.what() << std::endl;
-      }
-
-#endif
-
-      q.submit([&](handler& cgh) {
-          auto partial_sums = partial_sums_GPU.get_access<sycl_read_write>(cgh);
-          cgh.parallel_for<class sum>(
-              nd_range<1>(range<1>(1), range<1>(1)), [=] (nd_item<1> item) {
-#include "kernel_sum.sycl"
-              });
-          });
+    q.submit([&](sycl::handler& cgh) {
+      cgh.single_task<class sum>([=]() {
+        #include "kernel_sum.sycl"
+      });
+    });
 
 #ifdef DEBUG
-      try {
-        q.wait_and_throw();
-      } catch (cl::sycl::exception const& e) {
-        std::cout << "Caught synchronous SYCL exception:\n"
-          << e.what() << std::endl;
-      }
+    // this shows the sum of all partial_sum results
+    q.memcpy(sum, partial_sums_d, sizeof(float)).wait();
+    printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
+    free(sum);
 #endif
 
-#ifdef DEBUG
-      // this shows the sum of all partial_sum results
-      auto partial_sums_host = partial_sums_GPU.get_access<sycl_read>();
-      printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, partial_sums_host[0]);
-#endif
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<float, 0> u1(cgh);
+      sycl::local_accessor<float, 0> sumWeights(cgh);
+      cgh.parallel_for<class normalize_weights>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        #include "kernel_normalize_weights.sycl"
+      });
+    });
 
-      q.submit([&](handler& cgh) {
-          auto weights = weights_GPU.get_access<sycl_read_write>(cgh);
-          auto partial_sums = partial_sums_GPU.get_access<sycl_read>(cgh);
-          auto CDF = CDF_GPU.get_access<sycl_read_write>(cgh);
-          auto u = u_GPU.get_access<sycl_read_write>(cgh);
-          auto seed = seed_GPU.get_access<sycl_read_write>(cgh);
-          accessor <float, 1, sycl_read_write, access::target::local> u1(1, cgh);
-          accessor <float, 1, sycl_read_write, access::target::local> sumWeights(1, cgh);
-          cgh.parallel_for<class normalize_weights>(
-              nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
-#include "kernel_normalize_weights.sycl"
-              });
-          });
+    //Set number of threads
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class find_index>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        #include "kernel_find_index.sycl"
+      });
+    });
+  } //end loop
 
-#ifdef DEBUG
-      try {
-        q.wait_and_throw();
-      } catch (cl::sycl::exception const& e) {
-        std::cout << "Caught synchronous SYCL exception:\n"
-          << e.what() << std::endl;
-      }
+  q.wait();
+  long long end = get_time();
+  printf("Average execution time of kernels: %f (s)\n",
+         elapsed_time(start, end) / (Nfr-1));
 
-      auto arrayX_host = arrayX_GPU.get_access<sycl_read_write>();
-      auto arrayY_host = arrayY_GPU.get_access<sycl_read_write>();
-      auto weights_host = weights_GPU.get_access<sycl_read_write>();
+  q.memcpy(arrayX, arrayX_d, Nparticles*sizeof(float));
+  q.memcpy(arrayY, arrayY_d, Nparticles*sizeof(float));
+  q.memcpy(weights, weights_d, Nparticles*sizeof(float));
+  q.wait();
 
-      xe = 0;
-      ye = 0;
-      float total=0.0;
-      // estimate the object location by expected values
-      for (x = 0; x < Nparticles; x++) {
-        xe += arrayX_host[x] * weights_host[x];
-        ye += arrayY_host[x] * weights_host[x];
-        total+= weights_host[x];
-      }
-      printf("total weight: %lf\n", total);
-      printf("XE: %lf\n", xe);
-      printf("YE: %lf\n", ye);
-      float distance = std::sqrt(std::pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + 
-          std::pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
-      printf("distance: %lf\n", distance);
-#endif
-
-      //Set number of threads
-      q.submit([&](handler& cgh) {
-          auto arrayX = arrayX_GPU.get_access<sycl_read>(cgh);
-          auto arrayY = arrayY_GPU.get_access<sycl_read>(cgh);
-          auto CDF = CDF_GPU.get_access<sycl_read>(cgh);
-          auto u = u_GPU.get_access<sycl_read>(cgh);
-          auto xj = xj_GPU.get_access<sycl_write>(cgh);
-          auto yj = yj_GPU.get_access<sycl_write>(cgh);
-          //auto weights = weights_GPU.get_access<sycl_read_write>(cgh);
-          cgh.parallel_for<class find_index>(
-              nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
-#include "kernel_find_index.sycl"
-              });
-          });
-    } //end loop
-
-    q.wait();
-    long long end = get_time();
-    printf("Average execution time of kernels: %f (s)\n",
-           elapsed_time(start, end) / (Nfr-1));
-
-  } // scope
+  sycl::free(likelihood_d, q);
+  sycl::free(arrayX_d, q);
+  sycl::free(arrayY_d, q);
+  sycl::free(xj_d, q);
+  sycl::free(yj_d, q);
+  sycl::free(CDF_d, q);
+  sycl::free(partial_sums_d, q);
+  sycl::free(objxy_d, q);
+  sycl::free(u_d, q);
+  sycl::free(ind_d, q);
+  sycl::free(seed_d, q);
+  sycl::free(weights_d, q);
+  sycl::free(I_d, q);
 
   long long offload_end = get_time();
   printf("Device offloading time: %lf (s)\n", elapsed_time(offload_start, offload_end));
@@ -565,7 +505,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     xe += arrayX[x] * weights[x];
     ye += arrayY[x] * weights[x];
   }
-  float distance = std::sqrt(std::pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) + 
+  float distance = std::sqrt(std::pow((float) (xe - (int) roundFloat(IszY / 2.0)), 2) +
       std::pow((float) (ye - (int) roundFloat(IszX / 2.0)), 2));
 
   //Output results
@@ -653,7 +593,7 @@ int main(int argc, char * argv[]) {
   }
 
 #ifdef DEBUG
-  printf("dimX=%d dimY=%d Nfr=%d Nparticles=%d\n", 
+  printf("dimX=%d dimY=%d Nfr=%d Nparticles=%d\n",
       IszX, IszY, Nfr, Nparticles);
 #endif
 
