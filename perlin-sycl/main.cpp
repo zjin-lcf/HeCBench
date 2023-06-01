@@ -16,12 +16,10 @@ int main(int argc, char **argv) {
   params.persistence = 0.5;
   
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue default_stream (sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue default_stream (sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-
-  sycl::queue default_stream (dev_sel, sycl::property::queue::in_order());
 
   uint8_t *hPixels = sycl::malloc_host<uint8_t>(4 * WIN_WIDTH * WIN_HEIGHT, default_stream);
   CHECK(hPixels);
@@ -49,7 +47,11 @@ int main(int argc, char **argv) {
     CHECK(streams);
 
     for (int i = 0; i < nStreams; ++i) {
-      streams[i] = sycl::queue(dev_sel, sycl::property::queue::in_order());
+#ifdef USE_GPU
+      streams[i] = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+      streams[i] = sycl::queue(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
     }
 
     perlin.calculate(default_stream, d_hash, d_gradientX, d_gradientY,
