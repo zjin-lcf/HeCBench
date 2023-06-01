@@ -9,7 +9,6 @@
 #define RANDOMC_H
 
 #include <math.h>          // default math function linrary
-
 #include <assert.h>
 #include <stdio.h>
 
@@ -30,8 +29,8 @@ typedef unsigned int uint32;
 #define MERS_B   0x9D2C5680
 #define MERS_C   0xEFC60000
 
-void RandomInit(nd_item<1> &item, uint32 *mt, uint32 seed);
-void BRandom(nd_item<1> &item, uint32* mt);
+void RandomInit(sycl::nd_item<1> &item, uint32 *mt, uint32 seed);
+void BRandom(sycl::nd_item<1> &item, uint32* mt);
 
 #endif
 

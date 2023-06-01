@@ -7,16 +7,16 @@
  ***************************************************************************/
 #include "randomc.h"
 
-#define LOWER_MASK ((1LU << MERS_R) - 1)         
-#define UPPER_MASK (0xFFFFFFFF << MERS_R)        
+#define LOWER_MASK ((1LU << MERS_R) - 1)
+#define UPPER_MASK (0xFFFFFFFF << MERS_R)
 
-/* 
-   The following two functions implement the Mersenne Twister random 
+/*
+   The following two functions implement the Mersenne Twister random
    number generator.  The copyright notice/disclaimer, etc are related
    to this code.
 
    Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
-   All rights reserved.                          
+   All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
@@ -29,8 +29,8 @@
         notice, this list of conditions and the following disclaimer in the
         documentation and/or other materials provided with the distribution.
 
-     3. The names of its contributors may not be used to endorse or promote 
-        products derived from this software without specific prior written 
+     3. The names of its contributors may not be used to endorse or promote
+        products derived from this software without specific prior written
         permission.
 
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -46,14 +46,14 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
-void RandomInit(nd_item<1> &item, uint32 *mt, uint32 seed) 
+void RandomInit(sycl::nd_item<1> &item, uint32 *mt, uint32 seed)
 {
   int i;
   // re-seed generator
   if(item.get_local_id(0) == 0)
     {
       mt[0]= seed & 0xffffffffUL;
-      for (i=1; i < MERS_N; i++) 
+      for (i=1; i < MERS_N; i++)
 	{
 	  mt[i] = (1812433253UL * (mt[i-1] ^ (mt[i-1] >> 30)) + i);
   	}
@@ -61,7 +61,7 @@ void RandomInit(nd_item<1> &item, uint32 *mt, uint32 seed)
   __syncthreads();
 }
 
-void BRandom(nd_item<1> &item, uint32* mt) 
+void BRandom(sycl::nd_item<1> &item, uint32* mt)
 {
   // generate 32 random bits
   uint32 y;
@@ -70,48 +70,48 @@ void BRandom(nd_item<1> &item, uint32* mt)
 
   // block size is 256
   // step 1: 0-226, MERS_N-MERS_M=227
-  if (threadIdx_x<MERS_N-MERS_M) 
+  if (threadIdx_x<MERS_N-MERS_M)
     {
       y = (mt[threadIdx_x] & UPPER_MASK) | (mt[threadIdx_x+1] & LOWER_MASK);
       y = mt[threadIdx_x+MERS_M] ^ (y >> 1) ^ ( (y & 1)? MERS_A: 0);
     }
   __syncthreads();
-  if (threadIdx_x<MERS_N-MERS_M) 
+  if (threadIdx_x<MERS_N-MERS_M)
     {
       mt[threadIdx_x] = y;
     }
   __syncthreads();
-  
+
   // step 2: 227-453
   thdx = threadIdx_x + (MERS_N-MERS_M);
-  if (threadIdx_x<MERS_N-MERS_M) 
+  if (threadIdx_x<MERS_N-MERS_M)
     {
       y = (mt[thdx] & UPPER_MASK) | (mt[thdx+1] & LOWER_MASK);
       y = mt[threadIdx_x] ^ (y >> 1) ^ ( (y & 1)? MERS_A: 0);
     }
   __syncthreads();
-  if (threadIdx_x<MERS_N-MERS_M) 
+  if (threadIdx_x<MERS_N-MERS_M)
     {
       mt[thdx] = y;
     }
   __syncthreads();
-  
+
   // step 3: 454-622
   thdx += (MERS_N-MERS_M);
-  if (thdx < MERS_N-1) 
+  if (thdx < MERS_N-1)
     {
       y = (mt[thdx] & UPPER_MASK) | (mt[thdx+1] & LOWER_MASK);
       y = mt[threadIdx_x+(MERS_N-MERS_M)] ^ (y >> 1) ^ ( (y & 1)? MERS_A: 0);
     }
   __syncthreads();
-  if (thdx < MERS_N-1) 
+  if (thdx < MERS_N-1)
     {
       mt[thdx] = y;
     }
   __syncthreads();
 
   // step 4: 623
-  if (threadIdx_x == 0) 
+  if (threadIdx_x == 0)
     {
       y = (mt[MERS_N-1] & UPPER_MASK) | (mt[0] & LOWER_MASK);
       mt[MERS_N-1] = mt[MERS_M-1] ^ (y >> 1) ^ ( (y & 1)? MERS_A: 0);
