@@ -122,8 +122,7 @@ void call_Padding_kernel(sycl::queue &q, int blocks, int threads, int n, int m,
 
   q.submit([&](sycl::handler &cgh) {
 #ifdef DYNAMIC_PARTITION
-      sycl::accessor<int, 1, sycl::access::mode::read_write, sycl::access::target::local>
-        sm (sycl::range<1>(l_mem_size), cgh);
+      sycl::local_accessor<int, 1> sm (sycl::range<1>(l_mem_size), cgh);
 #endif
 
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
