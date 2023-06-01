@@ -13,7 +13,7 @@
 // Euler integration
 ////////////////////////////////////////////////////////////////////////////////
 void integrateSystemK(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     float4 *d_Pos,  //input/output
     float4 *d_Vel,  //input/output
     const simParams_t &params,
@@ -93,7 +93,7 @@ unsigned int getGridHash(int4 gridPos, const simParams_t &params){
 
 //Calculate grid hash value for each particle
 void calcHashK(
-    nd_item<1> item,
+    sycl::nd_item<1> item,
     unsigned int *d_Hash, //output
     unsigned int *d_Index, //output
     const float4 *d_Pos, //input: positions
@@ -118,7 +118,7 @@ void calcHashK(
 // Find cell bounds and reorder positions+velocities by sorted indices
 ////////////////////////////////////////////////////////////////////////////////
 void memSetK(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     unsigned int *d_Data,
     const unsigned int val,
     const unsigned int N)
@@ -128,7 +128,7 @@ void memSetK(
 }
 
 void findCellBoundsAndReorderK(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     unsigned int *d_CellStart,     //output: cell start index
     unsigned int *d_CellEnd,       //output: cell end index
     float4 *d_ReorderedPos,  //output: reordered by cell hash positions
@@ -138,7 +138,7 @@ void findCellBoundsAndReorderK(
     const unsigned int *d_Index,   //input: particle indices sorted by hash
     const float4 *d_Pos,     //input: positions array sorted by hash
     const float4 *d_Vel,     //input: velocity array sorted by hash
-    local_ptr<unsigned int> localHash,          //get_group_size(0) + 1 elements
+    unsigned int *localHash,          //get_group_size(0) + 1 elements
     const unsigned int    numParticles)
 {
   unsigned int hash;
@@ -159,7 +159,7 @@ void findCellBoundsAndReorderK(
       localHash[0] = d_Hash[index - 1];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(index < numParticles){
     //Border case
@@ -233,7 +233,7 @@ float4 collideSpheres(
 }
 
 void collideK(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     float4 *d_Vel,          //output: new velocity
     const float4 *d_ReorderedPos, //input: reordered positions
     const float4 *d_ReorderedVel, //input: reordered velocities

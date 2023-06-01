@@ -10,7 +10,7 @@
  */
 
 #include <assert.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define LOCAL_SIZE_LIMIT 512U
 
@@ -27,7 +27,7 @@ static unsigned int factorRadix2(unsigned int& log2L, unsigned int L){
 }
 
 void bitonicSort(
-    queue &q,
+    sycl::queue &q,
     unsigned int *d_dstKey,
     unsigned int *d_dstVal,
     unsigned int *d_srcKey,
@@ -55,18 +55,18 @@ void bitonicSort(
         //Launch bitonicSortLocal
         localWorkSize  = LOCAL_SIZE_LIMIT / 2;
         globalWorkSize = batch * arrayLength / 2;
-        range<1> bs_gws (globalWorkSize);
-        range<1> bs_lws (localWorkSize);
+        sycl::range<1> bs_gws (globalWorkSize);
+        sycl::range<1> bs_lws (localWorkSize);
 
-        q.submit([&] (handler &cgh) {
-          accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
-          accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
-          cgh.parallel_for<class BitonicSortLocal>(nd_range<1>(bs_gws, bs_lws), [=] (nd_item<1> item) {
-            bitonicSortLocal(item, 
-                             d_dstKey,  
-                             d_dstVal,  
-                             d_srcKey,  
-                             d_srcVal,  
+        q.submit([&] (sycl::handler &cgh) {
+          sycl::local_accessor<unsigned int, 1>  l_key(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+          sycl::local_accessor<unsigned int, 1>  l_val(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+          cgh.parallel_for<class BitonicSortLocal>(sycl::nd_range<1>(bs_gws, bs_lws), [=] (sycl::nd_item<1> item) {
+            bitonicSortLocal(item,
+                             d_dstKey,
+                             d_dstVal,
+                             d_srcKey,
+                             d_srcVal,
                              l_key.get_pointer(),
                              l_val.get_pointer(),
                              arrayLength,
@@ -79,13 +79,13 @@ void bitonicSort(
         //Launch bitonicSortLocal1
         localWorkSize  = LOCAL_SIZE_LIMIT / 2;
         globalWorkSize = batch * arrayLength / 2;
-        range<1> bs1_gws (globalWorkSize);
-        range<1> bs1_lws (localWorkSize);
-        q.submit([&] (handler &cgh) {
-          accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
-          accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
-          cgh.parallel_for<class BitonicSortLocal1>(nd_range<1>(bs1_gws, bs1_lws), [=] (nd_item<1> item) {
-            bitonicSortLocal1(item, 
+        sycl::range<1> bs1_gws (globalWorkSize);
+        sycl::range<1> bs1_lws (localWorkSize);
+        q.submit([&] (sycl::handler &cgh) {
+          sycl::local_accessor<unsigned int, 1>  l_key(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+          sycl::local_accessor<unsigned int, 1>  l_val(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+          cgh.parallel_for<class BitonicSortLocal1>(sycl::nd_range<1>(bs1_gws, bs1_lws), [=] (sycl::nd_item<1> item) {
+            bitonicSortLocal1(item,
                               d_dstKey,
                               d_dstVal,
                               d_srcKey,
@@ -104,12 +104,13 @@ void bitonicSort(
                     //Launch bitonicMergeGlobal
                     localWorkSize  = LOCAL_SIZE_LIMIT / 4;
                     globalWorkSize = batch * arrayLength / 2;
-                    range<1> bmg_gws (globalWorkSize);
-                    range<1> bmg_lws (localWorkSize);
+                    sycl::range<1> bmg_gws (globalWorkSize);
+                    sycl::range<1> bmg_lws (localWorkSize);
 
-                    q.submit([&] (handler &cgh) {
-                      cgh.parallel_for<class BitonicMergeGlobal>(nd_range<1>(bmg_gws, bmg_lws), [=] (nd_item<1> item) {
-                        bitonicMergeGlobal(item, 
+                    q.submit([&] (sycl::handler &cgh) {
+                      cgh.parallel_for<class BitonicMergeGlobal>(
+                        sycl::nd_range<1>(bmg_gws, bmg_lws), [=] (sycl::nd_item<1> item) {
+                        bitonicMergeGlobal(item,
                                            d_dstKey,
                                            d_dstVal,
                                            d_dstKey,
@@ -127,13 +128,14 @@ void bitonicSort(
                     localWorkSize  = LOCAL_SIZE_LIMIT / 2;
                     globalWorkSize = batch * arrayLength / 2;
 
-                    range<1> bml_gws (globalWorkSize);
-                    range<1> bml_lws (localWorkSize);
+                    sycl::range<1> bml_gws (globalWorkSize);
+                    sycl::range<1> bml_lws (localWorkSize);
 
-                    q.submit([&] (handler &cgh) {
-                      accessor<unsigned int, 1, sycl_read_write, access::target::local> l_key(LOCAL_SIZE_LIMIT, cgh);
-                      accessor<unsigned int, 1, sycl_read_write, access::target::local> l_val(LOCAL_SIZE_LIMIT, cgh);
-                      cgh.parallel_for<class BitonicMergeLocal>(nd_range<1>(bml_gws, bml_lws), [=] (nd_item<1> item) {
+                    q.submit([&] (sycl::handler &cgh) {
+                      sycl::local_accessor<unsigned int, 1>  l_key(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+                      sycl::local_accessor<unsigned int, 1>  l_val(sycl::range<1>(LOCAL_SIZE_LIMIT), cgh);
+                      cgh.parallel_for<class BitonicMergeLocal>(
+                        sycl::nd_range<1>(bml_gws, bml_lws), [=] (sycl::nd_item<1> item) {
                         bitonicMergeLocal(item,
                                           d_dstKey,
                                           d_dstVal,

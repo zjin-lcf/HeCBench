@@ -42,7 +42,7 @@ inline void ComparatorLocal(
 // Monolithic bitonic sort kernel for short arrays fitting into local memory
 ////////////////////////////////////////////////////////////////////////////////
 void bitonicSortLocal(
-    nd_item<1> &item, 
+    sycl::nd_item<1> &item, 
     unsigned int *__restrict d_DstKey,
     unsigned int *__restrict d_DstVal,
     unsigned int *__restrict d_SrcKey,
@@ -66,7 +66,7 @@ void bitonicSortLocal(
         //Bitonic merge
         unsigned int ddd = dir ^ ( (item.get_local_id(0) & (size / 2)) != 0 );
         for(unsigned int stride = size / 2; stride > 0; stride >>= 1){
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
             unsigned int pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (stride - 1));
             ComparatorLocal(
                 &l_key[pos +      0], &l_val[pos +      0],
@@ -79,7 +79,7 @@ void bitonicSortLocal(
     //ddd == dir for the last bitonic merge step
     {
         for(unsigned int stride = arrayLength / 2; stride > 0; stride >>= 1){
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
             unsigned int pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (stride - 1));
             ComparatorLocal(
                 &l_key[pos +      0], &l_val[pos +      0],
@@ -89,7 +89,7 @@ void bitonicSortLocal(
         }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     d_DstKey[                     0] = l_key[item.get_local_id(0) +                      0];
     d_DstVal[                     0] = l_val[item.get_local_id(0) +                      0];
     d_DstKey[(LOCAL_SIZE_LIMIT / 2)] = l_key[item.get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)];
@@ -104,7 +104,7 @@ void bitonicSortLocal(
 //of even / odd subarrays (of LOCAL_SIZE_LIMIT points) being
 //sorted in opposite directions
 void bitonicSortLocal1(
-    nd_item<1> &item, 
+    sycl::nd_item<1> &item, 
     unsigned int *__restrict d_DstKey,
     unsigned int *__restrict d_DstVal,
     unsigned int *__restrict d_SrcKey,
@@ -128,7 +128,7 @@ void bitonicSortLocal1(
         //Bitonic merge
         unsigned int ddd = (comparatorI & (size / 2)) != 0;
         for(unsigned int stride = size / 2; stride > 0; stride >>= 1){
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
             unsigned int pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (stride - 1));
             ComparatorLocal(
                 &l_key[pos +      0], &l_val[pos +      0],
@@ -143,7 +143,7 @@ void bitonicSortLocal1(
     {
         unsigned int ddd = (item.get_group(0) & 1);
         for(unsigned int stride = LOCAL_SIZE_LIMIT / 2; stride > 0; stride >>= 1){
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
             unsigned int pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (stride - 1));
             ComparatorLocal(
                 &l_key[pos +      0], &l_val[pos +      0],
@@ -153,7 +153,7 @@ void bitonicSortLocal1(
         }
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     d_DstKey[                     0] = l_key[item.get_local_id(0) +                      0];
     d_DstVal[                     0] = l_val[item.get_local_id(0) +                      0];
     d_DstKey[(LOCAL_SIZE_LIMIT / 2)] = l_key[item.get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)];
@@ -162,7 +162,7 @@ void bitonicSortLocal1(
 
 //Bitonic merge iteration for 'stride' >= LOCAL_SIZE_LIMIT
 void bitonicMergeGlobal(
-    nd_item<1> &item, 
+    sycl::nd_item<1> &item, 
     unsigned int *__restrict d_DstKey,
     unsigned int *__restrict d_DstVal,
     unsigned int *__restrict d_SrcKey,
@@ -198,7 +198,7 @@ void bitonicMergeGlobal(
 //Combined bitonic merge steps for
 //'size' > LOCAL_SIZE_LIMIT and 'stride' = [1 .. LOCAL_SIZE_LIMIT / 2]
 void bitonicMergeLocal(
-    nd_item<1> &item, 
+    sycl::nd_item<1> &item, 
     unsigned int *__restrict d_DstKey,
     unsigned int *__restrict d_DstVal,
     unsigned int *__restrict d_SrcKey,
@@ -223,7 +223,7 @@ void bitonicMergeLocal(
     unsigned int comparatorI = item.get_global_id(0) & ((arrayLength / 2) - 1);
     unsigned int         ddd = dir ^ ( (comparatorI & (size / 2)) != 0 );
     for(; stride > 0; stride >>= 1){
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         unsigned int pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (stride - 1));
         ComparatorLocal(
             &l_key[pos +      0], &l_val[pos +      0],
@@ -232,7 +232,7 @@ void bitonicMergeLocal(
         );
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     d_DstKey[                     0] = l_key[item.get_local_id(0) +                      0];
     d_DstVal[                     0] = l_val[item.get_local_id(0) +                      0];
     d_DstKey[(LOCAL_SIZE_LIMIT / 2)] = l_key[item.get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)];
