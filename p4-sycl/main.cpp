@@ -18,13 +18,13 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "params.h"
 
 float sigmoid(const float x) { return 1.0f / (1.0f + sycl::exp(-x)); }
 
 void postprocess (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const float *__restrict cls_input,
         float *__restrict box_input,
   const float *__restrict dir_cls_input,
@@ -99,11 +99,10 @@ void postprocess (
     const float dir_rot = val - sycl::floor(val / (period + 1e-8f)) * period;
     const float yaw = dir_rot + dir_offset + period * dir_label;
 
-    // int resCount = (int)atomicAdd(object_counter, 1);
-    auto ao_ref = ext::oneapi::atomic_ref<int, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (object_counter[0]);
+    auto ao_ref = sycl::atomic_ref<int,
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space> (object_counter[0]);
     int resCount = ao_ref.fetch_add(1);
 
     bndbox_output[0] = resCount+1;
@@ -142,7 +141,7 @@ int main(int argc, char* argv[])
   const float dir_offset = p.dir_offset;
   const int len_per_anchor = p.len_per_anchor;
   const int num_dir_bins = p.num_dir_bins;
-  
+
   const int feature_size = feature_x_size * feature_y_size;
   const int feature_anchor_size = feature_size * num_anchors;
   const int cls_size = feature_anchor_size * num_classes;
@@ -168,61 +167,50 @@ int main(int argc, char* argv[])
   for (int i = 0; i < cls_size; i++)  h_cls_input[i] = rand() / (float)RAND_MAX;
   for (int i = 0; i < box_size; i++)  h_box_input[i] = rand() / (float)RAND_MAX;
   for (int i = 0; i < dir_cls_size; i++)  h_dir_cls_input[i] = rand() / (float)RAND_MAX;
-  
+
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_cls_input(h_cls_input, cls_size);
-  buffer<float, 1> d_box_input(box_size);
-  buffer<float, 1> d_dir_cls_input(h_dir_cls_input, dir_cls_size);
-  buffer<float, 1> d_bndbox_output(bndbox_size);
+  float *d_cls_input = sycl::malloc_device<float>(cls_size, q);
+  float *d_box_input = sycl::malloc_device<float>(box_size, q);
+  float *d_dir_cls_input = sycl::malloc_device<float>(dir_cls_size, q);
+  float *d_bndbox_output = sycl::malloc_device<float>(bndbox_size, q);
+  float *d_anchors = sycl::malloc_device<float>(num_anchors * len_per_anchor, q);
+  float *d_anchor_bottom_heights = sycl::malloc_device<float>(num_classes, q);
+    int *d_object_counter = sycl::malloc_device<int>(1, q);
 
-  buffer<float, 1> d_anchors (p.anchors, num_anchors * len_per_anchor);
-  buffer<float, 1> d_anchor_bottom_heights(p.anchor_bottom_heights, num_classes);
-  buffer<  int, 1> d_object_counter(1);
+  q.memcpy(d_cls_input, h_cls_input, cls_size_byte);
+  q.memcpy(d_dir_cls_input, h_dir_cls_input, dir_cls_size_byte);
+  q.memcpy(d_anchors, p.anchors, num_anchors * len_per_anchor * sizeof(float));
+  q.memcpy(d_anchor_bottom_heights, p.anchor_bottom_heights, num_classes * sizeof(float));
 
   double time = 0.0;
 
-  range<1> lws (num_anchors);
-  range<1> gws (feature_size * num_anchors);
+  sycl::range<1> lws (num_anchors);
+  sycl::range<1> gws (feature_size * num_anchors);
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_box_input.get_access<sycl_write>(cgh);
-      cgh.copy(h_box_input, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_object_counter.get_access<sycl_write>(cgh);
-      cgh.fill(acc, 0);
-    });
+    q.memcpy(d_box_input, h_box_input, box_size_byte);
+    q.memset(d_object_counter, 0, sizeof(int));
 
     q.wait();
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto cls_input = d_cls_input.get_access<sycl_read>(cgh); 
-      auto box_input = d_box_input.get_access<sycl_read_write>(cgh); 
-      auto dir_cls_input = d_dir_cls_input.get_access<sycl_read>(cgh); 
-      auto anchors = d_anchors.get_access<sycl_read>(cgh); 
-      auto anchor_bottom_heights = d_anchor_bottom_heights.get_access<sycl_read>(cgh); 
-      auto bndbox_output = d_bndbox_output.get_access<sycl_write>(cgh); 
-      auto object_counter = d_object_counter.get_access<sycl_read_write>(cgh); 
-      
-      cgh.parallel_for<class p4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class p4>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         postprocess(item,
-                    cls_input.get_pointer(),
-                    box_input.get_pointer(),
-                    dir_cls_input.get_pointer(),
-                    anchors.get_pointer(),
-                    anchor_bottom_heights.get_pointer(),
-                    bndbox_output.get_pointer(),
-                    object_counter.get_pointer(),
+                    d_cls_input,
+                    d_box_input,
+                    d_dir_cls_input,
+                    d_anchors,
+                    d_anchor_bottom_heights,
+                    d_bndbox_output,
+                    d_object_counter,
                     min_x_range,
                     max_x_range,
                     min_y_range,
@@ -243,14 +231,19 @@ int main(int argc, char* argv[])
 
   printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bndbox_output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_bndbox_output);
-  }).wait();
+  q.memcpy(h_bndbox_output, d_bndbox_output, bndbox_size_byte).wait();
 
   double checksum = 0.0;
   for (int i = 0; i < bndbox_size; i++) checksum += h_bndbox_output[i];
   printf("checksum = %lf\n", checksum / bndbox_size);
+
+  sycl::free(d_anchors, q);
+  sycl::free(d_anchor_bottom_heights, q);
+  sycl::free(d_object_counter, q);
+  sycl::free(d_cls_input, q);
+  sycl::free(d_box_input, q);
+  sycl::free(d_dir_cls_input, q);
+  sycl::free(d_bndbox_output, q);
 
   free(h_cls_input);
   free(h_box_input);
