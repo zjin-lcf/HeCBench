@@ -18,11 +18,11 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
- 
+
  Description:
    This code sample will implement a simple example of a Monte Carlo
    simulation of the diffusion of water molecules in tissue.
- 
+
 **************************************************************************/
 
 #include <stdio.h>
@@ -32,7 +32,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <ctime>
 #include <iomanip>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Helper functions
 
@@ -73,15 +73,14 @@ void motion_device(float* particleX, float* particleY,
                    size_t* map, int nRepeat) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   auto device = q.get_device();
-  auto deviceName = device.get_info<info::device::name>();
-  auto maxBlockSize = device.get_info<info::device::max_work_group_size>();
+  auto deviceName = device.get_info<sycl::info::device::name>();
+  auto maxBlockSize = device.get_info<sycl::info::device::max_work_group_size>();
 
   std::cout << " Running on " << deviceName << std::endl;
   std::cout << " The device max work-group size is " << maxBlockSize << std::endl;
@@ -92,7 +91,7 @@ void motion_device(float* particleX, float* particleY,
   // Set the seed for rand() function.
   // Use a fixed seed for reproducibility/debugging
   srand(17);
-  
+
   // Scale of random numbers
   const size_t scale = 100;
 
@@ -104,18 +103,18 @@ void motion_device(float* particleX, float* particleY,
 
   const size_t map_size = n_particles * grid_size * grid_size;
 
-  float *d_randomX = malloc_device<float>(n_particles * nIterations, q);
+  float *d_randomX = sycl::malloc_device<float>(n_particles * nIterations, q);
   q.memcpy(d_randomX, randomX, n_particles * nIterations * sizeof(float));
 
-  float *d_randomY = malloc_device<float>(n_particles * nIterations, q);
+  float *d_randomY = sycl::malloc_device<float>(n_particles * nIterations, q);
   q.memcpy(d_randomY, randomY, n_particles * nIterations * sizeof(float));
 
-  float *d_particleX = malloc_device<float>(n_particles, q);
-  float *d_particleY = malloc_device<float>(n_particles, q);
-  size_t *d_map = malloc_device<size_t>(map_size, q);
+  float *d_particleX = sycl::malloc_device<float>(n_particles, q);
+  float *d_particleY = sycl::malloc_device<float>(n_particles, q);
+  size_t *d_map = sycl::malloc_device<size_t>(map_size, q);
 
-  range<1> gws ((n_particles + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((n_particles + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   double time_total = 0.0;
 
@@ -128,8 +127,9 @@ void motion_device(float* particleX, float* particleY,
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class motionsim>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class motionsim>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         size_t ii = item.get_global_id(0);
         if (ii >= n_particles) return;
 
@@ -209,11 +209,11 @@ void motion_device(float* particleX, float* particleY,
     }
   }  // End loop for number of particles
 
-  free(d_randomX, q);
-  free(d_randomY, q);
-  free(d_particleX, q);
-  free(d_particleY, q);
-  free(d_map, q);
+  sycl::free(d_randomX, q);
+  sycl::free(d_randomY, q);
+  sycl::free(d_particleX, q);
+  sycl::free(d_particleY, q);
+  sycl::free(d_map, q);
 }  // End of function motion_device()
 
 
