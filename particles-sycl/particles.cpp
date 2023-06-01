@@ -10,7 +10,6 @@
  */
 
 //Standard utilities and systems includes
-#include "common.h"
 #include "particles.h"
 #include "particles_kernels.cpp"
 
@@ -23,7 +22,7 @@ static size_t uSnap(size_t a, size_t b){
 }
 
 void integrateSystem(
-    queue &q,
+    sycl::queue &q,
     float4 *d_Pos,
     float4 *d_Vel,
     const simParams_t &params,
@@ -31,18 +30,19 @@ void integrateSystem(
     const unsigned int numParticles
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
-    range<1> gws (globalWorkSize);
-    range<1> lws (wgSize);
+    sycl::range<1> gws (globalWorkSize);
+    sycl::range<1> lws (wgSize);
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class Integrate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class Integrate>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         integrateSystemK(item, d_Pos, d_Vel, params, deltaTime, numParticles);
       });
     });
 }
 
 void calcHash(
-    queue &q,
+    sycl::queue &q,
     unsigned int *d_Hash,
     unsigned int *d_Index,
     float4 *d_Pos,
@@ -50,36 +50,38 @@ void calcHash(
     const int numParticles
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
-    range<1> gws (globalWorkSize);
-    range<1> lws (wgSize);
+    sycl::range<1> gws (globalWorkSize);
+    sycl::range<1> lws (wgSize);
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class CalcHash>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class CalcHash>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         calcHashK(item, d_Hash, d_Index, d_Pos, params, numParticles);
       });
     });
 }
 
 void memSet(
-    queue &q,
+    sycl::queue &q,
     unsigned int *d_Data,
     unsigned int val,
     unsigned int N
 ){
     size_t globalWorkSize = uSnap(N, wgSize);
 
-    range<1> gws (globalWorkSize);
-    range<1> lws (wgSize);
+    sycl::range<1> gws (globalWorkSize);
+    sycl::range<1> lws (wgSize);
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class Memset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class Memset>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         memSetK(item, d_Data, val, N);
       });
     });
 }
 
 void findCellBoundsAndReorder(
-    queue &q,
+    sycl::queue &q,
     unsigned int *d_CellStart,
     unsigned int *d_CellEnd,
     float4 *d_ReorderedPos,
@@ -94,12 +96,13 @@ void findCellBoundsAndReorder(
     memSet(q, d_CellStart, 0xFFFFFFFFU, numCells);
     
     size_t globalWorkSize = uSnap(numParticles, wgSize);
-    range<1> gws (globalWorkSize);
-    range<1> lws (wgSize);
+    sycl::range<1> gws (globalWorkSize);
+    sycl::range<1> lws (wgSize);
 
-    q.submit([&] (handler &cgh) {
-      accessor<unsigned int, 1, sycl_read_write, access::target::local> localHash (wgSize + 1, cgh);
-      cgh.parallel_for<class FindCellBoundsAndReorder>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<unsigned int, 1> localHash (sycl::range<1>(wgSize + 1), cgh);
+      cgh.parallel_for<class FindCellBoundsAndReorder>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         findCellBoundsAndReorderK(item, 
                                  d_CellStart,
                                  d_CellEnd, 
@@ -109,14 +112,14 @@ void findCellBoundsAndReorder(
                                  d_Index, 
                                  d_Pos, 
                                  d_Vel,
-                                 localHash,
+                                 localHash.get_pointer(),
                                  numParticles);
       });
     });
 }
 
 void collide(
-    queue &q,
+    sycl::queue &q,
     float4 *d_Vel,
     float4 *d_ReorderedPos,
     float4 *d_ReorderedVel,
@@ -129,11 +132,12 @@ void collide(
 ){
     size_t globalWorkSize = uSnap(numParticles, wgSize);
 
-    range<1> gws (globalWorkSize);
-    range<1> lws (wgSize);
+    sycl::range<1> gws (globalWorkSize);
+    sycl::range<1> lws (wgSize);
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class Collide>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class Collide>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         collideK(item, d_Vel, d_ReorderedPos, d_ReorderedVel, 
                 d_Index, d_CellStart, d_CellEnd, 
                 params, numParticles);
