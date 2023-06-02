@@ -1,12 +1,9 @@
 #include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <new>
 #include <string>
-#include <stdio.h>
-#include <math.h>
 #include <omp.h>
-
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
 
 // thread block size
 #define BSIZE 256
@@ -32,9 +29,9 @@ class MaxPoolGrad {
 template <typename PoolProcess, typename T>
 void KernelPool2DGrad(
     const int nthreads,
-    const T*__restrict input_data, 
+    const T*__restrict input_data,
     const T*__restrict output_data,
-    const T*__restrict output_grad, 
+    const T*__restrict output_grad,
     const int channels,
     const int input_height,
     const int input_width,
@@ -46,7 +43,7 @@ void KernelPool2DGrad(
     const int stride_width,
     const int padding_height,
     const int padding_width,
-    PoolProcess pool_process, 
+    PoolProcess pool_process,
     bool exclusive,
     T*__restrict input_grad,
     bool channel_last = false)
@@ -75,8 +72,8 @@ void KernelPool2DGrad(
     int pwstart, pwend;
     phstart = (h_offset < ksize_height) ? 0 : (h_offset - ksize_height) / stride_height + 1;
     pwstart = (w_offset < ksize_width) ? 0 : (w_offset - ksize_width) / stride_width + 1;
-    phend = min(h_offset / stride_height + 1, output_height);
-    pwend = min(w_offset / stride_width + 1, output_width);
+    phend = std::min(h_offset / stride_height + 1, output_height);
+    pwend = std::min(w_offset / stride_width + 1, output_width);
 
     // initial gradient value
     T gradient = static_cast<T>(0.0);
@@ -94,10 +91,10 @@ void KernelPool2DGrad(
         int pool_size;
         int hstart = ph * stride_height - padding_height;
         int wstart = pw * stride_width - padding_width;
-        int hend = min(hstart + ksize_height, input_height);
-        int wend = min(wstart + ksize_width, input_width);
-        hstart = max(hstart, 0);
-        wstart = max(wstart, 0);
+        int hend = std::min(hstart + ksize_height, input_height);
+        int wend = std::min(wstart + ksize_width, input_width);
+        hstart = std::max(hstart, 0);
+        wstart = std::max(wstart, 0);
         pool_size = exclusive ? (hend - hstart) * (wend - wstart)
           : ksize_height * ksize_width;
 
@@ -175,21 +172,15 @@ int main(int argc, char* argv[])
                                   output_grad[0:output_numel]) \
                           map(from: input_grad[0:input_numel])
   {
-    // warmup
-    KernelPool2DGrad<AvgPoolGrad<float>, float>(
-      nthreads, input, output, output_grad, input_channels,
-      input_height, input_width, output_height, output_width, ksize_height,
-      ksize_width, stride_height, stride_width, padding_height, padding_width,
-      pool_process, exclusive, input_grad, channel_last);
-
     auto start = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < repeat; i++) 
+    for (int i = 0; i < repeat; i++) {
       KernelPool2DGrad<AvgPoolGrad<float>, float>(
         nthreads, input, output, output_grad, input_channels,
         input_height, input_width, output_height, output_width, ksize_height,
         ksize_width, stride_height, stride_width, padding_height, padding_width,
         pool_process, exclusive, input_grad, channel_last);
+    }
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
