@@ -84,9 +84,9 @@ DEV static const real_t *lookup_find(const base_t *s, const int d, param_t p)
  * s[i] is paired with s[j]
  * s[i+1] is mismatched with s[j-1]
  ***/
-DEV static real_t hairpin_loop_energy(const base_t *s, 
-				      const int i, 
-				      const int j, 
+DEV static real_t hairpin_loop_energy(const base_t *s,
+				      const int i,
+				      const int j,
 				      const int d,
                                       param_t p)
 {
@@ -94,15 +94,15 @@ DEV static real_t hairpin_loop_energy(const base_t *s,
   const real_t *val;
   if ((val = lookup_find(&s[i],d,p)))
     return *val;
-  
+
   /* Hairpin loop initiation penalty */
   real_t e;
   if (d > LOOP_MAX)
-    e = p->hairpin_loop_initiation[LOOP_MAX] + p->Extrapolation_for_large_loops * 
+    e = p->hairpin_loop_initiation[LOOP_MAX] + p->Extrapolation_for_large_loops *
       LOG((real_t) d / LOOP_MAX);
   else
     e = p->hairpin_loop_initiation[d];
-  
+
   if (d == 3) {
     if (contains_only_base(C,d,&s[i+1]))
       e += p->c_hairpin_of_3;
@@ -112,10 +112,10 @@ DEV static real_t hairpin_loop_energy(const base_t *s,
     if (contains_only_base(C,d,&s[i+1]))
       e += p->c_hairpin_slope*d + p->c_hairpin_intercept;
   }
-  
+
   if (s[i] == G && s[j] == U && i > 1 && s[i-1] == G && s[i-2] == G)
     e += p->bonus_for_GGG_hairpin;
-  
+
   return e;
 }
 
@@ -140,7 +140,7 @@ DEV static real_t internal_loop_energy(const base_t *s,
 {
   /* Bulge loops */
   if (d1 == 0 || d2 == 0) {
-    real_t e = p->bulge_loop_initiation[d1+d2]; 
+    real_t e = p->bulge_loop_initiation[d1+d2];
     if (d1 == 1 || d2 == 1) { /* single-nucleotide bulge */
       e += p->stack[s[i]][s[j]][s[ip]][s[jp]];
       if ((d1 == 1 && s[i+1] == C && (s[i] == C || s[i+2] == C)) ||
@@ -151,7 +151,7 @@ DEV static real_t internal_loop_energy(const base_t *s,
       e += terminal_U_penalty(s,ip,jp,p);
     }
     return e;
-  } 
+  }
 
   /* Small internal loops */
   if (d1 == 1 && d2 == 1)
@@ -162,7 +162,7 @@ DEV static real_t internal_loop_energy(const base_t *s,
     return p->int21[s[i]][s[j]][s[i+1]][s[j-1]][s[jp+1]][s[ip]][s[jp]];
   if (d1 == 2 && d2 == 1)
     return p->int21[s[jp]][s[ip]][s[jp+1]][s[ip-1]][s[i+1]][s[j]][s[i]];
-  
+
   /* Larger internal loops */
   tab4_t *sp;
   if (d1 == 1 || d2 == 1)
@@ -171,11 +171,11 @@ DEV static real_t internal_loop_energy(const base_t *s,
     sp = &p->tstacki23;
   else
     sp = &p->tstacki;
-  return p->internal_loop_initiation[d1+d2] + 
+  return p->internal_loop_initiation[d1+d2] +
     real_min(p->fm_array_first_element * ABS(d1-d2), p->maximum_correction) +
     (*sp)[s[i]][s[j]][s[i+1]][s[j-1]] +
     (*sp)[s[jp]][s[ip]][s[jp+1]][s[ip-1]];
-  
+
 }
 
 /* return -ln(e^-a + e^-b) */
@@ -196,8 +196,8 @@ DEV static void free_energy_accumulate(real_t *a, const real_t b)
 
 DEV HOST static int int_min(int a, int b) { return a < b ? a : b; }
 
-DEV HOST static int ind(int i, int j, int n) 
-{ 
+DEV HOST static int ind(int i, int j, int n)
+{
   return i*n + j;
 }
 
@@ -240,7 +240,7 @@ DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int 
 
 
 #ifdef __CUDACC__
-#include "common.h"
+#include <sycl/sycl.hpp>
 #define ISTART wi.get_group(2)
 #define IINC wi.get_group_range(2)
 #else
@@ -251,16 +251,16 @@ DEV HOST real_t* array_val(real_t *__restrict a, int i, int j, int n, const int 
 GLOBAL static void calc_hairpin_stack_exterior_multibranch
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
 #endif
- const int d, 
- const int n, 
- const base_t *__restrict s, 
- const int *__restrict bcp, 
- real_t *__restrict v, 
- const real_t *__restrict x, 
- const real_t *__restrict w5, 
- const real_t *__restrict w3, 
+ const int d,
+ const int n,
+ const base_t *__restrict s,
+ const int *__restrict bcp,
+ real_t *__restrict v,
+ const real_t *__restrict x,
+ const real_t *__restrict w5,
+ const real_t *__restrict w3,
  const param_t p)
 {
   int i;
@@ -313,11 +313,11 @@ GLOBAL static void calc_hairpin_stack_exterior_multibranch
 #error THREAD_X * THREAD_Y must be equal to NTHREAD
 #endif
 
-DEV static void free_energy_reduce(nd_item<3> wi, real_t *buf, real_t *x, int tid, int nt)
+DEV static void free_energy_reduce(sycl::nd_item<3> wi, real_t *buf, real_t *x, int tid, int nt)
 {
   buf[tid] = *x;
-  for (nt /= 2, wi.barrier(access::fence_space::local_space); nt > 0; 
-       nt /= 2, wi.barrier(access::fence_space::local_space))
+  for (nt /= 2, wi.barrier(sycl::access::fence_space::local_space); nt > 0;
+       nt /= 2, wi.barrier(sycl::access::fence_space::local_space))
     if (tid < nt)
       free_energy_accumulate(&buf[tid], buf[tid+nt]);
   if (tid == 0)
@@ -329,7 +329,7 @@ DEV static void free_energy_reduce(nd_item<3> wi, real_t *buf, real_t *x, int ti
 GLOBAL static void calc_internal
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
  real_t *buf,
 #endif
  const int d,
@@ -426,12 +426,12 @@ DEV static real_t coaxial_mismatch2(const base_t *s,
   return terminal_U_penalty(s,i,j,p) + terminal_U_penalty(s,ip,jp,p) +
     p->tstackcoax[s[jp]][s[ip]][s[jp+1]][s[ip-1]] +
     p->coaxstack[s[j]][s[i]][s[j+1]][s[jp+1]];
-} 
+}
 
 GLOBAL static void calc_coaxial
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
  real_t *buf,
 #endif
  const int d, /* diagonal - length of bases in between i and j, exclusive */
@@ -442,7 +442,7 @@ GLOBAL static void calc_coaxial
  const real_t *__restrict y,
  const real_t *__restrict w5,
  const real_t *__restrict w3,
- const param_t p) 
+ const param_t p)
 {
   int i;
 #ifdef __CUDACC__
@@ -491,9 +491,9 @@ GLOBAL static void calc_coaxial
 	  free_energy_accumulate(&vij, w3[k+1] + w5[j-1] + coaxial_mismatch2(s,j,i,i+2,k-1,p) + (*v1));
       }
     } /* end exterior */
-    
+
     /* multibranch */
-    if (d > 2*LOOP_MIN + 3 && i != n-1 && j != 0) { 
+    if (d > 2*LOOP_MIN + 3 && i != n-1 && j != 0) {
       int ktmp;
 #ifdef __CUDACC__
       int ktmpstart = i + 2 + tx;
@@ -506,13 +506,13 @@ GLOBAL static void calc_coaxial
 	const int k = wrap(ktmp,n);
 	if (k != n-1) {
 	  if ((v1 = array_val(v,i+1,k,n,bcp)))
-	    free_energy_accumulate(&vij, coaxial_flush(s,j,i,i+1,k,p) + (*v1) + p->a_2c + 
+	    free_energy_accumulate(&vij, coaxial_flush(s,j,i,i+1,k,p) + (*v1) + p->a_2c +
 				   y[ind(k+1,j-1,n)]);
 	  if (ktmp+2 < jtmp-1 && i+1 != n-1 && k+1 != n-1 && (v1 = array_val(v,i+2,k,n,bcp))) {
 	    const real_t tmp = (*v1) + p->a_2b_2c;
 	    free_energy_accumulate(&vij, coaxial_mismatch2(s,j,i,i+2,k,p) + tmp + y[ind(k+2,j-1,n)]);
 	    if (j != 1) {
-	      free_energy_accumulate(&vij, coaxial_mismatch1(s,j,i,i+2,k,p) + tmp + y[ind(k+1,j-2,n)]);          
+	      free_energy_accumulate(&vij, coaxial_mismatch1(s,j,i,i+2,k,p) + tmp + y[ind(k+1,j-2,n)]);
 	    }
 	  }
 	}
@@ -526,7 +526,7 @@ GLOBAL static void calc_coaxial
 	const int k = wrap(ktmp,n);
 	if (k != 0) {
 	  if ((v1 = array_val(v,k,j-1,n,bcp)))
-	    free_energy_accumulate(&vij, coaxial_flush(s,k,j-1,j,i,p) + (*v1) + p->a_2c + 
+	    free_energy_accumulate(&vij, coaxial_flush(s,k,j-1,j,i,p) + (*v1) + p->a_2c +
 				   y[ind(i+1,k-1,n)]);
 	  if (j != 1 && ktmp > i+3 && (v1 = array_val(v,k,j-2,n,bcp))) {
 	    const real_t tmp = (*v1) + p->a_2b_2c;
@@ -557,7 +557,7 @@ GLOBAL static void calc_coaxial
  * For array x, five diagonals are stored.
  * Similarly to w, x[ind(d%5,i,n)] refers to element i on
  * the current diagonal, and x[ind((d-k)%5,i,n)] to element i
- * on a previous diagonal d-k.   
+ * on a previous diagonal d-k.
  * Specifically:
  *
  * x(i,j)       --> x(d%5,i,n)
@@ -571,7 +571,7 @@ GLOBAL static void calc_coaxial
 GLOBAL static void calc_wl
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
 #endif
  const int d, /* diagonal - length of bases in between i and j, exclusive */
  const int n,
@@ -582,7 +582,7 @@ GLOBAL static void calc_wl
  real_t *__restrict wq,
  real_t *__restrict w,
  real_t *__restrict wl,
- const param_t p) 
+ const param_t p)
 {
   int i;
 
@@ -591,7 +591,7 @@ GLOBAL static void calc_wl
     const int j = wrap(jtmp,n);
     if (is_exterior(i,j) && i-j <= LOOP_MIN)
       continue;
-    real_t wqtmp = INF, wltmp = INF; 
+    real_t wqtmp = INF, wltmp = INF;
     const real_t *v1;
     if ((v1 = array_val(v,i,j,n,bcp))) {
       const real_t tmp = (*v1) + terminal_U_penalty(s,i,j,p);
@@ -629,7 +629,7 @@ GLOBAL static void calc_wl
 GLOBAL static void calc_xl
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
  real_t *buf,
 #endif
  const int d, /* diagonal - length of bases in between i and j, exclusive */
@@ -668,8 +668,8 @@ GLOBAL static void calc_xl
     real_t tmp = INF;
     for (ktmp = kstart; ktmp < jtmp-1; ktmp += kinc) {
       if (ktmp != n-1) {
-	const int k = wrap(ktmp,n);     
-	free_energy_accumulate(&tmp, z[ind(i,k,n)] + yl[ind(k+1,j,n)]);	  
+	const int k = wrap(ktmp,n);
+	free_energy_accumulate(&tmp, z[ind(i,k,n)] + yl[ind(k+1,j,n)]);
       }
     }
 #ifdef __CUDACC__
@@ -684,7 +684,7 @@ GLOBAL static void calc_xl
 GLOBAL static void calc_z
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
  real_t *buf,
 #endif
  const int d, /* diagonal - length of bases in between i and j, exclusive */
@@ -695,7 +695,7 @@ GLOBAL static void calc_z
  real_t *__restrict z,
  real_t *__restrict xl,
  real_t *__restrict wq,
- const param_t p) 
+ const param_t p)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -746,7 +746,7 @@ GLOBAL static void calc_z
 GLOBAL static void calc_x
 (
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
 #endif
  const int d, /* diagonal - length of bases in between i and j, exclusive */
  const int n,
@@ -756,7 +756,7 @@ GLOBAL static void calc_x
  const real_t *__restrict wl,
  real_t *__restrict xl,
  real_t *__restrict x,
- const param_t p) 
+ const param_t p)
 {
   int i;
   for (i = ISTART; i < n; i += IINC) {
@@ -780,16 +780,16 @@ GLOBAL static void calc_x
 
 GLOBAL static void init_w5_and_w3(int n, real_t *w5, real_t *w3)
 {
-  w5[0] = w5[1] = w3[n-1] = w3[n] = 0;
+  w5[-1] = w5[0] = w3[n-1] = w3[n] = 0;
 }
 
 GLOBAL static void calc_w5_and_w3(
 #ifdef __CUDACC__
- nd_item<3> &wi,
+ sycl::nd_item<3> &wi,
  real_t *buf,
 #endif
   const int d,
-  const int n, 
+  const int n,
   real_t *__restrict w5,
   real_t *__restrict w3,
   const real_t *__restrict wq)
@@ -835,186 +835,149 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
   p->v = (real_t *) safe_malloc(n*n*sizeof(real_t));
   p->w5 = (real_t *) safe_malloc((n+1)*sizeof(real_t)) + 1;
   p->w3 = (real_t *) safe_malloc((n+1)*sizeof(real_t));
-   
+
 #ifdef __CUDACC__ /* do multithreaded fill on GPU */
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("Performing Calculation on GPU\n");
-  buffer<real_t, 1> d_v (n*n);
-  buffer<real_t, 1> d_w5 (n+1); //w5++;
-  buffer<real_t, 1> d_w3 (n+1);
-  buffer<real_t, 1> d_z (n*n);
-  buffer<real_t, 1> d_yl (n*n);
-  buffer<real_t, 1> d_y (n*n);
-  buffer<real_t, 1> d_wq (n*(n-1)/2);
-  buffer<real_t, 1> d_w (n*2);
-  buffer<real_t, 1> d_wl (n*2);
-  buffer<real_t, 1> d_xl (n*2);
-  buffer<real_t, 1> d_x (n*5);
+  real_t *d_v = sycl::malloc_device<real_t>(n*n, q);
+  real_t *d_w5 = sycl::malloc_device<real_t>(n+1, q);
+  d_w5++;
+  real_t *d_w3 = sycl::malloc_device<real_t>(n+1, q);
+  real_t *d_z = sycl::malloc_device<real_t>(n*n, q);
+  real_t *d_yl = sycl::malloc_device<real_t>(n*n, q);
+  real_t *d_y = sycl::malloc_device<real_t>(n*n, q);
+  real_t *d_wq = sycl::malloc_device<real_t>(n*(n-1)/2, q);
+  real_t *d_w = sycl::malloc_device<real_t>(n*2, q);
+  real_t *d_wl = sycl::malloc_device<real_t>(n*2, q);
+  real_t *d_xl = sycl::malloc_device<real_t>(n*2, q);
+  real_t *d_x = sycl::malloc_device<real_t>(n*5, q);
 
-  buffer<struct param, 1> d_par (par, 1);
-  buffer<base_t, 1> d_s (p->seq, n);
-  buffer<int, 1> d_bcp (p->base_can_pair, (n*(n-1)/2));
+  struct param *d_par = sycl::malloc_device<struct param>(1, q);
+  q.memcpy(d_par, par, sizeof(struct param));
 
-  q.submit([&] (handler &cgh) {
-    auto w5 = d_w5.get_access<sycl_write>(cgh);
-    auto w3 = d_w3.get_access<sycl_write>(cgh);
+  base_t *d_s = sycl::malloc_device<base_t>(n, q);
+  q.memcpy(d_s, p->seq, n*sizeof(base_t));
+
+  int *d_bcp = sycl::malloc_device<int>(n*(n-1)/2, q);
+  q.memcpy(d_bcp, p->base_can_pair, (n*(n-1)/2)*sizeof(int));
+
+  q.submit([&] (sycl::handler &cgh) {
     cgh.single_task<class init_w5_w3>([=] () {
-      init_w5_and_w3(n, w5.get_pointer(), w3.get_pointer());
+      init_w5_and_w3(n, d_w5, d_w3);
     });
   });
 
-  range<3> lws1(1,1,1);
-  range<3> gws1(1,1,n);
-  range<3> lws2(1, THREAD_Y, THREAD_X);
-  range<3> gws2(1, THREAD_Y, n*THREAD_X);
-  range<3> lws3(1,1,NTHREAD);
-  range<3> gws3(1,1,n*NTHREAD);
-  range<3> lws4(1,1,1);
-  range<3> gws4(1,1,n);
-  range<3> lws5(1,1,NTHREAD);
-  range<3> gws5(1,1,n*NTHREAD);
-  range<3> lws6(1,1,NTHREAD);
-  range<3> gws6(1,1,n*NTHREAD);
-  range<3> lws7(1,1,1);
-  range<3> gws7(1,1,n);
-  range<3> lws8(1,1,NTHREAD);
-  range<3> gws8(1,1,NTHREAD);
+  sycl::range<3> lws1(1,1,1);
+  sycl::range<3> gws1(1,1,n);
+  sycl::range<3> lws2(1, THREAD_Y, THREAD_X);
+  sycl::range<3> gws2(1, THREAD_Y, n*THREAD_X);
+  sycl::range<3> lws3(1,1,NTHREAD);
+  sycl::range<3> gws3(1,1,n*NTHREAD);
+  sycl::range<3> lws4(1,1,1);
+  sycl::range<3> gws4(1,1,n);
+  sycl::range<3> lws5(1,1,NTHREAD);
+  sycl::range<3> gws5(1,1,n*NTHREAD);
+  sycl::range<3> lws6(1,1,NTHREAD);
+  sycl::range<3> gws6(1,1,n*NTHREAD);
+  sycl::range<3> lws7(1,1,1);
+  sycl::range<3> gws7(1,1,n);
+  sycl::range<3> lws8(1,1,NTHREAD);
+  sycl::range<3> gws8(1,1,NTHREAD);
 
   for (int d = 0; d < n-1; d++) {
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto bcp = d_bcp.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_write>(cgh); 
-      auto x = d_x.get_access<sycl_read>(cgh);
-      auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_hairpin>(nd_range<3>(gws1, lws1), [=] (nd_item<3> wi) {
-        calc_hairpin_stack_exterior_multibranch(wi, d, n, s.get_pointer(), 
-          bcp.get_pointer(), v.get_pointer(), x.get_pointer(), w5.get_pointer(), 
-          w3.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_hairpin>(
+        sycl::nd_range<3>(gws1, lws1), [=] (sycl::nd_item<3> wi) {
+        calc_hairpin_stack_exterior_multibranch(wi, d, n, d_s,
+          d_bcp, d_v, d_x, d_w5, d_w3, d_par);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto bcp = d_bcp.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_internal>(nd_range<3>(gws2, lws2), [=] (nd_item<3> wi) {
-        calc_internal(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), 
-                      v.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_internal>(
+        sycl::nd_range<3>(gws2, lws2), [=] (sycl::nd_item<3> wi) {
+        calc_internal(wi, lmem.get_pointer(), d, n, d_s, d_bcp, d_v, d_par);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto bcp = d_bcp.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto y = d_y.get_access<sycl_read>(cgh);
-      auto w5 = d_w5.get_access<sycl_read>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_coaxial>(nd_range<3>(gws3, lws3), [=] (nd_item<3> wi) {
-        calc_coaxial(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
-                     y.get_pointer(), w5.get_pointer(), w3.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_coaxial>(
+        sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> wi) {
+        calc_coaxial(wi, lmem.get_pointer(), d, n,
+                     d_s, d_bcp, d_v, d_y, d_w5, d_w3, d_par);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto bcp = d_bcp.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read_write>(cgh);
-      auto z = d_z.get_access<sycl_write>(cgh);
-      auto wq = d_wq.get_access<sycl_write>(cgh);
-      auto w = d_w.get_access<sycl_read_write>(cgh);
-      auto wl = d_wl.get_access<sycl_read_write>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_wl>(nd_range<3>(gws4, lws4), [=] (nd_item<3> wi) {
-        calc_wl(wi, d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
-                z.get_pointer(), wq.get_pointer(), w.get_pointer(), 
-                wl.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_wl>(
+        sycl::nd_range<3>(gws4, lws4), [=] (sycl::nd_item<3> wi) {
+        calc_wl(wi, d, n, d_s, d_bcp, d_v, d_z,
+                d_wq, d_w, d_wl, d_par);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto z = d_z.get_access<sycl_read>(cgh);
-      auto yl = d_yl.get_access<sycl_read>(cgh);
-      auto xl = d_xl.get_access<sycl_read_write>(cgh);
-      accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_xl>(nd_range<3>(gws5, lws5), [=] (nd_item<3> wi) {
-        calc_xl(wi, lmem.get_pointer(), d, n, z.get_pointer(), yl.get_pointer(), xl.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_xl>(
+        sycl::nd_range<3>(gws5, lws5), [=] (sycl::nd_item<3> wi) {
+        calc_xl(wi, lmem.get_pointer(), d, n, d_z, d_yl, d_xl);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto s = d_s.get_access<sycl_read>(cgh);
-      auto bcp = d_bcp.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_read>(cgh);
-      auto z = d_z.get_access<sycl_read_write>(cgh);
-      auto xl = d_xl.get_access<sycl_read_write>(cgh);
-      auto wq = d_wq.get_access<sycl_read_write>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_z>(nd_range<3>(gws6, lws6), [=] (nd_item<3> wi) {
-        calc_z(wi, lmem.get_pointer(), d, n, s.get_pointer(), bcp.get_pointer(), v.get_pointer(), 
-               z.get_pointer(), xl.get_pointer(), wq.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_z>(
+        sycl::nd_range<3>(gws6, lws6), [=] (sycl::nd_item<3> wi) {
+        calc_z(wi, lmem.get_pointer(), d, n,
+               d_s, d_bcp, d_v, d_z, d_xl, d_wq, d_par);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto yl = d_yl.get_access<sycl_write>(cgh);
-      auto y = d_y.get_access<sycl_write>(cgh);
-      auto w = d_w.get_access<sycl_read>(cgh);
-      auto wl = d_wl.get_access<sycl_read>(cgh);
-      auto xl = d_xl.get_access<sycl_read_write>(cgh);
-      auto x = d_x.get_access<sycl_read_write>(cgh);
-      auto par = d_par.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class k_calc_x>(nd_range<3>(gws7, lws7), [=] (nd_item<3> wi) {
-        calc_x(wi, d, n, yl.get_pointer(), y.get_pointer(), w.get_pointer(), 
-               wl.get_pointer(), xl.get_pointer(), x.get_pointer(), par.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k_calc_x>(
+        sycl::nd_range<3>(gws7, lws7), [=] (sycl::nd_item<3> wi) {
+        calc_x(wi, d, n, d_yl, d_y, d_w, d_wl, d_xl, d_x, d_par);
       });
     });
-    
-    q.submit([&] (handler &cgh) {
-      auto w5 = d_w5.get_access<sycl_read_write>(cgh, range<1>(n), id<1>(1));
-      auto w3 = d_w3.get_access<sycl_read_write>(cgh);
-      auto wq = d_wq.get_access<sycl_read>(cgh);
-      accessor<real_t, 1, sycl_read_write, access::target::local> lmem(NTHREAD, cgh);
-      cgh.parallel_for<class k_calc_w5_w3>(nd_range<3>(gws8, lws8), [=] (nd_item<3> wi) {
-        calc_w5_and_w3(wi, lmem.get_pointer(), d, n, w5.get_pointer(), 
-                       w3.get_pointer(), wq.get_pointer());
+
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
+      cgh.parallel_for<class k_calc_w5_w3>(
+        sycl::nd_range<3>(gws8, lws8), [=] (sycl::nd_item<3> wi) {
+        calc_w5_and_w3(wi, lmem.get_pointer(), d, n, d_w5, d_w3, d_wq);
       });
     });
   }
-  
-  q.submit([&] (handler &cgh) {
-    auto acc = d_v.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->v);
-  });
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_w5.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->w5-1);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_w3.get_access<sycl_read>(cgh);
-    cgh.copy(acc, p->w3);
-  });
+  q.memcpy(p->v, d_v, n*n*sizeof(base_t));
+  q.memcpy(p->w5 - 1, d_w5 - 1, (n+1)*sizeof(base_t));
+  q.memcpy(p->w3, d_w3, (n+1)*sizeof(base_t));
 
   q.wait();
 
+  sycl::free(d_v, q);
+  sycl::free(d_w5 - 1, q);
+  sycl::free(d_w3, q);
+  sycl::free(d_z, q);
+  sycl::free(d_yl, q);
+  sycl::free(d_y, q);
+  sycl::free(d_wq, q);
+  sycl::free(d_w, q);
+  sycl::free(d_wl, q);
+  sycl::free(d_xl, q);
+  sycl::free(d_x, q);
+  sycl::free(d_par, q);
+  sycl::free(d_s, q);
+  sycl::free(d_bcp, q);
 #else /* do serial fill on CPU */
 
 #define ALLOC(a,sz) a = (real_t *) safe_malloc((sz)*sizeof(real_t))
@@ -1044,8 +1007,8 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
     calc_x(d, n, yl, y, w, wl, xl, x, par);
     calc_w5_and_w3(d, n, p->w5, p->w3, wq);
   }
-   
-  free(z);    
+
+  free(z);
   free(yl);
   free(y);
   free(wq);
@@ -1096,7 +1059,7 @@ void prna_delete(prna_t p)
       printf(RF" ", p->a[i] * RT37);				\
     printf("\n");							\
   }									\
-  
+
 void prna_show(const prna_t p)
 {
   int i, n = p->n;
@@ -1133,7 +1096,7 @@ real_t get_v_array(const prna_t p, int i, int j)
 {
   const int n = p->n;
   const int *bcp = p->base_can_pair;
-  
+
   if (can_pair(i,j,n,bcp)){
     return *array_val(p->v,i,j,n,bcp);
   }
@@ -1173,7 +1136,7 @@ void prna_write_probability_matrix(const prna_t p, const char *fn)
   int i, j;
   for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++)
-      fprintf(f,RF" ", 
+      fprintf(f,RF" ",
 	      can_pair(i,j,n,bcp) ? probability_of_pair(p,i,j) : 0);
     fprintf(f,"\n");
   }
@@ -1211,7 +1174,7 @@ static int is_paired(const int *pair, int i)
 {
   return pair[i] != i;
 }
-       
+
 static void remove_helices_shorter_than(int min_helix_length, int *pair, int n)
 {
   int i;
@@ -1297,9 +1260,9 @@ int *generate_bcp(const char *s)
 {
   int length = strlen(s);
   int i, j;
-  
+
   int *base_cp = (int *) safe_malloc((length*(length-1)/2)*sizeof(int));
-  
+
   base_t *seq = (base_t *) safe_malloc(length*sizeof(base_t));
   sequence_from_string(seq, s);
 
@@ -1316,4 +1279,4 @@ int *generate_bcp(const char *s)
   }
 
   return base_cp;
-} 
+}
