@@ -422,7 +422,11 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
 
   freeDeviceBuffer(distance_matrix_gmem);
   freeDeviceBuffer(indr_mtrx);
+  freeDeviceBuffer(degrees);
+  freeDeviceBuffer(ungrpd_pnts_indr);
   freeDeviceBuffer(Ai_mask);
+  freeDeviceBuffer(dist_to_clust);
+  freeDeviceBuffer(clustered_pnts_mask);
   freeDeviceBuffer(cardnl);
   freeDeviceBuffer(result);
 
