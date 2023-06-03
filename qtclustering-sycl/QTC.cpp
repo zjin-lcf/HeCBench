@@ -13,8 +13,9 @@
 
 #define _USE_MATH_DEFINES
 #include <float.h>
+
+#include <sycl/sycl.hpp>
 #include "comm.h"
-#include "common.h"
 
 using namespace std;
 
@@ -88,7 +89,7 @@ void RunBenchmark(OptionParser &op){
 // Creation: May 25, 2011
 //
 // ****************************************************************************
-void calculate_participants(int point_count, int node_count, int cwrank, 
+void calculate_participants(int point_count, int node_count, int cwrank,
 int *thread_block_count, int *total_thread_block_count, int *active_node_count){
 
   int ac_nd_cnt, thr_blc_cnt, total_thr_blc_cnt;
@@ -231,11 +232,10 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
   output = (int*) malloc (sizeof(int)*max_degree);
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    cl::sycl::queue q(dev_sel);
 
   // This is the N*Delta indirection matrix
   //allocDeviceBuffer(&distance_matrix_gmem, dst_matrix_elems*sizeof(float));
@@ -248,58 +248,42 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
   //allocDeviceBuffer(&cardnl,              thread_block_count*2*sizeof(int));
   //allocDeviceBuffer(&result,              point_count*sizeof(int));
 
-  buffer<float, 1> distance_matrix (dist_source, dst_matrix_elems);
-  buffer<int, 1> indr_mtrx (indr_mtrx_host, point_count*max_degree);
-  buffer<int, 1> degrees (point_count);
-  buffer<int, 1> ungrpd_pnts_indr (ungrpd_pnts_indr_host, point_count);
-  buffer<char, 1> Ai_mask (thread_block_count*point_count);
-  buffer<float,1 > dist_to_clust (max_degree*thread_block_count);
-  buffer<char,1 > clustered_pnts_mask (point_count);
-  buffer<int, 1> cardnl (thread_block_count*2);
-  buffer<int, 1> result (point_count);
+  float *distance_matrix = sycl::malloc_device<float>(dst_matrix_elems, q);
+  q.memcpy(distance_matrix, dist_source, dst_matrix_elems*sizeof(float));
 
-  distance_matrix.set_final_data(nullptr);
-  indr_mtrx.set_final_data(nullptr);
-  ungrpd_pnts_indr.set_final_data(nullptr);
+  int *indr_mtrx = sycl::malloc_device<int>(point_count*max_degree, q);
+  q.memcpy(indr_mtrx, indr_mtrx_host, point_count*max_degree*sizeof(int));
 
-  //cudaMemset(clustered_pnts_mask, 0, point_count*sizeof(char));
-  q.submit([&] (handler &cgh) {
-    auto mask_acc = clustered_pnts_mask.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class clear_mask>(nd_range<1>(range<1>((point_count+255)/256*256),
-                                                   range<1>(256)), [=] (nd_item<1> item) {
-        int gid = item.get_global_id(0);
-        if (gid < point_count) mask_acc[gid] = 0;
-        });
-    });
+  int *degrees = sycl::malloc_device<int>(point_count, q);
 
-  //cudaMemset(dist_to_clust, 0, max_degree*thread_block_count*sizeof(float));
-  q.submit([&] (handler &cgh) {
-      auto dist_to_clust_acc = dist_to_clust.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class clear_cluster>(nd_range<1>(
-      range<1>((max_degree*thread_block_count+255)/256*256), range<1>(256)), [=] (nd_item<1> item) {
-          int gid = item.get_global_id(0);
-          if (gid < max_degree*thread_block_count) dist_to_clust_acc[gid] = 0;
-          });
-      });
+  int *ungrpd_pnts_indr = sycl::malloc_device<int>(point_count, q);
+  q.memcpy(ungrpd_pnts_indr, ungrpd_pnts_indr_host, point_count*sizeof(int));
 
+  char *Ai_mask = sycl::malloc_device<char>(thread_block_count*point_count, q);
+  float *dist_to_clust = sycl::malloc_device<float>(max_degree*thread_block_count, q);
+  char *clustered_pnts_mask = sycl::malloc_device<char>(point_count, q);
+  int *cardnl = sycl::malloc_device<int>(thread_block_count*2, q);
+  int *result = sycl::malloc_device<int>(point_count, q);
+
+  q.memset(clustered_pnts_mask, 0, point_count*sizeof(char));
+  q.memset(dist_to_clust, 0, max_degree*thread_block_count*sizeof(float));
 
   tpb = ( point_count > THREADSPERBLOCK )? THREADSPERBLOCK : point_count;
 
   //compute_degrees<<<grid2D(thread_block_count), tpb>>>((int *)indr_mtrx, (int *)degrees, point_count, max_degree);
-  q.submit([&] (handler &cgh) {
-    auto indr_mtrx_acc = indr_mtrx.get_access<sycl_write>(cgh);
-    auto degrees_acc = degrees.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class compute_degrees>(nd_range<1>(range<1>(thread_block_count*tpb), 
-                                                        range<1>(tpb)), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_degrees>(
+      sycl::nd_range<1>(sycl::range<1>(thread_block_count*tpb),
+                        sycl::range<1>(tpb)), [=] (sycl::nd_item<1> item) {
       int curThreadCount = item.get_local_range(0);
       int tid = item.get_local_id(0);
       int tblock_id = item.get_group(0);
       int TB_count = item.get_group_range(0);
       int local_point_count = (point_count+TB_count-1)/TB_count;
       int starting_point = tblock_id * local_point_count;
-      int offset =  starting_point*max_degree;
-      int *indr = indr_mtrx_acc.get_pointer()+offset;
-      int *degree = degrees_acc.get_pointer()+starting_point;
+      int offset =  starting_point * max_degree;
+      int *indr = indr_mtrx + offset;
+      int *degree = degrees + starting_point;
 
       // The last threadblock might end up with less points.
       if( (tblock_id+1)*local_point_count > point_count )
@@ -373,7 +357,8 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
+    q.submit([&] (sycl::handler &cgh) {
+/*
       auto distance_matrix_acc = distance_matrix.get_access<sycl_write>(cgh);
       auto Ai_mask_acc = Ai_mask.get_access<sycl_read>(cgh);
       auto clustered_pnts_mask_acc = clustered_pnts_mask.get_access<sycl_read>(cgh);
@@ -382,32 +367,33 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       auto ungrpd_pnts_indr_acc = ungrpd_pnts_indr.get_access<sycl_read>(cgh);
       auto dist_to_clust_acc = dist_to_clust.get_access<sycl_read_write>(cgh);
       auto degrees_acc = degrees.get_access<sycl_read>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> dist_array(THREADSPERBLOCK, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> point_index_array(THREADSPERBLOCK, cgh);
-      cgh.parallel_for<class qtc>(nd_range<1>(range<1>(thread_block_count*tpb), 
-                                              range<1>(tpb)), [=] (nd_item<1> item) {
+*/
+      sycl::local_accessor<float, 1> dist_array(sycl::range<1>(THREADSPERBLOCK), cgh);
+      sycl::local_accessor<int, 1> point_index_array(sycl::range<1>(THREADSPERBLOCK), cgh);
+      cgh.parallel_for<class qtc>(sycl::nd_range<1>(sycl::range<1>(thread_block_count*tpb),
+                                                    sycl::range<1>(tpb)), [=] (sycl::nd_item<1> item) {
         int max_cardinality = -1;
         int max_cardinality_index;
 
         int tid = item.get_local_id(0);
         int tblock_id = item.get_group(0);
-        char *Ai_mask = Ai_mask_acc.get_pointer()+tblock_id * max_point_count;
-        float *dist_to_clust = dist_to_clust_acc.get_pointer()+tblock_id * max_degree;
+        char *Ai_mask_offset = Ai_mask + tblock_id * max_point_count;
+        float *dist_to_clust_offset = dist_to_clust + tblock_id * max_degree;
         int base_offset = tblock_id*node_count + cwrank;
 
         // for i loop of the algorithm.
         // Each thread iterates over all points that the whole thread-block owns
         for(int i = base_offset; i < point_count; i+= total_thread_block_count ){
-          int seed_index = ungrpd_pnts_indr_acc[i];
-          int degree = degrees_acc[seed_index];
+          int seed_index = ungrpd_pnts_indr[i];
+          int degree = degrees[seed_index];
           if( degree <= max_cardinality ) continue;
-          int  cnt = generate_candidate_cluster_compact_storage( 
-              item, dist_array, point_index_array,
-              seed_index, degree, Ai_mask, 
-              distance_matrix_acc.get_pointer(),
-              clustered_pnts_mask_acc.get_pointer(), 
-              indr_mtrx_acc.get_pointer(), 
-              dist_to_clust,
+          int  cnt = generate_candidate_cluster_compact_storage(
+              item, dist_array.get_pointer(), point_index_array.get_pointer(),
+              seed_index, degree, Ai_mask_offset,
+              distance_matrix,
+              clustered_pnts_mask,
+              indr_mtrx,
+              dist_to_clust_offset,
               point_count, max_point_count, max_degree, NULL, threshold);
           if( cnt > max_cardinality ){
             max_cardinality = cnt;
@@ -419,8 +405,8 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         int card_offset = tblock_id*2;
         // only one thread needs to write into the global memory since they all have the same information.
         if( 0 == tid ){
-          cluster_cardinalities_acc[card_offset] = max_cardinality;
-          cluster_cardinalities_acc[card_offset+1] = max_cardinality_index;
+          cardnl[card_offset] = max_cardinality;
+          cardnl[card_offset+1] = max_cardinality_index;
         }
       });
     }).wait();
@@ -439,28 +425,24 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
     if( thread_block_count > 1 ){
       // We are reducing 128 numbers or less, so one thread should be sufficient.
       //reduce_card_device<<<grid2D(1), 1>>>((int *)cardnl, thread_block_count);
-      q.submit([&] (handler &cgh) {
-        auto cardinalities_acc = cardnl.get_access<sycl_read_write>(cgh);
+      q.submit([&] (sycl::handler &cgh) {
         cgh.single_task<class reduce_card_device>([=] () {
           int max_card = -1;
           int  winner_index;
           for(int i=0; i<thread_block_count*2; i+=2){
-            if( cardinalities_acc[i] > max_card ){
-              max_card = cardinalities_acc[i];
-              winner_index = cardinalities_acc[i+1];
+            if( cardnl[i] > max_card ){
+              max_card = cardnl[i];
+              winner_index = cardnl[i+1];
             }
           }
-          cardinalities_acc[0] = max_card;
-          cardinalities_acc[1] = winner_index;
+          cardnl[0] = max_card;
+          cardnl[1] = winner_index;
         });
       }).wait();
     }
 
     //copyFromDevice( cardinalities, cardnl, 2*sizeof(int) );
-    q.submit([&] (handler &cgh) {
-      auto cardinalities_acc = cardnl.get_access<sycl_read>(cgh, range<1>(2));
-      cgh.copy(cardinalities_acc, cardinalities);
-    }).wait();
+    q.memcpy(cardinalities, cardnl, 2*sizeof(int)).wait();
 
     max_card     = cardinalities[0];
     winner_index = cardinalities[1];
@@ -480,7 +462,8 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       //printf("point count: %d\n", point_count);
     start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
+    q.submit([&] (sycl::handler &cgh) {
+/*
       auto distance_matrix_acc = distance_matrix.get_access<sycl_read>(cgh);
       auto Ai_mask_acc = Ai_mask.get_access<sycl_read_write>(cgh);
       auto clustered_pnts_mask_acc = clustered_pnts_mask.get_access<sycl_read>(cgh);
@@ -490,67 +473,67 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       auto dist_to_clust_acc = dist_to_clust.get_access<sycl_read_write>(cgh);
       auto degrees_acc = degrees.get_access<sycl_read>(cgh);
       auto result_acc = result.get_access<sycl_write>(cgh);
-
-      accessor<int, 1, sycl_read_write, access::target::local> tmp_pnts(THREADSPERBLOCK, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> cnt_sh(1, cgh);
-      accessor<bool, 1, sycl_read_write, access::target::local> flag_sh(1, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> dist_array(THREADSPERBLOCK, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> point_index_array(THREADSPERBLOCK, cgh);
-      cgh.parallel_for<class trim_ungrouped_pnts>(nd_range<1>(range<1>(tpb), 
-                                                              range<1>(tpb)), [=] (nd_item<1> item) {
+*/
+      sycl::local_accessor<int, 1> tmp_pnts(sycl::range<1>(THREADSPERBLOCK), cgh);
+      sycl::local_accessor<int, 0> cnt_sh(cgh);
+      sycl::local_accessor<bool, 0> flag_sh(cgh);
+      sycl::local_accessor<float, 1> dist_array(sycl::range<1>(THREADSPERBLOCK), cgh);
+      sycl::local_accessor<int, 1> point_index_array(sycl::range<1>(THREADSPERBLOCK), cgh);
+      cgh.parallel_for<class trim_ungrouped_pnts>(sycl::nd_range<1>(sycl::range<1>(tpb),
+                                                                    sycl::range<1>(tpb)), [=] (sycl::nd_item<1> item) {
         int cnt;
         int tid = item.get_local_id(0);
         int curThreadCount  = item.get_local_range(0);
 
-        int degree = degrees_acc[winner_index];
-        
-        generate_candidate_cluster_compact_storage( 
-            item, dist_array, point_index_array,
-            winner_index, degree, Ai_mask_acc.get_pointer(), 
-            distance_matrix_acc.get_pointer(),
-            clustered_pnts_mask_acc.get_pointer(), 
-            indr_mtrx_acc.get_pointer(), 
-            dist_to_clust_acc.get_pointer(),
-            point_count, max_point_count, max_degree, 
-      	    result_acc.get_pointer(), threshold);
+        int degree = degrees[winner_index];
+
+        generate_candidate_cluster_compact_storage(
+            item, dist_array.get_pointer(), point_index_array.get_pointer(),
+            winner_index, degree, Ai_mask,
+            distance_matrix,
+            clustered_pnts_mask,
+            indr_mtrx,
+            dist_to_clust,
+            point_count, max_point_count, max_degree,
+      	    result, threshold);
 
 
         if( 0 == tid ){
-          cnt_sh[0] = 0;
-          flag_sh[0] = false;
+          cnt_sh = 0;
+          flag_sh = false;
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         for(int i = 0; i+tid < point_count; i+=curThreadCount){
           // Have all threads make a coalesced read of contiguous global memory and copy the points assuming they are all good.
-          tmp_pnts[tid] = ungrpd_pnts_indr_acc[i+tid];
+          tmp_pnts[tid] = ungrpd_pnts_indr[i+tid];
           int pnt = tmp_pnts[tid];
           // If a point is bad (which should not happen very often), raise a global flag so that thread zero fixes the problem.
-          if( 1 == Ai_mask_acc[pnt] ){
-            flag_sh[0] = true;
+          if( 1 == Ai_mask[pnt] ){
+            flag_sh = true;
             tmp_pnts[tid] = INVALID_POINT_MARKER;
           }else{
-            ungrpd_pnts_indr_acc[cnt_sh[0]+tid] = pnt;
+            ungrpd_pnts_indr[cnt_sh+tid] = pnt;
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if( 0 == tid ){
-            if( flag_sh[0] ){
-              cnt = cnt_sh[0];
+            if( flag_sh ){
+              cnt = cnt_sh;
               for(int j = 0; (j < curThreadCount) && (i+j < point_count); j++ ){
                 if( INVALID_POINT_MARKER != tmp_pnts[j] ){
-                  ungrpd_pnts_indr_acc[cnt] = tmp_pnts[j];
+                  ungrpd_pnts_indr[cnt] = tmp_pnts[j];
                   cnt++;
                 }
               }
-              cnt_sh[0] = cnt;
+              cnt_sh = cnt;
             }else{
-              cnt_sh[0] += curThreadCount;
+              cnt_sh += curThreadCount;
             }
-            flag_sh[0]  = false;
+            flag_sh  = false;
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         }
       });
     }).wait();
@@ -565,10 +548,7 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
       }
 
       //copyFromDevice(output, (void *)result, max_card*sizeof(int) );
-      q.submit([&] (handler &cgh) {
-        auto result_acc = result.get_access<sycl_read>(cgh, range<1>(max_card));
-        cgh.copy(result_acc, output);
-      }).wait();
+      q.memcpy(output, result, max_card*sizeof(int)).wait();
 
       if( save_clusters ){
         for(int i=0; i<max_card; i++){
@@ -582,18 +562,16 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
     start = std::chrono::steady_clock::now();
 
     //update_clustered_pnts_mask<<<grid2D(1), tpb>>>((char *)clustered_pnts_mask, (char *)Ai_mask, max_point_count);
-    q.submit([&] (handler &cgh) {
-      auto Ai_mask_acc = Ai_mask.get_access<sycl_read>(cgh);
-      auto clustered_pnts_mask_acc = clustered_pnts_mask.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class update_clustered_pnts_mask>(nd_range<1>(range<1>(tpb), 
-        range<1>(tpb)), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class update_clustered_pnts_mask>(
+        sycl::nd_range<1>(sycl::range<1>(tpb), sycl::range<1>(tpb)), [=] (sycl::nd_item<1> item) {
         int tid = item.get_local_id(0);
         int curThreadCount  = item.get_local_range(0);
 
         // If a point is part of the latest winner cluster, then it should be marked as
         // clustered for the future iterations. Otherwise it should be left as it is.
         for(int i = 0; i+tid < max_point_count; i+=curThreadCount){
-          clustered_pnts_mask_acc[i+tid] |= Ai_mask_acc[i+tid];
+          clustered_pnts_mask[i+tid] |= Ai_mask[i+tid];
         }
       });
     }).wait();
@@ -624,6 +602,16 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
   free(indr_mtrx_host);
   free(output);
   free(cardinalities);
+
+  sycl::free(distance_matrix, q);
+  sycl::free(indr_mtrx, q);
+  sycl::free(degrees, q);
+  sycl::free(ungrpd_pnts_indr, q);
+  sycl::free(Ai_mask, q);
+  sycl::free(dist_to_clust, q);
+  sycl::free(clustered_pnts_mask, q);
+  sycl::free(cardnl, q);
+  sycl::free(result, q);
 
   return;
 }
