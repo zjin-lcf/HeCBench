@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "qrg.h"
 
 // forward declarations
@@ -28,13 +28,13 @@ double getQuasirandomValue63(INT64 i, int dim);
 double MoroInvCNDcpu(unsigned int x);
 
 // Round Up Division function
-size_t shrRoundUp(int group_size, int global_size) 
+size_t shrRoundUp(int group_size, int global_size)
 {
     int r = global_size % group_size;
-    if(r == 0) 
+    if(r == 0)
     {
         return global_size;
-    } else 
+    } else
     {
         return global_size + group_size - r;
     }
@@ -66,7 +66,7 @@ float MoroInvCNDgpu(unsigned int x)
     float z;
 
     bool negate = false;
-    
+
     // Ensure the conversion to floating point will give a value in the
     // range (0,0.5] by restricting the input to the bottom half of the
     // input domain. We will later reflect the result if the input was
@@ -129,21 +129,23 @@ int main(int argc, const char **argv)
   initQuasirandomGenerator(tableCPU);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_Output(QRNG_DIMENSIONS * N);
-  buffer<unsigned int, 1> d_Table(tableCPU, QRNG_DIMENSIONS * QRNG_RESOLUTION);
-  printf(">>>Launch QuasirandomGenerator kernel...\n\n"); 
+  float *d_Output = sycl::malloc_device<float>(QRNG_DIMENSIONS * N, q);
+
+  unsigned int *d_Table = sycl::malloc_device<unsigned int>(QRNG_DIMENSIONS * QRNG_RESOLUTION, q);
+  q.memcpy(d_Table, tableCPU, sizeof(unsigned int)*QRNG_DIMENSIONS*QRNG_RESOLUTION);
+
+  printf(">>>Launch QuasirandomGenerator kernel...\n\n");
 
   size_t szWorkgroup = 64 * (256 / QRNG_DIMENSIONS)/64;
   size_t globalWorkSize[2] = {shrRoundUp(szWorkgroup, 128*128), QRNG_DIMENSIONS};
   size_t localWorkSize[2] = {szWorkgroup, QRNG_DIMENSIONS};
-  range<2> gws (globalWorkSize[1], globalWorkSize[0]);
-  range<2> lws (localWorkSize[1], localWorkSize[0]);
+  sycl::range<2> gws (globalWorkSize[1], globalWorkSize[0]);
+  sycl::range<2> lws (localWorkSize[1], localWorkSize[0]);
 
   // seed is fixed at zero
   const unsigned int seed = 0;
@@ -153,20 +155,19 @@ int main(int argc, const char **argv)
 
   for (int i = 0; i < repeat; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto output = d_Output.get_access<sycl_write>(cgh);
-      auto table = d_Table.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class qrng>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class qrng>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         unsigned int globalID_x   = item.get_global_id(1);
         unsigned int localID_y    = item.get_local_id(0);
         unsigned int globalSize_x = item.get_global_range(1);
- 
+
         for (unsigned int pos = globalID_x; pos < N; pos += globalSize_x) {
           unsigned int result = 0;
           unsigned int data = seed + pos;
           for(int bit = 0; bit < QRNG_RESOLUTION; bit++, data >>= 1)
-            if(data & 1) result ^= table[bit+localID_y*QRNG_RESOLUTION];
-          output[sycl::mul24(localID_y,N) + pos] = (float)(result + 1) * INT_SCALE;
+            if(data & 1) result ^= d_Table[bit+localID_y*QRNG_RESOLUTION];
+          d_Output[sycl::mul24(localID_y,N) + pos] = (float)(result + 1) * INT_SCALE;
         }
       });
     });
@@ -177,11 +178,8 @@ int main(int argc, const char **argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (qrng): %f (us)\n", (time * 1e-3f) / repeat);
 
-  printf("\nRead back results...\n"); 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_OutputGPU);
-  }).wait();
+  printf("\nRead back results...\n");
+  q.memcpy(h_OutputGPU, d_Output, sizeof(float)*QRNG_DIMENSIONS*N).wait();
 
   printf("Comparing to the CPU results...\n\n");
   sumDelta = 0;
@@ -201,15 +199,15 @@ int main(int argc, const char **argv)
   printf("  ckQuasirandomGenerator deviations %s Allowable Tolerance\n\n\n", (L1norm < 1e-6) ? "WITHIN" : "ABOVE");
   bPassFlag = (L1norm < 1e-6);
 
-  printf(">>>Launch InverseCND kernel...\n\n"); 
+  printf(">>>Launch InverseCND kernel...\n\n");
 
   // determine work group sizes for each device
   szWorkgroup = 128;
   globalWorkSize[0] = shrRoundUp(szWorkgroup, 128*128);
   localWorkSize[0] = szWorkgroup;
 
-  range<1> gws2 (globalWorkSize[0]);
-  range<1> lws2 (localWorkSize[0]);
+  sycl::range<1> gws2 (globalWorkSize[0]);
+  sycl::range<1> lws2 (localWorkSize[0]);
 
   const unsigned int pathN = QRNG_DIMENSIONS * N;
   const unsigned int distance = ((unsigned int)-1) / (pathN  + 1);
@@ -219,15 +217,15 @@ int main(int argc, const char **argv)
 
   for (int i = 0; i < repeat; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto output = d_Output.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class icnd>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class icnd>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         const unsigned int globalID   = item.get_global_id(0);
         const unsigned int globalSize = item.get_global_range(0);
 
         for(unsigned int pos = globalID; pos < pathN; pos += globalSize){
           unsigned int d = (pos + 1) * distance;
-          output[pos] = MoroInvCNDgpu(d);
+          d_Output[pos] = MoroInvCNDgpu(d);
         }
       });
     });
@@ -237,12 +235,9 @@ int main(int argc, const char **argv)
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (icnd): %f (us)\n", (time * 1e-3f) / repeat);
-  printf("\nRead back results...\n"); 
+  printf("\nRead back results...\n");
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_Output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_OutputGPU);
-  }).wait();
+  q.memcpy(h_OutputGPU, d_Output, sizeof(float)*QRNG_DIMENSIONS*N).wait();
   printf("Comparing to the CPU results...\n\n");
 
   sumDelta = 0;
@@ -265,5 +260,7 @@ int main(int argc, const char **argv)
     printf("FAIL\n");
 
   free(h_OutputGPU);
+  sycl::free(d_Output, q);
+  sycl::free(d_Table, q);
   return 0;
 }
