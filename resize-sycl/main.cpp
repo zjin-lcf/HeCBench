@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 template <class T, std::size_t CHANNELS_PER_ITER>
 
@@ -155,7 +155,7 @@ void resize_bilinear(
 
 template <class T>
 void resize_image (
-  queue &q,
+  sycl::queue &q,
   const int in_width,
   const int in_height,
   const int out_width,
@@ -178,10 +178,10 @@ void resize_image (
   for(size_t i = 0; i < in_size; i++) in_images_h[i] = static_cast<T>((i+1) % 13);
 
   T *in_images_d, *out_images_d;
-  in_images_d = (T *)malloc_device(in_size_bytes, q);
+  in_images_d = (T *)sycl::malloc_device(in_size_bytes, q);
   q.memcpy(in_images_d, in_images_h, in_size_bytes);
 
-  out_images_d = (T *)malloc_device(out_size_bytes, q);
+  out_images_d = (T *)sycl::malloc_device(out_size_bytes, q);
   q.memset(out_images_d, 0, out_size_bytes);
 
   const float fx = in_width / out_width;
@@ -189,31 +189,33 @@ void resize_image (
 
   q.wait();
 
-  range<1> gws (29184 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws (29184 * 256);
+  sycl::range<1> lws (256);
 
   auto start = std::chrono::steady_clock::now();
 
   // default grid size is 256 * 114
   if (bilinear) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-          resize_bilinear<T, 8>(
-            out_images_d, out_size, out_height, out_width,
-            in_images_d, in_height, in_width, fx, fy, true,
-            item);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+          resize_bilinear<T, 8>(out_images_d, out_size, out_height,
+                                out_width, in_images_d, in_height,
+                                in_width, fx, fy, true,
+                                item);
         });
       });
     }
   } else {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           resize<T, 8>(out_images_d, out_size, out_height,
-            out_width, in_images_d, in_height,
-            in_width, fx, fy, true, true,
-            item);
+                       out_width, in_images_d, in_height,
+                       in_width, fx, fy, true, true,
+                       item);
         });
       });
     }
@@ -227,8 +229,8 @@ void resize_image (
 
   q.memcpy(out_images_h, out_images_d, out_size_bytes).wait();
 
-  free(in_images_d, q);
-  free(out_images_d, q);
+  sycl::free(in_images_d, q);
+  sycl::free(out_images_d, q);
 
   free(in_images_h);
   free(out_images_h);
@@ -253,11 +255,10 @@ int main(int argc, char* argv[]) {
           num_channels, in_width, in_height, out_width, out_height);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("\nThe size of each pixel is 1 byte\n");
   resize_image<unsigned char>(q, in_width, in_height, out_width, out_height, num_channels, repeat);
