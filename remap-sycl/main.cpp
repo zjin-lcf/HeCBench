@@ -78,7 +78,7 @@ void eval_remap(sycl::queue &q, const int N, const int repeat) {
     copy_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     start = std::chrono::steady_clock::now();
-     
+
     // Create two vectors of {0, 1, ..., N-1} on device
     dpct::iota(policy, order1.begin(), order1.end());
     dpct::iota(policy, order2.begin(), order2.end());
@@ -97,6 +97,8 @@ void eval_remap(sycl::queue &q, const int N, const int repeat) {
 
     auto buffer = dpct::get_device_pointer(d_input);
     dpct::sort(policy, buffer, buffer + N, order1.begin());
+
+    //oneapi::dpl::sort_by_key(policy, d_input, d_input + N, order1.begin());
 
     end = std::chrono::steady_clock::now();
     sort_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -200,13 +202,12 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[2]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
-  // warmup and run 
+  // warmup and run
   for (int i = 0; i < 2; i++) {
     printf("\nRun %d\n", i);
     eval_remap<int>(q, N, repeat);
