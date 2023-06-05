@@ -30,14 +30,11 @@ int main(int argc, char* argv[])
            "This program is supposed to execute with multiple devices.\n");
   }
 
-  // Can't add devices across platforms to a single context
-  // sycl::context same_ctxt = sycl::context(gpu_devices);
   std::vector<sycl::queue> queues;
 
   // Alocate memory to each device. Each queue share the same context
   for (int i = 0; i < num_devices; i++) {
-    //queues.push_back(sycl::queue(same_ctxt, gpu_devices[i]) );
-    queues.push_back(sycl::queue(gpu_devices[i]));
+    queues.push_back(sycl::queue(gpu_devices[i], sycl::property::queue::in_order()));
   }
 
   for (long len = min_len; len <= max_len; len = len * 4) {
