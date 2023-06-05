@@ -14,84 +14,78 @@
 
 
 void scanExclusiveLocal1(
-    queue &q,
-    buffer<unsigned int> &d_Dst,
-    buffer<unsigned int> &d_Src,
-    const unsigned int n,
-    const unsigned int size
-    ){
-
+    sycl::queue &q,
+    uint *d_Dst,
+    uint *d_Src,
+    const uint n,
+    const uint size)
+{
   size_t localWorkSize = WORKGROUP_SIZE;
   size_t globalWorkSize = (n * size) / 4;
 
-  range<1> gws (globalWorkSize);
-  range<1> lws (localWorkSize);
+  sycl::range<1> gws (globalWorkSize);
+  sycl::range<1> lws (localWorkSize);
 
-  q.submit([&] (handler &cgh) {
-    auto dst = d_Dst.get_access<sycl_discard_write>(cgh);
-    auto src = d_Src.get_access<sycl_read>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> l_Data(2 * WORKGROUP_SIZE , cgh);
-    cgh.parallel_for<class scan_exclusive_local1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      scanExclusiveLocal1K(item, dst.get_pointer(), src.get_pointer(), l_Data.get_pointer(), size);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<uint, 1> l_Data(sycl::range<1>(2 * WORKGROUP_SIZE), cgh);
+    cgh.parallel_for<class scan_exclusive_local1>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      scanExclusiveLocal1K(item, d_Dst, d_Src, l_Data.get_pointer(), size);
     });
   });
 }
 
 void scanExclusiveLocal2(
-    queue &q,
-    buffer<unsigned int> &d_Buf,
-    buffer<unsigned int> &d_Dst,
-    buffer<unsigned int> &d_Src,
-    const unsigned int n,
-    const unsigned int size)
+    sycl::queue &q,
+    uint *d_Buf,
+    uint *d_Dst,
+    uint *d_Src,
+    const uint n,
+    const uint size)
 {
-  const unsigned int elements = n * size;
+  const uint elements = n * size;
   size_t localWorkSize = WORKGROUP_SIZE;
   size_t globalWorkSize = iSnapUp(elements, WORKGROUP_SIZE);
-  range<1> gws (globalWorkSize);
-  range<1> lws (localWorkSize);
+  sycl::range<1> gws (globalWorkSize);
+  sycl::range<1> lws (localWorkSize);
 
-
-  q.submit([&] (handler &cgh) {
-    auto buf = d_Buf.get_access<sycl_discard_write>(cgh);
-    auto dst = d_Dst.get_access<sycl_read>(cgh);
-    auto src = d_Src.get_access<sycl_read>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> l_Data(2 * WORKGROUP_SIZE , cgh);
-    cgh.parallel_for<class scan_exclusive_local2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      scanExclusiveLocal2K(item, buf.get_pointer(), dst.get_pointer(), src.get_pointer(), 
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<uint, 1> l_Data(sycl::range<1>(2 * WORKGROUP_SIZE), cgh);
+    cgh.parallel_for<class scan_exclusive_local2>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      scanExclusiveLocal2K(item, d_Buf, d_Dst, d_Src,
                            l_Data.get_pointer(), elements, size);
     });
   });
 }
 
 void uniformUpdate(
-    queue &q,
-    buffer<unsigned int> &d_Dst,
-    buffer<unsigned int> &d_Buf,
-    const unsigned int n)
+    sycl::queue &q,
+    uint *d_Dst,
+    uint *d_Buf,
+    const uint n)
 {
-  range<1> gws (n * WORKGROUP_SIZE);
-  range<1> lws (WORKGROUP_SIZE);
+  sycl::range<1> gws (n * WORKGROUP_SIZE);
+  sycl::range<1> lws (WORKGROUP_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto d_dst = d_Dst.get_access<sycl_read_write>(cgh);
-    auto d_buf = d_Buf.get_access<sycl_read>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> buf(1 , cgh);
-    cgh.parallel_for<class uniform_update>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      uniformUpdateK(item, d_dst.get_pointer(), d_buf.get_pointer(), buf.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<uint, 0> buf(cgh);
+    cgh.parallel_for<class uniform_update>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      uniformUpdateK(item, d_Dst, d_Buf, buf);
     });
   });
 }
 
 // main exclusive scan routine
 void scanExclusiveLarge(
-    queue &q,
-    buffer<unsigned int> &d_Dst,
-    buffer<unsigned int> &d_Src,
-    buffer<unsigned int> &d_Buf,
-    const unsigned int batchSize,
-    const unsigned int arrayLength, 
-    const unsigned int numElements)
+    sycl::queue &q,
+    uint *d_Dst,
+    uint *d_Src,
+    uint *d_Buf,
+    const uint batchSize,
+    const uint arrayLength,
+    const uint numElements)
 {
 
   scanExclusiveLocal1(

@@ -10,11 +10,11 @@
  */
 
 
-static unsigned int iSnapUp(const unsigned int dividend, const unsigned int divisor)
+static uint iSnapUp(const uint dividend, const uint divisor)
 {
   return ((dividend % divisor) == 0) ? dividend : (dividend - dividend % divisor + divisor);
 }
-unsigned int factorRadix2(unsigned int& log2L, unsigned int L)
+uint factorRadix2(uint& log2L, uint L)
 {
   if(!L)
   {
@@ -35,8 +35,8 @@ unsigned int factorRadix2(unsigned int& log2L, unsigned int L)
 //Allocate 2 * 'size' local memory, initialize the first half
 //with 'size' zeros avoiding if(pos >= offset) condition evaluation
 //and saving instructions
-inline uint scan1Inclusive(nd_item<1> &item, const uint idata, 
-                           local_ptr<uint> l_Data, const uint size)
+inline uint scan1Inclusive(sycl::nd_item<1> &item, const uint idata,
+                           uint *l_Data, const uint size)
 {
   uint pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (size - 1));
   l_Data[pos] = 0;
@@ -44,17 +44,17 @@ inline uint scan1Inclusive(nd_item<1> &item, const uint idata,
   l_Data[pos] = idata;
 
   for(uint offset = 1; offset < size; offset <<= 1){
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     uint t = l_Data[pos] + l_Data[pos - offset];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     l_Data[pos] = t;
   }
 
   return l_Data[pos];
 }
 
-inline uint scan1Exclusive(nd_item<1> &item, const uint idata, 
-                           local_ptr<uint> l_Data, const uint size)
+inline uint scan1Exclusive(sycl::nd_item<1> &item, const uint idata,
+                           uint *l_Data, const uint size)
 {
   return scan1Inclusive(item, idata, l_Data, size) - idata;
 }
@@ -65,8 +65,8 @@ inline uint scan1Exclusive(nd_item<1> &item, const uint idata,
 
 //Almost the same as naiveScan1 but doesn't need barriers
 //assuming size <= WARP_SIZE
-inline uint warpScanInclusive(nd_item<1> &item, const uint idata, 
-                              local_ptr<uint> l_Data, const uint size)
+inline uint warpScanInclusive(sycl::nd_item<1> &item, const uint idata,
+                              uint *l_Data, const uint size)
 {
   uint pos = 2 * item.get_local_id(0) - (item.get_local_id(0) & (size - 1));
   l_Data[pos] = 0;
@@ -79,14 +79,14 @@ inline uint warpScanInclusive(nd_item<1> &item, const uint idata,
   return l_Data[pos];
 }
 
-inline uint warpScanExclusive(nd_item<1> &item, const uint idata, 
-                              local_ptr<uint> l_Data, const uint size)
+inline uint warpScanExclusive(sycl::nd_item<1> &item, const uint idata,
+                              uint *l_Data, const uint size)
 {
   return warpScanInclusive(item, idata, l_Data, size) - idata;
 }
 
-inline uint scan1Inclusive(nd_item<1> &item, const uint idata, 
-                           local_ptr<uint> l_Data, const uint size)
+inline uint scan1Inclusive(sycl::nd_item<1> &item, const uint idata,
+                           uint *l_Data, const uint size)
 {
   if(size > WARP_SIZE){
     //Bottom-level inclusive warp scan
@@ -94,14 +94,14 @@ inline uint scan1Inclusive(nd_item<1> &item, const uint idata,
 
     //Save top elements of each warp for exclusive warp scan
     //sync to wait for warp scans to complete (because l_Data is being overwritten)
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     int lid = item.get_local_id(0);
     if( (lid & (WARP_SIZE - 1)) == (WARP_SIZE - 1) )
       l_Data[lid >> LOG2_WARP_SIZE] = warpResult;
 
     //wait for warp scans to complete
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     if( lid < (WORKGROUP_SIZE / WARP_SIZE) ){
       //grab top warp elements
       uint val = l_Data[lid] ;
@@ -110,15 +110,15 @@ inline uint scan1Inclusive(nd_item<1> &item, const uint idata,
     }
 
     //return updated warp scans with exclusive scan results
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     return warpResult + l_Data[lid >> LOG2_WARP_SIZE];
   }else{
     return warpScanInclusive(item, idata, l_Data, size);
   }
 }
 
-inline uint scan1Exclusive(nd_item<1> &item, const uint idata, 
-                           local_ptr<uint> l_Data, const uint size){
+inline uint scan1Exclusive(sycl::nd_item<1> &item, const uint idata,
+                           uint *l_Data, const uint size){
   return scan1Inclusive(item, idata, l_Data, size) - idata;
 }
 #endif
@@ -126,8 +126,8 @@ inline uint scan1Exclusive(nd_item<1> &item, const uint idata,
 
 //Vector scan: the array to be scanned is stored
 //in work-item private memory as uint4
-inline uint4 scan4Inclusive(nd_item<1> &item, uint4 data4, 
-                            local_ptr<uint> l_Data, const uint size){
+inline uint4 scan4Inclusive(sycl::nd_item<1> &item, uint4 data4,
+                            uint *l_Data, const uint size){
   //Level-0 inclusive scan
   data4.y() += data4.x();
   data4.z() += data4.y();
@@ -139,8 +139,8 @@ inline uint4 scan4Inclusive(nd_item<1> &item, uint4 data4,
   return (data4 + (uint4)val);
 }
 
-inline uint4 scan4Exclusive(nd_item<1> &item, const uint4 data4, 
-                            local_ptr<uint> l_Data, const uint size)
+inline uint4 scan4Exclusive(sycl::nd_item<1> &item, const uint4 data4,
+                            uint *l_Data, const uint size)
 {
   return scan4Inclusive(item, data4, l_Data, size) - data4;
 }
@@ -150,31 +150,31 @@ inline uint4 scan4Exclusive(nd_item<1> &item, const uint4 data4,
 // Scan kernels
 ////////////////////////////////////////////////////////////////////////////////
 void scanExclusiveLocal1K(
-      nd_item<1> &item,
-      global_ptr<uint> d_Dst,
-      global_ptr<uint> d_Src,
-      local_ptr<uint> l_Data,
+      sycl::nd_item<1> &item,
+      uint *d_Dst,
+      uint *d_Src,
+      uint *l_Data,
       const uint size)
 {
     int i = item.get_global_id(0);
+
     //Load data
-    vec<uint, 4> idata4;
-    idata4.load(i, d_Src);
+    uint4 idata4 = reinterpret_cast<const uint4*>(d_Src)[i];
 
     //Calculate exclusive scan
     uint4 odata4 = scan4Exclusive(item, idata4, l_Data, size);
 
     //Write back
-    odata4.store(i, d_Dst);
+    reinterpret_cast<uint4*>(d_Dst)[i] = odata4;
 }
 
 //Exclusive scan of top elements of bottom-level scans (4 * THREADBLOCK_SIZE)
 void scanExclusiveLocal2K(
-      nd_item<1> &item,
-      global_ptr<uint> d_Buf,
-      global_ptr<uint> d_Dst,
-      global_ptr<uint> d_Src,
-      local_ptr<uint> l_Data,
+      sycl::nd_item<1> &item,
+      uint *d_Buf,
+      uint *d_Dst,
+      uint *d_Src,
+      uint *l_Data,
       const uint N,
       const uint arrayLength)
 {
@@ -184,7 +184,7 @@ void scanExclusiveLocal2K(
     uint data = 0;
     int i = item.get_global_id(0);
     if(i < N)
-      data = d_Dst[(4 * WORKGROUP_SIZE - 1) + (4 * WORKGROUP_SIZE) * i] + 
+      data = d_Dst[(4 * WORKGROUP_SIZE - 1) + (4 * WORKGROUP_SIZE) * i] +
              d_Src[(4 * WORKGROUP_SIZE - 1) + (4 * WORKGROUP_SIZE) * i];
 
     //Compute
@@ -197,23 +197,23 @@ void scanExclusiveLocal2K(
 //Final step of large-array scan: combine basic inclusive scan with exclusive scan of top elements of input arrays
 void uniformUpdateK(
       // uint4 *d_Data,
-      nd_item<1> &item,
-      global_ptr<uint> d_Data,
-      global_ptr<uint> d_Buf,
-      local_ptr<uint> buf)
+      sycl::nd_item<1> &item,
+      uint *d_Data,
+      uint *d_Buf,
+      uint &buf)
 {
     //__local uint buf[1];
 
     int i = item.get_global_id(0);
     //uint4 data4 = d_Data[get_global_id(0)];
-    vec<uint, 4> data4;
-    data4.load(i, d_Data);
+    uint4 data4 = reinterpret_cast<uint4*>(d_Data)[i];
 
     if(item.get_local_id(0) == 0)
-      buf[0] = d_Buf[item.get_group(0)];
+      buf = d_Buf[item.get_group(0)];
 
-    item.barrier(access::fence_space::local_space);
-    data4 += (uint4)buf[0];
+    item.barrier(sycl::access::fence_space::local_space);
+    data4 += (uint4)buf;
+
     //d_Data[i] = data4;
-    data4.store(i, d_Data);
+    reinterpret_cast<uint4*>(d_Data)[i] = data4;
 }
