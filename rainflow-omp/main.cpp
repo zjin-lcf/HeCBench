@@ -215,4 +215,6 @@ int main(int argc, char* argv[]) {
   free(results);
   free(result_lengths);
   free(ref_result_lengths);
+
+  return 0;
 }
