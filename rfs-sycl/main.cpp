@@ -4,7 +4,7 @@
 #include <float.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Copyright 2004-present Facebook. All Rights Reserved.
 // Constructs a rounding factor used to truncate elements in a sum
@@ -36,7 +36,7 @@ createRoundingFactor(float max, int n) {
   // return M = 2 ^ ceil(log_2(delta))
   return sycl::ldexp(1.f, exp);
 }
-  
+
 // Given the rounding factor in `createRoundingFactor` calculated
 // using max(|x_i|), truncate `x` to a value that can be used for a
 // deterministic, reproducible parallel sum of all x_i.
@@ -47,33 +47,33 @@ truncateWithRoundingFactor(float roundingFactor, float x) {
 }
 
 void sumArray (
-  nd_item<1> &item,
-  const float factor, 
+  sycl::nd_item<1> &item,
+  const float factor,
   const   int length,
   const float *__restrict__ x,
         float *__restrict__ r)
 {
-  for (int i = item.get_global_id(0); i < length; 
+  for (int i = item.get_global_id(0); i < length;
            i += item.get_local_range(0) * item.get_group_range(0)) {
     float q = truncateWithRoundingFactor(factor, x[i]);
     // atomicAdd(r, q);  // sum in any order
-    auto ao = ext::oneapi::atomic_ref<float, 
-              ext::oneapi::memory_order::relaxed,
-              ext::oneapi::memory_scope::device,
-              access::address_space::global_space> (r[0]);
+    auto ao = sycl::atomic_ref<float,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
+              sycl::access::address_space::global_space> (r[0]);
     ao.fetch_add(q);
   }
 }
-  
+
 void sumArrays (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int nArrays,
   const int length,
   const float *__restrict__ x,
         float *__restrict__ r,
   const float *__restrict__ maxVal)
 {
-  for (int i = item.get_global_id(0); i < nArrays; 
+  for (int i = item.get_global_id(0); i < nArrays;
            i += item.get_local_range(0) * item.get_group_range(0)) {
     x += i * length;
     float factor = createRoundingFactor(maxVal[i], length);
@@ -83,10 +83,10 @@ void sumArrays (
     r[i] = s;
   }
 }
-  
+
 int main(int argc, char* argv[]) {
   if (argc != 3) {
-    printf("Usage: %s <number of arrays> <length of each array>\n", argv[0]); 
+    printf("Usage: %s <number of arrays> <length of each array>\n", argv[0]);
     return 1;
   }
 
@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
 
   // set of arrays
   float *arrays = (float*) malloc (array_size);
-  // max value of each array 
+  // max value of each array
   float *maxVal = (float*) malloc (narray_size);
   // sum of each array
   float *result = (float*) malloc (narray_size);
@@ -132,24 +132,24 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_arrays (arrays, nArrays * nElems);
-  buffer<float, 1> d_maxVal (maxVal, nArrays);
-  buffer<float, 1> d_result (nArrays);
+  float *d_arrays = sycl::malloc_device<float>(nArrays * nElems, q);
+  q.memcpy(d_arrays, arrays, array_size);
 
-  range<1> gws (256*256);
-  range<1> lws (256);
- 
+  float *d_maxVal = sycl::malloc_device<float>(nArrays, q);
+  q.memcpy(d_maxVal, maxVal, narray_size);
+
+  float *d_result = sycl::malloc_device<float>(nArrays, q);
+
+  sycl::range<1> gws (256*256);
+  sycl::range<1> lws (256);
+
   // reset results for the sumArray kernel
-  q.submit([&] (handler &cgh) {
-    auto acc = d_result.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  q.memset(d_result, 0, narray_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -157,11 +157,10 @@ int main(int argc, char* argv[]) {
   for (int n = 0; n < nArrays; n++) {
     // sum over each array
     const float f = factor[n];
-    q.submit([&] (handler &cgh) {
-      auto arr = d_arrays.get_access<sycl_read>(cgh, range<1>(nElems), id<1>(n*nElems));
-      auto out = d_result.get_access<sycl_read_write>(cgh, range<1>(1), id<1>(n));
-      cgh.parallel_for<class sum_array>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        sumArray (item, f, nElems, arr.get_pointer(), out.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class sum_array>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        sumArray (item, f, nElems, d_arrays + n * nElems, d_result + n);
       });
     });
   }
@@ -172,24 +171,18 @@ int main(int argc, char* argv[]) {
   printf("Average kernel execution time (sumArray): %f (s)\n", (time * 1e-9f) / nArrays);
 
   // bit accurate sum
-  q.submit([&] (handler &cgh) {
-    auto acc = d_result.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, d_result, narray_size).wait();
 
   bool ok = !memcmp(result_ref, result, narray_size);
   printf("%s\n", ok ? "PASS" : "FAIL");
-  
+
   start = std::chrono::steady_clock::now();
 
   // sum over arrays
-  q.submit([&] (handler &cgh) {
-    auto arr = d_arrays.get_access<sycl_read>(cgh);
-    auto out = d_result.get_access<sycl_discard_write>(cgh);
-    auto max = d_maxVal.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class sum_arrays>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      sumArrays (item, nArrays, nElems, arr.get_pointer(), 
-                 out.get_pointer(), max.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class sum_arrays>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      sumArrays (item, nArrays, nElems, d_arrays, d_result, d_maxVal);
     });
   }).wait();
 
@@ -198,14 +191,14 @@ int main(int argc, char* argv[]) {
   printf("Kernel execution time (sumArrays): %f (s)\n", time * 1e-9f);
 
   // bit accurate sum
-  q.submit([&] (handler &cgh) {
-    auto acc = d_result.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, d_result, narray_size).wait();
 
   ok = !memcmp(result_ref, result, narray_size);
   printf("%s\n", ok ? "PASS" : "FAIL");
 
+  sycl::free(d_arrays, q);
+  sycl::free(d_maxVal, q);
+  sycl::free(d_result, q);
   free(arrays);
   free(maxVal);
   free(result);
