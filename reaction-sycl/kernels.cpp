@@ -2,14 +2,14 @@
  * @brief      Calculate Gray-Scott reaction rate
  */
 void reaction_gray_scott(
-    const float *__restrict fx, 
-    const float *__restrict fy, 
-    float *__restrict drx, 
+    const float *__restrict fx,
+    const float *__restrict fy,
+    float *__restrict drx,
     float *__restrict dry,
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const unsigned int ncells,
     const float d_c1,
-    const float d_c2) 
+    const float d_c2)
 {
   int index = item.get_global_id(0);
   int stride = item.get_local_range(0) * item.get_group_range(0);
@@ -28,10 +28,10 @@ void derivative_x2_pbc(
     const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f, // 2-wide halo
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
   int i   = item.get_local_id(1);
@@ -44,7 +44,7 @@ void derivative_x2_pbc(
 
   s_f[sj * (mx + 2 * offset) + si] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // fill in periodic images in shared memory array
   if (i < offset) {
@@ -52,7 +52,7 @@ void derivative_x2_pbc(
     s_f[sj * (mx + 2 * offset) + si + mx] = s_f[sj * (mx + 2 * offset) + si];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   df[globalIdx] = s_f[sj * (mx + 2 * offset) + si + 1] - 2.f * s_f[sj * (mx + 2 * offset) + si] + s_f[sj * (mx + 2 * offset) + si - 1];
 }
@@ -61,10 +61,10 @@ void derivative_x2_pbc(
  * @brief      Calculate second derivative in x direction with zero-flux boundary conditions
  */
 void derivative_x2_zeroflux(
-    const float *__restrict f, 
+    const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f,
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my)
 {
@@ -77,7 +77,7 @@ void derivative_x2_zeroflux(
 
   s_f[sj * mx + i] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(i == 0) {
     df[globalIdx] = s_f[sj * mx + i + 1] - s_f[sj * mx + i];
@@ -92,13 +92,13 @@ void derivative_x2_zeroflux(
  * @brief      Calculate second derivative in y direction with periodic boundary conditions
  */
 void derivative_y2_pbc(
-    const float *__restrict f, 
+    const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f,
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
 
@@ -111,7 +111,7 @@ void derivative_y2_pbc(
 
   s_f[sj * pencils + si] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // fill in periodic images in shared memory array
   if (j < offset) {
@@ -119,7 +119,7 @@ void derivative_y2_pbc(
     s_f[(sj + my) * pencils + si] = s_f[sj * pencils + si];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   df[globalIdx] = s_f[(sj+1) * pencils + si] - 2.f * s_f[sj * pencils + si] + s_f[(sj-1) * pencils + si];
 }
@@ -128,13 +128,13 @@ void derivative_y2_pbc(
  * @brief      Calculate second derivative in y direction with zero-flux  boundary conditions
  */
 void derivative_y2_zeroflux(
-    const float *__restrict f, 
+    const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f,
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   int i  = item.get_global_id(1);
   int j  = item.get_local_id(0);
@@ -144,7 +144,7 @@ void derivative_y2_zeroflux(
 
   s_f[j * pencils + si] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(j == 0) {
     df[globalIdx] = s_f[(j+1) * pencils + si] - s_f[j * pencils + si];
@@ -162,11 +162,11 @@ void derivative_z2_pbc(
     const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f,
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my,
     const unsigned int mz,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   const int offset = 1;
   int i  = item.get_global_id(1);
@@ -178,7 +178,7 @@ void derivative_z2_pbc(
 
   s_f[sk * pencils + si] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // fill in periodic images in shared memory array
   if (k < offset) {
@@ -186,7 +186,7 @@ void derivative_z2_pbc(
     s_f[(sk + mz) * pencils + si] = s_f[sk * pencils + si];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   df[globalIdx] = s_f[(sk+1) * pencils + si] - 2.f * s_f[sk * pencils + si] + s_f[(sk-1) * pencils + si];
 }
@@ -195,14 +195,14 @@ void derivative_z2_pbc(
  * @brief      Calculate second derivative in z direction with zero-flux boundary conditions
  */
 void derivative_z2_zeroflux(
-    const float *__restrict f, 
+    const float *__restrict f,
     float *__restrict df,
     float *__restrict s_f,
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const unsigned int mx,
     const unsigned int my,
     const unsigned int mz,
-    const unsigned int pencils) 
+    const unsigned int pencils)
 {
   int i  = item.get_global_id(1);
   int j  = item.get_group(0);
@@ -212,7 +212,7 @@ void derivative_z2_zeroflux(
 
   s_f[k * pencils + si] = f[globalIdx];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(k == 0) {
     df[globalIdx] = s_f[(k+1) * pencils + si] - s_f[k * pencils + si];
@@ -224,16 +224,16 @@ void derivative_z2_zeroflux(
 }
 
 /**
- * @brief      Construct the Laplacian for a component 
+ * @brief      Construct the Laplacian for a component
  */
 void construct_laplacian(
-    float *__restrict df, 
-    const float *__restrict dfx, 
-    const float *__restrict dfy, 
+    float *__restrict df,
+    const float *__restrict dfx,
+    const float *__restrict dfy,
     const float *__restrict dfz,
-    nd_item<1> &item,
-    const unsigned int ncells, 
-    const float d_diffcon) 
+    sycl::nd_item<1> &item,
+    const unsigned int ncells,
+    const float d_diffcon)
 {
   int index = item.get_global_id(0);
   int stride = item.get_local_range(0) * item.get_group_range(0);
@@ -254,13 +254,13 @@ void construct_laplacian(
  * @param[in]  dry   reaction of component B
  */
 void update(
-    float *__restrict x, 
-    float *__restrict y, 
-    const float *__restrict ddx, 
-    const float *__restrict ddy, 
-    const float *__restrict drx, 
+    float *__restrict x,
+    float *__restrict y,
+    const float *__restrict ddx,
+    const float *__restrict ddy,
+    const float *__restrict drx,
     const float *__restrict dry,
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const unsigned int ncells,
     const float d_dt)
 {
