@@ -5,18 +5,18 @@ const char weightName128one[] = "data/weight_one_1024.bin";
 const char bnBias_myKernel_Name128one[] = "data/bnBias_myKernel_one_1024.bin";
 const char bnScale_myKernel_Name128one[] = "data/bnScale_myKernel_one_1024.bin";
 
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 void kernel_512_one_128(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict shared_,
   const float *__restrict A,
   const float *__restrict B,
   const float *__restrict bnBias,
   const float *__restrict bnScale,
-        float *__restrict C) 
+        float *__restrict C)
 {
-  int tile = item.get_group(1), 
+  int tile = item.get_group(1),
       in_channel = item.get_local_id(1),
       line = item.get_local_id(0);
   int ind = line*128 + in_channel;
@@ -52,13 +52,13 @@ void kernel_512_one_128(
 }
 
 void kernel_128_one_512(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict shared_,
   const float *__restrict A,
   const float *__restrict B,
   const float *__restrict bnBias,
   const float *__restrict bnScale,
-        float *__restrict C) 
+        float *__restrict C)
 {
   int tile = item.get_group(1), part = item.get_group(0),
       in_channel = item.get_local_id(1), line = item.get_local_id(0);
@@ -90,7 +90,7 @@ void kernel_128_one_512(
   C_start[line * 512 + in_channel] = res;
 }
 
-void kernel_128_1_in(queue &q, double &time, double &ktime) {
+void kernel_128_1_in(sycl::queue &q, double &time, double &ktime) {
   float *input = get_parameter(inputName128one, 14*14*512);
   float *weight = get_parameter(weightName128one, 128*512);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name128one, 128);
@@ -101,30 +101,30 @@ void kernel_128_1_in(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  float *input_ = malloc_device<float>(nInput, q);
+  float *input_ = sycl::malloc_device<float>(nInput, q);
   q.memcpy(input_, input, sizeof(float) * nInput);
 
-  float *output_ = malloc_device<float>(nOutput, q);
+  float *output_ = sycl::malloc_device<float>(nOutput, q);
 
-  float *weight_ = malloc_device<float>(nWeights, q);
+  float *weight_ = sycl::malloc_device<float>(nWeights, q);
   q.memcpy(weight_, weight, sizeof(float) * nWeights);
 
-  float *bnBias_ = malloc_device<float>(128, q);
+  float *bnBias_ = sycl::malloc_device<float>(128, q);
   q.memcpy(bnBias_, bnBias_myKernel, sizeof(float) * 128);
 
-  float *bnScale_ = malloc_device<float>(128, q);
+  float *bnScale_ = sycl::malloc_device<float>(128, q);
   q.memcpy(bnScale_, bnScale_myKernel, sizeof(float) * 128);
 
-  range<2> gws (4, 128*49);
-  range<2> lws (4, 128);
+  sycl::range<2> gws (4, 128*49);
+  sycl::range<2> lws (4, 128);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local>
-      sm (4*512 + 64*128 + 4*128 + 2*128, cgh);
-    cgh.parallel_for<class k512_128>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1>
+      sm (sycl::range<1>(4*512 + 64*128 + 4*128 + 2*128), cgh);
+    cgh.parallel_for<class k512_128>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       kernel_512_one_128 (item, sm.get_pointer(), input_,
                           weight_, bnBias_, bnScale_, output_);
     });
@@ -135,11 +135,11 @@ void kernel_128_1_in(queue &q, double &time, double &ktime) {
 
   q.memcpy(result, output_, sizeof(float) * nOutput).wait();
 
-  free(input_, q);
-  free(output_, q);
-  free(weight_, q);
-  free(bnBias_, q);
-  free(bnScale_, q);
+  sycl::free(input_, q);
+  sycl::free(output_, q);
+  sycl::free(weight_, q);
+  sycl::free(bnBias_, q);
+  sycl::free(bnScale_, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -158,7 +158,7 @@ void kernel_128_1_in(queue &q, double &time, double &ktime) {
   free(weight);
 }
 
-void kernel_128_1_out(queue &q, double &time, double &ktime) {
+void kernel_128_1_out(sycl::queue &q, double &time, double &ktime) {
   float *input = get_parameter(inputName128one, 14*14*128);
   float *weight = get_parameter(weightName128one, 128*512);
   float *bnBias_myKernel = get_parameter(bnBias_myKernel_Name128one, 512);
@@ -168,31 +168,31 @@ void kernel_128_1_out(queue &q, double &time, double &ktime) {
   float result[nOutput];
 
   auto start = std::chrono::steady_clock::now();
-  
-  float *input_ = malloc_device<float>(nInput, q);
+
+  float *input_ = sycl::malloc_device<float>(nInput, q);
   q.memcpy(input_, input, sizeof(float) * nInput);
 
-  float *output_ = malloc_device<float>(nOutput, q);
+  float *output_ = sycl::malloc_device<float>(nOutput, q);
 
-  float *weight_ = malloc_device<float>(nWeights, q);
+  float *weight_ = sycl::malloc_device<float>(nWeights, q);
   q.memcpy(weight_, weight, sizeof(float) * nWeights);
 
-  float *bnBias_ = malloc_device<float>(512, q);
+  float *bnBias_ = sycl::malloc_device<float>(512, q);
   q.memcpy(bnBias_, bnBias_myKernel, sizeof(float) * 512);
 
-  float *bnScale_ = malloc_device<float>(512, q);
+  float *bnScale_ = sycl::malloc_device<float>(512, q);
   q.memcpy(bnScale_, bnScale_myKernel, sizeof(float) * 512);
 
-  range<2> gws (4*4, 128*49);
-  range<2> lws (4, 128);
+  sycl::range<2> gws (4*4, 128*49);
+  sycl::range<2> lws (4, 128);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local>
-      sm (4*128 + 64*128 + 4*128 + 2*128, cgh);
-    cgh.parallel_for<class k128_512>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1>
+      sm (sycl::range<1>(4*128 + 64*128 + 4*128 + 2*128), cgh);
+    cgh.parallel_for<class k128_512>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       kernel_128_one_512 (item, sm.get_pointer(), input_,
                           weight_, bnBias_, bnScale_, output_);
     });
@@ -204,11 +204,11 @@ void kernel_128_1_out(queue &q, double &time, double &ktime) {
 
   q.memcpy(result, output_, sizeof(float) * nOutput).wait();
 
-  free(input_, q);
-  free(output_, q);
-  free(weight_, q);
-  free(bnBias_, q);
-  free(bnScale_, q);
+  sycl::free(input_, q);
+  sycl::free(output_, q);
+  sycl::free(weight_, q);
+  sycl::free(bnBias_, q);
+  sycl::free(bnScale_, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

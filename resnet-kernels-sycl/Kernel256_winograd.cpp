@@ -6,10 +6,10 @@ const char bnBias_winograd_Name256[] = "data/bnBias_winograd_256.bin";
 const char bnScale_winograd_Name256[] = "data/bnScale_winograd_256.bin";
 
 #define d(input, i, j, Inz) ( input[Inz + i*768 + (j<<7)] )
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 void kernel_256_winograd_BtdB(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
         float *__restrict input,
   const float *__restrict pInputs,
         float *__restrict pOutputs)
@@ -102,14 +102,14 @@ void kernel_256_winograd_BtdB(
   __syncthreads();
 
   for (int i = 0; i < 6; i++) {
-    pOutputs[(Iny1 + i*6)*4096 + 
-             (item.get_group(2)*4+item.get_group(1))*256 + 
+    pOutputs[(Iny1 + i*6)*4096 +
+             (item.get_group(2)*4+item.get_group(1))*256 +
              Inz + (Part<<7)] = BTdB[i];
   }
 }
 
 void kernel_256_winograd_AtIA(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
         float *__restrict bias,
         float *__restrict scale,
         float *__restrict input,
@@ -178,7 +178,7 @@ void kernel_256_winograd_AtIA(
 }
 
 void kernel_256_OuterProduct_256(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict input,
   const float *__restrict A,
   const float *__restrict B,
@@ -191,7 +191,7 @@ void kernel_256_OuterProduct_256(
       T_offset = (Tile<<12) + (Part<<11) + c_input, B_offset = (Tile<<16) + c_kernel;
 
   float *kernel = input + 2048, *out = kernel + 8192;
-  int B_stride[32] = {0, 256, 512, 768, 1024, 1280, 1536, 1792, 
+  int B_stride[32] = {0, 256, 512, 768, 1024, 1280, 1536, 1792,
                       2048, 2304, 2560, 2816, 3072, 3328, 3584, 3840,
                       4096, 4352, 4608, 4864, 5120, 5376, 5632, 5888,
                       6144, 6400, 6656, 6912, 7168, 7424, 7680, 7936};
@@ -225,7 +225,7 @@ void kernel_256_OuterProduct_256(
   C[T_offset+1024] = out[c_input+1024];
 }
 
-void kernel_256(queue &q, double &time, double &ktime) {
+void kernel_256(sycl::queue &q, double &time, double &ktime) {
   float *input_ = get_parameter(inputName256, 16*16*256);
 
   float *kernel = get_parameter(weight_winograd_Name256, 36*256*256);
@@ -240,26 +240,26 @@ void kernel_256(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  float *input = malloc_device<float>(nInput, q);
+  float *input = sycl::malloc_device<float>(nInput, q);
   q.memcpy(input, input_, sizeof(float) * nInput);
 
-  float *l_weights = malloc_device<float>(nWeights, q);
+  float *l_weights = sycl::malloc_device<float>(nWeights, q);
   q.memcpy(l_weights, kernel, sizeof(float) * nWeights);
 
-  float *output = malloc_device<float>(nOutput, q);
+  float *output = sycl::malloc_device<float>(nOutput, q);
 
-  float *t_input = malloc_device<float>(nTransInput, q);
+  float *t_input = sycl::malloc_device<float>(nTransInput, q);
 
-  float *ip = malloc_device<float>(nInnerProd, q);
+  float *ip = sycl::malloc_device<float>(nInnerProd, q);
 
   q.memset(output, 0, sizeof(float) * nOutput);
   q.memset(t_input, 0, sizeof(float) * nTransInput);
   q.memset(ip, 0, sizeof(float) * nInnerProd);
 
-  float *l_bnBias = malloc_device<float>(nBias, q);
+  float *l_bnBias = sycl::malloc_device<float>(nBias, q);
   q.memcpy(l_bnBias, bnBias, sizeof(float) * nBias);
 
-  float *l_bnScale = malloc_device<float>(nBias, q);
+  float *l_bnScale = sycl::malloc_device<float>(nBias, q);
   q.memcpy(l_bnScale, bnScale, sizeof(float) * nBias);
 
   //kernel_256_winograd_BtdB <<<dim3(4, 4, 2), dim3(128, 6), (6*6*128)<<2 >>> (input, t_input);
@@ -269,32 +269,32 @@ void kernel_256(queue &q, double &time, double &ktime) {
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
-  range<3> gws (2, 4*6, 4*128);
-  range<3> lws (1, 6, 128);
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm (6*6*128, cgh);
-    cgh.parallel_for<class k1>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  sycl::range<3> gws (2, 4*6, 4*128);
+  sycl::range<3> lws (1, 6, 128);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm (sycl::range<1>(6*6*128), cgh);
+    cgh.parallel_for<class k1>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       kernel_256_winograd_BtdB (item, sm.get_pointer(), input, t_input);
     });
   });
 
-  range<2> gws2 (2*4, 36*256);
-  range<2> lws2 (4, 256);
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm (8*256 + 32*256 + 8*256, cgh);
-    cgh.parallel_for<class k2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+  sycl::range<2> gws2 (2*4, 36*256);
+  sycl::range<2> lws2 (4, 256);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm (sycl::range<1>(8*256 + 32*256 + 8*256), cgh);
+    cgh.parallel_for<class k2>(sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
       kernel_256_OuterProduct_256(item, sm.get_pointer(), t_input, l_weights, ip);
     });
   });
 
-  range<3> gws3 (256, 4*6, 4*6);
-  range<3> lws3 (1, 6, 6);
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm_bias (1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sm_scale (1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sm_input (6*6, cgh);
-    cgh.parallel_for<class k3>(nd_range<3>(gws3, lws3), [=] (nd_item<3> item) {
-      kernel_256_winograd_AtIA(item, 
+  sycl::range<3> gws3 (256, 4*6, 4*6);
+  sycl::range<3> lws3 (1, 6, 6);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm_bias (1, cgh);
+    sycl::local_accessor<float, 1> sm_scale (1, cgh);
+    sycl::local_accessor<float, 1> sm_input (6*6, cgh);
+    cgh.parallel_for<class k3>(sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> item) {
+      kernel_256_winograd_AtIA(item,
         sm_bias.get_pointer(), sm_scale.get_pointer(), sm_input.get_pointer(),
         ip, l_bnBias, l_bnScale, output);
     });
@@ -306,13 +306,13 @@ void kernel_256(queue &q, double &time, double &ktime) {
 
   q.memcpy(result, output, sizeof(float) * nOutput).wait();
 
-  free(input, q);
-  free(t_input, q);
-  free(l_weights, q);
-  free(l_bnBias, q);
-  free(l_bnScale, q);
-  free(ip, q);
-  free(output, q);
+  sycl::free(input, q);
+  sycl::free(t_input, q);
+  sycl::free(l_weights, q);
+  sycl::free(l_bnBias, q);
+  sycl::free(l_bnScale, q);
+  sycl::free(ip, q);
+  sycl::free(output, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
