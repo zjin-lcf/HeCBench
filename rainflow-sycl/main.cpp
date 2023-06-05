@@ -60,12 +60,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using double3 = sycl::double3;
+
 #include "reference.h"
 
 /// <summary>
-/// Utility function to get the local extrema (maxima and minima) of the provided 
-/// stress-time history as a sequence of peaks and valleys (bad in-between data 
+/// Utility function to get the local extrema (maxima and minima) of the provided
+/// stress-time history as a sequence of peaks and valleys (bad in-between data
 /// points – that are neither peaks nor valleys – are removed).
 /// </summary>
 /// <param name="history">The provided stress-time history.</param>
@@ -104,8 +107,9 @@ void Execute(const double* history, const int history_length,
   {
     points[++pidx] = ++eidx;
     double xRange, yRange;
-    while (pidx >= 2 && (xRange = sycl::fabs(extrema[points[pidx - 1]] - extrema[points[pidx]]))
-           >= (yRange = sycl::fabs(extrema[points[pidx - 2]] - extrema[points[pidx - 1]])))
+    while (pidx >= 2 &&
+           (xRange = sycl::fabs(extrema[points[pidx - 1]] - extrema[points[pidx]])) >=
+           (yRange = sycl::fabs(extrema[points[pidx - 2]] - extrema[points[pidx - 1]])))
     {
       double yMean = 0.5 * (extrema[points[pidx - 2]] + extrema[points[pidx - 1]]);
 
@@ -135,7 +139,7 @@ void Execute(const double* history, const int history_length,
   *results_length = ridx + 1;
 }
 
-void rainflow_count(nd_item<1> &item,
+void rainflow_count(sycl::nd_item<1> &item,
                     const double *__restrict history,
                     const int *__restrict history_lengths,
                     double *__restrict extrema,
@@ -149,7 +153,7 @@ void rainflow_count(nd_item<1> &item,
 
   const int offset = history_lengths[i];
   const int history_length = history_lengths[i+1] - offset;
-  Execute(history + offset, 
+  Execute(history + offset,
           history_length,
           extrema + offset,
           points + offset,
@@ -164,7 +168,7 @@ int main(int argc, char* argv[]) {
   int *history_lengths = (int*) malloc ((num_history + 1) * sizeof(int));
   int *result_lengths = (int*) malloc (num_history * sizeof(int));
   int *ref_result_lengths = (int*) malloc (num_history * sizeof(int));
-  
+
   srand(123);
 
   // initialize history length with a multiple of the scale unit
@@ -177,7 +181,7 @@ int main(int argc, char* argv[]) {
      total_length += (rand() % 10 + 1) * scale;
   }
   history_lengths[n] = total_length;
-  
+
   printf("Total history length = %zu\n", total_length);
 
   double *history = (double*) malloc (total_length * sizeof(double));
@@ -188,49 +192,45 @@ int main(int argc, char* argv[]) {
   double *extrema = (double*) malloc (total_length * sizeof(double));
   double3 *results = (double3*) malloc (total_length * sizeof(double3));
   int *points = (int*) malloc (total_length * sizeof(int));
-  
+
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> d_history_lengths (history_lengths, num_history  + 1);
+  int *d_history_lengths = sycl::malloc_device<int>(num_history + 1, q);
+  q.memcpy(d_history_lengths, history_lengths, sizeof(int) * (num_history + 1)); 
 
-  buffer<int, 1> d_result_lengths (num_history);
+  int *d_result_lengths = sycl::malloc_device<int>(num_history, q);
 
-  buffer<double, 1> d_history (history, total_length);
+  double *d_history = sycl::malloc_device<double>(total_length, q);
+  q.memcpy(d_history, history, sizeof(double) * total_length);
 
-  buffer<double, 1> d_extrema (total_length);
+  double *d_extrema = sycl::malloc_device<double>(total_length, q);
 
-  buffer<double3, 1> d_results (total_length);
+  double3 *d_results = sycl::malloc_device<double3>(total_length, q);
 
-  buffer<int, 1> d_points (total_length);
-  
-  range<1> lws (256);
-  range<1> gws ((num_history / 256 + 1) * 256);
+  int *d_points = sycl::malloc_device<int>(total_length, q);
+
+  sycl::range<1> lws (256);
+  sycl::range<1> gws ((num_history / 256 + 1) * 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      auto h_lens = d_history_lengths.get_access<sycl_read>(cgh);
-      auto h = d_history.get_access<sycl_read>(cgh);
-      auto e = d_extrema.get_access<sycl_read_write>(cgh);
-      auto p = d_points.get_access<sycl_read_write>(cgh);
-      auto r = d_results.get_access<sycl_write>(cgh);
-      auto r_lens = d_result_lengths.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class rainflow>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class rainflow>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         rainflow_count (
           item,
-          h.get_pointer(), 
-          h_lens.get_pointer(),
-          e.get_pointer(),
-          p.get_pointer(),
-          r.get_pointer(),
-          r_lens.get_pointer(),
+          d_history,
+          d_history_lengths,
+          d_extrema,
+          d_points,
+          d_results,
+          d_result_lengths,
           num_history);
       });
     });
@@ -241,13 +241,10 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_result_lengths.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result_lengths);
-  }).wait();
-  
+  q.memcpy(result_lengths, d_result_lengths, num_history * sizeof(int)).wait();
+
   reference (
-    history, 
+    history,
     history_lengths,
     extrema,
     points,
@@ -259,6 +256,12 @@ int main(int argc, char* argv[]) {
   int error = memcmp(ref_result_lengths, result_lengths, num_history * sizeof(int));
   printf("%s\n", error ? "FAIL" : "PASS");
 
+  sycl::free(d_history, q);
+  sycl::free(d_history_lengths, q);
+  sycl::free(d_extrema, q);
+  sycl::free(d_points, q);
+  sycl::free(d_results, q);
+  sycl::free(d_result_lengths, q);
   free(history);
   free(history_lengths);
   free(extrema);
@@ -266,4 +269,6 @@ int main(int argc, char* argv[]) {
   free(results);
   free(result_lengths);
   free(ref_result_lengths);
+
+  return 0;
 }
