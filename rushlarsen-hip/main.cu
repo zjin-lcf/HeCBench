@@ -65,6 +65,7 @@ int main(int argc, char *argv[])
 
   t = t_start;
 
+  hipDeviceSynchronize();
   clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
 
   for (int it = 0; it < num_timesteps; it++) {
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
   clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_now);
   time_elapsed = timestamp_now.tv_sec - timestamp_start.tv_sec + 1E-9 * (timestamp_now.tv_nsec - timestamp_start.tv_nsec);
   printf("Device: computed %d time steps in %g s. Time steps per second: %g\n\n",
-      num_timesteps, time_elapsed, num_timesteps/time_elapsed);
+         num_timesteps, time_elapsed, num_timesteps/time_elapsed);
 
   hipMemcpy(states2, d_states, states_size, hipMemcpyDeviceToHost);
 

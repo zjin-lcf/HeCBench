@@ -65,6 +65,7 @@ int main(int argc, char *argv[])
 
   t = t_start;
 
+  cudaDeviceSynchronize();
   clock_gettime(CLOCK_MONOTONIC_RAW, &timestamp_start);
 
   for (int it = 0; it < num_timesteps; it++) {
