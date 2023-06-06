@@ -1,5 +1,4 @@
 #include "rsbench.h"
-using namespace sycl;
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
@@ -16,107 +15,126 @@ using namespace sycl;
 void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vhash_result, double * kernel_init_time )
 {
   printf("Beginning event based simulation...\n");
-  
+
   // Let's create an extra verification array to reduce manually later on
   printf("Allocating an additional %.1lf MB of memory for verification arrays...\n", in.lookups * sizeof(int) /1024.0/1024.0);
   int * verification_host = (int *) malloc(in.lookups * sizeof(int));
-  
+
   // Scope here is important, as when we exit this blocl we will automatically sync with device
   // to ensure all work is done and that we can read from verification_host array.
-  {
-    // create a queue using the default device for the platform (cpu, gpu)
-    queue sycl_q{default_selector()};
+  // create a queue using the default device for the platform (cpu, gpu)
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
-    printf("Running on: %s\n", sycl_q.get_device().get_info<cl::sycl::info::device::name>().c_str());
-    printf("Initializing device buffers and JIT compiling kernel...\n");
-  
+  printf("Running on: %s\n", q.get_device().get_info<sycl::info::device::name>().c_str());
+  printf("Initializing device buffers and JIT compiling kernel...\n");
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Create Device Buffers
+  ////////////////////////////////////////////////////////////////////////////////
+
+  int *num_nucs_d = sycl::malloc_device<int>(SD.length_num_nucs, q);
+  q.memcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs);
+
+  double *concs_d = sycl::malloc_device<double>(SD.length_concs, q);
+  q.memcpy(concs_d, SD.concs, sizeof(double) * SD.length_concs);
+
+  int *mats_d = sycl::malloc_device<int>(SD.length_mats, q);
+  q.memcpy(mats_d, SD.mats, sizeof(int) * SD.length_mats);
+
+  int *n_windows_d = sycl::malloc_device<int>(SD.length_n_windows, q);
+  q.memcpy(n_windows_d, SD.n_windows, sizeof(int) * SD.length_n_windows);
+
+  Pole *poles_d = sycl::malloc_device<Pole>(SD.length_poles, q);
+  q.memcpy(poles_d, SD.poles, sizeof(Pole) * SD.length_poles);
+
+  Window *windows_d = sycl::malloc_device<Window>(SD.length_windows, q);
+  q.memcpy(windows_d, SD.windows, sizeof(Window) * SD.length_windows);
+
+  double *pseudo_K0RS_d = sycl::malloc_device<double>(SD.length_pseudo_K0RS, q);
+  q.memcpy(pseudo_K0RS_d, SD.pseudo_K0RS, sizeof(double) * SD.length_pseudo_K0RS);
+
+  int *verification_d = sycl::malloc_device<int>(in.lookups, q);
+  q.memcpy(verification_d, verification_host, sizeof(int) * in.lookups);
+
+  q.wait();
+  ////////////////////////////////////////////////////////////////////////////////
+  // Define Device Kernel
+  ////////////////////////////////////////////////////////////////////////////////
+  // Timers
+  double start = get_time();
+
+  // queue a kernel to be run, as a lambda
+  q.submit([&](sycl::handler &cgh) {
     ////////////////////////////////////////////////////////////////////////////////
-    // Create Device Buffers
+    // XS Lookup Simulation Loop
     ////////////////////////////////////////////////////////////////////////////////
+    cgh.parallel_for<class kernel>(
+      sycl::nd_range<1>(sycl::range<1>((in.lookups+255)/256*256),
+                        sycl::range<1>(256)), [=](sycl::nd_item<1> idx)
+    {
+      // get the index to operate on, first dimemsion
+      size_t i = idx.get_global_id(0);
 
-    // assign SYCL buffer to existing memory
-    buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
-    buffer<double, 1> concs_d(SD.concs, SD.length_concs);
-    buffer<int, 1> mats_d(SD.mats, SD.length_mats);
-    buffer<int, 1> n_windows_d(SD.n_windows, SD.length_n_windows);
-    buffer<Pole, 1> poles_d(SD.poles, SD.length_poles);
-    buffer<Window, 1> windows_d(SD.windows, SD.length_windows);
-    buffer<double, 1> pseudo_K0RS_d(SD.pseudo_K0RS, SD.length_pseudo_K0RS);
-    buffer<int, 1> verification_d(verification_host, in.lookups);
-    
-    ////////////////////////////////////////////////////////////////////////////////
-    // Define Device Kernel
-    ////////////////////////////////////////////////////////////////////////////////
-    // Timers
-    double start = get_time();
+      if (i < in.lookups) {
 
-    // queue a kernel to be run, as a lambda
-    sycl_q.submit([&](handler &cgh) {
-      ////////////////////////////////////////////////////////////////////////////////
-      // Create Device Accessors for Device Buffers
-      ////////////////////////////////////////////////////////////////////////////////
-      auto num_nucs = num_nucs_d.get_access<access::mode::read>(cgh);
-      auto concs = concs_d.get_access<access::mode::read>(cgh);
-      auto mats = mats_d.get_access<access::mode::read>(cgh);
-      auto verification = verification_d.get_access<access::mode::write>(cgh);
-      auto n_windows = n_windows_d.get_access<access::mode::read>(cgh);
-      auto poles = poles_d.get_access<access::mode::read>(cgh);
-      auto windows = windows_d.get_access<access::mode::read>(cgh);
-      auto pseudo_K0RS = pseudo_K0RS_d.get_access<access::mode::read>(cgh);
+        // Set the initial seed value
+        uint64_t seed = STARTING_SEED;
 
-      ////////////////////////////////////////////////////////////////////////////////
-      // XS Lookup Simulation Loop
-      ////////////////////////////////////////////////////////////////////////////////
-      //cgh.parallel_for<kernel>(range<1>(in.lookups), [=](id<1> idx)
-      cgh.parallel_for<kernel>(nd_range<1>(range<1>((in.lookups+255)/256*256), range<1>(256)), [=](nd_item<1> idx)
-      {
-        // get the index to operate on, first dimemsion
-        size_t i = idx.get_global_id(0);
+        // Forward seed to lookup index (we need 2 samples per lookup)
+        seed = fast_forward_LCG(seed, 2*i);
 
-        if (i < in.lookups) {
+        // Randomly pick an energy and material for the particle
+        double p_energy = LCG_random_double(&seed);
+        int mat         = pick_mat(&seed);
 
-          // Set the initial seed value
-          uint64_t seed = STARTING_SEED;  
+        // debugging
+        //printf("E = %lf mat = %d\n", p_energy, mat);
 
-          // Forward seed to lookup index (we need 2 samples per lookup)
-          seed = fast_forward_LCG(seed, 2*i);
+        double macro_xs_vector[4] = {0};
 
-          // Randomly pick an energy and material for the particle
-          double p_energy = LCG_random_double(&seed);
-          int mat         = pick_mat(&seed); 
+        // Perform macroscopic Cross Section Lookup
+        calculate_macro_xs(macro_xs_vector, mat, p_energy, in, num_nucs_d, mats_d,
+                           SD.max_num_nucs, concs_d, n_windows_d, pseudo_K0RS_d,
+                           windows_d, poles_d, SD.max_num_windows, SD.max_num_poles);
 
-          // debugging
-          //printf("E = %lf mat = %d\n", p_energy, mat);
-
-          double macro_xs_vector[4] = {0};
-
-          // Perform macroscopic Cross Section Lookup
-          calculate_macro_xs( macro_xs_vector, mat, p_energy, in, num_nucs, mats, SD.max_num_nucs, concs, n_windows, pseudo_K0RS, windows, poles, SD.max_num_windows, SD.max_num_poles );
-
-          // For verification, and to prevent the compiler from optimizing
-          // all work out, we interrogate the returned macro_xs_vector array
-          // to find its maximum value index, then increment the verification
-          // value by that index. In this implementation, we store to a global
-          // array that will get tranferred back and reduced on the host.
-          double max = -DBL_MAX;
-          int max_idx = 0;
-          for(int j = 0; j < 4; j++ )
+        // For verification, and to prevent the compiler from optimizing
+        // all work out, we interrogate the returned macro_xs_vector array
+        // to find its maximum value index, then increment the verification
+        // value by that index. In this implementation, we store to a global
+        // array that will get tranferred back and reduced on the host.
+        double max = -DBL_MAX;
+        int max_idx = 0;
+        for(int j = 0; j < 4; j++ )
+        {
+          if( macro_xs_vector[j] > max )
           {
-            if( macro_xs_vector[j] > max )
-            {
-              max = macro_xs_vector[j];
-              max_idx = j;
-            }
+            max = macro_xs_vector[j];
+            max_idx = j;
           }
-          verification[i] = max_idx+1;
         }
-      });
-    }).wait();
+        verification_d[i] = max_idx+1;
+      }
+    });
+  }).wait();
 
-    double stop = get_time();
-    *kernel_init_time = stop-start;
-    printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
-  }
+  double stop = get_time();
+  *kernel_init_time = stop-start;
+  printf("Kernel initialization, compilation, and execution took %.2lf seconds.\n", stop-start);
+  
+  q.memcpy(verification_host, verification_d, sizeof(int) * in.lookups).wait();
+
+  sycl::free(verification_d, q);
+  sycl::free(mats_d, q);
+  sycl::free(num_nucs_d, q);
+  sycl::free(concs_d, q);
+  sycl::free(n_windows_d, q);
+  sycl::free(windows_d, q);
+  sycl::free(poles_d, q);
+  sycl::free(pseudo_K0RS_d, q);
 
   // Host reduces the verification array
   unsigned long long verification_scalar = 0;
@@ -127,7 +145,7 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
 }
 
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
-void calculate_macro_xs( double * macro_xs, int mat, double E, Input input, INT_T num_nucs, INT_T mats, int max_num_nucs, DOUBLE_T concs, INT_T n_windows, DOUBLE_T pseudo_K0Rs, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles ) 
+void calculate_macro_xs( double * macro_xs, int mat, double E, Input input, INT_T num_nucs, INT_T mats, int max_num_nucs, DOUBLE_T concs, INT_T n_windows, DOUBLE_T pseudo_K0Rs, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles )
 {
   // zero out macro vector
   for( int i = 0; i < 4; i++ )
@@ -195,7 +213,7 @@ void calculate_micro_xs( double * micro_xs, int nuc, double E, Input input, INT_
     RSComplex CDUM;
     Pole pole = poles[nuc * max_num_poles + i];
     RSComplex t1 = {0, 1};
-    RSComplex t2 = {cl::sycl::sqrt(E), 0 };
+    RSComplex t2 = {sycl::sqrt(E), 0 };
     PSIIKI = c_div( t1 , c_sub(pole.MP_EA,t2) );
     RSComplex E_c = {E, 0};
     CDUM = c_div(PSIIKI, E_c);
@@ -216,6 +234,7 @@ void calculate_micro_xs( double * micro_xs, int nuc, double E, Input input, INT_
 // (This involves using the Complex Faddeeva function to
 // Doppler broaden the poles within the window)
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
+inline
 void calculate_micro_xs_doppler( double * micro_xs, int nuc, double E, Input input, INT_T n_windows, DOUBLE_T pseudo_K0RS, WINDOW_T windows, POLE_T poles, int max_num_windows, int max_num_poles )
 {
   // MicroScopic XS's to Calculate
@@ -273,7 +292,7 @@ void calculate_micro_xs_doppler( double * micro_xs, int nuc, double E, Input inp
 int pick_mat( uint64_t * seed )
 {
   // I have a nice spreadsheet supporting these numbers. They are
-  // the fractions (by volume) of material in the core. Not a 
+  // the fractions (by volume) of material in the core. Not a
   // *perfect* approximation of where XS lookups are going to occur,
   // but this will do a good job of biasing the system nonetheless.
 
@@ -313,19 +332,19 @@ void calculate_sig_T( int nuc, double E, Input input, DOUBLE_T pseudo_K0RS, RSCo
 
   for( int i = 0; i < 4; i++ )
   {
-    phi = pseudo_K0RS[nuc * input.numL + i] * cl::sycl::sqrt(E);
+    phi = pseudo_K0RS[nuc * input.numL + i] * sycl::sqrt(E);
 
     if( i == 1 )
-      phi -= - cl::sycl::atan( phi );
+      phi -= - sycl::atan( phi );
     else if( i == 2 )
-      phi -= cl::sycl::atan( 3.0 * phi / (3.0 - phi*phi));
+      phi -= sycl::atan( 3.0 * phi / (3.0 - phi*phi));
     else if( i == 3 )
-      phi -= cl::sycl::atan(phi*(15.0-phi*phi)/(15.0-6.0*phi*phi));
+      phi -= sycl::atan(phi*(15.0-phi*phi)/(15.0-6.0*phi*phi));
 
     phi *= 2.0;
 
-    sigTfactors[i].r = cl::sycl::cos(phi);
-    sigTfactors[i].i = -cl::sycl::sin(phi);
+    sigTfactors[i].r = sycl::cos(phi);
+    sigTfactors[i].i = -sycl::sin(phi);
   }
 }
 
@@ -334,7 +353,7 @@ void calculate_sig_T( int nuc, double E, Input input, DOUBLE_T pseudo_K0RS, RSCo
 // Only expected to use Abrarov ~0.5% of the time.
 RSComplex fast_nuclear_W( RSComplex Z )
 {
-  // Abrarov 
+  // Abrarov
   if( c_abs(Z) < 6.0 )
   {
     // Precomputed parts for speeding things up
@@ -422,7 +441,7 @@ double LCG_random_double(uint64_t * seed)
   const uint64_t c = 1ULL;
   *seed = (a * (*seed) + c) % m;
   return (double) (*seed) / (double) m;
-}  
+}
 
 uint64_t LCG_random_int(uint64_t * seed)
 {
@@ -431,7 +450,7 @@ uint64_t LCG_random_int(uint64_t * seed)
   const uint64_t c = 1ULL;
   *seed = (a * (*seed) + c) % m;
   return *seed;
-}  
+}
 
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
@@ -444,7 +463,7 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
   uint64_t a_new = 1;
   uint64_t c_new = 0;
 
-  while(n > 0) 
+  while(n > 0)
   {
     if(n & 1)
     {
@@ -505,7 +524,7 @@ RSComplex c_div( RSComplex A, RSComplex B)
 
 double c_abs( RSComplex A)
 {
-  return cl::sycl::sqrt(A.r*A.r + A.i * A.i);
+  return sycl::sqrt(A.r*A.r + A.i * A.i);
 }
 
 
@@ -536,10 +555,10 @@ RSComplex fast_cexp( RSComplex z )
   // will use our own exponetial implementation
   //double t1 = exp(x);
   double t1 = fast_exp(x);
-  double t2 = cl::sycl::cos(y);
-  double t3 = cl::sycl::sin(y);
+  double t2 = sycl::cos(y);
+  double t3 = sycl::sin(y);
   RSComplex t4 = {t2, t3};
   RSComplex t5 = {t1, 0};
   RSComplex result = c_mul(t5, (t4));
   return result;
-}  
+}
