@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
   float* image_cpu = (float*)malloc(ArraySize * sizeof(float));
 
   float a[5];
-  double pts, t0, t1, k0, k1, dt, flops, pt_rate, flop_rate, speedup, memory;
+  double pts, t0, t1, dt, flops, pt_rate, flop_rate, speedup, memory;
 
   memory = ArraySize*sizeof(float)*6;
   pts = (double)repeat*(nx-8)*(ny-8)*(nz-8);
@@ -167,7 +167,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  t0 = mysecond();
   //allocate and copy matrix to device
   float* vsq_d;
   float* next_s_d;
@@ -201,21 +200,21 @@ int main(int argc, char *argv[]) {
   dim3 grids (nx_pad, ny_pad, nz_pad);
   dim3 blocks (groupSize, groupSize, 1);
 
-  k0 = mysecond();
+  hipDeviceSynchronize();
+  t0 = mysecond();
 
   // Launch the kernel repeatedly
   for (int t = 0; t < repeat; t++) {
-    hipLaunchKernelGGL(rtm8, grids, blocks, 0, 0, vsq_d, current_s_d, next_s_d, current_r_d,
+    rtm8 <<<grids, blocks>>> (vsq_d, current_s_d, next_s_d, current_r_d,
                               next_r_d, image_d, a_d, ArraySize);
   }
 
   hipDeviceSynchronize();
-  k1 = mysecond();
+  t1 = mysecond();
+  dt = t1 - t0;
 
   //copy back image value
   hipMemcpy(image_gpu, image_d, ArraySize * sizeof(float), hipMemcpyDeviceToHost);
-  t1 = mysecond();
-  dt = t1 - t0;
 
   // CPU execution
   t0 = mysecond();
@@ -242,7 +241,7 @@ int main(int argc, char *argv[]) {
   printf("pt_rate (millions/sec) = %lf\n", pt_rate/1e6);
   printf("flop_rate (Gflops) = %lf\n", flop_rate/1e9);
   printf("speedup over cpu = %lf\n", speedup);
-  printf("average kernel execution time = %lf (s)\n", (k1 - k0) / repeat);
+  printf("average kernel execution time = %lf (s)\n", dt / repeat);
 
   //release arrays
   free(vsq);
