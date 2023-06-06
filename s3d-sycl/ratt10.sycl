@@ -1,5 +1,5 @@
 
-    const real TEMP = T[item.get_global_id(0)]*tconv;
+    const real TEMP = d_t[item.get_global_id(0)]*tconv;
     const real ALOGT = LOG(TEMP);
 
     RKLOW(1) = EXP((real)4.22794408e1  -(real)9.e-1*ALOGT   + DIV((real)8.55468335e2,TEMP));

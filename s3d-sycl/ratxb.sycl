@@ -1,4 +1,4 @@
-    const real TEMP = T[item.get_global_id(0)]*tconv;
+    const real TEMP = d_t[item.get_global_id(0)]*tconv;
     //const real ALOGT = LOG((TEMP));
     real CTOT = (real)0.0;
     real PR, PCOR, PRLOG, FCENT, FCLOG, XN;

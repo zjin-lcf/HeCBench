@@ -1,5 +1,5 @@
 
-    const real TEMP = T[item.get_global_id(0)]*tconv;
+    const real TEMP = d_t[item.get_global_id(0)]*tconv;
     const real TLOG = LOG((TEMP));
     const real TI = (real)1.0e0/(TEMP);
 

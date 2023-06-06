@@ -1,5 +1,5 @@
 
-    const real TEMP = T[item.get_global_id(0)]*tconv;
+    const real TEMP = d_t[item.get_global_id(0)]*tconv;
     //real ALOGT = LOG(TEMP);
 
     const real SMALL_INV = (real)1e37;

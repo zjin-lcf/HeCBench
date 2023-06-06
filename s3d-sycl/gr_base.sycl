@@ -1,6 +1,6 @@
     int gid = item.get_global_id(0);
-    const real TEMP = T[gid]*tconv;
-    const real PRES = P[gid]*pconv;
+    const real TEMP = d_t[gid]*tconv;
+    const real PRES = d_p[gid]*pconv;
     const real SMALL = FLT_MIN;
 
     real SUM, ctmp;

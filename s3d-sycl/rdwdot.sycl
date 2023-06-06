@@ -20,4 +20,4 @@
             -ROP2(156) -ROP2(157) +ROP2(165) +ROP2(167)
             -ROP2(170) -ROP2(171) +ROP2(173) -ROP2(180)
             -ROP2(185) -ROP2(186) -ROP2(190) -ROP2(191)
-            -ROP2(192) +ROP2(193) -ROP2(199) -ROP2(200))*rateconv *molwt[1];
+            -ROP2(192) +ROP2(193) -ROP2(199) -ROP2(200))*rateconv *d_molwt[1];
