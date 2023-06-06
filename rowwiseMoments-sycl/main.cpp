@@ -21,7 +21,7 @@ void RowwiseMomentsKernel(
 
   sycl::multi_ptr<typename std::aligned_storage<
                   sizeof(WelfordType), alignof(WelfordType)>::type[WARP_SIZE],
-                  sycl::access::address_space::local_space> 
+                  sycl::access::address_space::local_space>
     localPtr = sycl::ext::oneapi::group_local_memory_for_overwrite<
         typename std::aligned_storage<sizeof(WelfordType), alignof(WelfordType)>::type[WARP_SIZE]>(item.get_group());
   WelfordType* val_shared_ptr = reinterpret_cast<WelfordType*>(*localPtr);
@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
 
   double eps = 1e-6;
 
-  size_t input_size = (size_t)N * C * W * H; 
+  size_t input_size = (size_t)N * C * W * H;
   size_t input_size_bytes = input_size * sizeof(float);
 
   size_t output_size = N * G;
@@ -81,11 +81,10 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   float *d_X;
   d_X = (float *)sycl::malloc_device(input_size_bytes, q);
