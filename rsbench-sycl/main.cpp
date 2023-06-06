@@ -44,16 +44,16 @@ int main(int argc, char * argv[])
 
 	unsigned long vhash = 0;
 
+	double kernel_time = 0;
+
 	// Run Simulation
 	start = get_time();
-
-	double kernel_init_time;
 
 	// Run simulation
 	if( input.simulation_method == EVENT_BASED )
 	{
 		if( input.kernel_id == 0 )
-			run_event_based_simulation(input, SD, &vhash, &kernel_init_time );
+			run_event_based_simulation(input, SD, &vhash, &kernel_time );
 		else
 		{
 			printf("Error: No kernel ID %d found!\n", input.kernel_id);
@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
 	center_print("RESULTS", 79);
 	border_print();
 
-	int is_invalid = validate_and_print_results(input, stop-start, vhash, kernel_init_time);
+	int is_invalid = validate_and_print_results(input, stop-start, vhash, kernel_time);
 
 	border_print();
 

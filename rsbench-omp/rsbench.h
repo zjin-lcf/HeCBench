@@ -90,7 +90,7 @@ void fancy_int( int a );
 Input read_CLI( int argc, char * argv[] );
 void print_CLI_error(void);
 void print_input_summary(Input input);
-int validate_and_print_results(Input input, double runtime, unsigned long vhash);
+int validate_and_print_results(Input input, double runtime, unsigned long vhash, double kernel_time);
 
 // init.c
 SimulationData initialize_simulation( Input input );
@@ -118,7 +118,7 @@ void calculate_micro_xs( double * micro_xs, int nuc, double E, Input input, int 
 void calculate_micro_xs_doppler( double * micro_xs, int nuc, double E, Input input, int * n_windows, double * pseudo_K0RS, Window * windows, Pole * poles, int max_num_windows, int max_num_poles );
 
 // simulation.c
-void run_event_based_simulation(Input input, SimulationData data, unsigned long * vhash_result );
+void run_event_based_simulation(Input input, SimulationData data, unsigned long * vhash_result, double * kernel_init_time );
 void run_history_based_simulation(Input input, SimulationData data, unsigned long * vhash_result );
 double LCG_random_double(uint64_t * seed);
 uint64_t LCG_random_int(uint64_t * seed);

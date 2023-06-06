@@ -77,7 +77,7 @@ __global__ void lookup (
 }
 
 
-void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vhash_result, double * kernel_init_time )
+void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vhash_result, double * kernel_time )
 {
   printf("Beginning event based simulation...\n");
 
@@ -162,7 +162,7 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
 
   hipDeviceSynchronize();
   double stop = get_time();
-  printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
+  printf("Kernel initialization, compilation, and execution took %.2lf seconds.\n", stop-start);
 
   hipMemcpy(verification_host, verification_d, sizeof(int) * in.lookups, hipMemcpyDeviceToHost);
 
@@ -181,7 +181,7 @@ void run_event_based_simulation(Input in, SimulationData SD, unsigned long * vha
     verification_scalar += verification_host[i];
 
   *vhash_result = verification_scalar;
-  *kernel_init_time = stop-start;
+  *kernel_time = stop-start;
 }
 
 template <class INT_T, class DOUBLE_T, class WINDOW_T, class POLE_T >
