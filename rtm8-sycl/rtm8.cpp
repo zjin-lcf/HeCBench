@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define nx 680
 #define ny 134
@@ -82,9 +82,9 @@ int main(int argc, char *argv[]) {
   float* image_cpu = (float*)malloc(ArraySize * sizeof(float));
 
   float a[5];
-  double pts, t0, t1, k0, k1, dt, flops, pt_rate, flop_rate, speedup, memory;
+  double pts, t0, t1, dt, flops, pt_rate, flop_rate, speedup, memory;
 
-  memory = ArraySize*sizeof(float)*6; 
+  memory = ArraySize*sizeof(float)*6;
   pts = (double)repeat*(nx-8)*(ny-8)*(nz-8);
   flops = 67*pts;
   printf("memory (MB) = %lf\n", memory/1e6);
@@ -111,106 +111,93 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
-
-  t0 = mysecond();
 
   //allocate and copy matrix to device
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float, 1> vsq_d (vsq, ArraySize, props);
-  buffer<float, 1> next_s_d (next_s, ArraySize, props);
-  buffer<float, 1> next_r_d (next_r, ArraySize, props);
-  buffer<float, 1> current_s_d (current_s, ArraySize, props);
-  buffer<float, 1> current_r_d (current_r, ArraySize, props);
-  buffer<float, 1> image_d (image_gpu, ArraySize, props);
-  buffer<float, 1> a_d (a, 5, props);
-  next_s_d.set_final_data( nullptr );
-  next_r_d.set_final_data( nullptr );
-  image_d.set_final_data( nullptr );
+  float *vsq_d = sycl::malloc_device<float>(ArraySize, q);
+  float *next_s_d = sycl::malloc_device<float>(ArraySize, q);
+  float *next_r_d = sycl::malloc_device<float>(ArraySize, q);
+  float *current_s_d = sycl::malloc_device<float>(ArraySize, q);
+  float *current_r_d = sycl::malloc_device<float>(ArraySize, q);
+  float *image_d = sycl::malloc_device<float>(ArraySize, q);
+  float *a_d = sycl::malloc_device<float>(5, q);
+
+  q.memcpy(vsq_d, vsq, ArraySize * sizeof(float));
+  q.memcpy(next_s_d, next_s, ArraySize * sizeof(float));
+  q.memcpy(current_s_d, current_s, ArraySize * sizeof(float));
+  q.memcpy(next_r_d, next_r, ArraySize * sizeof(float));
+  q.memcpy(current_r_d, current_r, ArraySize * sizeof(float));
+  q.memcpy(image_d, image_gpu, ArraySize * sizeof(float));
+  q.memcpy(a_d, a, 5 * sizeof(float));
 
   int groupSize = 16;
   int nx_pad = (nx + groupSize - 1) / groupSize * groupSize;
   int ny_pad = (ny + groupSize - 1) / groupSize * groupSize;
   int nz_pad = nz;
 
-  range<3> gws (nz_pad, ny_pad, nx_pad); 
-  range<3> lws (1, groupSize, groupSize);
+  sycl::range<3> gws (nz_pad, ny_pad, nx_pad);
+  sycl::range<3> lws (1, groupSize, groupSize);
 
-  k0 = mysecond();
+  q.wait();
+  t0 = mysecond();
 
   for (int t = 0; t < repeat; t++) {
-    q.submit([&](handler& cgh) {
-      auto a = a_d.get_access<sycl_read>(cgh);
-      auto next_s = next_s_d.get_access<sycl_read_write>(cgh);
-      auto next_r = next_r_d.get_access<sycl_read_write>(cgh);
-      auto image = image_d.get_access<sycl_write>(cgh);
-      auto current_r = current_r_d.get_access<sycl_read>(cgh);
-      auto current_s = current_s_d.get_access<sycl_read>(cgh);
-      auto vsq = vsq_d.get_access<sycl_read>(cgh);
-
-      cgh.parallel_for<class kernel1>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class kernel1>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         int x = item.get_global_id(2);
         int y = item.get_global_id(1);
         int z = item.get_global_id(0);
         float div;
         if ((4 <= x && x < (nx - 4) ) && (4 <= y && y < (ny - 4)) && (4 <= z && z < (nz - 4))){
-	  div = a[0] * current_s[indexTo1D(x,y,z)] +
-	  a[1] * (current_s[indexTo1D(x+1,y,z)] + current_s[indexTo1D(x-1,y,z)] +
-	  		current_s[indexTo1D(x,y+1,z)] + current_s[indexTo1D(x,y-1,z)] +
-	  		current_s[indexTo1D(x,y,z+1)] + current_s[indexTo1D(x,y,z-1)]) +
-	  a[2] * (current_s[indexTo1D(x+2,y,z)] + current_s[indexTo1D(x-2,y,z)] +
-	  		current_s[indexTo1D(x,y+2,z)] + current_s[indexTo1D(x,y-2,z)] +
-	  		current_s[indexTo1D(x,y,z+2)] + current_s[indexTo1D(x,y,z-2)]) +
-	  a[3] * (current_s[indexTo1D(x+3,y,z)] + current_s[indexTo1D(x-3,y,z)] +
-	  		current_s[indexTo1D(x,y+3,z)] + current_s[indexTo1D(x,y-3,z)] +
-	  		current_s[indexTo1D(x,y,z+3)] + current_s[indexTo1D(x,y,z-3)]) +
-	  a[4] * (current_s[indexTo1D(x+4,y,z)] + current_s[indexTo1D(x-4,y,z)] +
-	  		current_s[indexTo1D(x,y+4,z)] + current_s[indexTo1D(x,y-4,z)] +
-	  		current_s[indexTo1D(x,y,z+4)] + current_s[indexTo1D(x,y,z-4)]);
-
-	  next_s[indexTo1D(x,y,z)] = 2*current_s[indexTo1D(x,y,z)] - next_s[indexTo1D(x,y,z)]
-	  	+ vsq[indexTo1D(x,y,z)]*div;
-	  div = a[0] * current_r[indexTo1D(x,y,z)] +
-	  	a[1] * (current_r[indexTo1D(x+1,y,z)] + current_r[indexTo1D(x-1,y,z)] +
-	  			current_r[indexTo1D(x,y+1,z)] + current_r[indexTo1D(x,y-1,z)] +
-	  			current_r[indexTo1D(x,y,z+1)] + current_r[indexTo1D(x,y,z-1)]) +
-	  	a[2] * (current_r[indexTo1D(x+2,y,z)] + current_r[indexTo1D(x-2,y,z)] +
-	  			current_r[indexTo1D(x,y+2,z)] + current_r[indexTo1D(x,y-2,z)] +
-	  			current_r[indexTo1D(x,y,z+2)] + current_r[indexTo1D(x,y,z-2)]) +
-	  	a[3] * (current_r[indexTo1D(x+3,y,z)] + current_r[indexTo1D(x-3,y,z)] +
-	  			current_r[indexTo1D(x,y+3,z)] + current_r[indexTo1D(x,y-3,z)] +
-	  			current_r[indexTo1D(x,y,z+3)] + current_r[indexTo1D(x,y,z-3)]) +
-	  	a[4] * (current_r[indexTo1D(x+4,y,z)] + current_r[indexTo1D(x-4,y,z)] +
-	  			current_r[indexTo1D(x,y+4,z)] + current_r[indexTo1D(x,y-4,z)] +
-	  			current_r[indexTo1D(x,y,z+4)] + current_r[indexTo1D(x,y,z-4)]);
-
-	  next_r[indexTo1D(x,y,z)] = 2 * current_r[indexTo1D(x,y,z)]
-	  	- next_r[indexTo1D(x,y,z)] + vsq[indexTo1D(x,y,z)] * div;
-
-	  image[indexTo1D(x,y,z)] = next_s[indexTo1D(x,y,z)] * next_r[indexTo1D(x,y,z)];
+          div = a[0] * current_s_d[indexTo1D(x,y,z)] +
+                a[1] * (current_s_d[indexTo1D(x+1,y,z)] + current_s_d[indexTo1D(x-1,y,z)] +
+                  current_s_d[indexTo1D(x,y+1,z)] + current_s_d[indexTo1D(x,y-1,z)] +
+                  current_s_d[indexTo1D(x,y,z+1)] + current_s_d[indexTo1D(x,y,z-1)]) +
+                a[2] * (current_s_d[indexTo1D(x+2,y,z)] + current_s_d[indexTo1D(x-2,y,z)] +
+                  current_s_d[indexTo1D(x,y+2,z)] + current_s_d[indexTo1D(x,y-2,z)] +
+                  current_s_d[indexTo1D(x,y,z+2)] + current_s_d[indexTo1D(x,y,z-2)]) +
+                a[3] * (current_s_d[indexTo1D(x+3,y,z)] + current_s_d[indexTo1D(x-3,y,z)] +
+                  current_s_d[indexTo1D(x,y+3,z)] + current_s_d[indexTo1D(x,y-3,z)] +
+                  current_s_d[indexTo1D(x,y,z+3)] + current_s_d[indexTo1D(x,y,z-3)]) +
+                a[4] * (current_s_d[indexTo1D(x+4,y,z)] + current_s_d[indexTo1D(x-4,y,z)] +
+                  current_s_d[indexTo1D(x,y+4,z)] + current_s_d[indexTo1D(x,y-4,z)] +
+                  current_s_d[indexTo1D(x,y,z+4)] + current_s_d[indexTo1D(x,y,z-4)]);
+          
+          next_s_d[indexTo1D(x,y,z)] = 2*current_s_d[indexTo1D(x,y,z)] - next_s_d[indexTo1D(x,y,z)]
+                                       + vsq_d[indexTo1D(x,y,z)]*div;
+          div = a[0] * current_r_d[indexTo1D(x,y,z)] +
+                a[1] * (current_r_d[indexTo1D(x+1,y,z)] + current_r_d[indexTo1D(x-1,y,z)] +
+                    current_r_d[indexTo1D(x,y+1,z)] + current_r_d[indexTo1D(x,y-1,z)] +
+                    current_r_d[indexTo1D(x,y,z+1)] + current_r_d[indexTo1D(x,y,z-1)]) +
+                a[2] * (current_r_d[indexTo1D(x+2,y,z)] + current_r_d[indexTo1D(x-2,y,z)] +
+                    current_r_d[indexTo1D(x,y+2,z)] + current_r_d[indexTo1D(x,y-2,z)] +
+                    current_r_d[indexTo1D(x,y,z+2)] + current_r_d[indexTo1D(x,y,z-2)]) +
+                a[3] * (current_r_d[indexTo1D(x+3,y,z)] + current_r_d[indexTo1D(x-3,y,z)] +
+                    current_r_d[indexTo1D(x,y+3,z)] + current_r_d[indexTo1D(x,y-3,z)] +
+                    current_r_d[indexTo1D(x,y,z+3)] + current_r_d[indexTo1D(x,y,z-3)]) +
+                a[4] * (current_r_d[indexTo1D(x+4,y,z)] + current_r_d[indexTo1D(x-4,y,z)] +
+                    current_r_d[indexTo1D(x,y+4,z)] + current_r_d[indexTo1D(x,y-4,z)] +
+                    current_r_d[indexTo1D(x,y,z+4)] + current_r_d[indexTo1D(x,y,z-4)]);
+          
+          next_r_d[indexTo1D(x,y,z)] = 2 * current_r_d[indexTo1D(x,y,z)]
+                                       - next_r_d[indexTo1D(x,y,z)] + vsq_d[indexTo1D(x,y,z)] * div;
+          
+          image_d[indexTo1D(x,y,z)] = next_s_d[indexTo1D(x,y,z)] * next_r_d[indexTo1D(x,y,z)];
         }
       });
     });
   }
 
   q.wait();
-  k1 = mysecond();
-
-  q.submit([&](handler& cgh) {
-    auto image_acc = image_d.get_access<sycl_read>(cgh);
-    cgh.copy(image_acc, image_gpu);
-  }).wait();
-
   t1 = mysecond();
   dt = t1 - t0;
 
-  }
+  q.memcpy(image_gpu, image_d, ArraySize * sizeof(float)).wait();
 
   t0 = mysecond();
   for (int t = 0; t < repeat; t++) {
@@ -236,7 +223,7 @@ int main(int argc, char *argv[]) {
   printf("pt_rate (millions/sec) = %lf\n", pt_rate/1e6);
   printf("flop_rate (Gflops) = %lf\n", flop_rate/1e9);
   printf("speedup over cpu = %lf\n", speedup);
-  printf("average kernel execution time = %lf (s)\n", (k1 - k0) / repeat);
+  printf("average kernel execution time = %lf (s)\n", dt / repeat);
 
   //release arrays
   free(vsq);
@@ -246,6 +233,13 @@ int main(int argc, char *argv[]) {
   free(current_r);
   free(image_cpu);
   free(image_gpu);
+  sycl::free(vsq_d, q);
+  sycl::free(next_s_d, q);
+  sycl::free(current_s_d, q);
+  sycl::free(next_r_d, q);
+  sycl::free(current_r_d, q);
+  sycl::free(image_d, q);
+  sycl::free(a_d, q);
 
   return 0;
 }
