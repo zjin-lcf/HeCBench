@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
   const int n = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
 
-  size_t input_size = b * n * 3;
+  int input_size = b * n * 3;
   size_t input_size_bytes = input_size * sizeof(int);
 
   size_t output_size = b * n * 8;
