@@ -52,7 +52,7 @@ Each benchmark falls into a single category. While such classification is not ac
     mt, permutate, qrg, rng-wallace, sobol, urng
 
 ### Search
-    bfs, bsearch, b+tree, grep, keogh, ss, tsp
+    bfs, bsearch, b+tree, grep, keogh, s8n, ss, tsp
 
 ### Signal processing
     extrema, fft, lombscargle, sosfil, zmddft
@@ -1127,6 +1127,9 @@ Early results are shown [here](results/README.md)
 
 ### s3d (opencl)
   Chemical rates computation used in the simulation of combustion (https://github.com/vetter/shoc/)
+
+### s8n (cuda)
+  Stacked 8-neighborhood search finds nearest neighbors in each of the eight octants partitioned by ordering of three coordinates (https://github.com/MVIG-SJTU/pointSIFT/tree/master)
 
 ### sad (cuda)
   Naive template matching with SAD (https://github.com/gholomia/CTMC)
