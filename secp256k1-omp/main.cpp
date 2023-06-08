@@ -1226,10 +1226,11 @@ int main(int argc, char **argv) {
     printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
 
-  char result[64];
+  char result[65];
   for (int i = 0; i < 32; ++i) {
    sprintf(result+2*i, "%02x", output[i]);
   }
+  result[64] = '\0';
   printf("result = %s\n", result);
 
   if (0 == strcmp(result, "bbde464b6355ee6de6deba5ae860f8a66524937eee81dde224a0214efd795d09"))
