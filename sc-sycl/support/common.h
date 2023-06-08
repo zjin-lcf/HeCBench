@@ -49,7 +49,7 @@
 template<sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline int atomicAdd(int& val, const int delta)
 {
-  sycl::ext::oneapi::atomic_ref<int, sycl::memory_order::relaxed,
+  sycl::atomic_ref<int, sycl::memory_order::relaxed,
      MemoryScope, sycl::access::address_space::global_space> ref(val);
   return ref.fetch_add(delta);
 }
