@@ -24,6 +24,43 @@
 
 #define SEGBIN_NUM 13
 
+inline void atomicAdd(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::work_group,
+    sycl::access::address_space::local_space>(var);
+  atm.fetch_add(val);
+}
+
+inline void atomicMax(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::work_group,
+    sycl::access::address_space::local_space>(var);
+  atm.fetch_max(val);
+}
+
+inline int atomicAddGlobal(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  return atm.fetch_add(val);
+}
+
+inline void atomicMaxGlobal(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  atm.fetch_max(val);
+}
+
+
 template<class T>
 void warp_exclusive_sum(const T * in, T * out, const int n,
                         sycl::nd_item<3> item_ct1)
@@ -62,58 +99,32 @@ void bb_bin_histo(
         const int size = d_seg_ends[gid] - d_seg_begins[gid];
 
         if (size <= 1)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[0]))
-                .fetch_add(1);
+            atomicAdd(local_histo[0 ], 1);
         if (1  < size && size <= 2 )
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[1]))
-                .fetch_add(1);
+            atomicAdd(local_histo[1 ], 1);
         if (2  < size && size <= 4 )
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[2]))
-                .fetch_add(1);
+            atomicAdd(local_histo[2 ], 1);
         if (4  < size && size <= 8 )
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[3]))
-                .fetch_add(1);
+            atomicAdd(local_histo[3 ], 1);
         if (8  < size && size <= 16)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[4]))
-                .fetch_add(1);
+            atomicAdd(local_histo[4 ], 1);
         if (16 < size && size <= 32)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[5]))
-                .fetch_add(1);
+            atomicAdd(local_histo[5 ], 1);
         if (32 < size && size <= 64)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[6]))
-                .fetch_add(1);
+            atomicAdd(local_histo[6 ], 1);
         if (64 < size && size <= 128)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[7]))
-                .fetch_add(1);
+            atomicAdd(local_histo[7 ], 1);
         if (128 < size && size <= 256)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[8]))
-                .fetch_add(1);
+            atomicAdd(local_histo[8 ], 1);
         if (256 < size && size <= 512)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[9]))
-                .fetch_add(1);
+            atomicAdd(local_histo[9 ], 1);
         if (512 < size && size <= 1024)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[10]))
-                .fetch_add(1);
+            atomicAdd(local_histo[10], 1);
         if (1024 < size && size <= 2048)
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[11]))
-                .fetch_add(1);
+            atomicAdd(local_histo[11], 1);
         if (2048 < size) {
-            // atomicAdd(&local_histo[12], 1);
-            sycl::atomic<int, sycl::access::address_space::local_space>(
-                sycl::local_ptr<int>(&local_histo[13]))
-                .fetch_max(size);
+            // atomicAdd(local_histo[12], 1);
+            atomicMax(local_histo[13], size);
         }
     }
     item_ct1.barrier(sycl::access::fence_space::local_space);
@@ -122,11 +133,9 @@ void bb_bin_histo(
         warp_exclusive_sum(local_histo, local_histo, SEGBIN_NUM, item_ct1);
 
         if (tid < SEGBIN_NUM)
-            sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[tid]))
-                .fetch_add(local_histo[tid]);
+            atomicAddGlobal(d_bin_counter[tid], local_histo[tid]);
         if (tid == SEGBIN_NUM)
-            sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[tid]))
-                .fetch_max(local_histo[tid]);
+            atomicMaxGlobal(d_bin_counter[tid], local_histo[tid]);
     }
 }
 
@@ -145,31 +154,31 @@ void bb_bin_group(
         const int size = d_seg_ends[gid] - d_seg_begins[gid];
         int position;
         if (size <= 1)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[0])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[0 ], 1);
         else if (size <= 2)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[1])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[1 ], 1);
         else if (size <= 4)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[2])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[2 ], 1);
         else if (size <= 8)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[3])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[3 ], 1);
         else if (size <= 16)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[4])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[4 ], 1);
         else if (size <= 32)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[5])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[5 ], 1);
         else if (size <= 64)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[6])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[6 ], 1);
         else if (size <= 128)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[7])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[7 ], 1);
         else if (size <= 256)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[8])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[8 ], 1);
         else if (size <= 512)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[9])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[9 ], 1);
         else if (size <= 1024)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[10])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[10], 1);
         else if (size <= 2048)
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[11])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[11], 1);
         else
-            position = sycl::atomic<int>(sycl::global_ptr<int>(&d_bin_counter[12])).fetch_add(1);
+            position = atomicAddGlobal(d_bin_counter[12], 1);
         d_bin_segs_id[position] = gid;
     }
 }
@@ -186,8 +195,7 @@ void bb_bin(const Offset *d_seg_begins, const Offset *d_seg_ends,
     const int num_blocks = ceil((double)num_segs/(double)num_threads);
 
   stream->submit([&](sycl::handler &cgh) {
-    sycl::accessor<int, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local>
+    sycl::local_accessor<int, 1>
         local_histo_acc_ct1(sycl::range<1>(SEGBIN_NUM + 1), cgh);
 
     cgh.parallel_for(

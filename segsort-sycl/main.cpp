@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <random>
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "src/bb_segsort.dp.hpp"
 #include "src/bb_segsort_keys.dp.hpp"
 
@@ -90,8 +90,9 @@ void sort_vals_of_same_key(const vector<K> &key, vector<T> &val, const vector<of
 
 // TODO: get device information about free bytes
 int show_mem_usage(sycl::queue &q) {
-  size_t total_byte = q.get_device().get_info<info::device::global_mem_size>();
-  size_t free_byte = total_byte * 0.75f;
+  auto d = q.get_device();
+  size_t total_byte = d.get_info<sycl::info::device::global_mem_size>();
+  size_t free_byte = d.get_info<sycl::ext::intel::info::device::free_memory>();
   size_t used_byte = total_byte - free_byte;
   printf("GPU memory usage: used = %4.2lf MB, free = %4.2lf MB, total = %4.2lf MB\n",
          used_byte/1024.0/1024.0, free_byte/1024.0/1024.0, total_byte/1024.0/1024.0);
@@ -221,13 +222,10 @@ int main()
   printf("The number of elements is %d\n", num_elements);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-
-  // TODO: enable out-of-order execution
-  sycl::queue q(dev_sel, {property::queue::in_order()});
 
   printf("Running key only test\n");
   segsort_keys(q, num_elements);
