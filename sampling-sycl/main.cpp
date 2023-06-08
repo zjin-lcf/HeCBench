@@ -18,7 +18,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <stdio.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.cpp"
 
 struct Dataset {
@@ -46,15 +46,14 @@ int main( int argc, char** argv)
   const std::vector<Dataset> inputs = {
     {1000, 0, 2000, 10, 11, 1234ULL},
     {0, 1000, 2000, 10, 11, 1234ULL},
-    {1000, 1000, 2000, 10, 11, 1234ULL}, 
+    {1000, 1000, 2000, 10, 11, 1234ULL},
   };
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   for (auto params : inputs) {
 
@@ -67,7 +66,7 @@ int main( int argc, char** argv)
       T *o = (T*) malloc (sizeof(T) * params.ncols);
       // nsamples
       int *n = (int*) malloc (sizeof(int) * params.nrows_sampled/2);
-      
+
       int nrows_X = params.nrows_exact + params.nrows_sampled;
       float *X = (float*) malloc (sizeof(float) * nrows_X * params.ncols);
       T *d = (T*) malloc(sizeof(T) * nrows_X * params.nrows_background * params.ncols);
@@ -100,28 +99,27 @@ int main( int argc, char** argv)
         n[i] = params.max_samples - i % 2;
       }
 
-      buffer<T, 1> d_b (b, params.nrows_background * params.ncols);
-      buffer<T, 1> d_o (o, params.ncols);
-      buffer<int, 1> d_n (n, params.nrows_sampled/2);
-      buffer<float, 1> d_X (X, nrows_X * params.ncols);
-      buffer<T, 1> d_d (nrows_X * params.nrows_background * params.ncols);
-      d_X.set_final_data(nullptr);
-      d_d.set_final_data(nullptr);
+      T *d_b = sycl::malloc_device<T>(params.nrows_background * params.ncols, q);
+      q.memcpy(d_b, b, sizeof(T) * params.nrows_background * params.ncols);
+
+      T *d_o = sycl::malloc_device<T>(params.ncols, q);
+      q.memcpy(d_o, o, sizeof(T) * params.ncols);
+
+      int *d_n = sycl::malloc_device<int>(params.nrows_sampled/2, q);
+      q.memcpy(d_n, n, sizeof(int) * params.nrows_sampled/2);
+
+      float *d_X = sycl::malloc_device<float>(nrows_X * params.ncols, q);
+      q.memcpy(d_X, X, sizeof(float) * nrows_X * params.ncols);
+
+      T *d_d = sycl::malloc_device<T>(nrows_X * params.nrows_background * params.ncols, q);
 
       kernel_dataset(q, d_X, nrows_X, params.ncols, d_b,
                      params.nrows_background, d_d, d_o, d_n,
                      params.nrows_sampled, params.max_samples, params.seed,
                      time);
 
-      q.submit([&] (handler &cgh) {
-        auto X_acc = d_X.template get_access<sycl_read>(cgh);
-        cgh.copy(X_acc, X);
-      });
-
-      q.submit([&] (handler &cgh) {
-        auto d_acc = d_d.template get_access<sycl_read>(cgh);
-        cgh.copy(d_acc, d);
-      });
+      q.memcpy(X, d_X, sizeof(float) * nrows_X * params.ncols);
+      q.memcpy(d, d_d, sizeof(T) * nrows_X * params.nrows_background * params.ncols);
 
       q.wait();
 
@@ -156,7 +154,7 @@ int main( int argc, char** argv)
             j += params.ncols) {
           counter = 0;
           for (k = j; k < j+params.ncols; k++)
-            if (d[k] == sent_value) counter++; 
+            if (d[k] == sent_value) counter++;
 
           // Check that indeed we have two observation entries ber row
           test_scatter_exact = test_scatter_exact && (counter == 2);
@@ -187,7 +185,7 @@ int main( int argc, char** argv)
 
           counter = 0;
           for (k = j; k < j+params.ncols; k++)
-            if (d[k] == sent_value) counter++; 
+            if (d[k] == sent_value) counter++;
 
           test_scatter_sampled = test_scatter_sampled && (counter == n[i - params.nrows_exact]);
           if (!test_scatter_sampled) {
@@ -206,7 +204,7 @@ int main( int argc, char** argv)
           // Check that number of observation entries corresponds to nsamples.
           counter = 0;
           for (k = j; k < j+params.ncols; k++)
-            if (d[k] == sent_value) counter++; 
+            if (d[k] == sent_value) counter++;
           test_scatter_sampled = test_scatter_sampled &&
             (counter == params.ncols - n[i - params.nrows_exact]);
           if (!test_scatter_sampled) {
@@ -222,6 +220,11 @@ int main( int argc, char** argv)
       free(X);
       free(n);
       free(d);
+      sycl::free(d_o, q);
+      sycl::free(d_b, q);
+      sycl::free(d_X, q);
+      sycl::free(d_n, q);
+      sycl::free(d_d, q);
     }
     printf("Average execution time of kernels: %f (us)\n", (time * 1e-3) / repeat);
   }
