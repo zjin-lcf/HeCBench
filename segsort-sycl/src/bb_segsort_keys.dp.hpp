@@ -210,11 +210,9 @@ void dispatch_kernels(K *keys_d, K *keysB_d, const Offset *d_seg_begins,
     num_blocks = subwarp_num;
     if(subwarp_num > 0)
     stream->submit([&](sycl::handler &cgh) {
-      sycl::accessor<K, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<K, 1>
           smem_acc_ct1(sycl::range<1>(512), cgh);
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<int, 1>
           tmem_acc_ct1(sycl::range<1>(512), cgh);
 
       auto d_bin_segs_id_h_bin_counter_ct4 = d_bin_segs_id + h_bin_counter[9];
@@ -235,11 +233,9 @@ void dispatch_kernels(K *keys_d, K *keysB_d, const Offset *d_seg_begins,
     num_blocks = subwarp_num;
     if(subwarp_num > 0)
     stream->submit([&](sycl::handler &cgh) {
-      sycl::accessor<K, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<K, 1>
           smem_acc_ct1(sycl::range<1>(1024), cgh);
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<int, 1>
           tmem_acc_ct1(sycl::range<1>(1024), cgh);
 
       auto d_bin_segs_id_h_bin_counter_ct4 = d_bin_segs_id + h_bin_counter[10];
@@ -260,11 +256,9 @@ void dispatch_kernels(K *keys_d, K *keysB_d, const Offset *d_seg_begins,
     num_blocks = subwarp_num;
     if(subwarp_num > 0)
     stream->submit([&](sycl::handler &cgh) {
-      sycl::accessor<K, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<K, 1>
           smem_acc_ct1(sycl::range<1>(2048), cgh);
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<int, 1>
           tmem_acc_ct1(sycl::range<1>(2048), cgh);
 
       auto d_bin_segs_id_h_bin_counter_ct4 = d_bin_segs_id + h_bin_counter[11];
@@ -310,7 +304,7 @@ void bb_segsort_run(K *keys_d, K *keysB_d, const Offset *d_seg_begins,
 }
 
 template <class K, class Offset>
-int bb_segsort(queue &q, K *&keys_d, const int num_elements, const Offset *d_seg_begins,
+int bb_segsort(sycl::queue &q, K *&keys_d, const int num_elements, const Offset *d_seg_begins,
                const Offset *d_seg_ends, const int num_segs) try {
 
     int *h_bin_counter = sycl::malloc_host<int>((SEGBIN_NUM + 1), q);
