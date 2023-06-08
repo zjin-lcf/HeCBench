@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 template<typename T>
 void verify(const T* cpu_out, const T* gpu_out, size_t n)
@@ -13,7 +13,7 @@ void verify(const T* cpu_out, const T* gpu_out, size_t n)
 
 #define LOG_MEM_BANKS 5
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 template<typename T, int N>
 class opt;
@@ -24,8 +24,8 @@ class base;
 // bank conflict aware optimization
 template<typename T, int N>
 void scan_bcao (
-        nd_item<1> &item,
-        local_ptr<T> temp,
+        sycl::nd_item<1> &item,
+        T *temp,
         T *__restrict g_odata,
   const T *__restrict g_idata)
 {
@@ -43,7 +43,7 @@ void scan_bcao (
   temp[b + ob] = g_idata[b];
 
   int offset = 1;
-  for (int d = N >> 1; d > 0; d >>= 1) 
+  for (int d = N >> 1; d > 0; d >>= 1)
   {
     __syncthreads();
     if (thid < d)
@@ -60,8 +60,8 @@ void scan_bcao (
   if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
   for (int d = 1; d < N; d *= 2) // traverse down
   {
-    offset >>= 1;     
-    __syncthreads();      
+    offset >>= 1;
+    __syncthreads();
     if (thid < d)
     {
       int ai = offset*(2*thid+1)-1;
@@ -81,8 +81,8 @@ void scan_bcao (
 
 template<typename T, int N>
 void scan (
-        nd_item<1> &item,
-        local_ptr<T> temp,
+        sycl::nd_item<1> &item,
+        T *temp,
         T *__restrict g_odata,
   const T *__restrict g_idata)
 {
@@ -94,10 +94,10 @@ void scan (
   int offset = 1;
   temp[2*thid]   = g_idata[2*thid];
   temp[2*thid+1] = g_idata[2*thid+1];
-  for (int d = N >> 1; d > 0; d >>= 1) 
+  for (int d = N >> 1; d > 0; d >>= 1)
   {
     __syncthreads();
-    if (thid < d) 
+    if (thid < d)
     {
       int ai = offset*(2*thid+1)-1;
       int bi = offset*(2*thid+2)-1;
@@ -109,8 +109,8 @@ void scan (
   if (thid == 0) temp[N-1] = 0; // clear the last elem
   for (int d = 1; d < N; d *= 2) // traverse down
   {
-    offset >>= 1;     
-    __syncthreads();      
+    offset >>= 1;
+    __syncthreads();
     if (thid < d)
     {
       int ai = offset*(2*thid+1)-1;
@@ -126,7 +126,7 @@ void scan (
 
 
 template <typename T, int N>
-void runTest (queue &q, const size_t n, const int repeat, bool timing = false) 
+void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = false)
 {
   const size_t num_blocks = (n + N - 1) / N;
 
@@ -143,29 +143,29 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
 
   T *t_in = in;
   T *t_out = cpu_out;
-  for (size_t n = 0; n < num_blocks; n++) { 
+  for (size_t n = 0; n < num_blocks; n++) {
     t_out[0] = 0;
-    for (int i = 1; i < N; i++) 
+    for (int i = 1; i < N; i++)
       t_out[i] = t_out[i-1] + t_in[i-1];
     t_out += N;
     t_in += N;
   }
 
-  T *d_in = malloc_device<T>(nelems, q);
+  T *d_in = sycl::malloc_device<T>(nelems, q);
   q.memcpy(d_in, in, bytes);
 
-  T *d_out = malloc_device<T>(nelems, q);
+  T *d_out = sycl::malloc_device<T>(nelems, q);
 
-  range<1> gws (num_blocks * N/2);
-  range<1> lws (N/2);
+  sycl::range<1> gws (num_blocks * N/2);
+  sycl::range<1> lws (N/2);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<T, 1, sycl_read_write, access::target::local> temp (N, cgh);
-      cgh.parallel_for<class base<T, N>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<T, 1> temp (sycl::range<1>(N), cgh);
+      cgh.parallel_for<class base<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         scan<T, N>(item, temp.get_pointer(), d_out, d_in);
       });
     });
@@ -185,9 +185,9 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<T, 1, sycl_read_write, access::target::local> temp (N*2, cgh);
-      cgh.parallel_for<class opt<T, N>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<T, 1> temp (sycl::range<1>(N*2), cgh);
+      cgh.parallel_for<class opt<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         scan_bcao<T, N>(item, temp.get_pointer(), d_out, d_in);
       });
     });
@@ -204,15 +204,15 @@ void runTest (queue &q, const size_t n, const int repeat, bool timing = false)
   q.memcpy(gpu_out, d_out, bytes).wait();
   if (!timing) verify(cpu_out, gpu_out, nelems);
 
-  free(d_in, q);
-  free(d_out, q);
+  sycl::free(d_in, q);
+  sycl::free(d_out, q);
   free(in);
   free(cpu_out);
   free(gpu_out);
 }
 
 template<int N>
-void run (queue &q, const int n, const int repeat) {
+void run (sycl::queue &q, const int n, const int repeat) {
   for (int i = 0; i < 2; i++) {
     bool report_timing = i > 0;
     printf("\nThe number of elements to scan in a thread block: %d\n", N);
@@ -233,17 +233,16 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[2]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
-    
-  run< 128>(q, n, repeat);  
-  run< 256>(q, n, repeat);  
-  run< 512>(q, n, repeat);  
-  run<1024>(q, n, repeat);  
-  run<2048>(q, n, repeat);  
 
-  return 0; 
+  run< 128>(q, n, repeat);
+  run< 256>(q, n, repeat);
+  run< 512>(q, n, repeat);
+  run<1024>(q, n, repeat);
+  run<2048>(q, n, repeat);
+
+  return 0;
 }
