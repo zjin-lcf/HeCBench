@@ -9,7 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 /*constants*/
@@ -78,14 +78,14 @@ struct Species
 /** FUNCTION PROTOTYPES **/
 double rnd();
 double SampleVel(double v_th);
-void ScatterSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu,
-                    float* den, buffer<float,1> &den_gpu, double &time);
+void ScatterSpecies(sycl::queue &q, Species* species, Particle *species_part_gpu,
+                    float* den, float *den_gpu, double &time);
 void ComputeRho(Species* ions, Species* electrons);
 bool SolvePotential(double* phi, double* rho);
 bool SolvePotentialDirect(double* phi, double* rho);
-void ComputeEF(queue &q, double* phi, double* ef, buffer<double,1> &ef_gpu);
-void PushSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu, buffer<double,1> &ef_gpu);
-void RewindSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu, buffer<double,1> &ef_gpu);
+void ComputeEF(sycl::queue &q, double* phi, double* ef, double *ef_gpu);
+void PushSpecies(sycl::queue &q, Species* species, Particle *species_part_gpu, double *ef_gpu);
+void RewindSpecies(sycl::queue &q, Species* species, Particle *species_part_gpu, double *ef_gpu);
 void AddParticle(Species* species, double x, double v);
 double XtoL(double pos);
 double gather(double lc, const double* field);
@@ -164,20 +164,20 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   /*also allocate device memory */
-  buffer<float, 1> nde_gpu(domain.ni);
-  buffer<float, 1> ndi_gpu(domain.ni);
-  buffer<double, 1> ef_gpu(domain.ni);
-  buffer<Particle, 1> ions_part_gpu(ions.part, NUM_IONS);
-  buffer<Particle, 1> electrons_part_gpu(electrons.part, NUM_ELECTRONS);
-  ions_part_gpu.set_final_data(nullptr);
-  electrons_part_gpu.set_final_data(nullptr);
+  float *nde_gpu = sycl::malloc_device<float>(domain.ni, q);
+  float *ndi_gpu = sycl::malloc_device<float>(domain.ni, q);
+  double *ef_gpu = sycl::malloc_device<double>(domain.ni, q);
+  Particle *ions_part_gpu = sycl::malloc_device<Particle>(NUM_IONS, q);
+  q.memcpy(ions_part_gpu, ions.part, NUM_IONS * sizeof(Particle)).wait();
+
+  Particle *electrons_part_gpu = sycl::malloc_device<Particle>(NUM_ELECTRONS, q);
+  q.memcpy(electrons_part_gpu, electrons.part, NUM_ELECTRONS * sizeof(Particle)).wait();
 
   /*compute number density*/
   ScatterSpecies(q, &ions, ions_part_gpu, ndi, ndi_gpu, sp_time);
@@ -244,10 +244,15 @@ int main(int argc, char* argv[])
   delete ef;
   delete nde;
   delete ndi;
+  sycl::free(nde_gpu, q);
+  sycl::free(ndi_gpu, q);
+  sycl::free(ef_gpu, q);
 
   /*free particles*/
   delete ions.part;
   delete electrons.part;
+  sycl::free(ions_part_gpu, q);
+  sycl::free(electrons_part_gpu, q);
 
   printf("Total kernel execution time (scatter particles) : %.3g (s)\n", sp_time * 1e-9f),
   printf("Total time for %d time steps: %.3g (s)\n", NUM_TS, time * 1e-9f);
@@ -277,39 +282,35 @@ double SampleVel(double v_th)
 
 
 /*scatter particles of species to the mesh*/
-void ScatterSpecies(queue &q,
-                    Species* species, 
-                    buffer<Particle,1> &species_part_gpu,
+void ScatterSpecies(sycl::queue &q,
+                    Species* species,
+                    Particle *species_part_gpu,
                     float* den,
-                    buffer<float,1> &den_gpu,
+                    float *den_gpu,
                     double &time)
 {
   /*initialize densities to zero*/
-  q.submit([&] (handler &cgh) {
-    auto acc = den_gpu.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, 0.f);
-  });
+  q.memset(den_gpu, 0, sizeof(float) * domain.ni);
 
   int size = species->np_alloc;
 
   /*scatter particles to the mesh*/
   int nblocks = 1 + size / THREADS_PER_BLOCK;
 
-  range<1> gws (nblocks * THREADS_PER_BLOCK);
-  range<1> lws (THREADS_PER_BLOCK);
-  
+  sycl::range<1> gws (nblocks * THREADS_PER_BLOCK);
+  sycl::range<1> lws (THREADS_PER_BLOCK);
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto particles = species_part_gpu.get_access<sycl_read>(cgh);
-    auto den = den_gpu.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class scatterParticle>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class scatterParticle>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       long p = item.get_global_id(0);
-      if (p < size && particles[p].alive)
+      if (p < size && species_part_gpu[p].alive)
       {
-        double lc = XtoL(particles[p].x);
-        scatter(lc, 1.f, den.get_pointer());
+        double lc = XtoL(species_part_gpu[p].x);
+        scatter(lc, 1.f, den_gpu);
       }
     });
   }).wait();
@@ -318,10 +319,7 @@ void ScatterSpecies(queue &q,
   time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   /*copy density back to CPU*/
-  q.submit([&] (handler &cgh) {
-    auto acc = den_gpu.get_access<sycl_read>(cgh);
-    cgh.copy(acc, den);
-  }).wait();
+  q.memcpy(den, den_gpu, sizeof(float) * domain.ni).wait();
 
   /*divide by cell volume*/
   for (int i = 0; i < domain.ni; i++)
@@ -452,7 +450,7 @@ bool SolvePotential(double* phi, double* rho)
 }
 
 /* computes electric field by differentiating potential*/
-void ComputeEF(queue &q, double* phi, double* ef, buffer<double,1> &ef_gpu)
+void ComputeEF(sycl::queue &q, double* phi, double* ef, double *ef_gpu)
 {
   for (int i = 1; i < domain.ni - 1; i++)
     ef[i] = -(phi[i + 1] - phi[i - 1]) / (2 * domain.dx); // central difference
@@ -462,17 +460,14 @@ void ComputeEF(queue &q, double* phi, double* ef, buffer<double,1> &ef_gpu)
   ef[domain.ni - 1] = -(phi[domain.ni - 1] - phi[domain.ni - 2]) / domain.dx;
 
   /*copy to the gpu*/
-  q.submit([&] (handler &cgh) {
-    auto acc = ef_gpu.get_access<sycl_discard_write>(cgh);
-    cgh.copy(ef, acc);
-  }).wait();
+  q.memcpy(ef_gpu, ef, domain.ni * sizeof(double));
 }
 
 /* moves particles of a single species, returns wall charge*/
-void PushSpecies(queue &q, 
+void PushSpecies(sycl::queue &q,
                  Species* species,
-                 buffer<Particle, 1> &species_part_gpu, 
-                 buffer<double,1> &ef_gpu)
+                 Particle *species_part_gpu,
+                 double *ef_gpu)
 {
   /*precompute q/m*/
   double qm = species->charge / species->mass;
@@ -482,26 +477,25 @@ void PushSpecies(queue &q,
   /*loop over particles*/
   int nblocks = 1 + size / THREADS_PER_BLOCK;
 
-  range<1> gws (nblocks * THREADS_PER_BLOCK);
-  range<1> lws (THREADS_PER_BLOCK);
-  
-  q.submit([&] (handler &cgh) {
-    auto particles = species_part_gpu.get_access<sycl_read_write>(cgh);
-    auto ef = ef_gpu.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class pushParticle>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (nblocks * THREADS_PER_BLOCK);
+  sycl::range<1> lws (THREADS_PER_BLOCK);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class pushParticle>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       /*get particle id*/
       long p = item.get_global_id(0);
 
-      if (p < size && particles[p].alive)
+      if (p < size && species_part_gpu[p].alive)
       {
         /*grab pointer to this particle*/
-        Particle* part = &particles[p];
+        Particle* part = &species_part_gpu[p];
 
         /*compute particle node position*/
         double lc = XtoL(part->x);
 
         /*gather electric field onto particle position*/
-        double part_ef = gather(lc, ef.get_pointer());
+        double part_ef = gather(lc, ef_gpu);
 
         /*advance velocity*/
         part->v += DT * qm * part_ef;
@@ -509,7 +503,7 @@ void PushSpecies(queue &q,
         /*advance position*/
         part->x += DT * part->v;
 
-        /*remove particles leaving the domain*/
+        /*remove species_part_gpu leaving the domain*/
         if (part->x < X0 || part->x >= XMAX)
           part->alive = false;
       }
@@ -519,7 +513,7 @@ void PushSpecies(queue &q,
 
 
 /* rewinds particle velocities by -0.5DT*/
-void RewindSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_gpu, buffer<double,1> &ef_gpu)
+void RewindSpecies(sycl::queue &q, Species* species, Particle *species_part_gpu, double *ef_gpu)
 {
   /*precompute q/m*/
   double qm = species->charge / species->mass;
@@ -529,26 +523,25 @@ void RewindSpecies(queue &q, Species* species, buffer<Particle,1> &species_part_
   /*loop over particles*/
   int nblocks = 1 + size / THREADS_PER_BLOCK;
 
-  range<1> gws (nblocks * THREADS_PER_BLOCK);
-  range<1> lws (THREADS_PER_BLOCK);
-  
-  q.submit([&] (handler &cgh) {
-    auto particles = species_part_gpu.get_access<sycl_read_write>(cgh);
-    auto ef = ef_gpu.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class rewindParticle>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (nblocks * THREADS_PER_BLOCK);
+  sycl::range<1> lws (THREADS_PER_BLOCK);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class rewindParticle>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       /*get particle id*/
       long p = item.get_global_id(0);
 
-      if (p < size && particles[p].alive)
+      if (p < size && species_part_gpu[p].alive)
       {
         /*grab pointer to this particle*/
-        Particle* part = &particles[p];
+        Particle* part = &species_part_gpu[p];
 
         /*compute particle node position*/
         double lc = XtoL(part->x);
 
         /*gather electric field onto particle position*/
-        double part_ef = gather(lc, ef.get_pointer());
+        double part_ef = gather(lc, ef_gpu);
 
         /*advance velocity*/
         part->v -= 0.5 * DT * qm * part_ef;
@@ -572,16 +565,16 @@ void scatter(double lc, float value, float* field)
   int i    = (int)lc;
   float di = lc - i;
 
-  auto f1 = ext::oneapi::atomic_ref<float, 
-    ext::oneapi::memory_order::relaxed,
-    ext::oneapi::memory_scope::device,
-    access::address_space::global_space> (field[i]);
-  f1 += value * (1 - di);
-  auto f2 = ext::oneapi::atomic_ref<float, 
-    ext::oneapi::memory_order::relaxed,
-    ext::oneapi::memory_scope::device,
-    access::address_space::global_space> (field[i+1]);
-  f2 += value * di;
+  auto f1 = sycl::atomic_ref<float,
+            sycl::memory_order::relaxed,
+            sycl::memory_scope::device,
+            sycl::access::address_space::global_space> (field[i]);
+  f1.fetch_add(value * (1 - di));
+  auto f2 = sycl::atomic_ref<float,
+            sycl::memory_order::relaxed,
+            sycl::memory_scope::device,
+            sycl::access::address_space::global_space> (field[i+1]);
+  f2.fetch_add(value * di);
 }
 
 /* gathers field value at logical coordinate lc*/
