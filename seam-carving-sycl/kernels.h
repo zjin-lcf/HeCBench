@@ -1,5 +1,7 @@
 #include <sycl/sycl.hpp>
 
+using uchar4 = sycl::uchar4;
+
 //#define COMPUTE_COSTS_FULL
 //#define COMPUTE_M_SINGLE
 //#define COMPUTE_M_ITERATE
@@ -738,4 +740,3 @@ void approx_seam_kernel(
     ix = d_index_map[ix];
   }
 }
-
