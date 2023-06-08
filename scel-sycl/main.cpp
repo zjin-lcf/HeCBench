@@ -8,6 +8,23 @@
 
 #define GPU_NUM_THREADS 256
 
+float k_sigmoid_xent_forward(float lgt, float tgt) {
+  return lgt * (tgt - (lgt >= 0.f)) - sycl::log(1.f + sycl::exp(lgt - 2.f * lgt * (lgt >= 0.f)));
+}
+
+float k_sigmoid_partition(float lgt) {
+  return lgt * (lgt >= 0.f) + sycl::log(1.f + sycl::exp(lgt - 2.f * lgt * (lgt >= 0.f)));
+}
+
+float k_sigmoid_xent_forward_with_log_d_trick(float lgt, float tgt) {
+  return (2.f * tgt - 1.f) * (lgt - k_sigmoid_partition(lgt));
+}
+
+float k_unjoined_sigmoid_xent_forward(float lgt, float tgt) {
+  return lgt * tgt + (tgt - 1.f) * lgt * (lgt >= 0.f) -
+      (1.f - tgt) * sycl::log(1.f + sycl::exp(lgt - 2.f * lgt * (lgt >= 0.f)));
+}
+
 void SigmoidCrossEntropyWithLogitsKernel(
   sycl::nd_item<1> &item,
   const int inner_size,
@@ -25,11 +42,11 @@ void SigmoidCrossEntropyWithLogitsKernel(
     float lgt = logits_ptr[in_idx];
     float tgt = targets_ptr[in_idx];
     if (unjoined_lr_loss) {
-      value += unjoined_sigmoid_xent_forward(lgt, tgt);
+      value += k_unjoined_sigmoid_xent_forward(lgt, tgt);
     } else {
       value += log_D_trick ?
-               sigmoid_xent_forward_with_log_d_trick(lgt, tgt) :
-               sigmoid_xent_forward(lgt, tgt);
+               k_sigmoid_xent_forward_with_log_d_trick(lgt, tgt) :
+               k_sigmoid_xent_forward(lgt, tgt);
     }
   }
 
@@ -70,9 +87,9 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   float *d_logits, *d_targets, *d_out;
