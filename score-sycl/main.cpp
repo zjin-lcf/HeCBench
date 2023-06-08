@@ -1,21 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifndef SUB_GROUP_SIZE
 #define SUB_GROUP_SIZE 32
 #endif
 
 template <class T, int BINS, int BLOCK_SIZE>
-void findTopK(int*__restrict indices_, 
-              int*__restrict count_, 
+void findTopK(int*__restrict indices_,
+              int*__restrict count_,
               const T*__restrict scores_,
               const float threshold,
               const int classwise_topK,
               const int num_classes,
               const int num_priors,
-              nd_item<3> &item,
+              sycl::nd_item<3> &item,
               int *__restrict bins)
 {
   /* We need to sort boxes based on their confidence scores. The confidence scores fall in
@@ -48,14 +48,14 @@ void findTopK(int*__restrict indices_,
   for (int unroll = 0; unroll < BINS / BLOCK_SIZE; unroll++)
     bins[unroll * BLOCK_SIZE + threadIdx_x] = 0;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for (int i = threadIdx_x; i < num_priors; i = i + BLOCK_SIZE)
   {
     const float confidence = scores[i];
     if (confidence > threshold)
     {
-      float conf_scaled = native::divide(confidence - threshold, 1.f - threshold);
+      float conf_scaled = sycl::native::divide(confidence - threshold, 1.f - threshold);
       int bin_index = conf_scaled * BINS;
 
       /* We store counts of confidence scores in the bins. Our ultimate goal is to store the indices
@@ -70,16 +70,16 @@ void findTopK(int*__restrict indices_,
 
       if (bin_index >= 0) {
         // atomicAdd(&bins[bin_index], 1);
-        auto ao = ext::oneapi::atomic_ref<int, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::work_group,
-                  access::address_space::local_space> (bins[bin_index]);
+        auto ao = sycl::atomic_ref<int,
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::work_group,
+                  sycl::access::address_space::local_space> (bins[bin_index]);
         ao.fetch_add(1);
       }
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   constexpr int WARP_SIZE = SUB_GROUP_SIZE; /* must be equal to warpSize */
 
@@ -136,7 +136,7 @@ void findTopK(int*__restrict indices_,
 
       for (int i = 1; i < WARP_SIZE; i *= 2)
       {
-        auto n = shift_group_left(sg, value, i);
+        auto n = sycl::shift_group_left(sg, value, i);
         if (inverse_lane_id >= i)
           value += n;
       }
@@ -144,20 +144,20 @@ void findTopK(int*__restrict indices_,
       value += previous_group_first_element;
       bins[idx] = value;
 
-      previous_group_first_element = select_from_group(sg, value, 0);
+      previous_group_first_element = sycl::select_from_group(sg, value, 0);
     }
   }
 
   if (threadIdx_x == 0) *count = 0;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for (int i = threadIdx_x; i < num_priors; i = i + BLOCK_SIZE)
   {
     const float confidence = scores[i];
     if (confidence > threshold)
     {
-      float conf_scaled = native::divide(confidence - threshold, 1.f - threshold);
+      float conf_scaled = sycl::native::divide(confidence - threshold, 1.f - threshold);
       int bin_index = conf_scaled * BINS;
       bin_index = sycl::clamp(bin_index, 0, BINS - 1);
 
@@ -189,18 +189,18 @@ void findTopK(int*__restrict indices_,
        */
 
       // const int idx = atomicAdd(&bins[bin_index], 1);
-      auto ao = ext::oneapi::atomic_ref<int, 
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (bins[bin_index]);
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (bins[bin_index]);
       const int idx = ao.fetch_add(1);
       if (idx < classwise_topK)
       {
         indices[idx] = i;
-        auto ao = ext::oneapi::atomic_ref<int, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (count[0]);
+        auto ao = sycl::atomic_ref<int,
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space> (count[0]);
         ao.fetch_add(1);
       }
     }
@@ -236,22 +236,21 @@ int main(int argc, char* argv[])
   int *indices = (int*) malloc (indices_size_bytes);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<3> gws (1, batch_size, num_classes * block_size);
-  range<3> lws (1, 1, block_size);
+  sycl::range<3> gws (1, batch_size, num_classes * block_size);
+  sycl::range<3> lws (1, 1, block_size);
 
-  float *d_scores = malloc_device<float>(scores_size, q);
-  int *d_count = malloc_device<int>(count_size, q);
-  int *d_indices = malloc_device<int>(indices_size, q);
+  float *d_scores = sycl::malloc_device<float>(scores_size, q);
+  int *d_count = sycl::malloc_device<int>(count_size, q);
+  int *d_indices = sycl::malloc_device<int>(indices_size, q);
 
   srand(123);
   for (size_t i = 0; i < scores_size; i++) {
-    scores[i] = rand() / (float) RAND_MAX; 
+    scores[i] = rand() / (float) RAND_MAX;
   }
   q.memcpy(d_scores, scores, scores_size_bytes);
 
@@ -259,9 +258,9 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<int, 1, sycl_read_write, access::target::local> bins (2048, cgh);
-      cgh.parallel_for(nd_range<3>(gws, lws), [=] (nd_item<3> item)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> bins (sycl::range<1>(2048), cgh);
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item)
         [[intel::reqd_sub_group_size(SUB_GROUP_SIZE)]] {
         findTopK<float, 2048, block_size>(
           d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors,
@@ -279,15 +278,15 @@ int main(int argc, char* argv[])
   q.memcpy(count, d_count, count_size_bytes);
   q.wait();
 
-  long checksum = 0; 
+  long checksum = 0;
   for (int b = 0; b < batch_size; b++)
     for (int c = 0; c < num_classes; c++)
       checksum += count[b * num_classes + c];
   printf("Checksum (count) = %ld\n", checksum);
 
-  free(d_indices, q);
-  free(d_count, q);
-  free(d_scores, q);
+  sycl::free(d_indices, q);
+  sycl::free(d_count, q);
+  sycl::free(d_scores, q);
   free(indices);
   free(count);
   free(scores);
