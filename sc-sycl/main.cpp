@@ -8,7 +8,7 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
- * with the Software without restriction, including without limitation the 
+ * with the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
@@ -18,14 +18,14 @@
  *      > Redistributions in binary form must reproduce the above copyright
  *        notice, this list of conditions and the following disclaimers in the
  *        documentation and/or other materials provided with the distribution.
- *      > Neither the names of IMPACT Research Group, University of Cordoba, 
- *        University of Illinois nor the names of its contributors may be used 
- *        to endorse or promote products derived from this Software without 
+ *      > Neither the names of IMPACT Research Group, University of Cordoba,
+ *        University of Illinois nor the names of its contributors may be used
+ *        to endorse or promote products derived from this Software without
  *        specific prior written permission.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
@@ -166,11 +166,10 @@ int main(int argc, char **argv) {
     const int n_flags     = n_tasks + 1;
 
 #ifdef USE_GPU
-    sycl::gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
 #ifdef DYNAMIC_PARTITION
     DATA_TYPE * h_in_out = sycl::malloc_shared<DATA_TYPE>(p.in_size, q);
@@ -231,7 +230,7 @@ int main(int argc, char **argv) {
 
         // Kernel launch
         if(p.n_gpu_blocks > 0) {
-            assert(p.n_gpu_threads <= max_gpu_threads && 
+            assert(p.n_gpu_threads <= max_gpu_threads &&
                 "The thread block size is greater than the maximum thread block size that can be used on this device");
             call_StreamCompaction_kernel(q, p.n_gpu_blocks, p.n_gpu_threads, p.in_size, p.remove_value, n_tasks, p.alpha,
                 d_in_out, d_in_out, (int*)d_flags,
