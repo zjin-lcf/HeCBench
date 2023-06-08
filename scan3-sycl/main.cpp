@@ -1,7 +1,7 @@
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "scan.h"
 
 /*
@@ -52,17 +52,16 @@ int main(int argc, char * argv[])
   fillRandom<float>(input, length, 1, 0, 255);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Create input buffer on device
-  buffer<float, 1> inputBuffer (input, length);
+  sycl::buffer<float, 1> inputBuffer (input, length);
 
   // Create output buffer on device
-  buffer<float, 1> outputBuffer (length);
+  sycl::buffer<float, 1> outputBuffer (length);
 
   std::cout << "Executing kernel for " << iterations << " iterations\n";
   std::cout << "-------------------------------------------\n";
@@ -87,8 +86,8 @@ int main(int argc, char * argv[])
   std::cout << "Average execution time of oneDPL exclusive scan: "
             << time * 1e-3f / iterations << " (us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto acc = outputBuffer.get_access<sycl_read>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    auto acc = outputBuffer.get_access<sycl::access::mode::read>(cgh);
     cgh.copy(acc, output);
   }).wait();
 
