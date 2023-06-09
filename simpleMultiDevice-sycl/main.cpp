@@ -25,7 +25,7 @@
 #include "simpleMultiDevice.h"
 
 // Data configuration
-#ifndef MAX_GPU_COUNT 
+#ifndef MAX_GPU_COUNT
   #define MAX_GPU_COUNT 8
 #endif
 
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
   printf("Starting simpleMultiDevice\n");
   auto gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
   GPU_N = gpu_devices.size();
-  
+
   GPU_N = MIN(GPU_N, MAX_GPU_COUNT);
 
   printf("GPU device count: %i\n", GPU_N);
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
   //allocate memory (GPU and System page-locked)
   for (i = 0; i < GPU_N; i++)
   {
-    plan[i].stream = sycl::queue(gpu_devices[i], sycl::property::queue::in_order()); 
+    plan[i].stream = sycl::queue(gpu_devices[i], sycl::property::queue::in_order());
     //Allocate memory
     plan[i].d_Data = sycl::malloc_device<float>(plan[i].dataN, plan[i].stream);
     plan[i].d_Sum = sycl::malloc_device<float>(ACCUM_N, plan[i].stream);
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  printf("  Average GPU Processing time: %f (us)\n\n", time * 1e-3f / repeat); 
+  printf("  Average GPU Processing time: %f (us)\n\n", time * 1e-3f / repeat);
 
   for (i = 0; i < GPU_N; i++)
   {
