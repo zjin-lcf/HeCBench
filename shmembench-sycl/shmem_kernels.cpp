@@ -6,9 +6,10 @@
 
 #include <chrono> // timing
 #include <stdio.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 using namespace std::chrono;
+using float4 = sycl::float4;
 
 #define TOTAL_ITERATIONS (1024)
 #define BLOCK_SIZE 256
@@ -26,7 +27,7 @@ float4 init_val(int i){
 }
 
 float4 reduce_vector(float4 v1, float4 v2, float4 v3, float4 v4, float4 v5, float4 v6){
-  return float4(v1.x() + v2.x() + v3.x() + v4.x() + v5.x() + v6.x(), 
+  return float4(v1.x() + v2.x() + v3.x() + v4.x() + v5.x() + v6.x(),
                 v1.y() + v2.y() + v3.y() + v4.y() + v5.y() + v6.y(),
                 v1.z() + v2.z() + v3.z() + v4.z() + v5.z() + v6.z(),
                 v1.w() + v2.w() + v3.w() + v4.w() + v5.w() + v6.w());
@@ -40,7 +41,7 @@ void set_vector(float4 *target, int offset, float4 v){
 }
 
 
-void benchmark_shmem(float4 *g_data, float4* shm_buffer, nd_item<1> &item){
+void benchmark_shmem(float4 *g_data, float4* shm_buffer, sycl::nd_item<1> &item){
 
   int tid = item.get_local_id(0);
   int blk = item.get_local_range(0);
@@ -54,7 +55,7 @@ void benchmark_shmem(float4 *g_data, float4* shm_buffer, nd_item<1> &item){
   set_vector(shm_buffer, tid+4*blk, init_val(tid+13));
   set_vector(shm_buffer, tid+5*blk, init_val(tid+17));
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   #pragma unroll 32
   for(int j=0; j<TOTAL_ITERATIONS; j++){
@@ -62,15 +63,15 @@ void benchmark_shmem(float4 *g_data, float4* shm_buffer, nd_item<1> &item){
     shmem_swap(shm_buffer+tid+2*blk, shm_buffer+tid+3*blk);
     shmem_swap(shm_buffer+tid+4*blk, shm_buffer+tid+5*blk);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     shmem_swap(shm_buffer+tid+1*blk, shm_buffer+tid+2*blk);
     shmem_swap(shm_buffer+tid+3*blk, shm_buffer+tid+4*blk);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
-  g_data[globaltid] = reduce_vector(shm_buffer[tid+0*blk], 
+  g_data[globaltid] = reduce_vector(shm_buffer[tid+0*blk],
                                     shm_buffer[tid+1*blk],
                                     shm_buffer[tid+2*blk],
                                     shm_buffer[tid+3*blk],
@@ -82,37 +83,33 @@ void shmembenchGPU(double *c, const long size, const int n) {
   const int TOTAL_BLOCKS = size/(BLOCK_SIZE);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<double, 1> cd (size);
+  double *cd = sycl::malloc_device<double>(size, q);
 
-  range<1> lws (BLOCK_SIZE);
-  range<1> gws (TOTAL_BLOCKS/4 * BLOCK_SIZE);
-  auto cd_re = cd.reinterpret<float4>(range<1>(size/2));
+  sycl::range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (TOTAL_BLOCKS/4 * BLOCK_SIZE);
 
   auto start = high_resolution_clock::now();
-  for (int i = 0; i < n; i++)
-    q.submit([&] (handler &cgh) {
-      auto g_data = cd_re.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> shm_buffer(BLOCK_SIZE*6, cgh);
-      cgh.parallel_for<class kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        benchmark_shmem(g_data.get_pointer(), shm_buffer.get_pointer(), item);
-      }); 
-    }); 
+  for (int i = 0; i < n; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> shm_buffer(sycl::range<1>(BLOCK_SIZE*6), cgh);
+      cgh.parallel_for<class kernel>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        benchmark_shmem((float4*)cd, shm_buffer.get_pointer(), item);
+      });
+    });
+  }
   q.wait();
   auto end = high_resolution_clock::now();
   auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
   printf("Average kernel execution time : %f (ms)\n", time_shmem_128b * 1e-6);
 
   // Copy results back to host memory
-  q.submit([&] (handler &cgh) {
-    auto acc = cd.get_access<sycl_read>(cgh);
-    cgh.copy(acc, c);
-  }).wait();
+  q.memcpy(c, cd, size*sizeof(double)).wait();
+  sycl::free(cd, q);
 
   // simple checksum
   double sum = 0;
@@ -124,7 +121,7 @@ void shmembenchGPU(double *c, const long size, const int n) {
   const long long operations_bytes  = (6LL+4*5*TOTAL_ITERATIONS+6)*size*sizeof(float);
   const long long operations_128bit = (6LL+4*5*TOTAL_ITERATIONS+6)*size/4;
 
-  printf("\tusing 128bit operations : %8.2f GB/sec (%6.2f billion accesses/sec)\n", 
+  printf("\tusing 128bit operations : %8.2f GB/sec (%6.2f billion accesses/sec)\n",
     (double)operations_bytes / time_shmem_128b,
     (double)operations_128bit / time_shmem_128b);
 }
