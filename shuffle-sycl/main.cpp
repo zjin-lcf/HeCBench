@@ -20,15 +20,15 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BUF_SIZE 256
 #define PATTERN 0xDEADBEEF
 
 
 // CPU implementation of matrix transpose
-void matrixTransposeCPUReference(float* output, float* input, 
-    unsigned int numGroups, unsigned int subGroupSize) {
+void matrixTransposeCPUReference(float* output, float* input,
+                                 unsigned int numGroups, unsigned int subGroupSize) {
   for (unsigned i = 0; i < numGroups; ++i) {
     for (unsigned j = 0; j < subGroupSize; j++) {
       output[i * subGroupSize + j] = input[i * subGroupSize + subGroupSize - j - 1];
@@ -40,7 +40,7 @@ void verifyBroadcast(const int *out, const int subGroupSize, int pattern = 0)
 {
   int expected = pattern;
   if (pattern == 0) {
-    for (int i = 0; i < subGroupSize; i++) 
+    for (int i = 0; i < subGroupSize; i++)
       expected += i;
   }
   int errors = 0;
@@ -58,7 +58,7 @@ void verifyBroadcast(const int *out, const int subGroupSize, int pattern = 0)
     std::cout << "FAIL\n";
 }
 
-void verifyTransposeMatrix(const float *TransposeMatrix, const float* cpuTransposeMatrix, 
+void verifyTransposeMatrix(const float *TransposeMatrix, const float* cpuTransposeMatrix,
             const int total, const int subGroupSize)
 {
   int errors = 0;
@@ -87,47 +87,49 @@ int main(int argc, char* argv[]) {
   const int repeat = atoi(argv[1]);
   const int repeat2 = atoi(argv[2]);
 
+  // CPU support may be unavailable for the shuffle instructions
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;   // CPU support may be unavailable for the shuffle instructions
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   std::cout << "Broadcast using the shuffle xor function (subgroup sizes 8, 16, and 32) \n";
   int *out = (int *)malloc(sizeof(int) * BUF_SIZE);
-  buffer<int,  1> d_out (BUF_SIZE);
+  int *d_out = sycl::malloc_device<int>(BUF_SIZE, q);
 
-  range<1> gws (BUF_SIZE);
-  range<1> lws (BUF_SIZE);
+  sycl::range<1> gws (BUF_SIZE);
+  sycl::range<1> lws (BUF_SIZE);
 
   // warmup
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shflxor_sg8_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shflxor_sg8_warmup>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = item.get_local_id(0) & 0x7;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
           value += sg.shuffle_xor(value, mask);
-        out_acc[item.get_global_id(0)] = value;
+        d_out[item.get_global_id(0)] = value;
       });
     });
+  }
   q.wait();
 
   auto begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shflxor_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shflxor_sg8>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = item.get_local_id(0) & 0x7;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
           value += sg.shuffle_xor(value, mask);
-        out_acc[item.get_global_id(0)] = value;
+        d_out[item.get_global_id(0)] = value;
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
@@ -135,27 +137,25 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 8): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 8);
 
   //=====================================================================================================
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shflxor_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shflxor_sg16>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = item.get_local_id(0) & 0xf;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0xf; mask *= 2)
           value += sg.shuffle_xor(value, mask);
-        out_acc[item.get_global_id(0)] = value;
+        d_out[item.get_global_id(0)] = value;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -163,26 +163,24 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 16): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 16);
 
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shflxor_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shflxor_sg32>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = item.get_local_id(0) & 0x1f;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x1f; mask *= 2)
           value += item.get_sub_group().shuffle_xor(value, mask);
-        out_acc[item.get_global_id(0)] = value;
+        d_out[item.get_global_id(0)] = value;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -190,26 +188,24 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 32): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 32);
   //=====================================================================================================
   std::cout << "Broadcast using the shuffle function (subgroup sizes 8, 16, and 32) \n";
-  
+
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shfl_sg8>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shfl_sg8>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x7) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        out_acc[item.get_global_id(0)] = out_v;
+        d_out[item.get_global_id(0)] = out_v;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -217,25 +213,23 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 8): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 8, PATTERN);
 
   //=====================================================================================================
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shfl_sg16>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shfl_sg16>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0xf) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        out_acc[item.get_global_id(0)] = out_v;
+        d_out[item.get_global_id(0)] = out_v;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -243,25 +237,23 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 16): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 16, PATTERN);
 
   //=====================================================================================================
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++)
-    q.submit([&] (handler &cgh) {
-      auto out_acc = d_out.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class bc_shfl_sg32>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class bc_shfl_sg32>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x1f) == 0 ? PATTERN : 0;
         int out_v = item.get_sub_group().shuffle(value, 0);
-        out_acc[item.get_global_id(0)] = out_v;
+        d_out[item.get_global_id(0)] = out_v;
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -269,14 +261,12 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 32): "
             << time * 1e-3f / repeat << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = d_out.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, out);
-  }).wait();
+  q.memcpy(out, d_out, sizeof(int) * BUF_SIZE).wait();
 
   verifyBroadcast(out, 32, PATTERN);
 
   free(out);
+  sycl::free(d_out, q);
 
   //=====================================================================================================
   std::cout << "matrix transpose using the shuffle function (subgroup sizes are 8, 16, and 32)\n";
@@ -292,24 +282,24 @@ int main(int argc, char* argv[]) {
     Matrix[i] = (float)i * 10.0f;
   }
 
-  buffer<float, 1> gpuMatrix(Matrix, total);
-  buffer<float, 1> gpuTransposeMatrix(total);
+  float *d_Matrix = sycl::malloc_device<float>(total, q);
+  float *d_TransposeMatrix = sycl::malloc_device<float>(total, q);
+  q.memcpy(d_Matrix, Matrix, total * sizeof(float)).wait();
 
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat2; n++)
-    q.submit([&] (handler &cgh) {
-      auto in  = gpuMatrix.get_access<sycl_read>(cgh);
-      auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class transpose_shfl_sg8>(nd_range<1>(
-            range<1>(total), range<1>(8)), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat2; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class transpose_shfl_sg8>(
+        sycl::nd_range<1>(sycl::range<1>(total), sycl::range<1>(8)), [=] (sycl::nd_item<1> item) {
         unsigned b_start = item.get_local_range(0) * item.get_group(0);
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
-        float val = in[b_offs];
-        out[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        float val = d_Matrix[b_offs];
+        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -317,29 +307,24 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 8): "
             << time * 1e-3f / repeat2 << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, TransposeMatrix);
-  }).wait();
+  q.memcpy(TransposeMatrix, d_TransposeMatrix, total * sizeof(float)).wait();
 
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/8, 8);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 8);
-
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat2; n++)
-    q.submit([&] (handler &cgh) {
-      auto in  = gpuMatrix.get_access<sycl_read>(cgh);
-      auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class transpose_shfl_sg16>(nd_range<1>(
-            range<1>(total), range<1>(16)), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat2; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class transpose_shfl_sg16>(
+        sycl::nd_range<1>(sycl::range<1>(total), sycl::range<1>(16)), [=] (sycl::nd_item<1> item) {
         unsigned b_start = item.get_local_range(0) * item.get_group(0);
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
-        float val = in[b_offs];
-        out[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        float val = d_Matrix[b_offs];
+        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -347,29 +332,25 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 16): "
             << time * 1e-3f / repeat2 << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, TransposeMatrix);
-  }).wait();
+  q.memcpy(TransposeMatrix, d_TransposeMatrix, total * sizeof(float)).wait();
 
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/16, 16);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 16);
 
   begin = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat2; n++)
-    q.submit([&] (handler &cgh) {
-      auto in  = gpuMatrix.get_access<sycl_read>(cgh);
-      auto out = gpuTransposeMatrix.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class transpose_shfl_sg32>(nd_range<1>(
-            range<1>(total), range<1>(32)), [=] (nd_item<1> item) {
+  for (int n = 0; n < repeat2; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class transpose_shfl_sg32>(
+        sycl::nd_range<1>(sycl::range<1>(total), sycl::range<1>(32)), [=] (sycl::nd_item<1> item) {
         unsigned b_start = item.get_local_range(0) * item.get_group(0);
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
-        float val = in[b_offs];
-        out[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        float val = d_Matrix[b_offs];
+        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
       });
     });
+  }
 
   q.wait();
   end = std::chrono::steady_clock::now();
@@ -377,14 +358,13 @@ int main(int argc, char* argv[]) {
   std::cout << "Average kernel time (subgroup size = 32): "
             << time * 1e-3f / repeat2 << "(us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out_acc = gpuTransposeMatrix.get_access<sycl_read>(cgh);
-    cgh.copy(out_acc, TransposeMatrix);
-  }).wait();
+  q.memcpy(TransposeMatrix, d_TransposeMatrix, total * sizeof(float)).wait();
 
   matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, total/32, 32);
   verifyTransposeMatrix(TransposeMatrix, cpuTransposeMatrix, total, 32);
 
+  sycl::free(d_Matrix, q);
+  sycl::free(d_TransposeMatrix, q);
   free(Matrix);
   free(TransposeMatrix);
   free(cpuTransposeMatrix);
