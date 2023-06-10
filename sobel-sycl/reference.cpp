@@ -1,9 +1,12 @@
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-inline uchar clamp (float f) {
+using uchar4 = sycl::uchar4;
+using float4 = sycl::float4;
+
+inline unsigned char clamp (float f) {
   if (f < 0.f) return 0;
   if (f > 255.f) return 255;
-  return (uchar)f;
+  return (unsigned char)f;
 }
 
 // convolution at the anchor point (c) using a 3x3 kernel(k) 

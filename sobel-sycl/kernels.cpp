@@ -35,10 +35,10 @@ inline float4 convert_float4(uchar4 data)
 
 inline uchar4 convert_uchar4(float4 v) {
   uchar4 r;
-  r.x() = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
-  r.y() = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
-  r.z() = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
-  r.w() = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
+  r.x() = (unsigned char) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
+  r.y() = (unsigned char) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
+  r.z() = (unsigned char) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
+  r.w() = (unsigned char) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
   return r;
 }
 
@@ -46,7 +46,7 @@ void sobel_filter(const uchar4*__restrict inputImage,
                         uchar4*__restrict outputImage, 
                   const uint width,
                   const uint height,
-                  nd_item<2> &item)
+                  sycl::nd_item<2> &item)
 {
   uint x = item.get_global_id(1);
   uint y = item.get_global_id(0);
