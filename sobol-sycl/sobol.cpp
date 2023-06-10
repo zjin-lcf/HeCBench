@@ -94,21 +94,26 @@ int main(int argc, char *argv[])
 
     std::cout << "Executing QRNG on GPU..." << std::endl;
 
-    {
 #ifdef USE_GPU
-      gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-      cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-      queue q(dev_sel);
 
-      buffer<unsigned int, 1> d_directions(h_directions, n_dimensions * n_directions); 
-      buffer<float, 1> d_output(h_outputGPU, n_dimensions * n_vectors); 
+    std::cout << "Allocating GPU memory..." << std::endl;
+    size_t direction_size = n_dimensions * n_directions * sizeof(unsigned int);
+    size_t output_size = n_vectors * n_dimensions * sizeof(float);
 
-      double ktime = sobolGPU(q, repeat, n_vectors, n_dimensions, d_directions, d_output);
+    unsigned int *d_directions = sycl::malloc_device<unsigned int>(n_dimensions * n_directions, q);
+    float *d_output = sycl::malloc_device<float>(n_dimensions * n_vectors, q);
 
-      std::cout << "Average kernel execution time: " << (ktime * 1e-9f) / repeat << " (s)\n";
-    }
+    q.memcpy(d_directions, h_directions, direction_size).wait();
+
+    double ktime = sobolGPU(q, repeat, n_vectors, n_dimensions, d_directions, d_output);
+
+    std::cout << "Average kernel execution time: " << (ktime * 1e-9f) / repeat << " (s)\n";
+
+    q.memcpy(h_outputGPU, d_output, output_size).wait();
 
     std::cout << std::endl;
     // Execute the QRNG on the host
@@ -173,11 +178,13 @@ int main(int argc, char *argv[])
     delete h_directions;
     delete h_outputCPU;
     delete h_outputGPU;
+    sycl::free(d_directions, q);
+    sycl::free(d_output, q);
 
     // Check pass/fail using L1 error
     if (l1error < L1ERROR_TOLERANCE)
       std::cout << "PASS" << std::endl;
-    else 
+    else
       std::cout << "FAIL" << std::endl;
 
     return 0;
