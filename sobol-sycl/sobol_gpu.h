@@ -37,9 +37,9 @@
 #define SOBOL_GPU_H
 
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-double sobolGPU(queue &q, int repeat, int n_vectors, int n_dimensions, 
-                buffer<unsigned int> &d_directions, buffer<float> &d_output);
+double sobolGPU(sycl::queue &q, int repeat, int n_vectors, int n_dimensions,
+                unsigned int *d_directions, float *d_output);
 
 #endif
