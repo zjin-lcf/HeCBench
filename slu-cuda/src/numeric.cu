@@ -589,4 +589,5 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
   cudaFree(csr_r_ptr_dev);
   cudaFree(csr_diag_ptr_dev);
   cudaFree(level_idx_dev);
+  cudaFree(tmpMem);
 }

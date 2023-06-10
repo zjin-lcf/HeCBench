@@ -35,13 +35,13 @@ SLU_INC = -I$(SLU_PATH)/../include \
           -I$(SLU_PATH)/nicslu/util
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall $(SLU_INC) -I../include -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall $(SLU_INC) -fsycl
 
 # Linker Flags
 LDFLAGS = -lpthread
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
