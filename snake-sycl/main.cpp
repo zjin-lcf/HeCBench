@@ -35,7 +35,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 using namespace std::chrono;
 
@@ -70,7 +70,7 @@ int main(int argc, const char * const argv[])
   int ReadLength = atoi(argv[1]);//in my inputs, it is always 100. Just for the generality we keep it as a variable
   int NumReads = atoi(argv[3]); // Number of reads
   int repeat = atoi(argv[4]);
-  int Size_of_uint_in_Bit = 32; //in Bits 
+  int Size_of_uint_in_Bit = 32; //in Bits
 
   FILE * fp;
   char * line = NULL;
@@ -78,9 +78,9 @@ int main(int argc, const char * const argv[])
   ssize_t read;
   char *p;//when reading each char_basepair from the file, we read it into the p.
 
-  int Number_of_warps_inside_each_block = 8; 
+  int Number_of_warps_inside_each_block = 8;
   int Concurrent_threads_In_Block = warp_size * Number_of_warps_inside_each_block;
-  int Number_of_blocks_inside_each_kernel = (NumReads + Concurrent_threads_In_Block - 1) / 
+  int Number_of_blocks_inside_each_kernel = (NumReads + Concurrent_threads_In_Block - 1) /
                                             Concurrent_threads_In_Block;
 
   int F_ErrorThreshold =0;
@@ -155,27 +155,23 @@ int main(int argc, const char * const argv[])
   fclose(fp);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<uint, 1> Dev_ReadSeq (NumReads * 8);
-  buffer<uint, 1> Dev_RefSeq (NumReads * 8);
-  buffer<int, 1> Dtest_Results (NumReads);
+  uint *d_ReadSeq = sycl::malloc_device<uint>(NumReads * 8, q);
+  q.memcpy(d_ReadSeq, ReadSeq, sizeof(int) * NumReads * 8);
 
-  range<1> gws(Concurrent_threads_In_Block * Number_of_blocks_inside_each_kernel);
-  range<1> lws(Concurrent_threads_In_Block);
+  uint *d_RefSeq = sycl::malloc_device<uint>(NumReads * 8, q);
+  q.memcpy(d_RefSeq, RefSeq, sizeof(int) * NumReads * 8);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_ReadSeq.get_access<sycl_write>(cgh);
-    cgh.copy(ReadSeq, acc);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = Dev_RefSeq.get_access<sycl_write>(cgh);
-    cgh.copy(RefSeq, acc);
-  });
+   int *d_Results = sycl::malloc_device<int>(NumReads, q);
+
+  sycl::range<1> gws(Concurrent_threads_In_Block * Number_of_blocks_inside_each_kernel);
+  sycl::range<1> lws(Concurrent_threads_In_Block);
+
+  q.wait();
 
   bool error = false;
   for (int loopPar = 0; loopPar <= 25; loopPar++) {
@@ -185,12 +181,10 @@ int main(int argc, const char * const argv[])
     auto t1 = high_resolution_clock::now();
 
     for (int n = 0; n < repeat; n++) {
-      q.submit([&] (handler &cgh) {
-        auto qs = Dev_ReadSeq.get_access<sycl_read>(cgh); 
-        auto rs = Dev_RefSeq.get_access<sycl_read>(cgh); 
-        auto tr = Dtest_Results.get_access<sycl_write>(cgh);
-        cgh.parallel_for<class filter>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          sneaky_snake (item, qs.get_pointer(), rs.get_pointer(), tr.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class filter>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          sneaky_snake (item, d_ReadSeq, d_RefSeq, d_Results,
                         NumReads, F_ErrorThreshold);
        });
       });
@@ -200,10 +194,7 @@ int main(int argc, const char * const argv[])
     auto t2 = high_resolution_clock::now();
     double elapsed_time = duration_cast<microseconds>(t2 - t1).count();
 
-    q.submit([&] (handler &cgh) {
-      auto acc = Dtest_Results.get_access<sycl_read>(cgh);
-      cgh.copy(acc, DFinal_Results);
-    }).wait();
+    q.memcpy(DFinal_Results, d_Results, sizeof(int) * NumReads).wait();
 
     // verify
     sneaky_snake_ref(ReadSeq, RefSeq, HFinal_Results, NumReads, F_ErrorThreshold);
@@ -214,7 +205,7 @@ int main(int argc, const char * const argv[])
     int D_accepted = 0;
     for(int i = 0; i < NumReads; i++) if(DFinal_Results[i] == 1) D_accepted++;
 
-    printf("Error threshold: %2d | Average kernel time (us): %5.4f | Accepted: %10d | Rejected: %10d\n", 
+    printf("Error threshold: %2d | Average kernel time (us): %5.4f | Accepted: %10d | Rejected: %10d\n",
           F_ErrorThreshold, elapsed_time / repeat, D_accepted, NumReads - D_accepted);
   }
   printf("%s\n", error ? "FAIL" : "PASS");
@@ -223,5 +214,8 @@ int main(int argc, const char * const argv[])
   free(RefSeq);
   free(DFinal_Results);
   free(HFinal_Results);
+  sycl::free(d_ReadSeq, q);
+  sycl::free(d_RefSeq, q);
+  sycl::free(d_Results, q);
   return 0;
 }

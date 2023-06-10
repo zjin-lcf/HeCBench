@@ -1,5 +1,5 @@
 void sneaky_snake(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const uint*__restrict F_ReadSeq,
   const uint*__restrict F_RefSeq, 
   int*__restrict Ftest_Results, 
