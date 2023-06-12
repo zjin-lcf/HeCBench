@@ -443,7 +443,7 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
             // WARNING: lcm can be slow, is not O(1) complexity.
             const size_t l = lcm(stride1, stride2);
             const size_t value = c_buf.elt(r,c);
-            ASSERT(c_buf.elt(r,c) == 1 + (k-1)/l && "Error in compiuted result.");
+            ASSERT(c_buf.elt(r,c) == 1 + (k-1)/l && "Error in computed result.");
           }
         }
       } // if is_step_active
@@ -490,7 +490,7 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
   const double timetotal= timetotal2 - timetotal1;
 
   if (proc_num == 0) {
-    printf("TF %.3f GEMM sec %.3f GEMM TF/sec %.3f total sec %.3f hash %zu\n",
+    printf("TFLOPS %.3f\nGEMM time %.3f (s)\nGEMM TFLOPS/s %.3f\nTotal time %.3f (s)\nhash %zu\n",
       flops/1e12, timegemm, flops*1e-12/timegemm, timetotal, hash);
   }
 
