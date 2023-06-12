@@ -5,14 +5,15 @@
 #include <math.h>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define NUM_THREADS 128
 #define NUM_BLOCKS 256
 
-
 // interpolation
-float interp(const int3 d, const unsigned char f[], float x, float y, float z)
+
+float interp(const sycl::int3 d, const unsigned char f[], float x, float y,
+             float z)
 {
   int ix, iy, iz;
   float dx1, dy1, dz1, dx2, dy2, dz2;
@@ -20,25 +21,16 @@ float interp(const int3 d, const unsigned char f[], float x, float y, float z)
   float vf;
   const unsigned char *ff;
 
-#ifdef __SYCL_DEVICE_ONLY__
-  ix = sycl::floor(x); 
-  iy = sycl::floor(y);
-  iz = sycl::floor(z); 
-#else
-  ix = floorf(x); 
-  iy = floorf(y);
-  iz = floorf(z); 
-#endif
-  dx1=x-ix; dx2=1.f-dx1;
-  dy1=y-iy; dy2=1.f-dy1;
-  dz1=z-iz; dz2=1.f-dz1;
+  ix = sycl::floor(x); dx1 = x - ix; dx2 = 1.f - dx1;
+  iy = sycl::floor(y); dy1 = y - iy; dy2 = 1.f - dy1;
+  iz = sycl::floor(z); dz1 = z - iz; dz2 = 1.f - dz1;
 
-  ff   = f + ix-1+d.x()*(iy-1+d.y()*(iz-1));
+  ff = f + ix - 1 + d.x() * (iy - 1 + d.y() * (iz - 1));
   k222 = ff[   0]; k122 = ff[     1];
-  k212 = ff[d.x()]; k112 = ff[d.x()+1];
-  ff  += d.x()*d.y();
+  k212 = ff[d.x()]; k112 = ff[d.x() + 1];
+  ff += d.x() * d.y();
   k221 = ff[   0]; k121 = ff[     1];
-  k211 = ff[d.x()]; k111 = ff[d.x()+1];
+  k211 = ff[d.x()]; k111 = ff[d.x() + 1];
 
   vf = (((k222*dx2+k122*dx1)*dy2 + (k212*dx2+k112*dx1)*dy1))*dz2 +
        (((k221*dx2+k121*dx1)*dy2 + (k211*dx2+k111*dx1)*dy1))*dz1;
@@ -46,17 +38,12 @@ float interp(const int3 d, const unsigned char f[], float x, float y, float z)
   return(vf);
 }
 
-void spm (
-  const float *__restrict M, 
-  const int data_size,
-  const unsigned char *__restrict g_d,
-  const unsigned char *__restrict f_d,
-  const int3 dg,
-  const int3 df,
-  unsigned char *__restrict ivf_d,
-  unsigned char *__restrict ivg_d,
-  bool *__restrict data_threshold_d,
-  nd_item<1> &item)
+void spm(const float *__restrict__ M, const int data_size,
+         const unsigned char *__restrict__ g_d,
+         const unsigned char *__restrict__ f_d, const sycl::int3 dg,
+         const sycl::int3 df, unsigned char *__restrict__ ivf_d,
+         unsigned char *__restrict__ ivg_d, bool *__restrict__ data_threshold_d,
+         const sycl::nd_item<1> &item)
 {
   // 97 random values
   const float ran[] = {
@@ -71,33 +58,35 @@ void spm (
     0.833027,0.191863,0.638987,0.669,0.772088,0.379818,0.441585,0.48306,0.608106,
     0.175996,0.00202556,0.790224,0.513609,0.213229,0.10345,0.157337,0.407515,0.407757,
     0.0526927,0.941815,0.149972,0.384374,0.311059,0.168534,0.896648};
-  
+
   const int idx = item.get_global_id(0);
 
-  int x_datasize=(dg.x()-2);
-  int y_datasize=(dg.y()-2);
+  int x_datasize = (dg.x() - 2);
+  int y_datasize = (dg.y() - 2);
 
   for(int i = idx; i < data_size; i += NUM_THREADS*NUM_BLOCKS)
   {
     float xx_temp = (i%x_datasize)+1.f;
-    float yy_temp = ((int)sycl::floor((float)i/x_datasize)%y_datasize)+1.f;
-    float zz_temp = (sycl::floor((float)i/x_datasize))/y_datasize+1.f;
+    float yy_temp =
+        ((int)sycl::floor((float)i / x_datasize) % y_datasize) + 1.f;
+    float zz_temp = (sycl::floor((float)i / x_datasize)) / y_datasize + 1.f;
 
     // generate rx,ry,rz coordinates
-    float rx = xx_temp + ran[idx%97];
-    float ry = yy_temp + ran[idx%97];
-    float rz = zz_temp + ran[idx%97];
+    float rx = xx_temp + ran[i%97];
+    float ry = yy_temp + ran[i%97];
+    float rz = zz_temp + ran[i%97];
 
     // rigid transformation over rx,ry,rz coordinates
     float xp = M[0]*rx + M[4]*ry + M[ 8]*rz + M[12];
     float yp = M[1]*rx + M[5]*ry + M[ 9]*rz+ M[13];
     float zp = M[2]*rx + M[6]*ry + M[10]*rz+ M[14];
 
-    if (zp>=1.f && zp<df.z() && yp>=1.f && yp<df.y() && xp>=1.f && xp<df.x())
+    if (zp >= 1.f && zp < df.z() && yp >= 1.f && yp < df.y() && xp >= 1.f &&
+        xp < df.x())
     {
       // interpolation
-      ivf_d[i] = sycl::floor(interp(df, f_d, xp,yp,zp)+0.5f);
-      ivg_d[i] = sycl::floor(interp(dg, g_d, rx,ry,rz)+0.5f);
+      ivf_d[i] = sycl::floor(interp(df, f_d, xp, yp, zp) + 0.5f);
+      ivg_d[i] = sycl::floor(interp(dg, g_d, rx, ry, rz) + 0.5f);
       data_threshold_d[i] = true;
     }
     else
@@ -109,16 +98,11 @@ void spm (
   }
 }
 
-void spm_reference (
-  const float *M, 
-  const int data_size,
-  const unsigned char *g_d,
-  const unsigned char *f_d,
-  const int3 dg,
-  const int3 df,
-  unsigned char *ivf_d,
-  unsigned char *ivg_d,
-  bool *data_threshold_d)
+void spm_reference(const float *M, const int data_size,
+                   const unsigned char *g_d, const unsigned char *f_d,
+                   const sycl::int3 dg, const sycl::int3 df,
+                   unsigned char *ivf_d, unsigned char *ivg_d,
+                   bool *data_threshold_d)
 {
   // 97 random values
   const float ran[] = {
@@ -133,9 +117,9 @@ void spm_reference (
     0.833027,0.191863,0.638987,0.669,0.772088,0.379818,0.441585,0.48306,0.608106,
     0.175996,0.00202556,0.790224,0.513609,0.213229,0.10345,0.157337,0.407515,0.407757,
     0.0526927,0.941815,0.149972,0.384374,0.311059,0.168534,0.896648};
-  
-  int x_datasize=(dg.x()-2);
-  int y_datasize=(dg.y()-2);
+
+  int x_datasize = (dg.x() - 2);
+  int y_datasize = (dg.y() - 2);
 
   for(int i = 0; i < data_size; i++)
   {
@@ -153,7 +137,8 @@ void spm_reference (
     float yp = M[1]*rx + M[5]*ry + M[ 9]*rz+ M[13];
     float zp = M[2]*rx + M[6]*ry + M[10]*rz+ M[14];
 
-    if (zp>=1.f && zp<df.z() && yp>=1.f && yp<df.y() && xp>=1.f && xp<df.x())
+    if (zp >= 1.f && zp < df.z() && yp >= 1.f && yp < df.y() && xp >= 1.f &&
+        xp < df.x())
     {
       // interpolation
       ivf_d[i] = floorf(interp(df, f_d, xp,yp,zp)+0.5f);
@@ -178,16 +163,16 @@ int main(int argc, char* argv[])
   int v = atoi(argv[1]);
   int repeat = atoi(argv[2]);
 
-  int3 g_vol = {v,v,v};
-  int3 f_vol = {v,v,v};
+  sycl::int3 g_vol = {v, v, v};
+  sycl::int3 f_vol = {v, v, v};
 
-  const int data_size = (g_vol.x()+1) * (g_vol.y()+1) * (g_vol.z()+5);
+  const int data_size = (g_vol.x() + 1) * (g_vol.y() + 1) * (g_vol.z() + 5);
   const int vol_size = g_vol.x() * g_vol.y() * g_vol.z();
 
   int *hist_d = (int*) malloc (65536*sizeof(int));
   int *hist_h = (int*) malloc (65536*sizeof(int));
-  memset(hist_d, 0, sizeof(int)*65536); 
-  memset(hist_h, 0, sizeof(int)*65536); 
+  memset(hist_d, 0, sizeof(int)*65536);
+  memset(hist_h, 0, sizeof(int)*65536);
 
   unsigned char *ivf_h = (unsigned char *)malloc(vol_size*sizeof(unsigned char));
   unsigned char *ivg_h = (unsigned char *)malloc(vol_size*sizeof(unsigned char));
@@ -205,38 +190,42 @@ int main(int argc, char* argv[])
     f_h[i] = rand() % 256;
   }
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> M_d (M_h, 16);
-  buffer<unsigned char, 1> g_d (g_h, data_size);
-  buffer<unsigned char, 1> f_d (f_h, data_size);
-  buffer<unsigned char, 1> ivf_d (ivf_h, vol_size);
-  buffer<unsigned char, 1> ivg_d (ivg_h, vol_size);
-  buffer<bool, 1> data_threshold_d (data_threshold_h, vol_size);
+  float *M_d;
+  M_d = sycl::malloc_device<float>(16, q);
+  q.memcpy(M_d, M_h, 16 * sizeof(float));
 
-  range<1> gws (NUM_BLOCKS*NUM_THREADS);
-  range<1> lws (NUM_THREADS);
+  unsigned char *g_d, *f_d;
+  g_d = sycl::malloc_device<unsigned char>(data_size, q);
+  f_d = sycl::malloc_device<unsigned char>(data_size, q);
+
+  q.memcpy(g_d, g_h, data_size * sizeof(unsigned char));
+  q.memcpy(f_d, f_h, data_size * sizeof(unsigned char));
+
+  unsigned char *ivf_d, *ivg_d;
+  ivf_d = sycl::malloc_device<unsigned char>(vol_size, q);
+  ivg_d = sycl::malloc_device<unsigned char>(vol_size, q);
+
+  bool *data_threshold_d;
+  data_threshold_d = sycl::malloc_device<bool>(vol_size, q);
+
+  sycl::range<1> gws (NUM_BLOCKS*NUM_THREADS);
+  sycl::range<1> lws (NUM_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto M = M_d.get_access<sycl_read>(cgh);
-      auto g = g_d.get_access<sycl_read>(cgh);
-      auto f = f_d.get_access<sycl_read>(cgh);
-      auto ivf = ivf_d.get_access<sycl_discard_write>(cgh);
-      auto ivg = ivg_d.get_access<sycl_discard_write>(cgh);
-      auto data_threshold = data_threshold_d.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        spm(M.get_pointer(), vol_size, g.get_pointer(), f.get_pointer(), g_vol, f_vol,
-            ivf.get_pointer(),ivg.get_pointer(),data_threshold.get_pointer(), item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        spm(M_d, vol_size, g_d, f_d, g_vol, f_vol,
+            ivf_d, ivg_d, data_threshold_d, item);
       });
     });
   }
@@ -246,13 +235,16 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  } // end of sycl scope
+  q.memcpy(ivf_h, ivf_d, vol_size * sizeof(unsigned char));
+  q.memcpy(ivg_h, ivg_d, vol_size * sizeof(unsigned char));
+  q.memcpy(data_threshold_h, data_threshold_d, vol_size * sizeof(bool));
+  q.wait();
 
   int count = 0;
   for(int i = 0; i < vol_size; i++)
   {
     if (data_threshold_h[i]) {
-      hist_d[ivf_h[i]+ivg_h[i]*256] += 1;    
+      hist_d[ivf_h[i]+ivg_h[i]*256] += 1;
       count++;
     }
   }
@@ -263,7 +255,7 @@ int main(int argc, char* argv[])
   for(int i = 0; i < vol_size; i++)
   {
     if (data_threshold_h[i]) {
-      hist_h[ivf_h[i]+ivg_h[i]*256] += 1;    
+      hist_h[ivf_h[i]+ivg_h[i]*256] += 1;
       count++;
     }
   }
@@ -272,7 +264,7 @@ int main(int argc, char* argv[])
   int max_diff = 0;
   for(int i = 0; i < 65536; i++) {
     if (hist_h[i] != hist_d[i]) {
-      max_diff = max(max_diff, abs(hist_h[i] - hist_d[i]));
+      max_diff = std::max(max_diff, abs(hist_h[i] - hist_d[i]));
     }
   }
   printf("Maximum difference %d\n", max_diff);
@@ -284,5 +276,12 @@ int main(int argc, char* argv[])
   free(g_h);
   free(f_h);
   free(data_threshold_h);
+  sycl::free(M_d, q);
+  sycl::free(g_d, q);
+  sycl::free(f_d, q);
+  sycl::free(ivf_d, q);
+  sycl::free(ivg_d, q);
+  sycl::free(data_threshold_d, q);
+
   return 0;
 }
