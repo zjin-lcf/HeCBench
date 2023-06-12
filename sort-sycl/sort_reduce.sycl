@@ -32,7 +32,7 @@
         {
             // Load this thread's sum into local/shared memory
             lmem[tid] = digit_counts[d];
-	          item.barrier(access::fence_space::local_space);
+	          item.barrier(sycl::access::fence_space::local_space);
 
             // Reduce the contents of shared/local memory
             for (unsigned int s = item.get_local_range(0) / 2; s > 0; s >>= 1)
@@ -41,7 +41,7 @@
                 {
                     lmem[tid] += lmem[tid + s];
                 }
-	              item.barrier(access::fence_space::local_space);
+	              item.barrier(sycl::access::fence_space::local_space);
             }
 
             // Write result for this block to global memory
