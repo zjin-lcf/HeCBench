@@ -1,8 +1,8 @@
 int local_range = item.get_local_range(0);
 int lid = item.get_local_id(0);
 
-if (lid == 0) s_seed[0] = 0; 
-item.barrier(access::fence_space::local_space);
+if (lid == 0) l_seed = 0; 
+item.barrier(sycl::access::fence_space::local_space);
 
 // Decide if this is the last thread that needs to
 // propagate the seed value
@@ -23,27 +23,27 @@ for (int d = 0; d < 16; d++)
   lmem[idx] = 0;
   idx += local_range;
   lmem[idx] = val;
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   for (int i = 1; i < local_range; i *= 2)
   {
     T t = lmem[idx -  i]; 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     lmem[idx] += t;     
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
   T res = lmem[idx-1];
 
   // Write scanned value out to global
   if (lid < num_work_groups)
   {
-    isums[(num_work_groups * d) + lid] = res + s_seed[0];
+    isums[(num_work_groups * d) + lid] = res + l_seed;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if (last_thread)
   {
-    s_seed[0] += res + val;
+    l_seed += res + val;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 }
 

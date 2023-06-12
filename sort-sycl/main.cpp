@@ -5,9 +5,10 @@
 #include <fstream>
 #include <vector>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 typedef unsigned int T;
+typedef sycl::uint4 VECTYPE;
 
 void verifySort(const T *keys, const size_t size)
 {
@@ -30,9 +31,9 @@ void verifySort(const T *keys, const size_t size)
     std::cout << "FAIL" << std::endl;
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
-  if (argc != 3) 
+  if (argc != 3)
   {
     printf("Usage: %s <problem size> <number of passes>\n.", argv[0]);
     return -1;
@@ -51,8 +52,8 @@ int main(int argc, char** argv)
   // Create input data on CPU
   unsigned int bytes = size * sizeof(T);
 
-  T* h_idata = (T*) malloc (bytes); 
-  T* h_odata = (T*) malloc (bytes); 
+  T* h_idata = (T*) malloc (bytes);
+  T* h_odata = (T*) malloc (bytes);
 
   // Initialize host memory
   std::cout << "Initializing host memory." << std::endl;
@@ -64,100 +65,99 @@ int main(int argc, char** argv)
 
   std::cout << "Running benchmark with input array length " << size << std::endl;
 
-  { // sycl scope
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    // Number of local work items per group
-    const size_t local_wsize  = 256;
-    // Number of global work items
-    const size_t global_wsize = 16384; 
-    // 64 work groups
-    const size_t num_work_groups = global_wsize / local_wsize;
+  // Number of local work items per group
+  const size_t local_wsize  = 256;
+  // Number of global work items
+  const size_t global_wsize = 16384;
+  // 64 work groups
+  const size_t num_work_groups = global_wsize / local_wsize;
 
-    // The radix width in bits
-    const int radix_width = 4; // Changing this requires major kernel updates
-    //const int num_digits = (int)pow((double)2, radix_width); // n possible digits
-    const int num_digits = 16;
+  // The radix width in bits
+  const int radix_width = 4; // Changing this requires major kernel updates
+  //const int num_digits = (int)pow((double)2, radix_width); // n possible digits
+  const int num_digits = 16;
 
-    const property_list props = property::buffer::use_host_ptr();
+  T *d_idata = sycl::malloc_device<T>(size, q);
+  q.memcpy(d_idata, h_idata, size * sizeof(T));
 
-    buffer<T, 1> d_idata (h_idata, size, props);
-    d_idata.set_final_data( nullptr );
+  T *d_odata = sycl::malloc_device<T>(size, q);
+  T *d_isums = sycl::malloc_device<T>(num_work_groups * num_digits, q);
 
-    buffer<T, 1> d_odata (size); 
-    d_odata.set_final_data( h_odata );
+  sycl::range<1> gws (global_wsize);
+  sycl::range<1> lws (local_wsize);
+  sycl::range<1> lws2 (local_wsize * 2);
+  sycl::range<1> lws3 (16);
 
-    buffer<T, 1> d_isums (num_work_groups * num_digits);
+  double time = 0.0;
 
-    range<1> gws (global_wsize);
-    range<1> lws (local_wsize);
+  for (int k = 0; k < passes; k++)
+  {
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
 
-    double time = 0.0;
-
-    for (int k = 0; k < passes; k++)
+    // Assuming an 8 bit byte.
+    // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
+    for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
     {
-      q.wait();
-      auto start = std::chrono::steady_clock::now();
+      // Like scan, we use a reduce-then-scan approach
 
-      // Assuming an 8 bit byte.
-      // shift is uint because Computecpp compiler has no operator>>(unsigned int, int);
-      for (unsigned int shift = 0; shift < sizeof(T)*8; shift += radix_width)
-      {
-        // Like scan, we use a reduce-then-scan approach
+      // But before proceeding, update the shift appropriately
+      // for each kernel. This is how many bits to shift to the
+      // right used in binning.
 
-        // But before proceeding, update the shift appropriately
-        // for each kernel. This is how many bits to shift to the
-        // right used in binning.
+      // Also, the sort is not in place, so swap the input and output
+      // buffers on each pass.
+      bool even = ((shift / radix_width) % 2 == 0) ? true : false;
 
-        // Also, the sort is not in place, so swap the input and output
-        // buffers on each pass.
-        bool even = ((shift / radix_width) % 2 == 0) ? true : false;
+      auto in = even ? d_idata : d_odata;
+      auto out = even ? d_odata : d_idata;
+      auto isums = d_isums;
 
-        q.submit([&](handler& cgh) {
-          auto in = even ? d_idata.get_access<sycl_read>(cgh) : d_odata.get_access<sycl_read>(cgh);
-          auto isums = d_isums.get_access<sycl_write>(cgh);
-          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize, cgh);
-            cgh.parallel_for<class reduce>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              #include "sort_reduce.sycl"
-          });
+      q.submit([&](sycl::handler& cgh) {
+        sycl::local_accessor <T, 1> lmem (lws, cgh);
+          cgh.parallel_for<class reduce>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+            #include "sort_reduce.sycl"
         });
+      });
 
-        q.submit([&](handler& cgh) {
-          auto isums = d_isums.get_access<sycl_read_write>(cgh);
-          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
-          accessor <T, 1, sycl_read_write, access::target::local> s_seed (1, cgh);
-          cgh.parallel_for<class top_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            #include "sort_top_scan.sycl"
-          });
+      q.submit([&](sycl::handler& cgh) {
+        sycl::local_accessor <T, 1> lmem (lws2, cgh);
+        sycl::local_accessor <T, 0> l_seed (cgh);
+        cgh.parallel_for<class top_scan>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          #include "sort_top_scan.sycl"
         });
+      });
 
-        q.submit([&](handler& cgh) {
-          auto in = even ? d_idata.get_access<sycl_read_write>(cgh) : d_odata.get_access<sycl_read_write>(cgh);
-          auto isums = d_isums.get_access<sycl_read_write>(cgh);
-          auto out = even ? d_odata.get_access<sycl_read_write>(cgh) : d_idata.get_access<sycl_read_write>(cgh) ;
-          accessor <T, 1, sycl_read_write, access::target::local> lmem (local_wsize*2, cgh);
-          accessor <T, 1, sycl_read_write, access::target::local> l_scanned_seeds (16, cgh);
-          accessor <T, 1, sycl_read_write, access::target::local> l_block_counts (16, cgh);
-          cgh.parallel_for<class bottom_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            #include "sort_bottom_scan.sycl"
-          });
+      q.submit([&](sycl::handler& cgh) {
+        sycl::local_accessor <T, 1> lmem (lws2, cgh);
+        sycl::local_accessor <T, 1> l_scanned_seeds (lws3, cgh);
+        sycl::local_accessor <T, 1> l_block_counts (lws3, cgh);
+        cgh.parallel_for<class bottom_scan>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          #include "sort_bottom_scan.sycl"
         });
-      }
+      });
+    }
 
-      q.wait();
-      auto end = std::chrono::steady_clock::now();
-      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    }  // passes
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }  // passes
 
-    printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
+  printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
 
-  } // sycl scope
+  q.memcpy(h_odata, d_odata, size * sizeof(T)).wait();
+  sycl::free(d_idata, q);
+  sycl::free(d_odata, q);
+  sycl::free(d_isums, q);
 
   verifySort(h_odata, size);
 
