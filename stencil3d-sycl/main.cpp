@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // 2D block size
 #define BSIZE 16
@@ -11,23 +11,23 @@
 typedef double Real;
 
 void stencil3d(
-          nd_item<3> &item,
+          sycl::nd_item<3> &item,
           Real*__restrict sm_psi,
-    const Real*__restrict d_psi, 
-          Real*__restrict d_npsi, 
-    const Real*__restrict d_sigmaX, 
-    const Real*__restrict d_sigmaY, 
+    const Real*__restrict d_psi,
+          Real*__restrict d_npsi,
+    const Real*__restrict d_sigmaX,
+    const Real*__restrict d_sigmaY,
     const Real*__restrict d_sigmaZ,
     int nx, int ny, int nz)
 {
   #define V0(y,z) sm_psi[pii*BSIZE*BSIZE+(y)*BSIZE+(z)]
   #define V1(y,z) sm_psi[cii*BSIZE*BSIZE+(y)*BSIZE+(z)]
   #define V2(y,z) sm_psi[nii*BSIZE*BSIZE+(y)*BSIZE+(z)]
-  
+
   #define sigmaX(x,y,z,dir) d_sigmaX[ z + nz * ( y + ny * ( x + nx * dir ) ) ]
   #define sigmaY(x,y,z,dir) d_sigmaY[ z + nz * ( y + ny * ( x + nx * dir ) ) ]
   #define sigmaZ(x,y,z,dir) d_sigmaZ[ z + nz * ( y + ny * ( x + nx * dir ) ) ]
-  
+
   #define psi(x,y,z) d_psi[ z + nz * ( (y) + ny * (x) ) ]
   #define npsi(x,y,z) d_npsi[ z + nz * ( (y) + ny * (x) ) ]
 
@@ -63,7 +63,7 @@ void stencil3d(
   sm_psi[nii*BSIZE*BSIZE+tjj*BSIZE+tkk] = psi(1,tjj,tkk);
   Real xcharge,ycharge,zcharge,dV = 0;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   //initial
   if ((tkk>0) && (tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
@@ -71,7 +71,7 @@ void stencil3d(
     Real xd=-V1(tjj,tkk) + V2(tjj,tkk);
     Real yd=(-V1(-1 + tjj,tkk) + V1(1 + tjj,tkk) - V2(-1 + tjj,tkk) + V2(1 + tjj,tkk))/4.;
     Real zd=(-V1(tjj,-1 + tkk) + V1(tjj,1 + tkk) - V2(tjj,-1 + tkk) + V2(tjj,1 + tkk))/4.;
-    dV -= sigmaX(1,tjj,tkk,0) * xd + sigmaX(1,tjj,tkk,1) * yd + sigmaX(1,tjj,tkk,2) * zd ; 
+    dV -= sigmaX(1,tjj,tkk,0) * xd + sigmaX(1,tjj,tkk,1) * yd + sigmaX(1,tjj,tkk,2) * zd ;
   }
 
   tii=pii; pii=cii; cii=nii; nii=tii;
@@ -79,7 +79,7 @@ void stencil3d(
   for(int ii=1;ii<nLast_x;ii++)
   {
     sm_psi[nii*BSIZE*BSIZE+tjj*BSIZE+tkk] = psi(ii+1,tjj,tkk);
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // y face current
     if ((tkk>0) && (tkk<nLast_z) && (tjj<nLast_y))
@@ -87,16 +87,16 @@ void stencil3d(
       Real xd=(-V0(tjj,tkk) - V0(1 + tjj,tkk) + V2(tjj,tkk) + V2(1 + tjj,tkk))/4.;
       Real yd=-V1(tjj,tkk) + V1(1 + tjj,tkk);
       Real zd=(-V1(tjj,-1 + tkk) + V1(tjj,1 + tkk) - V1(1 + tjj,-1 + tkk) + V1(1 + tjj,1 + tkk))/4.;
-      ycharge = sigmaY(ii,tjj+1,tkk,0) * xd + sigmaY(ii,tjj+1,tkk,1) * yd + sigmaY(ii,tjj+1,tkk,2) * zd ; 
+      ycharge = sigmaY(ii,tjj+1,tkk,0) * xd + sigmaY(ii,tjj+1,tkk,1) * yd + sigmaY(ii,tjj+1,tkk,2) * zd ;
       dV += ycharge;
       sm_psi[3*BSIZE*BSIZE+tjj*BSIZE+tkk]=ycharge;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if ((tkk>0) && (tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
       dV -= sm_psi[3*BSIZE*BSIZE+(tjj-1)*BSIZE+tkk];  //bring from left
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // z face current
     if ((tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
@@ -104,16 +104,16 @@ void stencil3d(
       Real xd=(-V0(tjj,tkk) - V0(tjj,1 + tkk) + V2(tjj,tkk) + V2(tjj,1 + tkk))/4.;
       Real yd=(-V1(-1 + tjj,tkk) - V1(-1 + tjj,1 + tkk) + V1(1 + tjj,tkk) + V1(1 + tjj,1 + tkk))/4.;
       Real zd=-V1(tjj,tkk) + V1(tjj,1 + tkk);
-      zcharge = sigmaZ(ii,tjj,tkk+1,0) * xd + sigmaZ(ii,tjj,tkk+1,1) * yd + sigmaZ(ii,tjj,tkk+1,2) * zd ; 
+      zcharge = sigmaZ(ii,tjj,tkk+1,0) * xd + sigmaZ(ii,tjj,tkk+1,1) * yd + sigmaZ(ii,tjj,tkk+1,2) * zd ;
       dV += zcharge;
       sm_psi[3*BSIZE*BSIZE+tjj*BSIZE+tkk]=zcharge;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if ((tkk>0) && (tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
       dV -= sm_psi[3*BSIZE*BSIZE+tjj*BSIZE+tkk-1];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // x face current
     if ((tkk>0) && (tkk<nLast_z) && (tjj>0) && (tjj<nLast_y))
@@ -121,12 +121,12 @@ void stencil3d(
       Real xd=-V1(tjj,tkk) + V2(tjj,tkk);
       Real yd=(-V1(-1 + tjj,tkk) + V1(1 + tjj,tkk) - V2(-1 + tjj,tkk) + V2(1 + tjj,tkk))/4.;
       Real zd=(-V1(tjj,-1 + tkk) + V1(tjj,1 + tkk) - V2(tjj,-1 + tkk) + V2(tjj,1 + tkk))/4.;
-      xcharge = sigmaX(ii+1,tjj,tkk,0) * xd + sigmaX(ii+1,tjj,tkk,1) * yd + sigmaX(ii+1,tjj,tkk,2) * zd ; 
+      xcharge = sigmaX(ii+1,tjj,tkk,0) * xd + sigmaX(ii+1,tjj,tkk,1) * yd + sigmaX(ii+1,tjj,tkk,2) * zd ;
       dV += xcharge;
       npsi(ii,tjj,tkk) = dV; //store dV
       dV = -xcharge; //pass to the next cell in x-dir
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     tii=pii; pii=cii; cii=nii; nii=tii;
   }
 }
@@ -146,11 +146,10 @@ int main(int argc, char* argv[])
   printf("Grid dimension: nx=%d ny=%d nz=%d\n",nx,ny,nz);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // allocate and initialize Vm
   Real *h_Vm = (Real*)malloc(sizeof(Real)*vol);
@@ -162,54 +161,38 @@ int main(int argc, char* argv[])
       for(int kk=0;kk<nz;kk++)
         h_Vm(ii,jj,kk) = (ii*(ny*nz) + jj * nz + kk) % 19;
 
-  buffer<Real, 1> d_Vm(h_Vm, vol);
+  Real *d_Vm = sycl::malloc_device<Real>(vol, q);
+  q.memcpy(d_Vm, h_Vm, sizeof(Real) * vol);
 
   // allocate and initialize sigma
   Real *h_sigma = (Real*) malloc(sizeof(Real)*vol*9);
 
   for (int i = 0; i < vol*9; i++) h_sigma[i] = i % 19;
 
-  buffer<Real, 1> d_sigma(h_sigma, vol*9);
+  Real *d_sigma = sycl::malloc_device<Real>(vol*9, q);
+  q.memcpy(d_sigma, h_sigma, sizeof(Real) * vol*9);
 
   // reset dVm
-  buffer<Real, 1> d_dVm(vol);
-  q.submit([&] (handler &cgh) {
-    auto dVm = d_dVm.get_access<sycl_write>(cgh);
-    cgh.fill(dVm, (Real)0);
-  });
+  Real *d_dVm = sycl::malloc_device<Real>(vol, q);
+  q.memset(d_dVm, 0, sizeof(Real) * vol);
 
   //determine block sizes
   int bdimz = (nz-2)/(BSIZE-2) + ((nz-2)%(BSIZE-2)==0?0:1);
   int bdimy = (ny-2)/(BSIZE-2) + ((ny-2)%(BSIZE-2)==0?0:1);
   int bdimx = (nx-2)/XTILE + ((nx-2)%XTILE==0?0:1);
-  range<3> gws (bdimz, bdimy*BSIZE, bdimx*BSIZE);
-  range<3> lws (1, BSIZE, BSIZE);
-
-  // warmup
-  q.submit([&] (handler &cgh) {
-    auto Vm = d_Vm.get_access<sycl_read>(cgh);
-    auto dVm = d_dVm.get_access<sycl_write>(cgh);
-    auto sigma = d_sigma.get_access<sycl_read>(cgh);
-    accessor<Real, 1, sycl_read_write, access::target::local> sm_psi (4*BSIZE*BSIZE, cgh);
-    cgh.parallel_for<class diffusion_warmup>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-      stencil3d(item, sm_psi.get_pointer(), Vm.get_pointer(), dVm.get_pointer(), 
-                sigma.get_pointer(), sigma.get_pointer() + 3*vol, sigma.get_pointer() + 6*vol, 
-                nx, ny, nz);
-    });
-  });
+  sycl::range<3> gws (bdimz, bdimy*BSIZE, bdimx*BSIZE);
+  sycl::range<3> lws (1, BSIZE, BSIZE);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto Vm = d_Vm.get_access<sycl_read>(cgh);
-      auto dVm = d_dVm.get_access<sycl_write>(cgh);
-      auto sigma = d_sigma.get_access<sycl_read>(cgh);
-      accessor<Real, 1, sycl_read_write, access::target::local> sm_psi (4*BSIZE*BSIZE, cgh);
-      cgh.parallel_for<class diffusion>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
-        stencil3d(item, sm_psi.get_pointer(), Vm.get_pointer(), dVm.get_pointer(), 
-                  sigma.get_pointer(), sigma.get_pointer() + 3*vol, sigma.get_pointer() + 6*vol, 
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<Real, 1> sm_psi (sycl::range<1>(4*BSIZE*BSIZE), cgh);
+      cgh.parallel_for<class diffusion>(
+        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
+        stencil3d(item, sm_psi.get_pointer(), d_Vm, d_dVm,
+                  d_sigma, d_sigma + 3*vol, d_sigma + 6*vol,
                   nx, ny, nz);
       });
     });
@@ -222,10 +205,7 @@ int main(int argc, char* argv[])
 
   // read dVm
   Real *h_dVm = (Real*) malloc (sizeof(Real) * vol);
-  q.submit([&] (handler &cgh) {
-    auto dVm = d_dVm.get_access<sycl_read>(cgh);
-    cgh.copy(dVm, h_dVm);
-  }).wait();
+  q.memcpy(h_dVm, d_dVm, vol*sizeof(Real)).wait();
 
 #ifdef DUMP
   for(int ii=0;ii<nx;ii++)
@@ -234,6 +214,9 @@ int main(int argc, char* argv[])
         printf("dVm (%d,%d,%d)=%e\n",ii,jj,kk,h_dVm[kk+nz*(jj+ny*ii)]);
 #endif
 
+  sycl::free(d_Vm, q);
+  sycl::free(d_dVm, q);
+  sycl::free(d_sigma, q);
   free(h_sigma);
   free(h_Vm);
   free(h_dVm);
