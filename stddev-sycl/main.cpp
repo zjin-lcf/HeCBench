@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 // final step for the deviation of a sample
@@ -45,36 +45,32 @@ class sopKernel;
  *  to normalize the output using N-1 or N, for true or false, respectively
  */
 template <typename Type, typename IdxType = int>
-void stddev(queue &q,
-            buffer<Type, 1> &d_std, 
-            buffer<const Type, 1> &d_data, 
+void stddev(sycl::queue &q,
+            Type *d_std,
+            const Type *d_data,
             IdxType D, IdxType N, bool sample) {
   static const int TPB = 256;
   static const int RowsPerThread = 4;
   static const int ColsPerBlk = 32;
   static const int RowsPerBlk = (TPB / ColsPerBlk) * RowsPerThread;
 
-  range<2> gws ((D + (IdxType)ColsPerBlk - 1) / (IdxType)ColsPerBlk ,
-                (N + (IdxType)RowsPerBlk - 1) / (IdxType)RowsPerBlk * TPB);
+  sycl::range<2> gws ((D + (IdxType)ColsPerBlk - 1) / (IdxType)ColsPerBlk ,
+                      (N + (IdxType)RowsPerBlk - 1) / (IdxType)RowsPerBlk * TPB);
 
-  range<2> lws (1, TPB);
+  sycl::range<2> lws (1, TPB);
 
   // required for atomics
-  q.submit([&] (handler &cgh) {
-    auto acc = d_std.template get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, (Type)0);
-  });
+  q.memset(d_std, 0, sizeof(Type) * D); // required for atomics
 
-  q.submit([&] (handler &cgh) {
-    auto std = d_std.template get_access<sycl_read_write>(cgh);
-    auto data = d_data.template get_access<sycl_read>(cgh);
-    accessor<Type, 1, sycl_read_write, access::target::local> sstd(ColsPerBlk, cgh);
-    cgh.parallel_for<class sopKernel<Type, IdxType, TPB, ColsPerBlk>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<Type, 1> sstd (sycl::range<1>(ColsPerBlk), cgh);
+    cgh.parallel_for<class sopKernel<Type, IdxType, TPB, ColsPerBlk>>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       int tx = item.get_local_id(1);
       int bx = item.get_group(1);
       int by = item.get_group(0);
       int gridDim_x = item.get_group_range(1);
- 
+
       const int RowsPerBlkPerIter = TPB / ColsPerBlk;
       IdxType thisColId = tx % ColsPerBlk;
       IdxType thisRowId = tx / ColsPerBlk;
@@ -83,40 +79,40 @@ void stddev(queue &q,
       Type thread_data = Type(0);
       const IdxType stride = RowsPerBlkPerIter * gridDim_x;
       for (IdxType i = rowId; i < N; i += stride) {
-        Type val = (colId < D) ? data[i * D + colId] : Type(0);
+        Type val = (colId < D) ? d_data[i * D + colId] : Type(0);
         thread_data += val * val;
       }
       if (tx < ColsPerBlk) sstd[tx] = Type(0);
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       //atomicAdd(sstd + thisColId, thread_data);
-      auto atomic_local = ext::oneapi::atomic_ref<Type, 
-            ext::oneapi::memory_order::relaxed,
-            ext::oneapi::memory_scope::work_group,
-            access::address_space::local_space> (sstd[thisColId]);
+      auto atomic_local = sycl::atomic_ref<Type,
+                          sycl::memory_order::relaxed,
+                          sycl::memory_scope::work_group,
+                          sycl::access::address_space::local_space> (sstd[thisColId]);
           atomic_local.fetch_add(thread_data);
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if (tx < ColsPerBlk) {
         // atomicAdd(std + colId, sstd[thisColId]);
-        auto atomic_global = ext::oneapi::atomic_ref<Type, 
-                             ext::oneapi::memory_order::relaxed,
-                             ext::oneapi::memory_scope::device,
-                             access::address_space::global_space> (std[colId]);
+        auto atomic_global = sycl::atomic_ref<Type,
+                             sycl::memory_order::relaxed,
+                             sycl::memory_scope::device,
+                             sycl::access::address_space::global_space> (d_std[colId]);
         atomic_global.fetch_add(sstd[thisColId]);
       }
     });
   });
 
-  range<1> gws2 ((D+TPB-1)/TPB*TPB);
-  range<1> lws2 (TPB);
+  sycl::range<1> gws2 ((D+TPB-1)/TPB*TPB);
+  sycl::range<1> lws2 (TPB);
   IdxType sampleSize = sample ? N-1 : N;
-  q.submit([&] (handler &cgh) {
-    auto std = d_std.template get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class sampleKernel<Type, IdxType>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class sampleKernel<Type, IdxType>>(
+      sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
       IdxType i = item.get_global_id(0);
-      if (i < D) std[i] = sycl::sqrt(std[i] / sampleSize);
+      if (i < D) d_std[i] = sycl::sqrt(d_std[i] / sampleSize);
     });
   });
 }
@@ -137,11 +133,11 @@ int main(int argc, char* argv[]) {
   long inputSizeByte = inputSize * sizeof(float);
   float *data = (float*) malloc (inputSizeByte);
 
-  // input data 
+  // input data
   srand(123);
   for (int i = 0; i < N; i++)
-    for (int j = 0; j < D; j++) 
-      data[i*D + j] = rand() / (float)RAND_MAX; 
+    for (int j = 0; j < D; j++)
+      data[i*D + j] = rand() / (float)RAND_MAX;
 
   // host and device results
   long outputSize = D;
@@ -149,17 +145,16 @@ int main(int argc, char* argv[]) {
   float *std  = (float*) malloc (outputSizeByte);
   float *std_ref  = (float*) malloc (outputSizeByte);
 
-  { // sycl scope 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<const float, 1> d_data (data, inputSize);
+  float *d_data = sycl::malloc_device<float>(inputSize, q);
+  q.memcpy(d_data, data, inputSizeByte);
 
-  buffer<float, 1> d_std (std, outputSize);
+  float *d_std = sycl::malloc_device<float>(outputSize, q);
 
   // warmup
   stddev(q, d_std, d_data, D, N, sample);
@@ -176,7 +171,7 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of stddev kernels: %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(std, d_std, outputSizeByte).wait();
 
   // verify
   stddev_ref(std_ref, data, D, N, sample);
@@ -193,6 +188,8 @@ int main(int argc, char* argv[]) {
   free(std_ref);
   free(std);
   free(data);
+  sycl::free(d_std, q);
+  sycl::free(d_data, q);
   return 0;
 }
 
