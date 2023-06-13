@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernel.h"
 #include "support/common.h"
 #include "support/timer.h"
@@ -120,7 +120,7 @@ int read_input_size(int &n_nodes, int &n_edges, const Params &p) {
     printf("Error: failed to read file %s. Exit\n", p.file_name);
     return -1;
   }
-    
+
   fscanf(fp, "%d", &n_nodes);
   fscanf(fp, "%d", &n_edges);
   if(fp) fclose(fp);
@@ -162,24 +162,24 @@ void read_input(int &source, Node *&h_nodes, Edge *&h_edges, const Params &p) {
   if(fp) fclose(fp);
 }
 
-template<typename T, memory_scope MemoryScope = memory_scope::device>
+template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 inline T atomicAdd(T *addr, const T val) {
-  auto ao = atomic_ref<T, memory_order::relaxed, MemoryScope,
-                       access::address_space::generic_space> (*addr);
+  auto ao = sycl::atomic_ref<T, sycl::memory_order::relaxed, MemoryScope,
+            sycl::access::address_space::generic_space> (*addr);
   return ao.fetch_add(val);
 }
 
-template<typename T, memory_scope MemoryScope = memory_scope::device>
+template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 inline T atomicMax(T *addr, const T val) {
-  auto ao = atomic_ref<T, memory_order::relaxed, MemoryScope,
-                       access::address_space::generic_space> (*addr);
+  auto ao = sycl::atomic_ref<T, sycl::memory_order::relaxed, MemoryScope,
+            sycl::access::address_space::generic_space> (*addr);
   return ao.fetch_max(val);
 }
 
-template<typename T, memory_scope MemoryScope = memory_scope::device>
+template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 inline void atomicExch(T *addr, const T val) {
-  auto ao = atomic_ref<T, memory_order::relaxed, MemoryScope,
-                       access::address_space::generic_space> (*addr);
+  auto ao = sycl::atomic_ref<T, sycl::memory_order::relaxed, MemoryScope,
+            sycl::access::address_space::generic_space> (*addr);
   ao.exchange(val);
 }
 
@@ -197,7 +197,7 @@ void SSSP_gpu(
     int *__restrict__ overflow,
     const int *__restrict__ gray_shade,
     int *__restrict__ iter,
-    const nd_item<1> &item,
+    const sycl::nd_item<1> &item,
     int *l_mem,
     int &tail_bin)
 {
@@ -219,7 +219,7 @@ void SSSP_gpu(
     *base = atomicAdd(head, WG_SIZE);
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   int my_base = *base;
   while(my_base < n_t_local) {
@@ -230,7 +230,7 @@ void SSSP_gpu(
         // Add local tail_bin to tail
         *shift = atomicAdd(tail, tail_bin);
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       int local_shift = tid;
       while(local_shift < tail_bin) {
@@ -238,13 +238,13 @@ void SSSP_gpu(
         // Multiple threads are copying elements at the same time, so we shift by multiple elements for next iteration
         local_shift += WG_SIZE;
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if(tid == 0) {
         // Reset local queue
         tail_bin = 0;
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
 
     if(my_base + tid < n_t_local && *overflow == 0) {
@@ -269,7 +269,7 @@ void SSSP_gpu(
           int old_color = atomicMax(color+id, gray_shade_local);
           if(old_color != gray_shade_local) {
             // Push to the queue
-            int tail_index = atomicAdd<int, memory_scope::work_group>(&tail_bin, 1);
+            int tail_index = atomicAdd<int, sycl::memory_scope::work_group>(&tail_bin, 1);
             if(tail_index >= W_QUEUE_SIZE) {
               *overflow = 1;
             } else
@@ -282,7 +282,7 @@ void SSSP_gpu(
     if(tid == 0) {
       *base = atomicAdd(head, WG_SIZE); // Fetch more frontier elements from the queue
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     my_base = *base;
   }
@@ -291,7 +291,7 @@ void SSSP_gpu(
   if(tid == 0) {
     *shift = atomicAdd(tail, tail_bin);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   ///////////////////// CONCATENATE INTO GLOBAL MEMORY /////////////////////
   int local_shift = tid;
@@ -309,12 +309,11 @@ void SSSP_gpu(
 
 // Main
 int main(int argc, char **argv) {
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q (dev_sel, property::queue::in_order());
 
   const Params p(argc, argv);
   Timer        timer;
@@ -327,33 +326,33 @@ int main(int argc, char **argv) {
   timer.start("Host/Device Allocation");
   Node * h_nodes = (Node *)malloc(sizeof(Node) * n_nodes);
   Node * d_nodes;
-  d_nodes = malloc_device<Node>(n_nodes, q);
+  d_nodes = sycl::malloc_device<Node>(n_nodes, q);
   Edge * h_edges = (Edge *)malloc(sizeof(Edge) * n_edges);
-  Edge * d_edges = malloc_device<Edge>(n_edges, q);
+  Edge * d_edges = sycl::malloc_device<Edge>(n_edges, q);
   std::atomic_int *h_color = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  int * d_color = malloc_device<int>(n_nodes, q);
+  int * d_color = sycl::malloc_device<int>(n_nodes, q);
   std::atomic_int *h_cost  = (std::atomic_int *)malloc(sizeof(std::atomic_int) * n_nodes);
-  int * d_cost = malloc_device<int>(n_nodes, q);
+  int * d_cost = sycl::malloc_device<int>(n_nodes, q);
   int * h_q1 = (int *)malloc(n_nodes * sizeof(int));
-  int * d_q1 = malloc_device<int>(n_nodes, q);
+  int * d_q1 = sycl::malloc_device<int>(n_nodes, q);
   int * h_q2 = (int *)malloc(n_nodes * sizeof(int));
-  int * d_q2 = malloc_device<int>(n_nodes, q);
+  int * d_q2 = sycl::malloc_device<int>(n_nodes, q);
   std::atomic_int  h_head[1];
-  int * d_head = malloc_device<int>(1, q);
+  int * d_head = sycl::malloc_device<int>(1, q);
   std::atomic_int  h_tail[1];
-  int * d_tail = malloc_device<int>(1, q);
+  int * d_tail = sycl::malloc_device<int>(1, q);
   std::atomic_int  h_threads_end[1];
-  int * d_threads_end = malloc_device<int>(1, q);
+  int * d_threads_end = sycl::malloc_device<int>(1, q);
   std::atomic_int  h_threads_run[1];
-  int * d_threads_run = malloc_device<int>(1, q);
+  int * d_threads_run = sycl::malloc_device<int>(1, q);
   int h_num_t[1];
-  int * d_num_t = malloc_device<int>(1, q);
+  int * d_num_t = sycl::malloc_device<int>(1, q);
   int h_overflow[1];
-  int * d_overflow = malloc_device<int>(1, q);
+  int * d_overflow = sycl::malloc_device<int>(1, q);
   std::atomic_int  h_gray_shade[1];
-  int * d_gray_shade = malloc_device<int>(1, q);
+  int * d_gray_shade = sycl::malloc_device<int>(1, q);
   std::atomic_int  h_iter[1];
-  int * d_iter = malloc_device<int>(1, q);
+  int * d_iter = sycl::malloc_device<int>(1, q);
   q.wait();
 
   //ALLOC_ERR(h_nodes, h_edges, h_color, h_cost, h_q1, h_q2);
@@ -531,18 +530,18 @@ int main(int argc, char **argv) {
                  "The thread block size is greater than the maximum thread "
                  "block size that can be used on this device");
 
-          range<1> dimGrid(p.n_gpu_blocks);
-          range<1> dimBlock(p.n_gpu_threads);
+          sycl::range<1> dimGrid(p.n_gpu_blocks);
+          sycl::range<1> dimBlock(p.n_gpu_threads);
 
           if(rep >= p.n_warmup)
             timer.start("Kernel on Device");
 
-          q.submit([&](handler &cgh) {
-            local_accessor<int, 1> l_mem_acc(range<1>(W_QUEUE_SIZE+2), cgh);
-            local_accessor<int, 0> tail_bin_acc(cgh);
+          q.submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int, 1> l_mem_acc(sycl::range<1>(W_QUEUE_SIZE+2), cgh);
+            sycl::local_accessor<int, 0> tail_bin_acc(cgh);
 
-            cgh.parallel_for<class kernel>(nd_range<1>(dimGrid * dimBlock, dimBlock),
-              [=](nd_item<1> item) {
+            cgh.parallel_for<class kernel>(sycl::nd_range<1>(dimGrid * dimBlock, dimBlock),
+              [=](sycl::nd_item<1> item) {
                 SSSP_gpu(d_nodes, d_edges, d_cost, d_color,
                          d_qin, d_qout, d_num_t, d_head, d_tail,
                          d_overflow, d_gray_shade, d_iter,
@@ -606,20 +605,20 @@ int main(int argc, char **argv) {
   free(h_cost);
   free(h_q1);
   free(h_q2);
-  free(d_nodes, q);
-  free(d_edges, q);
-  free(d_cost, q);
-  free(d_color, q);
-  free(d_q1, q);
-  free(d_q2, q);
-  free(d_num_t, q);
-  free(d_head, q);
-  free(d_tail, q);
-  free(d_threads_end, q);
-  free(d_threads_run, q);
-  free(d_overflow, q);
-  free(d_iter, q);
-  free(d_gray_shade, q);
+  sycl::free(d_nodes, q);
+  sycl::free(d_edges, q);
+  sycl::free(d_cost, q);
+  sycl::free(d_color, q);
+  sycl::free(d_q1, q);
+  sycl::free(d_q2, q);
+  sycl::free(d_num_t, q);
+  sycl::free(d_head, q);
+  sycl::free(d_tail, q);
+  sycl::free(d_threads_end, q);
+  sycl::free(d_threads_run, q);
+  sycl::free(d_overflow, q);
+  sycl::free(d_iter, q);
+  sycl::free(d_gray_shade, q);
 
   timer.stop("Host/Device Deallocation");
   timer.print("Host/Device Deallocation", 1);
