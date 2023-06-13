@@ -6,34 +6,34 @@
 #include <iomanip>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "kernels.cpp"
 
 void runDevice(float* input, float* output, int n, int repeat)
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_answer (output, 21*n);
-  buffer<float, 1> d_input (input, 9*n);
+  float *d_answer = sycl::malloc_device<float>(21*n, q);
 
-  range<1> lws (256);
-  range<1> gws ((n+255)/256*256);
+  float *d_input = sycl::malloc_device<float>(9*n, q);
+  q.memcpy(d_input, input, 9 * n * sizeof(float));
+
+  sycl::range<1> lws (256);
+  sycl::range<1> gws ((n+255)/256*256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto output = d_answer.get_access<sycl_discard_write>(cgh);
-      auto input = d_input.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class svd3x3_soa>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        svd3_SOA(input.get_pointer(), output.get_pointer(), n, item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class svd3x3_soa>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        svd3_SOA(d_input, d_answer, n, item);
       });
     });
   }
@@ -42,11 +42,15 @@ void runDevice(float* input, float* output, int n, int repeat)
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
+
+  q.memcpy(output, d_answer, 21 * sizeof(float) * n).wait();
+  sycl::free(d_answer, q);
+  sycl::free(d_input, q);
 }
 
 void svd3x3_ref(float* input, float* output, int testsize)
 {
-  for (int tid = 0; tid < testsize; tid++) 
+  for (int tid = 0; tid < testsize; tid++)
     svd(
       input[tid + 0 * testsize], input[tid + 1 * testsize], input[tid + 2 * testsize],
       input[tid + 3 * testsize], input[tid + 4 * testsize], input[tid + 5 * testsize],
@@ -94,7 +98,7 @@ int main(int argc, char* argv[])
     for (int j = 0; j < 9; j++) myfile >> input[count++];
   myfile.close();
 
-  // SVD 3x3 on a GPU 
+  // SVD 3x3 on a GPU
   runDevice(input, result, testsSize, repeat);
 
   bool ok = true;
