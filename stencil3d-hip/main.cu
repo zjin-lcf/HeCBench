@@ -176,10 +176,6 @@ int main(int argc, char* argv[])
   dim3 grids (bdimx, bdimy, bdimz);
   dim3 blocks (BSIZE, BSIZE, 1);
 
-  // warmup
-  hipLaunchKernelGGL(stencil3d, grids, blocks , 0, 0, 
-     d_Vm, d_dVm, d_sigma, d_sigma + 3*vol, d_sigma + 6*vol, nx, ny, nz);
-
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
