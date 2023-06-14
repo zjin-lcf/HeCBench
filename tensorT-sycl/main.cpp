@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define TILE_SIZE 5900
 #define NTHREADS 256
@@ -24,7 +24,7 @@ void verify(double *input, double *output) {
   int output_offset = 2 + d2 * (2 + d3 * (2 + d4 * (2 + d6 * (2 + 0 * d1))));
   bool error = false;
   for (size_t i = 0; i < d5; i++) {
-    if (input[input_offset + i * d1 * d2 * d3 * d4] != 
+    if (input[input_offset + i * d1 * d2 * d3 * d4] !=
         output[output_offset + i * d2 * d3 * d4 * d6 * d1]) {
       printf("FAIL\n");
       error = true;
@@ -52,48 +52,48 @@ int main(int argv, char **argc) {
   const int dim_input = 3;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  double *d_output = malloc_device<double>(data_size, q);
+  double *d_output = sycl::malloc_device<double>(data_size, q);
 
-  double *d_input = malloc_device<double>(data_size, q);
+  double *d_input = sycl::malloc_device<double>(data_size, q);
   q.memcpy(d_input, input, data_size * sizeof(double));
 
-  int *d_shape_input = malloc_device<int>(dim_input, q);
+  int *d_shape_input = sycl::malloc_device<int>(dim_input, q);
   q.memcpy(d_shape_input, shape_input, dim_input * sizeof(int));
 
-  float *d_shape_input_r = malloc_device<float>(dim_output, q);
+  float *d_shape_input_r = sycl::malloc_device<float>(dim_output, q);
   q.memcpy(d_shape_input_r, shape_input_r, dim_input * sizeof(float));
 
-  int *d_shape_output = malloc_device<int>(dim_output, q);
+  int *d_shape_output = sycl::malloc_device<int>(dim_output, q);
   q.memcpy(d_shape_output, shape_output, dim_output * sizeof(int));
 
-  float *d_shape_output_r = malloc_device<float>(dim_output, q);
+  float *d_shape_output_r = sycl::malloc_device<float>(dim_output, q);
   q.memcpy(d_shape_output_r, shape_output_r, dim_output * sizeof(float));
 
-  int *d_stride_input = malloc_device<int>(dim_input, q);
+  int *d_stride_input = sycl::malloc_device<int>(dim_input, q);
   q.memcpy(d_stride_input, stride_input, dim_input * sizeof(int));
 
-  int *d_stride_output_local = malloc_device<int>(dim_output, q);
+  int *d_stride_output_local = sycl::malloc_device<int>(dim_output, q);
   q.memcpy(d_stride_output_local, stride_output_local, dim_output * sizeof(int));
 
-  int *d_stride_output_global = malloc_device<int>(dim_output, q);
+  int *d_stride_output_global = sycl::malloc_device<int>(dim_output, q);
   q.memcpy(d_stride_output_global, stride_output_global, dim_output * sizeof(int));
 
-  range<1> gws (nblocks * NTHREADS);
-  range<1> lws (NTHREADS);
+  sycl::range<1> gws (nblocks * NTHREADS);
+  sycl::range<1> lws (NTHREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (size_t i = 0; i < repeat; ++i) {
-    q.submit([&] (handler &cgh) {
-      accessor<double, 1, sycl_read_write, access::target::local> tile(TILE_SIZE, cgh);
-      cgh.parallel_for<class transpose>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<double, 1> tile(sycl::range<1>(TILE_SIZE), cgh);
+      cgh.parallel_for<class transpose>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         for (int block_idx = item.get_group(0); block_idx < nblocks;
                  block_idx += item.get_group_range(0)) {
           int it = block_idx, im = 0, offset1 = 0;
@@ -107,7 +107,7 @@ int main(int argv, char **argc) {
             tile[i] = d_input[i + block_idx * tile_size];
           }
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           for (int i = item.get_local_id(0); i < tile_size; i += item.get_local_range(0)) {
             it = i;
@@ -121,7 +121,7 @@ int main(int argv, char **argc) {
             }
             d_output[offset1 + offset2] = tile[local_offset];
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         }
       });
     });
@@ -132,15 +132,15 @@ int main(int argv, char **argc) {
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
   q.memcpy(output, d_output, data_size * sizeof(double)).wait();
-  free(d_output, q);
-  free(d_input, q);
-  free(d_shape_input, q);
-  free(d_shape_input_r, q);
-  free(d_shape_output, q);
-  free(d_shape_output_r, q);
-  free(d_stride_input, q);
-  free(d_stride_output_local, q);
-  free(d_stride_output_global, q);
+  sycl::free(d_output, q);
+  sycl::free(d_input, q);
+  sycl::free(d_shape_input, q);
+  sycl::free(d_shape_input_r, q);
+  sycl::free(d_shape_output, q);
+  sycl::free(d_shape_output_r, q);
+  sycl::free(d_stride_input, q);
+  sycl::free(d_stride_output_local, q);
+  sycl::free(d_stride_output_global, q);
 
   verify(input, output);
   delete [] input;
