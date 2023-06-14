@@ -186,11 +186,10 @@ int main(int argc, char **argv) {
     memset((void *)h_consumed, 0, sizeof(int));
 
 #ifdef USE_GPU
-    sycl::gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
     task_t * d_task_queues = sycl::malloc_device<task_t>(p.queue_size, q);
 

@@ -8,7 +8,7 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
- * with the Software without restriction, including without limitation the 
+ * with the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
@@ -18,14 +18,14 @@
  *      > Redistributions in binary form must reproduce the above copyright
  *        notice, this list of conditions and the following disclaimers in the
  *        documentation and/or other materials provided with the distribution.
- *      > Neither the names of IMPACT Research Group, University of Cordoba, 
- *        University of Illinois nor the names of its contributors may be used 
- *        to endorse or promote products derived from this Software without 
+ *      > Neither the names of IMPACT Research Group, University of Cordoba,
+ *        University of Illinois nor the names of its contributors may be used
+ *        to endorse or promote products derived from this Software without
  *        specific prior written permission.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
@@ -52,9 +52,9 @@ void TaskQueue_gpu(const task_t *__restrict queue,
 
   // Fetch task
   if(tid == 0) {
-    auto ao = sycl::ext::oneapi::atomic_ref<int, 
-              sycl::ext::oneapi::memory_order::relaxed,
-              sycl::ext::oneapi::memory_scope::device,
+    auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
               sycl::access::address_space::global_space> (*consumed);
     *next = ao.fetch_add(1);
     t->id = queue[*next].id;
@@ -78,9 +78,9 @@ void TaskQueue_gpu(const task_t *__restrict queue,
       data[(t->id - offset) * tile_size + tid] += t->id;
     }
     if(tid == 0) {
-      auto ao = sycl::ext::oneapi::atomic_ref<int, 
-                sycl::ext::oneapi::memory_order::relaxed,
-                sycl::ext::oneapi::memory_scope::device,
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
                 sycl::access::address_space::global_space> (*consumed);
       *next = ao.fetch_add(1);
       // Fetch task
@@ -96,7 +96,7 @@ void call_TaskQueue_gpu(sycl::queue &q,
                         int threads,
                         const task_t *queue,
                         int *data,
-                        int *consumed, 
+                        int *consumed,
                         int iterations,
                         int offset,
                         int gpuQueueSize,
@@ -106,9 +106,7 @@ void call_TaskQueue_gpu(sycl::queue &q,
   sycl::range<1> lws (threads);
 
   q.submit([&](sycl::handler &cgh) {
-    sycl::accessor<uint8_t, 1, sycl::access::mode::read_write, sycl::access::target::local>
-      sm (sycl::range<1>(l_mem_size), cgh);
-
+    sycl::local_accessor<uint8_t, 1> sm (sycl::range<1>(l_mem_size), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       TaskQueue_gpu(queue, data, consumed, iterations, offset,
                     gpuQueueSize, item, sm.get_pointer());
