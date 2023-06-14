@@ -1,11 +1,11 @@
 #include <chrono>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "ThomasMatrix.hpp"
 #include "utils.hpp"
 
 // CPU kernel
-void solve_seq(const double* l, const double* d, double* u, double* rhs, const int n, const int N) 
+void solve_seq(const double* l, const double* d, double* u, double* rhs, const int n, const int N)
 {
   int first,last;
   for (int j = 0; j < N; ++j)
@@ -47,7 +47,7 @@ int main(int argc, char const *argv[])
   //Loading a synthetic tridiagonal matrix into our structure
   ThomasMatrix params = loadThomasMatrixSyn(M);
 
-  // Allocate host arrays for CPU execution 
+  // Allocate host arrays for CPU execution
   double* u_seq = (double*) malloc(matrix_size_bytes);
   double* u_Thomas_host =  (double*) malloc(matrix_size_bytes);
   double* u_input = (double*) malloc(matrix_size_bytes);
@@ -121,7 +121,7 @@ int main(int argc, char const *argv[])
   }
 
 
-  // Transpose the inputs for sequential accesses on a GPU 
+  // Transpose the inputs for sequential accesses on a GPU
   for (int i = 0; i < M; ++i)
   {
     for (int j = 0; j < N; ++j)
@@ -135,33 +135,33 @@ int main(int argc, char const *argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  double *u_d = malloc_device<double>(matrix_size, q);
-  q.memcpy(u_d, u_Thomas_host, matrix_size_bytes); 
+  double *u_d = sycl::malloc_device<double>(matrix_size, q);
+  q.memcpy(u_d, u_Thomas_host, matrix_size_bytes);
 
-  double *d_d = malloc_device<double>(matrix_size, q);
-  q.memcpy(d_d, d_Thomas_host, matrix_size_bytes); 
+  double *d_d = sycl::malloc_device<double>(matrix_size, q);
+  q.memcpy(d_d, d_Thomas_host, matrix_size_bytes);
 
-  double *l_d = malloc_device<double>(matrix_size, q);
-  q.memcpy(l_d, l_Thomas_host, matrix_size_bytes); 
+  double *l_d = sycl::malloc_device<double>(matrix_size, q);
+  q.memcpy(l_d, l_Thomas_host, matrix_size_bytes);
 
-  double *rhs_d = malloc_device<double>(matrix_size, q);
-  q.memcpy(rhs_d, rhs_Thomas_host, matrix_size_bytes); 
+  double *rhs_d = sycl::malloc_device<double>(matrix_size, q);
+  q.memcpy(rhs_d, rhs_Thomas_host, matrix_size_bytes);
 
-  range<1> gws = (N + BlockSize - 1) / BlockSize * BlockSize; 
-  range<1> lws = BlockSize;
+  sycl::range<1> gws ((N + BlockSize - 1) / BlockSize * BlockSize);
+  sycl::range<1> lws (BlockSize);
 
   q.wait();
   start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class thomas>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class thomas>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int tid = item.get_global_id(0);
         if (tid < N) {
           int first = tid;
@@ -172,12 +172,12 @@ int main(int argc, char const *argv[])
 
           for (int i = first + N; i < last; i+=N) {
             u_d[i] /= d_d[i] - l_d[i] * u_d[i-N];
-            rhs_d[i] = ( rhs_d[i] - l_d[i] * rhs_d[i-N] ) / 
-                     ( d_d[i] - l_d[i] * u_d[i-N] );
+            rhs_d[i] = ( rhs_d[i] - l_d[i] * rhs_d[i-N] ) /
+                       ( d_d[i] - l_d[i] * u_d[i-N] );
           }
 
-          rhs_d[last] = ( rhs_d[last] - l_d[last] * rhs_d[last-N] ) / 
-                      ( d_d[last] - l_d[last] * u_d[last-N] );
+          rhs_d[last] = ( rhs_d[last] - l_d[last] * rhs_d[last-N] ) /
+                        ( d_d[last] - l_d[last] * u_d[last-N] );
 
           for (int i = last-N; i >= first; i-=N) {
             rhs_d[i] -= u_d[i] * rhs_d[i+N];
@@ -197,28 +197,28 @@ int main(int argc, char const *argv[])
   // verify
   calcError(rhs_seq_interleave, rhs_Thomas_host, matrix_size);
 
-  free(u_seq);  
+  free(u_seq);
   free(u_Thomas_host);
   free(u_input);
 
-  free(d_seq);  
+  free(d_seq);
   free(d_Thomas_host);
   free(d_input);
 
-  free(l_seq);  
+  free(l_seq);
   free(l_Thomas_host);
   free(l_input);
 
-  free(rhs_seq);  
+  free(rhs_seq);
   free(rhs_Thomas_host);
   free(rhs_input);
 
   free(rhs_seq_output);
   free(rhs_seq_interleave);
 
-  free(l_d, q);
-  free(d_d, q);
-  free(u_d, q);
-  free(rhs_d, q);
+  sycl::free(l_d, q);
+  sycl::free(d_d, q);
+  sycl::free(u_d, q);
+  sycl::free(rhs_d, q);
   return 0;
 }
