@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 void reference(
     const   int *d_tisspoints,
@@ -48,7 +48,7 @@ void reference(
 }
 
 void tissue(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const   int *__restrict d_tisspoints,
     const float *__restrict d_gtt,
     const float *__restrict d_gbartt,
@@ -123,52 +123,43 @@ int main(int argc, char** argv) {
 
   int step = 4; //a power of two 
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<  int, 1> d_tisspoints (h_tisspoints, 3*nntDev);
-  buffer<float, 1> d_gtt (h_gtt, nsp*nntDev);
-  buffer<float, 1> d_gbartt (h_gbartt, nsp*nntDev);
-  buffer<float, 1> d_ct (h_ct, nntDev);
-  buffer<float, 1> d_ctprev (h_ctprev, nntDev);
-  buffer<float, 1> d_qt (h_qt, nntDev);
-  d_ct.set_final_data(nullptr);
+    int *d_tisspoints = sycl::malloc_device<int>(3*nntDev, q);
+  float *d_gtt = sycl::malloc_device<float>(nsp*nntDev, q);
+  float *d_gbartt = sycl::malloc_device<float>(nsp*nntDev, q);
+  float *d_ct = sycl::malloc_device<float>(nntDev, q);
+  float *d_ctprev = sycl::malloc_device<float>(nntDev, q);
+  float *d_qt = sycl::malloc_device<float>(nntDev, q);
 
-  range<1> lws (256);
-  range<1> gws ((step*nnt + 255) / 256 * 256);
+  q.memcpy(d_tisspoints, h_tisspoints, 3*nntDev*sizeof(int));
+  q.memcpy(d_gtt, h_gtt, nsp*nntDev*sizeof(float));
+  q.memcpy(d_gbartt, h_gbartt, nsp*nntDev*sizeof(float));
+  q.memcpy(d_ct, h_ct, nntDev*sizeof(float));
+  q.memcpy(d_ctprev, h_ctprev, nntDev*sizeof(float));
+  q.memcpy(d_qt, h_qt, nntDev*sizeof(float));
+
+  sycl::range<1> lws (256);
+  sycl::range<1> gws ((step*nnt + 255) / 256 * 256);
 
   // quick verification and warmup
   for (int i = 0; i < 2; i++) {
-    q.submit([&] (handler &cgh) {
-      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
-      auto gt = d_gtt.get_access<sycl_read>(cgh);
-      auto gb = d_gbartt.get_access<sycl_read>(cgh);
-      auto ct = d_ct.get_access<sycl_read_write>(cgh);
-      auto cp = d_ctprev.get_access<sycl_read>(cgh);
-      auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        tissue(item,
-          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
-          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,1);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class warmup>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+               nnt, nntDev, step, 1);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
-      auto gt = d_gtt.get_access<sycl_read>(cgh);
-      auto gb = d_gbartt.get_access<sycl_read>(cgh);
-      auto ct = d_ct.get_access<sycl_read_write>(cgh);
-      auto cp = d_ctprev.get_access<sycl_read>(cgh);
-      auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class warmup2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        tissue(item,
-          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
-          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,2);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class warmup2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+               nnt, nntDev, step, 2);
       });
     });
   }
@@ -179,10 +170,7 @@ int main(int argc, char** argv) {
   }
 
   bool ok = true;
-  q.submit([&] (handler &cgh) {
-    auto acc = d_ct.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_ct);
-  }).wait();
+  q.memcpy(h_ct, d_ct, nntDev*sizeof(float)).wait();
 
   for (int i = 0; i < nntDev; i++) {
     if (fabsf(h_ct[i] - h_ct_gold[i]) > 1e-2) {
@@ -198,31 +186,19 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
-      auto gt = d_gtt.get_access<sycl_read>(cgh);
-      auto gb = d_gbartt.get_access<sycl_read>(cgh);
-      auto ct = d_ct.get_access<sycl_read_write>(cgh);
-      auto cp = d_ctprev.get_access<sycl_read>(cgh);
-      auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class timing>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        tissue(item,
-          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
-          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,1);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class timing>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+               nnt, nntDev, step, 1);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto tp = d_tisspoints.get_access<sycl_read>(cgh);
-      auto gt = d_gtt.get_access<sycl_read>(cgh);
-      auto gb = d_gbartt.get_access<sycl_read>(cgh);
-      auto ct = d_ct.get_access<sycl_read_write>(cgh);
-      auto cp = d_ctprev.get_access<sycl_read>(cgh);
-      auto qt = d_qt.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class timing2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        tissue(item,
-          tp.get_pointer(),gt.get_pointer(),gb.get_pointer(),ct.get_pointer(),
-          cp.get_pointer(),qt.get_pointer(),nnt,nntDev,step,2);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class timing2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+               nnt, nntDev, step, 2);
       });
     });
   }
@@ -232,8 +208,6 @@ int main(int argc, char** argv) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
-
   free(h_tisspoints);
   free(h_gtt);
   free(h_gbartt);
@@ -241,6 +215,12 @@ int main(int argc, char** argv) {
   free(h_ct_gold);
   free(h_ctprev);
   free(h_qt);
+  sycl::free(d_tisspoints, q);
+  sycl::free(d_gtt, q);
+  sycl::free(d_gbartt, q);
+  sycl::free(d_ct, q);
+  sycl::free(d_ctprev, q);
+  sycl::free(d_qt, q);
 
   return 0;
 }
