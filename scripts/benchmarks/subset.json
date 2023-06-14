@@ -917,8 +917,7 @@
       "10",
       "-n",
       "500"
-    ],
-    "bs"
+    ]
   ],
   "bh-hip": [
     "(?:Total kernel execution time: )([0-9.+-e]+)(?: s)",
