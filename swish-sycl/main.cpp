@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 #ifdef __NVPTX__
@@ -21,7 +21,7 @@
            index += item.get_local_range(0) * item.get_group_range(0))
 
 template <typename T>
-void SwishKernel(nd_item<1> &item, const int N, const T* X, T* Y)
+void SwishKernel(sycl::nd_item<1> &item, const int N, const T* X, T* Y)
 {
   KERNEL_LOOP(i, N) {
     Y[i] = ldg(X + i) / (T(1) + sycl::exp(-ldg(X + i)));
@@ -30,7 +30,7 @@ void SwishKernel(nd_item<1> &item, const int N, const T* X, T* Y)
 
 template <typename T>
 void SwishGradientKernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int N,
     const T* X,
     const T* Y,
@@ -47,13 +47,12 @@ template<typename T>
 void eval_swish (const int N, const int repeat) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  size_t size_bytes = N * sizeof(T); 
+  size_t size_bytes = N * sizeof(T);
 
   T *h_X  = (T*) malloc (size_bytes);
   T *h_Y  = (T*) malloc (size_bytes);
@@ -70,25 +69,26 @@ void eval_swish (const int N, const int repeat) {
   }
 
   T *d_X, *d_Y, *d_dX, *d_dY;
-  d_X = malloc_device<T>(N, q);
+  d_X = sycl::malloc_device<T>(N, q);
   q.memcpy(d_X, h_X, size_bytes);
 
-  d_Y = malloc_device<T>(N, q);
+  d_Y = sycl::malloc_device<T>(N, q);
 
-  d_dY = malloc_device<T>(N, q);
+  d_dY = sycl::malloc_device<T>(N, q);
   q.memcpy(d_dY, h_dY, size_bytes);
 
-  d_dX = malloc_device<T>(N, q);
+  d_dX = sycl::malloc_device<T>(N, q);
 
-  range<1> gws ((N + GPU_THREADS - 1) / GPU_THREADS * GPU_THREADS);
-  range<1> lws (GPU_THREADS);
+  sycl::range<1> gws ((N + GPU_THREADS - 1) / GPU_THREADS * GPU_THREADS);
+  sycl::range<1> lws (GPU_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class swish>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swish>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         SwishKernel(item, N, d_X, d_Y);
       });
     });
@@ -102,8 +102,9 @@ void eval_swish (const int N, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class swish_grad>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class swish_grad>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         SwishGradientKernel(item, N, d_X, d_Y, d_dY, d_dX);
       });
     });
@@ -130,10 +131,10 @@ void eval_swish (const int N, const int repeat) {
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_X, q);
-  free(d_Y, q);
-  free(d_dX, q);
-  free(d_dY, q);
+  sycl::free(d_X, q);
+  sycl::free(d_Y, q);
+  sycl::free(d_dX, q);
+  sycl::free(d_dY, q);
 
   free(h_X);
   free(h_Y);
