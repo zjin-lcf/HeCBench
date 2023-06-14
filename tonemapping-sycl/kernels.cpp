@@ -20,16 +20,16 @@ inline float luminance(float r, float g, float b)
 }
 
 void toneMapping(
-    const float *__restrict input, 
-          float *__restrict output, 
-    const float averageLuminance, 
-    const float gamma, 
-    const float c, 
+    const float *__restrict input,
+          float *__restrict output,
+    const float averageLuminance,
+    const float gamma,
+    const float c,
     const float delta,
     const uint width,
     const uint numChannels,
     const uint height,
-    nd_item<2> &item)
+    sycl::nd_item<2> &item)
 {
   uint x = item.get_global_id(1);
   uint y = item.get_global_id(0);
@@ -78,13 +78,13 @@ void toneMapping(
     g = input[width * numChannels * (y) + ((x - 1) * numChannels) + 1];
     b = input[width * numChannels * (y) + ((x - 1) * numChannels) + 2];
 
-    left = luminance( r, g, b );  
+    left = luminance( r, g, b );
 
     r = input[width * numChannels * (y) + ((x + 1) * numChannels) + 0];
     g = input[width * numChannels * (y) + ((x + 1) * numChannels) + 1];
     b = input[width * numChannels * (y) + ((x + 1) * numChannels) + 2];
 
-    right = luminance( r, g, b );  
+    right = luminance( r, g, b );
 
     r = input[width * numChannels * (y + 1) + ((x - 1) * numChannels) + 0];
     g = input[width * numChannels * (y + 1) + ((x - 1) * numChannels) + 1];
@@ -104,8 +104,8 @@ void toneMapping(
 
     rightDown = luminance( r, g, b );
 
-    //Calculate median    
-    yLPattanaik = (leftUp + up + rightUp + left + right + leftDown + down + rightDown) / 8;    
+    //Calculate median
+    yLPattanaik = (leftUp + up + rightUp + left + right + leftDown + down + rightDown) / 8;
   }
   else
   {
@@ -124,6 +124,6 @@ void toneMapping(
   output[width * numChannels * y + (x * numChannels + 0)] = r;
   output[width * numChannels * y + (x * numChannels + 1)] = g;
   output[width * numChannels * y + (x * numChannels + 2)] = b;
-  output[width * numChannels * y + (x * numChannels + 3)] = 
+  output[width * numChannels * y + (x * numChannels + 3)] =
     input[width * numChannels * y + (x * numChannels + 3)];
 }
