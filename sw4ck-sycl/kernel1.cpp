@@ -1,8 +1,9 @@
+#include <sycl/sycl.hpp>
+
 void kernel1(
-    nd_item<3> &item,
-    const int N0, 
-    const int N1,
-    const int N2,
+    const int start0, const int N0, 
+    const int start1, const int N1,
+    const int start2, const int N2,
     const int ifirst, const int ilast,
     const int jfirst, const int jlast,
     const int kfirst, const int klast,
@@ -19,11 +20,13 @@ void kernel1(
     const float_sw4* __restrict__ a_acof_no_gp,
     const float_sw4* __restrict__ a_ghcof_no_gp, 
     const float_sw4* __restrict__ a_strx,
-    const float_sw4* __restrict__ a_stry ) 
+    const float_sw4* __restrict__ a_stry,
+    const sycl::nd_item<3> &item) 
 {
-  int i = item.get_global_id(2);
-  int j = item.get_global_id(1);
-  int k = item.get_global_id(0);
+
+  int i = start0 + item.get_global_id(2);
+  int j = start1 + item.get_global_id(1);
+  int k = start2 + item.get_global_id(0);
   if ((i < N0) && (j < N1) && (k < N2)) {
     // 5 ops
     float_sw4 ijac = strx(i) * stry(j) / jac(i, j, k);

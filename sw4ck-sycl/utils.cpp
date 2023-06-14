@@ -1,3 +1,4 @@
+#include <cmath>
 class Sarray {
   public:
     Sarray() {}
@@ -83,5 +84,3 @@ std::tuple<float_sw4,float_sw4> Sarray::minmax(){
   }
   return std::make_tuple(min,max);
 }
-
-
