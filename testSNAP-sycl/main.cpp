@@ -36,36 +36,14 @@
 
 int nsteps = 1; // num of force evaluations
 
-// Copyright (C) 2018 - 2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// See https://llvm.org/LICENSE.txt for license information.
-
-/// Atomically add the value operand to the value at the addr and assign the
-/// result to the value at addr, Float version.
-/// \param [in, out] addr The pointer to the data.
-/// \param operand The value to add to the value at \p addr.
-/// \param memoryOrder The memory ordering used.
-/// \returns The value at the \p addr before the call.
-inline double atomicAdd( double *addr, double operand )
+inline double atomicAdd( double &var, double operand )
 {
-  sycl::atomic_ref<long, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> obj(
-    (*reinterpret_cast<long *>(addr)));
-
-  long old_value;
-  double old_double_value;
-
-  do {
-    old_value = obj.load(sycl::memory_order::relaxed);
-    old_double_value = *reinterpret_cast<const double *>(&old_value);
-    const double new_double_value = old_double_value + operand;
-    const long new_value = *reinterpret_cast<const long *>(&new_double_value);
-    if (obj.compare_exchange_strong(old_value, new_value))
-      break;
-  } while (true);
-
-  return old_double_value;
+  auto atm = sycl::atomic_ref<double,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  return atm.fetch_add(operand);
 }
-
 
 int main(int argc, char* argv[])
 {
@@ -375,34 +353,49 @@ int main(int argc, char* argv[])
   double sumsqferr = 0.0;
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  sycl::buffer<int, 1> d_idxu_block(idxu_block, jdim);
-  sycl::buffer<int, 1> d_ulist_parity(ulist_parity, idxu_max);
-  sycl::buffer<double, 1> d_rootpqarray(rootpqarray, jdimpq * jdimpq);
-  sycl::buffer<int, 1> d_idxz(idxz, idxz_max * 9);
-  sycl::buffer<double, 1> d_idxzbeta(idxzbeta, idxz_max);
-  sycl::buffer<int, 1> d_idxcg_block(idxcg_block, jdim * jdim * jdim);
-  sycl::buffer<int, 1> d_idxdu_block(idxdu_block, jdim);
-  sycl::buffer<double, 1> d_cglist(cglist, idxcg_max);
+  int *d_idxu_block = sycl::malloc_device<int>(jdim, q);
+  q.memcpy(d_idxu_block, idxu_block, sizeof(int)*jdim);
 
-  sycl::buffer<COMPLEX, 1> d_dulist(dulist, num_atoms * num_nbor * 3 * idxdu_max);
-  sycl::buffer<COMPLEX, 1> d_ulist(ulist, num_atoms * num_nbor * idxu_max);
-  sycl::buffer<double, 1> d_dedr(dedr, num_atoms * num_nbor * 3);
+  int *d_ulist_parity = sycl::malloc_device<int>(idxu_max, q);
+  q.memcpy(d_ulist_parity, ulist_parity, sizeof(int)*idxu_max);
 
-  d_ulist.set_final_data(nullptr);
-  d_dulist.set_final_data(nullptr);
-  d_dedr.set_final_data(nullptr);
+  double *d_rootpqarray = sycl::malloc_device<double>(jdimpq * jdimpq, q);
+  q.memcpy(d_rootpqarray, rootpqarray, sizeof(double)*jdimpq*jdimpq);
 
-  sycl::buffer<COMPLEX, 1> d_ulisttot(num_atoms * idxu_max);
-  sycl::buffer<COMPLEX, 1> d_ylist(num_atoms * idxdu_max);
+  int *d_idxz = sycl::malloc_device<int>(idxz_max * 9, q);
+  q.memcpy(d_idxz, idxz, sizeof(int)*idxz_max*9);
 
-  sycl::buffer<double, 1> d_rij(num_atoms*num_nbor*3);
-  sycl::buffer<double, 1> d_rcutij(num_atoms*num_nbor);
-  sycl::buffer<double, 1> d_wj(num_atoms*num_nbor);
+  double *d_idxzbeta = sycl::malloc_device<double>(idxz_max, q);
+  q.memcpy(d_idxzbeta, idxzbeta, sizeof(double)*idxz_max);
+
+  int *d_idxcg_block = sycl::malloc_device<int>(jdim * jdim * jdim, q);
+  q.memcpy(d_idxcg_block, idxcg_block, sizeof(int)*jdim*jdim*jdim);
+
+  int *d_idxdu_block = sycl::malloc_device<int>(jdim, q);
+  q.memcpy(d_idxdu_block, idxdu_block, sizeof(int)*jdim);
+
+  double *d_cglist = sycl::malloc_device<double>(idxcg_max, q);
+  q.memcpy(d_cglist, cglist, sizeof(double)*idxcg_max);
+
+  COMPLEX *d_dulist = sycl::malloc_device<COMPLEX>(num_atoms * num_nbor * 3 * idxdu_max, q);
+  q.memcpy(d_dulist, dulist, sizeof(COMPLEX)*num_atoms*num_nbor*3*idxdu_max);
+
+  COMPLEX *d_ulist = sycl::malloc_device<COMPLEX>(num_atoms * num_nbor * idxu_max, q);
+  q.memcpy(d_ulist, ulist, sizeof(COMPLEX)*num_atoms*num_nbor*idxu_max);
+
+  double *d_dedr = sycl::malloc_device<double>(num_atoms * num_nbor * 3, q);
+  q.memcpy(d_dedr, dedr, sizeof(double)*num_atoms*num_nbor*3);
+
+  COMPLEX *d_ulisttot = sycl::malloc_device<COMPLEX>(num_atoms * idxu_max, q);
+  COMPLEX *d_ylist = sycl::malloc_device<COMPLEX>(num_atoms * idxdu_max, q);
+  double *d_rij = sycl::malloc_device<double>(num_atoms*num_nbor*3, q);
+  double *d_rcutij = sycl::malloc_device<double>(num_atoms*num_nbor, q);
+  double *d_wj = sycl::malloc_device<double>(num_atoms*num_nbor, q);
 
   // loop over steps
 
@@ -428,20 +421,10 @@ int main(int argc, char* argv[])
       }
     }
 
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_rij.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.copy(rij, acc);
-    });
-
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_rcutij.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.copy(rcutij, acc);
-    });
-
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_wj.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.copy(wj, acc);
-    });
+    q.memcpy(d_rij, rij, sizeof(double)*num_atoms*num_nbor*3);
+    q.memcpy(d_rcutij, rcutij, sizeof(double)*num_atoms*num_nbor);
+    q.memcpy(d_wj, wj, sizeof(double)*num_atoms*num_nbor);
+    q.wait();
 
     // compute_ui
     start = system_clock::now();
@@ -455,25 +438,24 @@ int main(int argc, char* argv[])
     sycl::range<1> gws_k1 ((num_atoms*idxu_max+255)/256*256);
     sycl::range<1> lws_k1 (256);
     q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_ulisttot.get_access<sycl::access::mode::write>(cgh);
-      cgh.parallel_for<class reset_ulisttot>(sycl::nd_range<1>(gws_k1, lws_k1), [=] (sycl::nd_item<1> item) {
+      cgh.parallel_for<class reset_ulisttot>(
+        sycl::nd_range<1>(gws_k1, lws_k1), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
-        if (i < num_atoms*idxu_max) acc[i] = {0.0, 0.0};
+        if (i < num_atoms*idxu_max) d_ulisttot[i] = {0.0, 0.0};
       });
     });
 
     sycl::range<1> gws_k2 ((num_atoms+255)/256*256);
     sycl::range<1> lws_k2 (256);
     q.submit([&] (sycl::handler &cgh) {
-      auto ulisttot = d_ulisttot.get_access<sycl::access::mode::write>(cgh);
-      auto idxu_block = d_idxu_block.get_access<sycl::access::mode::read>(cgh);
-      cgh.parallel_for<class set_ulisttot>(sycl::nd_range<1>(gws_k2, lws_k2), [=] (sycl::nd_item<1> item) {
+      cgh.parallel_for<class set_ulisttot>(
+        sycl::nd_range<1>(gws_k2, lws_k2), [=] (sycl::nd_item<1> item) {
         int natom = item.get_global_id(0);
         if (natom < num_atoms)
           for (int j = 0; j <= twojmax; j++) {
-            int jju = idxu_block[j];
+            int jju = d_idxu_block[j];
             for (int ma = 0; ma <= j; ma++) {
-              ulisttot[INDEX_2D(natom, jju)] = { wself, 0.0 };
+              d_ulisttot[INDEX_2D(natom, jju)] = { wself, 0.0 };
               jju += j + 2;
             }
           }
@@ -484,26 +466,17 @@ int main(int argc, char* argv[])
     sycl::range<2> lws_k3 (16, 16);
 
     q.submit([&] (sycl::handler &cgh) {
-      auto wj = d_wj.get_access<sycl::access::mode::read>(cgh);
-      auto rij = d_rij.get_access<sycl::access::mode::read>(cgh);
-      auto rcutij = d_rcutij.get_access<sycl::access::mode::read>(cgh);
-      auto ulist_parity = d_ulist_parity.get_access<sycl::access::mode::read>(cgh);
-      auto idxu_block = d_idxu_block.get_access<sycl::access::mode::read>(cgh);
-      auto rootpqarray = d_rootpqarray.get_access<sycl::access::mode::read>(cgh);
-      auto ulist = d_ulist.get_access<sycl::access::mode::read_write>(cgh);
-      auto ulisttot = d_ulisttot.get_access<sycl::access::mode::read_write>(cgh);
-
       cgh.parallel_for<class update_ulisttot>(sycl::nd_range<2>(gws_k3, lws_k3), [=] (sycl::nd_item<2> item) {
 	int nbor = item.get_global_id(0);
 	int natom = item.get_global_id(1);
         if (natom < num_atoms && nbor < num_nbor) {
-          double x = rij[ULIST_INDEX(natom, nbor, 0)];
-          double y = rij[ULIST_INDEX(natom, nbor, 1)];
-          double z = rij[ULIST_INDEX(natom, nbor, 2)];
+          double x = d_rij[ULIST_INDEX(natom, nbor, 0)];
+          double y = d_rij[ULIST_INDEX(natom, nbor, 1)];
+          double z = d_rij[ULIST_INDEX(natom, nbor, 2)];
           double rsq = x * x + y * y + z * z;
           double r = sycl::sqrt(rsq);
 
-          double theta0 = (r - rmin0) * rfac0 * MY_PI / (rcutij[INDEX_2D(natom, nbor)] - rmin0);
+          double theta0 = (r - rmin0) * rfac0 * MY_PI / (d_rcutij[INDEX_2D(natom, nbor)] - rmin0);
           double z0 = r / sycl::tan(theta0);
 
           double rootpq;
@@ -519,8 +492,8 @@ int main(int argc, char* argv[])
 
           double sfac;
 
-          sfac = compute_sfac(r, rcutij[INDEX_2D(natom, nbor)], switch_flag);
-          sfac *= wj[INDEX_2D(natom, nbor)];
+          sfac = compute_sfac(r, d_rcutij[INDEX_2D(natom, nbor)], switch_flag);
+          sfac *= d_wj[INDEX_2D(natom, nbor)];
 
           // Recursion relations
           // VMK Section 4.8.2
@@ -533,16 +506,16 @@ int main(int argc, char* argv[])
 
           // initialize first entry
           // initialize top row of each layer to zero
-          ulist[ULIST_INDEX(natom, nbor, 0)].re = 1.0;
-          ulist[ULIST_INDEX(natom, nbor, 0)].im = 0.0;
+          d_ulist[ULIST_INDEX(natom, nbor, 0)].re = 1.0;
+          d_ulist[ULIST_INDEX(natom, nbor, 0)].im = 0.0;
 
           // skip over right half of each uarray
           jju = 1;
           for (int j = 1; j <= twojmax; j++) {
             int deljju = j + 1;
             for (int mb = 0; 2 * mb <= j; mb++) {
-              ulist[ULIST_INDEX(natom, nbor, jju)].re = 0.0;
-              ulist[ULIST_INDEX(natom, nbor, jju)].im = 0.0;
+              d_ulist[ULIST_INDEX(natom, nbor, jju)].re = 0.0;
+              d_ulist[ULIST_INDEX(natom, nbor, jju)].im = 0.0;
               jju += deljju;
             }
             int ncolhalf = deljju / 2;
@@ -562,27 +535,27 @@ int main(int argc, char* argv[])
             for (int m_iter = 0; m_iter < m_max; ++m_iter) {
               int mb = m_iter / ma_max;
               int ma = m_iter % ma_max;
-              double up_r = ulist[ULIST_INDEX(natom, nbor, jjup)].re;
-              double up_i = ulist[ULIST_INDEX(natom, nbor, jjup)].im;
+              double up_r = d_ulist[ULIST_INDEX(natom, nbor, jjup)].re;
+              double up_i = d_ulist[ULIST_INDEX(natom, nbor, jjup)].im;
 
-              rootpq = rootpqarray[ROOTPQ_INDEX(j - ma, j - mb)];
-              ulist[ULIST_INDEX(natom, nbor, jju)].re += rootpq * (a_r * up_r + a_i * up_i);
-              ulist[ULIST_INDEX(natom, nbor, jju)].im += rootpq * (a_r * up_i - a_i * up_r);
+              rootpq = d_rootpqarray[ROOTPQ_INDEX(j - ma, j - mb)];
+              d_ulist[ULIST_INDEX(natom, nbor, jju)].re += rootpq * (a_r * up_r + a_i * up_i);
+              d_ulist[ULIST_INDEX(natom, nbor, jju)].im += rootpq * (a_r * up_i - a_i * up_r);
 
-              rootpq = rootpqarray[ROOTPQ_INDEX(ma + 1, j - mb)];
-              ulist[ULIST_INDEX(natom, nbor, jju+1)].re = -rootpq * (b_r * up_r + b_i * up_i);
-              ulist[ULIST_INDEX(natom, nbor, jju+1)].im = -rootpq * (b_r * up_i - b_i * up_r);
+              rootpq = d_rootpqarray[ROOTPQ_INDEX(ma + 1, j - mb)];
+              d_ulist[ULIST_INDEX(natom, nbor, jju+1)].re = -rootpq * (b_r * up_r + b_i * up_i);
+              d_ulist[ULIST_INDEX(natom, nbor, jju+1)].im = -rootpq * (b_r * up_i - b_i * up_r);
 
               // assign middle column i.e. mb+1
 
               if (2 * (mb + 1) == j) {
-                rootpq = rootpqarray[ROOTPQ_INDEX(j - ma, mb + 1)];
-                ulist[ULIST_INDEX(natom, nbor, jju+deljju)].re += rootpq * (b_r * up_r - b_i * up_i);
-                ulist[ULIST_INDEX(natom, nbor, jju+deljju)].im += rootpq * (b_r * up_i + b_i * up_r);
+                rootpq = d_rootpqarray[ROOTPQ_INDEX(j - ma, mb + 1)];
+                d_ulist[ULIST_INDEX(natom, nbor, jju+deljju)].re += rootpq * (b_r * up_r - b_i * up_i);
+                d_ulist[ULIST_INDEX(natom, nbor, jju+deljju)].im += rootpq * (b_r * up_i + b_i * up_r);
 
-                rootpq = rootpqarray[ROOTPQ_INDEX(ma + 1, mb + 1)];
-                ulist[ULIST_INDEX(natom, nbor, jju+deljju+1)].re = rootpq * (a_r * up_r - a_i * up_i);
-                ulist[ULIST_INDEX(natom, nbor, jju+deljju+1)].im = rootpq * (a_r * up_i + a_i * up_r);
+                rootpq = d_rootpqarray[ROOTPQ_INDEX(ma + 1, mb + 1)];
+                d_ulist[ULIST_INDEX(natom, nbor, jju+deljju+1)].re = rootpq * (a_r * up_r - a_i * up_i);
+                d_ulist[ULIST_INDEX(natom, nbor, jju+deljju+1)].im = rootpq * (a_r * up_i + a_i * up_r);
               }
 
               jju++;
@@ -596,12 +569,12 @@ int main(int argc, char* argv[])
             // u[ma-j][mb-j] = (-1)^(ma-mb)*Conj([u[ma][mb])
             // dependence on idxu_block could be removed
             // renamed counters b/c can not modify jju, jjup
-            int jjui = idxu_block[j];
+            int jjui = d_idxu_block[j];
             int jjuip = jjui + (j + 1) * (j + 1) - 1;
             for (int mb = 0; 2 * mb < j; mb++) {
               for (int ma = 0; ma <= j; ma++) {
-                ulist[ULIST_INDEX(natom, nbor, jjuip)].re = ulist_parity[jjui] * ulist[ULIST_INDEX(natom, nbor, jjui)].re;
-                ulist[ULIST_INDEX(natom, nbor, jjuip)].im = ulist_parity[jjui] * -ulist[ULIST_INDEX(natom, nbor, jjui)].im;
+                d_ulist[ULIST_INDEX(natom, nbor, jjuip)].re = d_ulist_parity[jjui] * d_ulist[ULIST_INDEX(natom, nbor, jjui)].re;
+                d_ulist[ULIST_INDEX(natom, nbor, jjuip)].im = d_ulist_parity[jjui] * -d_ulist[ULIST_INDEX(natom, nbor, jjui)].im;
                 jjui++;
                 jjuip--;
               }
@@ -617,15 +590,15 @@ int main(int argc, char* argv[])
             jjup += deljjup * ncolhalfp;
           }
 
-          sfac = compute_sfac(r, rcutij[INDEX_2D(natom, nbor)], switch_flag);
-          sfac *= wj[INDEX_2D(natom, nbor)];
+          sfac = compute_sfac(r, d_rcutij[INDEX_2D(natom, nbor)], switch_flag);
+          sfac *= d_wj[INDEX_2D(natom, nbor)];
 
           for (int j = 0; j <= twojmax; j++) {
-            int jju = idxu_block[j];
+            int jju = d_idxu_block[j];
             for (int mb = 0; mb <= j; mb++)
               for (int ma = 0; ma <= j; ma++) {
-                atomicAdd(&(ulisttot[INDEX_2D(natom, jju)].re), sfac * ulist[ULIST_INDEX(natom, nbor, jju)].re);
-                atomicAdd(&(ulisttot[INDEX_2D(natom, jju)].im), sfac * ulist[ULIST_INDEX(natom, nbor, jju)].im);
+                atomicAdd(d_ulisttot[INDEX_2D(natom, jju)].re, sfac * d_ulist[ULIST_INDEX(natom, nbor, jju)].re);
+                atomicAdd(d_ulisttot[INDEX_2D(natom, jju)].im, sfac * d_ulist[ULIST_INDEX(natom, nbor, jju)].im);
                 jju++;
               }
           }
@@ -646,10 +619,10 @@ int main(int argc, char* argv[])
     sycl::range<1> gws_k4 ((num_atoms*idxdu_max+255)/256*256);
     sycl::range<1> lws_k4 (256);
     q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_ylist.get_access<sycl::access::mode::write>(cgh);
-      cgh.parallel_for<class reset_ylist>(sycl::nd_range<1>(gws_k4, lws_k4), [=] (sycl::nd_item<1> item) {
+      cgh.parallel_for<class reset_ylist>(
+        sycl::nd_range<1>(gws_k4, lws_k4), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
-        if (i < num_atoms*idxdu_max) acc[i] = {0.0, 0.0};
+        if (i < num_atoms*idxdu_max) d_ylist[i] = {0.0, 0.0};
       });
     });
 
@@ -657,40 +630,32 @@ int main(int argc, char* argv[])
     sycl::range<2> lws_k5 (16, 16);
 
     q.submit([&] (sycl::handler &cgh) {
-      auto idxz = d_idxz.get_access<sycl::access::mode::read>(cgh);
-      auto idxzbeta = d_idxzbeta.get_access<sycl::access::mode::read>(cgh);
-      auto idxcg_block = d_idxcg_block.get_access<sycl::access::mode::read>(cgh);
-      auto cglist = d_cglist.get_access<sycl::access::mode::read>(cgh);
-      auto idxu_block = d_idxu_block.get_access<sycl::access::mode::read>(cgh);
-      auto idxdu_block = d_idxdu_block.get_access<sycl::access::mode::read>(cgh);
-      auto ulisttot = d_ulisttot.get_access<sycl::access::mode::read>(cgh);
-      auto ylist = d_ylist.get_access<sycl::access::mode::read_write>(cgh);
-
-      cgh.parallel_for<class compute_yi>(sycl::nd_range<2>(gws_k5, lws_k5), [=] (sycl::nd_item<2> item) {
+      cgh.parallel_for<class compute_yi>(
+        sycl::nd_range<2>(gws_k5, lws_k5), [=] (sycl::nd_item<2> item) {
         int jjz = item.get_global_id(0);
         int natom = item.get_global_id(1);
         if (jjz < idxz_max && natom < num_atoms) {
-          const int j1 = idxz[IDXZ_INDEX(jjz, 0)];
-          const int j2 = idxz[IDXZ_INDEX(jjz, 1)];
-          const int j = idxz[IDXZ_INDEX(jjz, 2)];
-          const int ma1min = idxz[IDXZ_INDEX(jjz, 3)];
-          const int ma2max = idxz[IDXZ_INDEX(jjz, 4)];
-          const int na = idxz[IDXZ_INDEX(jjz, 5)];
-          const int mb1min = idxz[IDXZ_INDEX(jjz, 6)];
-          const int mb2max = idxz[IDXZ_INDEX(jjz, 7)];
-          const int nb = idxz[IDXZ_INDEX(jjz, 8)];
+          const int j1 = d_idxz[IDXZ_INDEX(jjz, 0)];
+          const int j2 = d_idxz[IDXZ_INDEX(jjz, 1)];
+          const int j = d_idxz[IDXZ_INDEX(jjz, 2)];
+          const int ma1min = d_idxz[IDXZ_INDEX(jjz, 3)];
+          const int ma2max = d_idxz[IDXZ_INDEX(jjz, 4)];
+          const int na = d_idxz[IDXZ_INDEX(jjz, 5)];
+          const int mb1min = d_idxz[IDXZ_INDEX(jjz, 6)];
+          const int mb2max = d_idxz[IDXZ_INDEX(jjz, 7)];
+          const int nb = d_idxz[IDXZ_INDEX(jjz, 8)];
 
-          const double betaj = idxzbeta[jjz];
+          const double betaj = d_idxzbeta[jjz];
 
-          //const double* cgblock = cglist.dptr + idxcg_block(j1, j2, j);
-          const double* cgblock = cglist.get_pointer() + idxcg_block[j1 + jdim*j2 + jdim*jdim*j];
+          //const double* cgblock = d_cglist.dptr + d_idxcg_block(j1, j2, j);
+          const double* cgblock = d_cglist + d_idxcg_block[j1 + jdim*j2 + jdim*jdim*j];
 
           int mb = (2 * (mb1min + mb2max) - j1 - j2 + j) / 2;
           int ma = (2 * (ma1min + ma2max) - j1 - j2 + j) / 2;
-          const int jjdu = idxdu_block[j] + (j + 1) * mb + ma;
+          const int jjdu = d_idxdu_block[j] + (j + 1) * mb + ma;
 
-          int jju1 = idxu_block[j1] + (j1 + 1) * mb1min;
-          int jju2 = idxu_block[j2] + (j2 + 1) * mb2max;
+          int jju1 = d_idxu_block[j1] + (j1 + 1) * mb1min;
+          int jju2 = d_idxu_block[j2] + (j2 + 1) * mb2max;
           int icgb = mb1min * (j2 + 1) + mb2max;
 
           double ztmp_r = 0.0;
@@ -715,12 +680,12 @@ int main(int argc, char* argv[])
 
             for (int ia = 0; ia < na; ia++) {
               suma1_r += cgblock[icga] *
-                (ulisttot[INDEX_2D(natom, jju1 + ma1)].re * ulisttot[INDEX_2D(natom, jju2 + ma2)].re -
-                 ulisttot[INDEX_2D(natom, jju1 + ma1)].im * ulisttot[INDEX_2D(natom, jju2 + ma2)].im);
+                (d_ulisttot[INDEX_2D(natom, jju1 + ma1)].re * d_ulisttot[INDEX_2D(natom, jju2 + ma2)].re -
+                 d_ulisttot[INDEX_2D(natom, jju1 + ma1)].im * d_ulisttot[INDEX_2D(natom, jju2 + ma2)].im);
 
               suma1_i += cgblock[icga] *
-                (ulisttot[INDEX_2D(natom, jju1 + ma1)].re * ulisttot[INDEX_2D(natom, jju2 + ma2)].im +
-                 ulisttot[INDEX_2D(natom, jju1 + ma1)].im * ulisttot[INDEX_2D(natom, jju2 + ma2)].re);
+                (d_ulisttot[INDEX_2D(natom, jju1 + ma1)].re * d_ulisttot[INDEX_2D(natom, jju2 + ma2)].im +
+                 d_ulisttot[INDEX_2D(natom, jju1 + ma1)].im * d_ulisttot[INDEX_2D(natom, jju2 + ma2)].re);
 
               ma1++;
               ma2--;
@@ -736,8 +701,8 @@ int main(int argc, char* argv[])
 
             // apply z(j1,j2,j,ma,mb) to unique element of y(j)
 
-          atomicAdd(&(ylist[INDEX_2D(natom, jjdu)].re), betaj * ztmp_r);
-          atomicAdd(&(ylist[INDEX_2D(natom, jjdu)].im), betaj * ztmp_i);
+          atomicAdd(d_ylist[INDEX_2D(natom, jjdu)].re, betaj * ztmp_r);
+          atomicAdd(d_ylist[INDEX_2D(natom, jjdu)].im, betaj * ztmp_i);
 
         } // end jjz and natom loop
       });
@@ -755,23 +720,17 @@ int main(int argc, char* argv[])
     sycl::range<2> lws_k6 (16, 16);
 
     q.submit([&] (sycl::handler &cgh) {
-      auto wj = d_wj.get_access<sycl::access::mode::read>(cgh);
-      auto rij = d_rij.get_access<sycl::access::mode::read>(cgh);
-      auto rcutij = d_rcutij.get_access<sycl::access::mode::read>(cgh);
-      auto rootpqarray = d_rootpqarray.get_access<sycl::access::mode::read>(cgh);
-      auto ulist = d_ulist.get_access<sycl::access::mode::read>(cgh);
-      auto dulist = d_dulist.get_access<sycl::access::mode::read_write>(cgh);
-
-      cgh.parallel_for<class compute_duidrj>(sycl::nd_range<2>(gws_k6, lws_k6), [=] (sycl::nd_item<2> item) {
+      cgh.parallel_for<class compute_duidrj>(
+        sycl::nd_range<2>(gws_k6, lws_k6), [=] (sycl::nd_item<2> item) {
 	int nbor = item.get_global_id(0);
 	int natom = item.get_global_id(1);
         if (natom < num_atoms && nbor < num_nbor) {
-          double wj_in = wj[INDEX_2D(natom, nbor)];
-          double rcut = rcutij[INDEX_2D(natom, nbor)];
+          double wj_in = d_wj[INDEX_2D(natom, nbor)];
+          double rcut = d_rcutij[INDEX_2D(natom, nbor)];
 
-          double x = rij[ULIST_INDEX(natom, nbor, 0)];
-          double y = rij[ULIST_INDEX(natom, nbor, 1)];
-          double z = rij[ULIST_INDEX(natom, nbor, 2)];
+          double x = d_rij[ULIST_INDEX(natom, nbor, 0)];
+          double y = d_rij[ULIST_INDEX(natom, nbor, 1)];
+          double z = d_rij[ULIST_INDEX(natom, nbor, 2)];
           double rsq = x * x + y * y + z * z;
           double r = sycl::sqrt(rsq);
           double rscale0 = rfac0 * MY_PI / (rcut - rmin0);
@@ -784,9 +743,9 @@ int main(int argc, char* argv[])
           compute_duarray(natom, nbor, num_atoms, num_nbor, twojmax,
                           idxdu_max, jdimpq, switch_flag,
                           x, y, z, z0, r, dz0dr, wj_in, rcut,
-                          rootpqarray.get_pointer(),
-                          ulist.get_pointer(),
-                          dulist.get_pointer());
+                          d_rootpqarray,
+                          d_ulist,
+                          d_dulist);
          }
       });
     });
@@ -802,31 +761,27 @@ int main(int argc, char* argv[])
     sycl::range<2> lws_k7 (16, 16);
 
     q.submit([&] (sycl::handler &cgh) {
-      auto idxdu_block = d_idxdu_block.get_access<sycl::access::mode::read>(cgh);
-      auto dulist = d_dulist.get_access<sycl::access::mode::read>(cgh);
-      auto ylist = d_ylist.get_access<sycl::access::mode::read>(cgh);
-      auto dedr = d_dedr.get_access<sycl::access::mode::read_write>(cgh);
-
-      cgh.parallel_for<class compute_deidrj>(sycl::nd_range<2>(gws_k7, lws_k7), [=] (sycl::nd_item<2> item) {
+      cgh.parallel_for<class compute_deidrj>(
+        sycl::nd_range<2>(gws_k7, lws_k7), [=] (sycl::nd_item<2> item) {
 	int nbor = item.get_global_id(0);
 	int natom = item.get_global_id(1);
         if (natom < num_atoms && nbor < num_nbor) {
           for (int k = 0; k < 3; k++)
-            dedr[ULIST_INDEX(natom, nbor, k)] = 0.0;
+            d_dedr[ULIST_INDEX(natom, nbor, k)] = 0.0;
 
           for (int j = 0; j <= twojmax; j++) {
-            int jjdu = idxdu_block[j];
+            int jjdu = d_idxdu_block[j];
 
             for (int mb = 0; 2 * mb < j; mb++)
               for (int ma = 0; ma <= j; ma++) {
 
-                double jjjmambyarray_r = ylist[INDEX_2D(natom, jjdu)].re;
-                double jjjmambyarray_i = ylist[INDEX_2D(natom, jjdu)].im;
+                double jjjmambyarray_r = d_ylist[INDEX_2D(natom, jjdu)].re;
+                double jjjmambyarray_i = d_ylist[INDEX_2D(natom, jjdu)].im;
 
                 for (int k = 0; k < 3; k++)
-                  dedr[ULIST_INDEX(natom, nbor, k)] +=
-                    dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
-                    dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i;
+                  d_dedr[ULIST_INDEX(natom, nbor, k)] +=
+                    d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
+                    d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i;
                 jjdu++;
               } // end loop over ma mb
 
@@ -836,23 +791,23 @@ int main(int argc, char* argv[])
 
               int mb = j / 2;
               for (int ma = 0; ma < mb; ma++) {
-                double jjjmambyarray_r = ylist[INDEX_2D(natom, jjdu)].re;
-                double jjjmambyarray_i = ylist[INDEX_2D(natom, jjdu)].im;
+                double jjjmambyarray_r = d_ylist[INDEX_2D(natom, jjdu)].re;
+                double jjjmambyarray_i = d_ylist[INDEX_2D(natom, jjdu)].im;
 
                 for (int k = 0; k < 3; k++)
-                  dedr[ULIST_INDEX(natom, nbor, k)] +=
-                    dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
-                    dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i;
+                  d_dedr[ULIST_INDEX(natom, nbor, k)] +=
+                    d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
+                    d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i;
                 jjdu++;
               }
 
-              double jjjmambyarray_r = ylist[INDEX_2D(natom, jjdu)].re;
-              double jjjmambyarray_i = ylist[INDEX_2D(natom, jjdu)].im;
+              double jjjmambyarray_r = d_ylist[INDEX_2D(natom, jjdu)].re;
+              double jjjmambyarray_i = d_ylist[INDEX_2D(natom, jjdu)].im;
 
               for (int k = 0; k < 3; k++)
-                dedr[ULIST_INDEX(natom, nbor, k)] +=
-                  (dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
-                   dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i) *
+                d_dedr[ULIST_INDEX(natom, nbor, k)] +=
+                  (d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].re * jjjmambyarray_r +
+                   d_dulist[DULIST_INDEX(natom, nbor, jjdu, k)].im * jjjmambyarray_i) *
                   0.5;
               jjdu++;
 
@@ -861,7 +816,7 @@ int main(int argc, char* argv[])
           } // end loop over j
 
           for (int k = 0; k < 3; k++)
-            dedr[ULIST_INDEX(natom, nbor, k)] *= 2.0;
+            d_dedr[ULIST_INDEX(natom, nbor, k)] *= 2.0;
         }
       });
     });
@@ -871,11 +826,7 @@ int main(int argc, char* argv[])
     elapsed = end - start;
     elapsed_deidrj += elapsed.count();
 
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_dedr.get_access<sycl::access::mode::read>(cgh);
-      cgh.copy(acc, dedr);
-    });
-    q.wait();
+    q.memcpy(dedr, d_dedr, sizeof(double)*num_atoms*num_nbor*3).wait();
 
     // Compute forces and error
     //compute_forces(snaptr);
@@ -926,6 +877,23 @@ int main(int argc, char* argv[])
   printf("   Percentage of step time = %g%%\n\n", ktime / duration * 100.0);
   printf("grind time = %g [msec/atom-step]\n", 1000.0 * duration / (nlocal * nsteps));
   printf("RMS |Fj| deviation %g [eV/A]\n", sqrt(sumsqferr / (ntotal * nsteps)));
+
+  sycl::free(d_idxu_block, q);
+  sycl::free(d_ulist_parity, q);
+  sycl::free(d_rootpqarray, q);
+  sycl::free(d_idxz, q);
+  sycl::free(d_idxzbeta, q);
+  sycl::free(d_idxcg_block, q);
+  sycl::free(d_idxdu_block, q);
+  sycl::free(d_cglist, q);
+  sycl::free(d_dulist, q);
+  sycl::free(d_ulist, q);
+  sycl::free(d_dedr, q);
+  sycl::free(d_ulisttot, q);
+  sycl::free(d_ylist, q);
+  sycl::free(d_rij, q);
+  sycl::free(d_rcutij, q);
+  sycl::free(d_wj, q);
 
   free(coeffi);
   free(idxcg_block);
