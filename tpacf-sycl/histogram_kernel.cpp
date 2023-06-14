@@ -70,21 +70,21 @@ unsigned int *h_odata;
 int iDivUp(int a, int b);
 // Computes per-block sub-histograms and stores them in g_odata
 void histoKernel(unsigned int*__restrict g_odata, const unsigned int*__restrict g_idata, 
-                 int size, nd_item<3> &item, unsigned char *__restrict s_Hist);
+                 int size, sycl::nd_item<3> &item, unsigned char *__restrict s_Hist);
 
 // Compiles per-block sub-histograms into MAXBLOCKSEND sub-histograms.
-void mergeKernel(unsigned int* g_iodata, int numBlocks, nd_item<3> &item);
+void mergeKernel(unsigned int* g_iodata, int numBlocks, sycl::nd_item<3> &item);
 
 // Init and Close are used so that the histogram function can be called many times
 // without having to reallocate memory each time.
 // Allocate memory
-void histoInit(queue &q) {
+void histoInit(sycl::queue &q) {
   h_odata = (unsigned int *)sycl::malloc_host(HISTOSIZE * MAXBLOCKSEND, q);
   d_odata = (unsigned int *)sycl::malloc_device(MAXNUMBLOCKS * HISTOSIZE, q);
 }
 
 // Free memory
-void histoClose(queue &q) {
+void histoClose(sycl::queue &q) {
   sycl::free(d_odata, q);
   sycl::free(h_odata, q);
 }
@@ -93,7 +93,7 @@ void histoClose(queue &q) {
 // IMPORTANT: d_idata is assumed to pack four bin assignments in a 32 bit integer, treating
 // the 6 upper bits (0xFC) of each byte as a bin assignment. num is the number of bin assignments,
 // not the number of integers in d_idata.
-void GPUHistogram(unsigned int *h_result, unsigned int *d_idata, int num, queue &stream) {
+void GPUHistogram(unsigned int *h_result, unsigned int *d_idata, int num, sycl::queue &stream) {
   // Determine necessary number of blocks, return if too many are needed, etc.
   const int numBlocks = iDivUp(num >> 2, DATAPERBLOCK);
   if(numBlocks > MAXNUMBLOCKS) {
@@ -101,13 +101,13 @@ void GPUHistogram(unsigned int *h_result, unsigned int *d_idata, int num, queue 
     return;
   }
   // Create per-block sub-histograms in device global memory.
-  range<3> grid(1, 1, numBlocks);
-  range<3> threads(1, 1, NUMTHREADS);
+  sycl::range<3> grid(1, 1, numBlocks);
+  sycl::range<3> threads(1, 1, NUMTHREADS);
 
-  stream.submit([&](handler &cgh) {
+  stream.submit([&](sycl::handler &cgh) {
     auto d_odata_p = d_odata;
-    accessor<unsigned char, 1, sycl_read_write, access::target::local> s_Hist(MEMPERBLOCK, cgh);
-    cgh.parallel_for(nd_range<3>(grid * threads, threads), [=](nd_item<3> item) {
+    sycl::local_accessor<unsigned char, 1> s_Hist(sycl::range<1>(MEMPERBLOCK), cgh);
+    cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
       histoKernel(d_odata_p, d_idata, num >> 2, item, s_Hist.get_pointer());
     });
   });
@@ -116,18 +116,17 @@ void GPUHistogram(unsigned int *h_result, unsigned int *d_idata, int num, queue 
   const int endNumBlocks = std::min(MAXBLOCKSEND, numBlocks);
   if(MAXBLOCKSEND < numBlocks){
     // Otherwise we used the merge kernel to reduce the number of sub-histograms to MAXBLOCKSEND.
-    range<3> gws (1, 1, NUMBINS * MAXBLOCKSEND);
-    range<3> lws (1, 1, NUMBINS);
-    stream.submit([&](handler &cgh) {
+    sycl::range<3> gws (1, 1, NUMBINS * MAXBLOCKSEND);
+    sycl::range<3> lws (1, 1, NUMBINS);
+    stream.submit([&](sycl::handler &cgh) {
       auto d_odata_p = d_odata;
-      cgh.parallel_for(nd_range<3>(gws, lws), [=](nd_item<3> item) {
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
         mergeKernel(d_odata_p, numBlocks, item);
       });
     });
   }
   // Copy at most MAXBLOCKSEND sub-histograms to h_odata.
-  stream.memcpy(h_odata, d_odata, endNumBlocks * HISTOSIZE);
-  stream.wait();
+  stream.memcpy(h_odata, d_odata, endNumBlocks * HISTOSIZE).wait();
 
   // Compile the sub-histograms in the beginning of h_odata.
   for(int i = 1; i < endNumBlocks; i++){
@@ -147,7 +146,7 @@ int iDivUp(int a, int b){
 // g_odata are actual unsigned ints; g_idata pack four bin assignments as per above
 // size is actually the number of unsigned ints in g_idata now, unlike num above.
 void histoKernel(unsigned int*__restrict g_odata, const unsigned int*__restrict g_idata,
-                 int size, nd_item<3> &item, unsigned char *__restrict s_Hist) {
+                 int size, sycl::nd_item<3> &item, unsigned char *__restrict s_Hist) {
   // Map [31:6] bits to [31:6], [5:4] bits to [1:0], and [3:0] bits to [5:2]
   // This ensures there are no bank conflicts when accessing s_Hist below.
   // Basically, the location we write to is (threadPos + data*NUMTHREADS)/4.
@@ -164,7 +163,7 @@ void histoKernel(unsigned int*__restrict g_odata, const unsigned int*__restrict 
   for (int pos = item.get_local_id(2); pos < (MEMPERBLOCK >> 2); pos += item.get_local_range(2))
     ((unsigned int *)s_Hist)[pos] = 0;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Location in g_idata in which this block starts reading
   const int gStart = sycl::mul24((int)item.get_group(2), DATAPERBLOCK);
@@ -182,7 +181,7 @@ void histoKernel(unsigned int*__restrict g_odata, const unsigned int*__restrict 
     s_Hist[threadPos + sycl::mul24((int)((dataTemp >> 26) & 63), NUMTHREADS)]++;
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Use NUMBINS threads to create a per-block sub-histogram from the data in shared memory
   if (item.get_local_id(2) < NUMBINS) {
@@ -206,7 +205,7 @@ void histoKernel(unsigned int*__restrict g_odata, const unsigned int*__restrict 
 
 // Merges numBlocks per-block sub-histograms into gridDim.x sub-histograms.
 // (gridDim.x should be MAXBLOCKSEND for obvious reasons)
-void mergeKernel(unsigned int* d_iodata, int numBlocks, nd_item<3> &item) {
+void mergeKernel(unsigned int* d_iodata, int numBlocks, sycl::nd_item<3> &item) {
   // Total number of histogram bins.
   const int size = numBlocks * NUMBINS;
   // (Starting) Position in global memory for this thread.

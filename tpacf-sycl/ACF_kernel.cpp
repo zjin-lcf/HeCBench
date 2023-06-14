@@ -44,7 +44,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 // Similar to ACF kernel, but takes advantage of symmetry to cut computations down by half.
 // Obviously, due to symmetry, it needs only one input set.
 void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
-                   nd_item<3> item, double3 *__restrict sdata,
+                   sycl::nd_item<3> &item, double3 *__restrict sdata,
                    double *__restrict binbounds)
 {
   int tx = (item.get_group(2) << 7) + item.get_local_id(2);
@@ -71,7 +71,7 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
     sdata[item.get_local_id(2)].y() = g_idata1.y[by + item.get_local_id(2)];
     sdata[item.get_local_id(2)].z() = g_idata1.z[by + item.get_local_id(2)];
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     by <<= (LOG2_GRID_SIZE - 2);
     by += tx;
@@ -131,7 +131,7 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
     sdata[item.get_local_id(2)].y() = g_idata1.y[by + item.get_local_id(2)];
     sdata[item.get_local_id(2)].z() = g_idata1.z[by + item.get_local_id(2)];
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     by <<= (LOG2_GRID_SIZE - 2);
     by += tx;
@@ -187,7 +187,7 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
 
 
 void ACFKernel(cartesian g_idata1, cartesian g_idata2, unsigned int*__restrict g_odata,
-               nd_item<3> item, double3 *__restrict sdata, double *__restrict binbounds) 
+               sycl::nd_item<3> &item, double3 *__restrict sdata, double *__restrict binbounds) 
 {
   // Shared memory used to store vectors from g_idata2
   double temp;
@@ -210,7 +210,7 @@ void ACFKernel(cartesian g_idata1, cartesian g_idata2, unsigned int*__restrict g
   // Each thread will compute the dot product of its assigned vector with every shared vector.
 
   // Ensure all reads are finished before using them for any calculations
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Simplify some notation later on.
   by <<= (LOG2_GRID_SIZE - 2);
