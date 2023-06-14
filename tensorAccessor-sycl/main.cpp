@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "tensorAccessor.h"
 
 // A demo of packed tensor accessors in Pytorch
 void tensor_packed_accessor_kernel (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     PackedTensorAccessor64<float, 1, RestrictPtrTraits> r,
     PackedTensorAccessor64<float, 2, RestrictPtrTraits> m,
     PackedTensorAccessor64<float, 1, RestrictPtrTraits> v)
@@ -23,7 +23,7 @@ void tensor_packed_accessor_kernel (
 }
 
 void raw_accessor_kernel (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int64_t nrow,
     const int64_t ncol,
           float *__restrict__ r,
@@ -86,39 +86,40 @@ int main(int argc, char* argv[])
     r_ref[i] = val;
   }
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
   // Note: signficant performance drop using an out-of-order queue
-  queue q(dev_sel, property::queue::in_order());
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
   float *d_m, *d_v, *d_r;
-  d_m = malloc_device<float>(numel, q);
+  d_m = sycl::malloc_device<float>(numel, q);
   q.memcpy(d_m, m, m_bytes);
 
-  d_v = malloc_device<float>(ncol, q);
+  d_v = sycl::malloc_device<float>(ncol, q);
   q.memcpy(d_v, v, v_bytes);
 
-  d_r = malloc_device<float>(nrow, q);
+  d_r = sycl::malloc_device<float>(nrow, q);
 
   PackedTensorAccessor64<float, 2, RestrictPtrTraits> m_acc (d_m, sizes, strides);
   PackedTensorAccessor64<float, 1, RestrictPtrTraits> v_acc (d_v, &ncol, strides+1);
   PackedTensorAccessor64<float, 1, RestrictPtrTraits> r_acc (d_r, &nrow, strides+1);
 
-  range<1> gws ((nrow + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((nrow + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   printf("Warmup..\n");
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class packed_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class packed_warmup>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         tensor_packed_accessor_kernel(item, r_acc, m_acc, v_acc);
       });
     });
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class raw_warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class raw_warmup>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         raw_accessor_kernel(item, nrow, ncol, d_r, d_m, d_v);
       });
     });
@@ -128,8 +129,9 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class raw>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class raw>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         raw_accessor_kernel(item, nrow, ncol, d_r, d_m, d_v);
       });
     });
@@ -138,14 +140,15 @@ int main(int argc, char* argv[])
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of raw_accessor_kernel: %f (us)\n", 
+  printf("Average execution time of raw_accessor_kernel: %f (us)\n",
           time * 1e-3f / repeat);
 
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class packed>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class packed>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         tensor_packed_accessor_kernel(item, r_acc, m_acc, v_acc);
       });
     });
@@ -154,14 +157,14 @@ int main(int argc, char* argv[])
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of tensor_packed_accessor_kernel: %f (us)\n", 
+  printf("Average execution time of tensor_packed_accessor_kernel: %f (us)\n",
           time * 1e-3f / repeat);
 
   q.memcpy(r, d_r, r_bytes).wait();
 
-  free(d_m, q);
-  free(d_v, q);
-  free(d_r, q);
+  sycl::free(d_m, q);
+  sycl::free(d_v, q);
+  sycl::free(d_r, q);
 
   // verify (may fail due to floating-point rounding)
   bool ok = true;
@@ -178,6 +181,6 @@ int main(int argc, char* argv[])
   free(v);
   free(r);
   free(r_ref);
-  
+
   return 0;
 }
