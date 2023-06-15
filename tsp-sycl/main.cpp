@@ -45,7 +45,7 @@ Purpose Processing Using GPUs (10 pages). February 2015.
 #include <math.h>
 #include <limits.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // no point in using precise FP math or double precision as we are rounding
 // the results to the nearest integer anyhow
@@ -94,6 +94,24 @@ static int best_thread_count(int cities)
   return bthr;
 }
 
+inline int atomicAdd(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  return atm.fetch_add(val);
+}
+
+inline int atomicMin(int &var, int val) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(var);
+  return atm.fetch_min(val);
+}
+
 int main(int argc, char *argv[])
 {
   printf("2-opt TSP SYCL GPU code v2.3\n");
@@ -130,9 +148,9 @@ int main(int argc, char *argv[])
     fprintf(stderr, "the problem size must be at least 100 for this version of the code\n");
     fclose(f);
     exit(-1);
-  } 
+  }
 
-  ch = getc(f); 
+  ch = getc(f);
   while ((ch != EOF) && (ch != '\n')) ch = getc(f);
   fscanf(f, "%s\n", str);
   if (strcmp(str, "NODE_COORD_SECTION") != 0) {
@@ -170,62 +188,53 @@ int main(int argc, char *argv[])
   int best = INT_MAX;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> climbs_d (1);
-  buffer<int, 1> best_d (1);
-  buffer<int, 1> glob_d (restarts * ((3 * cities + 2 + 31) / 32 * 32));
-  buffer<float, 1> posx_d (posx, cities);
-  buffer<float, 1> posy_d (posy, cities);
+  int *climbs_d = sycl::malloc_device<int>(1, q);
+  int *best_d = sycl::malloc_device<int>(1, q);
+  int *glob_d = sycl::malloc_device<int>(restarts * (3 * cities + 2 + 31) / 32 * 32, q);
+
+  float *posx_d = sycl::malloc_device<float>(cities, q);
+  q.memcpy(posx_d, posx, sizeof(float) * cities);
+
+  float *posy_d = sycl::malloc_device<float>(cities, q);
+  q.memcpy(posy_d, posy, sizeof(float) * cities);
 
   int threads = best_thread_count(cities);
   printf("work-group size: %d\n", threads);
 
-  range<1> gws (restarts * threads);
-  range<1> lws (threads);
+  sycl::range<1> gws (restarts * threads);
+  sycl::range<1> lws (threads);
 
   double ktime = 0.0;
 
   for (int i = 0; i <= repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = climbs_d.get_access<sycl_write>(cgh);
-      cgh.copy(&climbs, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = best_d.get_access<sycl_write>(cgh);
-      cgh.copy(&best, acc);
-    });
+    q.memcpy(climbs_d, &climbs, sizeof(int));
+    q.memcpy(best_d, &best, sizeof(int));
 
     q.wait();
     auto kstart = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto posx = posx_d.get_access<sycl_read>(cgh);
-      auto posy = posy_d.get_access<sycl_read>(cgh);
-      auto glob = glob_d.get_access<sycl_read_write>(cgh);
-      auto climbs = climbs_d.get_access<sycl_atomic>(cgh);
-      auto best = best_d.get_access<sycl_atomic>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> px_s(tilesize, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> py_s(tilesize, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> bf_s(tilesize, cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> buf_s(threads, cgh);
-      cgh.parallel_for<class k>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> px_s(sycl::range<1>(tilesize), cgh);
+      sycl::local_accessor<float, 1> py_s(sycl::range<1>(tilesize), cgh);
+      sycl::local_accessor<int, 1> bf_s(sycl::range<1>(tilesize), cgh);
+      sycl::local_accessor<int, 1> buf_s(sycl::range<1>(threads), cgh);
+      cgh.parallel_for<class k>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int lid = item.get_local_id(0);
         const int bid = item.get_group(0);
         const int dim = item.get_local_range(0);
 
-        int *buf = &glob[bid * ((3 * cities + 2 + 31) / 32 * 32)];
+        int *buf = &glob_d[bid * ((3 * cities + 2 + 31) / 32 * 32)];
         float *px = (float *)(&buf[cities]);
         float *py = &px[cities + 1];
 
-        for (int i = lid; i < cities; i += dim) px[i] = posx[i];
-        for (int i = lid; i < cities; i += dim) py[i] = posy[i];
-        item.barrier(access::fence_space::local_space);
+        for (int i = lid; i < cities; i += dim) px[i] = posx_d[i];
+        for (int i = lid; i < cities; i += dim) py[i] = posy_d[i];
+        item.barrier(sycl::access::fence_space::local_space);
 
         if (lid == 0) {  // serial permutation
           unsigned int seed = bid;
@@ -237,12 +246,12 @@ int main(int argc, char *argv[])
           px[cities] = px[0];
           py[cities] = py[0];
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         int minchange;
         do {
           for (int i = lid; i < cities; i += dim) buf[i] = -dist(i, i + 1);
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           minchange = 0;
           int mini = 1;
@@ -268,7 +277,7 @@ int main(int argc, char *argv[])
                   bf_s[k] = buf[k + bound];
                 }
               }
-              item.barrier(access::fence_space::local_space);
+              item.barrier(sycl::access::fence_space::local_space);
 
               int lower = bound;
               if (lower < i + 2) lower = i + 2;
@@ -287,18 +296,18 @@ int main(int argc, char *argv[])
                   minj = j;
                 }
               }
-              item.barrier(access::fence_space::local_space);
+              item.barrier(sycl::access::fence_space::local_space);
             }
 
             if (i < cities - 2) {
               minchange += buf[i];
             }
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           int change = buf_s[lid] = minchange;
-          if (lid == 0) atomic_fetch_add(climbs[0], 1);  // stats only
-          item.barrier(access::fence_space::local_space);
+          if (lid == 0) atomicAdd(climbs_d[0], 1);  // stats only
+          item.barrier(sycl::access::fence_space::local_space);
 
           int j = dim;
           do {
@@ -309,19 +318,19 @@ int main(int argc, char *argv[])
               buf_s[lid] = change;
             }
             j = k;
-            item.barrier(access::fence_space::local_space);
+            item.barrier(sycl::access::fence_space::local_space);
           } while (j > 1);
 
           if (minchange == buf_s[0]) {
             buf_s[1] = lid;  // non-deterministic winner
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           if (lid == buf_s[1]) {
             buf_s[2] = mini + 1;
             buf_s[3] = minj;
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
 
           minchange = buf_s[0];
           mini = buf_s[2];
@@ -333,7 +342,7 @@ int main(int argc, char *argv[])
               swap(py[i], py[j]);
             }
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         } while (minchange < 0);
 
         int term = 0;
@@ -341,7 +350,7 @@ int main(int argc, char *argv[])
           term += dist(i, i + 1);
         }
         buf_s[lid] = term;
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         int j = dim;
         do {
@@ -349,16 +358,16 @@ int main(int argc, char *argv[])
           if ((lid + k) < j) {
             term += buf_s[lid + k];
           }
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           if ((lid + k) < j) {
             buf_s[lid] = term;
           }
           j = k;
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
         } while (j > 1);
 
         if (lid == 0) {
-          atomic_fetch_min(best[0], term);
+          atomicMin(best_d[0], term);
         }
       });
     });
@@ -369,16 +378,8 @@ int main(int argc, char *argv[])
       ktime += std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
   }
 
-  q.submit([&] (handler &cgh) {
-    auto acc = climbs_d.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &climbs);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = best_d.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &best);
-  });
-
+  q.memcpy(&best, best_d, sizeof(int));
+  q.memcpy(&climbs, climbs_d, sizeof(int));
   q.wait();
 
   long long moves = 1LL * climbs * (cities - 2) * (cities - 1) / 2;
@@ -393,6 +394,10 @@ int main(int argc, char *argv[])
   else
     printf("FAIL\n");
 
+  sycl::free(glob_d, q);
+  sycl::free(best_d, q);
+  sycl::free(climbs_d, q);
+  sycl::free(posx_d, q);
   free(posx);
   free(posy);
   return 0;
