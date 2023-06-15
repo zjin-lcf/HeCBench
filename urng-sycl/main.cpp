@@ -18,11 +18,11 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "urng.h"
 #include "kernel.cpp"
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
   if (argc != 5) {
     printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
@@ -34,7 +34,7 @@ int main(int argc, char** argv)
   const int iterations = atoi(argv[4]);
 
   // load input bitmap image
-  SDKBitMap inputBitmap;   
+  SDKBitMap inputBitmap;
   inputBitmap.load(filePath);
   if(!inputBitmap.isLoaded())
   {
@@ -82,19 +82,18 @@ int main(int argc, char** argv)
   const int factor = FACTOR;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  uchar4 *d_input = malloc_device<uchar4>(width * height, q);
+  uchar4 *d_input = sycl::malloc_device<uchar4>(width * height, q);
   q.memcpy(d_input, inputImageData, width * height * sizeof(uchar4));
 
-  uchar4 *d_output = malloc_device<uchar4>(width * height, q);
+  uchar4 *d_output = sycl::malloc_device<uchar4>(width * height, q);
 
-  range<1> gws (height * width);
-  range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
+  sycl::range<1> gws (height * width);
+  sycl::range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
@@ -103,9 +102,10 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for(int i = 0; i < iterations; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<int, 1, sycl_read_write, access::target::local> iv(NTAB * GROUP_SIZE, cgh);
-      cgh.parallel_for<class noise_uniform>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> iv (sycl::range<1>(NTAB * GROUP_SIZE), cgh);
+      cgh.parallel_for<class noise_uniform>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         kernel_noise_uniform(
           d_input,
           d_output,
@@ -122,8 +122,8 @@ int main(int argc, char** argv)
   std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
 
   q.memcpy(outputImageData, d_output, width * height * sizeof(uchar4)).wait();
-  free(d_input, q);
-  free(d_output, q);
+  sycl::free(d_input, q);
+  sycl::free(d_output, q);
 
   // verify
   float mean = 0;
@@ -153,7 +153,7 @@ int main(int argc, char** argv)
   // write the output bmp file
   if(!inputBitmap.write(OUTPUT_IMAGE))
     std::cout << "Failed to write output image!";
-  else 
+  else
     std::cout << "Write output image!";
 #endif
 
