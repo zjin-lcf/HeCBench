@@ -594,6 +594,8 @@ int main(int argc, char* argv[])
 
     //====== free device memories ========
 
+    hipFree(dev_pbf_xlec);
+    hipFree(dev_pbf_to_cbf);
     hipFree(dev_mat_D);
     hipFree(dev_mat_Q);
     hipFree(dev_mat_J_PI);
