@@ -4,11 +4,11 @@
 #include <algorithm>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 void zero_point (
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const float* x_min,
     const float* x_max,
     int32_t qmin,
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
     min[i] = distr(g);
     max[i] = distr(g);
   }
-  
+
   reference (min,
              max,
              qmin,
@@ -116,31 +116,31 @@ int main(int argc, char* argv[])
              zp_ref);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  int32_t *d_zp = malloc_device<int32_t>(size, q);
-  float *d_scale = malloc_device<float>(size, q);
+  int32_t *d_zp = sycl::malloc_device<int32_t>(size, q);
+  float *d_scale = sycl::malloc_device<float>(size, q);
 
-  float *d_min = malloc_device<float>(size, q);
+  float *d_min = sycl::malloc_device<float>(size, q);
   q.memcpy(d_min, min, size_bytes);
 
-  float *d_max = malloc_device<float>(size, q);
+  float *d_max = sycl::malloc_device<float>(size, q);
   q.memcpy(d_max, max, size_bytes);
 
   const int block_size = 256;
-  range<1> gws ((size + block_size - 1) / block_size * block_size);
-  range<1> lws (block_size);
+  sycl::range<1> gws ((size + block_size - 1) / block_size * block_size);
+  sycl::range<1> lws (block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class zp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class zp>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         zero_point(
             item,
             d_min,
@@ -174,10 +174,10 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_zp, q);
-  free(d_scale, q);
-  free(d_min, q);
-  free(d_max, q);
+  sycl::free(d_zp, q);
+  sycl::free(d_scale, q);
+  sycl::free(d_min, q);
+  sycl::free(d_max, q);
 
   free(zp);
   free(scale);
