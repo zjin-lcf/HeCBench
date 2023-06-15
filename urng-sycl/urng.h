@@ -17,6 +17,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef URNG_H_
 #define URNG_H_
 
+using float4 = sycl::float4;
+using uchar4 = sycl::uchar4;
+using uchar = unsigned char;
+
 #include "SDKBitMap.h"
 
 #define INPUT_IMAGE "URNG_Input.bmp"
