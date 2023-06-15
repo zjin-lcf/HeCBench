@@ -1,6 +1,6 @@
 /*****************************************************************************
-  This file is part of the XLQC program.                                      
-  Copyright (C) 2015 Xin Li <lixin.reco@gmail.com>                            
+  This file is part of the XLQC program.
+  Copyright (C) 2015 Xin Li <lixin.reco@gmail.com>
 
 License:   BSD 3-Clause License
 
@@ -39,7 +39,7 @@ of this software, even if advised of the possibility of such damage.
 #include "basis.h"
 #include "scf.h"
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "rys.h"
 #include "cuda_rys_sp.cpp"
 #include "cuda_rys_dp.cpp"
@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
   fprintf(stdout, "Coordinates in atomic unit:\n");
   for (int iatom = 0; iatom < p_atom->num; ++ iatom)
   {
-    fprintf(stdout, "%s (%.1f)  %.10f  %.10f  %.10f\n", 
+    fprintf(stdout, "%s (%.1f)  %.10f  %.10f  %.10f\n",
         p_atom->name[iatom], (double)p_atom->nuc_chg[iatom],
         p_atom->pos[iatom][0], p_atom->pos[iatom][1], p_atom->pos[iatom][2]);
   }
@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
 
 
   //====== one-electron integrals ========
-  
+
   start = std::chrono::steady_clock::now();
 
   // overlap, kinetic energy and nuclear attraction integral
@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
   // counter for pbf_xlec; i_pbf for pbf_to_cbf
   int counter = 0;
   int i_pbf = 0;
-  for (int a = 0; a < p_basis->num; ++ a) 
+  for (int a = 0; a < p_basis->num; ++ a)
   {
     for (int i = 0; i < p_basis->nprims[a]; ++ i)
     {
@@ -367,19 +367,25 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // allocate memories for arrays on device
-  buffer<double, 1> d_pbf_xlec (h_pbf_xlec, n_pbf * 8);
-  buffer<   int, 1> d_pbf_to_cbf (h_pbf_to_cbf, n_pbf);
-  buffer<double, 1> d_mat_J_PI (n_pbf_combi);
-  buffer<double, 1> d_mat_K_PI (n_pbf_combi);
-  buffer<double, 1> d_mat_D (n_combi);
-  buffer<double, 1> d_mat_Q (h_mat_Q, n_combi);
+  double *d_pbf_xlec = sycl::malloc_device<double>(n_pbf * 8, q);
+  q.memcpy(d_pbf_xlec, h_pbf_xlec, n_PBF_bytes * 8);
+
+     int *d_pbf_to_cbf = sycl::malloc_device<int>(n_pbf, q);
+  q.memcpy(d_pbf_to_cbf, h_pbf_to_cbf, n_PBF_bytes_int);
+
+  double *d_mat_J_PI = sycl::malloc_device<double>(n_pbf_combi, q);
+  double *d_mat_K_PI = sycl::malloc_device<double>(n_pbf_combi, q);
+  double *d_mat_D = sycl::malloc_device<double>(n_combi, q);
+
+  double *d_mat_Q = sycl::malloc_device<double>(n_combi, q);
+  q.memcpy(d_mat_Q, h_mat_Q, n_CI_bytes);
+  q.wait();
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -400,7 +406,7 @@ int main(int argc, char* argv[])
      * F' = S^-1/2 * F * S^-1/2
      * diagonalize F' matrix to get C'
      * C = S^-1/2 * C'
-     * compute new density matrix 
+     * compute new density matrix
      *------------------------------------*/
 
     // when iter > 0, use incremental Fock matrix formation and DIIS
@@ -417,17 +423,13 @@ int main(int argc, char* argv[])
       }
     }
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_mat_D.get_access<sycl_discard_write>(cgh);
-      cgh.copy(h_mat_D, acc);
-    });
-
+    q.memcpy(d_mat_D, h_mat_D, n_CI_bytes);
 
     // create 8x8 thread blocks
-    range<2> lws (BLOCKSIZE, BLOCKSIZE);
+    sycl::range<2> lws (BLOCKSIZE, BLOCKSIZE);
 
     // configure a two dimensional grid
-    range<2> gws (n_pbf*BLOCKSIZE, n_pbf*BLOCKSIZE);
+    sycl::range<2> gws (n_pbf*BLOCKSIZE, n_pbf*BLOCKSIZE);
 
 
     // timer for J and K matrices
@@ -435,39 +437,29 @@ int main(int argc, char* argv[])
 
     // use 1T1PI for J and K matrices
     if (use_dp) {
-      q.submit([&] (handler &cgh) {
-        auto pbf_xlec = d_pbf_xlec.get_access<sycl_read>(cgh);
-        auto pbf_to_cbf = d_pbf_to_cbf.get_access<sycl_read>(cgh);
-        auto mat_D = d_mat_D.get_access<sycl_read>(cgh);
-        auto mat_J_PI = d_mat_J_PI.get_access<sycl_discard_read_write>(cgh);
-        auto mat_Q = d_mat_Q.get_access<sycl_read>(cgh);
-        accessor<double, 1, sycl_read_write, access::target::local> smem(BLOCKSIZE * BLOCKSIZE, cgh);
-        cgh.parallel_for<class matJ_dp>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          cuda_mat_J_PI_dp(item, smem.get_pointer(), 
-                        pbf_xlec.get_pointer(),
-                        pbf_to_cbf.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
+        cgh.parallel_for<class matJ_dp>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          cuda_mat_J_PI_dp(item, smem.get_pointer(),
+                        d_pbf_xlec,
+                        d_pbf_to_cbf,
                         n_pbf,
-                        mat_D.get_pointer(),
-                        mat_J_PI.get_pointer(),
-                        mat_Q.get_pointer());
+                        d_mat_D,
+                        d_mat_J_PI,
+                        d_mat_Q);
         });
       });
     } else {
-      q.submit([&] (handler &cgh) {
-        auto pbf_xlec = d_pbf_xlec.get_access<sycl_read>(cgh);
-        auto pbf_to_cbf = d_pbf_to_cbf.get_access<sycl_read>(cgh);
-        auto mat_D = d_mat_D.get_access<sycl_read>(cgh);
-        auto mat_J_PI = d_mat_J_PI.get_access<sycl_discard_read_write>(cgh);
-        auto mat_Q = d_mat_Q.get_access<sycl_read>(cgh);
-        accessor<double, 1, sycl_read_write, access::target::local> smem(BLOCKSIZE * BLOCKSIZE, cgh);
-        cgh.parallel_for<class matJ>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          cuda_mat_J_PI(item, smem.get_pointer(), 
-                        pbf_xlec.get_pointer(),
-                        pbf_to_cbf.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
+        cgh.parallel_for<class matJ>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          cuda_mat_J_PI(item, smem.get_pointer(),
+                        d_pbf_xlec,
+                        d_pbf_to_cbf,
                         n_pbf,
-                        mat_D.get_pointer(),
-                        mat_J_PI.get_pointer(),
-                        mat_Q.get_pointer());
+                        d_mat_D,
+                        d_mat_J_PI,
+                        d_mat_Q);
         });
       });
     }
@@ -478,47 +470,34 @@ int main(int argc, char* argv[])
     time_in_usec = ktime * 1e-3f;
     time_mat_J += time_in_usec;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_mat_J_PI.get_access<sycl_read>(cgh);
-      cgh.copy(acc, h_mat_J_PI);
-    }).wait();
+    q.memcpy(h_mat_J_PI, d_mat_J_PI, n_PI_bytes).wait();
 
     kstart = std::chrono::steady_clock::now();
 
     if (use_dp) {
-      q.submit([&] (handler &cgh) {
-        auto pbf_xlec = d_pbf_xlec.get_access<sycl_read>(cgh);
-        auto pbf_to_cbf = d_pbf_to_cbf.get_access<sycl_read>(cgh);
-        auto mat_D = d_mat_D.get_access<sycl_read>(cgh);
-        auto mat_K_PI = d_mat_K_PI.get_access<sycl_discard_read_write>(cgh);
-        auto mat_Q = d_mat_Q.get_access<sycl_read>(cgh);
-        accessor<double, 1, sycl_read_write, access::target::local> smem(BLOCKSIZE * BLOCKSIZE, cgh);
-        cgh.parallel_for<class matK_dp>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          cuda_mat_K_PI_dp(item, smem.get_pointer(), 
-                        pbf_xlec.get_pointer(),
-                        pbf_to_cbf.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
+        cgh.parallel_for<class matK_dp>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          cuda_mat_K_PI_dp(item, smem.get_pointer(),
+                        d_pbf_xlec,
+                        d_pbf_to_cbf,
                         n_pbf,
-                        mat_D.get_pointer(),
-                        mat_K_PI.get_pointer(),
-                        mat_Q.get_pointer());
+                        d_mat_D,
+                        d_mat_K_PI,
+                        d_mat_Q);
         });
       });
     } else {
-      q.submit([&] (handler &cgh) {
-        auto pbf_xlec = d_pbf_xlec.get_access<sycl_read>(cgh);
-        auto pbf_to_cbf = d_pbf_to_cbf.get_access<sycl_read>(cgh);
-        auto mat_D = d_mat_D.get_access<sycl_read>(cgh);
-        auto mat_K_PI = d_mat_K_PI.get_access<sycl_discard_read_write>(cgh);
-        auto mat_Q = d_mat_Q.get_access<sycl_read>(cgh);
-        accessor<double, 1, sycl_read_write, access::target::local> smem(BLOCKSIZE * BLOCKSIZE, cgh);
-        cgh.parallel_for<class matK>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          cuda_mat_K_PI(item, smem.get_pointer(), 
-                        pbf_xlec.get_pointer(),
-                        pbf_to_cbf.get_pointer(),
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
+        cgh.parallel_for<class matK>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          cuda_mat_K_PI(item, smem.get_pointer(),
+                        d_pbf_xlec,
+                        d_pbf_to_cbf,
                         n_pbf,
-                        mat_D.get_pointer(),
-                        mat_K_PI.get_pointer(),
-                        mat_Q.get_pointer());
+                        d_mat_D,
+                        d_mat_K_PI,
+                        d_mat_Q);
         });
       });
     }
@@ -526,13 +505,10 @@ int main(int argc, char* argv[])
     q.wait();
     kend = std::chrono::steady_clock::now();
     ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+    time_in_usec = ktime * 1e-3f;
     time_mat_K += time_in_usec;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_mat_K_PI.get_access<sycl_read>(cgh);
-      cgh.copy(acc, h_mat_K_PI);
-    }).wait();
-
+    q.memcpy(h_mat_K_PI, d_mat_K_PI, n_PI_bytes).wait();
 
     // sum up primitive J and K matrices to contracted ones
     for (int a = 0; a < p_basis->num; ++ a) {
@@ -583,7 +559,7 @@ int main(int argc, char* argv[])
     // DIIS
     if (use_diis)
     {
-      update_Fock_DIIS(&diis_dim, &diis_index, &delta_DIIS, 
+      update_Fock_DIIS(&diis_dim, &diis_index, &delta_DIIS,
           Fock, D_prev, S, p_basis, diis_err, diis_Fock);
     }
 
@@ -610,7 +586,7 @@ int main(int argc, char* argv[])
     {
       for (nu = 0; nu < p_basis->num; ++ nu)
       {
-        double dd = gsl_matrix_get(D, mu, nu) - 
+        double dd = gsl_matrix_get(D, mu, nu) -
           gsl_matrix_get(D_prev, mu, nu);
 
         gsl_matrix_set(D_diff, mu, nu, dd);
@@ -662,6 +638,15 @@ int main(int argc, char* argv[])
     fprintf(stdout, "%5d %10s %15.5f %12.2f\n",
         ibasis + 1, occ, ener, ener * HARTREE2EV);
   }
+
+  //====== free device memories ========
+
+  sycl::free(d_pbf_xlec, q);
+  sycl::free(d_pbf_to_cbf, q);
+  sycl::free(d_mat_D, q);
+  sycl::free(d_mat_Q, q);
+  sycl::free(d_mat_J_PI, q);
+  sycl::free(d_mat_K_PI, q);
 
   //====== free host memories ========
 
