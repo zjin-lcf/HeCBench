@@ -2,7 +2,7 @@
 #include <assert.h>
 #include "cbow.h"
 
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 extern real *syn0;
 extern int * table;
@@ -25,13 +25,13 @@ int maxThreadsPerBlock = 256;
 int numBlock;
 int shared_mem_usage;
 
-void device_memset(nd_item<1> &item, real * array, int size){
+void device_memset(sycl::nd_item<1> &item, real * array, int size){
   int idx = item.get_global_id(0);
   if (idx < size)
     array[idx] = 0;
 }
 
-void reduceInWarp(nd_item<1> &item, volatile float * f, int idInWarp){
+void reduceInWarp(sycl::nd_item<1> &item, volatile float * f, int idInWarp){
 
   for (unsigned int i=THREADS_PER_WORD /2; i>32; i>>=1) {
     if (idInWarp < i) {
@@ -50,7 +50,7 @@ void reduceInWarp(nd_item<1> &item, volatile float * f, int idInWarp){
 }
 
 void device_cbow(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const real *__restrict expTable,
     float *__restrict shared,
     const int sentence_num,
@@ -133,7 +133,7 @@ void device_cbow(
 
 
             for (int c = idInWarp; c < layer1_size; c+=THREADS_PER_WORD){
-              f[idInWarp] += neu1[c] * d_syn1neg[c + l2];   
+              f[idInWarp] += neu1[c] * d_syn1neg[c + l2];
             }
             __syncthreads();
 
@@ -179,7 +179,7 @@ void device_cbow(
   }
 }
 
-void cleanUpGPU(queue &q){
+void cleanUpGPU(sycl::queue &q){
   free(d_syn1neg, q);
   free(d_syn0, q);
   free(sen, q);
@@ -189,7 +189,7 @@ void cleanUpGPU(queue &q){
   free(d_expTable, q);
 }
 
-void initializeGPU(queue &q){
+void initializeGPU(sycl::queue &q){
 
   real * h_expTable = (real *)malloc((EXP_TABLE_SIZE ) * sizeof(real));
   for (int i = 0; i < EXP_TABLE_SIZE; i++) {
@@ -197,31 +197,31 @@ void initializeGPU(queue &q){
     h_expTable[i] = h_expTable[i] / (h_expTable[i] + 1);
   }
 
-  d_expTable = malloc_device<real>(EXP_TABLE_SIZE, q);
+  d_expTable = sycl::malloc_device<real>(EXP_TABLE_SIZE, q);
   q.memcpy(d_expTable, h_expTable, sizeof(real) * EXP_TABLE_SIZE).wait();
   free(h_expTable);
 
   if (negative>0) {
     int syn1neg_size = vocab_size * layer1_size_aligned;
-    d_syn1neg = malloc_device<real>(syn1neg_size, q);
-    range<1> gws ((syn1neg_size / maxThreadsPerBlock + 1) * maxThreadsPerBlock);
-    range<1> lws (maxThreadsPerBlock);
-    q.submit([&] (handler &cgh) {
+    d_syn1neg = sycl::malloc_device<real>(syn1neg_size, q);
+    sycl::range<1> gws ((syn1neg_size / maxThreadsPerBlock + 1) * maxThreadsPerBlock);
+    sycl::range<1> lws (maxThreadsPerBlock);
+    q.submit([&] (sycl::handler &cgh) {
       auto syn1neg = d_syn1neg;
-      cgh.parallel_for<class reset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class reset>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         device_memset(item, syn1neg, syn1neg_size );
       });
     }).wait();
   }
 
   int syn0_size = vocab_size * layer1_size_aligned;
-  d_syn0 = malloc_device<real>(syn0_size, q);
+  d_syn0 = sycl::malloc_device<real>(syn0_size, q);
   q.memcpy(d_syn0, syn0, syn0_size * sizeof(real));
 
-  sen = malloc_host<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
-  d_sen = malloc_device<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
+  sen = sycl::malloc_host<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
+  d_sen = sycl::malloc_device<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
 
-  d_random = malloc_device<unsigned int>(MAX_SENTENCE_LENGTH, q);
+  d_random = sycl::malloc_device<unsigned int>(MAX_SENTENCE_LENGTH, q);
 
   int h_random[MAX_SENTENCE_LENGTH];
 
@@ -231,26 +231,26 @@ void initializeGPU(queue &q){
 
   q.memcpy(d_random, h_random, MAX_SENTENCE_LENGTH * sizeof(unsigned int));
 
-  d_table = malloc_device<int>(table_size, q);
+  d_table = sycl::malloc_device<int>(table_size, q);
   q.memcpy(d_table, table, table_size * sizeof(int));
 
   numBlock = MAX_SENTENCE_LENGTH / (BLOCK_SIZE/THREADS_PER_WORD) + 1;
   shared_mem_usage = (BLOCK_SIZE + (BLOCK_SIZE/THREADS_PER_WORD) * layer1_size_aligned * 2);
 }
 
-void GetResultFromGPU(queue &q) {
+void GetResultFromGPU(sycl::queue &q) {
   q.memcpy(syn0, d_syn0, vocab_size * layer1_size_aligned * sizeof(real)).wait();
 }
 
-void TrainGPU(queue &q, int sentence_num) {
+void TrainGPU(sycl::queue &q, int sentence_num) {
   q.memcpy(d_sen, sen,
            (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int));
 
-  range<1> gws (numBlock * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (numBlock * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    accessor<real, 1, sycl_read_write, access::target::local> sm (shared_mem_usage, cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<real, 1> sm (sycl::range<1>(shared_mem_usage), cgh);
     auto etab = d_expTable;
     auto l1s = layer1_size;
     auto l1s_aligned = layer1_size_aligned;
@@ -263,7 +263,7 @@ void TrainGPU(queue &q, int sentence_num) {
     auto syn0 = d_syn0;
     auto syn1neg = d_syn1neg;
     auto random = d_random;
-    cgh.parallel_for<class cbow>(nd_range<1>(gws, lws), [=] (nd_item<1> item)
+    cgh.parallel_for<class cbow>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
       [[intel::reqd_sub_group_size(32)]]  {
       device_cbow(item, etab, sm.get_pointer(),
         sentence_num, l1s, l1s_aligned, w,
