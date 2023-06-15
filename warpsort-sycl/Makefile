@@ -29,13 +29,14 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DWARP_SIZE=32 -DHALF_WARP_SIZE=16 -std=c++17 -Wall -I. -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -DWARP_SIZE=32 -DHALF_WARP_SIZE=16 \
+          -std=c++17 -Wall -I. -fsycl
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
