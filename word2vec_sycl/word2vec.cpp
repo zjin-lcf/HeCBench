@@ -17,7 +17,6 @@
 #include <string.h>
 #include <math.h>
 #include <pthread.h>
-
 #include "cbow.h"
 
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
@@ -301,7 +300,7 @@ void SaveVocab() {
 }
 
 void ReadVocab() {
-  int a, i = 0;
+  int a;
   char c;
   char word[MAX_STRING];
   FILE *fin = fopen(read_vocab_file, "rb");
@@ -316,7 +315,6 @@ void ReadVocab() {
     if (feof(fin)) break;
     a = AddWordToVocab(word);
     fscanf(fin, "%d%c", &vocab[a].cn, &c);
-    i++;
   }
   SortVocab();
   if (debug_mode > 0) {
@@ -348,13 +346,13 @@ void InitNet() {
 
 typedef struct thread_arguments {
   long n;
-  queue *q;
+  sycl::queue *q;
 } thargs_t;
 
 void *TrainModelThread(void *id) {
   // read the arguments
   unsigned int next_random = ((thargs_t*)id)->n;
-  queue &q = *(((thargs_t*)id)->q);
+  sycl::queue &q = *(((thargs_t*)id)->q);
 
   int   word, sentence_length = 0;
   long long word_count = 0, last_word_count = 0;
@@ -452,11 +450,10 @@ void TrainModel() {
   if (negative > 0) InitUnigramTable();
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
     
   initializeGPU(q);
 
