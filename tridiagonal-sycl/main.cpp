@@ -82,11 +82,10 @@ void run(int system_size, int num_systems)
   shrLog("\n----- optimized GPU solvers -----\n\n");
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
   
   // pcr (base and optimized)
   time_spent_gpu[0] = pcr_small_systems(q, a, b, c, d, x1, system_size, num_systems, 0);
