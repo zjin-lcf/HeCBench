@@ -1,10 +1,10 @@
 #include <complex>
-#include <vector>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <chrono>
-#include "common.h"
+#include <vector>
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 #include "reference.h"
 
@@ -29,7 +29,7 @@ void init_p(T *p_real, T *p_imag, int width, int height) {
 }
 
 template <typename T>
-void tsa(queue &q, int width, int height, int repeat) {
+void tsa(sycl::queue &q, int width, int height, int repeat) {
 
   T * p_real = new T[width * height];
   T * p_imag = new T[width * height];
@@ -62,20 +62,23 @@ void tsa(queue &q, int width, int height, int repeat) {
   // time step
   const int STEPS = 1;
 
-  range<2> gws ((height + (BLOCK_Y - 2 * STEPS * MARGIN_Y) - 1) / (BLOCK_Y - 2 * STEPS * MARGIN_Y) * STRIDE_Y,
-                (width + (BLOCK_X - 2 * STEPS * MARGIN_X) - 1) / (BLOCK_X - 2 * STEPS * MARGIN_X)  * BLOCK_X);
-             
-  range<2> lws (STRIDE_Y, BLOCK_X);
+  sycl::range<2> gws ((height + (BLOCK_Y - 2 * STEPS * MARGIN_Y) - 1) /
+                      (BLOCK_Y - 2 * STEPS * MARGIN_Y) * STRIDE_Y,
+                      (width + (BLOCK_X - 2 * STEPS * MARGIN_X) - 1) /
+                      (BLOCK_X - 2 * STEPS * MARGIN_X)  * BLOCK_X);
+
+  sycl::range<2> lws (STRIDE_Y, BLOCK_X);
+
   int sense = 0;
 
   T *d_real[2];
   T *d_imag[2];
 
   // ping-pong arrays
-  d_real[0] = malloc_device<T>(width * height, q);
-  d_real[1] = malloc_device<T>(width * height, q);
-  d_imag[0] = malloc_device<T>(width * height, q); 
-  d_imag[1] = malloc_device<T>(width * height, q); 
+  d_real[0] = sycl::malloc_device<T>(width * height, q);
+  d_real[1] = sycl::malloc_device<T>(width * height, q);
+  d_imag[0] = sycl::malloc_device<T>(width * height, q);
+  d_imag[1] = sycl::malloc_device<T>(width * height, q);
   q.memcpy(d_real[0], p_real, width * height * sizeof(T));
   q.memcpy(d_imag[0], p_imag, width * height * sizeof(T));
 
@@ -83,9 +86,9 @@ void tsa(queue &q, int width, int height, int repeat) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
+    q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>>(
-        nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         tsa_kernel<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>
           (item, a, b, width, height,
            d_real[sense], d_imag[sense], d_real[1-sense], d_imag[1-sense]);
@@ -122,6 +125,10 @@ void tsa(queue &q, int width, int height, int repeat) {
   delete[] p_imag;
   delete[] h_real;
   delete[] h_imag;
+  sycl::free(d_real[0], q);
+  sycl::free(d_real[1], q);
+  sycl::free(d_imag[0], q);
+  sycl::free(d_imag[1], q);
 }
 
 int main(int argc, char** argv) {
@@ -134,11 +141,10 @@ int main(int argc, char** argv) {
   int repeat = atoi(argv[3]);  // repeat kernel execution
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   printf("TSA in float32\n");
   tsa<float>(q, width, height, repeat);

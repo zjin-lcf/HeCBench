@@ -1,11 +1,11 @@
 template<typename T, int BLOCK_WIDTH, int BLOCK_HEIGHT, int MARGIN_X, int MARGIN_Y, int BACKWARDS>
 inline void trotter_vert_pair(
-    T a, T b, 
+    T a, T b,
     int width, int height,
-    T &cell_r, T &cell_i, 
-    int kx, int ky, int py, 
+    T &cell_r, T &cell_i,
+    int kx, int ky, int py,
     T rl[BLOCK_HEIGHT][BLOCK_WIDTH],
-    T im[BLOCK_HEIGHT][BLOCK_WIDTH]) 
+    T im[BLOCK_HEIGHT][BLOCK_WIDTH])
 {
   T peer_r;
   T peer_i;
@@ -23,12 +23,12 @@ inline void trotter_vert_pair(
 
 template<typename T, int BLOCK_WIDTH, int BLOCK_HEIGHT, int MARGIN_X, int MARGIN_Y, int BACKWARDS>
 inline void trotter_horz_pair(
-    T a, T b, 
+    T a, T b,
     int width, int height,
-    T &cell_r, T &cell_i, 
-    int kx, int ky, int px, 
+    T &cell_r, T &cell_i,
+    int kx, int ky, int px,
     T rl[BLOCK_HEIGHT][BLOCK_WIDTH],
-    T im[BLOCK_HEIGHT][BLOCK_WIDTH]) 
+    T im[BLOCK_HEIGHT][BLOCK_WIDTH])
 {
   T peer_r;
   T peer_i;
@@ -46,19 +46,21 @@ inline void trotter_horz_pair(
 
 template<typename T, int STEPS, int BLOCK_X, int BLOCK_Y, int MARGIN_X, int MARGIN_Y, int STRIDE_Y>
 void tsa_kernel(
-    nd_item<2> &item,
-    T a, T b, int width, int height, 
+    sycl::nd_item<2> &item,
+    T a, T b, int width, int height,
     const T * __restrict p_real,
     const T * __restrict p_imag,
           T * __restrict p2_real,
-          T * __restrict p2_imag) 
+          T * __restrict p2_imag)
 {
-  multi_ptr<T[BLOCK_Y][BLOCK_X], access::address_space::local_space> rl_ptr =
-    ext::oneapi::group_local_memory_for_overwrite<T[BLOCK_Y][BLOCK_X]>(item.get_group());
+  auto g = item.get_group();
+
+  sycl::multi_ptr<T[BLOCK_Y][BLOCK_X], sycl::access::address_space::local_space> rl_ptr =
+    sycl::ext::oneapi::group_local_memory_for_overwrite<T[BLOCK_Y][BLOCK_X]>(g);
   T (*rl)[BLOCK_X] = *rl_ptr;
 
-  multi_ptr<T[BLOCK_Y][BLOCK_X], access::address_space::local_space> im_ptr =
-    ext::oneapi::group_local_memory_for_overwrite<T[BLOCK_Y][BLOCK_X]>(item.get_group());
+  sycl::multi_ptr<T[BLOCK_Y][BLOCK_X], sycl::access::address_space::local_space> im_ptr =
+    sycl::ext::oneapi::group_local_memory_for_overwrite<T[BLOCK_Y][BLOCK_X]>(g);
   T (*im)[BLOCK_X] = *im_ptr;
 
   int blockIdx_x = item.get_group(1);
@@ -80,7 +82,7 @@ void tsa_kernel(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  group_barrier(g);
 
   // Place threads along the black cells of a checkerboard pattern
   int sx = threadIdx_x;
@@ -113,31 +115,31 @@ void tsa_kernel(
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
-          a, b, width, height, cell_r[part], cell_i[part], 
+          a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-          a, b, width, height, cell_r[part], cell_i[part], 
+          a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
 
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
@@ -145,28 +147,28 @@ void tsa_kernel(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_horz_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
           a, b, width, height, cell_r[part], cell_i[part],
           sx, sy + part * 2 * STRIDE_Y, px, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
     #pragma unroll
     for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
       trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>
-        (a, b, width, height, cell_r[part], cell_i[part], 
+        (a, b, width, height, cell_r[part], cell_i[part],
          sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
     }
-    item.barrier(access::fence_space::local_space);
+    group_barrier(g);
   }
 
   // write black cells in registers to shared memory
@@ -175,7 +177,7 @@ void tsa_kernel(
     rl[sy + part * 2 * STRIDE_Y][sx] = cell_r[part];
     im[sy + part * 2 * STRIDE_Y][sx] = cell_i[part];
   }
-  item.barrier(access::fence_space::local_space);
+  group_barrier(g);
 
   // discard the halo and copy results from shared to global memory
   sx = threadIdx_x + STEPS * MARGIN_X;
