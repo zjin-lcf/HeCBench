@@ -3,14 +3,14 @@
 #include <string.h>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define threadsPerBlock 512
 
 // Kernel for fast unfold+copy on volumes
 template <typename T>
 void vol2col_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const uint64_t range,
     const T* data_vol,
     const int depth,
@@ -67,7 +67,7 @@ void vol2col_kernel(
 
 template <typename T, typename accT>
 void col2vol_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const uint64_t n,
     const T* data_col,
     const unsigned depth,
@@ -137,11 +137,12 @@ void col2vol_kernel(
   }
 }
 
-int get_blocks (queue &q, uint64_t n) {
+int get_blocks (sycl::queue &q, uint64_t n) {
   uint64_t numBlocks = (n - threadsPerBlock) / threadsPerBlock + 1;
 
 #ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
-  id<3> groups = q.get_device().get_info<ext::oneapi::experimental::info::device::max_work_groups<3>>();
+  sycl::id<3> groups = q.get_device().get_info<
+    sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
   uint64_t blocksPerGrid = std::min((uint64_t)groups[2], numBlocks);
 #else
   uint64_t blocksPerGrid = std::min((uint64_t)0x7FFFFFFF, numBlocks);
@@ -174,30 +175,29 @@ void eval (
     const int dilation_w)
 {
   uint64_t vol_size = (uint64_t) channels * (2*pad_t+depth) * (2*pad_h+height) * (2*pad_w+width);
-  uint64_t col_size = ((uint64_t) channels * ksize_t * ksize_h * ksize_w + 1) * 
+  uint64_t col_size = ((uint64_t) channels * ksize_t * ksize_h * ksize_w + 1) *
                     (depth_col+pad_t) * (height_col+pad_h) * (width_col+pad_w);
-                         
+
   uint64_t vol_size_bytes = sizeof(T) * vol_size;
   uint64_t col_size_bytes = sizeof(T) * col_size;
-  
+
   T *h_data_vol = (T*) malloc (vol_size_bytes);
   T *h_data_col = (T*) malloc (col_size_bytes);
 
   for (uint64_t i = 0; i < vol_size; i++) {
-    h_data_vol[i] = (T)1; 
+    h_data_vol[i] = (T)1;
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  T *d_data_vol = malloc_device<T>(vol_size, q);
+  T *d_data_vol = sycl::malloc_device<T>(vol_size, q);
   q.memcpy(d_data_vol, h_data_vol, vol_size_bytes);
 
-  T *d_data_col = malloc_device<T>(col_size, q);
+  T *d_data_col = sycl::malloc_device<T>(col_size, q);
   q.memset(d_data_col, 0, col_size_bytes);
 
   // each of "channels * depth_col * height_col * width_col"
@@ -207,15 +207,16 @@ void eval (
 
   int blocksPerGrid = get_blocks(q, n);
 
-  range<1> gws (blocksPerGrid * threadsPerBlock);
-  range<1> lws (threadsPerBlock);
+  sycl::range<1> gws (blocksPerGrid * threadsPerBlock);
+  sycl::range<1> lws (threadsPerBlock);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class v2c>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class v2c>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         vol2col_kernel<T>(
           item,
           n,
@@ -247,8 +248,9 @@ void eval (
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class c2v>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class c2v>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         col2vol_kernel<T, T>(
           item,
           n,
@@ -277,8 +279,8 @@ void eval (
   }
   printf("Checksum = %f\n", checksum / vol_size);
 
-  free(d_data_vol, q);
-  free(d_data_col, q);
+  sycl::free(d_data_vol, q);
+  sycl::free(d_data_col, q);
   free(h_data_vol);
   free(h_data_col);
 }
@@ -290,7 +292,7 @@ int main(int argc, char* argv[])
     return 1;
   }
   const int repeat = atoi(argv[1]);
-  
+
   int channels = 4;
   int depth = 3;
   int height = 255;
