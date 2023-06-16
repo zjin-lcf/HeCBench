@@ -20,13 +20,13 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-CPPFLAGS = -I. -I../utils -I../fem $(MINIFE_TYPES) -I../../include/ $(MINIFE_MATRIX_TYPE) \
+CPPFLAGS = -I. -I../utils -I../fem $(MINIFE_TYPES) $(MINIFE_MATRIX_TYPE) \
            -std=c++17 -Wall -fsycl
 
 ifeq ($(CUDA), yes)
-  CPPFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CPPFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
               -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
               --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif

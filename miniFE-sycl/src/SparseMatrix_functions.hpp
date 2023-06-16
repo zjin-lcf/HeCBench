@@ -34,8 +34,7 @@
 #include <algorithm>
 #include <sstream>
 #include <fstream>
-#include <CL/sycl.hpp>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include <Vector.hpp>
 #include <Vector_functions.hpp>
@@ -98,7 +97,7 @@ namespace miniFE {
       }
 
   template<typename MatrixType>
-    void write_matrix(const std::string& filename, 
+    void write_matrix(const std::string& filename,
         MatrixType& mat)
     {
       typedef typename MatrixType::LocalOrdinalType LocalOrdinalType;
@@ -501,42 +500,38 @@ namespace miniFE {
         void operator()(MatrixType& A,
             VectorType& x,
             VectorType& y,
-            queue &q,
-            buffer<typename MatrixType::LocalOrdinalType, 1> &d_Arowoffsets,
-            buffer<typename MatrixType::GlobalOrdinalType, 1> &d_Acols,
-            buffer<typename MatrixType::ScalarType, 1> &d_Acoefs,
-            buffer<typename MatrixType::ScalarType, 1> &d_xcoefs,
-            buffer<typename MatrixType::ScalarType, 1> &d_ycoefs)
+            sycl::queue &q,
+            const typename MatrixType::LocalOrdinalType *d_Arowoffsets,
+            const typename MatrixType::GlobalOrdinalType *d_Acols,
+            const typename MatrixType::ScalarType *d_Acoefs,
+            const typename MatrixType::ScalarType *d_xcoefs,
+                  typename MatrixType::ScalarType *d_ycoefs)
         {
           exchange_externals(A, x);
 
-          const MINIFE_LOCAL_ORDINAL rows_size     = (MINIFE_LOCAL_ORDINAL) A.rows.size();
+          const MINIFE_LOCAL_ORDINAL rows_size = (MINIFE_LOCAL_ORDINAL) A.rows.size();
           MINIFE_GLOBAL_ORDINAL row_start = 0;
           MINIFE_GLOBAL_ORDINAL row_end   = 0;
 
-          range<1> gws ((rows_size+255)/256*256);
-          range<1> lws (256);
-          q.submit([&] (handler &h) {
-              auto Arowoffsets = d_Arowoffsets.template get_access<sycl_read>(h);
-              auto Acoefs = d_Acoefs.template get_access<sycl_read>(h);
-              auto Acols = d_Acols.template get_access<sycl_read>(h);
-              auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
-              auto ycoefs = d_ycoefs.template get_access<sycl_write>(h);
-              h.parallel_for<class matvec_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-                  MINIFE_LOCAL_ORDINAL row = item.get_global_id(0);
-                  if (row < rows_size) {
-                    MINIFE_GLOBAL_ORDINAL row_start = Arowoffsets[row];
-                    MINIFE_GLOBAL_ORDINAL row_end   = Arowoffsets[row+1];
-                    MINIFE_SCALAR sum = 0;
+          sycl::range<1> gws ((rows_size+255)/256*256);
+          sycl::range<1> lws (256);
+          q.submit([&] (sycl::handler &h) {
+             h.parallel_for<class matvec_kernel>(
+               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+               MINIFE_LOCAL_ORDINAL row = item.get_global_id(0);
+               if (row < rows_size) {
+                 MINIFE_GLOBAL_ORDINAL row_start = d_Arowoffsets[row];
+                 MINIFE_GLOBAL_ORDINAL row_end   = d_Arowoffsets[row+1];
+                 MINIFE_SCALAR sum = 0;
 
-		    // Use the unroll factor in the OpenMP program 
-                    #pragma unroll 27
-                    for(MINIFE_GLOBAL_ORDINAL i = row_start; i < row_end; ++i) {
-                      sum += Acoefs[i] * xcoefs[Acols[i]];
-                    }
-                    ycoefs[row] = sum;
-                  }
-             });
+	         // Use the unroll factor in the OpenMP program
+                 #pragma unroll 27
+                 for(MINIFE_GLOBAL_ORDINAL i = row_start; i < row_end; ++i) {
+                   sum += d_Acoefs[i] * d_xcoefs[d_Acols[i]];
+                 }
+                 d_ycoefs[row] = sum;
+               }
+            });
           });
         }
       };
@@ -580,12 +575,12 @@ namespace miniFE {
 #endif
 
   template<typename MatrixType, typename VectorType>
-        void matvec(MatrixType& A, VectorType& x, VectorType& y, queue &q,
-          buffer<typename MatrixType::LocalOrdinalType, 1> &d_Arowoffsets,
-          buffer<typename MatrixType::GlobalOrdinalType, 1> &d_Acols,
-          buffer<typename MatrixType::ScalarType, 1> &d_Acoefs,
-          buffer<typename MatrixType::ScalarType, 1> &d_xcoefs,
-          buffer<typename MatrixType::ScalarType, 1> &d_ycoefs)
+        void matvec(MatrixType& A, VectorType& x, VectorType& y, sycl::queue &q,
+                    typename MatrixType::LocalOrdinalType *d_Arowoffsets,
+                    typename MatrixType::GlobalOrdinalType *d_Acols,
+                    typename MatrixType::ScalarType *d_Acoefs,
+                    typename MatrixType::ScalarType *d_xcoefs,
+                    typename MatrixType::ScalarType *d_ycoefs)
       {
         matvec_std<MatrixType,VectorType> mv;
         mv(A, x, y, q, d_Arowoffsets, d_Acols, d_Acoefs, d_xcoefs, d_ycoefs);
@@ -598,12 +593,12 @@ namespace miniFE {
         void operator()(MatrixType& A,
             VectorType& x,
             VectorType& y,
-            queue &q,
-            buffer<typename MatrixType::LocalOrdinalType, 1> &d_Arowoffsets,
-            buffer<typename MatrixType::GlobalOrdinalType, 1> &d_Acols,
-            buffer<typename MatrixType::ScalarType, 1> &d_Acoefs,
-            buffer<typename MatrixType::ScalarType, 1> &d_xcoefs,
-            buffer<typename MatrixType::ScalarType, 1> &d_ycoefs)
+            sycl::queue &q,
+            typename MatrixType::LocalOrdinalType *d_Arowoffsets,
+            typename MatrixType::GlobalOrdinalType *d_Acols,
+            typename MatrixType::ScalarType *d_Acoefs,
+            typename MatrixType::ScalarType *d_xcoefs,
+            typename MatrixType::ScalarType *d_ycoefs)
 
         {
 #ifdef HAVE_MPI
@@ -613,7 +608,6 @@ namespace miniFE {
           typedef typename MatrixType::ScalarType ScalarType;
           typedef typename MatrixType::GlobalOrdinalType GlobalOrdinalType;
           typedef typename MatrixType::LocalOrdinalType LocalOrdinalType;
-
 
           int n = A.rows.size();
           const LocalOrdinalType* Arowoffsets = &A.row_offsets[0];
