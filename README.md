@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -490,6 +490,9 @@ Early results are shown [here](results/README.md)
 
 ### eikonal (cuda)
   Fast iterative method for Eikonal equations on structured volumes (https://github.com/SCIInstitute/StructuredEikonal)
+
+### egs (cuda)
+  A parallel implementation of EGSnrc's photon transport mechanism (https://jonaslippuner.com/research/cuda-egs/)
 
 ### entropy (cuda)
   Compute the entropy for each point of a 2D matrix using a 5x5 window (https://lan-jing.github.io/parallel%20computing/system/entropy/)
