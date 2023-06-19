@@ -58,7 +58,7 @@ Each benchmark falls into a single category. While such classification is not ac
     extrema, fft, lombscargle, sosfil, zmddft
 
 ### Simulation
-    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, xlqc, xsbench
+    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
 
 ### Sorting
     bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
@@ -1349,6 +1349,9 @@ Early results are shown [here](results/README.md)
 
 ### wordcount (cuda)
   Count the number of words in a text (https://github.com/NVIDIA/thrust/blob/main/examples/)
+
+### wsm5 (cuda)
+  Parallel weather and research forecast single moment 5-class (https://github.com/gpgpu-sim/ispass2009-benchmarks/tree/master/wp)
 
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)
