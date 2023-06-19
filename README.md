@@ -485,14 +485,14 @@ Early results are shown [here](results/README.md)
 ### ecdh (c++)
   Elliptic curve Diffie-Hellman key exchange (https://github.com/jaw566/ECDH)
 
+### egs (cuda)
+  Parallel implementation of EGSnrc's photon transport mechanism (https://jonaslippuner.com/research/cuda-egs/)
+
 ### eigenvalue (opencl)
   Calculate the eigenvalues of a tridiagonal symmetric matrix (https://github.com/OpenCL/AMD_APP_samples)
 
 ### eikonal (cuda)
   Fast iterative method for Eikonal equations on structured volumes (https://github.com/SCIInstitute/StructuredEikonal)
-
-### egs (cuda)
-  A parallel implementation of EGSnrc's photon transport mechanism (https://jonaslippuner.com/research/cuda-egs/)
 
 ### entropy (cuda)
   Compute the entropy for each point of a 2D matrix using a 5x5 window (https://lan-jing.github.io/parallel%20computing/system/entropy/)
