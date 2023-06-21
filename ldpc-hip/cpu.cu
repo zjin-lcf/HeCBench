@@ -55,10 +55,10 @@ void awgn (float trans [], float recv [], long seed)
   {
     do 
     {
-      randmum = (float)(rand())/RAND_MAX;
+      randmum = (float)(rand())/(float)RAND_MAX;
       u1 = randmum*2.0f - 1.0f;
 
-      randmum = (float)(rand())/RAND_MAX;
+      randmum = (float)(rand())/(float)RAND_MAX;
       u2 = randmum*2.0f - 1.0f;
       s = u1*u1 + u2*u2;
     } while( s >= 1) ;
@@ -136,7 +136,7 @@ int parity_check (float app[])
 //===================================
 // parity check
 //===================================
-error_result cuda_error_check (int info[], int hard_decision[])
+error_result error_check (int info[], int hard_decision[])
 {
   error_result this_error;
   this_error.bit_error = 0;

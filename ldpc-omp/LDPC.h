@@ -92,7 +92,7 @@ void modulation (int code [], float trans []);
 void awgn (float trans [], float recv [], long seed);
 void llr_init (float llr [], float recv []);
 int parity_check (float app[]);
-error_result cuda_error_check (int info[], int hard_decision[]);
+error_result error_check (int info[], int hard_decision[]);
 
 // Variable declaration
 extern float sigma ;

@@ -125,7 +125,7 @@ int main()
   float rate = (float)0.5f;
 
   //////////////////////////////////////////////////////////////////////////////////
-  // all the variables Starting with _gpu is used in host code and for cuda computation
+  // all the variables Starting with _gpu is used in host code and for gpu computation
 
   int wordSize_llr = MCW *  CW * CODEWORD_LEN;
   int wordSize_dt = MCW *  CW * ROW * BLK_COL;
@@ -214,7 +214,6 @@ int main()
       for(int j = 0; j < MAX_SIM; j++)
       {
         // Transfer LLR data into device.
-        //cudaMemcpy(dev_llr, llr_gpu, memorySize_llr_gpu, cudaMemcpyHostToDevice);
         #pragma omp target update to (llr_gpu[0:wordSize_llr])
 
         // kernel launch
@@ -269,7 +268,7 @@ int main()
         // copy the decoded data from device to host
         #pragma omp target update from (dev_hard_decision[0:wordSize_hard_decision])
 
-        this_error = cuda_error_check(info_bin_gpu, hard_decision_gpu);
+        this_error = error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM

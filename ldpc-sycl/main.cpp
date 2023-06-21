@@ -124,7 +124,7 @@ int main()
   float rate = (float)0.5f;
 
   //////////////////////////////////////////////////////////////////////////////////
-  // all the variables Starting with _gpu is used in host code and for cuda computation
+  // all the variables Starting with _gpu is used in host code and for gpu computation
   int wordSize_llr = MCW *  CW * CODEWORD_LEN;
   int wordSize_dt = MCW *  CW * ROW * BLK_COL;
   int wordSize_R = MCW *  CW * ROW * BLK_COL;
@@ -307,7 +307,7 @@ int main()
         // copy the decoded data from device to host
         q.memcpy(hard_decision_gpu, d_hard_decision, memorySize_hard_decision_gpu);
 
-        this_error = cuda_error_check(info_bin_gpu, hard_decision_gpu);
+        this_error = error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
