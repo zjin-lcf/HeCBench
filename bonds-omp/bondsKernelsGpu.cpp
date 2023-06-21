@@ -1000,7 +1000,7 @@ dataType modifiedDurationGpu(cashFlowsStruct cashFlows,
 
 #pragma omp end declare target
 
-void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+long getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
 {
   bondsYieldTermStruct* discountCurve = inArgsHost.discountCurve;
   bondsYieldTermStruct* repoCurve = inArgsHost.repoCurve;
@@ -1014,6 +1014,8 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   dataType* cleanPrice = resultsFromGpu.cleanPrice;
   dataType* bondForwardVal = resultsFromGpu.bondForwardVal;
 
+  long ktime;
+
   #pragma omp target data map(to: discountCurve[0:numBonds], \
                                   repoCurve[0:numBonds], \
                                   currDate[0:numBonds], \
@@ -1026,6 +1028,10 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
                                     cleanPrice[0:numBonds], \
                                     bondForwardVal[0:numBonds]) 
   {
+    struct timeval start;
+    struct timeval end;
+    gettimeofday(&start, NULL);
+
     #pragma omp target teams distribute parallel for thread_limit(256) 
     for (int bondNum = 0; bondNum < numBonds; bondNum++)
     {
@@ -1094,5 +1100,9 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   
       cleanPrice[bondNum] = dirtyPrice[bondNum] - accruedAmountCurrDate[bondNum];
     }
+
+    gettimeofday(&end, NULL);
+    ktime = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
   }
+  return ktime;
 }
