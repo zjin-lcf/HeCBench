@@ -35,7 +35,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../backprop-cuda
 
 ifeq ($(VENDOR), codeplay)
 CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
@@ -87,7 +87,8 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp backprop.h bpnn_adjust_weights.sycl bpnn_layerforward.sycl
+%.o: %.cpp ../backprop-cuda/backprop.h \
+	   bpnn_adjust_weights.sycl bpnn_layerforward.sycl
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

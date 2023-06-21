@@ -107,7 +107,10 @@
     ]
   ],
   "bonds-sycl": [
-    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100"
+    ]
   ],
   "bsearch-sycl": [
     "(?:Average device execution time \\(bs[1-9]\\) )([0-9.+-e]+)(?: \\(s\\))",
@@ -526,7 +529,10 @@
     ]
   ],
   "bonds-cuda": [
-    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))"
+    "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100"
+    ]
   ],
   "bsearch-cuda": [
     "(?:Average device execution time \\(bs[1-9]\\) )([0-9.+-e]+)(?: \\(s\\))",
@@ -956,7 +962,7 @@
   "bonds-hip": [
     "(?:Processing time on GPU: )([0-9.+-e]+)(?: \\(ms\\))",
     [
-      "2"
+      "100"
     ]
   ],
   "bsearch-hip": [
