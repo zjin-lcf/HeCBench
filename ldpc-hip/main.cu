@@ -225,7 +225,7 @@ int main()
         hipMemcpy(dev_llr, llr_gpu, memorySize_llr_gpu, hipMemcpyHostToDevice);
 
         // kernel launch
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
         auto start = std::chrono::steady_clock::now();
 
         for(int ii = 0; ii < MAX_ITERATION; ii++)
