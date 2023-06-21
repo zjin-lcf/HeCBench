@@ -1111,7 +1111,7 @@ __global__ void bonds(inArgsStruct inArgs, resultsStruct results, int n)
   }
 }
 
-void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+long getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
 {
   bondsYieldTermStruct* discountCurveGpu;
   bondsYieldTermStruct* repoCurveGpu;
@@ -1165,7 +1165,15 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
   dim3  threads(256, 1, 1);
 
+  struct timeval start;
+  struct timeval end;
+  gettimeofday(&start, NULL);
+
   bonds <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+
+  cudaDeviceSynchronize();
+  gettimeofday(&end, NULL);
+  long ktime = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
 
   cudaMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
   cudaMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), cudaMemcpyDeviceToHost);
@@ -1184,4 +1192,5 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   cudaFree(accruedAmountCurrDateGpu);
   cudaFree(cleanPriceGpu);
   cudaFree(bondForwardValGpu);
+  return ktime;
 }
