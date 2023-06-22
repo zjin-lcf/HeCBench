@@ -1,5 +1,0 @@
-Note
-
-https://github.com/oneapi-src/oneMKL/issues/183
-
-icpx -I../include -fsycl -O3 main.cpp -qmkl=parallel -o main
