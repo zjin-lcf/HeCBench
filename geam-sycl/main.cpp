@@ -27,14 +27,9 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
   printf("Host: serial matrix transpose time = %f (ms)\n", time * 1e-6f);
 
   const T alpha = (T)1;
-  const T beta  = (T)0;
 
-  // store host and device results
-  T *h_matrixT, *d_matrixT, *d_matrix;
-  h_matrixT = (T *) malloc (size_byte);
-
-  d_matrixT = (T *)sycl::malloc_device(size_byte, q);
-  d_matrix = (T *)sycl::malloc_device(size_byte, q);
+  T *d_matrix = (T *)sycl::malloc_device(size_byte, q);
+  T *d_matrixT = (T *)sycl::malloc_device(size_byte, q);
   q.memcpy(d_matrix, matrix, size_byte).wait();
 
   time = 0.0;
@@ -59,7 +54,7 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
         d_matrixT,
         nrow);
     } catch(sycl::exception const& e) {
-      std::cout << "\t\tCaught SYCL exception during omatadd_batch:\n"
+      std::cout << "\t\tCaught SYCL exception during omatcopy:\n"
                 << e.what() << std::endl;
       error = 1;
       break;
@@ -73,10 +68,9 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
 
   printf("Device: average matrix transpose time = %f (ms)\n", (time * 1e-6f) / repeat);
 
+  // store device results
+  T *h_matrixT = (T *) malloc (size_byte);
   q.memcpy(h_matrixT, d_matrixT, size_byte).wait();
-
-  sycl::free(d_matrix, q);
-  sycl::free(d_matrixT, q);
 
   if (error == 0) { // check host and device results
     error = memcmp(h_matrixT, matrixT, size_byte);
@@ -84,6 +78,10 @@ void transpose(sycl::queue &q, int nrow, int ncol, int repeat) {
 
   printf("%s\n", error ? "FAIL" : "PASS");
 
+  sycl::free(d_matrix, q);
+  sycl::free(d_matrixT, q);
+
+  free(h_matrixT);
   free(matrixT);
   free(matrix);
 }
