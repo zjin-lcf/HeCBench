@@ -1,33 +1,54 @@
-SYCL_BIN=/glob/development-tools/versions/oneapi/2022.1.2/oneapi/compiler/2022.0.2/linux/bin
+C_COMPILER   = clang
+CXX_COMPILER = clang++
+GPU          = yes
+CUDA         = no
+CUDA_ARCH    = sm_70
+HIP          = no
+HIP_ARCH     = gfx908
+
+ifeq ($(GPU),yes)
+  CXXFLAGS +=-DUSE_GPU
+endif
+
+ifeq ($(CUDA), yes)
+  CXXFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
+              -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
+endif
+
+ifeq ($(HIP), yes)
+  CXXFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
+	      -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
+endif
+
 
 # the path may be adjusted for each platform
 MPI_INCLUDE=/usr/lib/x86_64-linux-gnu/openmpi/include
 
-OPT=-O3 -g -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
+OPT=-O3 -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
 
 #SYCL_FLAGS=-use_fast_math -DINLINE_FORCE -I${MPI_INCLUDE}
-SYCL_FLAGS=-I${MPI_INCLUDE}
+SYCL_FLAGS=-fsycl -I${MPI_INCLUDE}
 
 HACC_PLATFORM=sycl
 HACC_OBJDIR=${HACC_PLATFORM}
 
-HACC_CFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_CC=${SYCL_BIN}/dpcpp
+HACC_CFLAGS=${OPT} ${OMP}
+HACC_CC=${C_COMPILER}
 
 HACC_CXXFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_CXX=${SYCL_BIN}/dpcpp
+HACC_CXX=${CXX_COMPILER}
 
 HACC_LDFLAGS=-lm -lrt
 
 HACC_NUM_CUDA_DEV="1"
-HACC_MPI_CFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_MPI_CC=${SYCL_BIN}/dpcpp
+HACC_MPI_CFLAGS=${OPT} ${OMP}
+HACC_MPI_CC=${C_COMPILER}
 
 HACC_MPI_CXXFLAGS=${OPT} ${OMP} ${SYCL_FLAGS}
-HACC_MPI_CXX=${SYCL_BIN}/dpcpp
-HACC_MPI_LD=${SYCL_BIN}/dpcpp
+HACC_MPI_CXX=${CXX_COMPILER}
+HACC_MPI_LD=${CXX_COMPILER}
 
-HACC_MPI_LDFLAGS=-lm -lrt
+HACC_MPI_LDFLAGS=-fsycl -lm -lrt
 
 OBJDIR = ${HACC_OBJDIR}
 #SOBJDIR = ${HACC_OBJDIR}_serial
@@ -82,7 +103,6 @@ CXXFLAGS += ${HF_WARNING}
 #CXXFLAGS += -g
 #CXXFLAGS += -DDEBUG
 CXXFLAGS += -I.
-CXXFLAGS += -fsycl
 #LDFLAGS  = ${MPI_LD_FLAGS} -lmpi_cxx
 
 CFLAGS += -Idfft
@@ -97,9 +117,6 @@ $(OBJDIR)/%.o: %.c | $(OBJDIR)
 
 $(OBJDIR)/%.o: %.cxx | $(OBJDIR)
 	${HACC_MPI_CXX} ${CXXFLAGS} -c -o $@ $<
-
-$(OBJDIR)/%.o: %.cu | $(OBJDIR)
-	${HACC_MPI_CXX} ${CFLAGS} -c -o $@ $<
 
 
 #$(SOBJDIR):
@@ -120,7 +137,7 @@ dims-local.c: dfft/dims.c
 
 
 $(OBJDIR)/ForceTreeTest: $(OBJDIR)/ForceTreeTest.o $(OBJDIR)/libparticle.a $(OBJDIR)/libBHForceTree.a $(OBJDIR)/libpartition.a $(OBJDIR)/libhalotime.a $(OBJDIR)/libbigchunk.a $(OBJDIR)/dims-local.o
-	${HACC_MPI_CXX} -o $@ $^ ${LDFLAGS} -DUSE_SERIAL_COSMO=1
+	${HACC_MPI_CXX} ${CXXFLAGS} -o $@ $^ ${LDFLAGS} -DUSE_SERIAL_COSMO=1
 
 $(OBJDIR)/libpartition.a: $(OBJDIR)/libpartition.a($(OBJDIR)/Partition.o)
 	#ranlib $@
