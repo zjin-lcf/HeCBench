@@ -16,7 +16,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, sa, snake
 
 ### Computer vision and image processing
     affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
@@ -1139,6 +1139,9 @@ Early results are shown [here](results/README.md)
 
 ### s8n (cuda)
   Stacked 8-neighborhood search finds nearest neighbors in each of the eight octants partitioned by ordering of three coordinates (https://github.com/MVIG-SJTU/pointSIFT/tree/master)
+
+### sa (cuda)
+  Dynamic parallel skew algorithm for suffix array on GPU (https://github.com/gmzang/Parallel-Suffix-Array-on-GPU)
 
 ### sad (cuda)
   Naive template matching with SAD (https://github.com/gholomia/CTMC)
