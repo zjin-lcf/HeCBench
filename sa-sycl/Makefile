@@ -3,15 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-ifeq ($(VENDOR), codeplay)
-CC        = compute++
-else
 CC        = clang++
-endif
-
 OPTIMIZE  = yes
 DEBUG     = no
-DUMP      = no
 
 GPU       = yes
 CUDA      = no
@@ -26,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = backprop.cpp imagenet.cpp facetrain.cpp main.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -35,21 +29,10 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../backprop-cuda
-
-ifeq ($(VENDOR), codeplay)
-CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
-          -no-serial-memop -sycl -sycl-driver
-else
-CFLAGS += -fsycl
-endif
+CFLAGS := -std=c++17 -Wall -I./oneDPL/include -fsycl
 
 # Linker Flags
 LDFLAGS = 
-
-ifeq ($(VENDOR), codeplay)
-LDFLAGS += -lComputeCpp
-endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
@@ -73,10 +56,6 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DUMP),yes)
-  CFLAGS += -DOUTPUT
-endif
-
 ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
@@ -87,12 +66,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../backprop-cuda/backprop.h \
-	   bpnn_adjust_weights.sycl bpnn_layerforward.sycl
+%.o: %.cpp kernels.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 65536
+	./$(program) genome.txt 1000000 100 
