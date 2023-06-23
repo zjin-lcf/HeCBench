@@ -5,7 +5,7 @@
 //newton should match theory prediction
 //short range may not due to lack of gauss law
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -27,8 +27,6 @@
 #include <xmmintrin.h>
 #endif
 
-#define USE_GPU
-
 #include <mpi.h>
 
 using namespace std;
@@ -36,11 +34,10 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
 #if defined(FE_NOMASK_ENV) && !defined(__INTEL_COMPILER)
   fesetenv(FE_NOMASK_ENV);
