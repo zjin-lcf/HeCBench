@@ -1,8 +1,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <vector>
+#include <sycl/sycl.hpp>
 #include <oneapi/mkl.hpp>
-#include "common.h"
 
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
@@ -12,14 +12,14 @@ int8_t float2int8(float f, float scale) {
 }
 
 template <typename T, typename S>
-void allocate_memory(queue &q, int m, int n, int k, T **A, T **B, S **C) {
+void allocate_memory(sycl::queue &q, int m, int n, int k, T **A, T **B, S **C) {
   *A = sycl::malloc_shared<T> (m * k, q);
   *B = sycl::malloc_shared<T> (k * n, q);
   *C = sycl::malloc_shared<S> (m * n, q);
 }
 
 template <typename T, typename S>
-void free_memory(queue &q, T *A, T *B, S *C) {
+void free_memory(sycl::queue &q, T *A, T *B, S *C) {
   sycl::free(A, q);
   sycl::free(B, q);
   sycl::free(C, q);
@@ -27,7 +27,7 @@ void free_memory(queue &q, T *A, T *B, S *C) {
 
 template <typename T, typename S>
 int mkl_gemm_ex(
-    queue &q, 
+    sycl::queue &q, 
     oneapi::mkl::transpose transA,
     oneapi::mkl::transpose transB,
     int m, int n, int k,
@@ -35,71 +35,15 @@ int mkl_gemm_ex(
     int lda, int ldb, int ldc,
     S alpha, S beta)
 {
-  std::vector<event> gemm_deps;
-  event status;
+  sycl::event status;
   try {
     status = oneapi::mkl::blas::column_major::gemm(
       q,
-      transA,
-      transB,
-      m,
-      n,
-      k,
-      alpha,
-      A,
-      lda,
-      B,
-      ldb,
-      beta,
-      C,
-      ldc,
-      gemm_deps);
-  } catch(sycl::exception const& e) {
-    std::cout << "\t\tCaught synchronous SYCL exception during GEMM:\n"
-              << e.what() << std::endl;
-    return 0;
-  }
-  status.wait();
-  return 1;
-}
-
-
-template <typename T, typename S>
-int mkl_gemm_bias(
-    queue &q, 
-    oneapi::mkl::transpose transA,
-    oneapi::mkl::transpose transB,
-    int m, int n, int k,
-    T *A, T *B, S *C,
-    int lda, int ldb, int ldc,
-    S alpha, S beta)
-{
-  std::vector<event> gemm_deps;
-  event status;
-  T ao = 0;
-  T bo = 0;
-  S co[1] = {0};
-  try {
-    status = oneapi::mkl::blas::column_major::gemm_bias(
-      q,
-      transA,
-      transB,
-      oneapi::mkl::offset::fix,
-      m,
-      n,
-      k,
-      alpha,
-      A,
-      lda,
-      ao,
-      B,
-      ldb,
-      bo,
-      beta,
-      C,
-      ldc,
-      co,
-      gemm_deps);
+      transA, transB,
+      m, n, k,
+      alpha, A, lda,
+      B, ldb, beta,
+      C, ldc);
   } catch(sycl::exception const& e) {
     std::cout << "\t\tCaught synchronous SYCL exception during GEMM:\n"
               << e.what() << std::endl;
@@ -110,50 +54,16 @@ int mkl_gemm_bias(
 }
 
 template <typename T, typename S>
-void test_gemm(queue &q,
-  const int m, const int n, const int k,
-  T *A, T *B, S *C,
-  const S alpha, const S beta, int iteration)
+void test_gemm(sycl::queue &q,
+               const int m, const int n, const int k,
+               T *A, T *B, S *C,
+               const S alpha, const S beta, int iteration)
 {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
     struct timeval start, end;
     gettimeofday(&start, NULL);
     int success = mkl_gemm_ex(q,
-        oneapi::mkl::transpose::nontrans,
-        oneapi::mkl::transpose::nontrans,
-        n, // number of rows of matrix A and C
-        m, // number of columns of matrix B and C
-        k, // number of columns of A and rows of B  
-        B,
-        A,
-        C,
-        n, // lda
-        k, // ldb
-        n, // ldc
-        alpha,
-        beta);
-        
-    q.wait();
-    gettimeofday(&end, NULL);
-    if (success > 0 && i > 0)
-      total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
-  }
-  if (total_time > 0)
-    printf("%.3f ms\n", total_time / (iteration - 1));
-}
-
-template <typename T, typename S>
-void test_gemm_bias(queue &q,
-  const int m, const int n, const int k,
-  T *A, T *B, S *C,
-  const S alpha, const S beta, int iteration)
-{
-  float total_time = 0;
-  for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-    int success = mkl_gemm_bias(q,
         oneapi::mkl::transpose::nontrans,
         oneapi::mkl::transpose::nontrans,
         n, // number of rows of matrix A and C
@@ -185,11 +95,10 @@ int main(int argc, char* argv[]) {
   const int iteration = atoi(argv[1]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   const int m = 4096, n = 8192, k = 1024;
   printf("shape: (%d, %d) x (%d, %d)\n", m, k, k, n);
@@ -238,12 +147,12 @@ int main(int argc, char* argv[]) {
   test_gemm(q, m, n, k, hA, hB, hC, h_alpha, h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_bias(q, m, n, k, iA, iB, iC, i_alpha, i_beta, iteration);
+  test_gemm(q, m, n, k, iA, iB, iC, i_alpha, i_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp64: ");
   for (int i = 0; i < 10; ++i)
-    printf("%.5lf%c", fC[i], " \n"[i==9]);
+    printf("%.5lf%c", dC[i], " \n"[i==9]);
 
   printf("fp32: ");
   for (int i = 0; i < 10; ++i)
@@ -263,4 +172,3 @@ int main(int argc, char* argv[]) {
   free_memory(q, iA, iB, iC);
   return 0;
 }
-
