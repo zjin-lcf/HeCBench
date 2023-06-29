@@ -25,7 +25,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
