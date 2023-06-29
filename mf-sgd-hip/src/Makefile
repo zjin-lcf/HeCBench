@@ -25,7 +25,7 @@ obj = main.o sgd.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
