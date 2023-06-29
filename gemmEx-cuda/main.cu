@@ -1,9 +1,9 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <type_traits> // is_same
-#include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cublas_v2.h>
 
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
@@ -27,7 +27,7 @@ void free_memory(T *A, T *B, S *C) {
 }
 
 template <typename T, typename S>
-int cublas_gemm_ex(
+bool cublas_gemm_ex(
     cublasHandle_t handle, cublasOperation_t transA, cublasOperation_t transB,
     const int m, const int n, const int k,
     T *A, T *B, S *C,
@@ -46,35 +46,18 @@ int cublas_gemm_ex(
     CType = ComputeType = CUDA_R_32I;
   } else {
     printf("Not supported data type.");
-    return -1;
+    return false;
   }
 
-  cublasStatus_t status;
-  status = cublasGemmEx(
-      handle,
-      transA,
-      transB,
-      m,
-      n,
-      k,
-      alpha,
-      A,
-      AType,
-      lda,
-      B,
-      BType,
-      ldb,
-      beta,
-      C,
-      CType,
-      ldc,
-      ComputeType,
-      static_cast<cublasGemmAlgo_t>(algo));
+  cublasStatus_t status = cublasGemmEx(handle,
+                                       transA, transB,
+                                       m, n, k,
+                                       alpha, A, AType, lda,
+                                       B, BType, ldb, beta,
+                                       C, CType, ldc, ComputeType,
+                                       static_cast<cublasGemmAlgo_t>(algo));
 
-  if (status == CUBLAS_STATUS_SUCCESS)
-    return 1;
-  else
-    return -1;
+  return (status == CUBLAS_STATUS_SUCCESS);
 }
 
 template <typename T, typename S>
@@ -84,29 +67,33 @@ void test_gemm(cublasHandle_t handle,
   const S *alpha, const S *beta, int algo, const int iteration)
 {
   float total_time = 0;
+  struct timeval start, end;
+
   for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
     cudaDeviceSynchronize();
     gettimeofday(&start, NULL);
-    int success = cublas_gemm_ex(handle,
-        CUBLAS_OP_N,
-        CUBLAS_OP_N,
-        n, // number of rows of matrix A and C
-        m, // number of columns of matrix B and C
-        k, // number of columns of A and rows of B  
-        B,
-        A,
-        C,
-        n, // lda
-        k, // ldb
-        n, // ldc
-        alpha,
-        beta,
-        static_cast<cublasGemmAlgo_t>(algo));
+    bool success = cublas_gemm_ex(handle,
+                                  CUBLAS_OP_N,
+                                  CUBLAS_OP_N,
+                                  n, // number of rows of matrix A and C
+                                  m, // number of columns of matrix B and C
+                                  k, // number of columns of A and rows of B
+                                  B,
+                                  A,
+                                  C,
+                                  n, // lda
+                                  k, // ldb
+                                  n, // ldc
+                                  alpha,
+                                  beta,
+                                  static_cast<cublasGemmAlgo_t>(algo));
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
-    if (success > 0 && i > 0)
+
+    if (!success) break;
+    else if (i > 0) {
       total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+    }
   }
   if (total_time > 0)
     printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
@@ -144,7 +131,7 @@ int main(int argc, char* argv[]) {
     fA[i] = float(i % 255 - 127) / 127;
     hA[i] = __float2half_rn(fA[i]);
     iA[i] = float2int8(fA[i], 127);
-  } 
+  }
   for (int i = 0; i < k * n; ++i) {
     dB[i] = double(i % 255 - 127) / 127;
     fB[i] = float(i % 255 - 127) / 127;
@@ -193,4 +180,3 @@ int main(int argc, char* argv[]) {
   free_memory(iA, iB, iC);
   return 0;
 }
-

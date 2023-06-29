@@ -26,8 +26,8 @@ void free_memory(sycl::queue &q, T *A, T *B, S *C) {
 }
 
 template <typename T, typename S>
-int mkl_gemm_ex(
-    sycl::queue &q, 
+bool mkl_gemm_ex(
+    sycl::queue &q,
     oneapi::mkl::transpose transA,
     oneapi::mkl::transpose transB,
     int m, int n, int k,
@@ -47,10 +47,10 @@ int mkl_gemm_ex(
   } catch(sycl::exception const& e) {
     std::cout << "\t\tCaught synchronous SYCL exception during GEMM:\n"
               << e.what() << std::endl;
-    return 0;
+    return false;
   }
   status.wait();
-  return 1;
+  return true;
 }
 
 template <typename T, typename S>
@@ -60,28 +60,29 @@ void test_gemm(sycl::queue &q,
                const S alpha, const S beta, int iteration)
 {
   float total_time = 0;
+  struct timeval start, end;
+
   for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
     gettimeofday(&start, NULL);
-    int success = mkl_gemm_ex(q,
-        oneapi::mkl::transpose::nontrans,
-        oneapi::mkl::transpose::nontrans,
-        n, // number of rows of matrix A and C
-        m, // number of columns of matrix B and C
-        k, // number of columns of A and rows of B  
-        B,
-        A,
-        C,
-        n, // lda
-        k, // ldb
-        n, // ldc
-        alpha,
-        beta);
-        
-    q.wait();
+    bool success = mkl_gemm_ex(q,
+                               oneapi::mkl::transpose::nontrans,
+                               oneapi::mkl::transpose::nontrans,
+                               n, // number of rows of matrix A and C
+                               m, // number of columns of matrix B and C
+                               k, // number of columns of A and rows of B
+                               B,
+                               A,
+                               C,
+                               n, // lda
+                               k, // ldb
+                               n, // ldc
+                               alpha,
+                               beta);
     gettimeofday(&end, NULL);
-    if (success > 0 && i > 0)
+    if (!success) break;
+    else if (i > 0) {
       total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+    }
   }
   if (total_time > 0)
     printf("%.3f ms\n", total_time / (iteration - 1));
@@ -128,7 +129,7 @@ int main(int argc, char* argv[]) {
     hA[i] = sycl::vec<float, 1>{fA[i]}
                 .convert<sycl::half, sycl::rounding_mode::rte>()[0];
     iA[i] = float2int8(fA[i], 127);
-  } 
+  }
   for (int i = 0; i < k * n; ++i) {
     dB[i] = double(i % 255 - 127) / 127;
     fB[i] = float(i % 255 - 127) / 127;
