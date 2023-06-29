@@ -6,7 +6,6 @@
 //  Copyright (c) 2017 csliu. All rights reserved.
 //
 
-#include <stdio.h>
 #include "GCRSMatrix.h"
 #include "galois.h"
 #include "jerasure.h"

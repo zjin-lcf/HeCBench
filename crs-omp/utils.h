@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sys/time.h>
 #include <omp.h>
 
 size_t align_value(size_t valueToAlign, size_t alignMask);
