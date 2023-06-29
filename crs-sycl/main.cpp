@@ -2,7 +2,6 @@
 //  Copyright (c) 2017 csliu. All rights reserved.
 //
 
-#include <sys/time.h>
 #include <sycl/sycl.hpp>
 #include "GCRSMatrix.h"
 #include "utils.h"

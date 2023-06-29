@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <hip/hip_runtime.h>
 
 size_t align_value(size_t valueToAlign, size_t alignMask);
