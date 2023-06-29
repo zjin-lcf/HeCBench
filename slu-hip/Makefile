@@ -31,7 +31,7 @@ SLU_INC = -I$(SLU_PATH)/../include \
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall $(SLU_INC)
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
