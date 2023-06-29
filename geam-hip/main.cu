@@ -80,6 +80,7 @@ void transpose_f64(int nrow, int ncol, int repeat) {
   printf("%s\n", error ? "FAIL" : "PASS");
 
   hipblasDestroy(handle);
+  free(h_matrixT);
   free(matrixT);
   free(matrix);
 }

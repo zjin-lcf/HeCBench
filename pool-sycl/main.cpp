@@ -1,8 +1,9 @@
 #include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <new>
 #include <string>
-#include <stdio.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // thread block size
 #define BSIZE 256
@@ -34,11 +35,11 @@ class k_warmup;
 
 template <typename PoolProcess, typename T>
 void KernelPool2DGrad(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int nthreads,
-    const T*__restrict input_data, 
+    const T*__restrict input_data,
     const T*__restrict output_data,
-    const T*__restrict output_grad, 
+    const T*__restrict output_grad,
     const int channels,
     const int input_height,
     const int input_width,
@@ -50,7 +51,7 @@ void KernelPool2DGrad(
     const int stride_width,
     const int padding_height,
     const int padding_width,
-    PoolProcess pool_process, 
+    PoolProcess pool_process,
     bool exclusive,
     T*__restrict input_grad,
     bool channel_last = false)
@@ -175,55 +176,36 @@ int main(int argc, char* argv[])
     output_grad[i] = input_width * input_height;
   }
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_input (input, input_numel);
-  buffer<float, 1> d_output (output, output_numel);
-  buffer<float, 1> d_output_grad (output_grad, output_numel);
-  buffer<float, 1> d_input_grad (input_grad, input_numel);
+  float *d_input = sycl::malloc_device<float>(input_numel, q);
+  float *d_input_grad = sycl::malloc_device<float>(input_numel, q);
+  float *d_output = sycl::malloc_device<float>(output_numel, q);
+  float *d_output_grad = sycl::malloc_device<float>(output_numel, q);
+  q.memcpy(d_input, input, input_numel * sizeof(float));
+  q.memcpy(d_output, output, output_numel * sizeof(float));
+  q.memcpy(d_output_grad, output_grad, output_numel * sizeof(float));
 
   int blocks = (nthreads + BSIZE - 1) / BSIZE;
-  range<1> gws (blocks * BSIZE);
-  range<1> lws (BSIZE);
-
-  // warmup
-  q.submit([&] (handler &cgh) {
-    auto idata = d_input.get_access<sycl_read>(cgh);
-    auto odata = d_output.get_access<sycl_read>(cgh);
-    auto ograd = d_output_grad.get_access<sycl_read>(cgh);
-    auto igrad = d_input_grad.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class k_warmup<float>>(
-      nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      KernelPool2DGrad<AvgPoolGrad<float>, float>(
-        item, nthreads, idata.get_pointer(), odata.get_pointer(), ograd.get_pointer(), 
-        input_channels, input_height, input_width, output_height, output_width, ksize_height,
-        ksize_width, stride_height, stride_width, padding_height, padding_width,
-        pool_process, exclusive, igrad.get_pointer(), channel_last);
-    });
-  });
+  sycl::range<1> gws (blocks * BSIZE);
+  sycl::range<1> lws (BSIZE);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++) { 
-    q.submit([&] (handler &cgh) {
-      auto idata = d_input.get_access<sycl_read>(cgh);
-      auto odata = d_output.get_access<sycl_read>(cgh);
-      auto ograd = d_output_grad.get_access<sycl_read>(cgh);
-      auto igrad = d_input_grad.get_access<sycl_write>(cgh);
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k<float>>(
-        nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         KernelPool2DGrad<AvgPoolGrad<float>, float>(
-          item, nthreads, idata.get_pointer(), odata.get_pointer(), ograd.get_pointer(), 
+          item, nthreads, d_input, d_output, d_output_grad,
           input_channels, input_height, input_width, output_height, output_width, ksize_height,
           ksize_width, stride_height, stride_width, padding_height, padding_width,
-          pool_process, exclusive, igrad.get_pointer(), channel_last);
+          pool_process, exclusive, d_input_grad, channel_last);
       });
     });
   }
@@ -233,7 +215,7 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
 
-  }
+  q.memcpy(input_grad, d_input_grad, input_numel * sizeof(float)).wait();
 
   // verify
   reference<AvgPoolGrad<float>, float>(
@@ -256,6 +238,9 @@ int main(int argc, char* argv[])
   delete[] input_grad;
   delete[] input_grad_ref;
   delete[] output_grad;
+  sycl::free(d_input, q);
+  sycl::free(d_input_grad, q);
+  sycl::free(d_output, q);
+  sycl::free(d_output_grad, q);
   return 0;
 }
-

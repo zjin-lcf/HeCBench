@@ -16,56 +16,53 @@
 
 
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "scan.h"
 
-void bScan(queue &q,
+void bScan(sycl::queue &q,
            const unsigned int blockSize,
            const unsigned int len,
-           buffer<float, 1> &inputBuffer,
-           buffer<float, 1> &outputBuffer,
-           buffer<float, 1> &blockSumBuffer)
+           float *input,
+           float *output,
+           float *blockSum)
 {
   // set the block size
-  range<1> gws (len / 2);
-  range<1> lws (blockSize / 2);
+  sycl::range<1> gws (len / 2);
+  sycl::range<1> lws (blockSize / 2);
 
-  q.submit([&] (handler &cgh) {
-    auto input = inputBuffer.get_access<sycl_read>(cgh);
-    auto output = outputBuffer.get_access<sycl_discard_write>(cgh);
-    auto sumBuffer = blockSumBuffer.get_access<sycl_discard_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> block(blockSize, cgh);
-    cgh.parallel_for<class lock_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> block(sycl::range<1>(blockSize), cgh);
+    cgh.parallel_for<class lock_scan>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 
       int tid = item.get_local_id(0);
       int gid = item.get_global_id(0);
       int bid = item.get_group(0);
-      
+
       /* Cache the computational window in shared memory */
       block[2*tid]     = input[2*gid];
       block[2*tid + 1] = input[2*gid + 1];
-      item.barrier(access::fence_space::local_space);
-      
+      item.barrier(sycl::access::fence_space::local_space);
+
       float cache0 = block[0];
       float cache1 = cache0 + block[1];
-      
+
       /* build the sum in place up the tree */
       for(int stride = 1; stride < blockSize; stride *=2) {
         if(2*tid>=stride) {
           cache0 = block[2*tid-stride]+block[2*tid];
           cache1 = block[2*tid+1-stride]+block[2*tid+1];
         }
-        item.barrier(access::fence_space::local_space);
-      
+        item.barrier(sycl::access::fence_space::local_space);
+
         block[2*tid] = cache0;
         block[2*tid+1] = cache1;
-      
-        item.barrier(access::fence_space::local_space);
+
+        item.barrier(sycl::access::fence_space::local_space);
       }
-      
-      /* store the value in sum buffer before making it to 0 */   
-      sumBuffer[bid] = block[blockSize-1];
-      
+
+      /* store the value in sum buffer before making it to 0 */
+      blockSum[bid] = block[blockSize-1];
+
       /*write the results back to global memory */
       if(tid==0) {
         output[2*gid]     = 0;
@@ -78,20 +75,18 @@ void bScan(queue &q,
   });
 }
 
-void pScan(queue &q,
+void pScan(sycl::queue &q,
            const unsigned int blockSize,
            const unsigned int len,
-           buffer<float, 1> &inputBuffer,
-           buffer<float, 1> &outputBuffer)
+           float *input,
+           float *output)
 {
-  range<1> gws (len / 2);
-  range<1> lws (len / 2);
+  sycl::range<1> gws (len / 2);
+  sycl::range<1> lws (len / 2);
 
-  q.submit([&] (handler &cgh) {
-    auto input = inputBuffer.get_access<sycl_read>(cgh);
-    auto output = outputBuffer.get_access<sycl_read_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> block(len+1, cgh);
-    cgh.parallel_for<class partial_scan>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> block(sycl::range<1>(len+1), cgh);
+    cgh.parallel_for<class partial_scan>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 
       int tid = item.get_local_id(0);
       int gid = item.get_global_id(0);
@@ -100,7 +95,7 @@ void pScan(queue &q,
       /* Cache the computational window in shared memory */
       block[2*tid]     = input[2*gid];
       block[2*tid + 1] = input[2*gid + 1];
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       float cache0 = block[0];
       float cache1 = cache0 + block[1];
@@ -112,12 +107,12 @@ void pScan(queue &q,
           cache0 = block[2*tid-stride]+block[2*tid];
           cache1 = block[2*tid+1-stride]+block[2*tid+1];
         }
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         block[2*tid] = cache0;
         block[2*tid+1] = cache1;
 
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
       }
 
       /*write the results back to global memory */
@@ -132,31 +127,29 @@ void pScan(queue &q,
   });
 }
 
-void bAddition(queue &q,
+void bAddition(sycl::queue &q,
                const unsigned int blockSize,
                const unsigned int len,
-               buffer<float, 1> &inputBuffer,
-               buffer<float, 1> &outputBuffer)
+               float *input,
+               float *output)
 {
   // set the block size
-  range<1> gws (len);
-  range<1> lws (blockSize);
+  sycl::range<1> gws (len);
+  sycl::range<1> lws (blockSize);
 
-  // Enqueue a kernel run call
-  q.submit([&] (handler &cgh) {
-    auto input = inputBuffer.get_access<sycl_read>(cgh);
-    auto output = outputBuffer.get_access<sycl_read_write>(cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> value(1, cgh);
-    cgh.parallel_for<class block_add>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  // Ensycl::queue a kernel run call
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 0> value(cgh);
+    cgh.parallel_for<class block_add>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       int globalId = item.get_global_id(0);
       int groupId = item.get_group(0);
       int localId = item.get_local_id(0);
 
       /* Only 1 thread of a group will read from global buffer */
-      if(localId == 0) value[0] = input[groupId];
-      item.barrier(access::fence_space::local_space);
+      if(localId == 0) value = input[groupId];
+      item.barrier(sycl::access::fence_space::local_space);
 
-      output[globalId] += value[0];
+      output[globalId] += value;
     });
   });
 }
@@ -229,37 +222,37 @@ int main(int argc, char * argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Create input buffer on device
-  buffer<float, 1> inputBuffer (input, length);
+  float *inputBuffer = sycl::malloc_device<float>(length, q);
+  q.memcpy(inputBuffer, input, sizeBytes);
 
   // Allocate output buffers
-  std::vector<buffer<float,1>> outputBuffer;
+  std::vector<float*> outputBuffers(pass);
 
   for(unsigned int i = 0; i < pass; i++)
   {
     int size = (int)(length / std::pow((float)blockSize,(float)i));
-    outputBuffer.emplace_back(buffer<float, 1>(size));
+    outputBuffers[i] = sycl::malloc_device<float>(size, q);
   }
 
   // Allocate blockSumBuffers
-  std::vector<buffer<float,1>> blockSumBuffer;
+  std::vector<float*> blockSumBuffers(pass);
 
   for(unsigned int i = 0; i < pass; i++)
   {
     int size = (int)(length / std::pow((float)blockSize,(float)(i + 1)));
-    blockSumBuffer.emplace_back(buffer<float, 1>(size));
+    blockSumBuffers[i] = sycl::malloc_device<float>(size, q);
   }
 
   // Create a tempBuffer on device
   int tempLength = (int)(length / std::pow((float)blockSize, (float)pass));
 
-  buffer<float, 1> tempBuffer (tempLength);
+  float *tempBuffer = sycl::malloc_device<float>(tempLength, q);
 
   std::cout << "Executing kernel for " << iterations << " iterations\n";
   std::cout << "-------------------------------------------\n";
@@ -270,25 +263,25 @@ int main(int argc, char * argv[])
   for(int n = 0; n < iterations; n++)
   {
     // Do block-wise sum
-    bScan(q, blockSize, length, inputBuffer, outputBuffer[0], blockSumBuffer[0]);
+    bScan(q, blockSize, length, inputBuffer, outputBuffers[0], blockSumBuffers[0]);
 
     for(int i = 1; i < (int)pass; i++)
     {
       int size = (int)(length / std::pow((float)blockSize,(float)i));
-      bScan(q, blockSize, size, blockSumBuffer[i - 1], outputBuffer[i], blockSumBuffer[i]);
+      bScan(q, blockSize, size, blockSumBuffers[i - 1], outputBuffers[i], blockSumBuffers[i]);
     }
 
     // Do scan to tempBuffer
-    pScan(q, blockSize, tempLength, blockSumBuffer[pass - 1], tempBuffer);
+    pScan(q, blockSize, tempLength, blockSumBuffers[pass - 1], tempBuffer);
 
-    // Do block-addition on outputBuffers
+    // Do block-addition on outputBufferss
     bAddition(q, blockSize, (unsigned int)(length / std::pow((float)blockSize, (float)(pass - 1))),
-          tempBuffer, outputBuffer[pass - 1]);
+          tempBuffer, outputBuffers[pass - 1]);
 
     for(int i = pass - 1; i > 0; i--)
     {
       bAddition(q, blockSize, (unsigned int)(length / std::pow((float)blockSize, (float)(i - 1))),
-            outputBuffer[i], outputBuffer[i - 1]);
+            outputBuffers[i], outputBuffers[i - 1]);
     }
   }
 
@@ -298,10 +291,17 @@ int main(int argc, char * argv[])
   std::cout << "Average execution time of scan kernels: " << time * 1e-3f / iterations
             << " (us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto acc = outputBuffer[0].get_access<sycl_read>(cgh);
-    cgh.copy(acc, output);
-  }).wait();
+  q.memcpy(output, outputBuffers[0], sizeBytes).wait();
+
+  sycl::free(inputBuffer, q);
+
+  for(unsigned int i = 0; i < pass; i++)
+  {
+    sycl::free(outputBuffers[i], q);
+    sycl::free(blockSumBuffers[i], q);
+  }
+
+  sycl::free(tempBuffer, q);
 
   // verification
   float* verificationOutput = (float*)malloc(sizeBytes);

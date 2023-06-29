@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernel.h"
 
 // threads per block
@@ -45,40 +45,41 @@ int main(int argc, char* argv[]) {
     family[i] = s + 1 + s * LCG_random_double(&seed);
   }
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> d_nlist (nlist, n);
-  buffer<int, 1> d_family (family, m);
-  buffer<int, 1> d_n_neigh (n_neigh, m);
-  buffer<double, 1> d_damage (damage, m);
+  int *d_nlist = sycl::malloc_device<int>(n, q);
+  q.memcpy(d_nlist, nlist, sizeof(int) * n);
 
-  range<1> lws (BS);
-  range<1> gws (m*BS);
+  int *d_family = sycl::malloc_device<int>(m, q);
+  q.memcpy(d_family, family, sizeof(int) * m);
+
+  int *d_n_neigh = sycl::malloc_device<int>(m, q);
+  q.memcpy(d_n_neigh, n_neigh, sizeof(int) * m);
+
+  double *d_damage = sycl::malloc_device<double>(m, q);
+
+  sycl::range<1> lws (BS);
+  sycl::range<1> gws (m*BS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto nlist = d_nlist.get_access<sycl_read>(cgh);
-      auto family = d_family.get_access<sycl_read>(cgh);
-      auto n_neigh = d_n_neigh.get_access<sycl_discard_write>(cgh);
-      auto damage = d_damage.get_access<sycl_discard_write>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> sm (BS, cgh);
-      cgh.parallel_for<class compute>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> sm (sycl::range<1>(BS), cgh);
+      cgh.parallel_for<class compute>(
+         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
          damage_of_node(item,
-                n,
-                nlist.get_pointer(),
-                family.get_pointer(),
-                n_neigh.get_pointer(),
-                damage.get_pointer(),
-                sm.get_pointer());
+                        n,
+                        d_nlist,
+                        d_family,
+                        d_n_neigh,
+                        d_damage,
+                        sm.get_pointer());
       });
     });
   }
@@ -88,12 +89,15 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  } // sycl scope
-
+  q.memcpy(damage, d_damage, sizeof(double) * m).wait();
   double sum = 0.0;
   for (int i = 0; i < m; i++) sum += damage[i]; 
   printf("Checksum: total damage = %lf\n", sum);
 
+  sycl::free(d_nlist, q);
+  sycl::free(d_family, q);
+  sycl::free(d_n_neigh, q);
+  sycl::free(d_damage, q);
   free(nlist);
   free(family);
   free(n_neigh);

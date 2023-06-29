@@ -25,12 +25,12 @@ void flagged(Policy&& policy,
              FlaggedIt flagged,
              OutputIt out,
              //std::int64_t *num_copied,
-             std::int64_t size) 
+             std::int64_t size)
 {
   auto zip_b = oneapi::dpl::make_zip_iterator(it, flagged);
   auto zip_e = oneapi::dpl::make_zip_iterator(it + size, flagged + size);
   auto out_it = oneapi::dpl::make_zip_iterator(out, oneapi::dpl::discard_iterator{});
-  
+
   auto end_it = std::copy_if(std::forward<Policy>(policy), zip_b, zip_e, out_it, [](auto const & x) {
       return std::get<1>(x);
   });
@@ -65,18 +65,18 @@ struct NonZero
 
 template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
 
-  // The total number of dimensions is a i32 number and 
+  // The total number of dimensions is a i32 number and
   // the size of each dimension is a i64 number
   const int in_ndims = MAX_DIMS;
   int64_t in_sizes[MAX_DIMS] = {nrows, ncols};
-  
+
   // Total number of elements
   int64_t num_items = 1;
   for (int i = 0; i < in_ndims; i++) {
     num_items *= in_sizes[i];
   }
   int64_t elem_size_bytes = num_items * sizeof(scalar_t);
-    
+
   std::mt19937 gen (19937);
 
   std::uniform_int_distribution<> dist (-1, 1);
@@ -88,11 +88,10 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
   long idx_time = 0;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   auto policy = oneapi::dpl::execution::device_policy(q);
 
@@ -103,7 +102,7 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
     // Ensure non-zero element(s)
     do {
       for (int i = 0; i < num_items; i++) {
-        h_in[i] = (scalar_t) dist(gen); 
+        h_in[i] = (scalar_t) dist(gen);
         if (h_in[i] != (scalar_t)0) r_nzeros++;
       }
     } while (r_nzeros == 0);
@@ -186,16 +185,16 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
       // If input has n dimensions, then the resulting tuple contains n tensors of size z,
       // where z is the total number of non-zero elements in the input tensor.
 
-      int64_t cnt_nzero = 0; 
+      int64_t cnt_nzero = 0;
 
       for (int i = 0; i < h_nzeros; i++) {
         if (in_ndims == 1) {
           if (h_in[h_out[i]] != 0)
-            cnt_nzero++; 
-        } 
+            cnt_nzero++;
+        }
         if (in_ndims == 2) {
           if (h_in[in_sizes[1] * h_out[i] + h_out[h_nzeros + i]] != 0)
-            cnt_nzero++; 
+            cnt_nzero++;
         }
       }
 
@@ -249,8 +248,8 @@ int main(int argc, char* argv[])
     printf("=========== Data type is FP32 ==========\n");
     nonzero<float> (nrows, ncols, repeat);
 
-    printf("=========== Data type is FP64 ==========\n");
-    nonzero<double> (nrows, ncols, repeat);
+    //printf("=========== Data type is FP64 ==========\n");
+    //nonzero<double> (nrows, ncols, repeat);
   }
 
   return 0;

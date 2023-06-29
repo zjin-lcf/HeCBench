@@ -441,6 +441,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     // this shows the sum of all partial_sum results
     cudaMemcpy(sum, partial_sums_GPU, sizeof(float), cudaMemcpyDeviceToHost);
     printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
+    free(sum);
 #endif
 
     kernel_normalize_weights<<<num_blocks, BLOCK_SIZE>>>(

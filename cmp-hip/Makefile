@@ -7,25 +7,22 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 
-VPATH     = ../cmp-cuda
-
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
 program = main
 
-cuda_source = main.cu
-cpp_source = reference.cpp su_cdp.cpp  su_gather.cpp  su_trace.cpp  log.cpp  parser.cpp  
+inc = ../cmp-cuda
 
-obj = $(cuda_source:.cu=.o) $(cpp_source:.cpp=.o)
+obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../cmp-cuda 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(inc)
 
 # Linker Flags
 LDFLAGS = 
@@ -48,19 +45,26 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu
+log.o : $(inc)/log.cpp $(inc)/log.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.cpp
+parser.o: $(inc)/parser.cpp $(inc)/parser.hpp  
 	$(CC) $(CFLAGS) -c $< -o $@
 
-log.o : log.cpp log.hpp
-parser.o: parser.cpp parser.hpp  
-su_cdp.o : su_cdp.cpp su_cdp.hpp log.hpp
-su_gather.o : su_gather.cpp su_gather.hpp log.hpp su_trace.hpp
-su_trace.o : su_trace.cpp su_trace.hpp log.hpp
-main.o : main.cu log.hpp utils.hpp parser.hpp su_gather.hpp
-reference.o : reference.cpp utils.hpp
+su_cdp.o : $(inc)/su_cdp.cpp $(inc)/su_cdp.hpp $(inc)/log.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+su_gather.o : $(inc)/su_gather.cpp $(inc)/su_gather.hpp $(inc)/log.hpp $(inc)/su_trace.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+su_trace.o : $(inc)/su_trace.cpp $(inc)/su_trace.hpp $(inc)/log.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o : main.cu $(inc)/log.hpp $(inc)/utils.hpp $(inc)/parser.hpp $(inc)/su_gather.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+reference.o : $(inc)/reference.cpp $(inc)/utils.hpp
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

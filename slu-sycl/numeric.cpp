@@ -361,25 +361,31 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
   unsigned num_lev = A_sym.num_lev;
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  sycl::buffer<unsigned, 1> sym_c_ptr_dev ( &(A_sym.sym_c_ptr[0]), (n + 1) );
-  sycl::buffer<unsigned, 1> sym_r_idx_dev ( &(A_sym.sym_r_idx[0]), nnz );
-  sycl::buffer<    REAL, 1>       val_dev ( &(A_sym.val[0]), nnz );
-  sycl::buffer<unsigned, 1> l_col_ptr_dev ( &(A_sym.l_col_ptr[0]), n );
-  sycl::buffer<unsigned, 1> csr_r_ptr_dev ( &(A_sym.csr_r_ptr[0]), (n + 1) );
-  sycl::buffer<unsigned, 1> csr_c_idx_dev ( &(A_sym.csr_c_idx[0]), nnz );
-  sycl::buffer<unsigned, 1> csr_diag_ptr_dev ( &(A_sym.csr_diag_ptr[0]), n );
-  sycl::buffer<     int, 1> level_idx_dev ( &(A_sym.level_idx[0]), n );
+  unsigned *sym_c_ptr_dev = sycl::malloc_device<unsigned>(n + 1, q);
+  unsigned *sym_r_idx_dev = sycl::malloc_device<unsigned>(nnz, q );
+      REAL *      val_dev = sycl::malloc_device<REAL>(nnz, q);
+  unsigned *l_col_ptr_dev = sycl::malloc_device<unsigned>(n, q);
+  unsigned *csr_r_ptr_dev = sycl::malloc_device<unsigned>(n + 1, q);
+  unsigned *csr_c_idx_dev = sycl::malloc_device<unsigned>(nnz, q);
+  unsigned *csr_diag_ptr_dev = sycl::malloc_device<unsigned>(n, q);
+       int *level_idx_dev = sycl::malloc_device<int>(n, q);
 
-  sycl::buffer<REAL, 1> tmpMem ( TMPMEMNUM*n );
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = tmpMem.get_access<sycl::access::mode::discard_write>(cgh);
-    cgh.fill(acc, (REAL)0);
-  });
+  q.memcpy(sym_c_ptr_dev, &(A_sym.sym_c_ptr[0]), (n + 1) * sizeof(unsigned));
+  q.memcpy(sym_r_idx_dev, &(A_sym.sym_r_idx[0]), nnz * sizeof(unsigned));
+  q.memcpy(val_dev, &(A_sym.val[0]), nnz * sizeof(REAL));
+  q.memcpy(l_col_ptr_dev, &(A_sym.l_col_ptr[0]), n * sizeof(unsigned));
+  q.memcpy(csr_r_ptr_dev, &(A_sym.csr_r_ptr[0]), (n + 1) * sizeof(unsigned));
+  q.memcpy(csr_c_idx_dev, &(A_sym.csr_c_idx[0]), nnz * sizeof(unsigned));
+  q.memcpy(csr_diag_ptr_dev, &(A_sym.csr_diag_ptr[0]), n * sizeof(unsigned));
+  q.memcpy(level_idx_dev, &(A_sym.level_idx[0]), n * sizeof(int));
+
+  REAL *tmpMem = sycl::malloc_device<REAL>(TMPMEMNUM * n, q);
+  q.memset(tmpMem, 0, TMPMEMNUM*n*sizeof(REAL));
 
   // calculate 1-norm of A and perturbation value for perturbation
   float pert = 0;
@@ -422,59 +428,42 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
         sycl::range<1> gws (restCol * WarpsPerBlock * 32);
         if (!PERTURB)
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RLk>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-              RL(
-                item,
-                sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
-                n,
-                l,
-                j*TMPMEMNUM);
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RLk>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+              RL(item,
+                 sm.get_pointer(),
+                 sym_c_ptr_dev,
+                 sym_r_idx_dev,
+                 val_dev,
+                 l_col_ptr_dev,
+                 csr_r_ptr_dev,
+                 csr_c_idx_dev,
+                 csr_diag_ptr_dev,
+                 level_idx_dev,
+                 tmpMem,
+                 n,
+                 l,
+                 j*TMPMEMNUM);
             });
           });
         else
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RL_pk>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RL_pk>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
                 sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
+                sym_c_ptr_dev,
+                sym_r_idx_dev,
+                val_dev,
+                l_col_ptr_dev,
+                csr_r_ptr_dev,
+                csr_c_idx_dev,
+                csr_diag_ptr_dev,
+                level_idx_dev,
+                tmpMem,
                 n,
                 l,
                 j*TMPMEMNUM,
@@ -495,59 +484,42 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
         sycl::range<1> gws (restCol * WarpsPerBlock * 32);
         if (!PERTURB)
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RLk2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-              RL(
-                item,
-                sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
-                n,
-                l,
-                j*TMPMEMNUM);
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RLk2>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+              RL(item,
+                 sm.get_pointer(),
+                 sym_c_ptr_dev,
+                 sym_r_idx_dev,
+                 val_dev,
+                 l_col_ptr_dev,
+                 csr_r_ptr_dev,
+                 csr_c_idx_dev,
+                 csr_diag_ptr_dev,
+                 level_idx_dev,
+                 tmpMem,
+                 n,
+                 l,
+                 j*TMPMEMNUM);
             });
           });
         else
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RL_pk2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RL_pk2>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
                 sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
+                sym_c_ptr_dev,
+                sym_r_idx_dev,
+                val_dev,
+                l_col_ptr_dev,
+                csr_r_ptr_dev,
+                csr_c_idx_dev,
+                csr_diag_ptr_dev,
+                level_idx_dev,
+                tmpMem,
                 n,
                 l,
                 j*TMPMEMNUM,
@@ -567,59 +539,42 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
         sycl::range<1> gws (restCol * 256);
         if (!PERTURB)
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RLk3>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-              RL(
-                item,
-                sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
-                n,
-                l,
-                j*TMPMEMNUM);
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RLk3>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+              RL(item,
+                 sm.get_pointer(),
+                 sym_c_ptr_dev,
+                 sym_r_idx_dev,
+                 val_dev,
+                 l_col_ptr_dev,
+                 csr_r_ptr_dev,
+                 csr_c_idx_dev,
+                 csr_diag_ptr_dev,
+                 level_idx_dev,
+                 tmpMem,
+                 n,
+                 l,
+                 j*TMPMEMNUM);
             });
           });
         else
           q.submit([&] (sycl::handler &cgh) {
-            auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-            auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_r_ptr = csr_r_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-            auto level_idx = level_idx_dev.get_access<sycl::access::mode::read>(cgh);
-            auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-            sycl::local_accessor<REAL> sm (WarpsPerBlock, cgh);
-            cgh.parallel_for<class RL_pk3>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+            sycl::local_accessor<REAL> sm (sycl::range<1>(WarpsPerBlock), cgh);
+            cgh.parallel_for<class RL_pk3>(
+              sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
                 sm.get_pointer(),
-                sym_c_ptr.get_pointer(),
-                sym_r_idx.get_pointer(),
-                val.get_pointer(),
-                l_col_ptr.get_pointer(),
-                csr_r_ptr.get_pointer(),
-                csr_c_idx.get_pointer(),
-                csr_diag_ptr.get_pointer(),
-                level_idx.get_pointer(),
-                tmp.get_pointer(),
+                sym_c_ptr_dev,
+                sym_r_idx_dev,
+                val_dev,
+                l_col_ptr_dev,
+                csr_r_ptr_dev,
+                csr_c_idx_dev,
+                csr_diag_ptr_dev,
+                level_idx_dev,
+                tmpMem,
                 n,
                 l,
                 j*TMPMEMNUM,
@@ -640,40 +595,32 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
 
             if (!PERTURB)
               q.submit([&] (sycl::handler &cgh) {
-                auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-                auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-                auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-                cgh.parallel_for<class factorizeCol>(sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
+                cgh.parallel_for<class factorizeCol>(
+                  sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
                   RL_onecol_factorizeCurrentCol(
                     item,
-                    sym_c_ptr.get_pointer(),
-                    sym_r_idx.get_pointer(),
-                    val.get_pointer(),
-                    l_col_ptr.get_pointer(),
+                    sym_c_ptr_dev,
+                    sym_r_idx_dev,
+                    val_dev,
+                    l_col_ptr_dev,
                     currentCol,
-                    tmp.get_pointer(),
+                    tmpMem,
                     j,
                     n);
                 });
               });
             else
               q.submit([&] (sycl::handler &cgh) {
-                auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-                auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-                auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
-                cgh.parallel_for<class factorizeColPerturb>(sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
+                cgh.parallel_for<class factorizeColPerturb>(
+                  sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
                   RL_onecol_factorizeCurrentCol_perturb(
                     item,
-                    sym_c_ptr.get_pointer(),
-                    sym_r_idx.get_pointer(),
-                    val.get_pointer(),
-                    l_col_ptr.get_pointer(),
+                    sym_c_ptr_dev,
+                    sym_r_idx_dev,
+                    val_dev,
+                    l_col_ptr_dev,
                     currentCol,
-                    tmp.get_pointer(),
+                    tmpMem,
                     j,
                     n,
                     pert);
@@ -682,42 +629,34 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
 
             if (subMatSize > 0)
               q.submit([&] (sycl::handler &cgh) {
-                auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-                auto val = val_dev.get_access<sycl::access::mode::read_write>(cgh);
-                auto csr_c_idx = csr_c_idx_dev.get_access<sycl::access::mode::read>(cgh);
-                auto csr_diag_ptr = csr_diag_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-                auto tmp = tmpMem.get_access<sycl::access::mode::read_write>(cgh);
                 sycl::local_accessor<REAL> sm (1, cgh);
-                cgh.parallel_for<class update>(sycl::nd_range<1>(256*subMatSize, 256), [=] (sycl::nd_item<1> item) {
+                cgh.parallel_for<class update>(
+                  sycl::nd_range<1>(256*subMatSize, 256), [=] (sycl::nd_item<1> item) {
                   RL_onecol_updateSubmat(
                     item,
                     sm.get_pointer(),
-                    sym_c_ptr.get_pointer(),
-                    sym_r_idx.get_pointer(),
-                    val.get_pointer(),
-                    csr_c_idx.get_pointer(),
-                    csr_diag_ptr.get_pointer(),
+                    sym_c_ptr_dev,
+                    sym_r_idx_dev,
+                    val_dev,
+                    csr_c_idx_dev,
+                    csr_diag_ptr_dev,
                     currentCol,
-                    tmp.get_pointer(),
+                    tmpMem,
                     j,
                     n);
                 });
               });
 
             q.submit([&] (sycl::handler &cgh) {
-              auto sym_c_ptr = sym_c_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-              auto sym_r_idx = sym_r_idx_dev.get_access<sycl::access::mode::read>(cgh);
-              auto l_col_ptr = l_col_ptr_dev.get_access<sycl::access::mode::read>(cgh);
-              auto tmp = tmpMem.get_access<sycl::access::mode::write>(cgh);
-              cgh.parallel_for<class clearMem>(sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
+              cgh.parallel_for<class clearMem>(
+                sycl::nd_range<1>(256, 256), [=] (sycl::nd_item<1> item) {
                 RL_onecol_cleartmpMem(
                   item,
-                  sym_c_ptr.get_pointer(),
-                  sym_r_idx.get_pointer(),
-                  l_col_ptr.get_pointer(),
+                  sym_c_ptr_dev,
+                  sym_r_idx_dev,
+                  l_col_ptr_dev,
                   currentCol,
-                  tmp.get_pointer(),
+                  tmpMem,
                   j,
                   n);
               });
@@ -733,10 +672,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
   out << "Total LU kernel execution time: " << utime << " ms" << std::endl;
 
   //copy LU val back to main mem
-  q.submit([&] (sycl::handler &cgh) {
-    auto acc = val_dev.get_access<sycl::access::mode::read>(cgh);
-    cgh.copy(acc, &(A_sym.val[0]));
-  }).wait();
+  q.memcpy(&(A_sym.val[0]), val_dev, nnz * sizeof(REAL)).wait();
 
 #ifdef VERIFY
   //check NaN elements
@@ -748,4 +684,14 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
   if (err_find != 0)
     err << "LU data check: NaN found!!" << std::endl;
 #endif
+
+  sycl::free(sym_c_ptr_dev, q);
+  sycl::free(sym_r_idx_dev, q);
+  sycl::free(val_dev, q);
+  sycl::free(l_col_ptr_dev, q);
+  sycl::free(csr_c_idx_dev, q);
+  sycl::free(csr_r_ptr_dev, q);
+  sycl::free(csr_diag_ptr_dev, q);
+  sycl::free(level_idx_dev, q);
+  sycl::free(tmpMem, q);
 }

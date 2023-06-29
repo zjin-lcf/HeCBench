@@ -3,7 +3,7 @@
 #include <string.h>
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 int main(int argc, char* argv[]) {
 
@@ -32,16 +32,14 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel, property::queue::in_order());
-  
-  int *d_test = malloc_device<int>(len, q);
-  range<1> gws (len);
-  range<1> lws (len);
+  int *d_test = sycl::malloc_device<int>(len, q);
+  sycl::range<1> gws (len);
+  sycl::range<1> lws (len);
 
   std::default_random_engine generator (123);
   // bound the number of reverse operations
@@ -53,17 +51,18 @@ int main(int argc, char* argv[]) {
     const int count = distribution(generator);
 
     q.memcpy(d_test, gold_even, sizeof(int) * len);
-    
+
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int j = 0; j < count; j++) {
-      q.submit([&](handler &cgh) {
-        accessor <int, 1, sycl_read_write, access::target::local> s (len, cgh);
-        cgh.parallel_for<class blockReverse>(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor <int, 1> s (lws, cgh);
+        cgh.parallel_for<class blockReverse>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           int t = item.get_local_id(0);
           s[t] = d_test[t];
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           d_test[t] = s[len-t-1];
         });
       });
@@ -79,13 +78,13 @@ int main(int argc, char* argv[]) {
       error = memcmp(test, gold_even, len*sizeof(int));
     else
       error = memcmp(test, gold_odd, len*sizeof(int));
-    
+
     if (error) break;
   }
-  
+
   printf("Total kernel execution time: %f (s)\n", time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
- 
+
   free(d_test, q);
 
   return 0;

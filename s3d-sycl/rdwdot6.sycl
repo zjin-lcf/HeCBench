@@ -8,8 +8,8 @@
             +ROP2(111) +ROP2(112) +ROP2(113) +ROP2(113)
             +ROP2(117) +ROP2(119) +ROP2(120) +ROP2(123)
             +ROP2(128) +ROP2(136) +ROP2(143) +ROP2(147)
-            +ROP2(154) +ROP2(164) +ROP2(179) +ROP2(189))*rateconv *molwt[10];
+            +ROP2(154) +ROP2(164) +ROP2(179) +ROP2(189))*rateconv *d_molwt[10];
     WDOT(12) = (+ROP2(29) +ROP2(30) +ROP2(32) +ROP2(33)
             -ROP2(40) +ROP2(44) +ROP2(52) -ROP2(70)
-            +ROP2(125) +ROP2(130))*rateconv *molwt[11];
+            +ROP2(125) +ROP2(130))*rateconv *d_molwt[11];
 

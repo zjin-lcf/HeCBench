@@ -1,5 +1,5 @@
 #include "dslash.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // SYCL lambda function kernel names
 class make_back;
@@ -18,11 +18,10 @@ double dslash_fn(
 { 
   // Set device and queue
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
   
   // Set the loop and work-group parameters
   size_t total_sites = sites_on_node; 
@@ -31,18 +30,33 @@ double dslash_fn(
   auto copy_start = Clock::now();
 
   // allocate device memory
-  buffer<su3_vector, 1> d_src (src.data(), total_sites * 1);
-  buffer<su3_matrix, 1> d_fat (fat.data(), total_sites * 4);
-  buffer<su3_matrix, 1> d_lng (lng.data(), total_sites * 4);
-  buffer<su3_vector, 1> d_dst (total_sites * 1);
-  buffer<su3_matrix, 1> d_fatbck (total_sites * 4);
-  buffer<su3_matrix, 1> d_lngbck (total_sites * 4);
+  su3_vector *d_src = sycl::malloc_device<su3_vector>(total_sites * 1, q);
+  q.memcpy(d_src, src.data(), total_sites * 1 * sizeof(su3_vector));
+
+  su3_matrix *d_fat  = sycl::malloc_device<su3_matrix>(total_sites * 4, q);
+  q.memcpy(d_fat, fat.data(), total_sites * 4 * sizeof(su3_matrix));
+
+  su3_matrix *d_lng  = sycl::malloc_device<su3_matrix>(total_sites * 4, q);
+  q.memcpy(d_lng, lng.data(), total_sites * 4 * sizeof(su3_matrix));
+
+  su3_vector *d_dst  = sycl::malloc_device<su3_vector>(total_sites * 1, q);
+  su3_matrix *d_fatbck  = sycl::malloc_device<su3_matrix>(total_sites * 4, q);
+  su3_matrix *d_lngbck  = sycl::malloc_device<su3_matrix>(total_sites * 4, q);
 
   // allocate offsets for device gathers and copy to shared buffers
-  buffer<size_t, 1> d_fwd (fwd, total_sites * 4);
-  buffer<size_t, 1> d_bck (bck, total_sites * 4);
-  buffer<size_t, 1> d_fwd3 (fwd3, total_sites * 4);
-  buffer<size_t, 1> d_bck3 (bck3, total_sites * 4);
+  size_t *d_fwd  = sycl::malloc_device<size_t>(total_sites * 4, q);
+  q.memcpy(d_fwd, fwd, total_sites * 4 * sizeof(size_t));
+
+  size_t *d_bck  = sycl::malloc_device<size_t>(total_sites * 4, q);
+  q.memcpy(d_bck, bck, total_sites * 4 * sizeof(size_t));
+
+  size_t *d_fwd3  = sycl::malloc_device<size_t>(total_sites * 4, q);
+  q.memcpy(d_fwd3, fwd3, total_sites * 4 * sizeof(size_t));
+
+  size_t *d_bck3  = sycl::malloc_device<size_t>(total_sites * 4, q);
+  q.memcpy(d_bck3, bck3, total_sites * 4 * sizeof(size_t));
+
+  q.wait();
   
   double copy_time = std::chrono::duration_cast<std::chrono::microseconds>(
                      Clock::now()-copy_start).count();
@@ -59,26 +73,19 @@ double dslash_fn(
     std::cout << "Setting workgroup size to " << 1 << std::endl;
   }
   auto back_start = Clock::now();
-  q.submit( [&](handler& cgh) {
-    auto d_fat_acc = d_fat.get_access<sycl_read>(cgh);
-    auto d_bck_acc = d_bck.get_access<sycl_read>(cgh);
-    auto d_lng_acc = d_lng.get_access<sycl_read>(cgh);
-    auto d_bck3_acc = d_bck3.get_access<sycl_read>(cgh);
-    auto d_fatbck_acc = d_fatbck.get_access<sycl_discard_write>(cgh);
-    auto d_lngbck_acc = d_lngbck.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class make_back>(nd_range<1> {total_wi, wgsize}, [=](nd_item<1> item) {
+  q.submit( [&](sycl::handler& cgh) {
+    cgh.parallel_for<class make_back>(sycl::nd_range<1> {total_wi, wgsize}, [=](sycl::nd_item<1> item) {
       size_t mySite = item.get_global_id(0);
       if (mySite < total_even_sites) {
 	for(int dir = 0; dir < 4; dir++) {
-	  su3_adjoint( d_fat_acc.get_pointer() + 4*d_bck_acc[4*mySite+dir]+dir, 
-                       d_fatbck_acc.get_pointer() + 4*mySite+dir );
-	  su3_adjoint( d_lng_acc.get_pointer() + 4*d_bck3_acc[4*mySite+dir]+dir, 
-                       d_lngbck_acc.get_pointer() + 4*mySite+dir );
+	  su3_adjoint( d_fat + 4*d_bck[4*mySite+dir]+dir, 
+                       d_fatbck + 4*mySite+dir );
+	  su3_adjoint( d_lng + 4*d_bck3[4*mySite+dir]+dir, 
+                       d_lngbck + 4*mySite+dir );
 	}
       }
     }); // end of the kernel lambda function
-  });   // end of command group
-  q.wait();
+  }).wait();   // end of command group
   double back_time = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-back_start).count();
   if (verbose > 1) {
     std::cout << "Time to create back links = " << back_time/1.0e6 << " secs\n";
@@ -99,60 +106,50 @@ double dslash_fn(
       tstart = Clock::now();
     }
     // Dslash kernel
-    q.submit( [&](handler& cgh) {
-      auto d_fat_acc = d_fat.get_access<sycl_read>(cgh);
-      auto d_src_acc = d_src.get_access<sycl_read>(cgh);
-      auto d_fwd_acc = d_fwd.get_access<sycl_read>(cgh);
-      auto d_fwd3_acc = d_fwd3.get_access<sycl_read>(cgh);
-      auto d_bck3_acc = d_bck3.get_access<sycl_read>(cgh);
-      auto d_bck_acc = d_bck.get_access<sycl_read>(cgh);
-      auto d_lng_acc = d_lng.get_access<sycl_read>(cgh);
-      auto d_lngbck_acc = d_lngbck.get_access<sycl_read>(cgh);
-      auto d_fatbck_acc = d_fatbck.get_access<sycl_read>(cgh);
-      auto d_dst_acc = d_dst.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class dslash>(nd_range<1> {total_wi, wgsize}, [=](nd_item<1> item) {
+    q.submit( [&](sycl::handler& cgh) {
+      cgh.parallel_for<class dslash>(
+        sycl::nd_range<1> {total_wi, wgsize}, [=](sycl::nd_item<1> item) {
 	size_t mySite = item.get_global_id(0);
 	if (mySite < total_even_sites) {
 	  su3_vector v;
           for (size_t k=0; k<4; ++k) {
-            auto a = d_fat_acc.get_pointer() + mySite*4 + k;
-	    auto b = d_src_acc.get_pointer() + d_fwd_acc[4*mySite + k];
+            auto a = d_fat + mySite*4 + k;
+	    auto b = d_src + d_fwd[4*mySite + k];
             if (k == 0)
-              mult_su3_mat_vec(a, b, &d_dst_acc[mySite]);
+              mult_su3_mat_vec(a, b, &d_dst[mySite]);
             else 
-              mult_su3_mat_vec_sum(a, b, &d_dst_acc[mySite]);
+              mult_su3_mat_vec_sum(a, b, &d_dst[mySite]);
           }
           for (size_t k=0; k<4; ++k) {
-            auto a = d_lng_acc.get_pointer() + mySite*4 + k;
-	    auto b = d_src_acc.get_pointer() + d_fwd3_acc[4*mySite + k];
+            auto a = d_lng + mySite*4 + k;
+	    auto b = d_src + d_fwd3[4*mySite + k];
             if (k == 0) 
               mult_su3_mat_vec(a, b, &v);
             else
               mult_su3_mat_vec_sum(a, b, &v);
           }
-	  add_su3_vector(&d_dst_acc[mySite], &v, &d_dst_acc[mySite]);
+	  add_su3_vector(&d_dst[mySite], &v, &d_dst[mySite]);
           for (size_t k=0; k<4; ++k) {
-            auto a = d_fatbck_acc.get_pointer() + mySite*4 + k;
-	    auto b = d_src_acc.get_pointer() + d_bck_acc[4*mySite + k];
+            auto a = d_fatbck + mySite*4 + k;
+	    auto b = d_src + d_bck[4*mySite + k];
             if (k == 0) 
               mult_su3_mat_vec(a, b, &v);
             else
               mult_su3_mat_vec_sum(a, b, &v);
           }
-	  sub_su3_vector(&d_dst_acc[mySite], &v, &d_dst_acc[mySite]);
+	  sub_su3_vector(&d_dst[mySite], &v, &d_dst[mySite]);
           for (size_t k=0; k<4; ++k) {
-            auto a = d_lngbck_acc.get_pointer() + mySite*4 + k;
-            auto b = d_src_acc.get_pointer() + d_bck3_acc[4*mySite + k];
+            auto a = d_lngbck + mySite*4 + k;
+            auto b = d_src + d_bck3[4*mySite + k];
             if (k == 0) 
               mult_su3_mat_vec(a, b, &v);
             else
               mult_su3_mat_vec_sum(a, b, &v);
           }
-	  sub_su3_vector(&d_dst_acc[mySite], &v, &d_dst_acc[mySite]);
+	  sub_su3_vector(&d_dst[mySite], &v, &d_dst[mySite]);
 	} // end of if mySite
       }); // end of the kernel lambda function
-    });   // end of command group
-    q.wait();
+    }).wait();   // end of command group
   } // end of iteration loop
   double ttotal = std::chrono::duration_cast<std::chrono::microseconds>(
                   Clock::now()-tstart).count();
@@ -160,18 +157,9 @@ double dslash_fn(
   // Move the result back to the host
   copy_start = Clock::now();
     
-  q.submit( [&](handler& cgh) {
-    auto acc = d_dst.get_access<sycl_read>(cgh);
-    cgh.copy(acc, dst.data());
-  });
-  q.submit( [&](handler& cgh) {
-    auto acc = d_fatbck.get_access<sycl_read>(cgh);
-    cgh.copy(acc, fatbck.data());
-  });
-  q.submit( [&](handler& cgh) {
-    auto acc = d_lngbck.get_access<sycl_read>(cgh);
-    cgh.copy(acc, lngbck.data());
-  }); 
+  q.memcpy(dst.data(), d_dst, total_sites * 1 * sizeof(su3_vector));
+  q.memcpy(fatbck.data(), d_fatbck, total_sites * 4 * sizeof(su3_matrix));
+  q.memcpy(lngbck.data(), d_lngbck, total_sites * 4 * sizeof(su3_matrix));
   q.wait();
 
   copy_time = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-copy_start).count();
@@ -179,6 +167,17 @@ double dslash_fn(
     std::cout << "Time to offload backward links = " << copy_time/1.0e6 << " secs\n";
     std::cout << std::flush;
   }
+
+  sycl::free(d_src, q);
+  sycl::free(d_fat, q);
+  sycl::free(d_lng, q);
+  sycl::free(d_dst, q);
+  sycl::free(d_fatbck, q);
+  sycl::free(d_lngbck, q);
+  sycl::free(d_fwd, q);
+  sycl::free(d_bck, q);
+  sycl::free(d_fwd3, q);
+  sycl::free(d_bck3, q);
 
   return (ttotal /= 1.0e6);
 }

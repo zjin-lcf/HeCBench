@@ -15,7 +15,7 @@
 #include <memory.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "LDPC.h"
 #include "matrix.h"
 #include "kernel.cpp"
@@ -124,7 +124,7 @@ int main()
   float rate = (float)0.5f;
 
   //////////////////////////////////////////////////////////////////////////////////
-  // all the variables Starting with _gpu is used in host code and for cuda computation
+  // all the variables Starting with _gpu is used in host code and for gpu computation
   int wordSize_llr = MCW *  CW * CODEWORD_LEN;
   int wordSize_dt = MCW *  CW * ROW * BLK_COL;
   int wordSize_R = MCW *  CW * ROW * BLK_COL;
@@ -151,20 +151,27 @@ int main()
   int total_codeword = 0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
+
+  int memorySize_h_compact1 = H_COMPACT1_ROW * H_COMPACT1_COL * sizeof(h_element);
+  int memorySize_h_compact2 = H_COMPACT2_ROW * H_COMPACT2_COL * sizeof(h_element);
   
-  buffer<float, 1> d_llr(wordSize_llr);
-  buffer<float, 1> d_dt(wordSize_dt);
-  buffer<float, 1> d_R(wordSize_R);
-  buffer<int, 1> d_hard_decision(wordSize_hard_decision);
-  buffer<h_element, 1> d_h_compact1(h_compact1, wordSize_h_compact1);
-  buffer<h_element, 1> d_h_compact2(h_compact2, wordSize_h_compact2);
-  buffer<char, 1> d_h_element_count1(h_element_count1, BLK_ROW);
-  buffer<char, 1> d_h_element_count2(h_element_count2, BLK_COL);
+  float *d_llr = sycl::malloc_device<float>(wordSize_llr, q);
+  float *d_dt = sycl::malloc_device<float>(wordSize_dt, q);
+  float *d_R = sycl::malloc_device<float>(wordSize_R, q);
+  int *d_hard_decision = sycl::malloc_device<int>(wordSize_hard_decision, q);
+  h_element *d_h_compact1 = sycl::malloc_device<h_element>(wordSize_h_compact1, q);
+  h_element *d_h_compact2 = sycl::malloc_device<h_element>(wordSize_h_compact2, q);
+  char *d_h_element_count1 = sycl::malloc_device<char>(BLK_ROW, q);
+  char *d_h_element_count2 = sycl::malloc_device<char>(BLK_COL, q);
+
+  q.memcpy(d_h_element_count1, h_element_count1, BLK_ROW);
+  q.memcpy(d_h_element_count2, h_element_count2, BLK_COL);
+  q.memcpy(d_h_compact1, h_compact1, memorySize_h_compact1);
+  q.memcpy(d_h_compact2, h_compact2, memorySize_h_compact2);
 
   srand(69012);
 
@@ -205,12 +212,12 @@ int main()
       }
 
       // Define kernel dimension
-      range<2> gws(MCW * CW, BLK_ROW * BLOCK_SIZE_X); // dim of the thread blocks
-      range<2> lws(CW, BLOCK_SIZE_X);
+      sycl::range<2> gws(MCW * CW, BLK_ROW * BLOCK_SIZE_X); // dim of the thread blocks
+      sycl::range<2> lws(CW, BLOCK_SIZE_X);
       int sharedRCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT;
 
-      range<2> gws2(MCW * CW, BLK_COL * BLOCK_SIZE_X);
-      range<2> lws2(CW, BLOCK_SIZE_X);
+      sycl::range<2> gws2(MCW * CW, BLK_COL * BLOCK_SIZE_X);
+      sycl::range<2> lws2(CW, BLOCK_SIZE_X);
       //int sharedDtCacheSize = THREADS_PER_BLOCK * NON_EMPTY_ELMENT_VNP * sizeof(float);
 
       // run the kernel
@@ -219,13 +226,9 @@ int main()
       for(int j = 0; j < MAX_SIM; j++)
       {
         // Transfer LLR data into device.
-        q.submit([&] (handler &cgh) {
-          auto acc = d_llr.get_access<sycl_discard_write>(cgh);
-          cgh.copy(llr_gpu, acc);
-        });
+        q.memcpy(d_llr, llr_gpu, memorySize_llr_gpu).wait();
 
         // kernel launch
-        q.wait();
         auto start = std::chrono::steady_clock::now();
 
         for(int ii = 0; ii < MAX_ITERATION; ii++)
@@ -234,37 +237,29 @@ int main()
           // run check-node processing kernel
           // TODO: run a special kernel the first iteration?
           if(ii == 0) {
-            q.submit([&] (handler &cgh) {
-              auto dev_llr = d_llr.get_access<sycl_read>(cgh);
-              auto dev_dt = d_dt.get_access<sycl_discard_write>(cgh);
-              auto dev_R = d_R.get_access<sycl_discard_write>(cgh);
-              auto dev_h_element_count1 = d_h_element_count1.get_access<sycl_read>(cgh);
-              auto dev_h_compact1 = d_h_compact1.get_access<sycl_read>(cgh);
-              cgh.parallel_for<class cnp_kernel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+            q.submit([&] (sycl::handler &cgh) {
+              cgh.parallel_for<class cnp_kernel>(
+                sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
                 ldpc_cnp_kernel_1st_iter (
-                  dev_llr.get_pointer(), 
-                  dev_dt.get_pointer(), 
-                  dev_R.get_pointer(), 
-                  dev_h_element_count1.get_pointer(), 
-                  dev_h_compact1.get_pointer(),
+                  d_llr, 
+                  d_dt, 
+                  d_R, 
+                  d_h_element_count1, 
+                  d_h_compact1,
                   item);
               });
             });
           } else {
-            q.submit([&] (handler &cgh) {
-              auto dev_llr = d_llr.get_access<sycl_read>(cgh);
-              auto dev_dt = d_dt.get_access<sycl_discard_write>(cgh);
-              auto dev_R = d_R.get_access<sycl_read_write>(cgh);
-              auto dev_h_element_count1 = d_h_element_count1.get_access<sycl_read>(cgh);
-              auto dev_h_compact1 = d_h_compact1.get_access<sycl_read>(cgh);
-              accessor<float, 1, sycl_read_write, access::target::local> RCache(sharedRCacheSize, cgh);
-              cgh.parallel_for<class cnp_kernel2>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+            q.submit([&] (sycl::handler &cgh) {
+              sycl::local_accessor<float, 1> RCache (sycl::range<1>(sharedRCacheSize), cgh);
+              cgh.parallel_for<class cnp_kernel2>(
+                sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
                 ldpc_cnp_kernel(
-                  dev_llr.get_pointer(),
-                  dev_dt.get_pointer(),
-                  dev_R.get_pointer(),
-                  dev_h_element_count1.get_pointer(), 
-                  dev_h_compact1.get_pointer(),
+                  d_llr,
+                  d_dt,
+                  d_R,
+                  d_h_element_count1, 
+                  d_h_compact1,
                   RCache.get_pointer(),
                   item);
               });
@@ -277,35 +272,28 @@ int main()
           // decision instead of writing back the belief
           // for the value of each bit.
           if(ii < MAX_ITERATION - 1) {
-            q.submit([&] (handler &cgh) {
-              auto dev_llr = d_llr.get_access<sycl_read_write>(cgh);
-              auto dev_dt = d_dt.get_access<sycl_read>(cgh);
-              auto dev_h_element_count2 = d_h_element_count2.get_access<sycl_read>(cgh);
-              auto dev_h_compact2 = d_h_compact2.get_access<sycl_read>(cgh);
-              cgh.parallel_for<class vnp_kernel>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+            q.submit([&] (sycl::handler &cgh) {
+              cgh.parallel_for<class vnp_kernel>(
+                sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
                 ldpc_vnp_kernel_normal(
-                   dev_llr.get_pointer(), 
-                   dev_dt.get_pointer(), 
-                   dev_h_element_count2.get_pointer(), 
-                   dev_h_compact2.get_pointer(),
+                   d_llr, 
+                   d_dt, 
+                   d_h_element_count2, 
+                   d_h_compact2,
                    item);
               });
             });
           } else {
-            q.submit([&] (handler &cgh) {
-              auto dev_llr = d_llr.get_access<sycl_read>(cgh);
-              auto dev_dt = d_dt.get_access<sycl_read>(cgh);
-              auto dev_hd = d_hard_decision.get_access<sycl_discard_write>(cgh);
-              auto dev_h_element_count2 = d_h_element_count2.get_access<sycl_read>(cgh);
-              auto dev_h_compact2 = d_h_compact2.get_access<sycl_read>(cgh);
-              cgh.parallel_for<class vnp_kernel2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
-                ldpc_vnp_kernel_last_iter
-                (dev_llr.get_pointer(), 
-                 dev_dt.get_pointer(), 
-                 dev_hd.get_pointer(), 
-                 dev_h_element_count2.get_pointer(), 
-                 dev_h_compact2.get_pointer(),
-                 item);
+            q.submit([&] (sycl::handler &cgh) {
+              cgh.parallel_for<class vnp_kernel2>(
+                sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
+                ldpc_vnp_kernel_last_iter(
+                   d_llr, 
+                   d_dt, 
+                   d_hard_decision, 
+                   d_h_element_count2, 
+                   d_h_compact2,
+                   item);
               });
             });
           }
@@ -317,12 +305,9 @@ int main()
         total_time += time;
 
         // copy the decoded data from device to host
-        q.submit([&] (handler &cgh) {
-          auto acc = d_hard_decision.get_access<sycl_read>(cgh);
-          cgh.copy(acc, hard_decision_gpu); 
-        }).wait();
+        q.memcpy(hard_decision_gpu, d_hard_decision, memorySize_hard_decision_gpu);
 
-        this_error = cuda_error_check(info_bin_gpu, hard_decision_gpu);
+        this_error = error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM
@@ -337,6 +322,15 @@ int main()
           (float) total_frame_error/total_codeword);
     } // end of the MAX frame error.
   }// end of the snr loop
+
+  sycl::free(d_llr, q);
+  sycl::free(d_dt, q);
+  sycl::free(d_R, q);
+  sycl::free(d_hard_decision, q);
+  sycl::free(d_h_compact1, q);
+  sycl::free(d_h_compact2, q);
+  sycl::free(d_h_element_count1, q);
+  sycl::free(d_h_element_count2, q);
 
   free(info_bin);
   free(codeword);

@@ -1,4 +1,4 @@
-// __global FP* d_in;
+// __global FP* in;
 int rot_row;
 int rot_col;
 int in2_rowlow;
@@ -62,43 +62,43 @@ int ei_new;
 //======================================================================================================================================================150
 
 // common
-auto d_common_change_d_frame = d_frame_acc;
+auto d_common_change_d_frame = d_frame;
 
 // offsets for either endo or epi points (separate arrays for endo and epi points)
 int d_unique_point_no = bx < common.endoPoints ? bx : bx-common.endoPoints;
 
-auto d_unique_d_Row = bx < common.endoPoints ? d_endoRow_acc: d_epiRow_acc;
-auto d_unique_d_Col = bx < common.endoPoints ? d_endoCol_acc: d_epiCol_acc;
-auto d_unique_d_tRowLoc = bx < common.endoPoints ? d_tEndoRowLoc_acc: d_tEpiRowLoc_acc;
-auto d_unique_d_tColLoc = bx < common.endoPoints ? d_tEndoColLoc_acc: d_tEpiColLoc_acc;
-auto d_in = bx < common.endoPoints ?  &d_endoT_acc[d_unique_point_no * common.in_elem] :
-                                               &d_epiT_acc[d_unique_point_no * common.in_elem] ;
+auto Row = bx < common.endoPoints ? d_endoRow: d_epiRow;
+auto Col = bx < common.endoPoints ? d_endoCol: d_epiCol;
+auto tRowLoc = bx < common.endoPoints ? d_tEndoRowLoc: d_tEpiRowLoc;
+auto tColLoc = bx < common.endoPoints ? d_tEndoColLoc: d_tEpiColLoc;
+auto in = bx < common.endoPoints ?  &d_endoT[d_unique_point_no * common.in_elem] :
+                                               &d_epiT[d_unique_point_no * common.in_elem] ;
 
 
 // offsets for all points (one array for all points)
-auto d_unique_d_in2 = &d_in2_all_acc[bx*common.in2_elem];
-auto d_unique_d_conv = &d_conv_all_acc[bx*common.conv_elem];
-auto d_unique_d_in2_pad_cumv = &d_in2_pad_cumv_all_acc[bx*common.in2_pad_cumv_elem];
-auto d_unique_d_in2_pad_cumv_sel = &d_in2_pad_cumv_sel_all_acc[bx*common.in2_pad_cumv_sel_elem];
-auto d_unique_d_in2_sub_cumh = &d_in2_sub_cumh_all_acc[bx*common.in2_sub_cumh_elem];
-auto d_unique_d_in2_sub_cumh_sel = &d_in2_sub_cumh_sel_all_acc[bx*common.in2_sub_cumh_sel_elem];
-auto d_unique_d_in2_sub2 = &d_in2_sub2_all_acc[bx*common.in2_sub2_elem];
-auto d_unique_d_in2_sqr = &d_in2_sqr_all_acc[bx*common.in2_sqr_elem];
-auto d_unique_d_in2_sqr_sub2 = &d_in2_sqr_sub2_all_acc[bx*common.in2_sqr_sub2_elem];
-auto d_unique_d_in_sqr = &d_in_sqr_all_acc[bx*common.in_sqr_elem];
-auto d_unique_d_tMask = &d_tMask_all_acc[bx*common.tMask_elem];
-auto d_unique_d_mask_conv = &d_mask_conv_all_acc[bx*common.mask_conv_elem];
+auto in2 = &d_in2[bx*common.in2_elem];
+auto conv = &d_conv[bx*common.conv_elem];
+auto in2_pad_cumv = &d_in2_pad_cumv[bx*common.in2_pad_cumv_elem];
+auto in2_pad_cumv_sel = &d_in2_pad_cumv_sel[bx*common.in2_pad_cumv_sel_elem];
+auto in2_sub_cumh = &d_in2_sub_cumh[bx*common.in2_sub_cumh_elem];
+auto in2_sub_cumh_sel = &d_in2_sub_cumh_sel[bx*common.in2_sub_cumh_sel_elem];
+auto in2_sub2 = &d_in2_sub2[bx*common.in2_sub2_elem];
+auto in2_sqr = &d_in2_sqr[bx*common.in2_sqr_elem];
+auto in2_sqr_sub2 = &d_in2_sqr_sub2[bx*common.in2_sqr_sub2_elem];
+auto in_sqr = &d_in_sqr[bx*common.in_sqr_elem];
+auto tMask = &d_tMask[bx*common.tMask_elem];
+auto mask_conv = &d_mask_conv[bx*common.mask_conv_elem];
 
 // used to be local
-auto d_in_mod_temp = &d_in_mod_temp_all_acc[bx*common.in_elem];
-auto in_partial_sum = &d_in_partial_sum_all_acc[bx*common.in_cols];
-auto in_sqr_partial_sum = &d_in_sqr_partial_sum_all_acc[bx*common.in_sqr_rows];
-auto par_max_val = &par_max_val_all_acc[bx*common.mask_conv_rows];
-auto  par_max_coo = &par_max_coo_all_acc[bx*common.mask_conv_rows];
+auto in_mod_temp = &d_in_mod_temp[bx*common.in_elem];
+auto in_partial_sum = &d_in_partial_sum[bx*common.in_cols];
+auto in_sqr_partial_sum = &d_in_sqr_partial_sum[bx*common.in_sqr_rows];
+auto par_max_val = &d_par_max_val[bx*common.mask_conv_rows];
+auto par_max_coo = &d_par_max_coo[bx*common.mask_conv_rows];
 
-auto in_final_sum = &d_in_final_sum_all_acc[bx];
-auto in_sqr_final_sum = &d_in_sqr_final_sum_all_acc[bx];
-auto denomT = &denomT_all_acc[bx];
+auto in_final_sum = &d_in_final_sum[bx];
+auto in_sqr_final_sum = &d_in_sqr_final_sum[bx];
+auto denomT = &d_denomT[bx];
 
 //======================================================================================================================================================150
 //  END
@@ -111,7 +111,7 @@ auto denomT = &denomT_all_acc[bx];
 if(bx==0 && tx==0){
 
   for(i=0; i<CHECK; i++){
-    checksum_acc[i] = 0;
+    d_checksum[i] = 0;
   }
 
 }
@@ -133,8 +133,8 @@ if(frame_no == 0){
 
     // update temporary row/col coordinates
     pointer = d_unique_point_no*common.no_frames+frame_no;
-    d_unique_d_tRowLoc[pointer] = d_unique_d_Row[d_unique_point_no];
-    d_unique_d_tColLoc[pointer] = d_unique_d_Col[d_unique_point_no];
+    tRowLoc[pointer] = Row[d_unique_point_no];
+    tColLoc[pointer] = Col[d_unique_point_no];
 
   }
 
@@ -155,12 +155,12 @@ if(frame_no == 0){
     }
 
     // figure out row/col location in corresponding new template area in image and give to every thread (get top left corner and progress down and right)
-    ori_row = d_unique_d_Row[d_unique_point_no] - 25 + row - 1;
-    ori_col = d_unique_d_Col[d_unique_point_no] - 25 + col - 1;
+    ori_row = Row[d_unique_point_no] - 25 + row - 1;
+    ori_col = Col[d_unique_point_no] - 25 + col - 1;
     ori_pointer = ori_col*common.frame_rows+ori_row;
 
     // update template
-    d_in[col*common.in_rows+row] = d_common_change_d_frame[ori_pointer];
+    in[col*common.in_rows+row] = d_common_change_d_frame[ori_pointer];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -174,12 +174,12 @@ if(frame_no == 0){
   item.barrier();
 
   //====================================================================================================100
-  //  checksum_acc
+  //  checksum
   //====================================================================================================100
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in_elem; i++){
-      checksum_acc[0] = checksum_acc[0]+d_in[i];
+      d_checksum[0] = d_checksum[0]+in[i];
     }
   }
 
@@ -210,8 +210,8 @@ if(frame_no != 0){
   //  SELECTION
   //====================================================================================================100
 
-  in2_rowlow = d_unique_d_Row[d_unique_point_no] - common.sSize;                          // (1 to n+1)
-  in2_collow = d_unique_d_Col[d_unique_point_no] - common.sSize;
+  in2_rowlow = Row[d_unique_point_no] - common.sSize;                          // (1 to n+1)
+  in2_collow = Col[d_unique_point_no] - common.sSize;
 
   // work
   ei_new = tx;
@@ -228,7 +228,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + in2_rowlow - 1;
     ori_col = col + in2_collow - 1;
-    d_unique_d_in2[ei_new] = d_common_change_d_frame[ori_col*common.frame_rows+ori_row];
+    in2[ei_new] = d_common_change_d_frame[ori_col*common.frame_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -242,12 +242,12 @@ if(frame_no != 0){
   item.barrier();
 
   //====================================================================================================100
-  //  checksum_acc
+  //  checksum
   //====================================================================================================100
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_elem; i++){
-      checksum_acc[1] = checksum_acc[1]+d_unique_d_in2[i];
+      d_checksum[1] = d_checksum[1]+in2[i];
     }
   }
 
@@ -281,7 +281,7 @@ if(frame_no != 0){
     // execution
     rot_row = (common.in_rows-1) - row;
     rot_col = (common.in_rows-1) - col;
-    d_in_mod_temp[ei_new] = d_in[rot_col*common.in_rows+rot_row];
+    in_mod_temp[ei_new] = in[rot_col*common.in_rows+rot_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -295,12 +295,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in_elem; i++){
-      checksum_acc[2] = checksum_acc[2]+d_in_mod_temp[i];
+      d_checksum[2] = d_checksum[2]+in_mod_temp[i];
     }
   }
 
@@ -364,12 +364,12 @@ if(frame_no != 0){
       jb = jp1 - ja;
       for(ia=ia1; ia<=ia2; ia++){
         ib = ip1 - ia;
-        s = s + d_in_mod_temp[common.in_rows*(ja-1)+ia-1] * d_unique_d_in2[common.in2_rows*(jb-1)+ib-1];
+        s = s + in_mod_temp[common.in_rows*(ja-1)+ia-1] * in2[common.in2_rows*(jb-1)+ib-1];
       }
     }
 
-    //d_unique_d_conv[common.conv_rows*(jc-1)+ic-1] = s;
-    d_unique_d_conv[ei_new] = s;
+    //conv[common.conv_rows*(jc-1)+ic-1] = s;
+    conv[ei_new] = s;
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -383,12 +383,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.conv_elem; i++){
-      checksum_acc[3] = checksum_acc[3]+d_unique_d_conv[i];
+      d_checksum[3] = d_checksum[3]+conv[i];
     }
   }
 
@@ -429,10 +429,10 @@ if(frame_no != 0){
         col < (common.in2_pad_add_cols+common.in2_cols)){
       ori_row = row - common.in2_pad_add_rows;
       ori_col = col - common.in2_pad_add_cols;
-      d_unique_d_in2_pad_cumv[ei_new] = d_unique_d_in2[ori_col*common.in2_rows+ori_row];
+      in2_pad_cumv[ei_new] = in2[ori_col*common.in2_rows+ori_row];
     }
     else{                                      // do if otherwise
-      d_unique_d_in2_pad_cumv[ei_new] = 0;
+      in2_pad_cumv[ei_new] = 0;
     }
 
     // go for second round
@@ -447,12 +447,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_elem; i++){
-      checksum_acc[4] = checksum_acc[4]+d_unique_d_in2_pad_cumv[i];
+      d_checksum[4] = d_checksum[4]+in2_pad_cumv[i];
     }
   }
 
@@ -478,8 +478,8 @@ if(frame_no != 0){
 
     // loop through all rows
     for(position = pos_ori; position < pos_ori+common.in2_pad_cumv_rows; position = position + 1){
-      d_unique_d_in2_pad_cumv[position] = d_unique_d_in2_pad_cumv[position] + sum;
-      sum = d_unique_d_in2_pad_cumv[position];
+      in2_pad_cumv[position] = in2_pad_cumv[position] + sum;
+      sum = in2_pad_cumv[position];
     }
 
     // go for second round
@@ -494,12 +494,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_cols; i++){
-      checksum_acc[5] = checksum_acc[5]+d_unique_d_in2_pad_cumv[i];
+      d_checksum[5] = d_checksum[5]+in2_pad_cumv[i];
     }
   }
 
@@ -528,7 +528,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_pad_cumv_sel_rowlow - 1;
     ori_col = col + common.in2_pad_cumv_sel_collow - 1;
-    d_unique_d_in2_pad_cumv_sel[ei_new] = d_unique_d_in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
+    in2_pad_cumv_sel[ei_new] = in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -542,12 +542,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_sel_elem; i++){
-      checksum_acc[6] = checksum_acc[6]+d_unique_d_in2_pad_cumv_sel[i];
+      d_checksum[6] = d_checksum[6]+in2_pad_cumv_sel[i];
     }
   }
 
@@ -576,7 +576,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_pad_cumv_sel2_rowlow - 1;
     ori_col = col + common.in2_pad_cumv_sel2_collow - 1;
-    d_unique_d_in2_sub_cumh[ei_new] = d_unique_d_in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
+    in2_sub_cumh[ei_new] = in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -590,12 +590,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_elem; i++){
-      checksum_acc[7] = checksum_acc[7]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[7] = d_checksum[7]+in2_sub_cumh[i];
     }
   }
   //==================================================50
@@ -614,7 +614,7 @@ if(frame_no != 0){
   while(ei_new < common.in2_sub_cumh_elem){
 
     // subtract
-    d_unique_d_in2_sub_cumh[ei_new] = d_unique_d_in2_pad_cumv_sel[ei_new] - d_unique_d_in2_sub_cumh[ei_new];
+    in2_sub_cumh[ei_new] = in2_pad_cumv_sel[ei_new] - in2_sub_cumh[ei_new];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -628,12 +628,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_elem; i++){
-      checksum_acc[8] = checksum_acc[8]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[8] = d_checksum[8]+in2_sub_cumh[i];
     }
   }
 
@@ -659,8 +659,8 @@ if(frame_no != 0){
 
     // loop through all rows
     for(position = pos_ori; position < pos_ori+common.in2_sub_cumh_elem; position = position + common.in2_sub_cumh_rows){
-      d_unique_d_in2_sub_cumh[position] = d_unique_d_in2_sub_cumh[position] + sum;
-      sum = d_unique_d_in2_sub_cumh[position];
+      in2_sub_cumh[position] = in2_sub_cumh[position] + sum;
+      sum = in2_sub_cumh[position];
     }
 
     // go for second round
@@ -675,12 +675,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_elem; i++){
-      checksum_acc[9] = checksum_acc[9]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[9] = d_checksum[9]+in2_sub_cumh[i];
     }
   }
 
@@ -709,7 +709,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_sub_cumh_sel_rowlow - 1;
     ori_col = col + common.in2_sub_cumh_sel_collow - 1;
-    d_unique_d_in2_sub_cumh_sel[ei_new] = d_unique_d_in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
+    in2_sub_cumh_sel[ei_new] = in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -723,12 +723,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_sel_elem; i++){
-      checksum_acc[10] = checksum_acc[10]+d_unique_d_in2_sub_cumh_sel[i];
+      d_checksum[10] = d_checksum[10]+in2_sub_cumh_sel[i];
     }
   }
 
@@ -757,7 +757,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_sub_cumh_sel2_rowlow - 1;
     ori_col = col + common.in2_sub_cumh_sel2_collow - 1;
-    d_unique_d_in2_sub2[ei_new] = d_unique_d_in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
+    in2_sub2[ei_new] = in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -771,12 +771,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[11] = checksum_acc[11]+d_unique_d_in2_sub2[i];
+      d_checksum[11] = d_checksum[11]+in2_sub2[i];
     }
   }
 
@@ -795,7 +795,7 @@ if(frame_no != 0){
   while(ei_new < common.in2_sub2_elem){
 
     // subtract
-    d_unique_d_in2_sub2[ei_new] = d_unique_d_in2_sub_cumh_sel[ei_new] - d_unique_d_in2_sub2[ei_new];
+    in2_sub2[ei_new] = in2_sub_cumh_sel[ei_new] - in2_sub2[ei_new];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -809,12 +809,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[12] = checksum_acc[12]+d_unique_d_in2_sub2[i];
+      d_checksum[12] = d_checksum[12]+in2_sub2[i];
     }
   }
 
@@ -840,8 +840,8 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.in2_sqr_elem){
 
-    temp = d_unique_d_in2[ei_new];
-    d_unique_d_in2_sqr[ei_new] = temp * temp;
+    temp = in2[ei_new];
+    in2_sqr[ei_new] = temp * temp;
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -855,12 +855,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sqr_elem; i++){
-      checksum_acc[13] = checksum_acc[13]+d_unique_d_in2_sqr[i];
+      d_checksum[13] = d_checksum[13]+in2_sqr[i];
     }
   }
 
@@ -897,10 +897,10 @@ if(frame_no != 0){
         col < (common.in2_pad_add_cols+common.in2_sqr_cols)){
       ori_row = row - common.in2_pad_add_rows;
       ori_col = col - common.in2_pad_add_cols;
-      d_unique_d_in2_pad_cumv[ei_new] = d_unique_d_in2_sqr[ori_col*common.in2_sqr_rows+ori_row];
+      in2_pad_cumv[ei_new] = in2_sqr[ori_col*common.in2_sqr_rows+ori_row];
     }
     else{                                              // do if otherwise
-      d_unique_d_in2_pad_cumv[ei_new] = 0;
+      in2_pad_cumv[ei_new] = 0;
     }
 
     // go for second round
@@ -915,12 +915,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_elem; i++){
-      checksum_acc[14] = checksum_acc[14]+d_unique_d_in2_pad_cumv[i];
+      d_checksum[14] = d_checksum[14]+in2_pad_cumv[i];
     }
   }
 
@@ -946,8 +946,8 @@ if(frame_no != 0){
 
     // loop through all rows
     for(position = pos_ori; position < pos_ori+common.in2_pad_cumv_rows; position = position + 1){
-      d_unique_d_in2_pad_cumv[position] = d_unique_d_in2_pad_cumv[position] + sum;
-      sum = d_unique_d_in2_pad_cumv[position];
+      in2_pad_cumv[position] = in2_pad_cumv[position] + sum;
+      sum = in2_pad_cumv[position];
     }
 
     // go for second round
@@ -962,12 +962,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_elem; i++){
-      checksum_acc[15] = checksum_acc[15]+d_unique_d_in2_pad_cumv[i];
+      d_checksum[15] = d_checksum[15]+in2_pad_cumv[i];
     }
   }
 
@@ -996,7 +996,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_pad_cumv_sel_rowlow - 1;
     ori_col = col + common.in2_pad_cumv_sel_collow - 1;
-    d_unique_d_in2_pad_cumv_sel[ei_new] = d_unique_d_in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
+    in2_pad_cumv_sel[ei_new] = in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1010,12 +1010,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_pad_cumv_sel_elem; i++){
-      checksum_acc[16] = checksum_acc[16]+d_unique_d_in2_pad_cumv_sel[i];
+      d_checksum[16] = d_checksum[16]+in2_pad_cumv_sel[i];
     }
   }
 
@@ -1044,7 +1044,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_pad_cumv_sel2_rowlow - 1;
     ori_col = col + common.in2_pad_cumv_sel2_collow - 1;
-    d_unique_d_in2_sub_cumh[ei_new] = d_unique_d_in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
+    in2_sub_cumh[ei_new] = in2_pad_cumv[ori_col*common.in2_pad_cumv_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1058,12 +1058,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_elem; i++){
-      checksum_acc[17] = checksum_acc[17]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[17] = d_checksum[17]+in2_sub_cumh[i];
     }
   }
 
@@ -1082,7 +1082,7 @@ if(frame_no != 0){
   while(ei_new < common.in2_sub_cumh_elem){
 
     // subtract
-    d_unique_d_in2_sub_cumh[ei_new] = d_unique_d_in2_pad_cumv_sel[ei_new] - d_unique_d_in2_sub_cumh[ei_new];
+    in2_sub_cumh[ei_new] = in2_pad_cumv_sel[ei_new] - in2_sub_cumh[ei_new];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1096,12 +1096,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_elem; i++){
-      checksum_acc[18] = checksum_acc[18]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[18] = d_checksum[18]+in2_sub_cumh[i];
     }
   }
 
@@ -1127,8 +1127,8 @@ if(frame_no != 0){
 
     // loop through all rows
     for(position = pos_ori; position < pos_ori+common.in2_sub_cumh_elem; position = position + common.in2_sub_cumh_rows){
-      d_unique_d_in2_sub_cumh[position] = d_unique_d_in2_sub_cumh[position] + sum;
-      sum = d_unique_d_in2_sub_cumh[position];
+      in2_sub_cumh[position] = in2_sub_cumh[position] + sum;
+      sum = in2_sub_cumh[position];
     }
 
     // go for second round
@@ -1143,12 +1143,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_rows; i++){
-      checksum_acc[19] = checksum_acc[19]+d_unique_d_in2_sub_cumh[i];
+      d_checksum[19] = d_checksum[19]+in2_sub_cumh[i];
     }
   }
 
@@ -1177,7 +1177,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_sub_cumh_sel_rowlow - 1;
     ori_col = col + common.in2_sub_cumh_sel_collow - 1;
-    d_unique_d_in2_sub_cumh_sel[ei_new] = d_unique_d_in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
+    in2_sub_cumh_sel[ei_new] = in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1191,12 +1191,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub_cumh_sel_elem; i++){
-      checksum_acc[20] = checksum_acc[20]+d_unique_d_in2_sub_cumh_sel[i];
+      d_checksum[20] = d_checksum[20]+in2_sub_cumh_sel[i];
     }
   }
 
@@ -1225,7 +1225,7 @@ if(frame_no != 0){
     // figure out corresponding location in old matrix and copy values to new matrix
     ori_row = row + common.in2_sub_cumh_sel2_rowlow - 1;
     ori_col = col + common.in2_sub_cumh_sel2_collow - 1;
-    d_unique_d_in2_sqr_sub2[ei_new] = d_unique_d_in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
+    in2_sqr_sub2[ei_new] = in2_sub_cumh[ori_col*common.in2_sub_cumh_rows+ori_row];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1239,12 +1239,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[21] = checksum_acc[21]+d_unique_d_in2_sqr_sub2[i];
+      d_checksum[21] = d_checksum[21]+in2_sqr_sub2[i];
     }
   }
 
@@ -1263,7 +1263,7 @@ if(frame_no != 0){
   while(ei_new < common.in2_sub2_elem){
 
     // subtract
-    d_unique_d_in2_sqr_sub2[ei_new] = d_unique_d_in2_sub_cumh_sel[ei_new] - d_unique_d_in2_sqr_sub2[ei_new];
+    in2_sqr_sub2[ei_new] = in2_sub_cumh_sel[ei_new] - in2_sqr_sub2[ei_new];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1277,12 +1277,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[22] = checksum_acc[22]+d_unique_d_in2_sqr_sub2[i];
+      d_checksum[22] = d_checksum[22]+in2_sqr_sub2[i];
     }
   }
 
@@ -1308,12 +1308,12 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.in2_sub2_elem){
 
-    temp = d_unique_d_in2_sub2[ei_new];
-    temp2 = d_unique_d_in2_sqr_sub2[ei_new] - (temp * temp / common.in_elem);
+    temp = in2_sub2[ei_new];
+    temp2 = in2_sqr_sub2[ei_new] - (temp * temp / common.in_elem);
     if(temp2 < 0){
       temp2 = 0;
     }
-    d_unique_d_in2_sqr_sub2[ei_new] = sqrt(temp2);
+    in2_sqr_sub2[ei_new] = sqrt(temp2);
 
 
     // go for second round
@@ -1328,12 +1328,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[23] = checksum_acc[23]+d_unique_d_in2_sqr_sub2[i];
+      d_checksum[23] = d_checksum[23]+in2_sqr_sub2[i];
     }
   }
 
@@ -1351,8 +1351,8 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.in_sqr_elem){
 
-    temp = d_in[ei_new];
-    d_unique_d_in_sqr[ei_new] = temp * temp;
+    temp = in[ei_new];
+    in_sqr[ei_new] = temp * temp;
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1366,12 +1366,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in_sqr_elem; i++){
-      checksum_acc[24] = checksum_acc[24]+d_unique_d_in_sqr[i];
+      d_checksum[24] = d_checksum[24]+in_sqr[i];
     }
   }
 
@@ -1392,7 +1392,7 @@ if(frame_no != 0){
     sum = 0;
     for(i = 0; i < common.in_rows; i++){
 
-      sum = sum + d_in[ei_new*common.in_rows+i];
+      sum = sum + in[ei_new*common.in_rows+i];
 
     }
     in_partial_sum[ei_new] = sum;
@@ -1409,12 +1409,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in_cols; i++){
-      checksum_acc[25] = checksum_acc[25]+in_partial_sum[i];
+      d_checksum[25] = d_checksum[25]+in_partial_sum[i];
     }
   }
 
@@ -1434,7 +1434,7 @@ if(frame_no != 0){
     sum = 0;
     for(i = 0; i < common.in_sqr_cols; i++){
 
-      sum = sum + d_unique_d_in_sqr[ei_new+common.in_sqr_rows*i];
+      sum = sum + in_sqr[ei_new+common.in_sqr_rows*i];
 
     }
     in_sqr_partial_sum[ei_new] = sum;
@@ -1451,12 +1451,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in_sqr_rows; i++){
-      checksum_acc[26] = checksum_acc[26]+in_sqr_partial_sum[i];
+      d_checksum[26] = d_checksum[26]+in_sqr_partial_sum[i];
     }
   }
 
@@ -1495,11 +1495,11 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
-    checksum_acc[27] = checksum_acc[27]+in_final_sum[0]+in_sqr_final_sum[0];
+    d_checksum[27] = d_checksum[27]+in_final_sum[0]+in_sqr_final_sum[0];
   }
 
   //==================================================50
@@ -1533,11 +1533,11 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
-    checksum_acc[28] = checksum_acc[28]+denomT[i];
+    d_checksum[28] = d_checksum[28]+denomT[i];
   }
 
   //==================================================50
@@ -1554,8 +1554,8 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.in2_sub2_elem){
 
-    // d_unique_d_in2_sqr_sub2[ei_new] = d_unique_d_in2_sqr_sub2[ei_new] * denomT;
-    d_unique_d_in2_sqr_sub2[ei_new] = d_unique_d_in2_sqr_sub2[ei_new] * denomT[0];
+    // in2_sqr_sub2[ei_new] = in2_sqr_sub2[ei_new] * denomT;
+    in2_sqr_sub2[ei_new] = in2_sqr_sub2[ei_new] * denomT[0];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1569,12 +1569,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[29] = checksum_acc[29]+d_unique_d_in2_sqr_sub2[i];
+      d_checksum[29] = d_checksum[29]+in2_sqr_sub2[i];
     }
   }
 
@@ -1592,8 +1592,8 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.conv_elem){
 
-    // d_unique_d_conv[ei_new] = d_unique_d_conv[ei_new] - d_unique_d_in2_sub2[ei_new] * in_final_sum / common.in_elem;
-    d_unique_d_conv[ei_new] = d_unique_d_conv[ei_new] - d_unique_d_in2_sub2[ei_new] * in_final_sum[0] / common.in_elem;
+    // conv[ei_new] = conv[ei_new] - in2_sub2[ei_new] * in_final_sum / common.in_elem;
+    conv[ei_new] = conv[ei_new] - in2_sub2[ei_new] * in_final_sum[0] / common.in_elem;
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1607,12 +1607,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.conv_elem; i++){
-      checksum_acc[30] = checksum_acc[30]+d_unique_d_conv[i];
+      d_checksum[30] = d_checksum[30]+conv[i];
     }
   }
 
@@ -1630,7 +1630,7 @@ if(frame_no != 0){
   ei_new = tx;
   while(ei_new < common.in2_sub2_elem){
 
-    d_unique_d_in2_sqr_sub2[ei_new] = d_unique_d_conv[ei_new] / d_unique_d_in2_sqr_sub2[ei_new];
+    in2_sqr_sub2[ei_new] = conv[ei_new] / in2_sqr_sub2[ei_new];
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1646,12 +1646,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.in2_sub2_elem; i++){
-      checksum_acc[31] = checksum_acc[31]+d_unique_d_in2_sqr_sub2[i];
+      d_checksum[31] = d_checksum[31]+in2_sqr_sub2[i];
     }
   }
 
@@ -1671,13 +1671,13 @@ if(frame_no != 0){
 
   cent = common.sSize + common.tSize + 1;
   if(frame_no == 0){
-    tMask_row = cent + d_unique_d_Row[d_unique_point_no] - d_unique_d_Row[d_unique_point_no] - 1;
-    tMask_col = cent + d_unique_d_Col[d_unique_point_no] - d_unique_d_Col[d_unique_point_no] - 1;
+    tMask_row = cent + Row[d_unique_point_no] - Row[d_unique_point_no] - 1;
+    tMask_col = cent + Col[d_unique_point_no] - Col[d_unique_point_no] - 1;
   }
   else{
     pointer = d_unique_point_no*common.no_frames+frame_no-1;
-    tMask_row = cent + d_unique_d_tRowLoc[pointer] - d_unique_d_Row[d_unique_point_no] - 1;
-    tMask_col = cent + d_unique_d_tColLoc[pointer] - d_unique_d_Col[d_unique_point_no] - 1;
+    tMask_row = cent + tRowLoc[pointer] - Row[d_unique_point_no] - 1;
+    tMask_col = cent + tColLoc[pointer] - Col[d_unique_point_no] - 1;
   }
 
   //work
@@ -1687,10 +1687,10 @@ if(frame_no != 0){
     location = tMask_col*common.tMask_rows + tMask_row;
 
     if(ei_new==location){
-      d_unique_d_tMask[ei_new] = 1;
+      tMask[ei_new] = 1;
     }
     else{
-      d_unique_d_tMask[ei_new] = 0;
+      tMask[ei_new] = 0;
     }
 
     //go for second round
@@ -1705,12 +1705,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.tMask_elem; i++){
-      checksum_acc[32] = checksum_acc[32]+d_unique_d_tMask[i];
+      d_checksum[32] = d_checksum[32]+tMask[i];
     }
   }
 
@@ -1778,12 +1778,12 @@ if(frame_no != 0){
       jb = jp1 - ja;
       for(ia=ia1; ia<=ia2; ia++){
         ib = ip1 - ia;
-        s = s + d_unique_d_tMask[common.tMask_rows*(ja-1)+ia-1] * 1;
+        s = s + tMask[common.tMask_rows*(ja-1)+ia-1] * 1;
       }
     }
 
-    // //d_unique_d_mask_conv[common.mask_conv_rows*(jc-1)+ic-1] = s;
-    d_unique_d_mask_conv[ei_new] = d_unique_d_in2_sqr_sub2[ei_new] * s;
+    // //mask_conv[common.mask_conv_rows*(jc-1)+ic-1] = s;
+    mask_conv[ei_new] = in2_sqr_sub2[ei_new] * s;
 
     // go for second round
     ei_new = ei_new + NUMBER_THREADS;
@@ -1797,12 +1797,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.mask_conv_elem; i++){
-      checksum_acc[33] = checksum_acc[33]+d_unique_d_mask_conv[i];
+      d_checksum[33] = d_checksum[33]+mask_conv[i];
     }
   }
 
@@ -1829,7 +1829,7 @@ if(frame_no != 0){
 
     for(i=0; i<common.mask_conv_cols; i++){
       largest_coordinate_current = ei_new*common.mask_conv_rows+i;
-      largest_value_current = fabs(d_unique_d_mask_conv[largest_coordinate_current]);
+      largest_value_current = fabs(mask_conv[largest_coordinate_current]);
       if(largest_value_current > largest_value){
         largest_coordinate = largest_coordinate_current;
         largest_value = largest_value_current;
@@ -1850,12 +1850,12 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
     for(i=0; i<common.mask_conv_rows; i++){
-      checksum_acc[34] = checksum_acc[34]+par_max_coo[i]+par_max_val[i];
+      d_checksum[34] = d_checksum[34]+par_max_coo[i]+par_max_val[i];
     }
   }
 
@@ -1892,8 +1892,8 @@ if(frame_no != 0){
     offset_row = largest_row - common.in_rows - (common.sSize - common.tSize);
     offset_col = largest_col - common.in_cols - (common.sSize - common.tSize);
     pointer = d_unique_point_no*common.no_frames+frame_no;
-    d_unique_d_tRowLoc[pointer] = d_unique_d_Row[d_unique_point_no] + offset_row;
-    d_unique_d_tColLoc[pointer] = d_unique_d_Col[d_unique_point_no] + offset_col;
+    tRowLoc[pointer] = Row[d_unique_point_no] + offset_row;
+    tColLoc[pointer] = Col[d_unique_point_no] + offset_col;
 
   }
 
@@ -1904,11 +1904,11 @@ if(frame_no != 0){
   item.barrier();
 
   //==================================================50
-  //  checksum_acc
+  //  checksum
   //==================================================50
 #ifdef TEST_CHECKSUM
   if(bx==0 && tx==0){
-    checksum_acc[35] = checksum_acc[35]+d_unique_d_tRowLoc[pointer]+d_unique_d_tColLoc[pointer];
+    d_checksum[35] = d_checksum[35]+tRowLoc[pointer]+tColLoc[pointer];
   }
 
   //==================================================50
@@ -1941,8 +1941,8 @@ if(frame_no != 0){
     // update coordinate
     loc_pointer = d_unique_point_no*common.no_frames+frame_no;
 
-    d_unique_d_Row[d_unique_point_no] = d_unique_d_tRowLoc[loc_pointer];
-    d_unique_d_Col[d_unique_point_no] = d_unique_d_tColLoc[loc_pointer];
+    Row[d_unique_point_no] = tRowLoc[loc_pointer];
+    Col[d_unique_point_no] = tColLoc[loc_pointer];
 
     // work
     ei_new = tx;
@@ -1957,12 +1957,12 @@ if(frame_no != 0){
       }
 
       // figure out row/col location in corresponding new template area in image and give to every thread (get top left corner and progress down and right)
-      ori_row = d_unique_d_Row[d_unique_point_no] - 25 + row - 1;
-      ori_col = d_unique_d_Col[d_unique_point_no] - 25 + col - 1;
+      ori_row = Row[d_unique_point_no] - 25 + row - 1;
+      ori_col = Col[d_unique_point_no] - 25 + col - 1;
       ori_pointer = ori_col*common.frame_rows+ori_row;
 
       // update template
-      d_in[ei_new] = common.alpha*d_in[ei_new] + (1-common.alpha)*d_common_change_d_frame[ori_pointer];
+      in[ei_new] = common.alpha*in[ei_new] + (1-common.alpha)*d_common_change_d_frame[ori_pointer];
 
       // go for second round
       ei_new = ei_new + NUMBER_THREADS;
@@ -1976,12 +1976,12 @@ if(frame_no != 0){
     item.barrier();
 
     //==================================================50
-    //  checksum_acc
+    //  checksum
     //==================================================50
 #ifdef TEST_CHECKSUM
     if(bx==0 && tx==0){
       for(i=0; i<common.in_elem; i++){
-        checksum_acc[36] = checksum_acc[36]+d_in[i];
+        d_checksum[36] = d_checksum[36]+in[i];
       }
     }
 

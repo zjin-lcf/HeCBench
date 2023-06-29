@@ -15,7 +15,7 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "util.h"
 
 /*
@@ -73,17 +73,17 @@ inline float compute_pressure(const float density, const float density_energy, c
 }
 // sqrt is a device function
 inline float compute_speed_of_sound(const float density, const float pressure){
-  return cl::sycl::sqrt((float)(GAMMA)*pressure/density);
+  return sycl::sqrt((float)(GAMMA)*pressure/density);
 }
 inline void compute_flux_contribution(const float density, 
-		Float3 momentum, 
-		const float density_energy, 
-		const float pressure, 
-		const Float3 velocity, 
-		Float3* fc_momentum_x, 
-		Float3* fc_momentum_y, 
-		Float3* fc_momentum_z, 
-		Float3* fc_density_energy)
+                                      Float3 momentum,
+                                      const float density_energy,
+                                      const float pressure,
+                                      const Float3 velocity,
+                                      Float3* fc_momentum_x,
+                                      Float3* fc_momentum_y,
+                                      Float3* fc_momentum_z,
+                                      Float3* fc_density_energy)
 {
   fc_momentum_x->x = velocity.x*momentum.x + pressure;
   fc_momentum_x->y = velocity.x*momentum.y;
@@ -106,15 +106,8 @@ inline void compute_flux_contribution(const float density,
 
 
 template <typename T>
-void copy(queue &q, buffer<T,1> &dst, buffer<T,1> &src, const int N){
-
-  q.submit([&](handler& cgh) {
-      accessor<T, 1, access::mode::write, access::target::global_buffer> 
-      dst_acc(dst, cgh, range<1>(N), id<1>(0));  // add workgroup size
-      accessor<T, 1, sycl_read, access::target::global_buffer> 
-      src_acc(src, cgh, range<1>(N), id<1>(0));  // add workgroup size 
-      cgh.copy(src_acc, dst_acc);
-      });
+void copy(sycl::queue &q, T *dst, const T *src, const int N){
+  q.memcpy(dst, src, N * sizeof(T));
 }
 
 void dump(const float *h_variables, const int nel, const int nelr){
@@ -143,105 +136,88 @@ void dump(const float *h_variables, const int nel, const int nelr){
   }
 }
 
-void initialize_buffer(queue &q, buffer<float,1> &mem_d, const float val, const int number_words) noexcept(false) {
-  q.submit([&] (handler& cgh) {
-      accessor<float,1,sycl_discard_write,access::target::global_buffer>  \
-      mem_d_acc (mem_d, cgh, range<1>(number_words), id<1>(0)); // add workgroup size
-      cgh.fill(mem_d_acc, val);
-      });
+void initialize_buffer(sycl::queue &q, float *mem_d, const float val, const int number_words) noexcept(false) {
+  q.memset(mem_d, val, number_words * sizeof(float));
 }
 
-void initialize_variables(queue &q, const int nelr, buffer<float,1> &variables, buffer<float,1> &ff_variable) noexcept(false) {
+void initialize_variables(sycl::queue &q, const int nelr, float *variables_acc, float *ff_variable_acc) noexcept(false) {
 
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_1;
 
-  q.submit([&](handler& cgh) {
-      auto variables_acc = variables.get_access<sycl_discard_write>(cgh);
-      auto ff_variable_acc = ff_variable.get_access<sycl_read>(cgh);
-
-      cgh.parallel_for<class init_vars>(
-        nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel_initialize_variables.sycl"
-        });
-      });
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class init_vars>(
+      sycl::nd_range<1>(sycl::range<1>(work_items),
+                        sycl::range<1>(work_group_size)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_initialize_variables.sycl"
+    });
+  });
 }
 
-void compute_step_factor(queue &q, const int nelr, 
-    buffer<float,1> &variables, 
-    buffer<float,1> &areas, 
-    buffer<float,1> &step_factors){
-
+void compute_step_factor(sycl::queue &q,
+                         const int nelr,
+                         float *variables_acc,
+                         float *areas_acc,
+                         float *step_factors_acc)
+{
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_2;
 
-
-  q.submit([&](handler& cgh) {
-      auto variables_acc = variables.get_access<sycl_read>(cgh);
-      auto areas_acc = areas.get_access<sycl_read>(cgh);
-      auto step_factors_acc = step_factors.get_access<sycl_write>(cgh);
-
-      cgh.parallel_for<class compute_step_factor>(
-        nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel_compute_step_factor.sycl"
-        });
-      });
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class compute_step_factor>(
+      sycl::nd_range<1>(sycl::range<1>(work_items),
+                        sycl::range<1>(work_group_size)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_compute_step_factor.sycl"
+    });
+  });
 }
 
-void compute_flux(queue &q, 
-    const int nelr, 
-    buffer<int,1> &elements_surrounding_elements,
-    buffer<float,1> &normals,
-    buffer<float,1> &variables,
-    buffer<float,1> &ff_variable,
-    buffer<float,1> &fluxes,
-    buffer<Float3,1> &ff_flux_contribution_density_energy,
-    buffer<Float3,1> &ff_flux_contribution_momentum_x,
-    buffer<Float3,1> &ff_flux_contribution_momentum_y,
-    buffer<Float3,1> &ff_flux_contribution_momentum_z){
-
+void compute_flux(sycl::queue &q,
+                  const int nelr,
+                  int *elements_surrounding_elements_acc,
+                  float *normals_acc,
+                  float *variables_acc,
+                  float *ff_variable_acc,
+                  float *fluxes_acc,
+                  Float3 *ff_flux_contribution_density_energy_acc,
+                  Float3 *ff_flux_contribution_momentum_x_acc,
+                  Float3 *ff_flux_contribution_momentum_y_acc,
+                  Float3 *ff_flux_contribution_momentum_z_acc)
+{
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_3;
 
-  q.submit([&](handler& cgh) {
-
-      auto elements_surrounding_elements_acc = elements_surrounding_elements.get_access<sycl_read>(cgh);
-      auto normals_acc = normals.get_access<sycl_read>(cgh);
-      auto variables_acc = variables.get_access<sycl_read>(cgh);
-      auto ff_variable_acc = ff_variable.get_access<sycl_read>(cgh);
-      auto fluxes_acc = fluxes.get_access<sycl_write>(cgh);
-      auto ff_flux_contribution_density_energy_acc = ff_flux_contribution_density_energy.get_access<sycl_read>(cgh);
-      auto ff_flux_contribution_momentum_x_acc = ff_flux_contribution_momentum_x.get_access<sycl_read>(cgh);
-      auto ff_flux_contribution_momentum_y_acc = ff_flux_contribution_momentum_y.get_access<sycl_read>(cgh);
-      auto ff_flux_contribution_momentum_z_acc = ff_flux_contribution_momentum_z.get_access<sycl_read>(cgh);
-
-      cgh.parallel_for<class compute_flux>(
-        nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel_compute_flux.sycl"
-        });
-      });
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class compute_flux>(
+      sycl::nd_range<1>(sycl::range<1>(work_items),
+                        sycl::range<1>(work_group_size)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_compute_flux.sycl"
+    });
+  });
 }
 
-void time_step(queue &q, const int j, const int nelr, 
-    buffer<float,1> &old_variables, 
-    buffer<float,1> &variables, 
-    buffer<float,1> &step_factors, 
-    buffer<float,1> &fluxes) {
-
+void time_step(sycl::queue &q,
+               const int j,
+               const int nelr,
+               float *old_variables_acc,
+               float *variables_acc,
+               float *step_factors_acc,
+               float *fluxes_acc)
+{
   int work_items = nelr;
   int work_group_size = BLOCK_SIZE_4;
 
-  q.submit([&](handler& cgh) {
-      auto variables_acc = variables.get_access<sycl_write>(cgh);
-      auto old_variables_acc = old_variables.get_access<sycl_read>(cgh);
-      auto fluxes_acc = fluxes.get_access<sycl_read>(cgh);
-      auto step_factors_acc = step_factors.get_access<sycl_read>(cgh);
-
-      cgh.parallel_for<class compute_time_step>(
-        nd_range<1>(range<1>(work_items), range<1>(work_group_size)), [=] (nd_item<1> item) {
-#include "kernel_time_step.sycl"
-        });
-      });
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class compute_time_step>(
+      sycl::nd_range<1>(sycl::range<1>(work_items),
+                        sycl::range<1>(work_group_size)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_time_step.sycl"
+    });
+  });
 }
 
 /*
@@ -258,7 +234,6 @@ int main(int argc, char** argv){
   float h_ff_variable[NVAR];
 
   // set far field conditions and load them into constant memory on the gpu
-  //{
   const float angle_of_attack = float(3.1415926535897931 / 180.0f) * float(deg_angle_of_attack);
 
   h_ff_variable[VAR_DENSITY] = float(1.4);
@@ -287,13 +262,14 @@ int main(int argc, char** argv){
   Float3 h_ff_flux_contribution_momentum_y;
   Float3 h_ff_flux_contribution_momentum_z;
   Float3 h_ff_flux_contribution_density_energy;
-  compute_flux_contribution(h_ff_variable[VAR_DENSITY], h_ff_momentum, 
-      h_ff_variable[VAR_DENSITY_ENERGY], ff_pressure,
-      ff_velocity, 
-      &h_ff_flux_contribution_momentum_x, 
-      &h_ff_flux_contribution_momentum_y, 
-      &h_ff_flux_contribution_momentum_z,
-      &h_ff_flux_contribution_density_energy);
+
+  compute_flux_contribution(h_ff_variable[VAR_DENSITY], h_ff_momentum,
+                            h_ff_variable[VAR_DENSITY_ENERGY], ff_pressure,
+                            ff_velocity, 
+                            &h_ff_flux_contribution_momentum_x, 
+                            &h_ff_flux_contribution_momentum_y, 
+                            &h_ff_flux_contribution_momentum_z,
+                            &h_ff_flux_contribution_density_energy);
 
   int nel;
   int nelr;
@@ -308,7 +284,6 @@ int main(int argc, char** argv){
   int* h_elements_surrounding_elements = new int[nelr*NNB];
   float* h_normals = new float[nelr*NDIM*NNB];
   float* h_variables = new float[nelr*NVAR];
-
 
   // read in data
   for(int i = 0; i < nel; i++)
@@ -341,100 +316,102 @@ int main(int argc, char** argv){
     }
   }
 
-  double kernel_start, kernel_end;
-
   double offload_start = get_time();
-  { // SYCL scope
+
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-    queue q(dev_sel);
+  // copy far field conditions to the gpu
+  float *d_ff_variable = sycl::malloc_device<float>(NVAR, q);
+  copy(q, d_ff_variable, h_ff_variable, NVAR);
+  
+  Float3 *d_ff_flux_contribution_momentum_x = sycl::malloc_device<Float3>(1, q);
+  copy(q, d_ff_flux_contribution_momentum_x, &h_ff_flux_contribution_momentum_x, 1);
 
-    // copy far field conditions to the gpu
+  Float3 *d_ff_flux_contribution_momentum_y = sycl::malloc_device<Float3>(1, q);
+  copy(q, d_ff_flux_contribution_momentum_y, &h_ff_flux_contribution_momentum_y, 1);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<float,1>  d_ff_variable (h_ff_variable, NVAR, props);
-    buffer<Float3,1> d_ff_flux_contribution_momentum_x (&h_ff_flux_contribution_momentum_x,1,props);
-    buffer<Float3,1> d_ff_flux_contribution_momentum_y (&h_ff_flux_contribution_momentum_y,1,props);
-    buffer<Float3,1> d_ff_flux_contribution_momentum_z (&h_ff_flux_contribution_momentum_z,1,props);
-    buffer<Float3,1> d_ff_flux_contribution_density_energy (&h_ff_flux_contribution_density_energy,1,props);
+  Float3 *d_ff_flux_contribution_momentum_z = sycl::malloc_device<Float3>(1, q);
+  copy(q, d_ff_flux_contribution_momentum_z, &h_ff_flux_contribution_momentum_z, 1);
 
-    //areas = alloc<float>(nelr);
-    //upload<float>(areas, h_areas, nelr);
-    buffer<float, 1> d_areas (h_areas, nelr, props);
+  Float3 *d_ff_flux_contribution_density_energy = sycl::malloc_device<Float3>(1, q);
+  copy(q, d_ff_flux_contribution_density_energy, &h_ff_flux_contribution_density_energy, 1);
 
-    //elements_surrounding_elements = alloc<int>(nelr*NNB);
-    //upload<int>(elements_surrounding_elements, h_elements_surrounding_elements, nelr*NNB);
-    buffer<int, 1> d_elements_surrounding_elements (h_elements_surrounding_elements, nelr*NNB, props);
-    //normals = alloc<float>(nelr*NDIM*NNB);
-    //upload<float>(normals, h_normals, nelr*NDIM*NNB);
-    buffer<float, 1> d_normals (h_normals, nelr*NDIM*NNB, props);
+  //upload<float>(q, areas, h_areas, nelr);
+  float *d_areas = sycl::malloc_device<float>(nelr, q);
+  copy(q, d_areas, h_areas, nelr);
 
+  //upload<int>(q, elements_surrounding_elements, h_elements_surrounding_elements, nelr*NNB);
+  int *d_elements_surrounding_elements = sycl::malloc_device<int>(nelr * NNB, q);
+  copy(q, d_elements_surrounding_elements, h_elements_surrounding_elements, nelr * NNB);
 
-    // Create arrays and set initial conditions
-    //variables = alloc<float>(nelr*NVAR);				
-    buffer<float,1> d_variables (nelr*NVAR);
+  //upload<float>(q, normals, h_normals, nelr*NDIM*NNB);
+  float *d_normals = sycl::malloc_device<float>(nelr * NDIM * NNB, q);
+  copy(q, d_normals, h_normals, nelr * NDIM * NNB);
 
-    //old_variables = alloc<float>(nelr*NVAR);   	
-    buffer<float,1> d_old_variables (nelr*NVAR);
+  // Create arrays and set initial conditions
+  float *d_variables = sycl::malloc_device<float>(nelr * NVAR, q);
 
-    //fluxes = alloc<float>(nelr*NVAR);
-    buffer<float,1> d_fluxes (nelr*NVAR);
+  float *d_old_variables = sycl::malloc_device<float>(nelr * NVAR, q);
 
-    //step_factors = alloc<float>(nelr); 
-    buffer<float,1> d_step_factors (nelr);
+  float *d_fluxes = sycl::malloc_device<float>(nelr * NVAR, q);
 
-    q.wait();
-    kernel_start = get_time();
+  float *d_step_factors = sycl::malloc_device<float>(nelr, q);
 
-    initialize_variables(q, nelr, d_variables, d_ff_variable);
-    initialize_variables(q, nelr, d_old_variables, d_ff_variable);	
-    initialize_variables(q, nelr, d_fluxes, d_ff_variable);		
-    initialize_buffer(q, d_step_factors, 0, nelr);
+  q.wait();
 
-    // these need to be computed the first time in order to compute time step
-    //std::cout << "Starting..." << std::endl;
+  double kernel_start = get_time();
 
-    // Begin iterations
-    for(int i = 0; i < iterations; i++){
-      copy<float>(q, d_old_variables, d_variables, nelr*NVAR);
-      // for the first iteration we compute the time step
-#ifdef DEBUG
-      auto h_old_variables_acc = d_old_variables.get_access<sycl_read>();
-      auto h_variables_acc = d_variables.get_access<sycl_read>();
-      for (int i = 0; i < 16; i++) printf("copy: i=%d %f %f\n", 
-          i, h_old_variables_acc[i], h_variables_acc[i]);
-#endif
-      compute_step_factor(q, nelr, d_variables, d_areas, d_step_factors);
-#ifdef DEBUG
-      auto h_step_factors_acc = d_step_factors.get_access<sycl_read>();
-      for (int i = 0; i < 16; i++) printf("step factor: i=%d %f\n", i, h_step_factors_acc[i]);
-#endif
-      for(int j = 0; j < RK; j++){
-        compute_flux(q, nelr, d_elements_surrounding_elements, d_normals, 
-            d_variables, d_ff_variable, d_fluxes, d_ff_flux_contribution_density_energy, \
-            d_ff_flux_contribution_momentum_x, d_ff_flux_contribution_momentum_y, 
-            d_ff_flux_contribution_momentum_z);
-        time_step(q, j, nelr, d_old_variables, d_variables, d_step_factors, d_fluxes);
-      }
+  initialize_variables(q, nelr, d_variables, d_ff_variable);
+  initialize_variables(q, nelr, d_old_variables, d_ff_variable);	
+  initialize_variables(q, nelr, d_fluxes, d_ff_variable);		
+  initialize_buffer(q, d_step_factors, 0, nelr);
+
+  // these need to be computed the first time in order to compute time step
+  //std::cout << "Starting..." << std::endl;
+
+  // Begin iterations
+  for(int i = 0; i < iterations; i++){
+    copy(q, d_old_variables, d_variables, nelr*NVAR);
+    // for the first iteration we compute the time step
+    compute_step_factor(q, nelr, d_variables, d_areas, d_step_factors);
+    for(int j = 0; j < RK; j++){
+      compute_flux(q, nelr, d_elements_surrounding_elements, d_normals, 
+                   d_variables, d_ff_variable, d_fluxes,
+                   d_ff_flux_contribution_density_energy, \
+                   d_ff_flux_contribution_momentum_x,
+                   d_ff_flux_contribution_momentum_y, 
+                   d_ff_flux_contribution_momentum_z);
+      time_step(q, j, nelr, d_old_variables, d_variables, d_step_factors, d_fluxes);
     }
+  }
 
-    q.wait();
-    kernel_end = get_time();
+  q.wait();
 
-    q.submit([&](handler& cgh) {
-      accessor<float, 1, sycl_read, access::target::global_buffer> 
-      variables_acc(d_variables, cgh, range<1>(nelr*NVAR), id<1>(0));  // add workgroup size
-      cgh.copy(variables_acc, h_variables);
-    });
-  } // SYCL scope
+  double kernel_end = get_time();
+
+  copy(q, h_variables, d_variables, nelr * NVAR);
+  q.wait();
+
+  sycl::free(d_ff_variable, q);
+  sycl::free(d_ff_flux_contribution_momentum_x, q);
+  sycl::free(d_ff_flux_contribution_momentum_y, q);
+  sycl::free(d_ff_flux_contribution_momentum_z, q);
+  sycl::free(d_ff_flux_contribution_density_energy, q);
+  sycl::free(d_areas, q);
+  sycl::free(d_normals, q);
+  sycl::free(d_elements_surrounding_elements, q);
+  sycl::free(d_variables, q);
+  sycl::free(d_old_variables, q);
+  sycl::free(d_fluxes, q);
+  sycl::free(d_step_factors, q);
 
   double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
+  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
   printf("Total execution time of kernels = %lf(s)\n", kernel_end - kernel_start);
 
 #ifdef OUTPUT

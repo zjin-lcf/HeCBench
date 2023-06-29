@@ -6,11 +6,11 @@
 #include "lebesgue.h"
 
 //
-// The expected test results are shown in 
+// The expected test results are shown in
 // https://people.math.sc.edu/Burkardt/c_src/lebesgue/lebesgue_test.txt
-// 
+//
 
-void test01 ( queue &q, int nfun  )
+void test01 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Chebyshev1 points for N = 11";
   double *l;
@@ -59,7 +59,7 @@ void test01 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test02 ( queue &q, int nfun  )
+void test02 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Chebyshev2 points for N = 11";
   double *l;
@@ -108,7 +108,7 @@ void test02 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test03 ( queue &q, int nfun  )
+void test03 ( sycl::queue &q, int nfun  )
 {
   // char label[] = "Chebyshev3 points for N = 11";
   double *l;
@@ -143,7 +143,7 @@ void test03 ( queue &q, int nfun  )
   }
   printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
-  r8vec_print ( n_max, l, 
+  r8vec_print ( n_max, l,
     "  Chebyshev3 Lebesgue constants for N = 1 to 11:" );
 /*
   Examine one case more closely.
@@ -157,7 +157,7 @@ void test03 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test04 ( queue &q, int nfun  )
+void test04 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Chebyshev4 points for N = 11";
   double *l;
@@ -192,7 +192,7 @@ void test04 ( queue &q, int nfun  )
   }
   printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
-  r8vec_print ( n_max, l, 
+  r8vec_print ( n_max, l,
     "  Chebyshev4 Lebesgue constants for N = 1 to 11:" );
 /*
   Examine one case more closely.
@@ -206,7 +206,7 @@ void test04 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test05 ( queue &q, int nfun  )
+void test05 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Equidistant1 points for N = 11";
   double *l;
@@ -241,7 +241,7 @@ void test05 ( queue &q, int nfun  )
   }
   printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
-  r8vec_print ( n_max, l, 
+  r8vec_print ( n_max, l,
     "  Equidistant1 Lebesgue constants for N = 1 to 11:" );
 /*
   Examine one case more closely.
@@ -255,7 +255,7 @@ void test05 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test06 ( queue &q, int nfun  )
+void test06 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Equidistant2 points for N = 11";
   double *l;
@@ -290,7 +290,7 @@ void test06 ( queue &q, int nfun  )
   }
   printf ( "  Total kernel execution time %f (s)\n", total_time * 1e-9f);
 
-  r8vec_print ( n_max, l, 
+  r8vec_print ( n_max, l,
     "  Equidistant2 Lebesgue constants for N = 1 to 11:" );
 /*
   Examine one case more closely.
@@ -304,7 +304,7 @@ void test06 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test07 ( queue &q, int nfun  )
+void test07 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Equidistant3 points for N = 11";
   double *l;
@@ -353,7 +353,7 @@ void test07 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test08 ( queue &q, int nfun  )
+void test08 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Fejer1 points for N = 11";
   double *l;
@@ -402,7 +402,7 @@ void test08 ( queue &q, int nfun  )
   free ( xfun );
 }
 
-void test09 ( queue &q, int nfun  )
+void test09 ( sycl::queue &q, int nfun  )
 {
   //char label[] = "Fejer2 points for N = 11";
   double *l;
@@ -464,11 +464,10 @@ int main (int argc, char* argv[] )
   printf ( "LEBESGUE_TEST\n" );
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   for (int i = 0; i < repeat; i++) {
     timestamp ( );

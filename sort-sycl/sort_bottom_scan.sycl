@@ -29,20 +29,19 @@ if (lid < 16)
   l_scanned_seeds[lid] =
     isums[(lid*group_range)+group];
 }
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 // Scan multiple elements per thread
 while (window < block_stop)
 {
   // Reset histogram
   for (int q = 0; q < 16; q++) histogram[q] = 0;
-  vec<T,4> val_4;
-  vec<T,4> key_4;
+  VECTYPE val_4;
+  VECTYPE key_4;
 
   if (i < block_stop) // Make sure we don't read out of bounds
   {
-    val_4.load(i, in.get_pointer());
-    //val_4 = in4[i];
+    val_4 = ((VECTYPE*)in)[i];
 
     // Mask the keys to get the appropriate digit
     key_4.x() = (val_4.x() >> shift) & 0xFU;
@@ -64,19 +63,19 @@ while (window < block_stop)
     lmem[idx] = 0;
     idx += local_range;
     lmem[idx] = histogram[digit];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     T t;
     for (int i = 1; i < local_range; i *= 2)
     {
       t = lmem[idx -  i]; 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
       lmem[idx] += t;     
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
     histogram[digit] = lmem[idx-1];
 
     //histogram[digit] = scanLocalMem(histogram[digit], lmem, 1);
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (i < block_stop) // Make sure we don't write out of bounds
@@ -101,7 +100,7 @@ while (window < block_stop)
 
   // Before proceeding, make sure everyone has finished their current
   // indexing computations.
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   // Now update the seed array.
   if (lid == local_range-1)
   {
@@ -110,7 +109,7 @@ while (window < block_stop)
       l_block_counts[q] += histogram[q];
     }
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Advance window
   window += local_range;

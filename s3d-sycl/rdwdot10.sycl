@@ -10,7 +10,7 @@
             -ROP2(64) +ROP2(72) +ROP2(96) +ROP2(102)
             +ROP2(127) +ROP2(133) +ROP2(134) +ROP2(150)
             +ROP2(155) +ROP2(157) +ROP2(171) +ROP2(180)
-            +ROP2(192) +ROP2(200))*rateconv*molwt[0] ;
+            +ROP2(192) +ROP2(200))*rateconv*d_molwt[0] ;
 
     WDOT(3) = (+ROP2(1) -ROP2(2) +ROP2(4) -ROP2(10)
             -ROP2(11) -ROP2(11) +ROP2(17) -ROP2(20)
@@ -22,7 +22,7 @@
             -ROP2(130) -ROP2(135) -ROP2(136) +ROP2(139)
             -ROP2(151) -ROP2(158) -ROP2(159) -ROP2(160)
             -ROP2(172) -ROP2(173) -ROP2(181) -ROP2(193)
-            -ROP2(194) -ROP2(195) -ROP2(201))*rateconv *molwt[2];
+            -ROP2(194) -ROP2(195) -ROP2(201))*rateconv *d_molwt[2];
 
     WDOT(4) = (-ROP2(1) +ROP2(11) -ROP12 +ROP2(18)
             +ROP2(20) +ROP2(21) +ROP22 -ROP2(32)
@@ -31,11 +31,11 @@
             -ROP2(83) +ROP2(84) -ROP2(101) -ROP2(110)
             -ROP2(125) -ROP2(138) -ROP2(139) -ROP2(140)
             -ROP2(153) -ROP2(154) -ROP2(162) -ROP2(174)
-            +ROP2(175) +ROP2(187) -ROP2(203))*rateconv *molwt[3];
+            +ROP2(175) +ROP2(187) -ROP2(203))*rateconv *d_molwt[3];
     WDOT(6) = (+ROP2(3) +ROP2(4) +ROP2(9) +ROP2(17)
             +ROP2(21) +ROP2(25) +ROP27 -ROP2(37)
             +ROP2(45) +ROP2(54) +ROP2(66) +ROP2(74)
             +ROP2(80) +ROP2(81) +ROP2(98) +ROP2(100)
             +ROP2(104) +ROP2(131) +ROP2(137) +ROP2(152)
-            +ROP2(161) +ROP2(182) +ROP2(196) +ROP2(202))*rateconv *molwt[5];
+            +ROP2(161) +ROP2(182) +ROP2(196) +ROP2(202))*rateconv *d_molwt[5];
 

@@ -28,7 +28,7 @@
 #include <sstream>
 #include <string>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "log.hpp"
 #include "utils.hpp"
@@ -36,14 +36,14 @@
 #include "su_gather.hpp"
 
 void
-init_c(nd_item<1> &item, real *c, real inc, real c0) 
+init_c(sycl::nd_item<1> &item, real *c, real inc, real c0) 
 {
   int i = item.get_group(0);
   c[i] = c0 + inc*i;
 }
 
 void
-init_half(nd_item<1> &item,
+init_half(sycl::nd_item<1> &item,
           const real* __restrict scalco, 
           const real* __restrict gx, 
           const real* __restrict gy, 
@@ -64,7 +64,7 @@ init_half(nd_item<1> &item,
 }
 
 void
-compute_semblances(nd_item<1> &item,
+compute_semblances(sycl::nd_item<1> &item,
                    const real* __restrict h, 
                    const real* __restrict c, 
                    const real* __restrict samples, 
@@ -138,7 +138,7 @@ compute_semblances(nd_item<1> &item,
 }
 
 void
-redux_semblances(nd_item<1> &item,
+redux_semblances(sycl::nd_item<1> &item,
                  const real* __restrict num, 
                  const real* __restrict stt, 
                  int*  __restrict ctr, 
@@ -221,30 +221,38 @@ int main(int argc, const char** argv) {
   LOG(INFO, "Starting CMP execution");
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
-
-  // Chronometer
-  auto beg = std::chrono::high_resolution_clock::now();
 
   // Alloc memory
-  buffer<real, 1> d_gx (h_gx, ttraces);
-  buffer<real, 1> d_gy (h_gy, ttraces);
-  buffer<real, 1> d_sx (h_sx, ttraces);
-  buffer<real, 1> d_sy (h_sy, ttraces);
-  buffer<real, 1> d_scalco (h_scalco, ttraces);
-  buffer<real, 1> d_cdpsmpl (ntrs*ns);
+  const size_t traces_bytes = ttraces * sizeof(real);
 
-  buffer<real, 1> d_c   (nc      );
-  buffer<real, 1> d_h   (ttraces );
-  buffer<real, 1> d_num (ns*nc   );
-  buffer<real, 1> d_stt (ns*nc   );
-  buffer< int, 1> d_ctr (ncdps*ns);
-  buffer<real, 1> d_str (ncdps*ns);
-  buffer<real, 1> d_stk (ncdps*ns);
+  real *d_gx = sycl::malloc_device<real>(ttraces, q);
+  q.memcpy(d_gx, h_gx, traces_bytes);
+
+  real *d_gy = sycl::malloc_device<real>(ttraces, q);
+  q.memcpy(d_gy, h_gy, traces_bytes);
+
+  real *d_sx = sycl::malloc_device<real>(ttraces, q);
+  q.memcpy(d_sx, h_sx, traces_bytes);
+
+  real *d_sy = sycl::malloc_device<real>(ttraces, q);
+  q.memcpy(d_sy, h_sy, traces_bytes);
+
+  real *d_scalco = sycl::malloc_device<real>(ttraces, q);
+  q.memcpy(d_scalco, h_scalco, traces_bytes);
+
+  real *d_cdpsmpl = sycl::malloc_device<real>(ntrs*ns, q);
+
+  real *d_c   = sycl::malloc_device<real>(nc      , q);
+  real *d_h   = sycl::malloc_device<real>(ttraces , q);
+  real *d_num = sycl::malloc_device<real>(ns*nc   , q);
+  real *d_stt = sycl::malloc_device<real>(ns*nc   , q);
+   int *d_ctr = sycl::malloc_device< int>(ncdps*ns, q);
+  real *d_str = sycl::malloc_device<real>(ncdps*ns, q);
+  real *d_stk = sycl::malloc_device<real>(ncdps*ns, q);
 
   h_ctr = (int*) malloc (sizeof(int )*ncdps*ns);
   h_str = (real*) malloc (sizeof(real)*ncdps*ns);
@@ -254,27 +262,25 @@ int main(int argc, const char** argv) {
   // DEVICE REGION
   //
 
-  auto kbeg = std::chrono::high_resolution_clock::now();
+  q.wait();
+  auto beg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
-  q.submit([&] (handler &cgh) {
-    auto c = d_c.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class k1>(nd_range<1>(range<1>(nc), range<1>(1)), [=] (nd_item<1> item) {
-      init_c(item, c.get_pointer(), inc, c0);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class k1>(
+      sycl::nd_range<1>(sycl::range<1>(nc), sycl::range<1>(1)),
+      [=] (sycl::nd_item<1> item) {
+      init_c(item, d_c, inc, c0);
     });
   });
 
   // Evaluate halfoffset points in x and y coordinates
-  q.submit([&] (handler &cgh) {
-    auto sc = d_scalco.get_access<sycl_read>(cgh);
-    auto gx = d_gx.get_access<sycl_read>(cgh);
-    auto gy = d_gy.get_access<sycl_read>(cgh);
-    auto sx = d_sx.get_access<sycl_read>(cgh);
-    auto sy = d_sy.get_access<sycl_read>(cgh);
-    auto h = d_h.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class k2>(nd_range<1>(range<1>(ttraces), range<1>(1)), [=] (nd_item<1> item) {
-      init_half(item, sc.get_pointer(), gx.get_pointer(), gy.get_pointer(),
-                sx.get_pointer(), sy.get_pointer(), h.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class k2>(
+      sycl::nd_range<1>(sycl::range<1>(ttraces), sycl::range<1>(1)),
+      [=] (sycl::nd_item<1> item) {
+      init_half(item, d_scalco, d_gx, d_gy,
+                d_sx, d_sy, d_h);
     });
   });
 
@@ -283,37 +289,25 @@ int main(int argc, const char** argv) {
     int t_idf = ntraces_by_cdp_id[cdp_id];
     int stride = t_idf - t_id0;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_cdpsmpl.get_access<sycl_discard_write>(cgh, stride*ns);
-      cgh.copy(h_samples + t_id0*ns, acc);
-    });
+    q.memcpy(d_cdpsmpl, h_samples + t_id0*ns , sizeof(real)*stride*ns);
 
     // Compute semblances for each c for each sample
-    q.submit([&] (handler &cgh) {
-      auto h = d_h.get_access<sycl_read>(cgh);
-      auto c = d_c.get_access<sycl_read>(cgh);
-      auto smpl = d_cdpsmpl.get_access<sycl_read>(cgh);
-      auto num = d_num.get_access<sycl_discard_write>(cgh);
-      auto stt = d_stt.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class k3>(nd_range<1>(range<1>((ns*nc+NTHREADS-1)/NTHREADS*NTHREADS), 
-                                             range<1>(NTHREADS)), [=] (nd_item<1> item) {
-        compute_semblances(item, h.get_pointer(), c.get_pointer(), 
-                           smpl.get_pointer(), num.get_pointer(), stt.get_pointer(), 
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k3>(
+        sycl::nd_range<1>(sycl::range<1>((ns*nc+NTHREADS-1)/NTHREADS*NTHREADS), 
+                          sycl::range<1>(NTHREADS)), [=] (sycl::nd_item<1> item) {
+        compute_semblances(item, d_h, d_c, d_cdpsmpl, d_num, d_stt, 
                            t_id0, t_idf, idt, dt, tau, w, nc, ns);
       });
     });
 
     // Get max C for max semblance for each sample on this cdp
-    q.submit([&] (handler &cgh) {
-      auto num = d_num.get_access<sycl_read>(cgh);
-      auto stt = d_stt.get_access<sycl_read>(cgh);
-      auto ctr = d_ctr.get_access<sycl_discard_write>(cgh);
-      auto str = d_str.get_access<sycl_discard_write>(cgh);
-      auto stk = d_stk.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class k4>(nd_range<1>(range<1>((ns+NTHREADS-1)/NTHREADS*NTHREADS), 
-                                             range<1>(NTHREADS)), [=] (nd_item<1> item) {
-        redux_semblances(item, num.get_pointer(), stt.get_pointer(), ctr.get_pointer(), 
-                         str.get_pointer(), stk.get_pointer(), nc, cdp_id, ns);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k4>(
+        sycl::nd_range<1>(sycl::range<1>((ns+NTHREADS-1)/NTHREADS*NTHREADS), 
+                          sycl::range<1>(NTHREADS)), [=] (sycl::nd_item<1> item) {
+        redux_semblances(item, d_num, d_stt, d_ctr, 
+                         d_str, d_stk, nc, cdp_id, ns);
       });
     });
 
@@ -325,24 +319,13 @@ int main(int argc, const char** argv) {
   }
   // Gets time at end of computation
   q.wait();
-  auto kend = std::chrono::high_resolution_clock::now();
+  auto end = std::chrono::high_resolution_clock::now();
 
   // Copy results back to host
-  q.submit([&] (handler &cgh) {
-    auto acc = d_ctr.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_ctr);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = d_str.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_str);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = d_stk.get_access<sycl_read>(cgh);
-    cgh.copy(acc, h_stk);
-  });
+  q.memcpy(h_ctr, d_ctr, sizeof(int ) * ncdps * ns);
+  q.memcpy(h_str, d_str, sizeof(real) * ncdps * ns);
+  q.memcpy(h_stk, d_stk, sizeof(real) * ncdps * ns);
   q.wait();
-
-  auto end = std::chrono::high_resolution_clock::now();
 
   //
   // END DEVICE REGION
@@ -390,13 +373,10 @@ int main(int argc, const char** argv) {
   printf("Error rate: ctr=%e str=%e stk=%e\n",
          err_ctr_rate, err_str_rate, err_stk_rate);
 
-  // Logs stats (exec time and semblance-traces per second)
-  double ktime = std::chrono::duration_cast<std::chrono::duration<double>>(kend - kbeg).count();
-  double stps = (number_of_semblances / 1e9 ) * (ns * nc / ktime);
-  std::string stats = "Giga-Semblances-Trace/s: " + std::to_string(stps);
-
-  double offload_time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
-  stats += "\nDevice offload time: " + std::to_string(offload_time) + " (s) ";
+  // Logs stats (semblance-traces per second)
+  double time = std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count();
+  double stps = (number_of_semblances / 1e9 ) * (ns * nc / time);
+  std::string stats = "Giga semblances traces per second: " + std::to_string(stps);
   LOG(INFO, stats);
 
 #ifdef SAVE
@@ -419,6 +399,20 @@ int main(int argc, const char** argv) {
     stk_t.fputtr(stack);
   }
 #endif
+
+  sycl::free(d_gx     , q);
+  sycl::free(d_gy     , q);
+  sycl::free(d_sx     , q);
+  sycl::free(d_sy     , q);
+  sycl::free(d_scalco , q);
+  sycl::free(d_cdpsmpl, q);
+  sycl::free(d_h      , q);
+  sycl::free(d_c      , q);
+  sycl::free(d_num    , q);
+  sycl::free(d_stt    , q);
+  sycl::free(d_ctr    , q);
+  sycl::free(d_str    , q);
+  sycl::free(d_stk    , q);
 
   free(h_ctr    );
   free(h_str    );

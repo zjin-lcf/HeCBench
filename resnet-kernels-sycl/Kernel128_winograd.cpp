@@ -7,15 +7,15 @@ const char bnBias_winograd_Name128[] = "data/bnBias_winograd_128.bin";
 const char bnScale_winograd_Name128[] = "data/bnScale_winograd_128.bin";
 
 #define d(input, i, j, Inz) ( input[Inz + i*768 + (j<<7)] )
-#define __syncthreads() item.barrier(access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 void kernel_128_winograd_BtdB(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict input,
   const float *__restrict pInputs,
         float *__restrict pOutputs)
 {
-  int Inx = item.get_group(1)<<2, 
+  int Inx = item.get_group(1)<<2,
       Iny0 = item.get_group(0)<<2,
       Iny1 = item.get_local_id(0),
       Inz = item.get_local_id(1);
@@ -105,15 +105,15 @@ void kernel_128_winograd_BtdB(
   __syncthreads();
 
   for (int i = 0; i < 6; i++) {
-    pOutputs[(Iny1 + i*6)*2048 + 
+    pOutputs[(Iny1 + i*6)*2048 +
              (item.get_group(1)*4+item.get_group(0))*128 + Inz] = BTdB[i];
   }
 }
 
 void kernel_128_winograd_AtIA(
-  nd_item<3> &item,
-        float *__restrict bias,
-        float *__restrict scale,
+  sycl::nd_item<3> &item,
+        float &bias,
+        float &scale,
         float *__restrict input,
   const float *__restrict pInputs,
   const float *__restrict pBiases,
@@ -125,8 +125,8 @@ void kernel_128_winograd_AtIA(
   int c_input = Inx*6 + Iny;
 
   input[c_input] = pInputs[c_input*16*128 + (Tilex*4+Tiley)*128 + kz];
-  *bias = pBiases[kz];
-  *scale = pScales[kz];
+  bias = pBiases[kz];
+  scale = pScales[kz];
   __syncthreads();
 
   float tmp = 0;
@@ -156,31 +156,31 @@ void kernel_128_winograd_AtIA(
   switch(Iny) {
     case 0:
       x = Inx*6;
-      o = *scale*(input[x]+input[x+1]+input[x+2]+input[x+3]+input[x+4])+ *bias;
+      o = scale*(input[x]+input[x+1]+input[x+2]+input[x+3]+input[x+4])+ bias;
       pOutputs[(((Tilex<<2)+1+Inx)*16 + (Tiley<<2)+1)*128 + kz] = o > 0 ? o : 0;
       break;
     case 1:
       x = Inx*6;
-      o = *scale*(input[x+1] - input[x+2] + 2*input[x+3] - 2*input[x+4]) + *bias;
+      o = scale*(input[x+1] - input[x+2] + 2*input[x+3] - 2*input[x+4]) + bias;
       pOutputs[(((Tilex<<2)+1+Inx)*16 + (Tiley<<2)+2)*128 + kz] = o > 0 ? o : 0;
       break;
     case 2:
       if (Tiley == 3) break;
       x = Inx*6;
-      o = *scale*(input[x+1] + input[x+2] + 4*input[x+3] + 4*input[x+4]) + *bias;
+      o = scale*(input[x+1] + input[x+2] + 4*input[x+3] + 4*input[x+4]) + bias;
       pOutputs[(((Tilex<<2)+1+Inx)*16 + (Tiley<<2)+3)*128 + kz] = o > 0 ? o : 0;
       break;
     case 3:
       if (Tiley == 3) break;
       x = Inx*6;
-      o = *scale*(input[x+1] - input[x+2] + 8*input[x+3] - 8*input[x+4] + input[x+5]) + *bias;
+      o = scale*(input[x+1] - input[x+2] + 8*input[x+3] - 8*input[x+4] + input[x+5]) + bias;
       pOutputs[(((Tilex<<2)+1+Inx)*16 + (Tiley<<2)+4)*128 + kz] = o > 0 ? o : 0;
       break;
   }
 }
 
 void kernel_128_OuterProduct_128(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
         float *__restrict input,
   const float *__restrict A,
   const float *__restrict B,
@@ -198,15 +198,15 @@ void kernel_128_OuterProduct_128(
                       2048, 2176, 2304, 2432, 2560, 2688, 2816, 2944,
                       3072, 3200, 3328, 3456, 3584, 3712, 3840, 3968};
   out[c_input] = 0.0f;
-  
+
   input[c_input] = A[T_offset];
-  
+
   for (int k = 0; k < 4; k++) {
     int B_start = B_offset + (k<<12); // 32*64
     kernel[c_kernel] = B[B_start], kernel[c_kernel+1024] = B[B_start+1024];
     kernel[c_kernel+2048] = B[B_start+2048], kernel[c_kernel+3072] = B[B_start+3072];
     __syncthreads();
-  
+
     float sum = 0;
     int y_tmp = (tY<<7)+(k<<5);
     for (int j = 0; j < 32; j++) {
@@ -215,11 +215,11 @@ void kernel_128_OuterProduct_128(
     out[tY*128 + tX] += sum;
     __syncthreads();
   }
-  
+
   C[T_offset] = out[c_input];
 }
 
-void kernel_128(queue &q, double &time, double &ktime) {
+void kernel_128(sycl::queue &q, double &time, double &ktime) {
   float *input_ = get_parameter(inputName128, 16*16*128);
   float *bias = get_parameter(biasName128, 128);
 
@@ -236,59 +236,59 @@ void kernel_128(queue &q, double &time, double &ktime) {
 
   auto start = std::chrono::steady_clock::now();
 
-  float *input = malloc_device<float>(nInput, q);
+  float *input = sycl::malloc_device<float>(nInput, q);
   q.memcpy(input, input_, sizeof(float) * nInput);
 
-  float *l_weights = malloc_device<float>(nWeights, q);
+  float *l_weights = sycl::malloc_device<float>(nWeights, q);
   q.memcpy(l_weights, kernel, sizeof(float) * nWeights);
 
-  float *output = malloc_device<float>(nOutput, q);
+  float *output = sycl::malloc_device<float>(nOutput, q);
 
-  float *t_input = malloc_device<float>(nTransInput, q);
+  float *t_input = sycl::malloc_device<float>(nTransInput, q);
 
-  float *ip = malloc_device<float>(nInnerProd, q);
+  float *ip = sycl::malloc_device<float>(nInnerProd, q);
 
   q.memset(output, 0, sizeof(float) * nOutput);
   q.memset(t_input, 0, sizeof(float) * nTransInput);
   q.memset(ip, 0, sizeof(float) * nInnerProd);
 
-  float *l_bnBias = malloc_device<float>(nBias, q);
+  float *l_bnBias = sycl::malloc_device<float>(nBias, q);
   q.memcpy(l_bnBias, bnBias, sizeof(float) * nBias);
 
-  float *l_bnScale = malloc_device<float>(nBias, q);
+  float *l_bnScale = sycl::malloc_device<float>(nBias, q);
   q.memcpy(l_bnScale, bnScale, sizeof(float) * nBias);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
-  range<2> gws (4*6, 4*128);
-  range<2> lws (6, 128);
+  sycl::range<2> gws (4*6, 4*128);
+  sycl::range<2> lws (6, 128);
 
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm (6*6*128, cgh);
-    cgh.parallel_for<class k1>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm (sycl::range<1>(6*6*128), cgh);
+    cgh.parallel_for<class k1>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       kernel_128_winograd_BtdB (item, sm.get_pointer(), input, t_input);
     });
   });
 
-  range<2> gws2 (2*8, 36*128);
-  range<2> lws2 (8, 128);
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm (8*128 + 64*128 + 8*128, cgh);
-    cgh.parallel_for<class k2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+  sycl::range<2> gws2 (2*8, 36*128);
+  sycl::range<2> lws2 (8, 128);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sm (sycl::range<1>(8*128 + 64*128 + 8*128), cgh);
+    cgh.parallel_for<class k2>(sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
       kernel_128_OuterProduct_128(item, sm.get_pointer(), t_input, l_weights, ip);
     });
   });
 
-  range<3> gws3 (128, 4*6, 4*6);
-  range<3> lws3 (1, 6, 6);
-  q.submit([&] (handler &cgh) {
-    accessor<float, 1, sycl_read_write, access::target::local> sm_bias (1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sm_scale (1, cgh);
-    accessor<float, 1, sycl_read_write, access::target::local> sm_input (6*6, cgh);
-    cgh.parallel_for<class k3>(nd_range<3>(gws3, lws3), [=] (nd_item<3> item) {
+  sycl::range<3> gws3 (128, 4*6, 4*6);
+  sycl::range<3> lws3 (1, 6, 6);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 0> sm_bias (cgh);
+    sycl::local_accessor<float, 0> sm_scale (cgh);
+    sycl::local_accessor<float, 1> sm_input (sycl::range<1>(6*6), cgh);
+    cgh.parallel_for<class k3>(sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> item) {
       kernel_128_winograd_AtIA(item,
-        sm_bias.get_pointer(), sm_scale.get_pointer(), sm_input.get_pointer(),
+        sm_bias, sm_scale, sm_input.get_pointer(),
         ip, l_bnBias, l_bnScale, output);
     });
   });
@@ -299,13 +299,13 @@ void kernel_128(queue &q, double &time, double &ktime) {
 
   q.memcpy(result, output, sizeof(float) * nOutput).wait();
 
-  free(input, q);
-  free(t_input, q);
-  free(l_weights, q);
-  free(l_bnBias, q);
-  free(l_bnScale, q);
-  free(ip, q);
-  free(output, q);
+  sycl::free(input, q);
+  sycl::free(t_input, q);
+  sycl::free(l_weights, q);
+  sycl::free(l_bnBias, q);
+  sycl::free(l_bnScale, q);
+  sycl::free(ip, q);
+  sycl::free(output, q);
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

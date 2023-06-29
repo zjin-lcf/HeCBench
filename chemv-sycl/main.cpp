@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "common.h"
+#include <chrono>
+#include <sycl/sycl.hpp>
 
 #define REPEAT 1000
 #define N 370
@@ -27,9 +28,9 @@ struct ComplexFloat {
 #include "kernel.cpp"
 
 void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) {
-
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE])
+{
   for (int i0 = 0; i0 <= (N - 1); i0 += 1) {
     float var5_Re;
     float var5_Im;
@@ -104,46 +105,60 @@ void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
  * The function body was taken from a VOBLA-generated BLAS library.
  */
 void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) 
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE]) 
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<struct ComplexFloat, 1> d_AT (AT, AT_SIZE);
-  buffer<struct ComplexFloat, 1> d_X (X, X_SIZE);
-  buffer<struct ComplexFloat, 1> d_Y (Y, Y_SIZE);
+  struct ComplexFloat *d_AT = sycl::malloc_device<struct ComplexFloat>(AT_SIZE, q);
+  q.memcpy(d_AT, AT, sizeof(struct ComplexFloat) * AT_SIZE);
 
-  range<1> k0_lws(32);
-  range<1> k0_gws(32*12);
-  for (int n = 0; n < REPEAT; n++)
-    q.submit([&] (handler &cgh) {
-      auto A = d_AT.template get_access<sycl_read>(cgh);
-      auto X = d_X.template get_access<sycl_read>(cgh);
-      auto Y = d_Y.template get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k0>(nd_range<1>(k0_gws, k0_lws), [=] (nd_item<1> item) {
-        kernel0(A.get_pointer(), X.get_pointer(), Y.get_pointer(), 
-                alpha_im, alpha_re, beta_im, beta_re, item);
+  struct ComplexFloat *d_X = sycl::malloc_device<struct ComplexFloat>(X_SIZE, q);
+  q.memcpy(d_X, X, sizeof(struct ComplexFloat) * X_SIZE);
+
+  struct ComplexFloat *d_Y = sycl::malloc_device<struct ComplexFloat>(Y_SIZE, q);
+  q.memcpy(d_Y, Y, sizeof(struct ComplexFloat) * Y_SIZE);
+
+  sycl::range<1> k0_lws(32);
+  sycl::range<1> k0_gws(32*12);
+
+  sycl::range<1> k1_lws(32);
+  sycl::range<1> k1_gws(32*12);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int n = 0; n < REPEAT; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k0>(
+        sycl::nd_range<1>(k0_gws, k0_lws), [=] (sycl::nd_item<1> item) {
+        kernel0(d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re, item);
       });
     });
+  }
 
-  range<1> k1_lws(32);
-  range<1> k1_gws(32*12);
-  for (int n = 0; n < REPEAT; n++)
-    q.submit([&] (handler &cgh) {
-      auto A = d_AT.template get_access<sycl_read>(cgh);
-      auto X = d_X.template get_access<sycl_read>(cgh);
-      auto Y = d_Y.template get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k1>(nd_range<1>(k1_gws, k1_lws), [=] (nd_item<1> item) {
-        kernel1(A.get_pointer(), X.get_pointer(), Y.get_pointer(), 
-                alpha_im, alpha_re, item);
+  for (int n = 0; n < REPEAT; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k1>(
+        sycl::nd_range<1>(k1_gws, k1_lws), [=] (sycl::nd_item<1> item) {
+        kernel1(d_AT, d_X, d_Y, alpha_im, alpha_re, item);
       });
     });
+  }
 
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
+
+  q.memcpy(Y, d_Y, Y_SIZE * sizeof(struct ComplexFloat)).wait();
+  sycl::free(d_AT, q);
+  sycl::free(d_X, q);
+  sycl::free(d_Y, q);
 }
 
 int main() {
@@ -180,4 +195,3 @@ int main() {
   printf("PASSED\n");
   return EXIT_SUCCESS;
 }
-

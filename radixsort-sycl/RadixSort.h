@@ -13,22 +13,22 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "Scan.h"
 
-static const unsigned int WARP_SIZE = 32;
-static const unsigned int bitStep = 4;
-static const unsigned int CTA_SIZE = 128;
+static const uint WARP_SIZE = 32;
+static const uint bitStep = 4;
+static const uint CTA_SIZE = 128;
 
-void radixSortKeys(queue &q,
-                   buffer<unsigned int> &d_keys, 
-                   buffer<unsigned int> &d_tempKeys, 
-                   buffer<unsigned int> &d_counters, 
-                   buffer<unsigned int> &d_blockOffsets, 
-                   buffer<unsigned int> &d_countersSum, 
-                   buffer<unsigned int> &d_buffer, 
-                   const unsigned int numElements, 
-                   const unsigned int keyBits,
-                   const unsigned int batchSize);
+void radixSortKeys(sycl::queue &q,
+                   uint *d_keys,
+                   uint *d_tempKeys,
+                   uint *d_counters,
+                   uint *d_blockOffsets,
+                   uint *d_countersSum,
+                   uint *d_buffer,
+                   const uint numElements,
+                   const uint keyBits,
+                   const uint batchSize);
 
 #endif

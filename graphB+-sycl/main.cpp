@@ -38,7 +38,7 @@ https://cs.txstate.edu/~burtscher/research/graphB/.
 #include <algorithm>
 #include <set>
 #include <map>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 int main(int argc, char* argv[])
@@ -79,11 +79,10 @@ int main(int argc, char* argv[])
 
   //GPU code
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   auto dev = q.get_device();
   auto devName = dev.get_info<sycl::info::device::name>();
@@ -178,7 +177,8 @@ int main(int argc, char* argv[])
 
   // use random pluses and minuses
   q.submit([&](sycl::handler &cgh) {
-    cgh.parallel_for<class init_1>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+    cgh.parallel_for<class init_1>(
+    sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
     init(g.edges, g.nodes, d_g.nlist, d_g.eweight, d_inCC, d_einfo,
          d_inTree, d_negCnt, item);
     });
@@ -195,7 +195,8 @@ int main(int argc, char* argv[])
     // generate tree
     q.submit([&](sycl::handler &cgh) {
       auto root_node = root[iter % g.nodes];
-      cgh.parallel_for<class init_2>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class init_2>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         init2(g.edges, g.nodes, root_node, d_g.nlist, d_parent,
               d_queue, d_label, d_tail, item);
       });
@@ -208,7 +209,8 @@ int main(int argc, char* argv[])
       q.submit([&](sycl::handler &cgh) {
         auto border_level_cur = border[level];
         auto border_level_nxt = border[level + 1];
-        cgh.parallel_for<class genSpanTree>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class genSpanTree>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           generateSpanningTree(g.nodes, d_g.nindex, d_g.nlist, iter + 17,
                                d_einfo, d_parent, d_queue, level, d_tail,
                                border_level_cur, border_level_nxt,
@@ -233,7 +235,8 @@ int main(int argc, char* argv[])
     q.submit([&](sycl::handler &cgh) {
       sycl::stream stream_out(64 * 1024, 80, cgh);
       auto border_level = border[level + 1];
-      cgh.parallel_for<class verify_spanTree>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class verify_spanTree>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         verify_generateSpanningTree(g.nodes, g.edges, d_g.nindex, d_g.nlist,
                                     iter, d_parent, level, d_tail,
                                     border_level, item, stream_out);
@@ -247,7 +250,8 @@ int main(int argc, char* argv[])
       q.submit([&](sycl::handler &cgh) {
         auto border_level_cur = border[level];
         auto border_level_nxt = border[level + 1];
-        cgh.parallel_for<class rootCount>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class rootCount>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           rootcount(d_parent, d_queue, d_label, level, border_level_cur,
                     border_level_nxt, item);
         });
@@ -290,13 +294,15 @@ int main(int argc, char* argv[])
 
     //#3
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class treeUpdate>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class treeUpdate>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         inTreeUpdate(g.edges, d_g.nlist, d_inTree, item);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class initM>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class initM>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         initMinus(g.edges, g.nodes, d_g.nindex, d_g.nlist, d_einfo, d_minus,
                   item);
       });
@@ -307,7 +313,8 @@ int main(int argc, char* argv[])
 #ifdef VERIFY
       sycl::stream stream_out(64 * 1024, 80, cgh);
 #endif
-      cgh.parallel_for<class pCyles>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class pCyles>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         processCycles(g.nodes, d_g.nindex, d_g.nlist, d_label, d_einfo,
                       d_minus, item
 #ifdef VERIFY
@@ -318,37 +325,43 @@ int main(int argc, char* argv[])
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class init_3>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class init_3>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         init3(g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue, item);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class computeOne>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class computeOne>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         compute1(g.nodes, d_g.nindex, d_g.nlist, d_label, d_minus, d_negCnt, item);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class flat>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class flat>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         flatten(g.nodes, d_label, item);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class sizeCC>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class sizeCC>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         ccSize(g.nodes, d_label, d_queue, item, d_hi, d_wSize);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class maxCC>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class maxCC>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         largestCC(g.nodes, d_queue, item, d_hi);
       });
     });
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class hopCountCC>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class hopCountCC>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         ccHopCount(g.nodes, d_g.nindex, d_g.nlist, d_label, d_queue, d_ws1,
                    d_ws2, item, d_hi, d_wSize);
       });
@@ -360,19 +373,22 @@ int main(int argc, char* argv[])
       q.memset(changed_gpu, 0, sizeof(bool)).wait();
 
       q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for<class BF1>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class BF1>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           BellmanFord(d_queue, changed_gpu, d_ws1, d_ws2, item, d_wSize);
         });
       });
 
       q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for<class BF2>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class BF2>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           BellmanFord(d_queue, changed_gpu, d_ws1, d_ws2, item, d_wSize);
         });
       });
 
       q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for<class BF3>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for<class BF3>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
           BellmanFord(d_queue, changed_gpu, d_ws1, d_ws2, item, d_wSize);
         });
       });
@@ -382,7 +398,8 @@ int main(int argc, char* argv[])
     } while (changed);
 
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for<class incrCC>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+      cgh.parallel_for<class incrCC>(
+        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         incrementCC(g.nodes, d_label, d_queue, d_inCC, item);
       });
     });

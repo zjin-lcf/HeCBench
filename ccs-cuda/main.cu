@@ -444,14 +444,6 @@ int main(int argc, char *argv[])
     cudaMemcpy(bicluster[i].data, d_bc_data_tmp+n*i, sizeof(char)*n, cudaMemcpyDeviceToHost);
   }
 
-  for(i=0; i<maxbcn; i++) {
-    bicluster[i].score=bicluster_temp_score[i];
-    bicluster[i].datacount=bicluster_temp_datacount[i];
-    bicluster[i].samplecount=bicluster_temp_samplecount[i];
-  }
-
-  printbicluster(out,gene,Hd,n,D,maxbcn,thr,bicluster,print_type,overlap);
-
   cudaFree(d_gene);
   cudaFree(d_bc_score);
   cudaFree(d_bc_datacount);
@@ -460,6 +452,14 @@ int main(int argc, char *argv[])
   cudaFree(d_bc_sample_tmp);
   cudaFree(d_bc_data);
   cudaFree(d_bc_data_tmp);
+
+  for(i=0; i<maxbcn; i++) {
+    bicluster[i].score=bicluster_temp_score[i];
+    bicluster[i].datacount=bicluster_temp_datacount[i];
+    bicluster[i].samplecount=bicluster_temp_samplecount[i];
+  }
+
+  printbicluster(out,gene,Hd,n,D,maxbcn,thr,bicluster,print_type,overlap);
 
   for (i = 0; i < n; i++) {
     free(gene[i].x);

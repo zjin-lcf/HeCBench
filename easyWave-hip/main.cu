@@ -42,7 +42,6 @@
 #include "cOgrd.h"
 #include "cOkadaEarthquake.h"
 
-// CUDA kernels
 #include "kernels.cuh"
 
 double diff(timespec start, timespec end) {
@@ -293,8 +292,11 @@ int main( int argc, char **argv )
   Dx = Re * g2r( DLon );     // in m along the equator
   Dy = Re * g2r( DLat );
 
+  const size_t grid_size = (size_t)NLat*NLon*MAX_VARS_PER_NODE;
+  const size_t grid_size_bytes = grid_size * sizeof(float);
+
   // allocate memory for GRIDNODE structure and for caching arrays
-  float* node = (float*) malloc(sizeof(float)*NLon*NLat*MAX_VARS_PER_NODE);
+  float* node = (float*) malloc(grid_size_bytes);
   if (node == NULL) return Err.post( Err.msgAllocateMem() );
   float* R6 = (float*) malloc( sizeof(float) * (NLat+1) );
   if (R6 == NULL) return Err.post( Err.msgAllocateMem() );
@@ -837,8 +839,8 @@ int main( int argc, char **argv )
   clock_gettime(CLOCK_MONOTONIC, &start);
 
   float* d_node;
-  hipMalloc((void**)&d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE);
-  hipMemcpyAsync(d_node, node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, hipMemcpyHostToDevice, 0);
+  hipMalloc((void**)&d_node, grid_size_bytes);
+  hipMemcpyAsync(d_node, node, grid_size_bytes, hipMemcpyHostToDevice, 0);
   float* d_R6;
   hipMalloc((void**)&d_R6, sizeof(float)*(NLat+1));
   hipMemcpyAsync(d_R6, R6, sizeof(float)*(NLat+1), hipMemcpyHostToDevice, 0);
@@ -870,7 +872,7 @@ int main( int argc, char **argv )
     /* FIXME: check if Par.poiDt can be used for those purposes */
     if( Par.filePOIs && Par.poiDt && ((Par.time/Par.poiDt)*Par.poiDt == Par.time) ) {
       // SavePOIs 
-      hipMemcpy(node, d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, hipMemcpyDeviceToHost);
+      hipMemcpy(node, d_node, grid_size_bytes, hipMemcpyDeviceToHost);
       it = Par.time / Par.poiDt;
       timePOI[it] = Par.time;
       for( n=0; n<NPOIs; n++ ) {
@@ -884,19 +886,19 @@ int main( int argc, char **argv )
     // sea floor topography (mass conservation)
     dim3 grids((Jmax-Jmin+16)/16, (Imax-Imin+16)/16);
     dim3 threads(16, 16);
-    hipLaunchKernelGGL(kernel, grids, threads, 0, 0, d_node, d_R6, Imin, Jmin, Imax, Jmax, 
+    kernel<<<grids, threads>>>(d_node, d_R6, Imin, Jmin, Imax, Jmax, 
         NLat, Par.sshZeroThreshold, Par.sshArrivalThreshold, Par.time);
 
-    hipLaunchKernelGGL(kernel2, dim3(1), dim3(1), 0, 0, d_node, d_C1, d_C2, d_C3, d_C4, Imin, Jmin, Imax, Jmax, NLat, NLon);
+    kernel2<<<1, 1>>>(d_node, d_C1, d_C2, d_C3, d_C4, Imin, Jmin, Imax, Jmax, NLat, NLon);
 
-    hipLaunchKernelGGL(kernel3, grids, threads, 0, 0, d_node, d_R6, Imin, Jmin, Imax, Jmax, NLat);
+    kernel3<<<grids, threads>>>(d_node, d_R6, Imin, Jmin, Imax, Jmax, NLat);
 
     hipMemcpy(d_Imin, &Imin, sizeof(int), hipMemcpyHostToDevice);
     hipMemcpy(d_Imax, &Imax, sizeof(int), hipMemcpyHostToDevice);
     hipMemcpy(d_Jmin, &Jmin, sizeof(int), hipMemcpyHostToDevice);
     hipMemcpy(d_Jmax, &Jmax, sizeof(int), hipMemcpyHostToDevice);
 
-    hipLaunchKernelGGL(kernel4, dim3(1), dim3(1), 0, 0, d_node, d_C1, d_C2, d_C3, d_C4, d_Imin, d_Jmin, d_Imax, d_Jmax, NLat, NLon, Par.sshClipThreshold);
+    kernel4<<<1, 1>>>(d_node, d_C1, d_C2, d_C3, d_C4, d_Imin, d_Jmin, d_Imax, d_Jmax, NLat, NLon, Par.sshClipThreshold);
 
     hipMemcpy(&Imin, d_Imin, sizeof(int), hipMemcpyDeviceToHost);
     hipMemcpy(&Imax, d_Imax, sizeof(int), hipMemcpyDeviceToHost);
@@ -927,7 +929,7 @@ int main( int argc, char **argv )
     }
   } // main loop
 
-  hipMemcpy(node, d_node, sizeof(float)*NLat*NLon*MAX_VARS_PER_NODE, hipMemcpyDeviceToHost);
+  hipMemcpy(node, d_node, grid_size_bytes, hipMemcpyDeviceToHost);
   hipFree(d_node);
   hipFree(d_C1);
   hipFree(d_C2);
@@ -1069,7 +1071,7 @@ int commandLineHelp( void )
   printf( "-ssh0_abs ...     absolute threshold for initial wave in [m], default- 0\n" );
   printf( "-ssh_arrival ...  threshold for arrival times in [m], default- 0.001\n" );
   printf( "                  negative value considered as relative threshold\n" );
-  printf( "-gpu              start GPU version of EasyWave (requires a CUDA capable device)\n" );
+  printf( "-gpu              start GPU version of EasyWave\n" );
   printf( "-verbose          generate verbose output on stdout\n" );
   printf( "\nExample:\n" );
   printf( "\t easyWave -grid gebcoIndonesia.grd  -source fault.inp  -time 120\n\n" );

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include <omp.h>
 
 #define REPEAT 1000
@@ -27,9 +28,9 @@ struct ComplexFloat {
 #include "kernel.cpp"
 
 void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) {
-
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE])
+{
   for (int i0 = 0; i0 <= (N - 1); i0 += 1) {
     float var5_Re;
     float var5_Im;
@@ -104,19 +105,24 @@ void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
  * The function body was taken from a VOBLA-generated BLAS library.
  */
 void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) 
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE])
 {
+  #pragma omp target data map(to: AT[0:AT_SIZE], X[0:X_SIZE]) \
+                          map(tofrom: Y[0:Y_SIZE])
+  {
+    auto start = std::chrono::steady_clock::now();
 
-#pragma omp target data map(to: AT[0:AT_SIZE], X[0:X_SIZE]) \
-                        map(tofrom: Y[0:Y_SIZE])
-{
-  for (int n = 0; n < REPEAT; n++)
-    kernel0(AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
+    for (int n = 0; n < REPEAT; n++)
+      kernel0(AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
 
-  for (int n = 0; n < REPEAT; n++)
-    kernel1(AT, X, Y, alpha_im, alpha_re);
-}
+    for (int n = 0; n < REPEAT; n++)
+      kernel1(AT, X, Y, alpha_im, alpha_re);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
+  }
 }
 
 int main() {

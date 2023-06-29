@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <iomanip>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifndef DEFAULT_PPWI
 #define DEFAULT_PPWI 1

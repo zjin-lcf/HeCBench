@@ -5,16 +5,16 @@
   int c = i + j * numCols;
   int xy = numCols * numRows;
 
-  int W = (i == 0)        ? c : c - 1;
-  int E = (i == numCols-1)     ? c : c + 1;
-  int N = (j == 0)        ? c : c - numCols;
-  int S = (j == numRows-1)     ? c : c + numCols;
+  int W = (i == 0)         ? c : c - 1;
+  int E = (i == numCols-1) ? c : c + 1;
+  int N = (j == 0)         ? c : c - numCols;
+  int S = (j == numRows-1) ? c : c + numCols;
 
   float temp1, temp2, temp3;
-  temp1 = temp2 = tIn_acc[c];
-  temp3 = tIn_acc[c+xy];
-  tOut_acc[c] = cc * temp2 + cw * tIn_acc[W] + ce * tIn_acc[E] + cs * tIn_acc[S]
-    + cn * tIn_acc[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn_acc[c] + ct * amb_temp;
+  temp1 = temp2 = d_tIn[c];
+  temp3 = d_tIn[c+xy];
+  d_tOut[c] = cc * temp2 + cw * d_tIn[W] + ce * d_tIn[E] + cs * d_tIn[S]
+    + cn * d_tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * d_pIn[c] + ct * amb_temp;
   c += xy;
   W += xy;
   E += xy;
@@ -24,9 +24,9 @@
   for (int k = 1; k < layers-1; ++k) {
       temp1 = temp2;
       temp2 = temp3;
-      temp3 = tIn_acc[c+xy];
-      tOut_acc[c] = cc * temp2 + cw * tIn_acc[W] + ce * tIn_acc[E] + cs * tIn_acc[S]
-        + cn * tIn_acc[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn_acc[c] + ct * amb_temp;
+      temp3 = d_tIn[c+xy];
+      d_tOut[c] = cc * temp2 + cw * d_tIn[W] + ce * d_tIn[E] + cs * d_tIn[S]
+        + cn * d_tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * d_pIn[c] + ct * amb_temp;
       c += xy;
       W += xy;
       E += xy;
@@ -35,7 +35,5 @@
   }
   temp1 = temp2;
   temp2 = temp3;
-  tOut_acc[c] = cc * temp2 + cw * tIn_acc[W] + ce * tIn_acc[E] + cs * tIn_acc[S]
-    + cn * tIn_acc[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn_acc[c] + ct * amb_temp;
-
-
+  d_tOut[c] = cc * temp2 + cw * d_tIn[W] + ce * d_tIn[E] + cs * d_tIn[S]
+    + cn * d_tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * d_pIn[c] + ct * amb_temp;

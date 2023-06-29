@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <omp.h>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "oneapi/mkl/blas.hpp"
 #include "wtcalc.h"
 #include "asaxpy.h"
@@ -33,11 +33,10 @@ void asaxpy(const int n,
             const int ial)
 {
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   struct timespec rt[2];
   int m = (n >> 4);
@@ -165,18 +164,24 @@ void asaxpy(const int n,
 /*
  * axpy in MKL
  */
-  sycl::buffer<float, 1> x_dev(x, n);
-  sycl::buffer<float, 1> y_dev(y, n);
+  float *x_dev = sycl::malloc_device<float>(n, q);
+  q.memcpy(x_dev, x, sizeof(float) * n);
+  float *y_dev = sycl::malloc_device<float>(n, q);
+  q.memcpy(y_dev, y, sizeof(float) * n);
+  q.wait();
+
   clock_gettime(CLOCK_REALTIME, rt + 0);
   try {
-    oneapi::mkl::blas::axpy(q, n, a, x_dev, 1, y_dev, 1);
-    q.wait();
+    oneapi::mkl::blas::row_major::axpy(q, n, a, x_dev, 1, y_dev, 1).wait();
   }
   catch(sycl::exception const& e) {
     std::cout << "\t\tCaught synchronous SYCL exception during AXPY:\n"
                   << e.what() << std::endl;
   }
   clock_gettime(CLOCK_REALTIME, rt + 1);
+  q.memcpy(y, y_dev, sizeof(float) * n).wait();
+  sycl::free(x_dev, q);
+  sycl::free(y_dev, q);
     break;
   } /* end switch (ial) */
 

@@ -42,7 +42,7 @@ DOUBLE get_time_eikonal(DOUBLE a, DOUBLE b, DOUBLE c, DOUBLE s)
 
 SYCL_EXTERNAL
 void run_solver(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const double*__restrict spd,
   const bool*__restrict mask,
   const DOUBLE *__restrict sol_in,
@@ -88,7 +88,7 @@ void run_solver(
 
     // copy global to shared memory
     //dim3 idx(tx+1,ty+1,tz+1);
-    range<3> idx (tz+1,ty+1,tx+1);
+    sycl::range<3> idx (tz+1,ty+1,tx+1);
 
     SOL(idx[2],idx[1],idx[0]) = sol_in[base_addr + tIdx];
     F = spd[base_addr + tIdx];
@@ -231,7 +231,7 @@ void run_solver(
 
 SYCL_EXTERNAL
 void run_reduction(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const bool *__restrict con,
   bool *__restrict listVol,
   const uint *__restrict list,
@@ -283,7 +283,7 @@ void run_reduction(
 
 SYCL_EXTERNAL
 void run_check_neighbor(
-  nd_item<3> &item,
+  sycl::nd_item<3> &item,
   const double*__restrict spd,
   const bool*__restrict mask,
   const DOUBLE *__restrict sol_in,
@@ -333,7 +333,7 @@ void run_check_neighbor(
 
       // copy global to shared memory
       //dim3 idx(tx+1,ty+1,tz+1);
-      range<3> idx (tz+1,ty+1,tx+1);
+      sycl::range<3> idx (tz+1,ty+1,tx+1);
 
       _sol[idx[2]][idx[1]][idx[0]] = sol_in[base_addr + tIdx];
       F = spd[base_addr + tIdx];

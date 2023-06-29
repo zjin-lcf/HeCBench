@@ -28,12 +28,12 @@
 
 #define INDEX(i,j,j_off)  (i + sycl::mul24(j,j_off))
 
-#define syncthreads() item.barrier(access::fence_space::local_space)
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 // device code
 
 void laplace3d(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   int NX, int NY, int NZ, int pitch, 
   const float *__restrict d_u1,
         float *__restrict d_u2,

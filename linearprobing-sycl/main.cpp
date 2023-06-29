@@ -42,12 +42,12 @@ std::vector<KeyValue> shuffle_keyvalues(std::mt19937& rnd, std::vector<KeyValue>
 
 using Time = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-Time start_timer() 
+Time start_timer()
 {
   return std::chrono::high_resolution_clock::now();
 }
 
-double get_elapsed_time(Time start) 
+double get_elapsed_time(Time start)
 {
   Time end = std::chrono::high_resolution_clock::now();
 
@@ -56,7 +56,7 @@ double get_elapsed_time(Time start)
   return us.count() / 1000.0f;
 }
 
-void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs) 
+void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs)
 {
   Time timer = start_timer();
 
@@ -64,7 +64,7 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   {
     std::unordered_map<uint32_t, uint32_t> kvs_map;
-    for (auto& kv : insert_kvs) 
+    for (auto& kv : insert_kvs)
     {
       kvs_map[kv.key] = kv.value;
     }
@@ -78,13 +78,13 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
 
   double milliseconds = get_elapsed_time(timer);
   double seconds = milliseconds / 1000.0f;
-  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n", 
+  printf("Total time for std::unordered_map: %f ms (%f million keys/second)\n",
       milliseconds, kNumKeyValues / seconds / 1000000.0f);
 }
 
 void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
   if (argc != 3) {
     printf("Usage: %s <number of insert batches> <number of delete batches>\n", argv[0]);
@@ -111,37 +111,31 @@ int main(int argc, char* argv[])
       (uint32_t)insert_kvs.size(), (uint32_t)delete_kvs.size());
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Time timer = start_timer();
 
   // Create a hash table. For linear probing, this is just an array of KeyValues
-  buffer<KeyValue, 1> pHashTable (kHashTableCapacity);
+  KeyValue *pHashTable = sycl::malloc_device<KeyValue>(kHashTableCapacity, q);
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
-  q.submit([&] (handler &cgh) {
-    auto acc = pHashTable.get_access<sycl_discard_write>(cgh);
-    cgh.fill(acc, {kEmpty, kEmpty});
-  });
+  q.memset(pHashTable, kEmpty, sizeof(KeyValue) * kHashTableCapacity);
 
   double total_ktime = 0.0;
 
   // Insert items into the hash table
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
 
-  buffer<KeyValue, 1> pInsertKvs (num_inserts_per_batch);
+  KeyValue *pInsertKvs = sycl::malloc_device<KeyValue>(num_inserts_per_batch, q);
 
   for (uint32_t i = 0; i < num_insert_batches; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto acc = pInsertKvs.get_access<sycl_discard_write>(cgh);
-      cgh.copy(insert_kvs.data() + i * num_inserts_per_batch, acc);
-    });
+    q.memcpy(pInsertKvs, insert_kvs.data() + i * num_inserts_per_batch,
+             sizeof(KeyValue) * num_inserts_per_batch);
 
     total_ktime += insert_hashtable(q, pHashTable, pInsertKvs, num_inserts_per_batch);
   }
@@ -151,14 +145,12 @@ int main(int argc, char* argv[])
   total_ktime = 0.0;
   uint32_t num_deletes_per_batch = (uint32_t)delete_kvs.size() / num_delete_batches;
 
-  buffer<KeyValue, 1> pDeleteKvs (num_deletes_per_batch);
+  KeyValue *pDeleteKvs = sycl::malloc_device<KeyValue>(num_deletes_per_batch, q);
 
   for (uint32_t i = 0; i < num_delete_batches; i++)
   {
-    q.submit([&] (handler &cgh) {
-      auto acc = pDeleteKvs.get_access<sycl_discard_write>(cgh);
-      cgh.copy(delete_kvs.data() + i * num_deletes_per_batch, acc);
-    });
+    q.memcpy(pDeleteKvs, delete_kvs.data() + i * num_deletes_per_batch,
+             sizeof(KeyValue) * num_deletes_per_batch);
 
     total_ktime += delete_hashtable(q, pHashTable, pDeleteKvs, num_deletes_per_batch);
   }
@@ -166,6 +158,10 @@ int main(int argc, char* argv[])
 
   // Get all the key-values from the hash table
   std::vector<KeyValue> kvs = iterate_hashtable(q, pHashTable);
+
+  sycl::free(pHashTable, q);
+  sycl::free(pInsertKvs, q);
+  sycl::free(pDeleteKvs, q);
 
   // Summarize results
   double milliseconds = get_elapsed_time(timer);

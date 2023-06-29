@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <mpi.h>
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "oneapi/mkl/blas.hpp"
 #include "mkl.h"
 
@@ -87,32 +87,37 @@ class Matrix {
   public:
 
     typedef P_ P;
-    buffer<P_, 1> db;  // a public member for easy access to the buffer 
 
     //----------
 
-    Matrix(size_t num_row, size_t num_col)
+    Matrix(size_t num_row, size_t num_col, sycl::queue &queue)
       // compiler may reorder the initialization order
       : num_row_(num_row)
       , num_col_(num_col)
       , num_row_up_(((num_row+ROUNDUP-1)/ROUNDUP)*ROUNDUP)
       , num_col_up_(((num_col+ROUNDUP-1)/ROUNDUP)*ROUNDUP)
       , num_elt_up_(num_row_up_ * num_col_up_)
-      , sizeP(sizeof(P)) 
-      , db{((num_row+ROUNDUP-1)/ROUNDUP*ROUNDUP)*((num_col+ROUNDUP-1)/ROUNDUP*ROUNDUP)} {
+      , sizeP(sizeof(P))
+      , q(queue) {
 
       h_ = (P *) mkl_malloc(num_elt_up_ * sizeP, 64);
       ASSERT(h_ && "Failure in host memory allocation");
       memset((void*)h_, 0, num_elt_up_ * sizeP);
+
+      d_ = sycl::malloc_device<P>(num_elt_up_, q);
+      ASSERT(d_ && "Failure in device memory allocation");
     }
 
     //----------
 
     ~Matrix() {
       mkl_free(h_);
+      sycl::free(d_, q);
     }
 
     //----------
+
+    P* d() const {return d_;}
 
     size_t nr() const {return num_row_;}
     size_t nc() const {return num_col_;}
@@ -134,20 +139,14 @@ class Matrix {
 
     //----------
 
-    void to_device(queue &q) {
-      q.submit([&] (handler &cgh) {
-        auto acc = db.template get_access<sycl_discard_write>(cgh);
-        cgh.copy(h_, acc);
-      });
+    void to_device() {
+      q.memcpy(d_, h_, num_elt_up_ * sizeP);
     }
 
     //----------
 
-    void from_device(queue &q) {
-      q.submit([&] (handler &cgh) {
-        auto acc = db.template get_access<sycl_read>(cgh);
-        cgh.copy(acc, h_);
-      }).wait();
+    void from_device() {
+      q.memcpy(h_, d_, num_elt_up_ * sizeP).wait();
     }
 
     //----------
@@ -160,8 +159,10 @@ class Matrix {
     size_t num_col_up_;
     size_t num_elt_up_;
     size_t sizeP;
+    sycl::queue q;
 
     P* h_;
+    P* d_;
 
     // Disallowed methods.
     Matrix(const Matrix&);
@@ -201,10 +202,10 @@ size_t nonzero_stride(const size_t& i) {
 
 template<class Matrix_t>
 void set_input_matrix_kernel(
-  nd_item<1> &item, 
-  size_t nr, size_t nc, size_t nru, 
-  typename Matrix_t::P* d,
-  size_t base_vector_num, 
+  sycl::nd_item<1> &item,
+  size_t nr, size_t nc, size_t nru,
+  typename Matrix_t::P *d,
+  size_t base_vector_num,
   typename Matrix_t::P value) {
 
   const size_t index = item.get_global_id(0);
@@ -232,25 +233,26 @@ void set_input_matrix_kernel(
 
 template<class Matrix_t>
 void set_input_matrix(
-  queue &q, 
-  Matrix_t& a, 
+  sycl::queue &q,
+  Matrix_t& a,
   size_t base_vector_num,
   typename Matrix_t::P value) {
 
   const int threadblocksize = 256;
-  const int num_threadblocks = (a.nr() * a.nc() + threadblocksize - 1) / 
+  const int num_threadblocks = (a.nr() * a.nc() + threadblocksize - 1) /
 	                       threadblocksize * threadblocksize;
 
-  range<1> gws (num_threadblocks);
-  range<1> lws (threadblocksize);
-  const size_t nr = a.nr(); 
-  const size_t nc = a.nc(); 
-  const size_t nru = a.nru(); 
-  q.submit([&] (handler &cgh) {
-    auto d_acc = a.db.template get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  sycl::range<1> gws (num_threadblocks);
+  sycl::range<1> lws (threadblocksize);
+  const size_t nr = a.nr();
+  const size_t nc = a.nc();
+  const size_t nru = a.nru();
+  const auto d = a.d();
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class initialize>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       set_input_matrix_kernel<Matrix_t> (item, nr, nc, nru,
-                                         d_acc.get_pointer(), base_vector_num, value);
+                                         d, base_vector_num, value);
     });
   });
 }
@@ -266,7 +268,7 @@ size_t elt_hash(size_t v, size_t r, size_t c) {
 //-----------------------------------------------------------------------------
 
 template<typename TCS, typename GemmIn_t, typename GemmOut_t>
-void perform_gemm(queue &q, size_t m, size_t n, size_t k,
+void perform_gemm(sycl::queue &q, size_t m, size_t n, size_t k,
   Matrix<GemmIn_t>& tc_buf_left, Matrix<GemmIn_t>& tc_buf_right,
   Matrix<GemmOut_t>& c_buf) {
 
@@ -277,14 +279,14 @@ void perform_gemm(queue &q, size_t m, size_t n, size_t k,
   oneapi::mkl::transpose transB = oneapi::mkl::transpose::trans;
 
   oneapi::mkl::blas::gemm(
-    q, 
-    transA, transB, 
-    m, n, k, 
-    alpha, 
-    tc_buf_left.db, tc_buf_left.nru(),
-    tc_buf_right.db, tc_buf_right.nru(),
+    q,
+    transA, transB,
+    m, n, k,
+    alpha,
+    tc_buf_left.d(), tc_buf_left.nru(),
+    tc_buf_right.d(), tc_buf_right.nru(),
     beta,
-    c_buf.db, c_buf.nru()
+    c_buf.d(), c_buf.nru()
   );
 
 /*  cblas as a reference
@@ -330,11 +332,10 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
 
   // SYCL initializations.
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Matrix setup.
 
@@ -349,12 +350,12 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
   const size_t n = m;
   const size_t k = num_field_local;
 
-  Matrix<GemmIn_t> tc_buf_left(m, k);
-  Matrix<GemmIn_t> tc_buf_right(n, k);
-  Matrix<GemmOut_t> c_buf(m, n);
+  Matrix<GemmIn_t> tc_buf_left(m, k, q);
+  Matrix<GemmIn_t> tc_buf_right(n, k, q);
+  Matrix<GemmOut_t> c_buf(m, n, q);
 
   set_input_matrix(q, tc_buf_left, base_vector_num_left, one);
-  c_buf.to_device(q);
+  c_buf.to_device();
 
   // Loop over steps.
 
@@ -426,7 +427,7 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
       }
 
       if (is_step_active) {
-        c_buf.from_device(q);
+        c_buf.from_device();
 
         const int check_freq1 = 89; // spot check, for speed.
         const int check_freq2 = 113;
@@ -438,7 +439,7 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
             // WARNING: lcm can be slow, is not O(1) complexity.
             const size_t l = lcm(stride1, stride2);
             const size_t value = c_buf.elt(r,c);
-            ASSERT(c_buf.elt(r,c) == 1 + (k-1)/l && "Error in compiuted result.");
+            ASSERT(c_buf.elt(r,c) == 1 + (k-1)/l && "Error in computed result.");
           }
         }
       } // if is_step_active
@@ -482,7 +483,7 @@ void perform_run(size_t num_vector, size_t num_field, int num_iterations) {
   const double timetotal= timetotal2 - timetotal1;
 
   if (proc_num == 0) {
-    printf("TF %.3f GEMM sec %.3f GEMM TF/sec %.3f total sec %.3f hash %zu\n",
+    printf("TFLOPS %.3f\nGEMM time %.3f (s)\nGEMM TFLOPS/s %.3f\nTotal time %.3f (s)\nhash %zu\n",
       flops/1e12, timegemm, flops*1e-12/timegemm, timetotal, hash);
   }
 }

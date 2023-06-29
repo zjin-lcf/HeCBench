@@ -1,29 +1,31 @@
-/* 
+/*
  * NMS Benchmarking Framework
  *
  * "Work-Efficient Parallel Non-Maximum Suppression Kernels"
  * Copyright (c) 2019 David Oro et al.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define MAX_DETECTIONS  4096
 #define N_PARTITIONS    32
+
+using float4 = sycl::float4;
 
 void print_help()
 {
@@ -38,7 +40,7 @@ int get_optimal_dim(int val)
 {
   int div, neg, cntneg, cntpos;
 
-  /* We start figuring out if 'val' is divisible by 16 
+  /* We start figuring out if 'val' is divisible by 16
      (e.g. optimal 16x16 thread block of maximum GPU occupancy */
 
   neg = 1;
@@ -46,7 +48,7 @@ int get_optimal_dim(int val)
   cntneg = div;
   cntpos = div;
 
-  /* In order to guarantee the ending of this loop if 'val' is 
+  /* In order to guarantee the ending of this loop if 'val' is
      a prime number, we limit the loop to 5 iterations */
 
   for(int i=0; i<5; i++)
@@ -129,7 +131,7 @@ int main(int argc, char *argv[])
        printf("Error: Invalid file format in line %d when reading %s\n", ndetections, argv[1]);
        return -1;
     }
- 
+
     cpu_points[ndetections].x() = (float) x;       // x coordinate
     cpu_points[ndetections].y() = (float) y;       // y coordinate
     cpu_points[ndetections].z() = (float) w;       // window dimensions
@@ -143,56 +145,55 @@ int main(int argc, char *argv[])
   fclose(fp);
 
   /* CPU array for storing the detection bitmap */
-  size_t pts_bm_size = sizeof(uchar) * MAX_DETECTIONS;
-  uchar* cpu_pointsbitmap;
-  cpu_pointsbitmap = (uchar*) malloc(pts_bm_size);
+  size_t pts_bm_size = sizeof(unsigned char) * MAX_DETECTIONS;
+  unsigned char* cpu_pointsbitmap;
+  cpu_pointsbitmap = (unsigned char*) malloc(pts_bm_size);
   memset(cpu_pointsbitmap, 0, pts_bm_size);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   /* GPU array for storing the coordinates, dimensions and score of each detected object */
-  float4 *rects = malloc_device<float4>(MAX_DETECTIONS, q);
+  float4 *rects = sycl::malloc_device<float4>(MAX_DETECTIONS, q);
   q.memcpy(rects, cpu_points, size);
 
   /* GPU array for storing the non-maximum supression bitmap */
-  size_t nms_bm_size = sizeof(uchar) * MAX_DETECTIONS * MAX_DETECTIONS;
-  uchar *nmsbitmap = malloc_device<uchar>(MAX_DETECTIONS * MAX_DETECTIONS, q);
-  q.memset(nmsbitmap, (uchar)1, nms_bm_size);
+  size_t nms_bm_size = sizeof(unsigned char) * MAX_DETECTIONS * MAX_DETECTIONS;
+  unsigned char *nmsbitmap = sycl::malloc_device<unsigned char>(MAX_DETECTIONS * MAX_DETECTIONS, q);
+  q.memset(nmsbitmap, (unsigned char)1, nms_bm_size);
 
   /* GPU array for storing the detection bitmap */
-  uchar *pointsbitmap = malloc_device<uchar>(MAX_DETECTIONS, q);
-  q.memset(pointsbitmap, (uchar)0, pts_bm_size);
+  unsigned char *pointsbitmap = sycl::malloc_device<unsigned char>(MAX_DETECTIONS, q);
+  q.memset(pointsbitmap, (unsigned char)0, pts_bm_size);
 
   /* Execute NMS on the GPU */
 
   /* We build up the non-maximum supression bitmap matrix by removing overlapping windows */
   int repeat = atoi(argv[3]);
   int limit = get_upper_limit(ndetections, 16);
-  range<2> gen_gws(limit, limit);
-  range<2> gen_lws(get_optimal_dim(limit), get_optimal_dim(limit));
+  sycl::range<2> gen_gws(limit, limit);
+  sycl::range<2> gen_lws(get_optimal_dim(limit), get_optimal_dim(limit));
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class generate>(nd_range<2>(gen_gws, gen_lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class generate>(sycl::nd_range<2>(gen_gws, gen_lws), [=] (sycl::nd_item<2> item) {
         const int i = item.get_global_id(1);
         const int j = item.get_global_id(0);
         if(rects[i].w() < rects[j].w())
         {
           float area = (rects[j].z() + 1.0f) * (rects[j].z() + 1.0f);
-          float w = sycl::fmax(0.0f, sycl::fmin(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) - 
+          float w = sycl::fmax(0.0f, sycl::fmin(rects[i].x() + rects[i].z(), rects[j].x() + rects[j].z()) -
                     sycl::fmax(rects[i].x(), rects[j].x()) + 1.0f);
-          float h = sycl::fmax(0.0f, sycl::fmin(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) - 
+          float h = sycl::fmax(0.0f, sycl::fmin(rects[i].y() + rects[i].z(), rects[j].y() + rects[j].z()) -
                     sycl::fmax(rects[i].y(), rects[j].y()) + 1.0f);
           nmsbitmap[i * MAX_DETECTIONS + j] = (((w * h) / area) < 0.3f) && (rects[j].z() != 0);
-        } 
+        }
       });
     });
   }
@@ -203,27 +204,27 @@ int main(int argc, char *argv[])
   printf("Average kernel execution time (generate_nms_bitmap): %f (s)\n", (time * 1e-9f) / repeat);
 
   /* Then we perform a reduction for generating a point bitmap vector */
-  range<1> reduce_gws (ndetections * MAX_DETECTIONS / N_PARTITIONS); 
-  range<1> reduce_lws (MAX_DETECTIONS / N_PARTITIONS); 
+  sycl::range<1> reduce_gws (ndetections * MAX_DETECTIONS / N_PARTITIONS);
+  sycl::range<1> reduce_lws (MAX_DETECTIONS / N_PARTITIONS);
 
   start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class reduce>(nd_range<1>(reduce_gws, reduce_lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class reduce>(sycl::nd_range<1>(reduce_gws, reduce_lws), [=] (sycl::nd_item<1> item) {
         auto g = item.get_group();
         int bid = item.get_group(0);
         int lid = item.get_local_id(0);
         int idx = bid * MAX_DETECTIONS + lid;
 
-        pointsbitmap[bid] = (item.barrier(access::fence_space::local_space),
-                            ext::oneapi::all_of(g, nmsbitmap[idx]));
+        pointsbitmap[bid] = (item.barrier(sycl::access::fence_space::local_space),
+                             sycl::all_of_group(g, nmsbitmap[idx]));
 
         for(int i=0; i<(N_PARTITIONS-1); i++)
         {
           idx += MAX_DETECTIONS / N_PARTITIONS;
-          pointsbitmap[bid] = (item.barrier(access::fence_space::local_space),
-                              ext::oneapi::all_of(g, pointsbitmap[bid] && nmsbitmap[idx]));
+          pointsbitmap[bid] = (item.barrier(sycl::access::fence_space::local_space),
+                              sycl::all_of_group(g, pointsbitmap[bid] && nmsbitmap[idx]));
         }
       });
     });
@@ -237,9 +238,9 @@ int main(int argc, char *argv[])
   /* Dump detections after having performed the NMS */
   q.memcpy(cpu_pointsbitmap, pointsbitmap, pts_bm_size).wait();
 
-  free(pointsbitmap, q);
-  free(nmsbitmap, q);
-  free(rects, q);
+  sycl::free(pointsbitmap, q);
+  sycl::free(nmsbitmap, q);
+  sycl::free(rects, q);
 
   fp = fopen(argv[2], "w");
   if (!fp)
@@ -258,7 +259,7 @@ int main(int argc, char *argv[])
       w = (int) cpu_points[i].z();          // window dimensions
       score = cpu_points[i].w();            // score
       fprintf(fp, "%d,%d,%d,%f\n", x, y, w, score);
-      totaldets++; 
+      totaldets++;
     }
   }
   fclose(fp);

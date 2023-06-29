@@ -86,20 +86,23 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   int doubles = fread(cbuf, 8, MAX, fp);
   if (doubles != MAX) {
     fprintf(stderr, "Error in reading input.bin. Exit\n");
+    if (cbuf != NULL) free(cbuf);
     fclose(fp);
     return ;
   }
   fclose(fp);
 
+  const int num_warps = blocks * warpsperblock;
+
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data
   if (dbuf == NULL) {
     fprintf(stderr, "cannot allocate dbuf\n");
   }
-  int *cut = (int *)malloc(sizeof(int) * blocks * warpsperblock); // chunk boundaries
+  int *cut = (int *)malloc(sizeof(int) * num_warps); // chunk boundaries
   if (cut == NULL) {
     fprintf(stderr, "cannot allocate cut\n");
   }
-  int *off = (int *)malloc(sizeof(int) * blocks * warpsperblock); // offset table
+  int *off = (int *)malloc(sizeof(int) * num_warps); // offset table
   if (off == NULL) {
     fprintf(stderr, "cannot allocate off\n");
   }
@@ -109,11 +112,11 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   doubles += padding;
 
   // determine chunk assignments per warp
-  int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock);
+  int per = (doubles + num_warps - 1) / (num_warps);
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
   int curr = 0, before = 0, d = 0;
-  for (int i = 0; i < blocks * warpsperblock; i++) {
+  for (int i = 0; i < num_warps; i++) {
     curr += per;
     cut[i] = min(curr, doubles);
     if (cut[i] - before > 0) {
@@ -145,17 +148,17 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   if (cudaSuccess != cudaMalloc((void **)&dbufl, sizeof(char) * ((doubles+1)/2*17)))
     fprintf(stderr, "could not allocate dbufd\n");
 
-  if (cudaSuccess != cudaMalloc((void **)&cutl, sizeof(int) * blocks * warpsperblock))
+  if (cudaSuccess != cudaMalloc((void **)&cutl, sizeof(int) * num_warps))
     fprintf(stderr, "could not allocate cutd\n");
 
-  if (cudaSuccess != cudaMalloc((void **)&offl, sizeof(int) * blocks * warpsperblock))
+  if (cudaSuccess != cudaMalloc((void **)&offl, sizeof(int) * num_warps))
     fprintf(stderr, "could not allocate offd\n");
 
   // copy CPU buffer contents to GPU
   if (cudaSuccess != cudaMemcpy(cbufl, cbuf, sizeof(ull) * doubles, cudaMemcpyHostToDevice))
     fprintf(stderr, "copying of cbuf to device failed\n");
 
-  if (cudaSuccess != cudaMemcpy(cutl, cut, sizeof(int) * blocks * warpsperblock, cudaMemcpyHostToDevice))
+  if (cudaSuccess != cudaMemcpy(cutl, cut, sizeof(int) * num_warps, cudaMemcpyHostToDevice))
     fprintf(stderr, "copying of cut to device failed\n");
 
   cudaDeviceSynchronize();
@@ -171,7 +174,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer offsets back to CPU
-  if(cudaSuccess != cudaMemcpy(off, offl, sizeof(int) * blocks * warpsperblock, cudaMemcpyDeviceToHost))
+  if(cudaSuccess != cudaMemcpy(off, offl, sizeof(int) * num_warps, cudaMemcpyDeviceToHost))
     fprintf(stderr, "copying of off from device failed\n");
 
   // output header
@@ -191,7 +194,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
   num = fwrite(&doublecnt, 4, 1, fp);
   assert(1 == num);
   // output offset table
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int start = 0;
     if(i > 0) start = cut[i-1];
     off[i] -= ((start+1)/2*17);
@@ -199,7 +202,7 @@ static void Compress(int blocks, int warpsperblock, int repeat, int dimensionali
     assert(1 == num);
   }
   // output compressed data by chunk
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int offset, start = 0;
     if(i > 0) start = cut[i-1];
     offset = ((start+1)/2*17);

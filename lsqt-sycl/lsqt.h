@@ -18,10 +18,10 @@
 */
 
 #pragma once
-#include "common.h"
 #include <string>
+#include <sycl/sycl.hpp>
 
-extern queue q; 
+extern sycl::queue q;
 
 #ifdef USE_SP
 typedef float real; // single precision

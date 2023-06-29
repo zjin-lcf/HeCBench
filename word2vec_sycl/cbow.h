@@ -18,12 +18,12 @@
 #define THREADS_PER_WORD 128
 #define BLOCK_SIZE 128
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 typedef float real;
 
-void TrainGPU(queue &q, int sentence_num);
-void GetResultFromGPU(queue &q);
-void initializeGPU(queue &q);
-void cleanUpGPU(queue &q);
+void TrainGPU(sycl::queue &q, int sentence_num);
+void GetResultFromGPU(sycl::queue &q);
+void initializeGPU(sycl::queue &q);
+void cleanUpGPU(sycl::queue &q);
 
 #endif /* CBOW_H_ */

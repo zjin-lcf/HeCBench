@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 void vanGenuchten(
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 
   double *Ksat, *psi, *C, *theta, *K;
   double *C_ref, *theta_ref, *K_ref;
-  
+
   Ksat = new double[size];
   psi = new double[size];
   C = new double[size];
@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
 
   // arbitrary numbers
   for (int i = 0; i < size; i++) {
-    Ksat[i] = 1e-6 +  (1.0 - 1e-6) * i / size; 
+    Ksat[i] = 1e-6 +  (1.0 - 1e-6) * i / size;
     psi[i] = -100.0 + 101.0 * i / size;
   }
 
@@ -90,11 +90,10 @@ int main(int argc, char* argv[])
   reference(Ksat, psi, C_ref, theta_ref, K_ref, size);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   double *d_Ksat, *d_psi, *d_C, *d_theta, *d_K;
   d_Ksat = (double *)sycl::malloc_device(size_byte, q);
@@ -133,7 +132,7 @@ int main(int argc, char* argv[])
 
   bool ok = true;
   for (int i = 0; i < size; i++) {
-    if (fabs(C[i] - C_ref[i]) > 1e-3 || 
+    if (fabs(C[i] - C_ref[i]) > 1e-3 ||
         fabs(theta[i] - theta_ref[i]) > 1e-3 ||
         fabs(K[i] - K_ref[i]) > 1e-3) {
       ok = false;

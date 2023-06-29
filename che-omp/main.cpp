@@ -3,8 +3,8 @@
 #include <chrono>
 #include <iostream>
 #include <random>
-#include <omp.h>
 #include <fstream>
+#include <omp.h>
 
 //define the data set size for a cubic volume
 #define DATAXSIZE 256
@@ -240,6 +240,7 @@ int main(int argc, char *argv[])
   const int ny = DATAYSIZE;
   const int nz = DATAZSIZE;
   const int vol = nx * ny * nz;
+  const size_t vol_bytes = vol * sizeof(double);
 
   // pointers for data set storage via malloc
   nRarray *cold; // storage for result stored on host
@@ -247,19 +248,19 @@ int main(int argc, char *argv[])
   nRarray *muold;
   nRarray *fold;
 
-  if ((cold = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((cold = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"cold host malloc failed\n"); 
     return 1;
   }
-  if ((cnew = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((cnew = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"cnew host malloc failed\n"); 
     return 1;
   }
-  if ((muold = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((muold = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"muold host malloc failed\n"); 
     return 1;
   }
-  if ((fold = (nRarray *)malloc(vol*sizeof(double))) == 0) {
+  if ((fold = (nRarray *)malloc(vol_bytes)) == 0) {
     fprintf(stderr,"fold host malloc failed\n"); 
     return 1;
   }

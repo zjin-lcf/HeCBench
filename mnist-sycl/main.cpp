@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define USE_MNIST_LOADER
 #define MNIST_DOUBLE
@@ -19,17 +19,13 @@ static inline void loaddata()
 }
 
 // replace cublas function in the case n = 10
-void snrm2(queue &q, const int n, buffer<float, 1> &x, float &result) {
+void snrm2(sycl::queue &q, const int n, float *x, float &result) {
   if (n <= 0) {
     result = 0.f;
     return;
   }
   float *r = (float*) malloc (n * sizeof(float));
-
-  q.submit([&] (handler &cgh) {
-    auto acc = x.get_access<sycl_read>(cgh);
-    cgh.copy(acc, r);
-  }).wait();
+  q.memcpy(r, x, n * sizeof(float)).wait();
 
   float sum = 0.f;
   for (int i = 0; i < n; i++) sum += r[i] * r[i];
@@ -39,17 +35,17 @@ void snrm2(queue &q, const int n, buffer<float, 1> &x, float &result) {
 
 // Forward propagation of a single row in dataset
 void forward_pass(
-  queue &q,
+  sycl::queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
   Layer &l_f,
   double data[28][28])
 {
-  l_input.clear(q);
-  l_c1.clear(q);
-  l_s1.clear(q);
-  l_f.clear(q);
+  l_input.clear();
+  l_c1.clear();
+  l_s1.clear();
+  l_f.clear();
 
   float input[28][28];
   for (int i = 0; i < 28; ++i) {
@@ -57,270 +53,243 @@ void forward_pass(
       input[i][j] = data[i][j];
     }
   }
-  l_input.setOutput(q, (float *)input);
+  l_input.setOutput((float *)input);
 
-  range<1> gws (64 * 64);
-  range<1> lws (64);
+  sycl::range<1> gws (64 * 64);
+  sycl::range<1> lws (64);
 
   // fp_preact_c1<<<64, 64>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
-  auto in_o_re = l_input.output.reinterpret<float[28]>(range<1>(28));
-  auto c1_p_re = l_c1.preact.reinterpret<float[24][24]>(range<1>(6));
-  auto c1_w_re = l_c1.weight.reinterpret<float[5][5]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto o = in_o_re.get_access<sycl_read>(cgh);
-    auto p = c1_p_re.get_access<sycl_read_write>(cgh);
-    auto w = c1_w_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class fw_preact_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_preact_c1(item, o.get_pointer(), p.get_pointer(), w.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto o = (float (*)[28])l_input.output;
+    auto p = (float (*)[24][24])l_c1.preact;
+    auto w = (float (*)[5][5])l_c1.weight;
+    cgh.parallel_for<class fw_preact_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_preact_c1(item, o, p, w);
     });
   });
 
   // fp_bias_c1<<<64, 64>>>((float (*)[24][24])l_c1.preact, l_c1.bias);
   // auto c1_p_re = l_c1.preact.reinterpret<float[24][24]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto p = c1_p_re.get_access<sycl_read_write>(cgh);
-    auto b = l_c1.bias.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class fw_bias_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_bias_c1(item, p.get_pointer(), b.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = (float (*)[24][24])l_c1.preact;
+    auto b = l_c1.bias;
+    cgh.parallel_for<class fw_bias_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_bias_c1(item, p, b);
     });
   });
 
   // apply_step_function<<<64, 64>>>(l_c1.preact, l_c1.output, l_c1.O);
-  const int l_c1_O = l_c1.O;
-  q.submit([&] (handler &cgh) {
-    auto p = l_c1.preact.get_access<sycl_read>(cgh);
-    auto o = l_c1.output.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class c1_step>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_step_function(item, p.get_pointer(), o.get_pointer(), l_c1_O);
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = l_c1.preact;
+    auto o = l_c1.output;
+    auto l_c1_O = l_c1.O;
+    cgh.parallel_for<class c1_step>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_step_function(item, p, o, l_c1_O);
     });
   });
 
   // fp_preact_s1<<<64, 64>>>((float (*)[24][24])l_c1.output, (float (*)[6][6])l_s1.preact, (float (*)[4][4])l_s1.weight);
-  auto c1_o_re = l_c1.output.reinterpret<float[24][24]>(range<1>(6));
-  auto s1_p_re = l_s1.preact.reinterpret<float[6][6]>(range<1>(6));
-  auto s1_w_re = l_s1.weight.reinterpret<float[4][4]>(range<1>(1));
-  q.submit([&] (handler &cgh) {
-    auto o = c1_o_re.get_access<sycl_read>(cgh);
-    auto p = s1_p_re.get_access<sycl_read_write>(cgh);
-    auto w = s1_w_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class preact_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_preact_s1(item, o.get_pointer(), p.get_pointer(), w.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto o = (float (*)[24][24])l_c1.output;
+    auto p = (float (*)[6][6])l_s1.preact;
+    auto w = (float (*)[4][4])l_s1.weight;
+    cgh.parallel_for<class preact_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_preact_s1(item, o, p, w);
     });
   });
 
   // fp_bias_s1<<<64, 64>>>((float (*)[6][6])l_s1.preact, l_s1.bias);
   //auto s1_p_re = l_s1.preact.reinterpret<float[6][6]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto p = s1_p_re.get_access<sycl_read_write>(cgh);
-    auto b = l_s1.bias.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class fw_bias_s1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_bias_s1(item, p.get_pointer(), b.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = (float (*)[6][6])l_s1.preact;
+    auto b = l_s1.bias;
+    cgh.parallel_for<class fw_bias_s1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_bias_s1(item, p, b);
     });
   });
 
 
   // apply_step_function<<<64, 64>>>(l_s1.preact, l_s1.output, l_s1.O);
   const int l_s1_O = l_s1.O;
-  q.submit([&] (handler &cgh) {
-    auto p = l_s1.preact.get_access<sycl_read>(cgh);
-    auto o = l_s1.output.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class s1_step>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_step_function(item, p.get_pointer(), o.get_pointer(), l_s1_O);
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = l_s1.preact;
+    auto o = l_s1.output;
+    cgh.parallel_for<class s1_step>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_step_function(item, p, o, l_s1_O);
     });
   });
 
   //fp_preact_f<<<64, 64>>>((float (*)[6][6])l_s1.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
-  auto s1_o_re = l_s1.output.reinterpret<float[6][6]>(range<1>(6));
-  auto f_w_re = l_f.weight.reinterpret<float[6][6][6]>(range<1>(10));
-  q.submit([&] (handler &cgh) {
-    auto o = s1_o_re.get_access<sycl_read>(cgh);
-    auto p = l_f.preact.get_access<sycl_read_write>(cgh);
-    auto w = f_w_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class preact_f>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_preact_f(item, o.get_pointer(), p.get_pointer(), w.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto o = (float (*)[6][6])l_s1.output;
+    auto p = l_f.preact;
+    auto w = (float (*)[6][6][6])l_f.weight;
+    cgh.parallel_for<class preact_f>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_preact_f(item, o, p, w);
     });
   });
 
   // fp_bias_f<<<64, 64>>>(l_f.preact, l_f.bias);
-  q.submit([&] (handler &cgh) {
-    auto p = l_f.preact.get_access<sycl_read_write>(cgh);
-    auto b = l_f.bias.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class fw_bias_f>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      fp_bias_f(item, p.get_pointer(), b.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = l_f.preact;
+    auto b = l_f.bias;
+    cgh.parallel_for<class fw_bias_f>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      fp_bias_f(item, p, b);
     });
   });
 
   // apply_step_function<<<64, 64>>>(l_f.preact, l_f.output, l_f.O);
-  const int l_f_O = l_f.O;
-  q.submit([&] (handler &cgh) {
-    auto p = l_f.preact.get_access<sycl_read>(cgh);
-    auto o = l_f.output.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class f_step>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_step_function(item, p.get_pointer(), o.get_pointer(), l_f_O);
+  q.submit([&] (sycl::handler &cgh) {
+    auto p = l_f.preact;
+    auto o = l_f.output;
+    auto l_f_O = l_f.O;
+    cgh.parallel_for<class f_step>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_step_function(item, p, o, l_f_O);
     });
   });
 }
 
 // Back propagation to update weights
 void back_pass(
-  queue &q,
+  sycl::queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
   Layer &l_f)
 {
-  range<1> gws (64 * 64);
-  range<1> lws (64);
+  sycl::range<1> gws (64 * 64);
+  sycl::range<1> lws (64);
 
   // bp_weight_f<<<64, 64>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_s1.output);
-  auto f_dw_re = l_f.d_weight.reinterpret<float[6][6][6]>(range<1>(10));
-  auto s1_o_re = l_s1.output.reinterpret<float[6][6]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto dw = f_dw_re.get_access<sycl_write>(cgh);
-    auto dp = l_f.d_preact.get_access<sycl_read>(cgh);
-    auto o = s1_o_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_weight_f>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_weight_f(item, dw.get_pointer(), dp.get_pointer(), o.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto dw = (float (*)[6][6][6])l_f.d_weight;
+    auto dp = l_f.d_preact;
+    auto o = (float (*)[6][6])l_s1.output;
+    cgh.parallel_for<class bw_weight_f>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_weight_f(item, dw, dp, o);
     });
   });
 
   // bp_bias_f<<<64, 64>>>(l_f.bias, l_f.d_preact);
-  q.submit([&] (handler &cgh) {
-    auto b = l_f.bias.get_access<sycl_read_write>(cgh);
-    auto dp = l_f.d_preact.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_bias_f>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_bias_f(item, b.get_pointer(), dp.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto b = l_f.bias;
+    auto dp = l_f.d_preact;
+    cgh.parallel_for<class bw_bias_f>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_bias_f(item, b, dp);
     });
   });
-    
+
   // bp_output_s1<<<64, 64>>>((float (*)[6][6])l_s1.d_output, (float (*)[6][6][6])l_f.weight, l_f.d_preact);
-  auto s1_do_re = l_s1.d_output.reinterpret<float[6][6]>(range<1>(6));
-  auto f_w_re = l_f.weight.reinterpret<float[6][6][6]>(range<1>(10));
-  q.submit([&] (handler &cgh) {
-    auto  o = s1_do_re.get_access<sycl_read_write>(cgh);
-    auto  w = f_w_re.get_access<sycl_read>(cgh);
-    auto dp = l_f.d_preact.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_output_s1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_output_s1(item, o.get_pointer(), w.get_pointer(), dp.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto  o = (float (*)[6][6])l_s1.d_output;
+    auto  w = (float (*)[6][6][6])l_f.weight;
+    auto dp = l_f.d_preact;
+    cgh.parallel_for<class bw_output_s1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_output_s1(item, o, w, dp);
     });
   });
 
   //bp_preact_s1<<<64, 64>>>((float (*)[6][6])l_s1.d_preact, (float (*)[6][6])l_s1.d_output, (float (*)[6][6])l_s1.preact);
-  auto s1_dp_re = l_s1.d_preact.reinterpret<float[6][6]>(range<1>(6));
-  //auto s1_do_re = l_s1.d_output.reinterpret<float[6][6]>(range<1>(6));
-  auto s1_p_re = l_s1.preact.reinterpret<float[6][6]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto dp = s1_dp_re.get_access<sycl_write>(cgh);
-    auto  o = s1_do_re.get_access<sycl_read>(cgh);
-    auto  p = s1_p_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_preact_s1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_preact_s1(item, dp.get_pointer(), o.get_pointer(), p.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto dp = (float (*)[6][6])l_s1.d_preact;
+    auto  o = (float (*)[6][6])l_s1.d_output;
+    auto  p = (float (*)[6][6])l_s1.preact;
+    cgh.parallel_for<class bw_preact_s1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_preact_s1(item, dp, o, p);
     });
   });
 
   // bp_weight_s1<<<64, 64>>>((float (*)[4][4])l_s1.d_weight, (float (*)[6][6])l_s1.d_preact, (float (*)[24][24])l_c1.output);
-  auto s1_dw_re = l_s1.d_weight.reinterpret<float[4][4]>(range<1>(1));
-  //auto s1_dp_re = l_s1.d_preact.reinterpret<float[6][6]>(range<1>(6));
-  auto c1_o_re = l_c1.output.reinterpret<float[24][24]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto dw = s1_dw_re.get_access<sycl_read_write>(cgh);
-    auto dp = s1_dp_re.get_access<sycl_read>(cgh);
-    auto o = c1_o_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_weight_s1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_weight_s1(item, dw.get_pointer(), dp.get_pointer(), o.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto dw = (float (*)[4][4])l_s1.d_weight;
+    auto dp = (float (*)[6][6])l_s1.d_preact;
+    auto o = (float (*)[24][24])l_c1.output;
+    cgh.parallel_for<class bw_weight_s1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_weight_s1(item, dw, dp, o);
     });
   });
 
   // bp_bias_s1<<<64, 64>>>(l_s1.bias, (float (*)[6][6])l_s1.d_preact);
-  q.submit([&] (handler &cgh) {
-    auto b = l_s1.bias.get_access<sycl_read_write>(cgh);
-    auto dp = s1_dp_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_bias_s1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_bias_s1(item, b.get_pointer(), dp.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto b = l_s1.bias;
+    auto dp = (float (*)[6][6])l_s1.d_preact;
+    cgh.parallel_for<class bw_bias_s1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_bias_s1(item, b, dp);
     });
   });
 
   // bp_output_c1<<<64, 64>>>((float (*)[24][24])l_c1.d_output, (float (*)[4][4])l_s1.weight, (float (*)[6][6])l_s1.d_preact);
-  auto c1_do_re = l_c1.d_output.reinterpret<float[24][24]>(range<1>(6));
-  auto s1_w_re = l_s1.weight.reinterpret<float[4][4]>(range<1>(1));
-  //auto s1_dp_re = l_s1.d_preact.reinterpret<float[6][6]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto  o = c1_do_re.get_access<sycl_read_write>(cgh);
-    auto  w = s1_w_re.get_access<sycl_read>(cgh);
-    auto dp = s1_dp_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_output_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_output_c1(item, o.get_pointer(), w.get_pointer(), dp.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto  o = (float (*)[24][24])l_c1.d_output;
+    auto  w = (float (*)[4][4])l_s1.weight;
+    auto dp = (float (*)[6][6])l_s1.d_preact;
+    cgh.parallel_for<class bw_output_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_output_c1(item, o, w, dp);
     });
   });
 
   // bp_preact_c1<<<64, 64>>>((float (*)[24][24])l_c1.d_preact, (float (*)[24][24])l_c1.d_output, (float (*)[24][24])l_c1.preact);
-  auto c1_dp_re = l_c1.d_preact.reinterpret<float[24][24]>(range<1>(6));
-  //auto c1_do_re = l_c1.d_output.reinterpret<float[24][24]>(range<1>(6));
-  auto c1_p_re = l_c1.preact.reinterpret<float[24][24]>(range<1>(6));
-  q.submit([&] (handler &cgh) {
-    auto dp = c1_dp_re.get_access<sycl_write>(cgh);
-    auto  o = c1_do_re.get_access<sycl_read>(cgh);
-    auto p = c1_p_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_preact_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_preact_c1(item, dp.get_pointer(), o.get_pointer(), p.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto dp = (float (*)[24][24])l_c1.d_preact;
+    auto  o = (float (*)[24][24])l_c1.d_output;
+    auto p = (float (*)[24][24])l_c1.preact;
+    cgh.parallel_for<class bw_preact_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_preact_c1(item, dp, o, p);
     });
   });
 
   // bp_weight_c1<<<64, 64>>>((float (*)[5][5])l_c1.d_weight, (float (*)[24][24])l_c1.d_preact, (float (*)[28])l_input.output);
-  auto c1_dw_re = l_c1.d_weight.reinterpret<float[5][5]>(range<1>(6));
-  // auto c1_dp_re = l_c1.d_preact.reinterpret<float[24][24]>(range<1>(6));
-  auto i_o_re = l_input.output.reinterpret<float[28]>(range<1>(28));
-  q.submit([&] (handler &cgh) {
-    auto dw = c1_dw_re.get_access<sycl_read_write>(cgh);
-    auto dp = c1_dp_re.get_access<sycl_read>(cgh);
-    auto o = i_o_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_weight_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_weight_c1(item, dw.get_pointer(), dp.get_pointer(), o.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto dw = (float (*)[5][5])l_c1.d_weight;
+    auto dp = (float (*)[24][24])l_c1.d_preact;
+    auto o = (float (*)[28])l_input.output;
+    cgh.parallel_for<class bw_weight_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_weight_c1(item, dw, dp, o);
     });
   });
-  
+
   // bp_bias_c1<<<64, 64>>>(l_c1.bias, (float (*)[24][24])l_c1.d_preact);
-  q.submit([&] (handler &cgh) {
-    auto b = l_c1.bias.get_access<sycl_read_write>(cgh);
-    auto dp = c1_dp_re.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class bw_bias_c1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      bp_bias_c1(item, b.get_pointer(), dp.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto b = l_c1.bias;
+    auto dp = (float (*)[24][24])l_c1.d_preact;
+    cgh.parallel_for<class bw_bias_c1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      bp_bias_c1(item, b, dp);
     });
   });
 
   // apply_grad<<<64, 64>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
-  const int l_f_mn = l_f.M * l_f.N;
-  q.submit([&] (handler &cgh) {
-    auto w = l_f.weight.get_access<sycl_read_write>(cgh);
-    auto dw = l_f.d_weight.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class l_f_grad>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_grad(item, w.get_pointer(), dw.get_pointer(), l_f_mn); 
+  q.submit([&] (sycl::handler &cgh) {
+    auto w = l_f.weight;
+    auto dw = l_f.d_weight;
+    auto l_f_mn = l_f.M * l_f.N;
+    cgh.parallel_for<class l_f_grad>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_grad(item, w, dw, l_f_mn);
     });
   });
 
-  const int l_s1_mn = l_s1.M * l_s1.N;
   // apply_grad<<<64, 64>>>(l_s1.weight, l_s1.d_weight, l_s1.M * l_s1.N);
-  q.submit([&] (handler &cgh) {
-    auto w = l_s1.weight.get_access<sycl_read_write>(cgh);
-    auto dw = l_s1.d_weight.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class l_s1_grad>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_grad(item, w.get_pointer(), dw.get_pointer(), l_s1_mn); 
+  q.submit([&] (sycl::handler &cgh) {
+    auto w = l_s1.weight;
+    auto dw = l_s1.d_weight;
+    auto l_s1_mn = l_s1.M * l_s1.N;
+    cgh.parallel_for<class l_s1_grad>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_grad(item, w, dw, l_s1_mn);
     });
   });
 
-  const int l_c1_mn = l_c1.M * l_c1.N;
   // apply_grad<<<64, 64>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
-  q.submit([&] (handler &cgh) {
-    auto w = l_c1.weight.get_access<sycl_read_write>(cgh);
-    auto dw = l_c1.d_weight.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class l_c1_grad>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      apply_grad(item, w.get_pointer(), dw.get_pointer(), l_c1_mn); 
+  q.submit([&] (sycl::handler &cgh) {
+    auto w = l_c1.weight;
+    auto dw = l_c1.d_weight;
+    auto l_c1_mn = l_c1.M * l_c1.N;
+    cgh.parallel_for<class l_c1_grad>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      apply_grad(item, w, dw, l_c1_mn);
     });
   });
 }
 
 static void learn(
-  queue &q,
+  sycl::queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
@@ -338,20 +307,20 @@ static void learn(
 
       forward_pass(q, l_input, l_c1, l_s1, l_f, train_set[i].data);
 
-      l_f.bp_clear(q);
-      l_s1.bp_clear(q);
-      l_c1.bp_clear(q);
+      l_f.bp_clear();
+      l_s1.bp_clear();
+      l_c1.bp_clear();
 
       // Euclid distance of train_set[i]
-      range<1> gws (10);
-      range<1> lws (1);
+      sycl::range<1> gws (10);
+      sycl::range<1> lws (1);
       // makeError<<<10, 1>>>(l_f.d_preact, l_f.output, train_set[i].label, 10);
-      const unsigned int train_set_label = train_set[i].label;
-      q.submit([&] (handler &cgh) {
-        auto dp = l_f.d_preact.get_access<sycl_write>(cgh);
-        auto o = l_f.output.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class err>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-          makeError(item, dp.get_pointer(), o.get_pointer(), train_set_label, 10);
+      q.submit([&] (sycl::handler &cgh) {
+        auto dp = l_f.d_preact;
+        auto o = l_f.output;
+        auto train_set_label = train_set[i].label;
+        cgh.parallel_for<class err>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          makeError(item, dp, o, train_set_label, 10);
         });
       });
 
@@ -374,7 +343,7 @@ static void learn(
 
 // Returns label of given data (0-9)
 static unsigned int classify(
-  queue &q,
+  sycl::queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
@@ -387,10 +356,7 @@ static unsigned int classify(
 
   unsigned int max = 0;
 
-  q.submit([&] (handler &cgh) {
-    auto acc = l_f.output.get_access<sycl_read>(cgh);
-    cgh.copy(acc, res);
-  }).wait();
+  q.memcpy(res, l_f.output, sizeof(float) * 10).wait();
 
   for (int i = 1; i < 10; ++i) {
     if (res[max] < res[i]) {
@@ -403,7 +369,7 @@ static unsigned int classify(
 
 // Perform forward propagation of test data
 static void test(
-  queue &q,
+  sycl::queue &q,
   Layer &l_input,
   Layer &l_c1,
   Layer &l_s1,
@@ -414,7 +380,7 @@ static void test(
   int error = 0;
 
   for (unsigned int i = 0; i < test_cnt; ++i) {
-    if (classify(q, l_input, l_c1, l_s1, l_f, test_set[i].data) 
+    if (classify(q, l_input, l_c1, l_s1, l_f, test_set[i].data)
         != test_set[i].label) {
       ++error;
     }
@@ -436,11 +402,10 @@ int main(int argc, const  char **argv)
   loaddata();
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Layer l_input (q, 0, 0, 28*28);
   Layer l_c1 (q, 5*5, 6, 24*24*6);

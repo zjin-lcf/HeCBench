@@ -302,9 +302,9 @@ void runBoundsEngine(const int repeat)
     resultsFromGpu.cleanPrice = (dataType*)malloc(numBonds*sizeof(dataType));
     resultsFromGpu.bondForwardVal = (dataType*)malloc(numBonds*sizeof(dataType));
 
-    long seconds, useconds;    
-    float mtimeCpu;
-    float mtimeGpu;
+    long ktimeGpu = 0;
+    double timeCpu;
+    double timeGpu;
 
     struct timeval start;
     struct timeval end;
@@ -318,16 +318,15 @@ void runBoundsEngine(const int repeat)
     gettimeofday(&start, NULL);
 
     for (int i = 0; i < repeat; i++)
-      getBondsResultsGpu(q, inArgsHost, resultsFromGpu, numBonds);
+      ktimeGpu += getBondsResultsGpu(q, inArgsHost, resultsFromGpu, numBonds);
 
     gettimeofday(&end, NULL);
+    timeGpu = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
 
-    seconds  = end.tv_sec  - start.tv_sec;
-    useconds = end.tv_usec - start.tv_usec;
-
-    mtimeGpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
     printf("Run on GPU\n");
-    printf("Average processing time on GPU: %f (ms)\n\n", mtimeGpu / repeat);
+    printf("Average kernel execution time on GPU: %lf (ms)  \n\n", ktimeGpu * 1e-3 / repeat);
+    printf("Average processing time on GPU: %lf (ms)  \n\n", timeGpu * 1e-3 / repeat);
+
 
     double totPrice = 0.0;
     int numBond1;
@@ -350,12 +349,9 @@ void runBoundsEngine(const int repeat)
 
     gettimeofday(&end, NULL);
 
-    seconds  = end.tv_sec  - start.tv_sec;
-    useconds = end.tv_usec - start.tv_usec;
-
-    mtimeCpu = ((seconds) * 1000 + ((float)useconds)/1000.0) + 0.5f;
+    timeCpu = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
     printf("Run on CPU\n");
-    printf("Average processing time on CPU: %f (ms)\n\n", mtimeCpu / 2);
+    printf("Average processing time on CPU: %lf (ms)  \n\n", timeCpu * 1e-3 / 2);
 
     totPrice = 0.0;
     for (numBond1= 0; numBond1< numBonds; numBond1++)
@@ -369,7 +365,7 @@ void runBoundsEngine(const int repeat)
     printf("Clean Price: %f\n", resultsHost.cleanPrice[numBonds/2]);
     printf("Bond Forward Val: %f\n\n", resultsHost.bondForwardVal[numBonds/2]);
 
-    printf("Speedup using GPU: %f\n", mtimeCpu/mtimeGpu);
+    printf("Speedup using GPU: %f\n", (timeCpu / 2) / (timeGpu / repeat) );
 
     free(resultsHost.dirtyPrice);
     free(resultsHost.accruedAmountCurrDate);

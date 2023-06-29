@@ -28,20 +28,20 @@ if (col != NUM) {
   u(col, (2 * row) - ((col + 1) & 1)) = new_u2;
 
   // check for max of these two
-  new_u = cl::sycl::fmax(cl::sycl::fabs(new_u), cl::sycl::fabs(new_u2));
+  new_u = sycl::fmax(sycl::fabs(new_u), sycl::fabs(new_u2));
 
   if ((2 * row) == NUM) {
     // also test for max velocity at vertical boundary
-    new_u = cl::sycl::fmax(new_u, cl::sycl::fabs( u(col, NUM + 1) ));
+    new_u = sycl::fmax(new_u, sycl::fabs( u(col, NUM + 1) ));
   }
 } else {
   // check for maximum velocity in boundary cells also
-  new_u = cl::sycl::fmax(cl::sycl::fabs( u(NUM, (2 * row)) ), cl::sycl::fabs( u(0, (2 * row)) ));
-  new_u = cl::sycl::fmax(cl::sycl::fabs( u(NUM, (2 * row) - 1) ), new_u);
-  new_u = cl::sycl::fmax(cl::sycl::fabs( u(0, (2 * row) - 1) ), new_u);
+  new_u = sycl::fmax(sycl::fabs( u(NUM, (2 * row)) ), sycl::fabs( u(0, (2 * row)) ));
+  new_u = sycl::fmax(sycl::fabs( u(NUM, (2 * row) - 1) ), new_u);
+  new_u = sycl::fmax(sycl::fabs( u(0, (2 * row) - 1) ), new_u);
 
-  new_u = cl::sycl::fmax(cl::sycl::fabs( u(NUM + 1, (2 * row)) ), new_u);
-  new_u = cl::sycl::fmax(cl::sycl::fabs( u(NUM + 1, (2 * row) - 1) ), new_u);
+  new_u = sycl::fmax(sycl::fabs( u(NUM + 1, (2 * row)) ), new_u);
+  new_u = sycl::fmax(sycl::fabs( u(NUM + 1, (2 * row) - 1) ), new_u);
 
 } // end if
 
@@ -49,21 +49,19 @@ if (col != NUM) {
 max_cache[lid] = new_u;
 
 // synchronize threads in block to ensure all velocities stored
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 // calculate maximum for block
 int i = BLOCK_SIZE >> 1;
 while (i != 0) {
   if (lid < i) {
-    max_cache[lid] = cl::sycl::fmax(max_cache[lid], max_cache[lid + i]);
+    max_cache[lid] = sycl::fmax(max_cache[lid], max_cache[lid + i]);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   i >>= 1;
 }
 
 // store block's maximum
 if (lid == 0) {
-  max_u[item.get_group_linear_id()] = max_cache[0];
+  max_u_d[item.get_group_linear_id()] = max_cache[0];
 }
-
-

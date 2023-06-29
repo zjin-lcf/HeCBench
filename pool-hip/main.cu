@@ -1,7 +1,8 @@
 #include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <new>
 #include <string>
-#include <stdio.h>
 #include <hip/hip_runtime.h>
 
 #define HOSTDEVICE __host__ __device__
@@ -30,9 +31,9 @@ class MaxPoolGrad {
 template <typename PoolProcess, typename T>
 __global__ void KernelPool2DGrad(
     const int nthreads,
-    const T*__restrict__ input_data, 
+    const T*__restrict__ input_data,
     const T*__restrict__ output_data,
-    const T*__restrict__ output_grad, 
+    const T*__restrict__ output_grad,
     const int channels,
     const int input_height,
     const int input_width,
@@ -44,7 +45,7 @@ __global__ void KernelPool2DGrad(
     const int stride_width,
     const int padding_height,
     const int padding_width,
-    PoolProcess pool_process, 
+    PoolProcess pool_process,
     bool exclusive,
     T*__restrict__ input_grad,
     bool channel_last = false)
@@ -170,9 +171,9 @@ int main(int argc, char* argv[])
 
   float *input_data, *output_data, *output_grad_data, *input_grad_data;
   hipMalloc((void **)&input_data, input_numel * sizeof(float));
+  hipMalloc((void **)&input_grad_data, input_numel * sizeof(float));
   hipMalloc((void **)&output_data, output_numel * sizeof(float));
   hipMalloc((void **)&output_grad_data, output_numel * sizeof(float));
-  hipMalloc((void **)&input_grad_data, input_numel * sizeof(float));
   hipMemcpy(input_data, input, input_numel * sizeof(float), hipMemcpyHostToDevice);
   hipMemcpy(output_data, output, output_numel * sizeof(float), hipMemcpyHostToDevice);
   hipMemcpy(output_grad_data, output_grad, output_numel * sizeof(float), hipMemcpyHostToDevice);
@@ -181,18 +182,11 @@ int main(int argc, char* argv[])
   dim3 threads(BSIZE);
   dim3 grid(blocks);
 
-  // warmup
-  hipLaunchKernelGGL(HIP_KERNEL_NAME(KernelPool2DGrad<AvgPoolGrad<float>, float>), grid, threads, 0, 0, 
-      nthreads, input_data, output_data, output_grad_data, input_channels,
-      input_height, input_width, output_height, output_width, ksize_height,
-      ksize_width, stride_height, stride_width, padding_height, padding_width,
-      pool_process, exclusive, input_grad_data, channel_last);
-
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++) 
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(KernelPool2DGrad<AvgPoolGrad<float>, float>), grid, threads, 0, 0, 
+  for (int i = 0; i < repeat; i++)
+    KernelPool2DGrad<AvgPoolGrad<float>, float><<<grid, threads, 0, 0>>>(
         nthreads, input_data, output_data, output_grad_data, input_channels,
         input_height, input_width, output_height, output_width, ksize_height,
         ksize_width, stride_height, stride_width, padding_height, padding_width,
@@ -226,5 +220,9 @@ int main(int argc, char* argv[])
   delete[] input_grad;
   delete[] input_grad_ref;
   delete[] output_grad;
+  hipFree(input_data);
+  hipFree(input_grad_data);
+  hipFree(output_data);
+  hipFree(output_grad_data);
   return 0;
 }

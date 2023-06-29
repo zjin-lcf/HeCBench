@@ -162,14 +162,6 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
                         map (from: vector_of_tree_size_h[0:n_explorers], \
                                    sols_h[0:n_explorers])
   {
-    // warmup
-    BP_queens_root_dfs(size,
-                       n_explorers,
-                       initial_depth,
-                       root_prefixes_h,
-                       vector_of_tree_size_h,
-                       sols_h);
-
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {

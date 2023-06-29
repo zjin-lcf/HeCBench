@@ -11,7 +11,7 @@
 /** The class that represents all of the available options for StructuredEikonal */
 class StructuredEikonal {
 public:
-  StructuredEikonal(queue &q, bool verbose = false);
+  StructuredEikonal(sycl::queue &q, bool verbose = false);
   virtual ~StructuredEikonal();
   void setDims(size_t w, size_t h, size_t d);
   void setMapType(size_t t);
@@ -45,7 +45,7 @@ private:
   std::vector<std::vector<std::vector<double> > > speeds_;
   std::vector<std::array<size_t, 3> > seeds_;
   GPUMEMSTRUCT memoryStruct_;
-  queue q;
+  sycl::queue q;
 };
 
 #endif

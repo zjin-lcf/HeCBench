@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <math.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "ecdh.h"
 
 #define P_x 5
@@ -32,27 +32,25 @@ int main(int argc, char **argv)
   int *pk_fast_y = (int*) malloc (pk_y_size);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> d_pk_x (num_pk);
-  buffer<int, 1> d_pk_y (num_pk);
+  int *d_pk_x = sycl::malloc_device<int>(num_pk, q);
+  int *d_pk_y = sycl::malloc_device<int>(num_pk, q);
   
-  range<1> gws ((num_pk + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((num_pk + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   gettimeofday(&start_slow,NULL);
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto pk_x = d_pk_x.get_access<sycl_write>(cgh);
-      auto pk_y = d_pk_y.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class ecdh_slow>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class ecdh_slow>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         k_slow(item, 18, P_x, P_y,
-               pk_x.get_pointer(), pk_y.get_pointer(),
+               d_pk_x, d_pk_y,
                MODULUS, a, num_pk);  
       });
     });
@@ -65,27 +63,19 @@ int main(int argc, char **argv)
 
   printf("Average time (slow kernel): %f s\n", elapsed_slow / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pk_x.get_access<sycl_read>(cgh);
-    cgh.copy(acc, pk_slow_x);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pk_y.get_access<sycl_read>(cgh);
-    cgh.copy(acc, pk_slow_y);
-  });
+  q.memcpy(pk_slow_x, d_pk_x, pk_x_size);
+  q.memcpy(pk_slow_y, d_pk_y, pk_y_size);
 
   q.wait();
 
   gettimeofday(&start_fast,NULL);
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto pk_x = d_pk_x.get_access<sycl_write>(cgh);
-      auto pk_y = d_pk_y.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class ecdh_fast>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class ecdh_fast>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         k_fast(item, 18, P_x, P_y,
-               pk_x.get_pointer(), pk_y.get_pointer(),
+               d_pk_x, d_pk_y,
                MODULUS, a, num_pk);  
       });
     });
@@ -98,15 +88,8 @@ int main(int argc, char **argv)
 
   printf("Average time (fast kernel): %f s\n", elapsed_fast / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pk_x.get_access<sycl_read>(cgh);
-    cgh.copy(acc, pk_fast_x);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pk_y.get_access<sycl_read>(cgh);
-    cgh.copy(acc, pk_fast_y);
-  });
+  q.memcpy(pk_fast_x, d_pk_x, pk_x_size);
+  q.memcpy(pk_fast_y, d_pk_y, pk_y_size);
 
   q.wait();
   
@@ -114,6 +97,8 @@ int main(int argc, char **argv)
   bool fail_pk_y = memcmp(pk_slow_y, pk_fast_y, pk_x_size);
   printf("%s\n", (fail_pk_x || fail_pk_y) ? "FAIL" : "PASS");
 
+  sycl::free(d_pk_x, q);
+  sycl::free(d_pk_y, q);
   free(pk_slow_x);
   free(pk_slow_y);
   free(pk_fast_x);

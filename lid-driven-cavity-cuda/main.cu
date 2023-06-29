@@ -998,8 +998,6 @@ int main (int argc, char *argv[])
     // set velocity boundary conditions
     set_BCs <<<grid_bcs, block_bcs>>> (u_d, v_d);
 
-    cudaDeviceSynchronize();
-
     // increase time
     time += dt;
 
@@ -1008,6 +1006,7 @@ int main (int argc, char *argv[])
 
   } // end while
 
+  cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("\nTotal execution time of the iteration loop: %f (s)\n", elapsed_time * 1e-9f);

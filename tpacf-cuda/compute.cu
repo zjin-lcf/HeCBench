@@ -283,7 +283,7 @@ void doComputeGPU(char* dataName, char* randomNames, int nr, int dataSize, int r
   t_computeDD = TDIFF(t1, t2);
 
   for(int i=0; i<nr; i++) {
-    sprintf(fname, "%s.%i\0", randomNames, i+1);
+    sprintf(fname, "%s.%i", randomNames, i+1);
     gettimeofday(&t0, NULL);
 
     readdatafile(fname, h_idata2, randomSize);

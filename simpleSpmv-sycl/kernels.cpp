@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "mv.h"
 
 // sparse matrix vector multiply using the CSR format
-void mv_csr(nd_item<1> &item,
+void mv_csr(sycl::nd_item<1> &item,
             const int num_rows,
             const size_t *row_indices,
             const int *col_indices,
@@ -26,7 +26,7 @@ void mv_csr(nd_item<1> &item,
 }
 
 // dense matrix vector multiply
-void mv_dense(nd_item<1> &item,
+void mv_dense(sycl::nd_item<1> &item,
               const int num_rows,
               const REAL* matrix,
               const REAL* x, REAL* y)
@@ -35,7 +35,7 @@ void mv_dense(nd_item<1> &item,
   if (i < num_rows) {
     REAL temp = 0;
     for (int j = 0; j < num_rows; j++) {
-      if (matrix[i * num_rows + j] != (REAL)0) 
+      if (matrix[i * num_rows + j] != (REAL)0)
         temp += matrix[i * num_rows + j] * x[j];
     }
     y[i] = temp;
@@ -50,31 +50,31 @@ long mv_dense_parallel(const int repeat,
                              REAL* y)
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  size_t num_elems = (size_t)num_rows * num_rows; 
+  size_t num_elems = (size_t)num_rows * num_rows;
 
   REAL *d_x, *d_matrix, *d_y;
-  d_x = malloc_device<REAL>(num_rows, q);
-  d_matrix = malloc_device<REAL>(num_elems, q);
-  d_y = malloc_device<REAL>(num_rows, q);
+  d_x = sycl::malloc_device<REAL>(num_rows, q);
+  d_matrix = sycl::malloc_device<REAL>(num_elems, q);
+  d_y = sycl::malloc_device<REAL>(num_rows, q);
 
   q.memcpy(d_x, x, num_rows*sizeof(REAL));
   q.memcpy(d_matrix, matrix, num_elems*sizeof(REAL));
 
-  range<1> gws ((num_rows + bs - 1) / bs * bs);
-  range<1> lws (bs);
+  sycl::range<1> gws ((num_rows + bs - 1) / bs * bs);
+  sycl::range<1> lws (bs);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class dmvm>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class dmvm>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         mv_dense(item, num_rows, d_matrix, d_x, d_y);
       });
     });
@@ -85,9 +85,9 @@ long mv_dense_parallel(const int repeat,
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   q.memcpy(y, d_y, num_rows*sizeof(REAL)).wait();
 
-  free(d_x, q);
-  free(d_y, q);
-  free(d_matrix, q);
+  sycl::free(d_x, q);
+  sycl::free(d_y, q);
+  sycl::free(d_matrix, q);
 
   return time;
 }
@@ -108,32 +108,32 @@ long mv_csr_parallel(const int repeat,
   init_csr(row_indices, values, col_indices, matrix, num_rows, nnz);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  size_t *d_row_indices = malloc_device<size_t>(num_rows+1, q);
-  int *d_col_indices = malloc_device<int>(nnz, q);
-  REAL *d_values = malloc_device<REAL>(nnz, q);
-  REAL *d_x = malloc_device<REAL>(num_rows, q);
-  REAL *d_y = malloc_device<REAL>(num_rows, q);
+  size_t *d_row_indices = sycl::malloc_device<size_t>(num_rows+1, q);
+  int *d_col_indices = sycl::malloc_device<int>(nnz, q);
+  REAL *d_values = sycl::malloc_device<REAL>(nnz, q);
+  REAL *d_x = sycl::malloc_device<REAL>(num_rows, q);
+  REAL *d_y = sycl::malloc_device<REAL>(num_rows, q);
 
   q.memcpy(d_row_indices, row_indices, (num_rows+1)*sizeof(size_t));
   q.memcpy(d_col_indices, col_indices, nnz*sizeof(int));
   q.memcpy(d_values, values, nnz*sizeof(REAL));
   q.memcpy(d_x, x, num_rows*sizeof(REAL));
 
-  range<1> gws ((num_rows + bs - 1) / bs * bs);
-  range<1> lws (bs);
+  sycl::range<1> gws ((num_rows + bs - 1) / bs * bs);
+  sycl::range<1> lws (bs);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class spmv>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class spmv>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         mv_csr(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
       });
     });
@@ -149,11 +149,11 @@ long mv_csr_parallel(const int repeat,
   free(row_indices);
   free(col_indices);
 
-  free(d_row_indices, q);
-  free(d_col_indices, q);
-  free(d_values, q);
-  free(d_x, q);
-  free(d_y, q);
+  sycl::free(d_row_indices, q);
+  sycl::free(d_col_indices, q);
+  sycl::free(d_values, q);
+  sycl::free(d_x, q);
+  sycl::free(d_y, q);
 
   return time;
 }

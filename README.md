@@ -6,6 +6,9 @@ This repository contains a collection of heterogeneous computing benchmarks writ
 [Intel DPC++ compiler](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md) or [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
 [NVIDIA HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
+# Dependencies
+  Certain SYCL benchmarks require [oneDPL](https://github.com/oneapi-src/oneDPL), [oneTBB](https://github.com/oneapi-src/oneTBB), [Syclomatic](https://github.com/oneapi-src/SYCLomatic), or [oneMKL interfaces](https://github.com/oneapi-src/oneMKL).
+
 # Benchmark categories
 Each benchmark falls into a single category. While such classification is not accurate, the arrangement serves as a starting point for users of the benchmark suite. Please see the Reference for more information about each benchmark. 
 
@@ -16,10 +19,10 @@ Each benchmark falls into a single category. While such classification is not ac
     cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, snake  
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, sa, snake
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
+    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
     aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -43,10 +46,10 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, resnet-kernels, rowwiseMoments, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
+    accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
+    atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -58,7 +61,7 @@ Each benchmark falls into a single category. While such classification is not ac
     extrema, fft, lombscargle, sosfil, zmddft
 
 ### Simulation
-    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, xlqc, xsbench
+    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, halo-finder, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
 
 ### Sorting
     bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
@@ -485,6 +488,9 @@ Early results are shown [here](results/README.md)
 ### ecdh (c++)
   Elliptic curve Diffie-Hellman key exchange (https://github.com/jaw566/ECDH)
 
+### egs (cuda)
+  Parallel implementation of EGSnrc's photon transport mechanism (https://jonaslippuner.com/research/cuda-egs/)
+
 ### eigenvalue (opencl)
   Calculate the eigenvalues of a tridiagonal symmetric matrix (https://github.com/OpenCL/AMD_APP_samples)
 
@@ -625,6 +631,9 @@ Early results are shown [here](results/README.md)
 
 ### haccmk (c)
   The HACC microkernel (https://asc.llnl.gov/CORAL-benchmarks/#haccmk)
+
+### halo-finder (cuda)
+  Parallel halo finder operation (https://gem5.googlesource.com/public/gem5-resources)
 
 ### hausdorff (c/c++)
   Hausdorff distance  (https://github.com/arohamirai/Hausdorff-Distance-Match)
@@ -875,6 +884,9 @@ Early results are shown [here](results/README.md)
 ### mf-sgd (cuda)
    Matrix factorization with stochastic gradient descent (https://github.com/cuMF/cumf_sgd)
 
+### michalewicz (c)
+   Evaluate the Michalewicz function (https://www.sfu.ca/~ssurjano/michal.html)
+
 ### miniFE (omp)
   MiniFE Mantevo mini-application (https://github.com/Mantevo/miniFE)
 
@@ -1082,6 +1094,9 @@ Early results are shown [here](results/README.md)
 ### remap (cuda)
   Map unique values to indices (https://pytorch.org/)
 
+### relu (cuda)
+  Rectified linear unit (https://github.com/tensorflow)
+
 ### resize (cuda)
   Resize images (https://github.com/opencv/)
 
@@ -1130,6 +1145,9 @@ Early results are shown [here](results/README.md)
 
 ### s8n (cuda)
   Stacked 8-neighborhood search finds nearest neighbors in each of the eight octants partitioned by ordering of three coordinates (https://github.com/MVIG-SJTU/pointSIFT/tree/master)
+
+### sa (cuda)
+  Dynamic parallel skew algorithm for suffix array on GPU (https://github.com/gmzang/Parallel-Suffix-Array-on-GPU)
 
 ### sad (cuda)
   Naive template matching with SAD (https://github.com/gholomia/CTMC)
@@ -1340,6 +1358,9 @@ Early results are shown [here](results/README.md)
 
 ### wordcount (cuda)
   Count the number of words in a text (https://github.com/NVIDIA/thrust/blob/main/examples/)
+
+### wsm5 (cuda)
+  Parallel weather and research forecast single moment 5-class (https://github.com/gpgpu-sim/ispass2009-benchmarks/tree/master/wp)
 
 ### wyllie (cuda)
   List ranking with Wyllie's algorithm (Rehman, M. & Kothapalli, Kishore & Narayanan, P.. (2009). Fast and Scalable List Ranking on the GPU. Proceedings of the International Conference on Supercomputing. 235-243. 10.1145/1542275.1542311.)

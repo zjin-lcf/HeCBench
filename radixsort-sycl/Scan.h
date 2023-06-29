@@ -11,25 +11,28 @@
 #ifndef _SCAN_H_
 #define _SCAN_H_
 
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using uint4 = sycl::uint4;
+using uint2 = sycl::uint2;
 
 #define MAX_WORKGROUP_INCLUSIVE_SCAN_SIZE 1024
 #define MAX_LOCAL_GROUP_SIZE 256
 static const int WORKGROUP_SIZE = 256;
-static const unsigned int   MAX_BATCH_ELEMENTS = 64 * 1048576;
-static const unsigned int MIN_SHORT_ARRAY_SIZE = 4;
-static const unsigned int MAX_SHORT_ARRAY_SIZE = 4 * WORKGROUP_SIZE;
-static const unsigned int MIN_LARGE_ARRAY_SIZE = 8 * WORKGROUP_SIZE;
-static const unsigned int MAX_LARGE_ARRAY_SIZE = 4 * WORKGROUP_SIZE * WORKGROUP_SIZE;
+static const uint   MAX_BATCH_ELEMENTS = 64 * 1048576;
+static const uint MIN_SHORT_ARRAY_SIZE = 4;
+static const uint MAX_SHORT_ARRAY_SIZE = 4 * WORKGROUP_SIZE;
+static const uint MIN_LARGE_ARRAY_SIZE = 8 * WORKGROUP_SIZE;
+static const uint MAX_LARGE_ARRAY_SIZE = 4 * WORKGROUP_SIZE * WORKGROUP_SIZE;
 
-unsigned int factorRadix2(unsigned int& log2L, unsigned int L);
+uint factorRadix2(uint& log2L, uint L);
 
 void scanExclusiveLarge(
-    queue &q,
-    buffer<unsigned int> &d_Dst,
-    buffer<unsigned int> &d_Src,
-    buffer<unsigned int> &d_Buf,
-    const unsigned int batchSize,
-    const unsigned int arrayLength, 
-    const unsigned int numElements);
+    sycl::queue &q,
+    uint *d_Dst,
+    uint *d_Src,
+    uint *d_Buf,
+    const uint batchSize,
+    const uint arrayLength,
+    const uint numElements);
 #endif

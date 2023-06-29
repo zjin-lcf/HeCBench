@@ -23,7 +23,7 @@ Compressed chunk offsets for offset table, in offd
 */
 
 void CompressionKernel(
-  nd_item<1> item,
+  sycl::nd_item<1> item,
   const int dimensionalityd,
   const ull *__restrict cbufd,
   char *__restrict dbufd,

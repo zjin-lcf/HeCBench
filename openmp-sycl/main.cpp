@@ -28,7 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 int main(int argc, char *argv[]) {
@@ -55,18 +55,17 @@ int main(int argc, char *argv[]) {
   double overhead = 0; // record overhead of first run
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
- 
+
   //   Recall that all variables declared inside an "omp parallel" scope are
   //   local to each CPU thread
   for (int i = 0; i < 2; i++) {
     for (int f = 1; f <= 32; f = f*2) {
       double start = omp_get_wtime();
-      omp_set_num_threads(f * num_gpus); 
+      omp_set_num_threads(f * num_gpus);
       #pragma omp parallel
       {
         unsigned int cpu_thread_id = omp_get_thread_num();
@@ -74,32 +73,34 @@ int main(int argc, char *argv[]) {
 
         // pointer to this CPU thread's portion of data
         unsigned int nwords_per_kernel = nwords / num_cpu_threads;
+        unsigned int nbytes_per_kernel = nbytes / num_cpu_threads;
         int *sub_a = a + cpu_thread_id * nwords_per_kernel;
 
         for (unsigned int n = 0; n < nwords_per_kernel; n++)
           sub_a[n] = n + cpu_thread_id * nwords_per_kernel;
 
-        range<1> lws (256);
-        range<1> gws (nwords_per_kernel);
+        sycl::range<1> lws (256);
+        sycl::range<1> gws (nwords_per_kernel);
 
         // pointer to memory on the device associated with this CPU thread
-        {
-          buffer<int, 1> d_a (sub_a, nwords_per_kernel);
-          q.submit([&] (handler &cgh) {
-            auto a = g_a.get_access<sycl_read_write>(cgh);
-            cgh.parallel_for<class addConstant>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-              int idx = item.get_global_id(0);
-              for (int i = 0; i < repeat; i++)
-                a[idx] += i % b;
-            });
+        int *d_a = sycl::malloc_device<int>(nwords_per_kernel, q);
+        q.memcpy(d_a, sub_a, nbytes_per_kernel);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class addConstant>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+            int idx = item.get_global_id(0);
+            for (int i = 0; i < repeat; i++)
+              d_a[idx] += i % b;
           });
-        }
+        });
+        q.memcpy(sub_a, d_a, nbytes_per_kernel).wait();
+        sycl::free(d_a, q);
       }
       double end = omp_get_wtime();
       printf("Work took %f seconds with %d CPU threads\n", end - start, f*num_gpus);
-      
+
       if (f == 1) {
-        if (i == 0) 
+        if (i == 0)
           overhead = end - start;
         else
           overhead -= (end - start);

@@ -1,24 +1,25 @@
 #ifndef SPH_
 #define SPH_
 
-#include "common.h"
+#include <sycl/sycl.hpp>
+using double3 = sycl::double3;
 
 ////////////////////////////////////////////////
 // Structures
 ////////////////////////////////////////////////
 
 struct boundary_particle {
-    cl::sycl::double3 pos; // position
-    cl::sycl::double3 n;   // position
+    double3 pos; // position
+    double3 n;   // position
 } ;
 
 struct fluid_particle {
     double density;
     double pressure;
-    cl::sycl::double3 pos;     // position
-    cl::sycl::double3 v;       // velocity
-    cl::sycl::double3 v_half;  // half step velocity
-    cl::sycl::double3 a;       // acceleration
+    double3 pos;     // position
+    double3 v;       // velocity
+    double3 v_half;  // half step velocity
+    double3 a;       // acceleration
 };
 
 struct param {

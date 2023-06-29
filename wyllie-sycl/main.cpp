@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 
 int main(int argc, char* argv[]) {
@@ -39,41 +39,37 @@ int main(int argc, char* argv[]) {
 
   // run list ranking on a device
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<long, 1> d_list (elems);
+  long *d_list = sycl::malloc_device<long>(elems, q);
 
-  range<1> gws ((elems + 255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((elems + 255)/256*256);
+  sycl::range<1> lws (256);
 
   double time = 0.0;
 
   for (i = 0; i <= repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_list.get_access<sycl_write>(cgh);
-      cgh.copy(list.data(), acc);
-    });
+    q.memcpy(d_list, list.data(), sizeof(long) * elems);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto list = d_list.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class wyllie>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class wyllie>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int index = item.get_global_id(0);
         if(index < elems ) {
           long node, next;
-          while ( ((node = list[index]) >> 32) != NIL && 
-                  ((next = list[node >> 32]) >> 32) != NIL ) {
+          while ( ((node = d_list[index]) >> 32) != NIL &&
+                  ((next = d_list[node >> 32]) >> 32) != NIL ) {
             long temp = (node & MASK) ;
             temp += (next & MASK) ;
             temp += (next >> 32) << 32;
-            item.barrier(access::fence_space::local_space);
-            list [ index ] = temp ;
+            item.barrier(sycl::access::fence_space::local_space);
+            d_list [index] = temp ;
           }
         }
       });
@@ -85,10 +81,8 @@ int main(int argc, char* argv[]) {
 
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_list.get_access<sycl_read>(cgh);
-    cgh.copy(acc, d_res.data());
-  }).wait();
+  q.memcpy(d_res.data(), d_list, sizeof(long) * elems).wait();
+  sycl::free(d_list, q);
 
   for (i = 0; i < elems; i++) d_res[i] &= MASK;
 
@@ -101,7 +95,7 @@ int main(int argc, char* argv[]) {
     i = next[i];
   }
 
- 
+
 #ifdef DEBUG
   printf("Ranks:\n");
   for (i = 0; i < elems; i++) {
@@ -110,6 +104,6 @@ int main(int argc, char* argv[]) {
 #endif
 
   printf("%s\n", (h_res == d_res) ? "PASS" : "FAIL");
-   
+
   return 0;
 }

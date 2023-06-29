@@ -1,6 +1,6 @@
 #include <chrono>
+#include <sycl/sycl.hpp>
 #include "nearestNeighbor.h"
-#include "common.h"
 
 int main(int argc, char *argv[]) {
   std::vector<Record> records;
@@ -59,29 +59,28 @@ void SyclFindNearestNeighbors(
     int timing) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  LatLong* d_locations = malloc_device<LatLong>(numRecords, q);
+  LatLong* d_locations = sycl::malloc_device<LatLong>(numRecords, q);
   q.memcpy(d_locations, locations.data(), sizeof(LatLong) * numRecords);
 
-  float *d_distances = malloc_device<float>(numRecords, q);
+  float *d_distances = sycl::malloc_device<float>(numRecords, q);
 
   size_t localWorkSize  = 64;
   size_t globalWorkSize = (numRecords + localWorkSize-1) / localWorkSize * localWorkSize;
-  range<1> gws (globalWorkSize);
-  range<1> lws (localWorkSize);
+  sycl::range<1> gws (globalWorkSize);
+  sycl::range<1> lws (localWorkSize);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   // measure the total kernel execution time
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class nn>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class nn>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int gid = item.get_global_id(0);
         if (gid < numRecords) {
           LatLong latLong = d_locations[gid];
@@ -98,8 +97,8 @@ void SyclFindNearestNeighbors(
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
   q.memcpy(distances, d_distances, numRecords * sizeof(float)).wait();
-  free(d_locations, q);
-  free(d_distances, q);
+  sycl::free(d_locations, q);
+  sycl::free(d_distances, q);
 }
 
 int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &locations){

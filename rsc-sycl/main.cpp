@@ -8,7 +8,7 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
- * with the Software without restriction, including without limitation the 
+ * with the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
@@ -18,14 +18,14 @@
  *      > Redistributions in binary form must reproduce the above copyright
  *        notice, this list of conditions and the following disclaimers in the
  *        documentation and/or other materials provided with the distribution.
- *      > Neither the names of IMPACT Research Group, University of Cordoba, 
- *        University of Illinois nor the names of its contributors may be used 
- *        to endorse or promote products derived from this Software without 
+ *      > Neither the names of IMPACT Research Group, University of Cordoba,
+ *        University of Illinois nor the names of its contributors may be used
+ *        to endorse or promote products derived from this Software without
  *        specific prior written permission.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
@@ -172,15 +172,14 @@ int main(int argc, char **argv) {
     const Params p(argc, argv);
 
     const int max_gpu_threads = 256;
-    assert(p.n_gpu_threads <= max_gpu_threads && 
+    assert(p.n_gpu_threads <= max_gpu_threads &&
            "The thread block size is greater than the maximum thread block size that can be used on this device");
 
 #ifdef USE_GPU
-    sycl::gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
     // Allocate
     int         n_flow_vectors = read_input_size(p);
@@ -194,17 +193,17 @@ int main(int argc, char **argv) {
     float *     h_model_param_local  = (float *)malloc(4 * p.max_iter * sizeof(float));
     int *       h_g_out_id           = (int *)malloc(sizeof(int));
 
-    ALLOC_ERR(h_flow_vector_array, h_random_numbers, h_model_candidate, h_outliers_candidate, h_model_param_local, 
+    ALLOC_ERR(h_flow_vector_array, h_random_numbers, h_model_candidate, h_outliers_candidate, h_model_param_local,
         h_g_out_id);
 
     // Initialize flow vector and random numbers
     read_input(h_flow_vector_array, h_random_numbers, p);
 
-    flowvector *     d_flow_vector_array = sycl::malloc_device<flowvector>(n_flow_vectors, q);
-    int *            d_model_candidate = sycl::malloc_device<int>(p.max_iter, q);
-    int *            d_outliers_candidate = sycl::malloc_device<int>(p.max_iter, q);
-    float *          d_model_param_local = sycl::malloc_device<float>(4 * p.max_iter, q);
-    int *d_g_out_id = sycl::malloc_device<int>(1, q);
+    flowvector *d_flow_vector_array = sycl::malloc_device<flowvector>(n_flow_vectors, q);
+           int *d_model_candidate = sycl::malloc_device<int>(p.max_iter, q);
+           int *d_outliers_candidate = sycl::malloc_device<int>(p.max_iter, q);
+         float *d_model_param_local = sycl::malloc_device<float>(4 * p.max_iter, q);
+           int *d_g_out_id = sycl::malloc_device<int>(1, q);
 
     // Copy to device
     q.memcpy(d_flow_vector_array, h_flow_vector_array, n_flow_vectors * sizeof(flowvector));
@@ -236,17 +235,18 @@ int main(int argc, char **argv) {
         main_thread.join();
 
         q.memcpy(d_model_param_local, h_model_param_local, 4 * p.max_iter * sizeof(float));
-        
+
         // Launch GPU threads
         // Kernel launch
 
-        call_RANSAC_kernel_block(q, p.n_gpu_blocks, p.n_gpu_threads, d_model_param_local, d_flow_vector_array, 
-            n_flow_vectors, p.max_iter, p.error_threshold, p.convergence_threshold, 
+        call_RANSAC_kernel_block(q, p.n_gpu_blocks, p.n_gpu_threads, d_model_param_local, d_flow_vector_array,
+            n_flow_vectors, p.max_iter, p.error_threshold, p.convergence_threshold,
             d_g_out_id, d_model_candidate, d_outliers_candidate, 1);
-        
-        q.memcpy(&candidates, d_g_out_id, sizeof(int)).wait();
-        q.memcpy(h_model_candidate, d_model_candidate, candidates * sizeof(int)).wait();
-        q.memcpy(h_outliers_candidate, d_outliers_candidate, candidates * sizeof(int)).wait();
+
+        q.memcpy(&candidates, d_g_out_id, sizeof(int));
+        q.memcpy(h_model_candidate, d_model_candidate, candidates * sizeof(int));
+        q.memcpy(h_outliers_candidate, d_outliers_candidate, candidates * sizeof(int));
+        q.wait();
 
         // Post-processing (chooses the best model among the candidates)
         for(int i = 0; i < candidates; i++) {
@@ -275,11 +275,11 @@ int main(int argc, char **argv) {
     free(h_flow_vector_array);
     free(h_random_numbers);
 
-    free(d_model_candidate, q);
-    free(d_outliers_candidate, q);
-    free(d_model_param_local, q);
-    free(d_g_out_id, q);
-    free(d_flow_vector_array, q);
+    sycl::free(d_model_candidate, q);
+    sycl::free(d_outliers_candidate, q);
+    sycl::free(d_model_param_local, q);
+    sycl::free(d_g_out_id, q);
+    sycl::free(d_flow_vector_array, q);
 
     return 0;
 }

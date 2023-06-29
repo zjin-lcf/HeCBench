@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define H2F(input) static_cast<accscalar_t>(input)
 #define F2H(input) static_cast<scalar_t>(input)
@@ -19,7 +19,7 @@ inline T sigmoid(T in)  {
 
 template <typename scalar_t, typename accscalar_t, typename index_type>
 void gru_cell_forward(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   scalar_t *__restrict Input,
   scalar_t *__restrict Hidden,
   scalar_t *__restrict Bias1,
@@ -91,28 +91,28 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[3]);
 
   int input_size = 3 * vsz * hsz;
-  size_t input_size_bytes = input_size * sizeof(half);
+  size_t input_size_bytes = input_size * sizeof(sycl::half);
 
   int hidden_size = 3 * vsz * hsz;
-  size_t hidden_size_bytes = hidden_size * sizeof(half);
+  size_t hidden_size_bytes = hidden_size * sizeof(sycl::half);
 
   int bias_size = 3 * hsz;
-  size_t bias_size_bytes = bias_size * sizeof(half);
+  size_t bias_size_bytes = bias_size * sizeof(sycl::half);
 
   int store_size = 5 * vsz * hsz;
-  size_t store_size_bytes = store_size * sizeof(half);
+  size_t store_size_bytes = store_size * sizeof(sycl::half);
 
   int state_size = vsz;
-  size_t state_size_bytes = state_size * sizeof(half);
+  size_t state_size_bytes = state_size * sizeof(sycl::half);
   
-  half *h_input, *h_hidden, *h_input_bias, *h_hidden_bias;
-  half *h_hy, *h_hx;
-  h_input = (half*) malloc (input_size_bytes);
-  h_hidden = (half*) malloc (hidden_size_bytes);
-  h_input_bias = (half*) malloc (bias_size_bytes);
-  h_hidden_bias = (half*) malloc (bias_size_bytes);
-  h_hy = (half*) malloc (state_size_bytes);
-  h_hx = (half*) malloc (state_size_bytes);
+  sycl::half *h_input, *h_hidden, *h_input_bias, *h_hidden_bias;
+  sycl::half *h_hy, *h_hx;
+  h_input = (sycl::half*) malloc (input_size_bytes);
+  h_hidden = (sycl::half*) malloc (hidden_size_bytes);
+  h_input_bias = (sycl::half*) malloc (bias_size_bytes);
+  h_hidden_bias = (sycl::half*) malloc (bias_size_bytes);
+  h_hy = (sycl::half*) malloc (state_size_bytes);
+  h_hx = (sycl::half*) malloc (state_size_bytes);
 
   std::default_random_engine g (123);
   std::uniform_real_distribution<float> distr (-2.f, 2.f);
@@ -134,45 +134,45 @@ int main(int argc, char* argv[])
     h_hx[i] = distr(g); 
   }
 
-  half *d_input, *d_hidden, *d_input_bias, *d_hidden_bias;
-  half *d_hx, *d_hy, *d_store;
+  sycl::half *d_input, *d_hidden, *d_input_bias, *d_hidden_bias;
+  sycl::half *d_hx, *d_hy, *d_store;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  d_input = malloc_device<half>(input_size, q);
+  d_input = sycl::malloc_device<sycl::half>(input_size, q);
   q.memcpy(d_input, h_input, input_size_bytes);
 
-  d_hidden = malloc_device<half>(hidden_size, q);
+  d_hidden = sycl::malloc_device<sycl::half>(hidden_size, q);
   q.memcpy(d_hidden, h_hidden, hidden_size_bytes);
 
-  d_input_bias = malloc_device<half>(bias_size, q);
+  d_input_bias = sycl::malloc_device<sycl::half>(bias_size, q);
   q.memcpy(d_input_bias, h_input_bias, bias_size_bytes);
 
-  d_hidden_bias = malloc_device<half>(bias_size, q);
+  d_hidden_bias = sycl::malloc_device<sycl::half>(bias_size, q);
   q.memcpy(d_hidden_bias, h_hidden_bias, bias_size_bytes);
 
-  d_hx = malloc_device<half>(state_size, q);
+  d_hx = sycl::malloc_device<sycl::half>(state_size, q);
   q.memcpy(d_hx, h_hx, state_size_bytes);
 
-  d_hy = malloc_device<half>(state_size, q);
+  d_hy = sycl::malloc_device<sycl::half>(state_size, q);
 
-  d_store = malloc_device<half>(store_size, q);
+  d_store = sycl::malloc_device<sycl::half>(store_size, q);
 
-  range<1> gws ((vsz + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((vsz + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        gru_cell_forward<half, float, int> (
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class gru>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        gru_cell_forward<sycl::half, float, int> (
           item, d_input, d_hidden, d_input_bias, d_hidden_bias,
           d_hx, d_hy, d_store, hsz, vsz);
       });
@@ -193,13 +193,13 @@ int main(int argc, char* argv[])
   }
   printf("Checksum is %f\n", checksum / state_size);
 
-  free(d_input, q);
-  free(d_hidden, q);
-  free(d_input_bias, q);
-  free(d_hidden_bias, q);
-  free(d_hx, q);
-  free(d_hy, q);
-  free(d_store, q);
+  sycl::free(d_input, q);
+  sycl::free(d_hidden, q);
+  sycl::free(d_input_bias, q);
+  sycl::free(d_hidden_bias, q);
+  sycl::free(d_hx, q);
+  sycl::free(d_hy, q);
+  sycl::free(d_store, q);
 
   free(h_input);
   free(h_hidden);

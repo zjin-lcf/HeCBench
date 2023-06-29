@@ -35,8 +35,7 @@
 #include <mytimer.hpp>
 
 #include <outstream.hpp>
-#include <CL/sycl.hpp>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 namespace miniFE {
@@ -53,9 +52,9 @@ template<typename VectorType>
 bool breakdown(typename VectorType::ScalarType inner,
                const VectorType& v,
                const VectorType& w,
-      queue &q,
-      buffer<typename VectorType::ScalarType,1> &d_v,
-      buffer<typename VectorType::ScalarType,1> &d_w)
+      sycl::queue &q,
+      typename VectorType::ScalarType *d_v,
+      typename VectorType::ScalarType *d_w)
 {
   typedef typename VectorType::ScalarType Scalar;
   typedef typename TypeTraits<Scalar>::magnitude_type magnitude;
@@ -134,29 +133,35 @@ cg_solve(OperatorType& A,
   const MINIFE_GLOBAL_ORDINAL* MINIFE_RESTRICT const Acols	= &A.packed_cols[0];
   const MINIFE_SCALAR* MINIFE_RESTRICT const Acoefs             = &A.packed_coefs[0];
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<MINIFE_SCALAR, 1> d_r(r_ptr, r.coefs.size());
-  buffer<MINIFE_SCALAR, 1> d_p(p_ptr, p.coefs.size());
-  buffer<MINIFE_SCALAR, 1> d_Ap(Ap_ptr, Ap.coefs.size());
-  buffer<MINIFE_SCALAR, 1> d_x(x_ptr, x.coefs.size());
-  buffer<MINIFE_SCALAR, 1> d_b(b_ptr, b.coefs.size());
-  buffer<LocalOrdinalType, 1> d_Arowoffsets(Arowoffsets, A.row_offsets.size());
-  buffer<GlobalOrdinalType, 1> d_Acols(Acols, A.packed_cols.size());
-  buffer<MINIFE_SCALAR, 1> d_Acoefs(Acoefs, A.packed_coefs.size());
+  MINIFE_SCALAR *d_r = sycl::malloc_device<MINIFE_SCALAR>(r.coefs.size(), q);
+  q.memcpy(d_r, r_ptr, sizeof(MINIFE_SCALAR) * r.coefs.size());
 
-  d_r.set_final_data(nullptr);
-  d_p.set_final_data(nullptr);
-  d_Ap.set_final_data(nullptr);
-  d_b.set_final_data(nullptr);
-  d_Arowoffsets.set_final_data(nullptr);
-  d_Acols.set_final_data(nullptr);
-  d_Acoefs.set_final_data(nullptr);
+  MINIFE_SCALAR *d_p = sycl::malloc_device<MINIFE_SCALAR>(p.coefs.size(), q);
+  q.memcpy(d_p, p_ptr, sizeof(MINIFE_SCALAR) * p.coefs.size());
+
+  MINIFE_SCALAR *d_Ap = sycl::malloc_device<MINIFE_SCALAR>(Ap.coefs.size(), q);
+  q.memcpy(d_Ap, Ap_ptr, sizeof(MINIFE_SCALAR) * Ap.coefs.size());
+
+  MINIFE_SCALAR *d_x = sycl::malloc_device<MINIFE_SCALAR>(x.coefs.size(), q);
+  q.memcpy(d_x, x_ptr, sizeof(MINIFE_SCALAR) * x.coefs.size());
+
+  MINIFE_SCALAR *d_b = sycl::malloc_device<MINIFE_SCALAR>(b.coefs.size(), q);
+  q.memcpy(d_b, b_ptr, sizeof(MINIFE_SCALAR) * b.coefs.size());
+
+  LocalOrdinalType *d_Arowoffsets = sycl::malloc_device<LocalOrdinalType>(A.row_offsets.size(), q);
+  q.memcpy(d_Arowoffsets, Arowoffsets, sizeof(LocalOrdinalType) * A.row_offsets.size());
+
+  GlobalOrdinalType *d_Acols = sycl::malloc_device<GlobalOrdinalType>(A.packed_cols.size(), q);
+  q.memcpy(d_Acols, Acols, sizeof(GlobalOrdinalType) * A.packed_cols.size());
+
+  MINIFE_SCALAR *d_Acoefs = sycl::malloc_device<MINIFE_SCALAR>(A.packed_coefs.size(), q);
+  q.memcpy(d_Acoefs, Acoefs, sizeof(MINIFE_SCALAR) * A.packed_coefs.size());
 
   TICK(); waxpby(one, x, zero, x, p, q, d_x, d_x, d_p); TOCK(tWAXPY);
 
@@ -168,8 +173,8 @@ cg_solve(OperatorType& A,
   matvec(A, p, Ap, q, d_Arowoffsets, d_Acols, d_Acoefs, d_p, d_Ap);
   TOCK(tMATVEC);
 
-  TICK(); 
-  waxpby(one, b, -one, Ap, r, q, d_b, d_Ap, d_r); 
+  TICK();
+  waxpby(one, b, -one, Ap, r, q, d_b, d_Ap, d_r);
   TOCK(tWAXPY);
 
   TICK(); rtrans = dot_r2(r, q, d_r); TOCK(tDOT);
@@ -195,16 +200,16 @@ std::cout << "rtrans="<<rtrans<<std::endl;
 
   for(LocalOrdinalType k=1; k <= max_iter && normr > tolerance; ++k) {
     if (k == 1) {
-      TICK(); 
-      waxpby(one, r, zero, r, p, q, d_r, d_r, d_p); 
+      TICK();
+      waxpby(one, r, zero, r, p, q, d_r, d_r, d_p);
       TOCK(tWAXPY);
     }
     else {
       oldrtrans = rtrans;
       TICK(); rtrans = dot_r2(r, q, d_r); TOCK(tDOT);
       magnitude_type beta = rtrans/oldrtrans;
-      TICK(); 
-      daxpby(one, r, beta, p, q, d_r, d_p); 
+      TICK();
+      daxpby(one, r, beta, p, q, d_r, d_p);
       TOCK(tWAXPY);
     }
 
@@ -217,7 +222,7 @@ std::cout << "rtrans="<<rtrans<<std::endl;
     magnitude_type alpha = 0;
     magnitude_type p_ap_dot = 0;
 
-    TICK(); 
+    TICK();
     matvec(A, p, Ap, q, d_Arowoffsets, d_Acols, d_Acoefs, d_p, d_Ap);
     TOCK(tMATVEC);
 
@@ -247,7 +252,7 @@ std::cout << "rtrans="<<rtrans<<std::endl;
     os << ", rtrans = " << rtrans << ", alpha = " << alpha << std::endl;
 #endif
 
-    TICK(); 
+    TICK();
     daxpby(alpha, p, one, x, q, d_p, d_x);
     daxpby(-alpha, Ap, one, r, q, d_Ap, d_r);
     TOCK(tWAXPY);
@@ -255,11 +260,22 @@ std::cout << "rtrans="<<rtrans<<std::endl;
     num_iters = k;
   }
 
+  q.memcpy(x_ptr, d_x, sizeof(MINIFE_SCALAR) * x.coefs.size()).wait();
+
   my_cg_times[WAXPY] = tWAXPY;
   my_cg_times[DOT] = tDOT;
   my_cg_times[MATVEC] = tMATVEC;
   my_cg_times[MATVECDOT] = tMATVECDOT;
   my_cg_times[TOTAL] = mytimer() - total_time;
+
+  sycl::free(d_r, q);
+  sycl::free(d_p, q);
+  sycl::free(d_Ap, q);
+  sycl::free(d_x, q);
+  sycl::free(d_b, q);
+  sycl::free(d_Arowoffsets, q);
+  sycl::free(d_Acols, q);
+  sycl::free(d_Acoefs, q);
 }
 
 }//namespace miniFE

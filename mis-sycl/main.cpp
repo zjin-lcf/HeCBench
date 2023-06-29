@@ -47,7 +47,7 @@ for GPUs. ACM Transactions on Parallel Computing, Vol. 5, No. 2, Article 8
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
@@ -58,8 +58,8 @@ static const stattype out = 0;
 
 /* main computation kernel */
 
-void findmins(nd_item<1> &item,
-    const int nodes, 
+void findmins(sycl::nd_item<1> &item,
+    const int nodes,
     const int* const __restrict nidx,
     const int* const __restrict nlist,
     volatile stattype* const __restrict nstat)
@@ -102,9 +102,9 @@ unsigned int hash(unsigned int val)
 
 /* prioritized-selection initialization kernel */
 
-void init(nd_item<1> &item,
-    const int nodes, 
-    const int edges, 
+void init(sycl::nd_item<1> &item,
+    const int nodes,
+    const int edges,
     const int* const __restrict nidx,
     stattype* const __restrict nstat)
 {
@@ -127,7 +127,7 @@ void init(nd_item<1> &item,
 }
 
 void computeMIS(
-    const int nodes, 
+    const int nodes,
     const int edges,
     const int* const __restrict nidx,
     const int* const __restrict nlist,
@@ -135,38 +135,38 @@ void computeMIS(
 {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-  buffer<int, 1> nidx_d (nidx, nodes+1);
-  buffer<int, 1> nlist_d (nlist, edges);
-  buffer<stattype, 1> nstat_d (nodes+1);
+  int *nidx_d = sycl::malloc_device<int>(nodes+1, q);
+  q.memcpy(nidx_d, nidx, (nodes+1) * sizeof(int));
+
+  int *nlist_d = sycl::malloc_device<int>(edges, q);
+  q.memcpy(nlist_d, nlist, edges * sizeof(int));
+
+  stattype *nstat_d = sycl::malloc_device<stattype>(nodes+1, q);
 
   const int blocks = 24;
-  range<1> gws (blocks * ThreadsPerBlock);
-  range<1> lws (ThreadsPerBlock);
+  sycl::range<1> gws (blocks * ThreadsPerBlock);
+  sycl::range<1> lws (ThreadsPerBlock);
 
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
   for (int n = 0; n < 100; n++) {
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        init(item, nodes, edges, nidx.get_pointer(), nstat.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k1>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        init(item, nodes, edges, nidx_d, nstat_d);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        findmins(item, nodes, nidx.get_pointer(), nlist.get_pointer(), nstat.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        findmins(item, nodes, nidx_d, nlist_d, nstat_d);
       });
     });
   }
@@ -180,10 +180,10 @@ void computeMIS(
   printf("throughput: %.6f Mnodes/s\n", nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", edges * 0.000001 / runtime);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = nstat_d.get_access<sycl_read>(cgh);
-    cgh.copy(acc, nstat);
-  }).wait();
+  q.memcpy(nstat, nstat_d, nodes * sizeof(stattype)).wait();
+  sycl::free(nstat_d, q);
+  sycl::free(nlist_d, q);
+  sycl::free(nidx_d, q);
 }
 
 int main(int argc, char* argv[])

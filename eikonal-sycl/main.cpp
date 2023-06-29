@@ -40,13 +40,13 @@ int main(int argc, char** argv) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   StructuredEikonal data(q, verbose);
+
   data.setDims(size,size,size);
   data.setMapType(type);
   data.setItersPerBlock(itersPerBlock);

@@ -26,7 +26,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #define _GPU_COMPUTE_H_
 
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
+using double3 = sycl::double3;
 
 #include "ACF_kernel.cpp"
 #include "histogram_kernel.cpp"
@@ -37,8 +38,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 #define GRID_SIZE  (1 << LOG2_GRID_SIZE)
 
-const range<3> grid(1, 128, 128);
-const range<3> threads(1, 1, 128);
+const sycl::range<3> grid(1, 128, 128);
+const sycl::range<3> threads(1, 1, 128);
 
 // Device-side data storage
 cartesian d_idata1;
@@ -65,9 +66,9 @@ float t_Compute = 0.0f;
 // jkSizes: List of jackknife sizes, in order
 // nBins: Number of histogram bins
 // histo: The function outputs by adding on to this histogram
-// stream: SYCL queue
+// stream: SYCL sycl::queu
 void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
-                     long long *histo, queue &stream) {
+                     long long *histo, sycl::queue&stream) {
   // Storage for GPUHistogram output
   unsigned int* subHistoTemp = (unsigned int*)malloc(njk*nBins*sizeof(unsigned int));
 
@@ -89,12 +90,12 @@ void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
       stream.memcpy(d_idata1.z, &h_idata2.z[i * GRID_SIZE], GRID_SIZE * sizeof(double));
     }
 
-    stream.submit([&](handler &cgh) {
-      accessor<double3, 1, sycl_read_write, access::target::local> sm (128, cgh);
+    stream.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<double3, 1> sm (sycl::range<1>(128), cgh);
       auto d_idata1_p = d_idata1;
       auto d_odata1_p = d_odata1;
       auto d_binbs_p = d_binbs;
-      cgh.parallel_for(nd_range<3>(grid * threads, threads), [=](nd_item<3> item) {
+      cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
         ACFKernelSymm(d_idata1_p, d_odata1_p, item, sm.get_pointer(), d_binbs_p);
       });
     });
@@ -122,13 +123,13 @@ void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
         stream.memcpy(d_idata2.z, &h_idata2.z[j * GRID_SIZE], GRID_SIZE * sizeof(double));
       }
 
-      stream.submit([&](handler &cgh) {
+      stream.submit([&](sycl::handler &cgh) {
         auto d_idata1_p = d_idata1;
         auto d_idata2_p = d_idata2;
         auto d_odata1_p = d_odata1;
         auto d_binbs_p = d_binbs;
-        accessor<double3, 1, sycl_read_write, access::target::local> sm (128, cgh);
-        cgh.parallel_for(nd_range<3>(grid * threads, threads), [=](nd_item<3> item) {
+        sycl::local_accessor<double3, 1> sm (sycl::range<1>(128), cgh);
+        cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
           ACFKernel(d_idata1_p, d_idata2_p, d_odata1_p,
                     item, sm.get_pointer(), d_binbs_p);
         });
@@ -153,7 +154,7 @@ void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
 // randomSize: Size of random set
 // All else: See descriptions in tileComputeSymm
 void tileCompute(int dataSize, int randomSize, int njk, int *jkSizes, int nBins,
-                 long long *histo, queue &stream) {
+                 long long *histo, sycl::queue&stream) {
   unsigned int* subHistoTemp = (unsigned int*)malloc(njk*nBins*sizeof(unsigned int));
 
   int ndkernels = iDivUp(dataSize, GRID_SIZE);
@@ -170,13 +171,13 @@ void tileCompute(int dataSize, int randomSize, int njk, int *jkSizes, int nBins,
       stream.memcpy(d_idata2.y, &h_idata2.y[j * GRID_SIZE], GRID_SIZE * sizeof(double));
       stream.memcpy(d_idata2.z, &h_idata2.z[j * GRID_SIZE], GRID_SIZE * sizeof(double));
 
-      stream.submit([&](handler &cgh) {
+      stream.submit([&](sycl::handler &cgh) {
         auto d_idata1_p = d_idata1;
         auto d_idata2_p = d_idata2;
         auto d_odata1_p = d_odata1;
         auto d_binbs_p = d_binbs;
-        accessor<double3, 1, sycl_read_write, access::target::local> sm (128, cgh);
-        cgh.parallel_for(nd_range<3>(grid * threads, threads), [=](nd_item<3> item) {
+        sycl::local_accessor<double3, 1> sm (sycl::range<1>(128), cgh);
+        cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
             ACFKernel(d_idata1_p, d_idata2_p, d_odata1_p,
                       item, sm.get_pointer(), d_binbs_p);
         });
@@ -219,11 +220,10 @@ void doComputeGPU(char *dataName, char *randomNames, int nr,
                   long long **DRs,
                   long long **RRs) {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // DDs, DRs, RRs are not assumed to be allocated or cleared.
   *DDs = (long long*)malloc(nBins*njk*sizeof(long long));
@@ -312,6 +312,7 @@ void doComputeGPU(char *dataName, char *randomNames, int nr,
   struct timeval t3, t2, t1, t0;
   float t_computeDD=0, t_computeRRS=0, t_computeDRS=0, t_fileIO=0;
 
+  q.wait();
   gettimeofday(&t0, NULL);
 
   char fname[256];
@@ -328,7 +329,7 @@ void doComputeGPU(char *dataName, char *randomNames, int nr,
   t_computeDD = TDIFF(t1, t2);
 
   for(int i=0; i<nr; i++) {
-    sprintf(fname, "%s.%i\0", randomNames, i+1);
+    sprintf(fname, "%s.%i", randomNames, i+1);
     gettimeofday(&t0, NULL);
 
     readdatafile(fname, h_idata2, randomSize);

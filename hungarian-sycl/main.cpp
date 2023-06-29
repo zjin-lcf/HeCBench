@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Uncomment to use chars as the data type, otherwise use int
 // #define CHAR_DATA_TYPE
@@ -20,15 +20,21 @@
 
 #define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
-template <typename T, sycl::access::address_space 
-          addressSpace = sycl::access::address_space::global_space>
-T atomicExch(T *addr,
-             T operand, 
-             sycl::memory_order memoryOrder = sycl::memory_order::relaxed)
+inline int atomicExch(int& var, const int val) {
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space> (var);
+  return atm.exchange(val);
+}
+
+inline int atomicAdd(int *var, int val) 
 {
-  // add a pair of parentheses to declare a variable
-  sycl::atomic<T, addressSpace> obj((sycl::multi_ptr<T, addressSpace>(addr)));
-  return sycl::atomic_exchange(obj, operand, memoryOrder);
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*var);
+  return atm.fetch_add(val);
 }
 
 #ifndef USE_TEST_MATRIX
@@ -272,10 +278,10 @@ void compress_matrix(
   int i = item.get_global_id(0);
 
   if (slack[i] == 0) {
-    sycl::atomic<int>(sycl::global_ptr<int>(zeros_size)).fetch_add(1);
+    atomicAdd(zeros_size, 1);
     int b = i >> log2_data_block_size;
     int i0 = i & ~(data_block_size - 1);    // == b << log2_data_block_size
-    int j = sycl::atomic<int>(sycl::global_ptr<int>(zeros_size_b + b)).fetch_add(1);
+    int j = atomicAdd(zeros_size_b + b, 1);
     zeros[i0 + j] = i;
   }
 }
@@ -294,17 +300,17 @@ void step_2(
   int *__restrict cover_row,
   int *__restrict cover_column,
   bool *__restrict repeat_kernel,
-  bool *__restrict repeat,
-  bool *__restrict s_repeat_kernel)
+  bool &s_repeat,
+  bool &s_repeat_kernel)
 {
   int i = item.get_local_id(0);
   int b = item.get_group(0);
 
-  if (i == 0) *s_repeat_kernel = false;
+  if (i == 0) s_repeat_kernel = false;
 
   do {
     __syncthreads();
-    if (i == 0) *repeat = false;
+    if (i == 0) s_repeat = false;
     __syncthreads();
 
     for (int j = i; j < zeros_size_b[b]; j += item.get_local_range(0))
@@ -315,25 +321,25 @@ void step_2(
 
       if (cover_row[l] == 0 && cover_column[c] == 0) {
         // thread trys to get the line
-        if (!atomicExch((int *)&(cover_row[l]), 1)) {
+        if (!atomicExch(cover_row[l], 1)) {
           // only one thread gets the line
-          if (!atomicExch((int *)&(cover_column[c]), 1)) {
+          if (!atomicExch(cover_column[c], 1)) {
             // only one thread gets the column
             row_of_star_at_column[c] = l;
             column_of_star_at_row[l] = c;
           }
           else {
             cover_row[l] = 0;
-            *repeat = true;
-            *s_repeat_kernel = true;
+            s_repeat = true;
+            s_repeat_kernel = true;
           }
         }
       }
     }
     __syncthreads();
-  } while ((*repeat));
+  } while ((s_repeat));
 
-  if ((*s_repeat_kernel)) *repeat_kernel = true;
+  if ((s_repeat_kernel)) s_repeat_kernel = true;
 }
 
 // STEP 3
@@ -362,7 +368,7 @@ void step_3(
   if (row_of_star_at_column[i]>=0)
   {
     cover_column[i] = 1;
-    sycl::atomic<int>(sycl::global_ptr<int>(n_matches)).fetch_add(1);
+    atomicAdd(n_matches, 1);
   }
 }
 
@@ -394,9 +400,9 @@ void step_4(
   int *__restrict column_of_prime_at_row,
   bool *__restrict goto_5,
   bool *__restrict repeat_kernel,
-  bool *__restrict s_found,
-  bool *__restrict s_goto_5,
-  bool *__restrict s_repeat_kernel)
+  bool &s_found,
+  bool &s_goto_5,
+  bool &s_repeat_kernel)
 {
 
   volatile int *v_cover_row = cover_row;
@@ -406,13 +412,13 @@ void step_4(
   int b = item.get_group(0);
 
   if (i == 0) {
-    *s_repeat_kernel = false;
-    *s_goto_5 = false;
+    s_repeat_kernel = false;
+    s_goto_5 = false;
   }
 
   do {
     __syncthreads();
-    if (i == 0) *s_found = false;
+    if (i == 0) s_found = false;
     __syncthreads();
 
     for (int j = i; j < zeros_size_b[b]; j += item.get_local_range(0))
@@ -425,7 +431,8 @@ void step_4(
       for (int n = 0; n < 10; n++) {
 
         if (!v_cover_column[c] && !v_cover_row[l]) {
-          *s_found = true; *s_repeat_kernel = true;
+          s_found = true;
+          s_repeat_kernel = true;
           column_of_prime_at_row[l] = c;
 
           if (c1 >= 0) {
@@ -434,17 +441,17 @@ void step_4(
             v_cover_column[c1] = 0;
           }
           else {
-            *s_goto_5 = true;
+            s_goto_5 = true;
           }
         }
       } // for(int n
 
     } // for(int j
     __syncthreads();
-  } while (*s_found && !(*s_goto_5));
+  } while (s_found && !s_goto_5);
 
-  if (i == 0 && *s_repeat_kernel) *repeat_kernel = true;
-  if (i == 0 && *s_goto_5) *goto_5 = true;
+  if (i == 0 && s_repeat_kernel) *repeat_kernel = true;
+  if (i == 0 && s_goto_5) *goto_5 = true;
 }
 
 /* STEP 5:
@@ -690,11 +697,10 @@ void check(bool val, const char *str){
 int main(int argc, char* argv[])
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   if (argc != 2) {
     printf("Usage: %s <output file>\n", argv[0]);
@@ -780,228 +786,243 @@ int main(int argc, char* argv[])
     // Invoke kernels
     auto start = std::chrono::steady_clock::now();
 
-    range<1> gws1 (n_blocks * n_threads);
-    range<1> lws1 (n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class init_k>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
+    sycl::range<1> gws1 (n_blocks * n_threads);
+    sycl::range<1> lws1 (n_threads);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class init_k>(
+        sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
         init(item, 
-            row_of_star_at_column,
-            column_of_star_at_row,
-            cover_row,
-            cover_column);
+             row_of_star_at_column,
+             column_of_star_at_row,
+             cover_row,
+             cover_column);
       });
     });
 
   // Step 1 kernels
 
-    range<1> gws2 (n_blocks_reduction * n_threads_reduction);
-    range<1> lws2 (n_threads_reduction);
-    q.submit([&] (handler &cgh) {
-      accessor<data, 1, sycl_read_write, access::target::local> sm (n_threads_reduction, cgh);
-      cgh.parallel_for<class calc_minRow>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    sycl::range<1> gws2 (n_blocks_reduction * n_threads_reduction);
+    sycl::range<1> lws2 (n_threads_reduction);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<data, 1> sm (sycl::range<1>(n_threads_reduction), cgh);
+      cgh.parallel_for<class calc_minRow>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         calc_min_in_rows(item, slack, min_in_rows, sm.get_pointer());
       });
     });
 
   //call_kernel(step_1_row_sub, n_blocks_full, n_threads_full);
-    range<1> gws3 (n_blocks_full * n_threads_full);
-    range<1> lws3 (n_threads_full);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s1_rowSub>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
+    sycl::range<1> gws3 (n_blocks_full * n_threads_full);
+    sycl::range<1> lws3 (n_threads_full);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class s1_rowSub>(
+        sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
         step_1_row_sub(item, slack, min_in_rows);
       });
     });
 
   //call_kernel(calc_min_in_cols, n_blocks_reduction, n_threads_reduction);
-    q.submit([&] (handler &cgh) {
-      accessor<data, 1, sycl_read_write, access::target::local> sm (n_threads_reduction, cgh);
-      cgh.parallel_for<class calc_minCol>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<data, 1> sm (sycl::range<1>(n_threads_reduction), cgh);
+      cgh.parallel_for<class calc_minCol>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         calc_min_in_cols(item, slack, min_in_cols, sm.get_pointer());
       });
     });
 
   //call_kernel(step_1_col_sub, n_blocks_full, n_threads_full);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s1_colSub>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class s1_colSub>(
+        sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
         step_1_col_sub(item, slack, min_in_cols, 
             zeros_size_b, zeros_size);
       });
     });
 
   //call_kernel(compress_matrix, n_blocks_full, n_threads_full);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class compress>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class compress>(
+        sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
         compress_matrix(item, slack, zeros, zeros_size_b, zeros_size);
       });
     });
 
-  // Step 2 kernels
-  do {
-    repeat_kernel[0] = false;
-    //call_kernel(step_2, n_blocks_step_4, (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size);
-    const int block_size = 
-      (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size;
-    range<1> gws4 (n_blocks_step_4 *  block_size);
-    range<1> lws4 (block_size);
-    q.submit([&] (handler &cgh) {
-      accessor<bool, 1, sycl_read_write, access::target::local> s_repeat (1, cgh);
-      accessor<bool, 1, sycl_read_write, access::target::local> s_repeat_kernel (1, cgh);
-      cgh.parallel_for<class s2>(nd_range<1>(gws4, lws4), [=] (nd_item<1> item) {
-        step_2(item, zeros, zeros_size_b, 
-            row_of_star_at_column,
-            column_of_star_at_row,
-            cover_row, cover_column, repeat_kernel, 
-            s_repeat.get_pointer(),
-            s_repeat_kernel.get_pointer());
+    // Step 2 kernels
+    do {
+      repeat_kernel[0] = false;
+      //call_kernel(step_2, n_blocks_step_4, (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size);
+      const int block_size = 
+        (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size;
+      sycl::range<1> gws4 (n_blocks_step_4 *  block_size);
+      sycl::range<1> lws4 (block_size);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<bool, 0> s_repeat (cgh);
+        sycl::local_accessor<bool, 0> s_repeat_kernel (cgh);
+        cgh.parallel_for<class s2>(
+          sycl::nd_range<1>(gws4, lws4), [=] (sycl::nd_item<1> item) {
+          step_2(item, zeros, zeros_size_b, 
+              row_of_star_at_column,
+              column_of_star_at_row,
+              cover_row, cover_column, repeat_kernel, 
+              s_repeat,
+              s_repeat_kernel);
+        });
+      }).wait();
+
+      // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
+    } while (repeat_kernel[0]);
+
+    while (1) {  // repeat steps 3 to 6
+
+      // Step 3 kernels
+      //call_kernel(step_3_init, n_blocks, n_threads);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class s3_init>(
+          sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+          step_3_init(item, cover_row, cover_column, n_matches);
+        });
       });
-    }).wait();
 
-    // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
-  } while (repeat_kernel[0]);
+      //call_kernel(step_3, n_blocks, n_threads);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class s3>(
+          sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+          step_3(item, row_of_star_at_column, cover_column, n_matches);
+        });
+      }).wait();
 
-  while (1) {  // repeat steps 3 to 6
+      if (n_matches[0] >= ncols) break; // It's done
 
-    // Step 3 kernels
-    //call_kernel(step_3_init, n_blocks, n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s3_init>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        step_3_init(item, cover_row, cover_column, n_matches);
+      //step 4_kernels
+      //call_kernel(step_4_init, n_blocks, n_threads);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class s4_init>(
+          sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+          step_4_init(item, column_of_prime_at_row, row_of_green_at_column);
+        });
       });
-    });
 
-    //call_kernel(step_3, n_blocks, n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s3>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        step_3(item, row_of_star_at_column, cover_column, n_matches);
-      });
-    }).wait();
+      while (1) // repeat step 4 and 6
+      {
+        do {  // step 4 loop
+          goto_5[0] = false; repeat_kernel[0] = false;
 
-    if (n_matches[0] >= ncols) break; // It's done
+          //call_kernel(step_4, n_blocks_step_4, (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size);
+          const int block_size = 
+            (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size;
+          sycl::range<1> gws4 (n_blocks_step_4 *  block_size);
+          sycl::range<1> lws4 (block_size);
+          q.submit([&] (sycl::handler &cgh) {
+            sycl::local_accessor<bool, 0> s_found (cgh);
+            sycl::local_accessor<bool, 0> s_goto_5 (cgh);
+            sycl::local_accessor<bool, 0> s_repeat_kernel (cgh);
+            cgh.parallel_for<class s4>(
+              sycl::nd_range<1>(gws4, lws4), [=] (sycl::nd_item<1> item) {
+              step_4(item, zeros, zeros_size_b, 
+                  column_of_star_at_row,
+                  cover_row, 
+                  cover_column,
+                  column_of_prime_at_row,
+                  goto_5,
+                  repeat_kernel, 
+                  s_found,
+                  s_goto_5,
+                  s_repeat_kernel);
+            });
+          }).wait();
+          
+          // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
 
-    //step 4_kernels
-    //call_kernel(step_4_init, n_blocks, n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s4_init>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        step_4_init(item, column_of_prime_at_row, row_of_green_at_column);
-      });
-    });
+        } while (repeat_kernel[0] && !goto_5[0]);
 
-    while (1) // repeat step 4 and 6
-    {
-      do {  // step 4 loop
-        goto_5[0] = false; repeat_kernel[0] = false;
+        if (goto_5[0]) break;
 
-        //call_kernel(step_4, n_blocks_step_4, (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size);
-        const int block_size = 
-          (n_blocks_step_4 > 1 || *zeros_size > max_threads_per_block) ? max_threads_per_block : *zeros_size;
-        range<1> gws4 (n_blocks_step_4 *  block_size);
-        range<1> lws4 (block_size);
-        q.submit([&] (handler &cgh) {
-          accessor<bool, 1, sycl_read_write, access::target::local> s_found (1, cgh);
-          accessor<bool, 1, sycl_read_write, access::target::local> s_goto_5 (1, cgh);
-          accessor<bool, 1, sycl_read_write, access::target::local> s_repeat_kernel (1, cgh);
-          cgh.parallel_for<class s4>(nd_range<1>(gws4, lws4), [=] (nd_item<1> item) {
-            step_4(item, zeros, zeros_size_b, 
-                column_of_star_at_row,
-                cover_row, 
+        //step 6_kernel
+        //call_kernel_s(min_reduce_kernel1, n_blocks_reduction, n_threads_reduction, n_threads_reduction*sizeof(int));
+        q.submit([&] (sycl::handler &cgh) {
+          sycl::local_accessor<int, 1> sm (sycl::range<1>(n_threads_reduction), cgh);
+          cgh.parallel_for<class s6_min_reduce>(
+            sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
+            min_reduce_kernel1(item, slack, 
+                cover_row,
                 cover_column,
-                column_of_prime_at_row,
-                goto_5,
-                repeat_kernel, 
-                s_found.get_pointer(),
-                s_goto_5.get_pointer(),
-                s_repeat_kernel.get_pointer());
+                d_min_in_mat_vect,
+                sm.get_pointer());
           });
-        }).wait();
-        
-        // If we have more than one block it means that we have 512 lines per block so 1024 threads should be adequate.
+        });
 
-      } while (repeat_kernel[0] && !goto_5[0]);
+        //call_kernel_s(min_reduce_kernel2, 1, n_blocks_reduction / 2, (n_blocks_reduction / 2) * sizeof(int));
+        sycl::range<1> gws5 (n_blocks_reduction / 2);
+        sycl::range<1> lws5 (n_blocks_reduction / 2);
+        q.submit([&] (sycl::handler &cgh) {
+          sycl::local_accessor<int, 1> sm (sycl::range<1>(n_blocks_reduction/2), cgh);
+          cgh.parallel_for<class s6_min_reduce2>(
+          sycl::nd_range<1>(gws5, lws5), [=] (sycl::nd_item<1> item) {
+            min_reduce_kernel2(item,
+                d_min_in_mat_vect,
+                d_min_in_mat,
+                sm.get_pointer());
+          });
+        });
 
-      if (goto_5[0]) break;
+        //call_kernel(step_6_add_sub, n_blocks_full, n_threads_full);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class s6_addSub>(
+          sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
+            step_6_add_sub(item, slack,
+                      zeros_size_b,
+                        cover_row, cover_column, d_min_in_mat,
+                        zeros_size);
+          });
+        });
 
-      //step 6_kernel
-      //call_kernel_s(min_reduce_kernel1, n_blocks_reduction, n_threads_reduction, n_threads_reduction*sizeof(int));
-      q.submit([&] (handler &cgh) {
-        accessor<int, 1, sycl_read_write, access::target::local> sm (n_threads_reduction, cgh);
-        cgh.parallel_for<class s6_min_reduce>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
-          min_reduce_kernel1(item, slack, 
-              cover_row,
-              cover_column,
-              d_min_in_mat_vect,
-              sm.get_pointer());
+        //  call_kernel(compress_matrix, n_blocks_full, n_threads_full);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class compress2>(
+          sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
+            compress_matrix(item, slack, zeros, zeros_size_b, zeros_size);
+          });
+        });
+      } // repeat step 4 and 6
+
+      // call_kernel(step_5a, n_blocks, n_threads);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class s5a>(
+          sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+          step_5a(item, row_of_star_at_column,
+               column_of_star_at_row, column_of_prime_at_row,
+               row_of_green_at_column);
         });
       });
 
-      //call_kernel_s(min_reduce_kernel2, 1, n_blocks_reduction / 2, (n_blocks_reduction / 2) * sizeof(int));
-      range<1> gws5 (n_blocks_reduction / 2);
-      range<1> lws5 (n_blocks_reduction / 2);
-      q.submit([&] (handler &cgh) {
-         accessor<int, 1, sycl_read_write, access::target::local> sm (n_blocks_reduction/2, cgh);
-        cgh.parallel_for<class s6_min_reduce2>(nd_range<1>(gws5, lws5), [=] (nd_item<1> item) {
-          min_reduce_kernel2(item,
-              d_min_in_mat_vect,
-              d_min_in_mat,
-              sm.get_pointer());
+      //call_kernel(step_5b, n_blocks, n_threads);
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class s5b>(
+          sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+          step_5b(item, row_of_star_at_column,
+               column_of_star_at_row, 
+               row_of_green_at_column);
         });
       });
+    }  // repeat steps 3 to 6
 
-      //call_kernel(step_6_add_sub, n_blocks_full, n_threads_full);
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class s6_addSub>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
-          step_6_add_sub(item, slack,
-                    zeros_size_b,
-                      cover_row, cover_column, d_min_in_mat,
-                      zeros_size);
-        });
-      });
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    total_time += time;
+    printf("Total kernel execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
 
-      //  call_kernel(compress_matrix, n_blocks_full, n_threads_full);
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class compress2>(nd_range<1>(gws3, lws3), [=] (nd_item<1> item) {
-          compress_matrix(item, slack, zeros, zeros_size_b, zeros_size);
-        });
-      });
+    fflush(file);
 
-    } // repeat step 4 and 6
+    // Copy assignments from Device to Host and calculate the total Cost
+    q.memcpy(h_column_of_star_at_row, column_of_star_at_row, nrows * sizeof(int)).wait();
 
-    // call_kernel(step_5a, n_blocks, n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s5a>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        step_5a(item, row_of_star_at_column,
-             column_of_star_at_row, column_of_prime_at_row,
-             row_of_green_at_column);
-      });
-    });
+    int total_cost = 0;
+    for (int r = 0; r < nrows; r++) {
+      int c = h_column_of_star_at_row[r];
+      if (c >= 0) total_cost += h_cost[c][r];
+    }
 
-    //call_kernel(step_5b, n_blocks, n_threads);
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class s5b>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        step_5b(item, row_of_star_at_column,
-             column_of_star_at_row, 
-             row_of_green_at_column);
-      });
-    });
-
-  }  // repeat steps 3 to 6
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  total_time += time;
-  printf("Total kernel execution time of the Hungarian algorithm %f (s)\n", time * 1e-9f);
-
-  fflush(file);
-
-  // Copy assignments from Device to Host and calculate the total Cost
-  q.memcpy(h_column_of_star_at_row, column_of_star_at_row, nrows * sizeof(int)).wait();
-
-  int total_cost = 0;
-  for (int r = 0; r < nrows; r++) {
-    int c = h_column_of_star_at_row[r];
-    if (c >= 0) total_cost += h_cost[c][r];
-  }
-
-  printf("Total cost is \t %d \n", total_cost);
+    printf("Total cost is \t %d \n", total_cost);
 
 #ifndef USE_TEST_MATRIX
   }

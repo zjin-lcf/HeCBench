@@ -441,6 +441,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
     // this shows the sum of all partial_sum results
     hipMemcpy(sum, partial_sums_GPU, sizeof(float), hipMemcpyDeviceToHost);
     printf("kernel sum: frame=%d partial_sums[0]=%f\n", k, sum[0]);
+    free(sum);
 #endif
 
     hipLaunchKernelGGL(kernel_normalize_weights, num_blocks, BLOCK_SIZE, 0, 0, 

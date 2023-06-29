@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "common.h"
 #include "particles.h"
 
 // Simulation parameters
@@ -29,7 +28,7 @@ const float fColliderRadius = 0.17f;      // Radius of collider for interacting 
 //const float collideSpring = 0.4f;         // Elastic spring constant for impact between particles
 //const float collideDamping = 0.025f;      // Inelastic loss component for impact between particles
 //const float collideShear = 0.12f;         // Friction constant for particles in contact
-//const float collideAttraction = 0.0012f;  // Attraction between particles (~static or Van der Waals) 
+//const float collideAttraction = 0.0012f;  // Attraction between particles (~static or Van der Waals)
 
 // Forward Function declarations
 //*****************************************************************************
@@ -37,7 +36,7 @@ inline float frand(void){
   return (float)rand() / (float)RAND_MAX;
 }
 
-void initGrid(float *hPos, float *hVel, float particleRadius, float spacing, 
+void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
     unsigned int numParticles)
 {
   float jitter = particleRadius * 0.01f;
@@ -46,14 +45,14 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
   gridSize[0] = gridSize[1] = gridSize[2] = s;
 
   srand(1973);
-  for(unsigned int z=0; z<gridSize[2]; z++) 
+  for(unsigned int z=0; z<gridSize[2]; z++)
   {
-    for(unsigned int y=0; y<gridSize[1]; y++) 
+    for(unsigned int y=0; y<gridSize[1]; y++)
     {
-      for(unsigned int x=0; x<gridSize[0]; x++) 
+      for(unsigned int x=0; x<gridSize[0]; x++)
       {
         unsigned int i = (z * gridSize[0] * gridSize[1]) + (y * gridSize[1]) + x;
-        if (i < numParticles) 
+        if (i < numParticles)
         {
           hPos[i * 4] = (spacing * x) + particleRadius - 1.0f + (frand() * 2.0f - 1.0f) * jitter;
           hPos[i * 4 + 1] = (spacing * y) + particleRadius - 1.0f + (frand() * 2.0f - 1.0f) * jitter;
@@ -69,7 +68,7 @@ void initGrid(float *hPos, float *hVel, float particleRadius, float spacing,
   }
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
   if (argc != 2) {
     printf("Usage: %s <iterations>\n", argv[0]);
@@ -80,7 +79,7 @@ int main(int argc, char** argv)
   unsigned int gridDim = GRID_SIZE;
 
   // Set and log grid size and particle count, after checking optional command-line inputs
-  sycl::uint3 gridSize;
+  uint3 gridSize;
   gridSize.x() = gridSize.y() = gridSize.z() = gridDim;
 
   unsigned int numGridCells = gridSize.x() * gridSize.y() * gridSize.z();
@@ -92,7 +91,7 @@ int main(int argc, char** argv)
   params.gridSize = gridSize;
   params.numCells = numGridCells;
   params.numBodies = numParticles;
-  params.particleRadius = fParticleRadius; 
+  params.particleRadius = fParticleRadius;
   params.colliderPos = {1.2f, -0.8f, 0.8f};
   params.colliderRadius = fColliderRadius;
 
@@ -125,25 +124,24 @@ int main(int argc, char** argv)
   initGrid(hPos, hVel, params.particleRadius, params.particleRadius * 2.0f, numParticles);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  float4 *dPos = malloc_device<float4>(numParticles, q);
-  q.memcpy(dPos, (sycl::float4*)hPos, sizeof(float4) * numParticles);
+  float4 *dPos = sycl::malloc_device<float4>(numParticles, q);
+  q.memcpy(dPos, (float4*)hPos, sizeof(float4) * numParticles);
 
-  float4 *dVel = malloc_device<float4>(numParticles, q);
-  q.memcpy(dVel, (sycl::float4*)hVel, sizeof(float4) * numParticles);
+  float4 *dVel = sycl::malloc_device<float4>(numParticles, q);
+  q.memcpy(dVel, (float4*)hVel, sizeof(float4) * numParticles);
 
-  float4 *dReorderedPos = malloc_device<float4>(numParticles, q);
-  float4 *dReorderedVel = malloc_device<float4>(numParticles, q);
+  float4 *dReorderedPos = sycl::malloc_device<float4>(numParticles, q);
+  float4 *dReorderedVel = sycl::malloc_device<float4>(numParticles, q);
 
-  unsigned int *dHash = malloc_device<unsigned int>(numParticles, q);
-  unsigned int *dIndex = malloc_device<unsigned int>(numParticles, q);
-  unsigned int *dCellStart = malloc_device<unsigned int>(numGridCells, q);
-  unsigned int *dCellEnd = malloc_device<unsigned int>(numGridCells, q);
+  unsigned int *dHash = sycl::malloc_device<unsigned int>(numParticles, q);
+  unsigned int *dIndex = sycl::malloc_device<unsigned int>(numParticles, q);
+  unsigned int *dCellStart = sycl::malloc_device<unsigned int>(numGridCells, q);
+  unsigned int *dCellEnd = sycl::malloc_device<unsigned int>(numGridCells, q);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -223,14 +221,14 @@ int main(int argc, char** argv)
   free(hIndex       );
   free(hCellStart   );
   free(hCellEnd     );
-  free(dPos, q);
-  free(dVel, q);
-  free(dReorderedPos, q); 
-  free(dReorderedVel, q);
-  free(dHash, q);
-  free(dIndex, q);
-  free(dCellStart, q);
-  free(dCellEnd, q);
+  sycl::free(dPos, q);
+  sycl::free(dVel, q);
+  sycl::free(dReorderedPos, q);
+  sycl::free(dReorderedVel, q);
+  sycl::free(dHash, q);
+  sycl::free(dIndex, q);
+  sycl::free(dCellStart, q);
+  sycl::free(dCellEnd, q);
 
   return EXIT_SUCCESS;
 }

@@ -549,7 +549,7 @@ int shrLogEx(int iLogMode = LOGCONSOLE, int iErrNum = 0, const char* cFormatStri
   va_start(vaArgList, cFormatString);
   int ret = shrLogV(iLogMode, iErrNum, cFormatString, vaArgList);
 
-  // end variable argument handler
+  // end variable argument sycl::handler
   va_end(vaArgList);
 
   return ret;
@@ -565,7 +565,7 @@ int shrLog(const char* cFormatString = "", ...)
   va_start(vaArgList, cFormatString);
   int ret = shrLogV(LOGBOTH, 0, cFormatString, vaArgList);
 
-  // end variable argument handler
+  // end variable argument sycl::handler
   va_end(vaArgList);
 
   return ret;

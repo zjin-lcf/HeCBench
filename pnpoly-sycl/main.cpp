@@ -4,7 +4,7 @@
 #include <math.h>
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define VERTICES 600
 #define BLOCK_SIZE_X 256
@@ -42,31 +42,30 @@ int main(int argc, char* argv[]) {
   int *bitmap_opt = (int*) malloc (nPoints * sizeof(int));
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float2, 1> d_point (point, nPoints);
-  buffer<float2, 1> d_vertex (vertex, vertices);
-  buffer<int, 1> d_bitmap_ref (nPoints);
-  buffer<int, 1> d_bitmap_opt (nPoints);
+  float2 *d_point = sycl::malloc_device<float2>(nPoints, q);
+  float2 *d_vertex = sycl::malloc_device<float2>(vertices, q);
+  q.memcpy(d_point, point, nPoints*sizeof(float2));
+  q.memcpy(d_vertex, vertex, vertices*sizeof(float2));
+
+  int *d_bitmap_ref = sycl::malloc_device<int>(nPoints, q);
+  int *d_bitmap_opt = sycl::malloc_device<int>(nPoints, q);
 
   //kernel parameters
-  range<1> lws (BLOCK_SIZE_X);
-  range<1> gws ((nPoints+BLOCK_SIZE_X-1) / BLOCK_SIZE_X * BLOCK_SIZE_X);
+  sycl::range<1> lws (BLOCK_SIZE_X);
+  sycl::range<1> gws ((nPoints+BLOCK_SIZE_X-1) / BLOCK_SIZE_X * BLOCK_SIZE_X);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_ref.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class reference>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_base(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class reference>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_base(item, d_bitmap_ref, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -76,21 +75,15 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (pnpoly_base): %f (s)\n", (time * 1e-9f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bitmap_ref.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bitmap_ref);
-  }).wait();
+  q.memcpy(bitmap_ref, d_bitmap_ref, nPoints*sizeof(int)).wait();
 
   // performance tuning with tile sizes
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<1>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<1>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -103,12 +96,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<2>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<2>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -121,12 +111,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt3>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<4>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt3>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<4>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -139,12 +126,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt4>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<8>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt4>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<8>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -157,12 +141,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt5>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<16>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt5>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<16>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -175,12 +156,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt6>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<32>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt6>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<32>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -193,12 +171,9 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto bm = d_bitmap_opt.get_access<sycl_discard_write>(cgh);
-      auto p = d_point.get_access<sycl_read>(cgh);
-      auto v = d_vertex.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class opt7>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        pnpoly_opt<64>(item, bm.get_pointer(), p.get_pointer(), v.get_pointer(), nPoints);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class opt7>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        pnpoly_opt<64>(item, d_bitmap_opt, d_point, d_vertex, nPoints);
       });
     });
   }
@@ -208,10 +183,7 @@ int main(int argc, char* argv[]) {
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (pnpoly_opt<64>): %f (s)\n", (time * 1e-9f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bitmap_opt.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bitmap_opt);
-  }).wait();
+  q.memcpy(bitmap_opt, d_bitmap_opt, nPoints*sizeof(int)).wait();
 
   // compare against reference kernel for verification
   int error = memcmp(bitmap_opt, bitmap_ref, nPoints*sizeof(int)); 
@@ -222,6 +194,11 @@ int main(int argc, char* argv[]) {
   printf("Checksum: %d\n", checksum);
 
   printf("%s\n", error ? "FAIL" : "PASS");
+
+  sycl::free(d_vertex, q);
+  sycl::free(d_point, q);
+  sycl::free(d_bitmap_ref, q);
+  sycl::free(d_bitmap_opt, q);
 
   free(vertex);
   free(point);

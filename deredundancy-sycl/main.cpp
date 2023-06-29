@@ -28,48 +28,49 @@ int main(int argc, char **argv) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   auto t1 = std::chrono::high_resolution_clock::now();
 
-  buffer<int, 1> d_lengths (h_lengths, readsCount);
-  buffer<long, 1> d_offsets (h_offsets, (1 + readsCount));
-  buffer<char, 1> d_reads (h_reads, total_length);
-  d_reads.set_final_data(nullptr);
+  int *d_lengths = sycl::malloc_device<int>(readsCount, q);
+  q.memcpy(d_lengths, h_lengths, sizeof(int) * readsCount);
+
+  long *d_offsets = sycl::malloc_device<long>(1 + readsCount, q);
+  q.memcpy(d_offsets, h_offsets, sizeof(long) * (1 + readsCount));
+
+  char *d_reads = sycl::malloc_device<char>(total_length, q);
+  q.memcpy(d_reads, h_reads, sizeof(char) * total_length);
 
   // copyData(reads, data);
-  range<1> baseToNum_gws(128*128);
-  range<1> baseToNum_lws(128);
+  sycl::range<1> baseToNum_gws(128*128);
+  sycl::range<1> baseToNum_lws(128);
 
-  q.submit([&](handler &cgh) {
-    auto reads = d_reads.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class baseToNum> (nd_range<1>(baseToNum_gws, baseToNum_lws), [=] (nd_item<1> item) {
-      kernel_baseToNumber(reads.get_pointer(), total_length, item);
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for<class baseToNum> (
+      sycl::nd_range<1>(baseToNum_gws, baseToNum_lws), [=] (sycl::nd_item<1> item) {
+      kernel_baseToNumber(d_reads, total_length, item);
     });
   });
 
-  buffer<unsigned int> d_compressed(total_length / 16);
-  buffer<int> d_gaps(readsCount);
-  range<1> compress_gws((readsCount+127)/128*128);
-  range<1> compress_lws(128);
-  q.submit([&](handler &cgh) {
-    auto lengths = d_lengths.get_access<sycl_read>(cgh);
-    auto reads = d_reads.get_access<sycl_read>(cgh);
-    auto offsets = d_offsets.get_access<sycl_read>(cgh);
-    auto compressed = d_compressed.get_access<sycl_discard_write>(cgh);
-    auto gaps = d_gaps.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class compressData> (nd_range<1>(compress_gws, compress_lws), [=] (nd_item<1> item) {
+  unsigned int *d_compressed = sycl::malloc_device<unsigned int>(total_length / 16, q);
+  int *d_gaps = sycl::malloc_device<int>(readsCount, q);
+
+  sycl::range<1> compress_gws((readsCount+127)/128*128);
+  sycl::range<1> compress_lws(128);
+
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for<class compressData> (
+      sycl::nd_range<1>(compress_gws, compress_lws), [=] (sycl::nd_item<1> item) {
       kernel_compressData(
-        lengths.get_pointer(),
-        offsets.get_pointer(), 
-        reads.get_pointer(), 
-        compressed.get_pointer(), 
-        gaps.get_pointer(), 
-        readsCount, 
+        d_lengths,
+        d_offsets,
+        d_reads,
+        d_compressed,
+        d_gaps,
+        readsCount,
         item);
     });
   });
@@ -79,103 +80,79 @@ int main(int argc, char **argv) {
   unsigned short* h_indexs = (unsigned short*) malloc (sizeof(unsigned short) * total_length);
   long* h_words = (long*) malloc (sizeof(long) * readsCount);
 
-  buffer<unsigned short, 1> d_indexs (total_length);
-  buffer<unsigned short, 1> d_orders (total_length);
-  buffer<long, 1> d_words (readsCount);
-  buffer<int, 1> d_magicBase (readsCount * 4);
+  unsigned short *d_indexs = sycl::malloc_device<unsigned short>(total_length, q);
+  unsigned short *d_orders = sycl::malloc_device<unsigned short>(total_length, q);
+  long *d_words = sycl::malloc_device<long>(readsCount, q);
+  int *d_magicBase = sycl::malloc_device<int>(readsCount * 4, q);
 
   int wordLength = option.wordLength;
 
-  range<1> index_gws ((readsCount+127)/128*128);
-  range<1> index_lws (128);
+  sycl::range<1> index_gws ((readsCount+127)/128*128);
+  sycl::range<1> index_lws (128);
   switch (wordLength) {
     case 4:
-      q.submit([&](handler &cgh) {
-        auto reads = d_reads.get_access<sycl_read>(cgh);
-        auto lengths = d_lengths.get_access<sycl_read>(cgh);
-        auto offsets = d_offsets.get_access<sycl_read>(cgh);
-        auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
-        auto orders = d_orders.get_access<sycl_read>(cgh);
-        auto words = d_words.get_access<sycl_discard_write>(cgh);
-        auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class index4> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+      q.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for<class index4> (
+          sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
           kernel_createIndex4(
-            reads.get_pointer(), 
-            lengths.get_pointer(),
-            offsets.get_pointer(), 
-            indexs.get_pointer(),
-            orders.get_pointer(),
-            words.get_pointer(), 
-            magicBase.get_pointer(), 
+            d_reads,
+            d_lengths,
+            d_offsets,
+            d_indexs,
+            d_orders,
+            d_words,
+            d_magicBase,
             readsCount,
             item);
         });
       });
       break;
     case 5:
-      q.submit([&](handler &cgh) {
-        auto reads = d_reads.get_access<sycl_read>(cgh);
-        auto lengths = d_lengths.get_access<sycl_read>(cgh);
-        auto offsets = d_offsets.get_access<sycl_read>(cgh);
-        auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
-        auto orders = d_orders.get_access<sycl_read>(cgh);
-        auto words = d_words.get_access<sycl_discard_write>(cgh);
-        auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class index5> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+      q.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for<class index5> (
+          sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
           kernel_createIndex5(
-            reads.get_pointer(), 
-            lengths.get_pointer(),
-            offsets.get_pointer(), 
-            indexs.get_pointer(),
-            orders.get_pointer(),
-            words.get_pointer(), 
-            magicBase.get_pointer(), 
+            d_reads,
+            d_lengths,
+            d_offsets,
+            d_indexs,
+            d_orders,
+            d_words,
+            d_magicBase,
             readsCount,
             item);
         });
       });
       break;
     case 6:
-      q.submit([&](handler &cgh) {
-        auto reads = d_reads.get_access<sycl_read>(cgh);
-        auto lengths = d_lengths.get_access<sycl_read>(cgh);
-        auto offsets = d_offsets.get_access<sycl_read>(cgh);
-        auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
-        auto orders = d_orders.get_access<sycl_read>(cgh);
-        auto words = d_words.get_access<sycl_discard_write>(cgh);
-        auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class index6> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+      q.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for<class index6> (
+          sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
           kernel_createIndex6(
-            reads.get_pointer(), 
-            lengths.get_pointer(),
-            offsets.get_pointer(), 
-            indexs.get_pointer(),
-            orders.get_pointer(),
-            words.get_pointer(), 
-            magicBase.get_pointer(), 
+            d_reads,
+            d_lengths,
+            d_offsets,
+            d_indexs,
+            d_orders,
+            d_words,
+            d_magicBase,
             readsCount,
             item);
         });
       });
       break;
     case 7:
-      q.submit([&](handler &cgh) {
-        auto reads = d_reads.get_access<sycl_read>(cgh);
-        auto lengths = d_lengths.get_access<sycl_read>(cgh);
-        auto offsets = d_offsets.get_access<sycl_read>(cgh);
-        auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
-        auto orders = d_orders.get_access<sycl_read>(cgh);
-        auto words = d_words.get_access<sycl_discard_write>(cgh);
-        auto magicBase = d_magicBase.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class index7> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+      q.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for<class index7> (
+          sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
           kernel_createIndex7(
-            reads.get_pointer(), 
-            lengths.get_pointer(),
-            offsets.get_pointer(), 
-            indexs.get_pointer(),
-            orders.get_pointer(),
-            words.get_pointer(), 
-            magicBase.get_pointer(), 
+            d_reads,
+            d_lengths,
+            d_offsets,
+            d_indexs,
+            d_orders,
+            d_words,
+            d_magicBase,
             readsCount,
             item);
         });
@@ -185,37 +162,29 @@ int main(int argc, char **argv) {
 
   // createCutoff(data, option);
   float threshold = option.threshold;
-  buffer<int, 1> d_wordCutoff (readsCount);
-  q.submit([&](handler &cgh) {
-    //auto reads = d_reads.get_access<sycl_read>(cgh);
-    auto lengths = d_lengths.get_access<sycl_read>(cgh);
-    auto words = d_words.get_access<sycl_read>(cgh);
-    auto wordCutoff = d_wordCutoff.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class createCutoff> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+  int *d_wordCutoff = sycl::malloc_device<int>(readsCount, q);
+
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for<class createCutoff> (
+      sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
       kernel_createCutoff(
-        threshold, 
-        wordLength, 
-        lengths.get_pointer(),
-        words.get_pointer(),
-        wordCutoff.get_pointer(),
-        readsCount, 
+        threshold,
+        wordLength,
+        d_lengths,
+        d_words,
+        d_wordCutoff,
+        readsCount,
         item);
     });
   });
 
   // sortIndex(data);
-  q.submit([&](handler &cgh) {
-    auto indexs = d_indexs.get_access<sycl_read>(cgh);
-    cgh.copy(indexs, h_indexs);
-  });
-  q.submit([&](handler &cgh) {
-    auto offsets = d_offsets.get_access<sycl_read>(cgh);
-    cgh.copy(offsets, h_offsets);
-  });
-  q.submit([&](handler &cgh) {
-    auto words = d_words.get_access<sycl_read>(cgh);
-    cgh.copy(words, h_words);
-  });
+  q.memcpy(h_indexs, d_indexs, sizeof(unsigned short) * total_length);
+
+  q.memcpy(h_offsets, d_offsets, sizeof(long) * (1+readsCount));
+
+  q.memcpy(h_words, d_words, sizeof(long) * readsCount);
+
   q.wait();
 
   for (int i = 0; i< readsCount; i++) {
@@ -225,23 +194,17 @@ int main(int argc, char **argv) {
   }
 
   // mergeIndex(data);
-  q.submit([&](handler &cgh) {
-    auto indexs = d_indexs.get_access<sycl_discard_write>(cgh);
-    cgh.copy(h_indexs, indexs);
-  });
+  q.memcpy(d_indexs, h_indexs, sizeof(unsigned short) * total_length);
 
-  q.submit([&](handler &cgh) {
-    auto indexs = d_indexs.get_access<sycl_read>(cgh);
-    auto offsets = d_offsets.get_access<sycl_read>(cgh);
-    auto words = d_words.get_access<sycl_read>(cgh);
-    auto orders = d_orders.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class mergeIndex> (nd_range<1>(index_gws, index_lws), [=] (nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for<class mergeIndex> (
+      sycl::nd_range<1>(index_gws, index_lws), [=] (sycl::nd_item<1> item) {
       kernel_mergeIndex(
-        offsets.get_pointer(), 
-        indexs.get_pointer(), 
-        orders.get_pointer(),
-        words.get_pointer(), 
-        readsCount, 
+        d_offsets,
+        d_indexs,
+        d_orders,
+        d_words,
+        readsCount,
         item);
     });
   });
@@ -251,26 +214,27 @@ int main(int argc, char **argv) {
     h_cluster[i] = -1;
   }
 
-  buffer<int, 1> d_cluster(h_cluster, readsCount);
-  d_cluster.set_final_data(nullptr);
+  int *d_cluster = sycl::malloc_device<int>(readsCount, q);
+  q.memcpy(d_cluster, h_cluster, sizeof(int) * readsCount);
 
   unsigned short* table = (unsigned short*) malloc (sizeof(unsigned short) * 65536);
   memset(table, 0, 65536*sizeof(unsigned short));  // fill zero
-  buffer<unsigned short, 1> d_table(table, 65536);
-  d_table.set_final_data(nullptr);
+
+  unsigned short* d_table = sycl::malloc_device<unsigned short>(65536, q);
+  q.memcpy(d_table, table, 65536*sizeof(unsigned short));
 
   int r = -1; // a shorthand for representative
 
-  range<1> makeTable_gws(128*128);
-  range<1> makeTable_lws(128);
-  range<1> cleanTable_gws(128*128);
-  range<1> cleanTable_lws(128);
-  range<1> magic_gws((readsCount+127)/128*128);
-  range<1> magic_lws(128);
-  range<1> filter_gws(readsCount*128);
-  range<1> filter_lws(128);
-  range<1> align_gws((readsCount+127)/128*128);
-  range<1> align_lws(128);
+  sycl::range<1> makeTable_gws(128*128);
+  sycl::range<1> makeTable_lws(128);
+  sycl::range<1> cleanTable_gws(128*128);
+  sycl::range<1> cleanTable_lws(128);
+  sycl::range<1> magic_gws((readsCount+127)/128*128);
+  sycl::range<1> magic_lws(128);
+  sycl::range<1> filter_gws(readsCount*128);
+  sycl::range<1> filter_lws(128);
+  sycl::range<1> align_gws((readsCount+127)/128*128);
+  sycl::range<1> align_lws(128);
 
   while (r < readsCount) {  // clustering
 
@@ -281,33 +245,27 @@ int main(int argc, char **argv) {
     //std::cout << r << "/" << readsCount << std::endl;
 
     q.submit([&](sycl::handler &cgh) {
-      auto offsets = d_offsets.get_access<sycl_read>(cgh);
-      auto indexs = d_indexs.get_access<sycl_read>(cgh);
-      auto orders = d_orders.get_access<sycl_read>(cgh);
-      auto words = d_words.get_access<sycl_read>(cgh);
-      auto table = d_table.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class makeTable>(nd_range<1>(makeTable_gws, makeTable_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class makeTable>(
+        sycl::nd_range<1>(makeTable_gws, makeTable_lws), [=] (sycl::nd_item<1> item) {
         kernel_makeTable(
-          offsets.get_pointer(), 
-          indexs.get_pointer(),
-          orders.get_pointer(),
-          words.get_pointer(),
-          table.get_pointer(),
+          d_offsets,
+          d_indexs,
+          d_orders,
+          d_words,
+          d_table,
           r,
           item);
       });
     }); // create table
 
     q.submit([&](sycl::handler &cgh) {
-      auto lengths = d_lengths.get_access<sycl_read>(cgh);
-      auto magicBase = d_magicBase.get_access<sycl_read>(cgh);
-      auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class magic>(nd_range<1>(magic_gws, magic_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class magic>(
+        sycl::nd_range<1>(magic_gws, magic_lws), [=] (sycl::nd_item<1> item) {
         kernel_magic(
           threshold,
-          lengths.get_pointer(),
-          magicBase.get_pointer(),
-          cluster.get_pointer(),
+          d_lengths,
+          d_magicBase,
+          d_cluster,
           r,
           readsCount,
           item);
@@ -316,68 +274,58 @@ int main(int argc, char **argv) {
 
 
     q.submit([&](sycl::handler &cgh) {
-      auto lengths = d_lengths.get_access<sycl_read>(cgh);
-      auto offsets = d_offsets.get_access<sycl_read>(cgh);
-      auto indexs = d_indexs.get_access<sycl_read>(cgh);
-      auto orders = d_orders.get_access<sycl_read>(cgh);
-      auto words = d_words.get_access<sycl_read>(cgh);
-      //auto magicBase = d_magicBase.get_access<sycl_read>(cgh);
-      auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
-      auto wordCutoff = d_wordCutoff.get_access<sycl_read>(cgh);
-      auto table = d_table.get_access<sycl_read>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> result (128, cgh);
-      cgh.parallel_for<class filter>(nd_range<1>(filter_gws, filter_lws), [=] (nd_item<1> item) {
-        kernel_filter(threshold, wordLength, 
-          lengths.get_pointer(),
-          offsets.get_pointer(), indexs.get_pointer(), orders.get_pointer(), words.get_pointer(),
-          wordCutoff.get_pointer(), cluster.get_pointer(), table.get_pointer(),
+      sycl::local_accessor<int, 1> result (sycl::range<1>(128), cgh);
+      cgh.parallel_for<class filter>(
+        sycl::nd_range<1>(filter_gws, filter_lws), [=] (sycl::nd_item<1> item) {
+        kernel_filter(
+          threshold,
+          wordLength, 
+          d_lengths,
+          d_offsets,
+          d_indexs,
+          d_orders,
+          d_words,
+          d_wordCutoff,
+          d_cluster,
+          d_table,
           readsCount,
-          item, 
+          item,
           result.get_pointer());
       });
     }); // word filter
 
     q.submit([&](sycl::handler &cgh) {
-      auto lengths = d_lengths.get_access<sycl_read>(cgh);
-      auto offsets = d_offsets.get_access<sycl_read>(cgh);
-      auto compressed = d_compressed.get_access<sycl_read>(cgh);
-      auto gaps = d_gaps.get_access<sycl_read>(cgh);
-      auto cluster = d_cluster.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class align>(nd_range<1>(align_gws, align_lws), [=] (nd_item<1> item) {
-        kernel_align(threshold, 
-          lengths.get_pointer(), 
-          offsets.get_pointer(),
-          compressed.get_pointer(), 
-          gaps.get_pointer(), 
+      cgh.parallel_for<class align>(
+        sycl::nd_range<1>(align_gws, align_lws), [=] (sycl::nd_item<1> item) {
+        kernel_align(
+          threshold,
+          d_lengths,
+          d_offsets,
+          d_compressed,
+          d_gaps,
           r,
-          cluster.get_pointer(), 
-          readsCount, item);
+          d_cluster,
+          readsCount,
+          item);
       });
     }); // dynamic programming
 
     q.submit([&](sycl::handler &cgh) {
-      auto offsets = d_offsets.get_access<sycl_read>(cgh);
-      auto indexs = d_indexs.get_access<sycl_read>(cgh);
-      auto orders = d_orders.get_access<sycl_read>(cgh);
-      auto words = d_words.get_access<sycl_read>(cgh);
-      auto table = d_table.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class cleanTable>(nd_range<1>(cleanTable_gws, cleanTable_lws), [=] (nd_item<1> item) {
+      cgh.parallel_for<class cleanTable>(
+        sycl::nd_range<1>(cleanTable_gws, cleanTable_lws), [=] (sycl::nd_item<1> item) {
         kernel_cleanTable(
-          offsets.get_pointer(), 
-          indexs.get_pointer(),
-          orders.get_pointer(),
-          words.get_pointer(),
-          table.get_pointer(),
+          d_offsets,
+          d_indexs,
+          d_orders,
+          d_words,
+          d_table,
           r,
           item);
       }); // table fill zero
     });
   }
 
-  q.submit([&](handler &cgh) {
-    auto cluster = d_cluster.get_access<sycl_read>(cgh);
-    cgh.copy(cluster, h_cluster);
-  }).wait();
+  q.memcpy(h_cluster, d_cluster, sizeof(int) * readsCount).wait();
 
   auto t2 = std::chrono::high_resolution_clock::now();
   double total_time = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
@@ -403,5 +351,17 @@ int main(int argc, char **argv) {
   free(h_cluster);
   free(table);
 
+  sycl::free(d_lengths, q);
+  sycl::free(d_offsets, q);
+  sycl::free(d_reads, q);
+  sycl::free(d_compressed, q);
+  sycl::free(d_gaps, q);
+  sycl::free(d_indexs, q);
+  sycl::free(d_orders, q);
+  sycl::free(d_words, q);
+  sycl::free(d_magicBase, q);
+  sycl::free(d_wordCutoff, q);
+  sycl::free(d_cluster, q);
+  sycl::free(d_table, q);
   return 0;
 }

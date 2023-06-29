@@ -1133,49 +1133,74 @@ void bonds (
   }
 }
 
-void getBondsResultsGpu(sycl::queue &q, inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+long getBondsResultsGpu(sycl::queue &q, inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
 {
-  sycl::buffer<bondsYieldTermStruct, 1> discountCurveGpu (inArgsHost.discountCurve, numBonds);
-  sycl::buffer<bondsYieldTermStruct, 1> repoCurveGpu (inArgsHost.repoCurve, numBonds);
-  sycl::buffer<bondsDateStruct, 1> currDateGpu (inArgsHost.currDate, numBonds);
-  sycl::buffer<bondsDateStruct, 1> maturityDateGpu (inArgsHost.maturityDate, numBonds);
-  sycl::buffer<dataType, 1> bondCleanPriceGpu (inArgsHost.bondCleanPrice, numBonds);
-  sycl::buffer<bondStruct, 1> bondGpu (inArgsHost.bond, numBonds);
-  sycl::buffer<dataType, 1> dummyStrikeGpu (inArgsHost.dummyStrike, numBonds);
-  sycl::buffer<dataType, 1> dirtyPriceGpu (resultsFromGpu.dirtyPrice, numBonds);
-  sycl::buffer<dataType, 1> accruedAmountCurrDateGpu (resultsFromGpu.accruedAmountCurrDate, numBonds);
-  sycl::buffer<dataType, 1> cleanPriceGpu (resultsFromGpu.cleanPrice, numBonds);
-  sycl::buffer<dataType, 1> bondForwardValGpu (resultsFromGpu.bondForwardVal, numBonds);
+  bondsYieldTermStruct *discountCurveGpu = sycl::malloc_device<bondsYieldTermStruct>(numBonds, q);
+  bondsYieldTermStruct *repoCurveGpu = sycl::malloc_device<bondsYieldTermStruct>(numBonds, q);
+  bondsDateStruct *currDateGpu = sycl::malloc_device<bondsDateStruct>(numBonds, q);
+  bondsDateStruct *maturityDateGpu = sycl::malloc_device<bondsDateStruct>(numBonds, q);
+  dataType *bondCleanPriceGpu = sycl::malloc_device<dataType>(numBonds, q);
+  bondStruct *bondGpu = sycl::malloc_device<bondStruct>(numBonds, q);
+  dataType *dummyStrikeGpu = sycl::malloc_device<dataType>(numBonds, q);
+  dataType *dirtyPriceGpu = sycl::malloc_device<dataType>(numBonds, q);
+  dataType *accruedAmountCurrDateGpu = sycl::malloc_device<dataType>(numBonds, q);
+  dataType *cleanPriceGpu = sycl::malloc_device<dataType>(numBonds, q);
+  dataType *bondForwardValGpu = sycl::malloc_device<dataType>(numBonds, q);
+
+  q.memcpy(discountCurveGpu, inArgsHost.discountCurve, sizeof(bondsYieldTermStruct) * numBonds);
+  q.memcpy(repoCurveGpu, inArgsHost.repoCurve, numBonds*sizeof(bondsYieldTermStruct));
+  q.memcpy(currDateGpu, inArgsHost.currDate, numBonds*sizeof(bondsDateStruct));
+  q.memcpy(maturityDateGpu, inArgsHost.maturityDate, numBonds*sizeof(bondsDateStruct));
+  q.memcpy(bondCleanPriceGpu, inArgsHost.bondCleanPrice, numBonds*sizeof(dataType));
+  q.memcpy(bondGpu, inArgsHost.bond, numBonds*sizeof(bondStruct));
+  q.memcpy(dummyStrikeGpu, inArgsHost.dummyStrike, numBonds*sizeof(dataType));
+  q.wait();
 
   sycl::range<1> gws ((numBonds + 255)/256*256);
   sycl::range<1> lws (256);
 
+  struct timeval start;
+  struct timeval end;
+  gettimeofday(&start, NULL);
+
   q.submit([&] (sycl::handler &cgh) {
-    auto discountCurve = discountCurveGpu.get_access<sycl::access::mode::read>(cgh);
-    auto repoCurve = repoCurveGpu.get_access<sycl::access::mode::read>(cgh);
-    auto currDate = currDateGpu.get_access<sycl::access::mode::read>(cgh);
-    auto maturityDate = maturityDateGpu.get_access<sycl::access::mode::read>(cgh);
-    auto bondCleanPrice = bondCleanPriceGpu.get_access<sycl::access::mode::read>(cgh);
-    auto bond = bondGpu.get_access<sycl::access::mode::read>(cgh);
-    auto dummyStrike = dummyStrikeGpu.get_access<sycl::access::mode::read>(cgh);
-    auto dirtyPrice = dirtyPriceGpu.get_access<sycl::access::mode::discard_write>(cgh);
-    auto accruedAmountCurrDate = accruedAmountCurrDateGpu.get_access<sycl::access::mode::discard_write>(cgh);
-    auto cleanPrice = cleanPriceGpu.get_access<sycl::access::mode::discard_write>(cgh);
-    auto bondForwardVal = bondForwardValGpu.get_access<sycl::access::mode::discard_write>(cgh);
     cgh.parallel_for<class kernel>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       bonds(item,
-        discountCurve.get_pointer(),
-        repoCurve.get_pointer(),
-        currDate.get_pointer(),
-        maturityDate.get_pointer(),
-        bondCleanPrice.get_pointer(),
-        bond.get_pointer(),
-        dummyStrike.get_pointer(),
-        dirtyPrice.get_pointer(),
-        accruedAmountCurrDate.get_pointer(),
-        cleanPrice.get_pointer(),
-        bondForwardVal.get_pointer(),
-        numBonds);
+            discountCurveGpu,
+            repoCurveGpu,
+            currDateGpu,
+            maturityDateGpu,
+            bondCleanPriceGpu,
+            bondGpu,
+            dummyStrikeGpu,
+            dirtyPriceGpu,
+            accruedAmountCurrDateGpu,
+            cleanPriceGpu,
+            bondForwardValGpu,
+            numBonds);
     });
-  });
+  }).wait();
+
+  gettimeofday(&end, NULL);
+  long ktime = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
+
+  q.memcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType));
+  q.memcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType));
+  q.memcpy(resultsFromGpu.cleanPrice, cleanPriceGpu, numBonds*sizeof(dataType));
+  q.memcpy(resultsFromGpu.bondForwardVal, bondForwardValGpu, numBonds*sizeof(dataType));
+  q.wait();
+
+  sycl::free(discountCurveGpu, q);
+  sycl::free(repoCurveGpu, q);
+  sycl::free(currDateGpu, q);
+  sycl::free(maturityDateGpu, q);
+  sycl::free(bondCleanPriceGpu, q);
+  sycl::free(bondGpu, q);
+  sycl::free(dummyStrikeGpu, q);
+
+  sycl::free(dirtyPriceGpu, q);
+  sycl::free(accruedAmountCurrDateGpu, q);
+  sycl::free(cleanPriceGpu, q);
+  sycl::free(bondForwardValGpu, q);
+  return ktime;
 }

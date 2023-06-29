@@ -22,13 +22,13 @@
 
 
 void pcr_small_systems_kernel(
-    nd_item<1> &item,
-    global_ptr<const float> a_d, 
-    global_ptr<const float> b_d, 
-    global_ptr<const float> c_d, 
-    global_ptr<const float> d_d, 
-    global_ptr<float> x_d, 
-    local_ptr<float> shared, 
+    sycl::nd_item<1> &item,
+    const float * a_d, 
+    const float * b_d, 
+    const float * c_d, 
+    const float * d_d, 
+    float * x_d, 
+    float * shared, 
     int system_size, 
     int num_systems, 
     int iterations)
@@ -38,11 +38,11 @@ void pcr_small_systems_kernel(
 
   int delta = 1;
 
-  local_ptr<float> a = shared;
-  local_ptr<float> b = &a[system_size+1];
-  local_ptr<float> c = &b[system_size+1];
-  local_ptr<float> d = &c[system_size+1];
-  local_ptr<float> x = &d[system_size+1];
+  float * a = shared;
+  float * b = &a[system_size+1];
+  float * c = &b[system_size+1];
+  float * d = &c[system_size+1];
+  float * x = &d[system_size+1];
 
   a[thid] = a_d[thid + blid * system_size];
   b[thid] = b_d[thid + blid * system_size];
@@ -51,7 +51,7 @@ void pcr_small_systems_kernel(
 
   float aNew, bNew, cNew, dNew;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // parallel cyclic reduction
   for (int j = 0; j < iterations; j++)
@@ -63,7 +63,7 @@ void pcr_small_systems_kernel(
 #ifndef NATIVE_DIVIDE
       float tmp2 = c[i] / b[i+delta];
 #else
-      float tmp2 = cl::sycl::native::divide(c[i], b[i+delta]);
+      float tmp2 = sycl::native::divide(c[i], b[i+delta]);
 #endif
       bNew = b[i] - a[i+delta] * tmp2;
       dNew = d[i] - d[i+delta] * tmp2;
@@ -75,7 +75,7 @@ void pcr_small_systems_kernel(
 #ifndef NATIVE_DIVIDE
       float tmp = a[i] / b[i-delta];
 #else
-      float tmp = cl::sycl::native::divide(a[i], b[i-delta]);
+      float tmp = sycl::native::divide(a[i], b[i-delta]);
 #endif
       bNew = b[i] - c[i-delta] * tmp;
       dNew = d[i] - d[i-delta] * tmp;
@@ -88,8 +88,8 @@ void pcr_small_systems_kernel(
       float tmp1 = a[i] / b[i-delta];
       float tmp2 = c[i] / b[i+delta];
 #else
-      float tmp1 = cl::sycl::native::divide(a[i], b[i-delta]);
-      float tmp2 = cl::sycl::native::divide(c[i], b[i+delta]);
+      float tmp1 = sycl::native::divide(a[i], b[i-delta]);
+      float tmp2 = sycl::native::divide(c[i], b[i+delta]);
 #endif
       bNew = b[i] - c[i-delta] * tmp1 - a[i+delta] * tmp2;
       dNew = d[i] - d[i-delta] * tmp1 - d[i+delta] * tmp2;
@@ -97,7 +97,7 @@ void pcr_small_systems_kernel(
       cNew = -c[i+delta] * tmp2;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     b[i] = bNew;
     d[i] = dNew;
@@ -105,7 +105,7 @@ void pcr_small_systems_kernel(
     c[i] = cNew;  
 
     delta *= 2;
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (thid < delta)
@@ -117,24 +117,24 @@ void pcr_small_systems_kernel(
     x[addr1] = (b[addr2] * d[addr1] - c[addr1] * d[addr2]) / tmp3;
     x[addr2] = (d[addr2] * b[addr1] - d[addr1] * a[addr2]) / tmp3;
 #else
-    x[addr1] = cl::sycl::native::divide((b[addr2] * d[addr1] - c[addr1] * d[addr2]), tmp3);
-    x[addr2] = cl::sycl::native::divide((d[addr2] * b[addr1] - d[addr1] * a[addr2]), tmp3);
+    x[addr1] = sycl::native::divide((b[addr2] * d[addr1] - c[addr1] * d[addr2]), tmp3);
+    x[addr2] = sycl::native::divide((d[addr2] * b[addr1] - d[addr1] * a[addr2]), tmp3);
 #endif
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   x_d[thid + blid * system_size] = x[thid];
 }
 
 void pcr_branch_free_kernel(
-    nd_item<1> &item,
-    global_ptr<const float> a_d, 
-    global_ptr<const float> b_d, 
-    global_ptr<const float> c_d, 
-    global_ptr<const float> d_d, 
-    global_ptr<float> x_d, 
-    local_ptr<float> shared, 
+    sycl::nd_item<1> &item,
+    const float * a_d, 
+    const float * b_d, 
+    const float * c_d, 
+    const float * d_d, 
+    float * x_d, 
+    float * shared, 
     int system_size, int num_systems, int iterations)
 {
   int thid = item.get_local_id(0);
@@ -142,11 +142,11 @@ void pcr_branch_free_kernel(
 
   int delta = 1;
 
-  local_ptr<float> a = shared;
-  local_ptr<float> b = &a[system_size+1];
-  local_ptr<float> c = &b[system_size+1];
-  local_ptr<float> d = &c[system_size+1];
-  local_ptr<float> x = &d[system_size+1];
+  float * a = shared;
+  float * b = &a[system_size+1];
+  float * c = &b[system_size+1];
+  float * d = &c[system_size+1];
+  float * x = &d[system_size+1];
 
   a[thid] = a_d[thid + blid * system_size];
   b[thid] = b_d[thid + blid * system_size];
@@ -155,7 +155,7 @@ void pcr_branch_free_kernel(
 
   float aNew, bNew, cNew, dNew;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // parallel cyclic reduction
   for (int j = 0; j < iterations; j++)
@@ -172,8 +172,8 @@ void pcr_branch_free_kernel(
     float tmp1 = a[i] / b[iLeft];
     float tmp2 = c[i] / b[iRight];
 #else
-    float tmp1 = cl::sycl::native::divide(a[i], b[iLeft]);
-    float tmp2 = cl::sycl::native::divide(c[i], b[iRight]);
+    float tmp1 = sycl::native::divide(a[i], b[iLeft]);
+    float tmp2 = sycl::native::divide(c[i], b[iRight]);
 #endif
 
     bNew = b[i] - c[iLeft] * tmp1 - a[iRight] * tmp2;
@@ -181,7 +181,7 @@ void pcr_branch_free_kernel(
     aNew = -a[iLeft] * tmp1;
     cNew = -c[iRight] * tmp2;
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     b[i] = bNew;
     d[i] = dNew;
@@ -189,7 +189,7 @@ void pcr_branch_free_kernel(
     c[i] = cNew;  
 
     delta *= 2;
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (thid < delta)
@@ -201,12 +201,12 @@ void pcr_branch_free_kernel(
     x[addr1] = (b[addr2] * d[addr1] - c[addr1] * d[addr2]) / tmp3;
     x[addr2] = (d[addr2] * b[addr1] - d[addr1] * a[addr2]) / tmp3;
 #else
-    x[addr1] = cl::sycl::native::divide((b[addr2] * d[addr1] - c[addr1] * d[addr2]), tmp3);
-    x[addr2] = cl::sycl::native::divide((d[addr2] * b[addr1] - d[addr1] * a[addr2]), tmp3);
+    x[addr1] = sycl::native::divide((b[addr2] * d[addr1] - c[addr1] * d[addr2]), tmp3);
+    x[addr2] = sycl::native::divide((d[addr2] * b[addr1] - d[addr1] * a[addr2]), tmp3);
 #endif
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   x_d[thid + blid * system_size] = x[thid];
 }

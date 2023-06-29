@@ -508,6 +508,7 @@ kernel_gpu_wrapper(  params_common common,
   cudaFree(d_checksum);
 #endif
   cudaFree(d_epiT);
+  cudaFree(d_endoT);
   cudaFree(d_in2);
   cudaFree(d_conv);
   cudaFree(d_in2_pad_cumv);

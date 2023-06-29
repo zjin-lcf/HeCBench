@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using float3 = sycl::float3;
+using float4 = sycl::float4;
 
 #ifndef SYCL_Geometric
 inline float dot(const float3 &a, const float3 &b)
@@ -26,7 +29,7 @@ inline float length(const float3 &v)
 }
 #endif
 
-inline float4 normalEstimate(const float3 *points, int idx, int width, int height) 
+inline float4 normalEstimate(const float3 *points, int idx, int width, int height)
 {
   float3 query_pt = points[idx];
   if (sycl::isnan(query_pt.z()))
@@ -36,7 +39,7 @@ inline float4 normalEstimate(const float3 *points, int idx, int width, int heigh
   int yIdx = idx / width;
 
   // are we at a border? are our neighbor valid points?
-  bool west_valid  = (xIdx > 1)        && !sycl::isnan (points[idx-1].z()) &&     
+  bool west_valid  = (xIdx > 1)        && !sycl::isnan (points[idx-1].z()) &&
                      sycl::fabs (points[idx-1].z() - query_pt.z()) < 200.f;
   bool east_valid  = (xIdx < width-1)  && !sycl::isnan (points[idx+1].z()) &&
                      sycl::fabs (points[idx+1].z() - query_pt.z()) < 200.f;
@@ -87,7 +90,7 @@ inline float4 normalEstimate(const float3 *points, int idx, int width, int heigh
 }
 
 void ne (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const float3 *__restrict points,
         float4 *__restrict normal_points,
   const int width,
@@ -95,7 +98,7 @@ void ne (
   const int numPts)
 {
   int idx = item.get_global_id(0);
-  if (idx < numPts) 
+  if (idx < numPts)
     normal_points[idx] = normalEstimate(points, idx, width, height);
 }
 
@@ -121,38 +124,28 @@ int main(int argc, char* argv[]) {
     points[i].z() = rand() % 256;
   }
 
-  { // sycl scope
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float3, 1> d_points (points, numPts);
-  buffer<float4, 1> d_normal_points (normal_points, numPts);
+  float3 *d_points = sycl::malloc_device<float3>(numPts, q);
+  q.memcpy(d_points, points, size);
 
-  range<1> gws ((numPts + 255)/256*256);
-  range<1> lws  (256);
+  float4 *d_normal_points = sycl::malloc_device<float4>(numPts, q);
 
-  // warmup
-  q.submit([&] (handler &cgh) {
-    auto p = d_points.get_access<sycl_read>(cgh);
-    auto np = d_normal_points.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      ne(item, p.get_pointer(), np.get_pointer(), width, height, numPts); 
-    });
-  });
+  sycl::range<1> gws ((numPts + 255)/256*256);
+  sycl::range<1> lws  (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto p = d_points.get_access<sycl_read>(cgh);
-      auto np = d_normal_points.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class normal_estimate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        ne(item, p.get_pointer(), np.get_pointer(), width, height, numPts); 
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class normal_estimate>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        ne(item, d_points, d_normal_points, width, height, numPts);
       });
     });
   }
@@ -161,7 +154,8 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
-  }
+
+  q.memcpy(normal_points, d_normal_points, normal_size).wait();
 
   float sx, sy, sz, sw;
   sx = sy = sz = sw = 0.f;
@@ -173,6 +167,8 @@ int main(int argc, char* argv[]) {
   }
   printf("Checksum: x=%f y=%f z=%f w=%f\n", sx, sy, sz, sw);
 
+  sycl::free(d_normal_points, q);
+  sycl::free(d_points, q);
   free(normal_points);
   free(points);
   return 0;

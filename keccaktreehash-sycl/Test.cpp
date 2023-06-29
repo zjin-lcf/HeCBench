@@ -10,13 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #include "KeccakF.h"
 #include "KeccakTreeCPU.h"
 #include "KeccakTreeGPU.h"
 
-// choose 8 for fast execution 
+// choose 8 for fast execution
 #define IMAX 8 // 1600 //2400 // 1600 for high speed mesures // iteration for speed mesure loops
 
 
@@ -35,16 +35,16 @@ void TestCPU(int reduc)
    int i;
 
    tKeccakLane *h_inBuffer;// Host in buffer for data to be hashed
-   tKeccakLane *h_outBuffer;// Host out buffer 
+   tKeccakLane *h_outBuffer;// Host out buffer
 
    tKeccakLane Kstate[25]; //Keccak State for top node
    memset(Kstate, 0, 25 * sizeof(tKeccakLane));
 
-   //init host inBuffer 
+   //init host inBuffer
    h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
    memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
 
-   //init host outBuffer   
+   //init host outBuffer
    h_outBuffer=(tKeccakLane *) malloc( OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
    memset(h_outBuffer, 0, OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
 
@@ -53,7 +53,7 @@ void TestCPU(int reduc)
    for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++) h_inBuffer[i]=i;
 
    //CPU computation *******************************
-   printf("CPU speed test started \n");   
+   printf("CPU speed test started \n");
 
    t1=time(NULL);
 
@@ -74,7 +74,7 @@ void TestCPU(int reduc)
 
    //free all buffer host and device
    free(h_inBuffer);
-   free(h_outBuffer);    
+   free(h_outBuffer);
 }
 
 void TestGPU()
@@ -110,16 +110,16 @@ void TestGPU()
    };
 
    tKeccakLane *h_inBuffer;// Host in buffer for data to be hashed
-   tKeccakLane *h_outBuffer;// Host out buffer 
+   tKeccakLane *h_outBuffer;// Host out buffer
 
    tKeccakLane Kstate[25]; //Keccak State for top node
    memset(Kstate, 0, 25 * sizeof(tKeccakLane));
 
-   //init host inBuffer 
+   //init host inBuffer
    h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
    memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
 
-   //init host outBuffer   
+   //init host outBuffer
    h_outBuffer=(tKeccakLane *) malloc( OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
    memset(h_outBuffer, 0, OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
 
@@ -128,16 +128,18 @@ void TestGPU()
    for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++ )
    {h_inBuffer[i]=i;}
 
-#ifdef USE_GPU 
-   gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-   cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-   queue q(dev_sel);
 
-   buffer<tKeccakLane,1> d_inBuffer(INPUT_BLOCK_SIZE_B/4 * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
-   buffer<tKeccakLane,1> d_outBuffer(OUTPUT_BLOCK_SIZE_B/4 * NB_THREADS*NB_THREADS_BLOCKS);
-   buffer<tKeccakLane,1> d_KeccakF_RoundConstants(KeccakF_RoundConstants, 22);
+   tKeccakLane *d_inBuffer = sycl::malloc_device<tKeccakLane>(
+     INPUT_BLOCK_SIZE_B/4 * NB_THREADS * NB_THREADS_BLOCKS * NB_INPUT_BLOCK, q);
+   tKeccakLane *d_outBuffer = sycl::malloc_device<tKeccakLane>(
+     OUTPUT_BLOCK_SIZE_B/4 * NB_THREADS * NB_THREADS_BLOCKS, q);
+   tKeccakLane *d_KeccakF_RoundConstants = sycl::malloc_device<tKeccakLane>(22, q);
+   q.memcpy(d_KeccakF_RoundConstants, KeccakF_RoundConstants, 22 * sizeof(tKeccakLane));
 
    //GPU computation *******************************
    printf("GPU speed test started\n");
@@ -162,7 +164,10 @@ void TestGPU()
 
    //free all buffer host and device
    free(h_inBuffer);
-   free(h_outBuffer);    
+   free(h_outBuffer);
+   sycl::free(d_inBuffer, q);
+   sycl::free(d_outBuffer, q);
+   sycl::free(d_KeccakF_RoundConstants, q);
 }
 
 void Print_Param(void)

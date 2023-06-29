@@ -12,7 +12,7 @@
 // line argument.
 ////////////////////////////////////////////////////////////////////////////////////
 
-void run_event_based_simulation(Input input, SimulationData data, unsigned long * vhash_result)
+void run_event_based_simulation(Input input, SimulationData data, unsigned long * vhash_result, double * kernel_time )
 {
   printf("Beginning event based simulation ...\n");
   unsigned long verification = 0;
@@ -29,6 +29,7 @@ void run_event_based_simulation(Input input, SimulationData data, unsigned long 
                           map(to:data.max_num_nucs)\
                           map(to:data.max_num_poles)\
                           map(to:data.max_num_windows)\
+                          map(to:input) \
                           map(tofrom:verification)
   {
     double start = get_time();
@@ -74,7 +75,8 @@ void run_event_based_simulation(Input input, SimulationData data, unsigned long 
     }
 
     double stop = get_time();
-    printf("Kernel initialization, compilation, and launch took %.2lf seconds.\n", stop-start);
+    printf("Kernel initialization, compilation, and execution took %.2lf seconds.\n", stop-start);
+    *kernel_time = stop-start;
   }
 
   *vhash_result = verification;

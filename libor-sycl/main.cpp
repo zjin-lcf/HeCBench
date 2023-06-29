@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // parameters for device execution
 
@@ -37,12 +37,11 @@
 #define NPATH 96000
 
 // Monte Carlo LIBOR path calculation
-
-void path_calc(float *L, 
-               const float *z, 
-               const float *lambda, 
+void path_calc(float *L,
+               const float *z,
+               const float *lambda,
                const float delta,
-               const int Nmat, 
+               const int Nmat,
                const int N)
 {
   int   i, n;
@@ -65,9 +64,8 @@ void path_calc(float *L,
 
 /* forward path calculation storing data
    for subsequent reverse path calculation */
-
-void path_calc_b1(float *L, 
-                  const float *z, 
+void path_calc_b1(float *L,
+                  const float *z,
                   float *L2,
                   const float *lambda,
                   const float delta,
@@ -78,7 +76,7 @@ void path_calc_b1(float *L,
   float sqez, lam, con1, v, vrat;
 
   for (i=0; i<N; i++) L2[i] = L[i];
-   
+
   for(n=0; n<Nmat; n++) {
     sqez = sycl::sqrt(delta)*z[n];
     v = 0.f;
@@ -97,11 +95,10 @@ void path_calc_b1(float *L,
 }
 
 // reverse path calculation of deltas using stored data
-
-void path_calc_b2(float *L_b, 
-                  const float *z, 
-                  const float *L2, 
-                  const float *lambda, 
+void path_calc_b2(float *L_b,
+                  const float *z,
+                  const float *L2,
+                  const float *lambda,
                   const float delta,
                   const int Nmat,
                   const int N)
@@ -116,19 +113,18 @@ void path_calc_b2(float *L_b,
       faci   = sycl::native::divide(delta,1.f+delta*L2[i+n*N]);
       L_b[i] = L_b[i]*sycl::native::divide(L2[i+(n+1)*N],L2[i+n*N])
               + v1*lambda[i-n-1]*faci*faci;
- 
+
     }
   }
 }
 
 // calculate the portfolio value v, and its sensitivity to L
 // hand-coded reverse mode sensitivity
-
-float portfolio_b(float *L, 
+float portfolio_b(float *L,
                   float *L_b,
-                  const float *lambda, 
-                  const   int *maturities, 
-                  const float *swaprates, 
+                  const float *lambda,
+                  const   int *maturities,
+                  const float *swaprates,
                   const float delta,
                   const int Nmat,
                   const int N,
@@ -195,11 +191,10 @@ float portfolio_b(float *L,
 
 
 // calculate the portfolio value v
-
 float portfolio(float *L,
-                const float *lambda, 
-                const   int *maturities, 
-                const float *swaprates, 
+                const float *lambda,
+                const   int *maturities,
+                const float *swaprates,
                 const float delta,
                 const int Nmat,
                 const int N,
@@ -207,7 +202,7 @@ float portfolio(float *L,
 {
   int   n, m, i;
   float v, b, s, swapval, B[40], S[40];
-	
+
   b = 1.f;
   s = 0.f;
 
@@ -252,7 +247,7 @@ int main(int argc, char **argv)
   int     h_maturities[] = {4,4,4,8,8,8,20,20,20,28,28,28,40,40,40};
   float   h_swaprates[]  = {.045f,.05f,.055f,.045f,.05f,.055f,.045f,.05f,
                             .055f,.045f,.05f,.055f,.045f,.05f,.055f };
-  double  v, Lb; 
+  double  v, Lb;
   bool    ok = true;
 
   // 'd_' prefix - GPU (device) memory space
@@ -263,21 +258,25 @@ int main(int argc, char **argv)
   h_Lb = (float *)malloc(sizeof(float)*NPATH);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
+  int *d_maturities = sycl::malloc_device<int>(NOPT, q);
+  q.memcpy(d_maturities, h_maturities, sizeof(int) * NOPT);
 
-  buffer<  int,1> d_maturities(h_maturities, NOPT);
-  buffer<float,1> d_swaprates(h_swaprates, NOPT);
-  buffer<float,1> d_lambda(h_lambda, NN);
-  buffer<float,1> d_v(NPATH);
-  buffer<float,1> d_Lb(NPATH);
+  float *d_swaprates = sycl::malloc_device<float>(NOPT, q);
+  q.memcpy(d_swaprates, h_swaprates, sizeof(float) * NOPT);
 
-  range<1> gws (GRID_SIZE * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  float *d_lambda = sycl::malloc_device<float>(NN, q);
+  q.memcpy(d_lambda, h_lambda, sizeof(float) * NN);
+
+  float *d_v = sycl::malloc_device<float>(NPATH, q);
+  float *d_Lb = sycl::malloc_device<float>(NPATH, q);
+
+  sycl::range<1> gws (GRID_SIZE * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
   // Execute GPU kernel -- no Greeks
 
@@ -286,17 +285,14 @@ int main(int argc, char **argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto maturities = d_maturities.get_access<sycl_read>(cgh);
-      auto swaprates  = d_swaprates.get_access<sycl_read>(cgh);
-      auto lambda = d_lambda.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class porfolio_nogreek>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class porfolio_nogreek>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int     tid = item.get_global_id(0);
         const int threadN = item.get_global_range(0);
         int   i, path;
         float L[NN], z[NN];
-        
+
         /* Monte Carlo LIBOR path calculation*/
         for(path = tid; path < NPATH; path += threadN){
           // initialise the data for current thread
@@ -305,9 +301,9 @@ int main(int argc, char **argv)
             z[i] = 0.3f;
             L[i] = 0.05f;
           }
-          path_calc(L, z, lambda.get_pointer(), h_delta, h_Nmat, h_N);
-          v[path] = portfolio(L, lambda.get_pointer(), maturities.get_pointer(), 
-                              swaprates.get_pointer(), h_delta, h_Nmat, h_N, h_Nopt);
+          path_calc(L, z, d_lambda, h_delta, h_Nmat, h_N);
+          d_v[path] = portfolio(L, d_lambda, d_maturities,
+                                d_swaprates, h_delta, h_Nmat, h_N, h_Nopt);
         }
       });
     });
@@ -319,11 +315,8 @@ int main(int argc, char **argv)
   printf("Average kernel execution time : %f (s)\n", (time * 1e-9f) / repeat);
 
   // Read back GPU results and compute average
-  q.submit([&] (handler &cgh) {
-    auto v = d_v.get_access<sycl_read>(cgh);
-    cgh.copy(v, h_v);
-  }).wait();
-  
+  q.memcpy(h_v, d_v, sizeof(float) * NPATH).wait();
+
   v = 0.0;
   for (i=0; i<NPATH; i++) v += h_v[i];
   v = v / NPATH;
@@ -340,20 +333,16 @@ int main(int argc, char **argv)
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto maturities = d_maturities.get_access<sycl_read>(cgh);
-      auto swaprates  = d_swaprates.get_access<sycl_read>(cgh);
-      auto lambda = d_lambda.get_access<sycl_read>(cgh);
-      auto v = d_v.get_access<sycl_discard_write>(cgh);
-      auto Lb = d_Lb.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class porfolio_greek>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class porfolio_greek>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         const int     tid = item.get_global_id(0);
         const int threadN = item.get_global_range(0);
 
         int   i,path;
         float L[NN], L2[L2_SIZE], z[NN];
         float *L_b = L;
-        
+
         /* Monte Carlo LIBOR path calculation*/
 
         for(path = tid; path < NPATH; path += threadN){
@@ -363,11 +352,11 @@ int main(int argc, char **argv)
             z[i] = 0.3f;
             L[i] = 0.05f;
           }
-          path_calc_b1(L, z, L2, lambda.get_pointer(), h_delta, h_Nmat, h_N);
-          v[path] = portfolio_b(L, L_b, lambda.get_pointer(), maturities.get_pointer(), 
-                                swaprates.get_pointer(), h_delta, h_Nmat, h_N, h_Nopt);
-          path_calc_b2(L_b, z, L2, lambda.get_pointer(), h_delta, h_Nmat, h_N);
-          Lb[path] = L_b[NN-1];
+          path_calc_b1(L, z, L2, d_lambda, h_delta, h_Nmat, h_N);
+          d_v[path] = portfolio_b(L, L_b, d_lambda, d_maturities,
+                                d_swaprates, h_delta, h_Nmat, h_N, h_Nopt);
+          path_calc_b2(L_b, z, L2, d_lambda, h_delta, h_Nmat, h_N);
+          d_Lb[path] = L_b[NN-1];
         }
       });
     });
@@ -380,16 +369,8 @@ int main(int argc, char **argv)
 
   // Read back GPU results and compute average
 
-  q.submit([&] (handler &cgh) {
-    auto Lb = d_Lb.get_access<sycl_read>(cgh);
-    cgh.copy(Lb, h_Lb);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto v = d_v.get_access<sycl_read>(cgh);
-    cgh.copy(v, h_v);
-  });
-
+  q.memcpy(h_v, d_v, sizeof(float) * NPATH);
+  q.memcpy(h_Lb, d_Lb, sizeof(float) * NPATH);
   q.wait();
 
   v = 0.0;
@@ -408,6 +389,12 @@ int main(int argc, char **argv)
     ok = false;
     printf("Expected:  21.348 Actual %15.3f\n", Lb);
   }
+
+  sycl::free(d_v, q);
+  sycl::free(d_Lb, q);
+  sycl::free(d_maturities, q);
+  sycl::free(d_swaprates, q);
+  sycl::free(d_lambda, q);
 
   free(h_v);
   free(h_Lb);

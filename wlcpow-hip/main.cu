@@ -293,7 +293,7 @@ int main(int argc, char* argv[]) {
 
   // no NaN values in the outputs
   for (i = 0; i < n+1; i++) {
-    bool r = (isnan(force_x[i]) | isnan(force_y[i]) | isnan(force_z[i]));
+    bool r = (isnan(force_x[i]) || isnan(force_y[i]) || isnan(force_z[i]));
     if (r) printf("There are NaN numbers at index %d\n", i);
   }
 

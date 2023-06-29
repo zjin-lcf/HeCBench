@@ -495,7 +495,7 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/o shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/o shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
   float f0 = 0, f1 = 0, f2 = 0; 
@@ -566,7 +566,7 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time (w/ shift): %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average kernel execution time (w/ shift): %f (us)\n", (time * 1e-3f) / repeat);
 
 #ifdef DEBUG
   f0 = 0, f1 = 0, f2 = 0; 

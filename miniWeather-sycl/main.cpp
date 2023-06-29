@@ -12,7 +12,7 @@
 #include <math.h>
 #include <mpi.h>
 #include <time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
 const double grav      = 9.8;                               //Gravitational acceleration (m / s^2)
@@ -85,8 +85,8 @@ double *recvbuf_l;            //Buffer to receive data from the left MPI rank
 double *recvbuf_r;            //Buffer to receive data from the right MPI rank
 int    num_out = 0;           //The number of outputs performed so far
 int    direction_switch = 1;
-double mass0, te0;            //Initial domain totals for mass and total energy  
-double mass , te ;            //Domain totals for mass and total energy  
+double mass0, te0;            //Initial domain totals for mass and total energy
+double mass , te ;            //Domain totals for mass and total energy
 
 //Establish hydrstatic balance using constant potential temperature (thermally neutral atmosphere)
 //z is the input coordinate
@@ -225,30 +225,31 @@ void collision( double x , double z , double &r , double &u , double &w , double
 //First, compute the flux vector at each cell interface in the x-direction (including hyperviscosity)
 //Then, compute the tendencies using those fluxes
 void compute_tendencies_x(
-    const int hs, 
-    const int nx, 
-    const int nz, 
+    const int hs,
+    const int nx,
+    const int nz,
     const double dx,
-    double *d_state, 
-    double *d_flux, 
-    double *d_tend, 
-    double *d_hy_dens_cell, 
+    double *d_state,
+    double *d_flux,
+    double *d_tend,
+    double *d_hy_dens_cell,
     double *d_hy_dens_theta_cell,
-    queue &q )
-{ 
-  range<3> flux_gws (1, (nz+15)/16*16, (nx+16)/16*16);
-  range<3> flux_lws (1, 16, 16);
+    sycl::queue &q )
+{
+  sycl::range<3> flux_gws (1, (nz+15)/16*16, (nx+16)/16*16);
+  sycl::range<3> flux_lws (1, 16, 16);
 
   //Compute the hyperviscosity coeficient
   double hv_coef = -hv_beta * dx / (16*dt);
   //Compute fluxes in the x-direction for each cell
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class compute_flux_x>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_flux_x>(
+      sycl::nd_range<3>(flux_gws, flux_lws), [=] (sycl::nd_item<3> item) {
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
       double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-      if (i < nx+1 && k < nz) { 
+      if (i < nx+1 && k < nz) {
         //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
         for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s < sten_size; s++) {
@@ -278,15 +279,16 @@ void compute_tendencies_x(
   });
 
   //Use the fluxes to compute tendencies for each cell
-  range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
-  range<3> tend_lws (1, 16, 16);
+  sycl::range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
+  sycl::range<3> tend_lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class compute_tend_x>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_tend_x>(
+      sycl::nd_range<3>(tend_gws, tend_lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
-      if (i < nx && k < nz) { 
+      if (i < nx && k < nz) {
         int indt  = ll* nz   * nx    + k* nx    + i  ;
         int indf1 = ll*(nz+1)*(nx+1) + k*(nx+1) + i  ;
         int indf2 = ll*(nz+1)*(nx+1) + k*(nx+1) + i+1;
@@ -302,33 +304,34 @@ void compute_tendencies_x(
 //First, compute the flux vector at each cell interface in the z-direction (including hyperviscosity)
 //Then, compute the tendencies using those fluxes
 void compute_tendencies_z(
-    const int hs, 
-    const int nx, 
-    const int nz,  
+    const int hs,
+    const int nx,
+    const int nz,
     const double dz,
-    double *d_state, 
-    double *d_flux, 
-    double *d_tend, 
-    double *d_hy_dens_int, 
-    double *d_hy_dens_theta_int, 
-    double *d_hy_pressure_int, 
-    queue &q ) 
+    double *d_state,
+    double *d_flux,
+    double *d_tend,
+    double *d_hy_dens_int,
+    double *d_hy_dens_theta_int,
+    double *d_hy_pressure_int,
+    sycl::queue &q )
 {
   //Compute the hyperviscosity coeficient
   double hv_coef = -hv_beta * dz / (16*dt);
 
   //Compute fluxes in the z-direction for each cell
 
-  range<3> flux_gws (1, (nz+16)/16*16, (nx+15)/16*16);
-  range<3> flux_lws (1, 16, 16);
+  sycl::range<3> flux_gws (1, (nz+16)/16*16, (nx+15)/16*16);
+  sycl::range<3> flux_lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class compute_flux_z>(nd_range<3>(flux_gws, flux_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_flux_z>(
+      sycl::nd_range<3>(flux_gws, flux_lws), [=] (sycl::nd_item<3> item) {
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
       double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-      if (i < nx && k < nz+1) { 
+      if (i < nx && k < nz+1) {
         //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
         for (int ll=0; ll<NUM_VARS; ll++) {
           for (int s=0; s<sten_size; s++) {
@@ -363,15 +366,16 @@ void compute_tendencies_z(
   });
 
   //Use the fluxes to compute tendencies for each cell
-  range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
-  range<3> tend_lws (1, 16, 16);
+  sycl::range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
+  sycl::range<3> tend_lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class compute_tend_z>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_tend_z>(
+      sycl::nd_range<3>(tend_gws, tend_lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
-      if (i < nx && k < nz) { 
+      if (i < nx && k < nz) {
         int indt  = ll* nz   * nx    + k* nx    + i  ;
         int indf1 = ll*(nz+1)*(nx+1) + (k  )*(nx+1) + i;
         int indf2 = ll*(nz+1)*(nx+1) + (k+1)*(nx+1) + i;
@@ -388,19 +392,19 @@ void compute_tendencies_z(
 
 //Set this MPI task's halo values in the x-direction. This routine will require MPI
 void set_halo_values_x(
-    const int hs, 
+    const int hs,
     const int nx,
     const int nz,
     const int k_beg,
     const double dz,
-    double *d_state, 
-    double *d_hy_dens_cell, 
-    double *d_hy_dens_theta_cell, 
+    double *d_state,
+    double *d_hy_dens_cell,
+    double *d_hy_dens_theta_cell,
     double *d_sendbuf_l,
     double *d_sendbuf_r,
     double *d_recvbuf_l,
     double *d_recvbuf_r,
-    queue &q ) 
+    sycl::queue &q )
 {
   int ierr;
   MPI_Request req_r[2], req_s[2];
@@ -410,15 +414,16 @@ void set_halo_values_x(
   ierr = MPI_Irecv(recvbuf_r,hs*nz*NUM_VARS,MPI_DOUBLE,right_rank,1,MPI_COMM_WORLD,&req_r[1]);
 
   //Pack the send buffers
-  range<3> buffer_gws (NUM_VARS, (nz+15)/16*16, (hs+15)/16*16);
-  range<3> buffer_lws (1, 16, 16);
+  sycl::range<3> buffer_gws (NUM_VARS, (nz+15)/16*16, (hs+15)/16*16);
+  sycl::range<3> buffer_lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class pack_send_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class pack_send_buf>(
+      sycl::nd_range<3>(buffer_gws, buffer_lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
-      if (s < hs && k < nz) { 
+      if (s < hs && k < nz) {
         d_sendbuf_l[ll*nz*hs + k*hs + s] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
         d_sendbuf_r[ll*nz*hs + k*hs + s] = d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
       }
@@ -442,12 +447,13 @@ void set_halo_values_x(
   q.memcpy(d_recvbuf_r, recvbuf_r, sizeof(double)*hs*nz*NUM_VARS);
 
   //Unpack the receive buffers
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class unpack_recv_buf>(nd_range<3>(buffer_gws, buffer_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class unpack_recv_buf>(
+      sycl::nd_range<3>(buffer_gws, buffer_lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int s = item.get_global_id(2);
-      if (s < hs && k < nz) { 
+      if (s < hs && k < nz) {
         d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = d_recvbuf_l[ll*nz*hs + k*hs + s];
         d_state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = d_recvbuf_r[ll*nz*hs + k*hs + s];
       }
@@ -459,14 +465,15 @@ void set_halo_values_x(
 
   if (data_spec_int == DATA_SPEC_INJECTION) {
     if (myrank == 0) {
-      range<3> inj_gws (1, (nz+15)/16*16, (hs+15)/16*16);
-      range<3> inj_lws (1, 16, 16);
+      sycl::range<3> inj_gws (1, (nz+15)/16*16, (hs+15)/16*16);
+      sycl::range<3> inj_lws (1, 16, 16);
 
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class update_state_x>(nd_range<3>(inj_gws, inj_lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class update_state_x>(
+          sycl::nd_range<3>(inj_gws, inj_lws), [=] (sycl::nd_item<3> item) {
           int k = item.get_global_id(1);
           int i = item.get_global_id(2);
-          if (i < hs && k < nz) { 
+          if (i < hs && k < nz) {
             double z = (k_beg + k+0.5)*dz;
             if (sycl::fabs(z-3*zlen/4) <= zlen/16) {
               int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
@@ -486,23 +493,24 @@ void set_halo_values_x(
 //Set this MPI task's halo values in the z-direction. This does not require MPI because there is no MPI
 //decomposition in the vertical direction
 void set_halo_values_z(
-    const int hs, const int nx, const int nz, 
+    const int hs, const int nx, const int nz,
     const int i_beg,
     const double dx,
     const int data_spec_int,
     double *d_state,
-    queue &q ) 
+    sycl::queue &q )
 {
   const double mnt_width = xlen/8;
 
-  range<3> gws (1, (NUM_VARS+15)/16*16, (nx+2*hs+15)/16*16);
-  range<3> lws (1, 16, 16);
+  sycl::range<3> gws (1, (NUM_VARS+15)/16*16, (nx+2*hs+15)/16*16);
+  sycl::range<3> lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class update_state_z>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class update_state_z>(
+      sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(1);
       int i = item.get_global_id(2);
-      if (i < nx+2*hs && ll < NUM_VARS) { 
+      if (i < nx+2*hs && ll < NUM_VARS) {
         if (ll == ID_WMOM) {
           d_state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
           d_state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = 0.;
@@ -693,37 +701,38 @@ void finalize() {
 
 static inline void atomicAdd(double& val, const double delta)
 {
-  sycl::ext::oneapi::atomic_ref<double, sycl::memory_order::relaxed,
-                                sycl::memory_scope::device,
-                                sycl::access::address_space::global_space> ref(val);
+  sycl::atomic_ref<double, sycl::memory_order::relaxed,
+                   sycl::memory_scope::device,
+                   sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
 
-void reductions( 
-    double &mass, 
-    double &te, 
+void reductions(
+    double &mass,
+    double &te,
     const int hs,
     const int nx,
     const int nz,
     const double dx,
     const double dz,
-    const double *d_state, 
-    const double *d_hy_dens_cell, 
-    const double *d_hy_dens_theta_cell, 
-    queue &q ) 
+    const double *d_state,
+    const double *d_hy_dens_cell,
+    const double *d_hy_dens_theta_cell,
+    sycl::queue &q )
 {
   double* d_mass, *d_te;
-  d_mass = malloc_device<double>(1, q);
-  d_te = malloc_device<double>(1, q);
+  d_mass = sycl::malloc_device<double>(1, q);
+  d_te = sycl::malloc_device<double>(1, q);
 
-  range<3> gws (1, (nz+15)/16*16, (nx+15)/16*16);
-  range<3> lws (1, 16, 16);
+  sycl::range<3> gws (1, (nz+15)/16*16, (nx+15)/16*16);
+  sycl::range<3> lws (1, 16, 16);
 
   q.memset(d_mass, 0, sizeof(double));
   q.memset(d_te, 0, sizeof(double));
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class reduce>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class reduce>(
+      sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
       if (k < nz && i < nx) {
@@ -766,44 +775,44 @@ void reductions(
 //Perform a single semi-discretized step in time with the form:
 //state_out = state_init + dt * rhs(state_forcing)
 //Meaning the step starts from state_init, computes the rhs using state_forcing, and stores the result in state_out
-void semi_discrete_step( 
-    const int hs, 
-    const int nx, 
-    const int nz, 
-    const int k_beg, 
-    const int i_beg, 
-    const double dx , 
-    const double dz , 
-    const double dt , 
-    int dir , 
+void semi_discrete_step(
+    const int hs,
+    const int nx,
+    const int nz,
+    const int k_beg,
+    const int i_beg,
+    const double dx ,
+    const double dz ,
+    const double dt ,
+    int dir ,
     const int data_spec_int,
-    double *d_state_init , 
-    double *d_state_forcing , 
-    double *d_state_out, 
-    double *d_flux , 
+    double *d_state_init ,
+    double *d_state_forcing ,
+    double *d_state_out,
+    double *d_flux ,
     double *d_tend,
-    double *d_hy_dens_cell , 
-    double *d_hy_dens_theta_cell , 
-    double *d_hy_dens_int , 
-    double *d_hy_dens_theta_int , 
-    double *d_hy_pressure_int , 
-    double *d_sendbuf_l , 
-    double *d_sendbuf_r , 
-    double *d_recvbuf_l , 
-    double *d_recvbuf_r , 
-    queue &q  ) 
+    double *d_hy_dens_cell ,
+    double *d_hy_dens_theta_cell ,
+    double *d_hy_dens_int ,
+    double *d_hy_dens_theta_int ,
+    double *d_hy_pressure_int ,
+    double *d_sendbuf_l ,
+    double *d_sendbuf_r ,
+    double *d_recvbuf_l ,
+    double *d_recvbuf_r ,
+    sycl::queue &q  )
 {
   if (dir == DIR_X) {
     //Set the halo values for this MPI task's fluid state in the x-direction
     set_halo_values_x(
-        hs, 
-        nx, 
-        nz, 
-        k_beg, 
-        dz, 
-        d_state_forcing, 
-        d_hy_dens_cell , 
-        d_hy_dens_theta_cell , 
+        hs,
+        nx,
+        nz,
+        k_beg,
+        dz,
+        d_state_forcing,
+        d_hy_dens_cell ,
+        d_hy_dens_theta_cell ,
         d_sendbuf_l,
         d_sendbuf_r,
         d_recvbuf_l,
@@ -821,15 +830,16 @@ void semi_discrete_step(
   }
 
   //Apply the tendencies to the fluid state
-  range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
-  range<3> tend_lws (1, 16, 16);
+  sycl::range<3> tend_gws (NUM_VARS, (nz+15)/16*16, (nx+15)/16*16);
+  sycl::range<3> tend_lws (1, 16, 16);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class update_fluid_state>(nd_range<3>(tend_gws, tend_lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class update_fluid_state>(
+      sycl::nd_range<3>(tend_gws, tend_lws), [=] (sycl::nd_item<3> item) {
       int ll = item.get_global_id(0);
       int k = item.get_global_id(1);
       int i = item.get_global_id(2);
-      if (i < nx && k < nz) { 
+      if (i < nx && k < nz) {
         int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
         int indt = ll*nz*nx + k*nx + i;
         d_state_out[inds] = d_state_init[inds] + dt * d_tend[indt];
@@ -846,22 +856,22 @@ void semi_discrete_step(
 // q*     = q[n] + dt/3 * rhs(q[n])
 // q**    = q[n] + dt/2 * rhs(q*  )
 // q[n+1] = q[n] + dt/1 * rhs(q** )
-void perform_timestep( 
-    double *d_state , 
-    double *d_state_tmp , 
-    double *d_flux , 
+void perform_timestep(
+    double *d_state ,
+    double *d_state_tmp ,
+    double *d_flux ,
     double *d_tend ,
-    double *d_hy_dens_cell , 
-    double *d_hy_dens_theta_cell , 
-    double *d_hy_dens_int , 
-    double *d_hy_dens_theta_int , 
-    double *d_hy_pressure_int , 
-    double *d_sendbuf_l , 
-    double *d_sendbuf_r , 
-    double *d_recvbuf_l , 
-    double *d_recvbuf_r , 
+    double *d_hy_dens_cell ,
+    double *d_hy_dens_theta_cell ,
+    double *d_hy_dens_int ,
+    double *d_hy_dens_theta_int ,
+    double *d_hy_pressure_int ,
+    double *d_sendbuf_l ,
+    double *d_sendbuf_r ,
+    double *d_recvbuf_l ,
+    double *d_recvbuf_r ,
     const double dt,
-    queue &q ) {
+    sycl::queue &q ) {
 
 // semi discrete step
 #define SEMI_DSTEP(dt, dir, state, next_state) \
@@ -912,43 +922,42 @@ int main(int argc, char **argv) {
   init( &argc , &argv );
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   const int state_size = (nz+2*hs)*(nx+2*hs)*NUM_VARS;
   const int state_size_byte = (nz+2*hs)*(nx+2*hs)*NUM_VARS*sizeof(double);
-  double *d_state_tmp = malloc_device<double>(state_size, q);
+  double *d_state_tmp = sycl::malloc_device<double>(state_size, q);
   q.memcpy(d_state_tmp, state, state_size_byte);
 
-  double *d_state = malloc_device<double>(state_size, q);
+  double *d_state = sycl::malloc_device<double>(state_size, q);
   q.memcpy(d_state, state, state_size_byte);
 
-  double *d_hy_dens_cell = malloc_device<double>(nz+2*hs, q);
+  double *d_hy_dens_cell = sycl::malloc_device<double>(nz+2*hs, q);
   q.memcpy(d_hy_dens_cell, hy_dens_cell, (nz+2*hs)*sizeof(double));
 
-  double *d_hy_dens_theta_cell = malloc_device<double>(nz+2*hs, q);
+  double *d_hy_dens_theta_cell = sycl::malloc_device<double>(nz+2*hs, q);
   q.memcpy(d_hy_dens_theta_cell, hy_dens_theta_cell, (nz+2*hs)*sizeof(double));
 
-  double *d_hy_dens_int = malloc_device<double>(nz+1, q);
+  double *d_hy_dens_int = sycl::malloc_device<double>(nz+1, q);
   q.memcpy(d_hy_dens_int, hy_dens_int, (nz+1)*sizeof(double));
 
-  double *d_hy_dens_theta_int = malloc_device<double>(nz+1, q);
+  double *d_hy_dens_theta_int = sycl::malloc_device<double>(nz+1, q);
   q.memcpy(d_hy_dens_theta_int, hy_dens_theta_int, (nz+1)*sizeof(double));
 
-  double *d_hy_pressure_int = malloc_device<double>(nz+1, q);
+  double *d_hy_pressure_int = sycl::malloc_device<double>(nz+1, q);
   q.memcpy(d_hy_pressure_int, hy_pressure_int, (nz+1)*sizeof(double));
 
-  double *d_flux = malloc_device<double>((nz+1)*(nx+1)*NUM_VARS, q);
+  double *d_flux = sycl::malloc_device<double>((nz+1)*(nx+1)*NUM_VARS, q);
 
-  double *d_tend = malloc_device<double>(nz*nx*NUM_VARS, q);
+  double *d_tend = sycl::malloc_device<double>(nz*nx*NUM_VARS, q);
 
-  double *d_sendbuf_l = malloc_device<double>(hs*nz*NUM_VARS, q);
-  double *d_sendbuf_r = malloc_device<double>(hs*nz*NUM_VARS, q);
-  double *d_recvbuf_l = malloc_device<double>(hs*nz*NUM_VARS, q);
-  double *d_recvbuf_r = malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_sendbuf_l = sycl::malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_sendbuf_r = sycl::malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_recvbuf_l = sycl::malloc_device<double>(hs*nz*NUM_VARS, q);
+  double *d_recvbuf_r = sycl::malloc_device<double>(hs*nz*NUM_VARS, q);
 
   //Initial reductions for mass, kinetic energy, and total energy
   reductions(mass0, te0, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);
@@ -967,16 +976,16 @@ int main(int argc, char **argv) {
         d_state_tmp,
         d_flux,
         d_tend,
-        d_hy_dens_cell, 
-        d_hy_dens_theta_cell, 
-        d_hy_dens_int, 
-        d_hy_dens_theta_int, 
-        d_hy_pressure_int, 
-        d_sendbuf_l, 
-        d_sendbuf_r, 
-        d_recvbuf_l, 
-        d_recvbuf_r, 
-        dt, 
+        d_hy_dens_cell,
+        d_hy_dens_theta_cell,
+        d_hy_dens_int,
+        d_hy_dens_theta_int,
+        d_hy_pressure_int,
+        d_sendbuf_l,
+        d_sendbuf_r,
+        d_recvbuf_l,
+        d_recvbuf_r,
+        dt,
         q);
 
     //Update the elapsed time and output counter
@@ -995,19 +1004,19 @@ int main(int argc, char **argv) {
 
   finalize();
 
-  free(d_state, q);
-  free(d_state_tmp, q);
-  free(d_flux, q);
-  free(d_tend, q);
-  free(d_hy_dens_cell, q); 
-  free(d_hy_dens_theta_cell, q); 
-  free(d_hy_dens_int, q); 
-  free(d_hy_dens_theta_int, q); 
-  free(d_hy_pressure_int, q); 
-  free(d_sendbuf_l, q); 
-  free(d_sendbuf_r, q); 
-  free(d_recvbuf_l, q); 
-  free(d_recvbuf_r, q); 
+  sycl::free(d_state, q);
+  sycl::free(d_state_tmp, q);
+  sycl::free(d_flux, q);
+  sycl::free(d_tend, q);
+  sycl::free(d_hy_dens_cell, q);
+  sycl::free(d_hy_dens_theta_cell, q);
+  sycl::free(d_hy_dens_int, q);
+  sycl::free(d_hy_dens_theta_int, q);
+  sycl::free(d_hy_pressure_int, q);
+  sycl::free(d_sendbuf_l, q);
+  sycl::free(d_sendbuf_r, q);
+  sycl::free(d_recvbuf_l, q);
+  sycl::free(d_recvbuf_r, q);
 
   return 0;
 }

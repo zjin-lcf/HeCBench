@@ -5,10 +5,10 @@
  *
  * Solves Laplace's equation in 2D (e.g., heat conduction in a rectangular plate)
  * on GPU using CUDA with the red-black Gauss Seidel with sucessive overrelaxation
- * (SOR) that has been "optimized". This means that the red and black kernels 
+ * (SOR) that has been "optimized". This means that the red and black kernels
  * only loop over their respective cells, instead of over all cells and skipping
  * even/odd cells. This requires separate arrays for red and black cells.
- * 
+ *
  * Boundary conditions:
  * T = 0 at x = 0, x = L, y = 0
  * T = TN at y = H
@@ -35,7 +35,7 @@
 const Real omega = 1.85f;
 
 /** Function to evaluate coefficient matrix and right-hand side vector.
- * 
+ *
  * \param[in]   rowmax   number of rows
  * \param[in]   colmax   number of columns
  * \param[in]   th_cond  thermal conductivity
@@ -51,7 +51,7 @@ const Real omega = 1.85f;
  * \param[out]  b        right-hand side array
  */
 void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
-    Real width, Real TN, Real * aP, Real * aW, Real * aE, 
+    Real width, Real TN, Real * aP, Real * aW, Real * aE,
     Real * aS, Real * aN, Real * b)
 {
   int col, row;
@@ -101,7 +101,7 @@ void fill_coeffs (int rowmax, int colmax, Real th_cond, Real dx, Real dy,
 } // end fill_coeffs
 
 /** Function to update temperature for red cells
- * 
+ *
  * \param[in]     aP          array of self coefficients
  * \param[in]     aW          array of west neighbor coefficients
  * \param[in]     aE          array of east neighbor coefficients
@@ -147,7 +147,7 @@ void red_kernel (const Real *__restrict__ aP,
 } // end red_kernel
 
 /** Function to update temperature for black cells
- * 
+ *
  * \param[in]      aP          array of self coefficients
  * \param[in]      aW          array of west neighbor coefficients
  * \param[in]      aE          array of east neighbor coefficients
@@ -166,7 +166,7 @@ void black_kernel (const Real *__restrict__ aP,
                    const Real *__restrict__ aN,
                    const Real *__restrict__ b,
                    const Real *__restrict__ temp_red,
-                         Real *__restrict__ temp_black, 
+                         Real *__restrict__ temp_black,
                          Real *__restrict__ norm_L2)
 {
   int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -192,7 +192,7 @@ void black_kernel (const Real *__restrict__ aP,
 } // end black_kernel
 
 /** Main function that solves Laplace's equation in 2D (heat conduction in plate)
- * 
+ *
  * Contains iteration loop for red-black Gauss-Seidel with SOR GPU kernels
  */
 int main (void) {
@@ -314,7 +314,7 @@ int main (void) {
 
     black_kernel <<<dimGrid, dimBlock>>> (aP_d, aW_d, aE_d, aS_d, aN_d, b_d, temp_red_d, temp_black_d, bl_norm_L2_d);
 
-    // transfer residual value(s) back to CPU and 
+    // transfer residual value(s) back to CPU and
     cudaMemcpy (bl_norm_L2, bl_norm_L2_d, size_norm * sizeof(Real), cudaMemcpyDeviceToHost);
 
     // add black cell contributions to residual
@@ -334,7 +334,7 @@ int main (void) {
 
   // transfer final temperature values back
   cudaMemcpy (temp_red, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
-  cudaMemcpy (temp_black, temp_red_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
+  cudaMemcpy (temp_black, temp_black_d, size_temp * sizeof(Real), cudaMemcpyDeviceToHost);
 
   // print temperature data to file
   FILE * pfile;

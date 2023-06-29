@@ -1,3 +1,4 @@
+#include <sycl/sycl.hpp>
 #include "curvilinear4sg.h"
 #include "kernel1.cpp"
 #include "kernel2.cpp"
@@ -5,22 +6,15 @@
 #include "kernel4.cpp"
 #include "kernel5.cpp"
 
-void curvilinear4sg_ci(
-    queue &q,
-    int ifirst, int ilast, 
-    int jfirst, int jlast, 
-    int kfirst, int klast,
-    buffer<float_sw4,1> &d_u, 
-    buffer<float_sw4,1> &d_mu,
-    buffer<float_sw4,1> &d_lambda,
-    buffer<float_sw4,1> &d_met,
-    buffer<float_sw4,1> &d_jac,
-    buffer<float_sw4,1> &d_lu, 
-    int* onesided,
-    buffer<float_sw4,1> &d_cof, 
-    buffer<float_sw4,1> &d_sg_str, 
-    int nk, char op) {
-
+void curvilinear4sg_ci(sycl::queue &q,
+                       int ifirst, int ilast, int jfirst, int jlast, int kfirst,
+                       int klast, float_sw4 *d_u, float_sw4 *d_mu,
+                       float_sw4 *d_lambda, float_sw4 *d_met, float_sw4 *d_jac,
+                       float_sw4 *d_lu, int *onesided, float_sw4 *d_acof,
+                       float_sw4 *d_bope, float_sw4 *d_ghcof,
+                       float_sw4 *d_acof_no_gp, float_sw4 *d_ghcof_no_gp,
+                       float_sw4 *d_strx, float_sw4 *d_stry, int nk, char op)
+{
   float_sw4 a1 = 0;
   float_sw4 sgn = 1;
   if (op == '=') {
@@ -45,213 +39,63 @@ void curvilinear4sg_ci(
     Range<4> J(jfirst + 2, jlast - 1);
     Range<3> K(1, 6 + 1);  // This was 6
 
-    range<3> gws (K.tpb * K.blocks, J.tpb * J.blocks, I.tpb * I.blocks);
-    range<3> lws (K.tpb, J.tpb, I.tpb);
-    id<3> offset (K.start, J.start, I.start);
+    sycl::range<3> tpb(K.tpb, J.tpb, I.tpb);
+    sycl::range<3> blocks(K.blocks, J.blocks, I.blocks);
 
-    q.submit([&] (handler &cgh) {
-      auto u = d_u.get_access<sycl_read>(cgh);
-      auto mu = d_mu.get_access<sycl_read>(cgh); 
-      auto lambda = d_lambda.get_access<sycl_read>(cgh);
-      auto met = d_met.get_access<sycl_read>(cgh);
-      auto jac = d_jac.get_access<sycl_read>(cgh);
-      auto lu = d_lu.get_access<sycl_read_write>(cgh); 
-      auto cof = d_cof.get_access<sycl_read>(cgh); 
-      auto str = d_sg_str.get_access<sycl_read>(cgh); 
-      cgh.parallel_for<class k1>(nd_range<3>(gws, lws, offset), [=] (nd_item<3> item) {
-        kernel1(
-          item,
-          I.end, J.end, K.end,
-          ifirst, ilast, jfirst, jlast, kfirst, klast, a1, sgn,
-          u.get_pointer(), 
-          mu.get_pointer(), 
-          lambda.get_pointer(),
-          met.get_pointer(),
-          jac.get_pointer(),
-          lu.get_pointer(), 
-          // acof, 
-          cof.get_pointer() + 6,
-          // bope, 
-          cof.get_pointer() + 6 + 384 + 24,
-          // ghcof, 
-          cof.get_pointer() + 6 + 384 + 24 + 48,
-          // acof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6,
-          // ghcof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6 + 384,
-          // strx
-          str.get_pointer(), 
-          // stry
-          str.get_pointer() + ilast - ifirst + 1);
-       });
-     });
+    q.parallel_for(
+        sycl::nd_range<3>(blocks * tpb, tpb), [=](sycl::nd_item<3> item) {
+          kernel1(I.start, I.end, J.start, J.end, K.start, K.end, ifirst, ilast,
+                  jfirst, jlast, kfirst, klast, a1, sgn, d_u, d_mu, d_lambda,
+                  d_met, d_jac, d_lu, d_acof, d_bope, d_ghcof, d_acof_no_gp,
+                  d_ghcof_no_gp, d_strx, d_stry, item);
+        });
   }
 
   Range<64> I(ifirst + 2, ilast - 1);
   Range<2> J(jfirst + 2, jlast - 1);
   Range<2> K(kstart, kend + 1);  // Changed for CUrvi-MR Was klast-1
 
-  range<3> gws (K.tpb * K.blocks, J.tpb * J.blocks, I.tpb * I.blocks);
-  range<3> lws (K.tpb, J.tpb, I.tpb);
-  id<3> offset (K.start, J.start, I.start);
+  sycl::range<3> tpb(K.tpb, J.tpb, I.tpb);
+  sycl::range<3> blocks(K.blocks, J.blocks, I.blocks);
 
-  q.submit([&] (handler &cgh) {
-    auto u = d_u.get_access<sycl_read>(cgh);
-    auto mu = d_mu.get_access<sycl_read>(cgh); 
-    auto lambda = d_lambda.get_access<sycl_read>(cgh);
-    auto met = d_met.get_access<sycl_read>(cgh);
-    auto jac = d_jac.get_access<sycl_read>(cgh);
-    auto lu = d_lu.get_access<sycl_read_write>(cgh); 
-    auto cof = d_cof.get_access<sycl_read>(cgh); 
-    auto str = d_sg_str.get_access<sycl_read>(cgh); 
-    cgh.parallel_for<class k2>(nd_range<3>(gws, lws, offset), [=] (nd_item<3> item) {
-      kernel2(
-          item,
-          I.end, J.end, K.end,
-          ifirst, ilast, jfirst, jlast, kfirst, klast, a1, sgn,
-          u.get_pointer(), 
-          mu.get_pointer(), 
-          lambda.get_pointer(),
-          met.get_pointer(),
-          jac.get_pointer(),
-          lu.get_pointer(), 
-          // acof, 
-          cof.get_pointer() + 6,
-          // bope, 
-          cof.get_pointer() + 6 + 384 + 24,
-          // ghcof, 
-          cof.get_pointer() + 6 + 384 + 24 + 48,
-          // acof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6,
-          // ghcof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6 + 384,
-          // strx
-          str.get_pointer(), 
-          // stry
-          str.get_pointer() + ilast - ifirst + 1);
-    });
-  });
+  q.parallel_for(
+      sycl::nd_range<3>(blocks * tpb, tpb), [=](sycl::nd_item<3> item) {
+        kernel2(I.start, I.end, J.start, J.end, K.start, K.end, ifirst, ilast,
+                jfirst, jlast, kfirst, klast, a1, sgn, d_u, d_mu, d_lambda,
+                d_met, d_jac, d_lu, d_acof, d_bope, d_ghcof, d_acof_no_gp,
+                d_ghcof_no_gp, d_strx, d_stry, item);
+      });
 
-  q.submit([&] (handler &cgh) {
-    auto u = d_u.get_access<sycl_read>(cgh);
-    auto mu = d_mu.get_access<sycl_read>(cgh); 
-    auto lambda = d_lambda.get_access<sycl_read>(cgh);
-    auto met = d_met.get_access<sycl_read>(cgh);
-    auto jac = d_jac.get_access<sycl_read>(cgh);
-    auto lu = d_lu.get_access<sycl_read_write>(cgh); 
-    auto cof = d_cof.get_access<sycl_read>(cgh); 
-    auto str = d_sg_str.get_access<sycl_read>(cgh); 
-    cgh.parallel_for<class k3>(nd_range<3>(gws, lws, offset), [=] (nd_item<3> item) {
-      kernel3(
-          item,
-          I.end, J.end, K.end,
-          ifirst, ilast, jfirst, jlast, kfirst, klast, a1, sgn,
-          u.get_pointer(), 
-          mu.get_pointer(), 
-          lambda.get_pointer(),
-          met.get_pointer(),
-          jac.get_pointer(),
-          lu.get_pointer(), 
-          // acof, 
-          cof.get_pointer() + 6,
-          // bope, 
-          cof.get_pointer() + 6 + 384 + 24,
-          // ghcof, 
-          cof.get_pointer() + 6 + 384 + 24 + 48,
-          // acof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6,
-          // ghcof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6 + 384,
-          // strx
-          str.get_pointer(), 
-          // stry
-          str.get_pointer() + ilast - ifirst + 1);
-    });
-  });
+  q.parallel_for(
+      sycl::nd_range<3>(blocks * tpb, tpb), [=](sycl::nd_item<3> item) {
+        kernel3(I.start, I.end, J.start, J.end, K.start, K.end, ifirst, ilast,
+                jfirst, jlast, kfirst, klast, a1, sgn, d_u, d_mu, d_lambda,
+                d_met, d_jac, d_lu, d_acof, d_bope, d_ghcof, d_acof_no_gp,
+                d_ghcof_no_gp, d_strx, d_stry, item);
+      });
 
-  q.submit([&] (handler &cgh) {
-    auto u = d_u.get_access<sycl_read>(cgh);
-    auto mu = d_mu.get_access<sycl_read>(cgh); 
-    auto lambda = d_lambda.get_access<sycl_read>(cgh);
-    auto met = d_met.get_access<sycl_read>(cgh);
-    auto jac = d_jac.get_access<sycl_read>(cgh);
-    auto lu = d_lu.get_access<sycl_read_write>(cgh); 
-    auto cof = d_cof.get_access<sycl_read>(cgh); 
-    auto str = d_sg_str.get_access<sycl_read>(cgh); 
-    cgh.parallel_for<class k4>(nd_range<3>(gws, lws, offset), [=] (nd_item<3> item) {
-      kernel4(
-          item,
-          I.end, J.end, K.end,
-          ifirst, ilast, jfirst, jlast, kfirst, klast, a1, sgn,
-          u.get_pointer(), 
-          mu.get_pointer(), 
-          lambda.get_pointer(),
-          met.get_pointer(),
-          jac.get_pointer(),
-          lu.get_pointer(), 
-          // acof, 
-          cof.get_pointer() + 6,
-          // bope, 
-          cof.get_pointer() + 6 + 384 + 24,
-          // ghcof, 
-          cof.get_pointer() + 6 + 384 + 24 + 48,
-          // acof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6,
-          // ghcof_no_gp, 
-          cof.get_pointer() + 6 + 384 + 24 + 48 + 6 + 384,
-          // strx
-          str.get_pointer(), 
-          // stry
-          str.get_pointer() + ilast - ifirst + 1);
-    });
-  });
+  q.parallel_for(
+      sycl::nd_range<3>(blocks * tpb, tpb), [=](sycl::nd_item<3> item) {
+        kernel4(I.start, I.end, J.start, J.end, K.start, K.end, ifirst, ilast,
+                jfirst, jlast, kfirst, klast, a1, sgn, d_u, d_mu, d_lambda,
+                d_met, d_jac, d_lu, d_acof, d_bope, d_ghcof, d_acof_no_gp,
+                d_ghcof_no_gp, d_strx, d_stry, item);
+      });
 
   if (onesided[5] == 1) {
     Range<16> I(ifirst + 2, ilast - 1);
     Range<4> J(jfirst + 2, jlast - 1);
     Range<4> K(nk - 5, nk + 1);  // THIS WAS 6
 
-    range<3> gws (K.tpb * K.blocks, J.tpb * J.blocks, I.tpb * I.blocks);
-    range<3> lws (K.tpb, J.tpb, I.tpb);
-    id<3> offset (K.start, J.start, I.start);
+    sycl::range<3> tpb(K.tpb, J.tpb, I.tpb);
+    sycl::range<3> blocks(K.blocks, J.blocks, I.blocks);
 
-    q.submit([&] (handler &cgh) {
-      auto u = d_u.get_access<sycl_read>(cgh);
-      auto mu = d_mu.get_access<sycl_read>(cgh); 
-      auto lambda = d_lambda.get_access<sycl_read>(cgh);
-      auto met = d_met.get_access<sycl_read>(cgh);
-      auto jac = d_jac.get_access<sycl_read>(cgh);
-      auto lu = d_lu.get_access<sycl_read_write>(cgh); 
-      auto cof = d_cof.get_access<sycl_read>(cgh); 
-      auto str = d_sg_str.get_access<sycl_read>(cgh); 
-      cgh.parallel_for<class k5>(nd_range<3>(gws, lws, offset), [=] (nd_item<3> item) {
-        kernel5(
-            item,
-            I.end, J.end, K.end,
-            ifirst, ilast, jfirst, jlast, kfirst, klast, nk, a1, sgn, 
-            u.get_pointer(), 
-            mu.get_pointer(), 
-            lambda.get_pointer(),
-            met.get_pointer(),
-            jac.get_pointer(),
-            lu.get_pointer(), 
-            // acof, 
-            cof.get_pointer() + 6,
-            // bope, 
-            cof.get_pointer() + 6 + 384 + 24,
-            // ghcof, 
-            cof.get_pointer() + 6 + 384 + 24 + 48,
-            // acof_no_gp, 
-            cof.get_pointer() + 6 + 384 + 24 + 48 + 6,
-            // ghcof_no_gp, 
-            cof.get_pointer() + 6 + 384 + 24 + 48 + 6 + 384,
-            // strx
-            str.get_pointer(), 
-            // stry
-            str.get_pointer() + ilast - ifirst + 1);
-       });
-    });
+    q.parallel_for(
+        sycl::nd_range<3>(blocks * tpb, tpb), [=](sycl::nd_item<3> item) {
+          kernel5(I.start, I.end, J.start, J.end, K.start, K.end, ifirst, ilast,
+                  jfirst, jlast, kfirst, klast, nk, a1, sgn, d_u, d_mu,
+                  d_lambda, d_met, d_jac, d_lu, d_acof, d_bope, d_ghcof,
+                  d_acof_no_gp, d_ghcof_no_gp, d_strx, d_stry, item);
+        });
   }
 }
-
-

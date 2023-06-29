@@ -77,26 +77,28 @@ int main (int argc, char *argv[]) {
   createDataStructsCPU(numK, numX, &phiMag, &Qr, &Qi);
 
   /* GPU section 1 (precompute PhiMag) */
+  /* Mirror several data structures on the device */
+  float *phiR_d, *phiI_d;
+  float *phiMag_d;
+
+  setupMemoryGPU(numK, sizeof(float), phiR_d, phiR);
+  setupMemoryGPU(numK, sizeof(float), phiI_d, phiI);
+  cudaMalloc((void **)&phiMag_d, numK * sizeof(float));
+  CUDA_ERRCK;
+
+  cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
-  {
-    /* Mirror several data structures on the device */
-    float *phiR_d, *phiI_d;
-    float *phiMag_d;
 
-    setupMemoryGPU(numK, sizeof(float), phiR_d, phiR);
-    setupMemoryGPU(numK, sizeof(float), phiI_d, phiI);
-    cudaMalloc((void **)&phiMag_d, numK * sizeof(float));
-    CUDA_ERRCK;
+  computePhiMag_GPU(numK, phiR_d, phiI_d, phiMag_d);
 
-    computePhiMag_GPU(numK, phiR_d, phiI_d, phiMag_d);
-
-    cleanupMemoryGPU(numK, sizeof(float), phiMag_d, phiMag);
-    cudaFree(phiR_d);
-    cudaFree(phiI_d);
-  }
+  cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computePhiMag offload time: %f s\n", time * 1e-9);
+  printf("computePhiMag time: %f s\n", time * 1e-9);
+
+  cleanupMemoryGPU(numK, sizeof(float), phiMag_d, phiMag);
+  cudaFree(phiR_d);
+  cudaFree(phiI_d);
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
   for (int k = 0; k < numK; k++) {
@@ -107,33 +109,35 @@ int main (int argc, char *argv[]) {
   }
 
   /* GPU section 2 */
+  float *x_d, *y_d, *z_d;
+  float *Qr_d, *Qi_d;
+
+  setupMemoryGPU(numX, sizeof(float), x_d, x);
+  setupMemoryGPU(numX, sizeof(float), y_d, y);
+  setupMemoryGPU(numX, sizeof(float), z_d, z);
+  cudaMalloc((void **)&Qr_d, numX * sizeof(float));
+  CUDA_ERRCK;
+  cudaMemset((void *)Qr_d, 0, numX * sizeof(float));
+  cudaMalloc((void **)&Qi_d, numX * sizeof(float));
+  CUDA_ERRCK;
+  cudaMemset((void *)Qi_d, 0, numX * sizeof(float));
+
+  cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
-  {
-    float *x_d, *y_d, *z_d;
-    float *Qr_d, *Qi_d;
 
-    setupMemoryGPU(numX, sizeof(float), x_d, x);
-    setupMemoryGPU(numX, sizeof(float), y_d, y);
-    setupMemoryGPU(numX, sizeof(float), z_d, z);
-    cudaMalloc((void **)&Qr_d, numX * sizeof(float));
-    CUDA_ERRCK;
-    cudaMemset((void *)Qr_d, 0, numX * sizeof(float));
-    cudaMalloc((void **)&Qi_d, numX * sizeof(float));
-    CUDA_ERRCK;
-    cudaMemset((void *)Qi_d, 0, numX * sizeof(float));
+  computeQ_GPU(numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
 
-    computeQ_GPU(numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
-
-    cudaFree(x_d);
-    cudaFree(y_d);
-    cudaFree(z_d);
-    cleanupMemoryGPU(numX, sizeof(float), Qr_d, Qr);
-    cleanupMemoryGPU(numX, sizeof(float), Qi_d, Qi);
-  }
+  cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("computeQ offload time: %f s\n", time * 1e-9);
+  printf("computeQ time: %f s\n", time * 1e-9);
 
+  cudaFree(x_d);
+  cudaFree(y_d);
+  cudaFree(z_d);
+  cleanupMemoryGPU(numX, sizeof(float), Qr_d, Qr);
+  cleanupMemoryGPU(numX, sizeof(float), Qi_d, Qi);
+  
   outputData(outputFileName, Qr, Qi, numX);
 
   free(phiMag);

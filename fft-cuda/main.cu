@@ -21,11 +21,9 @@ using namespace std;
 #define EPISON 1e-6
 #endif
 
-
 #ifndef M_SQRT1_2
 # define M_SQRT1_2      0.70710678118654752440f
 #endif
-
 
 #define exp_1_8   (T2){  1, -1 }//requires post-multiply by 1/sqrt(2)
 #define exp_1_4   (T2){  0, -1 }
@@ -50,25 +48,24 @@ __device__
 T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
 
 
-
-#define FFT2(a0, a1)                            \
-{                                               \
+#define FFT2(a0, a1)                     \
+{                                        \
   T2 c0 = *a0;                           \
-  *a0 = cmplx_add(c0,*a1);                    \
-  *a1 = cmplx_sub(c0,*a1);                    \
+  *a0 = cmplx_add(c0,*a1);               \
+  *a1 = cmplx_sub(c0,*a1);               \
 }
 
-#define FFT4(a0, a1, a2, a3)                    \
-{                                               \
-  FFT2( a0, a2 );                             \
-  FFT2( a1, a3 );                             \
-  *a3 = cmplx_mul(*a3,exp_1_4);               \
-  FFT2( a0, a1 );                             \
-  FFT2( a2, a3 );                             \
+#define FFT4(a0, a1, a2, a3)             \
+{                                        \
+  FFT2( a0, a2 );                        \
+  FFT2( a1, a3 );                        \
+  *a3 = cmplx_mul(*a3,exp_1_4);          \
+  FFT2( a0, a1 );                        \
+  FFT2( a2, a3 );                        \
 }
 
-#define FFT8(a)                                                 \
-{                                                               \
+#define FFT8(a)                                               \
+{                                                             \
   FFT2( &a[0], &a[4] );                                       \
   FFT2( &a[1], &a[5] );                                       \
   FFT2( &a[2], &a[6] );                                       \
@@ -84,8 +81,8 @@ T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
 
 #define IFFT2 FFT2
 
-#define IFFT4( a0, a1, a2, a3 )                 \
-{                                               \
+#define IFFT4( a0, a1, a2, a3 )               \
+{                                             \
   IFFT2( a0, a2 );                            \
   IFFT2( a1, a3 );                            \
   *a3 = cmplx_mul(*a3 , iexp_1_4);            \
@@ -93,8 +90,8 @@ T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
   IFFT2( a2, a3);                             \
 }
 
-#define IFFT8( a )                                              \
-{                                                               \
+#define IFFT8( a )                                            \
+{                                                             \
   IFFT2( &a[0], &a[4] );                                      \
   IFFT2( &a[1], &a[5] );                                      \
   IFFT2( &a[2], &a[6] );                                      \
@@ -154,11 +151,6 @@ int main(int argc, char** argv)
 
   memcpy(reference, source, used_bytes);
 
-  const char *sizeStr;
-  stringstream ss;
-  ss << "N=" << (long)N;
-  sizeStr = strdup(ss.str().c_str());
-
   T2 *d_source;
   cudaMalloc((void**)&d_source, (long)N * sizeof(T2));
   cudaMemcpy(d_source, source, (long)N * sizeof(T2), cudaMemcpyHostToDevice);
@@ -197,4 +189,3 @@ int main(int argc, char** argv)
   free(reference);
   free(source);
 }
-

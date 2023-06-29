@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <functional>
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 #define NUM_THREADS 256
@@ -14,34 +15,38 @@ typedef int scalar_t;
    size, Func, T, grid_dim, ...)                                       \
   do {                                                                 \
    if (size >= 128) {                                                  \
-     range<2> gws (128, grid_dim);                                     \
-     range<2> lws (128, 1);                                            \
-     q.submit([&](handler &cgh) {                                      \
-       cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) { \
+     sycl::range<2> gws (128, grid_dim);                               \
+     sycl::range<2> lws (128, 1);                                      \
+     q.submit([&](sycl::handler &cgh) {                                \
+       cgh.parallel_for(                                               \
+         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
          Func<T>(item, __VA_ARGS__);                                   \
        });                                                             \
      });                                                               \
    } else if (size >= 64) {                                            \
-     range<2> gws (64, 2 * grid_dim);                                  \
-     range<2> lws (64, 2);                                             \
-     q.submit([&](handler &cgh) {                                      \
-       cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) { \
+     sycl::range<2> gws (64, 2 * grid_dim);                            \
+     sycl::range<2> lws (64, 2);                                       \
+     q.submit([&](sycl::handler &cgh) {                                \
+       cgh.parallel_for(                                               \
+         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
          Func<T>(item, __VA_ARGS__);                                   \
        });                                                             \
      });                                                               \
    } else if (size >= 32) {                                            \
-     range<2> gws (32, 4 * grid_dim);                                  \
-     range<2> lws (32, 4);                                             \
-     q.submit([&](handler &cgh) {                                      \
-       cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) { \
+     sycl::range<2> gws (32, 4 * grid_dim);                            \
+     sycl::range<2> lws (32, 4);                                       \
+     q.submit([&](sycl::handler &cgh) {                                \
+       cgh.parallel_for(                                               \
+         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
          Func<T>(item, __VA_ARGS__);                                   \
        });                                                             \
      });                                                               \
    } else {                                                            \
-     range<2> gws (16, 8 * grid_dim);                                  \
-     range<2> lws (16, 8);                                             \
-     q.submit([&](handler &cgh) {                                      \
-       cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) { \
+     sycl::range<2> gws (16, 8 * grid_dim);                            \
+     sycl::range<2> lws (16, 8);                                       \
+     q.submit([&](sycl::handler &cgh) {                                \
+       cgh.parallel_for(                                               \
+         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
          Func<T>(item, __VA_ARGS__);                                   \
        });                                                             \
      });                                                               \
@@ -51,7 +56,7 @@ typedef int scalar_t;
 
 template <typename T>
 void ChannelSumNCHW(
-    nd_item<2> item,
+    sycl::nd_item<2> item,
     const int N,
     const int C,
     const int HxW,
@@ -74,8 +79,9 @@ void ChannelSumNCHW(
       v_val += *(X + index) * *(X + index);
     }
   }
-  m_val = reduce_over_group(item.get_group(), m_val, plus<>());
-  v_val = reduce_over_group(item.get_group(), v_val, plus<>());
+  auto g = item.get_group();
+  m_val = sycl::reduce_over_group(g, m_val, std::plus<>());
+  v_val = sycl::reduce_over_group(g, v_val, std::plus<>());
 
   if (item.get_local_id(1) == 0 && item.get_local_id(0) == 0) {
     sum[c] = m_val;
@@ -85,7 +91,7 @@ void ChannelSumNCHW(
 
 template <typename T>
 void ChannelSumNHWC(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int N,
     const int C,
     const int HxW,
@@ -106,8 +112,8 @@ void ChannelSumNHWC(
   }
 
   auto g = item.get_group();
-  m_val = reduce_over_group(g, m_val, plus<>());
-  v_val = reduce_over_group(g, v_val, plus<>());
+  m_val = sycl::reduce_over_group(g, m_val, std::plus<>());
+  v_val = sycl::reduce_over_group(g, v_val, std::plus<>());
   if (item.get_local_id(0) == 0) {
     sum[c] = m_val;
     sumsq[c] = v_val;
@@ -115,7 +121,7 @@ void ChannelSumNHWC(
 }
 
 void ComputeChannelSumNCHW (
-    queue &q,
+    sycl::queue &q,
     const int N,
     const int C,
     const int HxW,
@@ -138,7 +144,7 @@ void ComputeChannelSumNCHW (
 }
 
 void ComputeChannelSumNHWC (
-    queue &q,
+    sycl::queue &q,
     const int N,
     const int C,
     const int HxW,
@@ -148,14 +154,14 @@ void ComputeChannelSumNHWC (
     long &time,
     int repeat)
 {
-  range<1> lws (NUM_THREADS);
-  range<1> gws (C * NUM_THREADS);
+  sycl::range<1> lws (NUM_THREADS);
+  sycl::range<1> gws (C * NUM_THREADS);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         ChannelSumNHWC<scalar_t>(item, N, C, HxW, X, sum, sumsq);
       });
     });
@@ -178,11 +184,10 @@ int main(int argc, char *argv[]) {
   long time;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   for (int N = 1; N <= 64; N = N * 4) {
     for (int C = 32; C <= 512; C = C * 4) {
@@ -203,13 +208,13 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < numel; i++) h_X[i] = rand() % 256;
 
       scalar_t *d_X, *d_sum, *d_sumsq;
-      d_X = malloc_device<scalar_t>(numel, q);
-      d_sum = malloc_device<scalar_t>(C, q);
-      d_sumsq = malloc_device<scalar_t>(C, q);
+      d_X = sycl::malloc_device<scalar_t>(numel, q);
+      d_sum = sycl::malloc_device<scalar_t>(C, q);
+      d_sumsq = sycl::malloc_device<scalar_t>(C, q);
       if (d_X == nullptr || d_sum == nullptr || d_sumsq == nullptr) {
-        if (d_X != nullptr) free(d_X, q);
-        if (d_sum != nullptr) free(d_sum, q);
-        if (d_sumsq != nullptr) free(d_sumsq, q);
+        if (d_X != nullptr) sycl::free(d_X, q);
+        if (d_sum != nullptr) sycl::free(d_sum, q);
+        if (d_sumsq != nullptr) sycl::free(d_sumsq, q);
         printf("Device memory allocation failed. Exit\n");
         goto end;
       }
@@ -238,9 +243,9 @@ int main(int argc, char *argv[]) {
       else
         printf("Verification fails for channel sum (nchw)\n");
 
-      free(d_X, q);
-      free(d_sum, q);
-      free(d_sumsq, q);
+      sycl::free(d_X, q);
+      sycl::free(d_sum, q);
+      sycl::free(d_sumsq, q);
 
       free(h_X);
       free(h_sum);

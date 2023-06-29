@@ -1,6 +1,8 @@
 #include "kernel_common.h"
 #include "datatypes.h"
 
+using short4 = sycl::short4;
+
 score_dt device_ilog2(const score_dt v)
 {
   if (v < 2) return 0;
@@ -19,7 +21,7 @@ score_dt chain_dp_score(
   const anchor_dt curr,
   const float avg_qspan,
   const int max_dist_x,
-  const int max_dist_y, 
+  const int max_dist_y,
   const int bw, const int id)
 {
   anchor_dt act;
@@ -54,8 +56,8 @@ void device_chain_tiled(
   anchor_dt *__restrict active,
   score_dt *__restrict max_tracker,
   parent_dt *__restrict j_tracker,
-  nd_item<1> &item,
-  const int max_dist_x, 
+  sycl::nd_item<1> &item,
+  const int max_dist_x,
   const int max_dist_y,
   const int bw)
 {
@@ -75,7 +77,7 @@ void device_chain_tiled(
 
   for (int i = BACK_SEARCH_COUNT_GPU, curr_idx = 0; curr_idx < TILE_SIZE; i++, curr_idx++) {
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     anchor_dt curr;
     *((short4*)&curr) = ((short4*)active)[i % BACK_SEARCH_COUNT_GPU];
     score_dt f_curr = max_tracker[i % BACK_SEARCH_COUNT_GPU];
@@ -86,24 +88,24 @@ void device_chain_tiled(
     }
 
     /* read in new query anchor, put into active array*/
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     if (id == i % BACK_SEARCH_COUNT_GPU) {
       ((short4*)active)[id] = ((short4*)a)[ofs * TILE_SIZE_ACTUAL + i];
       max_tracker[id] = 0;
       j_tracker[id] = -1;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     score_dt sc = chain_dp_score(active, curr,
         control.avg_qspan, max_dist_x, max_dist_y, bw, id);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     if (sc + f_curr >= max_tracker[id]) {
       max_tracker[id] = sc + f_curr;
       j_tracker[id] = (parent_dt)curr_idx + (parent_dt)control.tile_num * TILE_SIZE;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     if (id == curr_idx % BACK_SEARCH_COUNT_GPU) {
       return_dt tmp;
       tmp.score = f_curr;
@@ -112,7 +114,7 @@ void device_chain_tiled(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   max_tracker_g[ofs * BACK_SEARCH_COUNT_GPU + id] = max_tracker[id];
   j_tracker_g[ofs * BACK_SEARCH_COUNT_GPU + id] = j_tracker[id];
 }

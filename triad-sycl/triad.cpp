@@ -1,6 +1,6 @@
 #include <math.h>
 #include <string.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "OptionParser.h"
 #include "Timer.h"
 #include "Utility.h"
@@ -63,23 +63,22 @@ void RunBenchmark(OptionParser &op)
   const size_t halfNumFloats = numMaxFloats / 2;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  cl::sycl::queue q(dev_sel, property::queue::in_order());
 
   // Create some host memory pattern
   srand48(8650341L);
-  float *h_mem = malloc_host<float> (numMaxFloats, q);
+  float *h_mem = sycl::malloc_host<float> (numMaxFloats, q);
 
   // Allocate device memory of maximum sizes
-  float *d_memA0 = malloc_device<float>(numMaxFloats, q);
-  float *d_memB0 = malloc_device<float>(numMaxFloats, q);
-  float *d_memC0 = malloc_device<float>(numMaxFloats, q);
-  float *d_memA1 = malloc_device<float>(numMaxFloats, q);
-  float *d_memB1 = malloc_device<float>(numMaxFloats, q);
-  float *d_memC1 = malloc_device<float>(numMaxFloats, q);
+  float *d_memA0 = sycl::malloc_device<float>(numMaxFloats, q);
+  float *d_memB0 = sycl::malloc_device<float>(numMaxFloats, q);
+  float *d_memC0 = sycl::malloc_device<float>(numMaxFloats, q);
+  float *d_memA1 = sycl::malloc_device<float>(numMaxFloats, q);
+  float *d_memB1 = sycl::malloc_device<float>(numMaxFloats, q);
+  float *d_memC1 = sycl::malloc_device<float>(numMaxFloats, q);
 
   const float scalar = 1.75f;
   const size_t blockSize = 128;
@@ -94,9 +93,9 @@ void RunBenchmark(OptionParser &op)
     // Copy input memory to the device
     if (verbose) {
       std::cout << ">> Executing Triad with vectors of length "
-        << numMaxFloats << " and block size of "
-        << elemsInBlock << " elements." << "\n";
-      cout << "Block: " << blockSizes[i] << "KB" << "\n";
+                << numMaxFloats << " and block size of "
+                << elemsInBlock << " elements." << "\n";
+      std::cout << "Block: " << blockSizes[i] << "KB" << "\n";
     }
 
     // start submitting blocks of data of size elemsInBlock
@@ -104,7 +103,8 @@ void RunBenchmark(OptionParser &op)
     // download for the next block and the results upload for
     // the previous block
     int crtIdx = 0;
-    size_t globalWorkSize = elemsInBlock;
+    sycl::range<1> gws (elemsInBlock);
+    sycl::range<1> lws (blockSize);
 
     int TH = Timer::Start();
 
@@ -115,10 +115,10 @@ void RunBenchmark(OptionParser &op)
       q.memcpy(d_memA0, h_mem, sizeof(float) * elemsInBlock);
       q.memcpy(d_memB0, h_mem, sizeof(float) * elemsInBlock);
 
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class triad_start>(nd_range<1>(
-          range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-          int gid = item.get_global_id(0); 
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class triad_start>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          int gid = item.get_global_id(0);
           d_memC0[gid] = d_memA0[gid] + scalar*d_memB0[gid];
         });
       });
@@ -152,18 +152,20 @@ void RunBenchmark(OptionParser &op)
           // Execute the kernel
           if (currStream)
           {
-            q.submit([&] (handler &cgh) {
-              cgh.parallel_for<class triad_curr>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-                int gid = item.get_global_id(0); 
+            q.submit([&] (sycl::handler &cgh) {
+              cgh.parallel_for<class triad_curr>(
+                sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+                int gid = item.get_global_id(0);
                 d_memC1[gid] = d_memA1[gid] + scalar*d_memB1[gid];
               });
             });
           }
           else
           {
-            q.submit([&] (handler &cgh) {
-              cgh.parallel_for<class triad_next>(nd_range<1>(range<1>(globalWorkSize), range<1>(blockSize)), [=] (nd_item<1> item) {
-                int gid = item.get_global_id(0); 
+            q.submit([&] (sycl::handler &cgh) {
+              cgh.parallel_for<class triad_next>(
+                sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+                int gid = item.get_global_id(0);
                 d_memC0[gid] = d_memA0[gid] + scalar*d_memB0[gid];
               });
             });
@@ -206,19 +208,19 @@ void RunBenchmark(OptionParser &op)
     {
       if (h_mem[j] != h_mem[j+halfNumFloats])
       {
-        cout << "Error; hostMem[" << j << "]=" << h_mem[j]
-          << " is different from its twin element hostMem["
-          << (j+halfNumFloats) << "]: "
-          << h_mem[j+halfNumFloats] << "stopping check\n";
+        std::cout << "Error; hostMem[" << j << "]=" << h_mem[j]
+                  << " is different from its twin element hostMem["
+                  << (j+halfNumFloats) << "]: "
+                  << h_mem[j+halfNumFloats] << "stopping check\n";
         ok = false;
         break;
       }
     }
 
     if (ok)
-      cout << "PASS\n";
+      std::cout << "PASS\n";
     else
-      cout << "FAIL\n";
+      std::cout << "FAIL\n";
 
     // Zero out the test host memory
     for (int j=0; j<numMaxFloats; ++j) h_mem[j] = 0.0f;

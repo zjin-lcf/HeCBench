@@ -3,10 +3,17 @@
 #include <cstring>
 #include <vector>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
-void ga(nd_item<1> &item,
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
+  #define ldg(a) (*(a))
+#endif
+
+void ga(sycl::nd_item<1> &item,
         const char *__restrict target,
         const char *__restrict query,
               char *__restrict batch_result,
@@ -19,12 +26,13 @@ void ga(nd_item<1> &item,
   uint tid = item.get_global_id(0);
   if (tid > length) return;
   bool match = false;
-  int max_length = query_sequence_length - coarse_match_length;
+  const int max_length = query_sequence_length - coarse_match_length;
+  const int base = current_position + tid;
 
   for (int i = 0; i <= max_length; i++) {
     int distance = 0;
     for (int j = 0; j < coarse_match_length; j++) {
-      if (target[current_position + tid + j] != query[i + j]) {
+      if (ldg(&target[base + j]) != ldg(&query[i + j])) {
         distance++;
       }
     }
@@ -62,15 +70,17 @@ int main(int argc, char* argv[])
   for (int i = 0; i < qseq_size; i++) query_sequence[i] = seq[rand()%4];
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<char, 1> d_target (target_sequence.data(), tseq_size);
-  buffer<char, 1> d_query (query_sequence.data(), qseq_size);
-  buffer<char, 1> d_batch_result (kBatchSize);
+  char *d_target = sycl::malloc_device<char>(tseq_size, q);
+  char *d_query = sycl::malloc_device<char>(qseq_size, q);
+  char *d_batch_result = sycl::malloc_device<char>(kBatchSize, q);
+
+  q.memcpy(d_target, target_sequence.data(), tseq_size * sizeof(char));
+  q.memcpy(d_query, query_sequence.data(), qseq_size * sizeof(char));
 
   uint32_t max_searchable_length = tseq_size - coarse_match_length;
   uint32_t current_position = 0;
@@ -83,11 +93,7 @@ int main(int argc, char* argv[])
 
   int error = 0;
   while (current_position < max_searchable_length) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_batch_result.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, (char)0);
-    });
-
+    q.memset(d_batch_result, 0, kBatchSize);
     memset(batch_result_ref, 0, kBatchSize);
 
     uint32_t end_position = current_position + kBatchSize;
@@ -96,23 +102,21 @@ int main(int argc, char* argv[])
     }
     uint32_t length = end_position - current_position;
 
-    range<1> lws (256);
-    range<1> gws ((length + 255) / 256 * 256);
+    sycl::range<1> lws (256);
+    sycl::range<1> gws ((length + 255) / 256 * 256);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto t = d_target.get_access<sycl_read>(cgh);
-      auto q = d_query.get_access<sycl_read>(cgh);
-      auto r = d_batch_result.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class genetic>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        ga (item, t.get_pointer(), q.get_pointer(), r.get_pointer(), length, qseq_size,
-        coarse_match_length, coarse_match_threshold, current_position);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class genetic>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        ga (item, d_target, d_query, d_batch_result,
+            length, qseq_size, coarse_match_length,
+            coarse_match_threshold, current_position);
       });
-    });
+    }).wait();
 
-    q.wait();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     total_time += time;
@@ -120,10 +124,7 @@ int main(int argc, char* argv[])
     reference(target_sequence.data(), query_sequence.data(), batch_result_ref, length, qseq_size,
               coarse_match_length, coarse_match_threshold, current_position);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_batch_result.get_access<sycl_read>(cgh);
-      cgh.copy(acc, batch_result);
-    }).wait();
+    q.memcpy(batch_result, d_batch_result, kBatchSize * sizeof(char)).wait();
 
     error = memcmp(batch_result_ref, batch_result, kBatchSize * sizeof(char));
     if (error) break;
@@ -132,5 +133,9 @@ int main(int argc, char* argv[])
   }
   printf("Total kernel execution time %f (s)\n", total_time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
+
+  sycl::free(d_target, q);
+  sycl::free(d_query, q);
+  sycl::free(d_batch_result, q);
   return 0;
 }

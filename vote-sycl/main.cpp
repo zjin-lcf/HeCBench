@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "reference.h"
 #include "kernels.h"
 
@@ -33,11 +33,10 @@ int main(int argc, char **argv) {
   genVoteTestPattern(h_input, VOTE_DATA_GROUP * warp_size);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   d_input = sycl::malloc_device<unsigned int>(
       VOTE_DATA_GROUP * warp_size, q);
@@ -57,14 +56,14 @@ int main(int argc, char **argv) {
   // Warmup
 
   // reqd_sub_group_size requires a constant
-  q.parallel_for<class any_test_warmup>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
+  q.parallel_for<class any_test_warmup>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
       [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAnyKernel1(d_input, d_result, repeat, item);
   }).wait();
 
   auto start = std::chrono::steady_clock::now();
 
-  q.parallel_for<class any_test>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
+  q.parallel_for<class any_test>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
       [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAnyKernel1(d_input, d_result, repeat, item);
   }).wait();
@@ -123,7 +122,7 @@ int main(int argc, char **argv) {
   start = std::chrono::steady_clock::now();
 
   q.parallel_for<class vote_any> (sycl::nd_range<1>(sycl::range<1>(warp_size * 3),
-                                   sycl::range<1>(warp_size * 3)),
+                                                    sycl::range<1>(warp_size * 3)),
       [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
         VoteAnyKernel3(dinfo, warp_size, repeat, item);
   }).wait();

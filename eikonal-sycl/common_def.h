@@ -16,7 +16,7 @@
 #include <assert.h>
 #include <float.h>
 #include <math.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "timer.h"
 
 //

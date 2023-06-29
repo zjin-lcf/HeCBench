@@ -598,6 +598,8 @@ int main(int argc, char* argv[])
 
     //====== free device memories ========
 
+    cudaFree(dev_pbf_xlec);
+    cudaFree(dev_pbf_to_cbf);
     cudaFree(dev_mat_D);
     cudaFree(dev_mat_Q);
     cudaFree(dev_mat_J_PI);

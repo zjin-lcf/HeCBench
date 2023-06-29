@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 typedef struct {
@@ -1194,59 +1194,59 @@ int main(int argc, char **argv) {
 
   unsigned char output[32];
 
-  {
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    buffer<secp256k1_ge_storage, 1> prec_buffer(prec, 512);
-    buffer<unsigned char, 1> output_buffer(output, 32);
+  secp256k1_ge_storage *d_prec = sycl::malloc_device<secp256k1_ge_storage>(512, q);
+  q.memcpy(d_prec, prec, 512 * sizeof(secp256k1_ge_storage)).wait();
 
-    size_t global_work_size = 1;
-    size_t local_work_size = 1;
-    range<1> gws(global_work_size);
-    range<1> lws(local_work_size);
+  unsigned char *d_output = sycl::malloc_device<unsigned char>(32, q);
 
-    auto start = std::chrono::steady_clock::now();
+  sycl::range<1> gws(1);
+  sycl::range<1> lws(1);
 
-    for (int n = 0; n < repeat; n++) {
-      q.submit([&] (handler &cgh) {
-        auto result = output_buffer.get_access<sycl_discard_write>(cgh);
-        auto prec = prec_buffer.get_access<sycl_read>(cgh);
-        cgh.parallel_for<class secp256k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  auto start = std::chrono::steady_clock::now();
 
-          secp256k1_ge ge[512];
-          secp256k1_gej sum;
+  for (int n = 0; n < repeat; n++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class secp256k1>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 
-          secp256k1_ge_from_storage(&ge[0], prec.get_pointer());
-          secp256k1_gej_set_ge(&sum, &ge[0]);
-          secp256k1_fe z_all = sum.z;
+        secp256k1_ge ge[512];
+        secp256k1_gej sum;
 
-          for (uint i=1; i<512; ++i) {
-            secp256k1_ge_from_storage(&ge[i], prec.get_pointer()+i);
-            secp256k1_gej_add_ge_var(&sum, &sum, &ge[i], 0);
-            secp256k1_fe_mul(&z_all, &z_all, &sum.z);
-          }
-          secp256k1_fe_inv(&z_all, &z_all);
-          secp256k1_fe_get_b32(result.get_pointer(), &z_all);
-        });
+        secp256k1_ge_from_storage(&ge[0], d_prec);
+        secp256k1_gej_set_ge(&sum, &ge[0]);
+        secp256k1_fe z_all = sum.z;
+
+        for (uint i=1; i<512; ++i) {
+          secp256k1_ge_from_storage(&ge[i], d_prec+i);
+          secp256k1_gej_add_ge_var(&sum, &sum, &ge[i], 0);
+          secp256k1_fe_mul(&z_all, &z_all, &sum.z);
+        }
+        secp256k1_fe_inv(&z_all, &z_all);
+        secp256k1_fe_get_b32(d_output, &z_all);
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    });
   }
 
-  char result[64];
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  
+  q.memcpy(output, d_output, 32).wait();
+  sycl::free(d_prec, q);
+  sycl::free(d_output, q);
+
+  char result[65];
   for (int i = 0; i < 32; ++i) {
    sprintf(result+2*i, "%02x", output[i]);
   }
+  result[64] = '\0';
   printf("result = %s\n", result);
 
   if (0 == strcmp(result, "bbde464b6355ee6de6deba5ae860f8a66524937eee81dde224a0214efd795d09"))

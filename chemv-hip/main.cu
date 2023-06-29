@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <chrono>
 #include "kernel.h"
 
 #define REPEAT 1000
@@ -24,9 +25,9 @@
 
 
 void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) {
-
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE])
+{
   for (int i0 = 0; i0 <= (N - 1); i0 += 1) {
     float var5_Re;
     float var5_Im;
@@ -101,8 +102,8 @@ void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
  * The function body was taken from a VOBLA-generated BLAS library.
  */
 void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
-    struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-    struct ComplexFloat Y[Y_SIZE]) 
+               struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
+               struct ComplexFloat Y[Y_SIZE])
 {
   struct ComplexFloat *dev_AT;
   struct ComplexFloat *dev_X;
@@ -118,13 +119,23 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
 
   dim3 k0_dimBlock(32);
   dim3 k0_dimGrid(12);
-  for (int n = 0; n < REPEAT; n++)
-    hipLaunchKernelGGL(kernel0, k0_dimGrid, k0_dimBlock, 0, 0, dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
 
   dim3 k1_dimBlock(32);
   dim3 k1_dimGrid(12);
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
   for (int n = 0; n < REPEAT; n++)
-    hipLaunchKernelGGL(kernel1, k1_dimGrid, k1_dimBlock, 0, 0, dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
+    kernel0 <<< k0_dimGrid, k0_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
+
+  for (int n = 0; n < REPEAT; n++)
+    kernel1 <<< k1_dimGrid, k1_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
+
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
 
   hipMemcpy(Y, dev_Y, Y_SIZE * sizeof(struct ComplexFloat), hipMemcpyDeviceToHost);
   hipFree(dev_AT);

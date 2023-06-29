@@ -15,6 +15,7 @@
 */
 
 #include <chrono>
+#include <sycl/sycl.hpp>
 #include "ccs.h"
 #include "matrixsize.c"
 #include "readgene.c"
@@ -22,7 +23,6 @@
 #include "bicluster_pair_score.c"
 #include "merge_bicluster.c"
 #include "print_bicluster.c"
-#include "common.h"
 
 // number of samples in the input datamatrix. 
 // Fixed here to make static shared memory on a device
@@ -94,7 +94,7 @@ struct pair_r compute(
 }
 
 void compute_bicluster(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   char *__restrict s_vect,
   float *__restrict s_genekj,
   float *__restrict s_geneij,
@@ -376,64 +376,53 @@ int main(int argc, char *argv[])
   readgene(infile,gene,Hd,n,D);  
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   auto start = std::chrono::steady_clock::now();
 
-  buffer<float, 1> d_gene (n * (D+1));
+  float *d_gene = sycl::malloc_device<float>(n * (D+1), q);
   for (i = 0; i < n; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_gene.get_access<sycl_write>(cgh, range<1>(D+1), id<1>(i*(D+1)));
-      cgh.copy(gene[i].x, acc);
-    });
+    q.memcpy(d_gene+i*(D+1), gene[i].x, sizeof(float)*(D+1));
   }
 
-  buffer<float, 1> d_bc_score (maxbcn);
-  buffer<int, 1> d_bc_datacount (maxbcn);
-  buffer<int, 1> d_bc_samplecount (maxbcn);
-  buffer<char, 1> d_bc_sample (D * maxbcn);
-  buffer<char, 1> d_bc_sample_tmp (D * maxbcn);
-  buffer<char, 1> d_bc_data (n * maxbcn);
-  buffer<char, 1> d_bc_data_tmp (n * maxbcn);
+  float *d_bc_score = sycl::malloc_device<float>(maxbcn, q);
+  int *d_bc_datacount = sycl::malloc_device<int>(maxbcn, q);
+  int *d_bc_samplecount = sycl::malloc_device<int>(maxbcn, q);
+  char *d_bc_sample = sycl::malloc_device<char>(D * maxbcn, q);
+  char *d_bc_sample_tmp = sycl::malloc_device<char>(D * maxbcn, q);
+  char *d_bc_data = sycl::malloc_device<char>(n * maxbcn, q);
+  char *d_bc_data_tmp = sycl::malloc_device<char>(n * maxbcn, q);
 
-  range<1> lws (1);
-  range<1> gws (maxbcn);
+  sycl::range<1> lws (1);
+  sycl::range<1> gws (maxbcn);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
 
   for (i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto gene = d_gene.get_access<sycl_read>(cgh);
-      auto sample = d_bc_sample.get_access<sycl_discard_write>(cgh);
-      auto data = d_bc_data.get_access<sycl_discard_write>(cgh);
-      auto score = d_bc_score.get_access<sycl_discard_write>(cgh);
-      auto datacount = d_bc_datacount.get_access<sycl_read_write>(cgh);
-      auto samplecount = d_bc_samplecount.get_access<sycl_discard_write>(cgh);
-      auto sample_tmp = d_bc_sample_tmp.get_access<sycl_read_write>(cgh);
-      auto data_tmp = d_bc_data_tmp.get_access<sycl_read_write>(cgh);
-      accessor<char, 1, sycl_read_write, access::target::local> vect (3*MAXSAMPLE, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> genekj (MAXSAMPLE, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> geneij (MAXSAMPLE, cgh);
-      cgh.parallel_for<class bc>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<char, 1> vect (sycl::range<1>(3*MAXSAMPLE), cgh);
+      sycl::local_accessor<float, 1> genekj (sycl::range<1>(MAXSAMPLE), cgh);
+      sycl::local_accessor<float, 1> geneij (sycl::range<1>(MAXSAMPLE), cgh);
+      cgh.parallel_for<class bc>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_bicluster(
           item,
           vect.get_pointer(),
           genekj.get_pointer(),
           geneij.get_pointer(),
-          gene.get_pointer(),
+          d_gene,
           n,maxbcn,D,thr,
-          sample.get_pointer(),
-          data.get_pointer(),
-          score.get_pointer(),
-          datacount.get_pointer(),
-          samplecount.get_pointer(),
-          sample_tmp.get_pointer(),
-          data_tmp.get_pointer());
+          d_bc_sample,
+          d_bc_data,
+          d_bc_score,
+          d_bc_datacount,
+          d_bc_samplecount,
+          d_bc_sample_tmp,
+          d_bc_data_tmp);
       });
     });
   }
@@ -444,36 +433,29 @@ int main(int argc, char *argv[])
   printf("Average kernel execution time %f (s)\n", ktime * 1e-9f / repeat);
 
   float *bicluster_temp_score = (float *)calloc(maxbcn,sizeof(float));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bc_score.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bicluster_temp_score);
-  });
+  q.memcpy(bicluster_temp_score, d_bc_score, sizeof(float)*maxbcn);
 
   int *bicluster_temp_datacount = (int *)calloc(maxbcn,sizeof(int));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bc_datacount.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bicluster_temp_datacount);
-  });
+  q.memcpy(bicluster_temp_datacount, d_bc_datacount, sizeof(int)*maxbcn);
 
   int *bicluster_temp_samplecount = (int *)calloc(maxbcn,sizeof(int));
-  q.submit([&] (handler &cgh) {
-    auto acc = d_bc_samplecount.get_access<sycl_read>(cgh);
-    cgh.copy(acc, bicluster_temp_samplecount);
-  });
+  q.memcpy(bicluster_temp_samplecount, d_bc_samplecount, sizeof(int)*maxbcn);
 
   for(i=0; i<maxbcn; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_bc_sample_tmp.get_access<sycl_read>(cgh, range<1>(D), id<1>(D*i));
-      cgh.copy(acc, bicluster[i].sample);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_bc_data_tmp.get_access<sycl_read>(cgh, range<1>(n), id<1>(n*i));
-      cgh.copy(acc, bicluster[i].data);
-    });
+    q.memcpy(bicluster[i].sample, d_bc_sample_tmp+D*i, sizeof(char)*D);
+    q.memcpy(bicluster[i].data, d_bc_data_tmp+n*i, sizeof(char)*n);
   }
 
   q.wait();
+
+  sycl::free(d_gene, q);
+  sycl::free(d_bc_score, q);
+  sycl::free(d_bc_datacount, q);
+  sycl::free(d_bc_samplecount, q);
+  sycl::free(d_bc_sample, q);
+  sycl::free(d_bc_sample_tmp, q);
+  sycl::free(d_bc_data, q);
+  sycl::free(d_bc_data_tmp, q);
 
   for(i=0; i<maxbcn; i++) {
     bicluster[i].score=bicluster_temp_score[i];

@@ -8,13 +8,13 @@
 #include <float.h>
 #include "kmeans.h"
 
-float	min_rmse_ref = FLT_MAX;		
+float	min_rmse_ref = FLT_MAX;
 extern double wtime(void);
 /* reference min_rmse value */
 
 int cluster(int npoints,         /* number of data points */
             int nfeatures,       /* number of attributes for each point */
-            float **features,    /* array: [npoints][nfeatures] */                  
+            float **features,    /* array: [npoints][nfeatures] */
             int min_nclusters,   /* range of min to max number of clusters */
             int max_nclusters,
             float threshold,     /* loop terminating factor */
@@ -24,18 +24,16 @@ int cluster(int npoints,         /* number of data points */
             int	isRMSE,          /* calculate RMSE */
             int	nloops           /* number of iteration for each number of clusters */
            )
-{    
+{
   int index = 0; /* number of iteration to reach the best RMSE */
   int rmse;     /* RMSE for each clustering */
   float delta;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-
-  queue q(dev_sel);
 
   /* current memberships of points  */
   int *membership = (int*) malloc(npoints * sizeof(int));
@@ -44,12 +42,13 @@ int cluster(int npoints,         /* number of data points */
   int *membership_OCL = (int*) malloc(npoints * sizeof(int));
 
   // associated with feature[0]
-  buffer<float, 1>d_feature(features[0], range<1>(npoints * nfeatures), props);
+  float *d_feature = sycl::malloc_device<float>(npoints * nfeatures, q);
+  q.memcpy(d_feature, features[0], npoints * nfeatures * sizeof(float));
 
-  // d_feature_swap is written by the first kernel, and read by the second kernel 
-  buffer<float, 1>d_feature_swap(range<1>(npoints * nfeatures));
-  
-  buffer<int, 1>d_membership((range<1>(npoints)));
+  // d_feature_swap is written by the first kernel, and read by the second kernel
+  float *d_feature_swap = sycl::malloc_device<float>(npoints * nfeatures, q);
+
+  int *d_membership = sycl::malloc_device<int>(npoints, q);
 
   // set the global work size based on local work size
   size_t global_work_size = npoints;
@@ -57,8 +56,8 @@ int cluster(int npoints,         /* number of data points */
   if(global_work_size%local_work_size !=0)
     global_work_size=(global_work_size/local_work_size+1)*local_work_size;
 
-  range<1> gws (global_work_size);
-  range<1> lws (local_work_size);
+  sycl::range<1> gws (global_work_size);
+  sycl::range<1> lws (local_work_size);
 
   /* sweep k from min to max_nclusters to find the best number of clusters */
   for(int nclusters = min_nclusters; nclusters <= max_nclusters; nclusters++)
@@ -68,14 +67,13 @@ int cluster(int npoints,         /* number of data points */
     int c = 0;  // for each cluster size, count the actual number of loop interations
 
     // copy the feature to a feature swap region
-    q.submit([&](handler& cgh) {
-      auto acc_feature = d_feature.get_access<sycl_read>(cgh);
-      auto acc_feature_swap = d_feature_swap.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class kernel2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class kernel2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         unsigned int tid = item.get_global_id(0);
         if (tid < npoints) {
           for(int i = 0; i <  nfeatures; i++)
-            acc_feature_swap[i * npoints + tid] = acc_feature[tid * nfeatures + i];
+            d_feature_swap[i * npoints + tid] = d_feature[tid * nfeatures + i];
         }
       });
     });
@@ -92,17 +90,17 @@ int cluster(int npoints,         /* number of data points */
     int initial_points = npoints;
 
     /* allocate the buffer before entering the nloops */
-    buffer<float, 1> d_clusters(range<1>(nclusters * nfeatures));
+    float *d_clusters = sycl::malloc_device<float>(nclusters * nfeatures, q);
 
     /* iterate nloops times for each number of clusters */
     for(int lp = 0; lp < nloops; lp++)
     {
       int n = 0;
 
-      /* pick cluster centers based on the initial array 
+      /* pick cluster centers based on the initial array
          Maybe n = (int)rand() % initial_points; is more straightforward
          without using the initial array
-       */	
+       */
       for (int i=0; i<nclusters && initial_points >= 0; i++) {
 
         for (int j=0; j<nfeatures; j++)
@@ -133,16 +131,11 @@ int cluster(int npoints,         /* number of data points */
       do {
         delta = 0.0;
 
-        q.submit([&](handler& cgh) {
-           auto acc_clusters = d_clusters.get_access<sycl_write>(cgh);
-           cgh.copy(clusters[0], acc_clusters);
-        });
+        q.memcpy(d_clusters, clusters[0], nclusters * nfeatures * sizeof(float));
 
-        q.submit([&](handler& cgh) {
-          auto acc_feature    = d_feature_swap.get_access<sycl_read>(cgh);
-          auto acc_clusters   = d_clusters.get_access<sycl_read>(cgh);
-          auto acc_membership = d_membership.get_access<sycl_write>(cgh);
-          cgh.parallel_for<class kernel_s>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        q.submit([&](sycl::handler& cgh) {
+          cgh.parallel_for<class find_membership>(
+            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
             unsigned int point_id = item.get_global_id(0);
             int index = 0;
             if (point_id < npoints) {
@@ -151,8 +144,8 @@ int cluster(int npoints,         /* number of data points */
                 float dist = 0;
                 float ans  = 0;
                 for (int l=0; l< nfeatures; l++) {
-                  ans += (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l])* 
-                         (acc_feature[l*npoints+point_id] - acc_clusters[i*nfeatures+l]);
+                  ans += (d_feature_swap[l*npoints+point_id] - d_clusters[i*nfeatures+l])*
+                         (d_feature_swap[l*npoints+point_id] - d_clusters[i*nfeatures+l]);
                 }
                 dist = ans;
                 if (dist < min_dist) {
@@ -160,21 +153,16 @@ int cluster(int npoints,         /* number of data points */
                   index    = i;
                 }
               }
-              acc_membership[point_id] = index;
+              d_membership[point_id] = index;
             }
           });
         });
 
-        q.submit([&](handler& cgh) {
-           auto acc_membership = d_membership.get_access<sycl_read>(cgh);
-           cgh.copy(acc_membership, membership_OCL);
-        });
+        q.memcpy(membership_OCL, d_membership, npoints * sizeof(int)).wait();
 
-        q.wait();
-
-        /* 
-           1 compute the 'new' size and center of each cluster 
-           2 update the membership of each point. 
+        /*
+           1 compute the 'new' size and center of each cluster
+           2 update the membership of each point.
          */
 
         for (int i = 0; i < npoints; i++)
@@ -201,7 +189,7 @@ int cluster(int npoints,         /* number of data points */
             new_centers[i][j] = 0.0;	/* set back to 0 */
           }
           new_centers_len[i] = 0;			/* set back to 0 */
-        }	 
+        }
         c++;
       } while ((delta > threshold) && (loop++ < 500));	/* makes sure loop terminates */
 
@@ -234,8 +222,13 @@ int cluster(int npoints,         /* number of data points */
     }
     *cluster_centres = clusters;
 
+    sycl::free(d_clusters, q);
     free(initial);
   }
+  sycl::free(d_feature, q);
+  sycl::free(d_feature_swap, q);
+  sycl::free(d_membership, q);
+
   free(membership_OCL);
   free(membership);
 

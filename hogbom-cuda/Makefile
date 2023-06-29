@@ -58,7 +58,7 @@ reference.o: reference.cpp reference.h
 timer.o: timer.cpp timer.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o: kernels.cu kernels.h 
+kernels.o: kernels.cu kernels.h timer.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

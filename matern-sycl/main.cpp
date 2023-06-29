@@ -2,16 +2,16 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 //
-// Assumption 
-// There are many more evaluation(target) points than sources for the subsequent code. 
-// Each thread block will perform the evaluation for a small chunk of the target points and all source points. 
-// 
+// Assumption
+// There are many more evaluation(target) points than sources for the subsequent code.
+// Each thread block will perform the evaluation for a small chunk of the target points and all source points.
+//
 void matern_kernel (
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   const int num_targets,
   const float l,
   const float *__restrict sources,
@@ -43,21 +43,21 @@ void matern_kernel (
     local_weights[ty] = weights[ty];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   float squared_diff = 0.f;
-  
+
   for (int i = 0; i < 3; i++) {
     squared_diff += (local_targets[tx * 3 + i] - local_sources[ty * 3 + i]) *
                     (local_targets[tx * 3 + i] - local_sources[ty * 3 + i]);
-  } 
+  }
   float diff = sycl::sqrt(squared_diff);
 
-  local_result[tx * SY + ty] = 
-    (1.f + sycl::sqrt(5.f) * diff / l + 5.f * squared_diff / (3.f * l * l)) *  
+  local_result[tx * SY + ty] =
+    (1.f + sycl::sqrt(5.f) * diff / l + 5.f * squared_diff / (3.f * l * l)) *
     sycl::exp(-sycl::sqrt(5.f) * diff / l) * local_weights[ty];
-   
-  item.barrier(access::fence_space::local_space);
+
+  item.barrier(sycl::access::fence_space::local_space);
 
   if (ty == 0) {
     float res = 0.f;
@@ -102,15 +102,14 @@ int main(int argc, char* argv[])
   for (int i = 0; i < weight_size; i++)
     weights[i] = rand() / (float)RAND_MAX;
 
-  for (int i = 0; i < target_size; i++) 
+  for (int i = 0; i < target_size; i++)
     targets[i] = rand() / (float)RAND_MAX;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   float *d_sources = sycl::malloc_device<float>(source_size, q);
   float *d_weights = sycl::malloc_device<float>(weight_size, q);
@@ -125,8 +124,8 @@ int main(int argc, char* argv[])
   float l = 0.1f; // length scale lower bound
 
   const int nblocks = (ntargets + SX - 1) / SX;
-  range<2> gws (64, SX * nblocks);
-  range<2> lws (64, SX);
+  sycl::range<2> gws (64, SX * nblocks);
+  sycl::range<2> lws (64, SX);
 
   // quickly verify the results using a small problem size
   const int ntargets_small = 16*16*16;
@@ -135,12 +134,13 @@ int main(int argc, char* argv[])
   printf("------------------------------------------------------------\n");
 
   while (l <= 1e5f) {
-    auto e = q.submit([&] (handler &cgh) {
-      accessor<float, 1, sycl_read_write, access::target::local> l_result (SX*SY, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> l_targets (SX*3, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> l_sources (SY*3, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> l_weights (SY, cgh);
-      cgh.parallel_for<class test>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    auto e = q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> l_result (sycl::range<1>(SX*SY), cgh);
+      sycl::local_accessor<float, 1> l_targets (sycl::range<1>(SX*3), cgh);
+      sycl::local_accessor<float, 1> l_sources (sycl::range<1>(SY*3), cgh);
+      sycl::local_accessor<float, 1> l_weights (sycl::range<1>(SY), cgh);
+      cgh.parallel_for<class test>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         matern_kernel(item, ntargets_small, l, d_sources, d_targets, d_weights, d_result,
                       l_result.get_pointer(), l_targets.get_pointer(),
                       l_sources.get_pointer(), l_weights.get_pointer());
@@ -171,12 +171,13 @@ int main(int argc, char* argv[])
   while (l <= 1e5f) {
     printf("Warmup..\n");
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        accessor<float, 1, sycl_read_write, access::target::local> l_result (SX*SY, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_targets (SX*3, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_sources (SY*3, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_weights (SY, cgh);
-        cgh.parallel_for<class warmup>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> l_result (sycl::range<1>(SX*SY), cgh);
+        sycl::local_accessor<float, 1> l_targets (sycl::range<1>(SX*3), cgh);
+        sycl::local_accessor<float, 1> l_sources (sycl::range<1>(SY*3), cgh);
+        sycl::local_accessor<float, 1> l_weights (sycl::range<1>(SY), cgh);
+        cgh.parallel_for<class warmup>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           matern_kernel(item, ntargets, l, d_sources, d_targets, d_weights, d_result,
                         l_result.get_pointer(), l_targets.get_pointer(),
                         l_sources.get_pointer(), l_weights.get_pointer());
@@ -188,12 +189,13 @@ int main(int argc, char* argv[])
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (handler &cgh) {
-        accessor<float, 1, sycl_read_write, access::target::local> l_result (SX*SY, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_targets (SX*3, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_sources (SY*3, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> l_weights (SY, cgh);
-        cgh.parallel_for<class measure>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> l_result (sycl::range<1>(SX*SY), cgh);
+        sycl::local_accessor<float, 1> l_targets (sycl::range<1>(SX*3), cgh);
+        sycl::local_accessor<float, 1> l_sources (sycl::range<1>(SY*3), cgh);
+        sycl::local_accessor<float, 1> l_weights (sycl::range<1>(SY), cgh);
+        cgh.parallel_for<class measure>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           matern_kernel(item, ntargets, l, d_sources, d_targets, d_weights, d_result,
                         l_result.get_pointer(), l_targets.get_pointer(),
                         l_sources.get_pointer(), l_weights.get_pointer());

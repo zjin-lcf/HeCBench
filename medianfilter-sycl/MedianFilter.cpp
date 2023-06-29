@@ -11,15 +11,15 @@
 
 // RGB Median filter kernel using binary search method
 // Uses 32 bit GMEM reads into a block of LMEM padded for apron of radius = 1 (3x3 neighbor op)
-// R, G and B medians are treated separately 
+// R, G and B medians are treated separately
 //*****************************************************************************
 void ckMedian(
-    nd_item<2> &item,
-    global_ptr<const cl::sycl::uchar4> uc4Source, 
-    global_ptr<unsigned int> uiDest,
-    local_ptr<cl::sycl::uchar4> uc4LocalData,
-    const int iLocalPixPitch, 
-    const int iImageWidth, 
+    sycl::nd_item<2> &item,
+    const sycl::uchar4 *uc4Source,
+    unsigned int *uiDest,
+    sycl::uchar4 *uc4LocalData,
+    const int iLocalPixPitch,
+    const int iImageWidth,
     const int iDevImageHeight)
 {
   // Get parent image x and y pixel coordinates from global ID, and compute offset into parent GMEM data
@@ -32,38 +32,38 @@ void ckMedian(
   int iBlockY = item.get_local_range(0);
   int iImageX = item.get_global_range(1);
 
-  int iDevGMEMOffset = cl::sycl::mul24(iDevYPrime, iImageX) + iImagePosX; 
+  int iDevGMEMOffset = sycl::mul24(iDevYPrime, iImageX) + iImagePosX;
 
   // Compute initial offset of current pixel within work group LMEM block
-  int iLocalPixOffset = cl::sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX + 1;
+  int iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX + 1;
 
   // Main read of GMEM data into LMEM
   if((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) && (iImagePosX < iImageWidth))
   {
     uc4LocalData[iLocalPixOffset] = uc4Source[iDevGMEMOffset];
   }
-  else 
+  else
   {
-    uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+    uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
   }
 
-  // Work items with y ID < 2 read bottom 2 rows of LMEM 
+  // Work items with y ID < 2 read bottom 2 rows of LMEM
   if (iLocalIdY < 2)
   {
     // Increase local offset by 1 workgroup LMEM block height
     // to read in top rows from the next block region down
-    iLocalPixOffset += cl::sycl::mul24(iBlockY, iLocalPixPitch);
+    iLocalPixOffset += sycl::mul24(iBlockY, iLocalPixPitch);
 
     // If source offset is within the image boundaries
     if (((iDevYPrime + iBlockY) < iDevImageHeight) && (iImagePosX < iImageWidth))
     {
       // Read in top rows from the next block region down
-      uc4LocalData[iLocalPixOffset] = uc4Source[iDevGMEMOffset + 
-                                      cl::sycl::mul24(iBlockY, iImageX)];
+      uc4LocalData[iLocalPixOffset] = uc4Source[iDevGMEMOffset +
+                                      sycl::mul24(iBlockY, iImageX)];
     }
-    else 
+    else
     {
-      uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+      uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
     }
   }
 
@@ -71,84 +71,84 @@ void ckMedian(
   if (iLocalIdX == (iBlockX - 1))
   {
     // set local offset to read data from the next region over
-    iLocalPixOffset = cl::sycl::mul24(iLocalIdY, iLocalPixPitch);
+    iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch);
 
     // If source offset is within the image boundaries and not at the leftmost workgroup
     if ((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) && (iGroupIdX > 0))
     {
       // Read data into the LMEM apron from the GMEM at the left edge of the next block region over
-      uc4LocalData[iLocalPixOffset] = uc4Source[cl::sycl::mul24(iDevYPrime, 
-      iImageX) + cl::sycl::mul24(iGroupIdX, iBlockX) - 1];
+      uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24(iDevYPrime,
+      iImageX) + sycl::mul24(iGroupIdX, iBlockX) - 1];
     }
-    else 
+    else
     {
-      uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+      uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
     }
 
-    // If in the bottom 2 rows of workgroup block 
+    // If in the bottom 2 rows of workgroup block
     if (iLocalIdY < 2)
     {
       // Increase local offset by 1 workgroup LMEM block height
       // to read in top rows from the next block region down
-      iLocalPixOffset += cl::sycl::mul24(iBlockY, iLocalPixPitch);
+      iLocalPixOffset += sycl::mul24(iBlockY, iLocalPixPitch);
 
       // If source offset in the next block down isn't off the image and not at the leftmost workgroup
       if (((iDevYPrime + iBlockY) < iDevImageHeight) && (iGroupIdX > 0))
       {
         // read in from GMEM (reaching down 1 workgroup LMEM block height and left 1 pixel)
-        uc4LocalData[iLocalPixOffset] = uc4Source[cl::sycl::mul24((iDevYPrime + 
-        iBlockY), iImageX) + cl::sycl::mul24(iGroupIdX, iBlockX) - 1];
+        uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24((iDevYPrime +
+        iBlockY), iImageX) + sycl::mul24(iGroupIdX, iBlockX) - 1];
       }
-      else 
+      else
       {
-        uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+        uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
       }
     }
-  } 
+  }
   else if (iLocalIdX == 0) // Work items with x ID at left workgroup edge will read right apron pixel
   {
-    // set local offset 
-    iLocalPixOffset = cl::sycl::mul24((iLocalIdY + 1), iLocalPixPitch) - 1;
+    // set local offset
+    iLocalPixOffset = sycl::mul24((iLocalIdY + 1), iLocalPixPitch) - 1;
 
-    if ((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) && 
-        (cl::sycl::mul24((iGroupIdX + 1), iBlockX) < iImageWidth))
+    if ((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) &&
+        (sycl::mul24((iGroupIdX + 1), iBlockX) < iImageWidth))
     {
       // read in from GMEM (reaching left 1 pixel) if source offset is within image boundaries
-      uc4LocalData[iLocalPixOffset] = uc4Source[cl::sycl::mul24(iDevYPrime, 
-      iImageX) + cl::sycl::mul24((iGroupIdX + 1), iBlockX)];
+      uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24(iDevYPrime,
+      iImageX) + sycl::mul24((iGroupIdX + 1), iBlockX)];
     }
-    else 
+    else
     {
-      uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+      uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
     }
 
     // Read bottom 2 rows of workgroup LMEM block
     if (iLocalIdY < 2)
     {
       // increase local offset by 1 workgroup LMEM block height
-      iLocalPixOffset += (cl::sycl::mul24(iBlockY, iLocalPixPitch));
+      iLocalPixOffset += (sycl::mul24(iBlockY, iLocalPixPitch));
 
-      if (((iDevYPrime + iBlockY) < iDevImageHeight) && 
-          (cl::sycl::mul24((iGroupIdX + 1), iBlockX) 
+      if (((iDevYPrime + iBlockY) < iDevImageHeight) &&
+          (sycl::mul24((iGroupIdX + 1), iBlockX)
           < iImageWidth) )
       {
         // read in from GMEM (reaching down 1 workgroup LMEM block height and left 1 pixel) if source offset is within image boundaries
-        uc4LocalData[iLocalPixOffset] = uc4Source[cl::sycl::mul24((iDevYPrime + 
-        iBlockY), iImageX) + 
-        cl::sycl::mul24((iGroupIdX + 1), iBlockX)];
+        uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24((iDevYPrime +
+        iBlockY), iImageX) +
+        sycl::mul24((iGroupIdX + 1), iBlockX)];
       }
-      else 
+      else
       {
-        uc4LocalData[iLocalPixOffset] = (cl::sycl::uchar4)0; 
+        uc4LocalData[iLocalPixOffset] = (sycl::uchar4)0;
       }
     }
   }
 
   // Synchronize the read into LMEM
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
-  // Compute 
-  // reset accumulators  
+  // Compute
+  // reset accumulators
   float fMedianEstimate[3] = {128.0f, 128.0f, 128.0f};
   float fMinBound[3] = {0.0f, 0.0f, 0.0f};
   float fMaxBound[3] = {255.0f, 255.0f, 255.0f};
@@ -159,86 +159,86 @@ void ckMedian(
     unsigned int uiHighCount [3] = {0, 0, 0};
 
     // set local offset and kernel offset
-    iLocalPixOffset = cl::sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX;
+    iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX;
 
     // Row1 Left Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row1 Middle Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row1 Right Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());
 
     // set the offset into SMEM for next row
-    iLocalPixOffset += (iLocalPixPitch - 2);  
+    iLocalPixOffset += (iLocalPixPitch - 2);
 
     // Row2 Left Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row2 Middle Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row2 Right Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());
 
     // set the offset into SMEM for next row
-    iLocalPixOffset += (iLocalPixPitch - 2);  
+    iLocalPixOffset += (iLocalPixPitch - 2);
 
     // Row3 Left Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row3 Middle Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset++].z());
 
     // Row3 Right Pix (RGB)
-    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());          
-    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());          
-    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());          
+    uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
+    uiHighCount[1] += (fMedianEstimate[1] < uc4LocalData[iLocalPixOffset].y());
+    uiHighCount[2] += (fMedianEstimate[2] < uc4LocalData[iLocalPixOffset].z());
 
     //********************************
     // reset the appropriate bound, depending upon counter
     if(uiHighCount[0] > 4)
     {
-      fMinBound[0] = fMedianEstimate[0];        
+      fMinBound[0] = fMedianEstimate[0];
     }
     else
     {
-      fMaxBound[0] = fMedianEstimate[0];        
+      fMaxBound[0] = fMedianEstimate[0];
     }
 
     if(uiHighCount[1] > 4)
     {
-      fMinBound[1] = fMedianEstimate[1];        
+      fMinBound[1] = fMedianEstimate[1];
     }
     else
     {
-      fMaxBound[1] = fMedianEstimate[1];        
+      fMaxBound[1] = fMedianEstimate[1];
     }
 
     if(uiHighCount[2] > 4)
     {
-      fMinBound[2] = fMedianEstimate[2];        
+      fMinBound[2] = fMedianEstimate[2];
     }
     else
     {
-      fMaxBound[2] = fMedianEstimate[2];        
+      fMaxBound[2] = fMedianEstimate[2];
     }
 
     // refine the estimate
@@ -247,7 +247,7 @@ void ckMedian(
     fMedianEstimate[2] = 0.5f * (fMaxBound[2] + fMinBound[2]);
   }
 
-  // pack into a monochrome unsigned int 
+  // pack into a monochrome unsigned int
   unsigned int uiPackedPix = 0x000000FF & (unsigned int)(fMedianEstimate[0] + 0.5f);
   uiPackedPix |= 0x0000FF00 & (((unsigned int)(fMedianEstimate[1] + 0.5f)) << 8);
   uiPackedPix |= 0x00FF0000 & (((unsigned int)(fMedianEstimate[2] + 0.5f)) << 16);

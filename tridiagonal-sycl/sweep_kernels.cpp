@@ -6,10 +6,10 @@
  * this software. Any use, reproduction, disclosure, or distribution of
  * this software and related documentation outside the terms of the EULA
  * is strictly prohibited.
- * 
+ *
  * Tridiagonal solvers.
  * Device code for sweep solver (one-system-per-thread).
- * 
+ *
  * NVIDIA, Nikolai Sakharnykh, 2009
  */
 
@@ -17,14 +17,16 @@
 // solves a bunch of tridiagonal linear systems
 // much better performance when doing data reordering before
 // so that all memory accesses are coalesced
+using float4 = sycl::float4;
+
 void sweep_small_systems_local_kernel(
-    nd_item<1> &item,
-    global_ptr<const float> a_d, 
-    global_ptr<const float> b_d, 
-    global_ptr<const float> c_d, 
-    global_ptr<const float> d_d, 
-    global_ptr<float> x_d, 
-    int system_size, 
+    sycl::nd_item<1> &item,
+    const float * a_d,
+    const float * b_d,
+    const float * c_d,
+    const float * d_d,
+    float * x_d,
+    int system_size,
     int num_systems,
     bool reorder)
 {
@@ -42,7 +44,7 @@ void sweep_small_systems_local_kernel(
   float c1, c2, c3;
   float f_i, x_prev, x_next;
 
-  // solving next system:  
+  // solving next system:
   // c1 * u_i+1 + c2 * u_i + c3 * u_i-1 = f_i
 
   c1 = c_d[base_idx];
@@ -53,8 +55,8 @@ void sweep_small_systems_local_kernel(
   a[1] = - c1 / c2;
   x_prev = f_i / c2;
 #else
-  a[1] = - cl::sycl::native::divide(c1, c2);
-  x_prev = cl::sycl::native::divide(f_i, c2);
+  a[1] = - sycl::native::divide(c1, c2);
+  x_prev = sycl::native::divide(f_i, c2);
 #endif
 
   // forward trace
@@ -71,9 +73,9 @@ void sweep_small_systems_local_kernel(
 
     float q = (c3 * a[k] + c2);
 #ifndef NATIVE_DIVIDE
-    float t = 1 / q; 
+    float t = 1 / q;
 #else
-    float t = cl::sycl::native::recip(q);
+    float t = sycl::native::recip(q);
 #endif
     x_next = (f_i - c3 * x_prev) * t;
     x_d[idx] = x_prev = x_next;
@@ -89,10 +91,10 @@ void sweep_small_systems_local_kernel(
 
   float q = (c3 * a[system_size-1] + c2);
 #ifndef NATIVE_DIVIDE
-  float t = 1 / q; 
+  float t = 1 / q;
 #else
-  float t = cl::sycl::native::recip(q);
-#endif 
+  float t = sycl::native::recip(q);
+#endif
   x_next = (f_i - c3 * x_prev) * t;
   x_d[idx] = x_prev = x_next;
 
@@ -115,14 +117,14 @@ inline int getLocalIdx(int i, int k, int num_systems)
 }
 
 void sweep_small_systems_global_kernel(
-    nd_item<1> &item,
-    global_ptr<const float> a_d, 
-    global_ptr<const float> b_d, 
-    global_ptr<const float> c_d, 
-    global_ptr<const float> d_d, 
-    global_ptr<float> x_d, 
-    global_ptr<float> w_d, 
-    int system_size, 
+    sycl::nd_item<1> &item,
+    const float * a_d,
+    const float * b_d,
+    const float * c_d,
+    const float * d_d,
+    float * x_d,
+    float * w_d,
+    int system_size,
     int num_systems,
     bool reorder)
 {
@@ -137,7 +139,7 @@ void sweep_small_systems_global_kernel(
   float c1, c2, c3;
   float f_i, x_prev, x_next;
 
-  // solving next system:  
+  // solving next system:
   // c1 * u_i+1 + c2 * u_i + c3 * u_i-1 = f_i
 
   c1 = c_d[base_idx];
@@ -148,8 +150,8 @@ void sweep_small_systems_global_kernel(
   w_d[getLocalIdx(i, 1, num_systems)] = - c1 / c2;
   x_prev = f_i / c2;
 #else
-  w_d[getLocalIdx(i, 1, num_systems)] = - cl::sycl::native::divide(c1, c2);
-  x_prev = cl::sycl::native::divide(f_i, c2);
+  w_d[getLocalIdx(i, 1, num_systems)] = - sycl::native::divide(c1, c2);
+  x_prev = sycl::native::divide(f_i, c2);
 #endif
 
   // forward trace
@@ -166,9 +168,9 @@ void sweep_small_systems_global_kernel(
 
     float q = (c3 * w_d[getLocalIdx(i, k, num_systems)] + c2);
 #ifndef NATIVE_DIVIDE
-    float t = 1 / q; 
+    float t = 1 / q;
 #else
-    float t = cl::sycl::native::recip(q);
+    float t = sycl::native::recip(q);
 #endif
     x_next = (f_i - c3 * x_prev) * t;
     x_d[idx] = x_prev = x_next;
@@ -184,10 +186,10 @@ void sweep_small_systems_global_kernel(
 
   float q = (c3 * w_d[getLocalIdx(i, system_size-1, num_systems)] + c2);
 #ifndef NATIVE_DIVIDE
-  float t = 1 / q; 
+  float t = 1 / q;
 #else
-  float t = cl::sycl::native::recip(q);
-#endif 
+  float t = sycl::native::recip(q);
+#endif
   x_next = (f_i - c3 * x_prev) * t;
   x_d[idx] = x_prev = x_next;
 
@@ -201,12 +203,12 @@ void sweep_small_systems_global_kernel(
   }
 }
 
-inline float4 load(global_ptr<const float> a, int i)
+inline float4 load(const float * a, int i)
 {
-  return (float4)(a[i], a[i+1], a[i+2], a[i+3]);
+  return float4(a[i], a[i+1], a[i+2], a[i+3]);
 }
 
-inline void store(global_ptr<float> a, int i, float4 v)
+inline void store(float * a, int i, float4 v)
 {
   a[i] = v.x();
   a[i+1] = v.y();
@@ -215,14 +217,14 @@ inline void store(global_ptr<float> a, int i, float4 v)
 }
 
 void sweep_small_systems_global_vec4_kernel(
-    nd_item<1> &item,
-    global_ptr<const float> a_d, 
-    global_ptr<const float> b_d, 
-    global_ptr<const float> c_d, 
-    global_ptr<const float> d_d, 
-    global_ptr<float> x_d, 
-    global_ptr<float> w_d, 
-    int system_size, 
+    sycl::nd_item<1> &item,
+    const float * a_d,
+    const float * b_d,
+    const float * c_d,
+    const float * d_d,
+    float * x_d,
+    float * w_d,
+    int system_size,
     int num_systems,
     bool reorder)
 {
@@ -238,7 +240,7 @@ void sweep_small_systems_global_vec4_kernel(
   float4 c1, c2, c3;
   float4 f_i, x_prev, x_next;
 
-  // solving next system:  
+  // solving next system:
   // c1 * u_i+1 + c2 * u_i + c3 * u_i-1 = f_i
 
   c1 = load(c_d, base_idx);
@@ -249,8 +251,8 @@ void sweep_small_systems_global_vec4_kernel(
   store(w_d, getLocalIdx(i, 1, num_systems), - c1 / c2);
   x_prev = f_i / c2;
 #else
-  store(w_d, getLocalIdx(i, 1, num_systems), - cl::sycl::native::divide(c1, c2));
-  x_prev = cl::sycl::native::divide(f_i, c2);
+  store(w_d, getLocalIdx(i, 1, num_systems), - sycl::native::divide(c1, c2));
+  x_prev = sycl::native::divide(f_i, c2);
 #endif
 
   // forward trace
@@ -267,9 +269,9 @@ void sweep_small_systems_global_vec4_kernel(
 
     float4 q = (c3 * load(w_d, getLocalIdx(i, k, num_systems)) + c2);
 #ifndef NATIVE_DIVIDE
-    float4 t = float4(1,1,1,1) / q; 
+    float4 t = float4(1,1,1,1) / q;
 #else
-    float4 t = cl::sycl::native::recip(q);
+    float4 t = sycl::native::recip(q);
 #endif
     x_next = (f_i - c3 * x_prev) * t;
     x_prev = x_next;
@@ -286,10 +288,10 @@ void sweep_small_systems_global_vec4_kernel(
 
   float4 q = (c3 * load(w_d, getLocalIdx(i, system_size-1, num_systems)) + c2);
 #ifndef NATIVE_DIVIDE
-  float4 t = float4(1,1,1,1) / q; 
+  float4 t = float4(1,1,1,1) / q;
 #else
-  float4 t = cl::sycl::native::recip(q);
-#endif 
+  float4 t = sycl::native::recip(q);
+#endif
   x_next = (f_i - c3 * x_prev) * t;
   x_prev = x_next;
   store(x_d, idx, x_prev);
@@ -301,22 +303,22 @@ void sweep_small_systems_global_vec4_kernel(
     x_next = load(x_d, idx);
     x_next += x_prev * load(w_d, getLocalIdx(i, k+1, num_systems));
     x_prev = x_next;
-    store(x_d, idx, x_prev); 
+    store(x_d, idx, x_prev);
   }
 }
 
 // This kernel is optimized to ensure all global reads and writes are coalesced,
 // and to avoid bank conflicts in shared memory.  This kernel is up to 11x faster
-// than the naive kernel below.  Note that the shared memory array is sized to 
-// (BLOCK_DIM+1)*BLOCK_DIM.  This pads each row of the 2D block in shared memory 
+// than the naive kernel below.  Note that the shared memory array is sized to
+// (BLOCK_DIM+1)*BLOCK_DIM.  This pads each row of the 2D block in shared memory
 // so that bank conflicts do not occur when threads address the array column-wise.
 void transpose(
-    nd_item<2> &item,
-    global_ptr<float> odata, 
-    global_ptr<const float> idata, 
-    local_ptr<float> block,
-    int width, 
-    int height) 
+    sycl::nd_item<2> &item,
+    float * odata,
+    const float * idata,
+    float * block,
+    int width,
+    int height)
 {
   int blockIdxx = item.get_group(1);
   int blockIdxy = item.get_group(0);
@@ -325,23 +327,23 @@ void transpose(
   int threadIdxy = item.get_local_id(0);
 
   // evaluate coordinates and check bounds
-  int i0 = cl::sycl::mul24(blockIdxx, BLOCK_DIM) + threadIdxx;
-  int j0 = cl::sycl::mul24(blockIdxy, BLOCK_DIM) + threadIdxy;
+  int i0 = sycl::mul24(blockIdxx, BLOCK_DIM) + threadIdxx;
+  int j0 = sycl::mul24(blockIdxy, BLOCK_DIM) + threadIdxy;
 
   if (i0 >= width || j0 >= height) return;
 
-  int i1 = cl::sycl::mul24(blockIdxy, BLOCK_DIM) + threadIdxx;
-  int j1 = cl::sycl::mul24(blockIdxx, BLOCK_DIM) + threadIdxy;
+  int i1 = sycl::mul24(blockIdxy, BLOCK_DIM) + threadIdxx;
+  int j1 = sycl::mul24(blockIdxx, BLOCK_DIM) + threadIdxy;
 
   if (i1 >= height || j1 >= width) return;
 
-  int idx_a = i0 + cl::sycl::mul24(j0, width);
-  int idx_b = i1 + cl::sycl::mul24(j1, height);
+  int idx_a = i0 + sycl::mul24(j0, width);
+  int idx_b = i1 + sycl::mul24(j1, height);
 
   // read the tile from global memory into shared memory
   block[threadIdxy * (BLOCK_DIM+1) + threadIdxx] = idata[idx_a];
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // write back to transposed array
   odata[idx_b] = block[threadIdxx * (BLOCK_DIM+1) + threadIdxy];
