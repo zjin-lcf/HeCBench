@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 size_t align_value(size_t valueToAlign, size_t alignMask){
   if (valueToAlign % alignMask != 0) {
