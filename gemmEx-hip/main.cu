@@ -1,9 +1,9 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <type_traits> // is_same
-#include <hipblas.h>
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
+#include <hipblas.h>
 
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
@@ -27,7 +27,7 @@ void free_memory(T *A, T *B, S *C) {
 }
 
 template <typename T, typename S>
-int cublas_gemm_ex(
+bool hipblas_gemm_ex(
     hipblasHandle_t handle, hipblasOperation_t transA, hipblasOperation_t transB,
     const int m, const int n, const int k,
     T *A, T *B, S *C,
@@ -44,37 +44,21 @@ int cublas_gemm_ex(
   } else if (std::is_same<T, int8_t>::value) {
     AType = BType = HIPBLAS_R_8I;
     CType = ComputeType = HIPBLAS_R_32I;
+    hipblasSetInt8Datatype(handle, HIPBLAS_INT8_DATATYPE_INT8);
   } else {
     printf("Not supported data type.");
     return -1;
   }
 
-  hipblasStatus_t status;
-  status = hipblasGemmEx(
-      handle,
-      transA,
-      transB,
-      m,
-      n,
-      k,
-      alpha,
-      A,
-      AType,
-      lda,
-      B,
-      BType,
-      ldb,
-      beta,
-      C,
-      CType,
-      ldc,
-      ComputeType,
-      static_cast<hipblasGemmAlgo_t>(algo));
+  hipblasStatus_t status = hipblasGemmEx(handle,
+                                         transA, transB,
+                                         m, n, k,
+                                         alpha, A, AType, lda,
+                                         B, BType, ldb, beta,
+                                         C, CType, ldc, ComputeType,
+                                         static_cast<hipblasGemmAlgo_t>(algo));
 
-  if (status == HIPBLAS_STATUS_SUCCESS)
-    return 1;
-  else
-    return -1;
+  return (status == HIPBLAS_STATUS_SUCCESS);
 }
 
 template <typename T, typename S>
@@ -84,29 +68,32 @@ void test_gemm(hipblasHandle_t handle,
   const S *alpha, const S *beta, int algo, const int iteration)
 {
   float total_time = 0;
+  struct timeval start, end;
+
   for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
     hipDeviceSynchronize();
     gettimeofday(&start, NULL);
-    int success = cublas_gemm_ex(handle,
-        HIPBLAS_OP_N,
-        HIPBLAS_OP_N,
-        n, // number of rows of matrix A and C
-        m, // number of columns of matrix B and C
-        k, // number of columns of A and rows of B  
-        B,
-        A,
-        C,
-        n, // lda
-        k, // ldb
-        n, // ldc
-        alpha,
-        beta,
-        static_cast<hipblasGemmAlgo_t>(algo));
+    bool success = hipblas_gemm_ex(handle,
+                                   HIPBLAS_OP_N,
+                                   HIPBLAS_OP_N,
+                                   n, // number of rows of matrix A and C
+                                   m, // number of columns of matrix B and C
+                                   k, // number of columns of A and rows of B
+                                   B,
+                                   A,
+                                   C,
+                                   n, // lda
+                                   k, // ldb
+                                   n, // ldc
+                                   alpha,
+                                   beta,
+                                   static_cast<hipblasGemmAlgo_t>(algo));
     hipDeviceSynchronize();
     gettimeofday(&end, NULL);
-    if (success > 0 && i > 0)
+    if (!success) break;
+    else if (i > 0) {
       total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+    }
   }
   if (total_time > 0)
     printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
@@ -144,7 +131,7 @@ int main(int argc, char* argv[]) {
     fA[i] = float(i % 255 - 127) / 127;
     hA[i] = __float2half_rn(fA[i]);
     iA[i] = float2int8(fA[i], 127);
-  } 
+  }
   for (int i = 0; i < k * n; ++i) {
     dB[i] = double(i % 255 - 127) / 127;
     fB[i] = float(i % 255 - 127) / 127;
@@ -193,4 +180,3 @@ int main(int argc, char* argv[]) {
   free_memory(iA, iB, iC);
   return 0;
 }
-
