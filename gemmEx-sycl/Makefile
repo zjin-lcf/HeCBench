@@ -26,7 +26,7 @@ program = main
 
 source = main.cpp
 
-obj = $(source:.cc=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
